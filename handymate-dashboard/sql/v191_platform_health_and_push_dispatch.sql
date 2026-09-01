@@ -1,4 +1,4 @@
--- v190: Driftsynlighet + push-dedupe (2026-09-01).
+-- v191: Driftsynlighet + push-dedupe (2026-09-01).
 --
 -- Två små tabeller, båda service_role-only (RLS på, inga policyer, inga
 -- grants till anon/authenticated — samma låsning som v96). Koden är

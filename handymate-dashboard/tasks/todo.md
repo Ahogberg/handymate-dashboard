@@ -50,7 +50,7 @@ claude/next-dev-steps-launch-b4xqwu.
 - [x] Facit: tests/kortkvalitet.spec.ts + tests/push-policy.spec.ts.
 
 ## Migration
-- [x] `sql/v190_platform_health_and_push_dispatch.sql` KÖRD via MCP
+- [x] `sql/v191_platform_health_and_push_dispatch.sql` KÖRD via MCP
       2026-09-01 (Andreas "Kör!"), facit-SELECT verifierad: relrowsecurity
       = true på båda, 0 grants till anon/authenticated, dedupe-indexet finns.
 
@@ -60,7 +60,7 @@ claude/next-dev-steps-launch-b4xqwu.
       102/102; outbound-truth/innehållskontrakt/feature-gates 86/86
 - [x] next build exit 0 (689 rutter); Kontraktsgrind grön på branchen (run 33553161185, 2,5 min)
 - [ ] Efter deploy: sätt NEXT_PUBLIC_SENTRY_DSN + SENTRY_DSN i Vercel,
-      kör v190, trigga /api/cron/credit-watch manuellt (admin-session
+      kör v191, trigga /api/cron/credit-watch manuellt (admin-session
       räcker), läs /api/health och /admin/kortkvalitet.
 
 ---
@@ -1449,7 +1449,7 @@ kunna bli en levande huvudperson i fler annonser.
 Ur PARTNER_REVENUE_REALITY_AUDIT_2026-09-01. Codex äger motorn (P0-1–5, 7, 8); Claude äger v190,
 referral-RLS, referred_by-triggern, portalens acceptansyta och adminens approve-rutter.
 
-- [x] sql/v190: referrals_tenant_member FOR ALL → FOR SELECT; BEFORE UPDATE-trigger som låser
+- [x] sql/v191: referrals_tenant_member FOR ALL → FOR SELECT; BEFORE UPDATE-trigger som låser
       business_config.referred_by för allt utom service_role/postgres. Bara fil tills Andreas säger kör.
 - [x] lib/partners/agreement.ts: delad version/hash/IP + capability-token + recordAgreementAcceptance.
 - [x] POST /api/partners/agreement: cookie (aktiv partner) ELLER engångslänk (väntande partner).

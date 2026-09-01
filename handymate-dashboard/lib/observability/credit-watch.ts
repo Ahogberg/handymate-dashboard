@@ -13,7 +13,7 @@
  *     testbara utan nät, exakta gränsvärden i namngivna konstanter.
  *  2. korKreditbevakning — kör de fyra kontrollerna med injicerbar fetch/env.
  *  3. spara/las — persisterar senaste utfallet i platform_health_check
- *     (sql/v190) så /api/health kan visa det UTAN att själv anropa
+ *     (sql/v191) så /api/health kan visa det UTAN att själv anropa
  *     leverantörerna (health är publik och oautentiserad — den ska aldrig
  *     kunna användas för att bränna Anthropic-anrop eller rate-limits).
  *
@@ -261,7 +261,7 @@ async function defaultDbProbe(): Promise<boolean> {
   return !error
 }
 
-// ─── Persistens (platform_health_check, sql/v190) ───────────────────────
+// ─── Persistens (platform_health_check, sql/v191) ───────────────────────
 
 export interface SparatKreditlage {
   saved: boolean
@@ -283,7 +283,7 @@ export async function sparaKreditlage(supabase: SupabaseClient, results: Kontrol
     )
     if (error) {
       if (arSchemaSaknas(error)) {
-        console.warn('[credit-watch] platform_health_check saknas — kör sql/v190 för att /api/health ska visa kreditläget')
+        console.warn('[credit-watch] platform_health_check saknas — kör sql/v191 för att /api/health ska visa kreditläget')
         return { saved: false, reason: 'schema_saknas' }
       }
       console.error('[credit-watch] kunde inte spara kreditläget:', error.message)

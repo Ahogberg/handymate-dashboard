@@ -157,8 +157,8 @@ test.describe('källskanning — inkopplingen', () => {
     expect(src).toMatch(/catch \(err\) \{[\s\S]*return false/)
   })
 
-  test('sql/v190 har dedupe-index på (business_id, dedupe_key, sent_at)', () => {
-    const sql = read('sql/v190_platform_health_and_push_dispatch.sql')
+  test('sql/v191 har dedupe-index på (business_id, dedupe_key, sent_at)', () => {
+    const sql = read('sql/v191_platform_health_and_push_dispatch.sql')
     expect(sql).toMatch(/ON public\.push_dispatch_log \(business_id, dedupe_key, sent_at DESC\)/)
   })
 })

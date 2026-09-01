@@ -333,7 +333,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
   // Klassen (lib/notifications/push-policy.ts) ger TTL + prioritet som
   // följer med till Expo/web-push, och ett dedupefönster: samma händelse
   // till samma mottagare inom fönstret skickas inte igen
-  // (push_dispatch_log, sql/v190 — fail-open tills migrationen är körd).
+  // (push_dispatch_log, sql/v191 — fail-open tills migrationen är körd).
   const policy = klassificeraPush(approval.approval_type)
   const dedupeKey = byggDedupeNyckel(
     approval.approval_type,

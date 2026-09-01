@@ -11,7 +11,7 @@
  * TTL skickas till Expo (ttl) och web-push (TTL) så en notis om ett beslut
  * inte dyker upp tre dagar senare på en telefon som legat avstängd.
  * Dedupe-fönstret används av sendApprovalPush mot push_dispatch_log
- * (sql/v190): samma händelse till samma mottagare inom fönstret skickas
+ * (sql/v191): samma händelse till samma mottagare inom fönstret skickas
  * inte igen.
  *
  * Rena funktioner, ingen I/O.

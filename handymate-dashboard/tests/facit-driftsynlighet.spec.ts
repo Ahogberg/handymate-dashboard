@@ -11,7 +11,7 @@
  *  - Kreditbevakningen finns som cron, är cron-auth-grindad, står i
  *    vercel.json, och /api/health läser dess sparade utfall — utan att
  *    själv anropa leverantörer.
- *  - sql/v190 skapar de två tabellerna, RLS på, inga grants till anon.
+ *  - sql/v191 skapar de två tabellerna, RLS på, inga grants till anon.
  *
  * Körs: npx playwright test tests/facit-driftsynlighet.spec.ts --no-deps
  */
@@ -144,8 +144,8 @@ test.describe('Kreditbevakningen', () => {
     expect(src).toContain('warnings')
   })
 
-  test('sql/v190 skapar båda tabellerna service_role-only', () => {
-    const sql = read('sql/v190_platform_health_and_push_dispatch.sql')
+  test('sql/v191 skapar båda tabellerna service_role-only', () => {
+    const sql = read('sql/v191_platform_health_and_push_dispatch.sql')
     for (const t of ['platform_health_check', 'push_dispatch_log']) {
       expect(sql).toMatch(new RegExp(`CREATE TABLE IF NOT EXISTS public\\.${t}`))
       expect(sql).toMatch(new RegExp(`ALTER TABLE public\\.${t} ENABLE ROW LEVEL SECURITY`))

@@ -19,7 +19,7 @@ export const dynamic = 'force-dynamic'
  * före driftlarmet 05:15) av 46elks-saldo, Anthropic-kredit, Stripe-nyckel
  * och databasen. Se lib/observability/credit-watch.ts för bakgrunden.
  *
- * Utfallet sparas i platform_health_check (sql/v190) så /api/health kan
+ * Utfallet sparas i platform_health_check (sql/v191) så /api/health kan
  * visa det. Vid warn/error: ett mejl till OPS_ALERT_EMAIL (default samma
  * adress som driftlarmet). Vid error dessutom SMS till Handymates egna
  * nummer via samma interna larmväg som Anthropic-kreditstoppet redan
@@ -113,7 +113,7 @@ function byggMail(results: KontrollResultat[], sparat: boolean): string {
     .join('\n')
   const sparatText = sparat
     ? ''
-    : '<p style="font-size:12px;color:#92400E;">Utfallet kunde inte sparas — kör sql/v190_platform_health_and_push_dispatch.sql så /api/health visar kreditläget.</p>'
+    : '<p style="font-size:12px;color:#92400E;">Utfallet kunde inte sparas — kör sql/v191_platform_health_and_push_dispatch.sql så /api/health visar kreditläget.</p>'
   return `
 <!DOCTYPE html>
 <html lang="sv">

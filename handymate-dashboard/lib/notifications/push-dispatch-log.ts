@@ -1,5 +1,5 @@
 /**
- * push_dispatch_log (sql/v190) — dedupe vid SÄNDNING av push.
+ * push_dispatch_log (sql/v191) — dedupe vid SÄNDNING av push.
  *
  * Tidigare fanns dedupe bara när agent-observationer SKAPADES; en push
  * kunde ändå gå två gånger (cron-omkörning, dubbel signal, två anropare).
@@ -36,7 +36,7 @@ export async function nyligenSkickad(
       if (arSchemaSaknas(error)) {
         if (!schemaVarnat) {
           schemaVarnat = true
-          console.warn('[push-dispatch-log] push_dispatch_log saknas — kör sql/v190 för dedupe vid sändning')
+          console.warn('[push-dispatch-log] push_dispatch_log saknas — kör sql/v191 för dedupe vid sändning')
         }
       } else {
         console.warn('[push-dispatch-log] uppslag misslyckades (fail-open):', error.message)

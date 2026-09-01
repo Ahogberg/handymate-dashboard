@@ -14,7 +14,7 @@ type CheckStatus = 'ok' | 'warn' | 'error'
  *
  * Kollar databasen och att miljövariablerna FINNS. Sedan 2026-09-01 visar
  * den även kreditläget hos 46elks, Anthropic och Stripe — men läser det ur
- * platform_health_check (sql/v190), skrivet av /api/cron/credit-watch en
+ * platform_health_check (sql/v191), skrivet av /api/cron/credit-watch en
  * gång per dygn. Den anropar ALDRIG leverantörerna själv: en publik rutt
  * som gör riktiga Anthropic-anrop per träff vore en gratis kostnadsattack.
  *
@@ -51,7 +51,7 @@ export async function GET() {
       checks.credit_watch = 'warn'
       warnings.push(
         creditWatch.reason === 'schema_saknas'
-          ? 'Kreditläget kan inte visas: sql/v190_platform_health_and_push_dispatch.sql är inte körd'
+          ? 'Kreditläget kan inte visas: sql/v191_platform_health_and_push_dispatch.sql är inte körd'
           : creditWatch.reason === 'aldrig_kord'
             ? 'Kreditbevakningen har inte körts ännu (/api/cron/credit-watch)'
             : 'Kreditläget kunde inte läsas',
