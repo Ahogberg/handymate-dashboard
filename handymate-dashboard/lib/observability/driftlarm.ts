@@ -23,6 +23,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { rapporteraTillSentry } from '@/lib/observability/sentry'
 
 /**
  * Rapporterar ett tyst fel till driftlarmet genom att skriva en
@@ -52,6 +53,14 @@ export async function rapporteraTystFel(
   fel: string,
   context?: Record<string, unknown>,
 ): Promise<void> {
+  // Samma tysta fel går även till Sentry (no-op utan DSN) — digest-mejlet
+  // kommer en gång om dagen, Sentry direkt, med kodställe som gruppnyckel.
+  rapporteraTillSentry({
+    meddelande: `tyst_fel/${kalla}`,
+    niva: 'warning',
+    tags: { business_id: businessId, kalla },
+    extra: { fel, ...(context || {}) },
+  })
   try {
     const { error } = await supabase.from('automation_activity').insert({
       business_id: businessId,

@@ -255,6 +255,9 @@ export async function saveAndPush(
       }
 
       void sendApprovalPush({
+        // Kortets id blir dedupe-objektet (lib/notifications/push-policy.ts)
+        // — samma observation pushas inte två gånger inom fönstret.
+        id: approval?.id ?? null,
         business_id: businessId,
         approval_type: approvalType,
         payload: {

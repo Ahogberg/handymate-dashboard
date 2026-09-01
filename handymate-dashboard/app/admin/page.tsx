@@ -401,6 +401,13 @@ export default function AdminDashboardPage() {
               <Target className="w-4 h-4" />
               Launch Desk
             </a>
+            <a
+              href="/admin/kortkvalitet"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-800 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 transition-colors"
+            >
+              <Zap className="w-4 h-4" />
+              Kortkvalitet
+            </a>
             <button
               onClick={handleRefresh}
               disabled={refreshing}

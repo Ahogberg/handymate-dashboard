@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { sendExpoPushNotification } from '@/lib/notifications/expo-push'
+import { normaliseraPrioritet, normaliseraTtl, PUSH_POLICY } from '@/lib/notifications/push-policy'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,11 +45,17 @@ function isRecord(value: unknown): value is Record<string, unknown> {
  */
 export async function POST(request: NextRequest) {
   try {
-    const { business_id, title, body, url, tag, target_user_id, data } = await request.json()
+    const { business_id, title, body, url, tag, target_user_id, data, ttl_seconds, priority } = await request.json()
 
     if (!business_id || !title) {
       return NextResponse.json({ error: 'Missing business_id or title' }, { status: 400 })
     }
+
+    // TTL + prioritet (2026-09-01): sendApprovalPush skickar klassens
+    // värden (lib/notifications/push-policy.ts). Anropare utan dem får
+    // beslut-klassens — längst TTL, hög prioritet. Klampas till giltigt spann.
+    const ttlSeconds = normaliseraTtl(ttl_seconds, PUSH_POLICY.beslut.ttlSeconds)
+    const pushPriority = normaliseraPrioritet(priority, PUSH_POLICY.beslut.priority)
 
     // Auth (Etapp 0, 2026-08-27): rutten var helt öppen — vem som helst
     // kunde posta en push till valfritt business_id. Nu: intern signatur
@@ -76,7 +83,10 @@ export async function POST(request: NextRequest) {
       url: url || '/dashboard',
       tag: tag || 'handymate',
     }
-    const expo = await sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id)
+    const expo = await sendExpoPushNotification(business_id, title, body || '', expoData, target_user_id, {
+      ttlSeconds,
+      priority: pushPriority,
+    })
 
     let web: ChannelResult = {
       attempted: 0,
@@ -146,7 +156,8 @@ export async function POST(request: NextRequest) {
               try {
                 await activeWebpush.sendNotification(
                   { endpoint: sub.endpoint, keys: { p256dh: sub.p256dh, auth: sub.auth } },
-                  payload
+                  payload,
+                  { TTL: ttlSeconds, urgency: pushPriority === 'high' ? 'high' : 'normal' }
                 )
                 accepted++
               } catch (err: any) {
