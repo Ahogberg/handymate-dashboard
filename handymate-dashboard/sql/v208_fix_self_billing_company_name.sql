@@ -1,3 +1,13 @@
+-- EFTERSKRIFT 2026-09-02, efter körning: v206_partner_self_billing_business_name.sql
+-- (Codex lane, körd EFTER den här filen) ersätter samma funktion med en
+-- likvärdig rättelse — den läser också business_name i stället för det
+-- obefintliga company_name. Den gällande definitionen i produktion kommer
+-- alltså från v206, inte härifrån. Den här filen står kvar som dokumentation
+-- av felet och som den fix som faktiskt öppnade utbetalningsvägen först.
+-- OBS för den som kör om äldre migrationer: v205 innehåller en ÄLDRE version
+-- av samma funktion. Kör aldrig v205 utan att köra v206 direkt efteråt och
+-- verifiera att b.company_name är borta — annars återinförs buggen tyst.
+--
 -- v208: laga create_partner_self_billing_batch — fantomfältet business_config.company_name
 --
 -- BAKGRUND (2026-09-02): branschgenomgången av schemadriften hittade att
