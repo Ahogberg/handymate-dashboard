@@ -237,7 +237,7 @@ export const toolDefinitions = [
   },
   {
     name: "add_work_note",
-    description: "Skriv en arbetsanteckning i projektets dagbok — vad som utfördes, avvikelser och antal personer på plats. Använd när hantverkaren sammanfattar dagen eller ett moment. Skriver ALDRIG något som går ut till kunden.",
+    description: "Skriv en arbetsanteckning i projektets byggdagbok — vad som utfördes, avvikelser, antal personer på plats, timmar och material. Använd när hantverkaren sammanfattar dagen eller ett moment. Skriver ALDRIG något som går ut till kunden.",
     input_schema: {
       type: "object" as const,
       properties: {
@@ -246,6 +246,8 @@ export const toolDefinitions = [
         log_date: { type: "string", description: "YYYY-MM-DD. Utelämnas = idag i svensk tid." },
         issues: { type: "string", description: "Avvikelser, hinder eller skador — utelämnas om inget nämnts." },
         workers_count: { type: "number", description: "Antal personer på plats, om det sagts." },
+        hours_worked: { type: "number", description: "Sammanlagda arbetstimmar på plats den dagen (0–24), om det sagts. Detta är dagbokens anteckning — INTE tidrapportering; använd log_time för debiterbar tid." },
+        materials_used: { type: "string", description: "Material som användes, i fritext, om det nämnts." },
       },
       required: ["project_id", "work_performed"],
     },

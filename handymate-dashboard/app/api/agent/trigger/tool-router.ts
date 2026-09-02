@@ -37,6 +37,7 @@ import { fetchReservationLibrary, suggestSnapshotForItems } from '@/lib/reservat
 import { resolveTimeEntryAttribution } from '@/lib/time-entries/resolve-attribution'
 import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
 import { hittaNyligDubblett } from '@/lib/agent/recent-duplicate'
+import { createDiaryEntry } from '@/lib/diary/write'
 import { suggestQuoteDraftForLead } from '@/lib/quotes/suggest-quote-draft'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 import { fetchPersonDays } from '@/lib/schedule/person-day'
@@ -1797,11 +1798,10 @@ async function logMaterial(
 /**
  * Fältkommando (Matte Mobile Voice V1): arbetsanteckning i byggdagboken.
  *
- * OBS kolumnnamnen: project_log heter `order_id`, `date` och `work_performed`
- * i den faktiska databasen — INTE project_id/log_date/work_description som
- * sql/rot_rut_documents.sql antyder. Verifierat mot live-schemat 2026-08-30;
- * app/api/projects/[id]/logs/route.ts skriver mot samma namn.
- * Anteckningen är intern och går aldrig ut till kunden.
+ * Skriver via lib/diary/write.ts — dagbokens enda skrivväg (validering,
+ * projektvakt, dubblettskydd, revisionslogg). Kolumnnamnen är `order_id`,
+ * `date`, `work_performed` (sql/rot_rut_documents.sql DEL 4 speglar live-schemat
+ * sedan 2026-09-02). Anteckningen är intern och går aldrig ut till kunden.
  */
 async function addWorkNote(
   supabase: SupabaseClient,
@@ -1822,6 +1822,9 @@ async function addWorkNote(
     return { success: false, error: 'log_date måste vara ett giltigt datum (YYYY-MM-DD)' }
   }
 
+  // Tenantvakten: projektet måste bevisligen tillhöra företaget. createDiaryEntry
+  // gör samma kontroll igen (den är dagbokens enda skrivväg och litar inte på
+  // anroparen), men namnet behövs här för svaret till hantverkaren.
   const { data: project, error: projectErr } = await supabase
     .from('project')
     .select('project_id, name')
@@ -1831,58 +1834,43 @@ async function addWorkNote(
   if (projectErr) return { success: false, error: `Kunde inte verifiera projektet: ${projectErr.message}` }
   if (!project) return { success: false, error: 'Projektet finns inte i det här företaget' }
 
-  let befintlig: string | null = null
-  try {
-    befintlig = context.workReport ? null : await hittaNyligDubblett({
-      supabase,
-      tabell: 'project_log',
-      idKolumn: 'id',
-      filter: {
-        business_id: businessId,
-        order_id: projectId,
-        date: logDate,
-        work_performed: workPerformed,
-      },
-    })
-  } catch (err) {
-    return { success: false, error: `Kunde inte kontrollera dubbelregistrering: ${(err as Error).message}` }
-  }
-  if (befintlig) {
-    return {
-      success: true,
-      data: {
-        log_id: befintlig,
-        project_id: projectId,
-        duplicate: true,
-        message: `Den anteckningen fanns redan på ${project.name || 'projektet'} — står kvar som en enda post.`,
-      },
-    }
-  }
-
-  const logId = context.workReport && context.confirmationId ? `log_report_${context.confirmationId}` : `log_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  // Rapportläget (Matte "skriv dagens rapport") sätter ett deterministiskt id
+  // per bekräftelse-token så ett återanvänt ja aldrig ger två rader, och
+  // hoppar dubblettkontrollen — den har sin egen (lib/matte/work-report.ts).
   const workersCount = Number(params.workers_count)
-  const { error } = await supabase.from('project_log').insert({
-    id: logId,
-    order_id: projectId,
+  const hoursWorked = Number(params.hours_worked)
+  const resultat = await createDiaryEntry(supabase, {
     business_id: businessId,
+    order_id: projectId,
     business_user_id: context.businessUserId ?? null,
     date: logDate,
     work_performed: workPerformed,
-    issues: typeof params.issues === 'string' && params.issues.trim() ? params.issues.trim() : null,
+    issues: typeof params.issues === 'string' ? params.issues : null,
     workers_count: Number.isFinite(workersCount) && workersCount > 0 ? Math.round(workersCount) : null,
+    hours_worked: Number.isFinite(hoursWorked) && hoursWorked > 0 ? hoursWorked : null,
+    materials_used: typeof params.materials_used === 'string' ? params.materials_used : null,
+    id: context.workReport && context.confirmationId ? `log_report_${context.confirmationId}` : undefined,
+    skipDuplicateCheck: Boolean(context.workReport),
   })
 
-  if (error) {
-    if (error.code === '23505' && context.workReport && context.confirmationId) {
-      const { data: saved, error: readError } = await supabase.from('project_log').select('id').eq('business_id', businessId).eq('business_user_id', context.businessUserId!).eq('id', logId).maybeSingle()
-      if (!readError && saved) return { success: true, data: { duplicate: true, message: 'Anteckningen är redan sparad. Ingen ny post skapades.' } }
+  if (!resultat.ok) return { success: false, error: resultat.error }
+  if (resultat.duplicate) {
+    return {
+      success: true,
+      data: {
+        log_id: resultat.id,
+        project_id: projectId,
+        duplicate: true,
+        message: context.workReport
+          ? 'Anteckningen är redan sparad. Ingen ny post skapades.'
+          : `Den anteckningen fanns redan på ${project.name || 'projektet'} — står kvar som en enda post.`,
+      },
     }
-    return { success: false, error: error.message }
   }
   return {
     success: true,
     data: {
-      log_id: logId,
+      log_id: resultat.id,
       project_id: projectId,
       message: `Arbetsanteckning sparad på ${project.name || 'projektet'} (${logDate})`,
     },

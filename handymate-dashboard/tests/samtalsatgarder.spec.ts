@@ -108,20 +108,28 @@ test.describe('Steg 5 — dagboksrad via godkännande', () => {
     expect(ACTION_CONTRACT.project_log_note).toBe('EXECUTABLE_ACTION')
   })
 
-  test('exekveraren skriver project_log med LIVE-kolumnerna', () => {
+  test('exekveraren skriver dagboksraden via createDiaryEntry med LIVE-kolumnerna', () => {
+    // Byggdagboken (2026-09-02): project_log skrivs bara via lib/diary/write.ts.
+    // Grenen får inte längre göra en egen insert — helpern äger validering,
+    // projektvakt, 23505→dubblett och revisionslogg.
     const s = read('app/api/approvals/[id]/route.ts')
+    expect(s).toContain("import { createDiaryEntry } from '@/lib/diary/write'")
     const i = s.indexOf("case 'project_log_note':")
     expect(i, 'case project_log_note saknas').toBeGreaterThan(-1)
     const gren = s.slice(i, s.indexOf("case 'customer_fact':", i))
-    expect(gren).toContain("from('project_log')")
+    expect(gren).toContain('createDiaryEntry(')
+    expect(gren).not.toContain(".from('project_log')")
     expect(gren).toContain('log_call_')
     expect(gren).toContain("work_performed: 'Samtal med kund'")
     expect(gren).toContain('order_id: pl.project_id')
-    // Projektet verifieras på tenant före skrivningen.
-    expect(gren.indexOf(".from('project')")).toBeLessThan(gren.indexOf(".from('project_log')"))
-    // Dubblett (23505) kvitteras, inte fel.
-    expect(gren).toContain("'23505'")
+    // Projektet verifieras på tenant före skrivningen (helpern gör det igen).
+    expect(gren.indexOf(".from('project')")).toBeLessThan(gren.indexOf('createDiaryEntry('))
+    // Samtalets id är nyckeln — den generella dubblettkontrollen hoppas,
+    // och helperns dubblettkvitto (23505) returneras som duplicate, inte fel.
+    expect(gren).toContain('skipDuplicateCheck: true')
     expect(gren).toContain('duplicate: true')
+    const helper = read('lib/diary/write.ts')
+    expect(helper).toContain("error.code === '23505'")
   })
 
   test('log_id är en vitlistad artefakt', () => {

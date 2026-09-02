@@ -699,30 +699,31 @@ export async function GET(
     // Project log entries (byggdagbok)
     const projectIds = (projects || []).map((p: any) => p.id)
     if (projectIds.length > 0) {
-      // Byggdagboken har `work_description`/`notes` och `log_date` — aldrig
-      // `entry` eller `logged_at` (sql/rot_rut_documents.sql:64). Frågan bad om
-      // de senare och gav 42703, så byggdagboken har aldrig synts i timelinen.
-      // Samma fel som saneringen ovan rättade för `projects` → `project` den
-      // 5 augusti, i samma fil, utan att grannarna kontrollerades.
+      // Byggdagboken (project_log) heter i LIVE-schemat order_id/date/
+      // work_performed/description — inte project_id/log_date/
+      // work_description/notes (sql/rot_rut_documents.sql DEL 4 beskrev fel
+      // schema fram till 2026-09-02 och den här frågan 42703:ade tyst i
+      // månader: byggdagboken har aldrig synts i tidslinjen).
       const { data: logEntries, error: logErr } = await supabase
         .from('project_log')
-        .select('id, work_description, notes, project_id, log_date, created_at')
-        .in('project_id', projectIds)
-        .order('log_date', { ascending: false })
+        .select('id, work_performed, description, order_id, date, created_at')
+        .eq('business_id', businessId)
+        .in('order_id', projectIds)
+        .order('date', { ascending: false })
         .limit(20)
 
       if (logErr) console.error('[timeline] byggdagbok:', logErr.message)
 
       for (const le of logEntries || []) {
-        const proj = (projects || []).find((p: any) => p.id === le.project_id)
-        const text = le.work_description || le.notes || null
+        const proj = (projects || []).find((p: any) => p.id === le.order_id)
+        const text = le.work_performed || le.description || null
         events.push({
           id: `plog_${le.id}`,
           type: 'project_log',
           title: `Byggdagbok: ${proj?.name || 'Projekt'}`,
           description: text ? String(text).substring(0, 150) : null,
-          timestamp: le.log_date || le.created_at,
-          metadata: { project_id: le.project_id },
+          timestamp: le.date || le.created_at,
+          metadata: { project_id: le.order_id },
         })
       }
     }
