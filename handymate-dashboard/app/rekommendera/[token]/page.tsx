@@ -18,10 +18,14 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams } from 'next/navigation'
 import { Loader2, CheckCircle2, AlertTriangle, Send } from 'lucide-react'
+import type { Attribution } from '@/lib/branding/attribution'
+import AttributionStamp from '@/components/branding/AttributionStamp'
 
 interface LinkInfo {
   business_name: string
   logo_url: string | null
+  /** "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts). */
+  attribution?: Attribution | null
 }
 
 export default function ReferralLandingPage() {
@@ -206,9 +210,7 @@ export default function ReferralLandingPage() {
           </button>
         </form>
 
-        <div className="mt-6 text-center text-xs text-gray-400">
-          Drivs av <span className="font-medium text-primary-700">Handymate</span>
-        </div>
+        <AttributionStamp attribution={info.attribution} className="mt-6 text-center text-xs text-gray-400" linkClassName="font-medium" />
       </div>
     </div>
   )

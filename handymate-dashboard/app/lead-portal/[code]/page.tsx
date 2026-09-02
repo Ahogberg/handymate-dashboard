@@ -18,12 +18,16 @@ import {
 } from 'lucide-react'
 import { LEAD_CATEGORIES, getLeadCategory } from '@/lib/lead-categories'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
+import type { Attribution } from '@/lib/branding/attribution'
+import AttributionStamp from '@/components/branding/AttributionStamp'
 
 interface PortalData {
   source: { id: string; name: string; portal_code: string; default_category: string | null }
   business: { business_name: string; logo_url: string | null; contact_name: string | null }
   leads: Lead[]
   stats: { total: number; contacted: number; won: number }
+  /** "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts). */
+  attribution?: Attribution | null
 }
 
 interface Lead {
@@ -509,10 +513,8 @@ export default function LeadPortalPage() {
           </>
         )}
 
-        {/* Footer */}
-        <div className="mt-8 text-center text-xs text-gray-400">
-          Drivs av <span className="font-medium text-primary-700">Handymate</span>
-        </div>
+        {/* Footer — stämpeln, lib/branding/attribution.ts */}
+        <AttributionStamp attribution={data.attribution} className="mt-8 text-center text-xs text-gray-400" linkClassName="font-medium" />
       </div>
     </div>
   )

@@ -3,6 +3,8 @@
  * Extraherade från page.tsx vid komponent-splitten — INGEN logik-ändring.
  */
 
+import type { Attribution } from '@/lib/branding/attribution'
+
 export interface WorkingHoursDay {
   active: boolean
   start: string
@@ -28,6 +30,9 @@ export interface PortalData {
     bankgiro?: string | null
   }
   unreadMessages: number
+  /** "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts) — laddad
+      en gång i /api/portal/[token]; saknas den visas texten utan länk. */
+  attribution?: Attribution | null
 }
 
 /**

@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { verifyReferralToken } from '@/lib/referral/link'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
+import { loadAttribution } from '@/lib/branding/attribution'
 import { createHash } from 'crypto'
 
 /**
@@ -111,9 +112,15 @@ export async function GET(request: NextRequest) {
       .maybeSingle()
     if (!business) return invalidLinkResponse()
 
+    // "Skickat via Handymate"-stämpeln i sidfoten (kolumnlistan ovan får
+    // inte utökas med attribution_link_enabled före sql/v200) — helperns
+    // fallback-säkra query, en gång per visning.
+    const attribution = await loadAttribution(supabase, decoded.businessId)
+
     return NextResponse.json({
       business_name: business.business_name || 'företaget',
       logo_url: business.logo_url || null,
+      attribution,
     })
   } catch (error: any) {
     console.error('[referral-lead] GET-fel', error)

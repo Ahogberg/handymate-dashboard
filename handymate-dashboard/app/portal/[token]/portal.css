@@ -336,12 +336,13 @@
   }
 }
 
-/* Handymate footer attribution (always teal) */
+/* Handymate-stämpeln "Skickat via …" (always teal, components/branding/AttributionStamp.tsx) */
 .bp-hm-attr {
   display: flex; align-items: center; justify-content: center;
-  gap: 6px;
+  gap: 4px;
+  margin: 0;
   padding: 16px;
   font-size: 11px;
   color: var(--subtle);
 }
-.bp-hm-attr strong { color: var(--hm-700); font-weight: 600; }
+.bp-hm-attr a, .bp-hm-attr span { color: var(--hm-700); font-weight: 600; text-decoration: none; }

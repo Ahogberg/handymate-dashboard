@@ -270,6 +270,9 @@ export async function GET(
       // två-tre offerter — vår ska vara den enda som visar hur det blev.
       // null när det inte finns något att visa; aldrig ett tomt block.
       reference_photos: referencePhotos,
+      // Samma stämpel som i dokumentet, för sidans egen fotrad
+      // (components/branding/AttributionStamp.tsx) — laddad en gång ovan.
+      attribution,
     })
 
   } catch (error: any) {

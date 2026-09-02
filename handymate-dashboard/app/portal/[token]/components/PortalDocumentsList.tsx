@@ -263,7 +263,7 @@ export default function PortalDocumentsList({
           </div>
         </div>
 
-        <PortalHandymateAttribution />
+        <PortalHandymateAttribution attribution={portal.attribution} />
       </div>
     </>
   )

@@ -26,6 +26,8 @@ import {
 import { applyLiveSelectionToTemplateData } from '@/lib/quotes/public-document'
 import { PublicQuoteDocument } from './components/PublicQuoteDocument'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
+import type { Attribution } from '@/lib/branding/attribution'
+import AttributionStamp from '@/components/branding/AttributionStamp'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -141,6 +143,8 @@ export default function QuoteSignPage() {
     }
   }
   const [business, setBusiness] = useState<BusinessInfo | null>(null)
+  // "Skickat via Handymate"-stämpeln i sidfoten — ur samma svar som offerten.
+  const [attribution, setAttribution] = useState<Attribution | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [name, setName] = useState('')
   const [hasDrawn, setHasDrawn] = useState(false)
@@ -174,6 +178,7 @@ export default function QuoteSignPage() {
 
         const { quote: quoteData, business: businessData, alreadySigned } = data
         setReferencePhotos(data.reference_photos || null)
+        setAttribution(data.attribution || null)
 
         // Redirect till kundportalen om kunden har portal_token — all
         // offerthantering sker där.
@@ -1194,11 +1199,8 @@ export default function QuoteSignPage() {
           </div>
         )}
 
-        {/* Footer */}
-        <p className="text-center text-xs text-gray-400 pb-8">
-          Drivs av{' '}
-          <span className="text-primary-700 font-medium">Handymate</span>
-        </p>
+        {/* Footer — stämpeln, lib/branding/attribution.ts */}
+        <AttributionStamp attribution={attribution} className="text-center text-xs text-gray-400 pb-8" linkClassName="font-medium" />
       </div>
     </div>
   )

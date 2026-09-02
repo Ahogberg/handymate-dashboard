@@ -23,9 +23,16 @@ export type AttributionSource = {
   attribution_link_enabled?: boolean | null
 }
 
-const BRAND = 'Handymate'
-const PREFIX = 'Skickat via '
-const LINK_COLOR = '#0F766E'
+/** Ordet som länkas resp. texten före det — för React-stämpeln
+ *  (components/branding/AttributionStamp.tsx) så ingen yta skriver strängen själv. */
+export const ATTRIBUTION_BRAND = 'Handymate'
+export const ATTRIBUTION_PREFIX = 'Skickat via '
+/** Teal (#0F766E) på länken oavsett företagets egen accentfärg. */
+export const ATTRIBUTION_LINK_COLOR = '#0F766E'
+
+const BRAND = ATTRIBUTION_BRAND
+const PREFIX = ATTRIBUTION_PREFIX
+const LINK_COLOR = ATTRIBUTION_LINK_COLOR
 const MUTED_COLOR = '#6b7280'
 
 export function buildAttribution(cfg: AttributionSource | null | undefined): Attribution {

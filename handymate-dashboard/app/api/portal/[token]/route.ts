@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 const ELKS_API_USER = process.env.ELKS_API_USER!
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
@@ -98,6 +99,12 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       .eq('direction', 'outbound')
       .is('read_at', null)
 
+    // Stämpeln "Skickat via Handymate" i portalens fotrader. Business-
+    // selecten ovan är en kolumnlista som inte får utökas med
+    // attribution_link_enabled före sql/v200 — helperns fallback-säkra
+    // query i stället (kastar aldrig). EN laddning per portalbesök.
+    const attribution = await loadAttribution(supabase, customer.business_id)
+
     return NextResponse.json({
       customer: {
         name: customer.name,
@@ -105,6 +112,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
         phone: customer.phone_number,
         customerId: customer.customer_id
       },
+      attribution,
       business: {
         name: business?.business_name || '',
         contactName: business?.contact_name || '',
