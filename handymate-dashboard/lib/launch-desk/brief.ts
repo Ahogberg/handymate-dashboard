@@ -1,6 +1,28 @@
 import type { GtmAccount, GtmSourceFact } from './types'
+import { valjOppning, type GtmSignal } from './signaler'
+import { getAdminSupabase } from '@/lib/admin-auth'
+import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
+import { llmCostUsd } from '@/lib/costs/meter'
 
 const BRIEF_MODEL = 'claude-haiku-4-5-20251001'
+
+/**
+ * Handymates eget "husföretag" i business_config (pass 1b,
+ * tasks/plan-launch-desk-signaler.md — se .env.local.example).
+ * meterDirectLlmCall kräver ett businessId att bokföra kostnaden på; utan
+ * den här variabeln mäts brief-anropet inte alls (fail-soft, som innan
+ * mätningen fanns) — vi gissar ALDRIG ett businessId.
+ */
+const HUS_BUSINESS_ID = process.env.HANDYMATE_HOUSE_BUSINESS_ID || null
+
+/** Läser ut den fulla, härledda signal-listan (med styrka) ur en tidigare
+ * körd signaler-hämtning, om den finns. Se lib/launch-desk/signaler-runner.ts
+ * som skriver brief_source_snapshot.signals = GtmSignalSnapshot. */
+function lasHardleddaSignaler(account: GtmAccount): GtmSignal[] {
+  const snapshot = account.brief_source_snapshot as { signals?: { signals?: unknown } } | undefined
+  const raw = snapshot?.signals?.signals
+  return Array.isArray(raw) ? raw as GtmSignal[] : []
+}
 
 export interface LaunchBrief {
   research_summary: string
@@ -20,6 +42,10 @@ function compact(value: string | null | undefined, max = 600): string | null {
 }
 
 export function buildBriefSourceSnapshot(account: GtmAccount): Record<string, unknown> {
+  const signaler = lasHardleddaSignaler(account)
+    .slice(0, 5)
+    .map(signal => ({ label: compact(signal.label, 160), evidence: compact(signal.evidence, 200) }))
+
   return {
     company_name: account.company_name,
     org_number: account.org_number,
@@ -45,6 +71,7 @@ export function buildBriefSourceSnapshot(account: GtmAccount): Record<string, un
       role: compact(account.primary_contact_role, 160),
       basis: account.contact_basis,
     },
+    signals: signaler,
   }
 }
 
@@ -105,6 +132,15 @@ export async function generateLaunchBrief(account: GtmAccount): Promise<LaunchBr
   const apiKey = process.env.ANTHROPIC_API_KEY
   if (!apiKey) return fallback
 
+  // Pass 1b: öppna utkastet med den starkaste, verkliga signalen från deras
+  // EGEN sajt (härledd utan AI i lib/launch-desk/signaler.ts) — aldrig en
+  // hittepå-slutsats. Utan signaler är prompten oförändrad (som innan
+  // detta pass).
+  const oppning = valjOppning(lasHardleddaSignaler(account))
+  const signalInstruktion = oppning
+    ? `\n\nSIGNAL ATT ÖPPNA MED (härledd automatiskt ur deras egen sajt, ingen gissning):\n"${oppning.label}": "${oppning.evidence}"\n\nDu ska öppna med den här signalen i opening_angle och nämna den. Citera deras egen formulering ovan, eller ligg mycket nära den. Du får aldrig hitta på något som inte står i citatet ovan.`
+    : ''
+
   try {
     const response = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -128,7 +164,7 @@ KÄLLKONTRAKT:
 - Relevans ska märkas som en hypotes eller fråga, aldrig som ett konstaterat problem.
 - Skriv på naturlig svenska, kort och respektfullt. Ingen hype eller påtryckning.
 - E-postutkastet måste innehålla en enkel möjlighet att tacka nej till mer kontakt.
-- Svara endast med giltig JSON och exakt nycklarna relevance_hypothesis, opening_angle, call_opener, email_draft, linkedin_draft, video_script.
+- Svara endast med giltig JSON och exakt nycklarna relevance_hypothesis, opening_angle, call_opener, email_draft, linkedin_draft, video_script.${signalInstruktion}
 
 KÄLLDATA:
 ${JSON.stringify(snapshot)}`,
@@ -138,6 +174,25 @@ ${JSON.stringify(snapshot)}`,
 
     if (!response.ok) return fallback
     const data = await response.json()
+
+    // Kostnadsmätning (fail-soft, pass 1b): bara om HUS_BUSINESS_ID är satt.
+    // meterDirectLlmCall kräver ett businessId — utan husbolaget mäts detta
+    // anrop inte alls, precis som innan mätningen fanns.
+    if (HUS_BUSINESS_ID) {
+      try {
+        await meterDirectLlmCall({
+          supabase: getAdminSupabase(),
+          businessId: HUS_BUSINESS_ID,
+          usage: data?.usage,
+          costUsd: llmCostUsd(data?.usage || { input_tokens: 0, output_tokens: 0 }, BRIEF_MODEL),
+          refType: 'launch_desk_brief',
+          refId: account.id,
+        })
+      } catch (meterError) {
+        console.warn('[launch-desk/brief] kostnadsmätning misslyckades (fail-soft):', meterError)
+      }
+    }
+
     const text = data?.content?.find((part: any) => part?.type === 'text')?.text
     const parsed = typeof text === 'string' ? parseJsonObject(text) : null
     if (!parsed) return fallback

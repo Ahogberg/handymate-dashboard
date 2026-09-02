@@ -89,6 +89,8 @@ jobs:
           tests/kundminne-pass2.spec.ts
           tests/kundminne-pass3.spec.ts
           tests/raddningsko.spec.ts
+          tests/foretagsskannern.spec.ts
+          tests/launch-desk-signaler.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

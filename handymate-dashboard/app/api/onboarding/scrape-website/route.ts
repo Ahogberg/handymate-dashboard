@@ -1,6 +1,5 @@
 import { checkFuelGate } from '@/lib/costs/fuel'
 import { NextRequest, NextResponse } from 'next/server'
-import dns from 'node:dns'
 import Anthropic from '@anthropic-ai/sdk'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getClaudeModel } from '@/lib/ai/get-model'
@@ -10,18 +9,13 @@ import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import {
   normalizeWebsiteUrl,
-  isBlockedHostname,
-  isPrivateOrReservedIp,
   htmlToExtractableText,
   parseExtractionJson,
   buildScrapeRateLimitKey,
   extractClientIp,
-  SCRAPE_TIMEOUT_MS,
-  SCRAPE_MAX_BYTES,
-  SCRAPE_MAX_REDIRECTS,
   SCRAPE_MIN_TEXT_CHARS,
-  SCRAPE_USER_AGENT,
 } from '@/lib/onboarding/website-scrape'
+import { fetchWebsiteWithSsrfGuard } from '@/lib/onboarding/website-fetch'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,104 +56,10 @@ export const dynamic = 'force-dynamic'
  * etc. — routen returnerar aldrig 500 för det, bara { ok:false, reason }.
  */
 
-async function resolveHostIsBlocked(hostname: string): Promise<boolean> {
-  if (isBlockedHostname(hostname)) return true
-  try {
-    const addrs = await dns.promises.lookup(hostname, { all: true })
-    if (addrs.length === 0) return true // inget svar — inget att läsa, och inget att chansa på
-    return addrs.some(a => isPrivateOrReservedIp(a.address))
-  } catch {
-    // DNS-uppslaget misslyckades — kan inte verifiera att målet är säkert,
-    // blockera hellre än att chansa (fail-closed).
-    return true
-  }
-}
-
-type FetchResult = { ok: true; html: string } | { ok: false; reason: string }
-
-async function fetchWithSsrfGuard(startUrl: string): Promise<FetchResult> {
-  let currentUrl = startUrl
-
-  for (let hop = 0; hop <= SCRAPE_MAX_REDIRECTS; hop++) {
-    let parsed: URL
-    try {
-      parsed = new URL(currentUrl)
-    } catch {
-      return { ok: false, reason: 'Ogiltig webbadress' }
-    }
-    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-      return { ok: false, reason: 'Bara http eller https stöds' }
-    }
-    if (await resolveHostIsBlocked(parsed.hostname)) {
-      return { ok: false, reason: 'Den adressen pekar på ett internt mål och kan inte läsas' }
-    }
-
-    const controller = new AbortController()
-    const timer = setTimeout(() => controller.abort(), SCRAPE_TIMEOUT_MS)
-    let res: Response
-    try {
-      res = await fetch(currentUrl, {
-        method: 'GET',
-        redirect: 'manual',
-        signal: controller.signal,
-        headers: { 'User-Agent': SCRAPE_USER_AGENT, Accept: 'text/html,text/plain' },
-      })
-    } catch {
-      clearTimeout(timer)
-      return { ok: false, reason: 'Kunde inte nå sidan (timeout eller nätverksfel)' }
-    }
-    clearTimeout(timer)
-
-    // Manuell redirect-hantering — nästa varv validerar det NYA målet mot
-    // SSRF-skyddet innan det följs (en publik URL kan redirecta internt).
-    if (res.status >= 300 && res.status < 400) {
-      const location = res.headers.get('location')
-      if (!location) return { ok: false, reason: 'Sidan svarade med en redirect utan mål' }
-      try {
-        currentUrl = new URL(location, currentUrl).toString()
-      } catch {
-        return { ok: false, reason: 'Sidan redirectade till en ogiltig adress' }
-      }
-      continue
-    }
-
-    if (!res.ok) {
-      return { ok: false, reason: `Sidan svarade med fel (status ${res.status})` }
-    }
-
-    const contentType = res.headers.get('content-type') || ''
-    if (contentType && !/text\/html|text\/plain/i.test(contentType)) {
-      return { ok: false, reason: 'Sidan innehöll inte läsbar text' }
-    }
-
-    // Läs strömmen med ett hårt storlekstak (~1MB) — litar inte på
-    // Content-Length (kan saknas eller vara felaktig).
-    const reader = res.body?.getReader()
-    if (!reader) {
-      const text = await res.text()
-      return { ok: true, html: text.slice(0, SCRAPE_MAX_BYTES) }
-    }
-
-    const chunks: Uint8Array[] = []
-    let total = 0
-    for (;;) {
-      const { done, value } = await reader.read()
-      if (done) break
-      if (value) {
-        total += value.byteLength
-        if (total > SCRAPE_MAX_BYTES) {
-          try { await reader.cancel() } catch { /* best effort */ }
-          break
-        }
-        chunks.push(value)
-      }
-    }
-    const html = Buffer.concat(chunks.map(c => Buffer.from(c))).toString('utf-8')
-    return { ok: true, html }
-  }
-
-  return { ok: false, reason: 'För många omdirigeringar' }
-}
+// SSRF-skyddad hämtning: lib/onboarding/website-fetch.ts (bruten ut i
+// pass 1b, tasks/plan-launch-desk-signaler.md, så att Launch Desk-
+// signalerna kan återanvända EXAKT samma skydd — se den filens doc-kommentar
+// för det fulla resonemanget om DNS-rebinding, redirects och storlekstak).
 
 const EXTRACTION_PROMPT_HEADER = `Du läser text extraherad från ett svenskt hantverksföretags hemsida.
 
@@ -227,7 +127,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: false, reason: normalized.reason })
     }
 
-    const fetchResult = await fetchWithSsrfGuard(normalized.url)
+    const fetchResult = await fetchWebsiteWithSsrfGuard(normalized.url)
     if (!fetchResult.ok) {
       return NextResponse.json({ ok: false, reason: fetchResult.reason, normalizedUrl: normalized.url })
     }

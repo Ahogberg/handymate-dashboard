@@ -1,3 +1,33 @@
+# Nattpass 10: Lanseringsboost pass 1 — Företagsskannern + webbplatssignaler (Claude + 3 Sonnet-agenter 2026-09-02)
+
+Program: docs/gtm/LANSERINGSBOOST_PROGRAM.md (sju idéer som pass).
+- [x] Företagsskannern (app.handymate.se/foretagsskannern): kundlista-CSV +
+      valfri faktura-CSV läses I WEBBLÄSAREN, riktiga fynd (kunder, utan
+      telefon, dubbletter, förfallna fakturor + kr), "Skapa konto och ta med
+      underlaget" via sessionStorage → StepImportData erbjuder importen.
+      Onboardingvariant 'skanner' i tratten. Spårrutt med IP-tak + honeypot,
+      ingen tabell. Plan: tasks/plan-foretagsskannern.md
+- [x] Webbplatssignaler i Launch Desk: SSRF-skyddad hämtning utbruten till
+      lib/onboarding/website-fetch.ts (delad med onboardingens scrape), nio
+      deterministiska signaler med citat (ingen bokning, bara telefon,
+      svarstid, gammalt årtal, säsong, anställer, ROT, recensioner,
+      tjänster) i brief_source_snapshot.signals; AI-utkastet öppnar med
+      starkaste signalen; batch 25; UI-sektion. Kostnadsmätning bara med
+      HANDYMATE_HOUSE_BUSINESS_ID. Plan: tasks/plan-launch-desk-signaler.md
+- [x] Smärtkartan docs/gtm/SMARTKARTA_KONKURRENTER_2026-09-02.md — OBS:
+      proxyn blockerade direkta sidhämtningar, underlaget är sökmotor-
+      sammanfattningar; tunna konkurrenter markerade "underlag saknas"
+- [x] Facit tests/foretagsskannern.spec.ts + tests/launch-desk-signaler.spec.ts
+      i kontraktsgrinden; tsc 0, 449 kontrakt gröna
+- Lärdom: två agenter som kör next build samtidigt i samma .next slår
+  varandra (ENOENT/OOM). Bygg alltid seriellt, en agent i taget.
+- Kvar i programmet: pass 2 (budskapsbibliotek + jämförelsesidor), 3
+  (timing-signaler: Platsbanken/JobTech, bolagsålder), 4 (Offertgranskaren,
+  efter branschpaketen), 5 (byråspåret), 6 (Matte-demo via SMS, kräver
+  46elks), 7 (veckorapporten)
+
+---
+
 # Nattpass 9: Första 10 kunderna — räddningskön + lanseringsbevis (Claude + Sonnet-agent 2026-09-02)
 
 Program: docs/launch/FORSTA_10_KUNDER_BEVIS_OCH_RADDNING.md (Codex förslag,

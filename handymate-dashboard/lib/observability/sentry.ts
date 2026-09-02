@@ -16,7 +16,7 @@
 
 import * as Sentry from '@sentry/nextjs'
 
-export type SentryNiva = 'warning' | 'error' | 'fatal'
+export type SentryNiva = 'info' | 'warning' | 'error' | 'fatal'
 
 export interface SentryRapport {
   /** Kort, stabil rubrik — samma text för samma felklass så Sentry grupperar. */

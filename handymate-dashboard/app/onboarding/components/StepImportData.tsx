@@ -30,6 +30,7 @@ import type { OnboardingFormData } from '../types-redesign'
 import CustomerImportReceipt from '@/components/customers/CustomerImportReceipt'
 import { parseCsvCustomers } from '@/lib/customers/csv'
 import { readCustomerImportResult, type CustomerImportResult } from '@/lib/customers/import-result'
+import { lasOchRensaUnderlag, type ForetagsskannernUnderlag, type SkannadKund } from '@/lib/foretagsskannern/skanna'
 
 interface Props {
   onNext: () => void
@@ -60,6 +61,16 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
   const [csvResult, setCsvResult] = useState<CustomerImportResult | null>(null)
   const [csvBusy, setCsvBusy] = useState(false)
   const [dragOver, setDragOver] = useState(false)
+
+  // Företagsskannern-handoff (2026-09-02, tasks/plan-foretagsskannern.md):
+  // ett underlag från den publika skanner-sidan (app.handymate.se/
+  // foretagsskannern) väntar i sessionStorage. Läses OCH RENSAS en gång vid
+  // mount — en engångshandoff, aldrig kvar för nästa laddning. Fortnox-
+  // vägen rörs inte alls.
+  const [skannerUnderlag, setSkannerUnderlag] = useState<ForetagsskannernUnderlag | null>(null)
+  useEffect(() => {
+    setSkannerUnderlag(lasOchRensaUnderlag())
+  }, [])
 
   // 90-dagarsgenomgången: när importen är klar hämtas RIKTIGA counts —
   // checklistan tickar aldrig fram siffror vi inte har.
@@ -176,17 +187,17 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
     }
   }, [setData])
 
-  async function handleCsvFile(file: File) {
+  /**
+   * Delad med Företagsskannern-underlaget: samma POST /api/customers/import,
+   * samma kvitto (CustomerImportReceipt) — oavsett om kunderna kom från en
+   * uppladdad CSV eller redan låg i minnet från skanner-handoffen.
+   */
+  const importeraKunder = useCallback(async (customers: SkannadKund[]) => {
     if (csvBusyRef.current) return
     csvBusyRef.current = true
     setCsvBusy(true)
     setError(null)
     try {
-      const text = await file.text()
-      const customers = parseCsvCustomers(text)
-      if (customers.length === 0) {
-        throw new Error('Hittade inga kunder i filen — kontrollera att den har namn/telefon')
-      }
       const res = await fetch('/api/customers/import', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -203,8 +214,31 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
     } finally {
       csvBusyRef.current = false
       setCsvBusy(false)
+    }
+  }, [setData])
+
+  async function handleCsvFile(file: File) {
+    if (csvBusyRef.current) return
+    setError(null)
+    try {
+      const text = await file.text()
+      const customers = parseCsvCustomers(text)
+      if (customers.length === 0) {
+        throw new Error('Hittade inga kunder i filen — kontrollera att den har namn/telefon')
+      }
+      await importeraKunder(customers)
+    } catch (e) {
+      setError(`${e instanceof Error ? e.message : 'Importresultatet kunde inte bekräftas.'} Kontrollera kundlistan innan du försöker igen; vissa rader kan redan ha sparats.`)
+    } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
     }
+  }
+
+  function importeraSkannerUnderlag() {
+    if (!skannerUnderlag) return
+    const kunder = skannerUnderlag.kunder
+    setSkannerUnderlag(null)
+    importeraKunder(kunder)
   }
 
   /* ─────────── VY (förfinad, obi-*) ─────────── */
@@ -223,6 +257,33 @@ export default function StepImportData({ onNext, onBack, data, setData }: Props)
             </p>
 
             {error && <FallbackNote text={error} />}
+
+            {skannerUnderlag && (
+              <div className="ob-card" style={{ marginBottom: 16, borderColor: 'var(--ob-primary-500)' }}>
+                <p style={{ margin: '0 0 10px', fontSize: 14, fontWeight: 700, color: 'var(--ob-ink)' }}>
+                  Du har {skannerUnderlag.kunder.length} kund{skannerUnderlag.kunder.length > 1 ? 'er' : ''} från Företagsskannern
+                </p>
+                <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="ob-cta"
+                    style={{ width: 'auto', height: 44, padding: '0 18px', flex: '1 1 auto' }}
+                    disabled={csvBusy}
+                    onClick={importeraSkannerUnderlag}
+                  >
+                    {csvBusy ? 'Importerar…' : 'Importera dem'}
+                  </button>
+                  <button
+                    type="button"
+                    className="obi-skiplink"
+                    style={{ padding: '0 8px' }}
+                    onClick={() => setSkannerUnderlag(null)}
+                  >
+                    Hoppa över
+                  </button>
+                </div>
+              </div>
+            )}
 
             <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 18 }}>
               <button className="obi-choice rec" onClick={isDemo ? runDemoFortnoxSim : connectFortnox}>

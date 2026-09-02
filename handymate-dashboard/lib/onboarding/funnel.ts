@@ -42,7 +42,7 @@ export const FUNNEL_KEY = '_funnel'
 export const FUNNEL_VERSION = 1
 export const FUNNEL_FINAL_STEP = 9
 
-export type OnboardingVariant = 'studio' | 'classic'
+export type OnboardingVariant = 'studio' | 'classic' | 'skanner'
 
 export interface FunnelRecord {
   v: number
@@ -81,14 +81,14 @@ export function readFunnel(onboardingData: unknown): FunnelRecord | null {
   }
   return {
     v: typeof raw.v === 'number' ? raw.v : FUNNEL_VERSION,
-    variant: raw.variant === 'studio' || raw.variant === 'classic' ? raw.variant : undefined,
+    variant: raw.variant === 'studio' || raw.variant === 'classic' || raw.variant === 'skanner' ? raw.variant : undefined,
     reached,
     finalized_at: typeof raw.finalized_at === 'string' ? raw.finalized_at : undefined,
   }
 }
 
 export function normaliseraVariant(v: unknown): OnboardingVariant | undefined {
-  return v === 'studio' || v === 'classic' ? v : undefined
+  return v === 'studio' || v === 'classic' || v === 'skanner' ? v : undefined
 }
 
 /** Klientens kopia av _funnel får aldrig skrivas tillbaka — servern äger den. */
@@ -269,7 +269,7 @@ export function sammanstallTratt(rows: FunnelRow[], nowMs: number = Date.now()):
     if (m !== null && funnel?.finalized_at) tillKlar.push(m)
   }
 
-  const varianter: Array<OnboardingVariant | 'okand'> = ['studio', 'classic', 'okand']
+  const varianter: Array<OnboardingVariant | 'okand'> = ['studio', 'classic', 'skanner', 'okand']
   const per_variant = varianter
     .map(variant => {
       const egna = riktigaBeskrivna.filter(f => f.variant === variant)

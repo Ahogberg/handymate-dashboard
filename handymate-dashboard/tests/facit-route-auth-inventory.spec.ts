@@ -100,6 +100,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'integrations/fortnox/callback': 'httpOnly state-cookie (16 slumpbytes) jämförs med state-parametern',
   'auth/logout': 'Supabase-session',
   'auth/register': 'Ingen (registrering) — business_id genereras kryptografiskt server-side',
+  'foretagsskannern/spar': 'Ingen tenant (anonym publik sida, ingen DB-skrivning) — honeypot + IP-tak, 2026-09-02',
 }
 
 /** Publika rutter som SKRIVER något dyrt (SMS/LLM/kort/rad) måste ha fail-closed tak. */
@@ -114,6 +115,7 @@ const KRAVER_PUBLIKT_TAK = [
   'partners/validate',
   'leads/intake',
   'widget/chat',
+  'foretagsskannern/spar',
 ]
 
 test('varje rutt utan standardgrind bär en känd grind eller står i PUBLIC_BY_DESIGN', () => {

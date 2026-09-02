@@ -12,6 +12,7 @@ import {
   ChevronRight,
   ClipboardCopy,
   FileUp,
+  Globe,
   Loader2,
   MessageSquare,
   Phone,
@@ -25,6 +26,7 @@ import {
 import { parseLaunchCsv } from '@/lib/launch-desk/csv'
 import { channelPolicy } from '@/lib/launch-desk/policy'
 import { priorityScore } from '@/lib/launch-desk/scoring'
+import type { GtmSignalSnapshot } from '@/lib/launch-desk/signaler'
 import type {
   GtmAccount,
   GtmActivity,
@@ -71,6 +73,17 @@ function dateLabel(value: string | null): string {
   return new Date(value).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric' })
 }
 
+function dateTimeLabel(value: string): string {
+  return new Date(value).toLocaleString('sv-SE', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+}
+
+/** Läser ut signal-snapshoten ur brief_source_snapshot.signals (pass 1b,
+ * tasks/plan-launch-desk-signaler.md) — skriven av signaler-rutten. */
+function signalSnapshotFromAccount(account: GtmAccount): (GtmSignalSnapshot & { error?: string }) | null {
+  const raw = (account.brief_source_snapshot as Record<string, unknown> | undefined)?.signals
+  return raw && typeof raw === 'object' ? raw as GtmSignalSnapshot & { error?: string } : null
+}
+
 function dateTimeLocal(value: Date): string {
   const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 16)
@@ -98,6 +111,7 @@ export default function LaunchDeskPage() {
   const [importRows, setImportRows] = useState<unknown[]>([])
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [batchSignalsBusy, setBatchSignalsBusy] = useState(false)
   const [toast, setToast] = useState('')
 
   const loadAccounts = useCallback(async () => {
@@ -183,6 +197,39 @@ export default function LaunchDeskPage() {
       setToast(err?.message || 'Kunde inte förbereda kontaktunderlaget')
     } finally {
       setBusy(false)
+    }
+  }
+
+  async function readSignals() {
+    if (!selected) return
+    setBusy(true)
+    try {
+      const response = await fetch(`/api/admin/launch/accounts/${selected.id}/signaler`, { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kunde inte läsa sajten')
+      if (data.account) setSelected(data.account)
+      const antal = data.snapshot?.signals?.length || 0
+      setToast(data.ok ? `${antal} signal${antal === 1 ? '' : 'er'} hittade på sajten` : (data.reason || 'Sajten gick inte att läsa'))
+      await loadAccounts()
+    } catch (err: any) {
+      setToast(err?.message || 'Kunde inte läsa sajten')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function readSignalsBatch() {
+    setBatchSignalsBusy(true)
+    try {
+      const response = await fetch('/api/admin/launch/signaler/batch', { method: 'POST' })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Kunde inte läsa sajterna')
+      setToast(`${data.checked} sajter kollade · ${data.ok} lästa · ${data.error} gick inte att läsa`)
+      await loadAccounts()
+    } catch (err: any) {
+      setToast(err?.message || 'Kunde inte läsa sajterna')
+    } finally {
+      setBatchSignalsBusy(false)
     }
   }
 
@@ -330,8 +377,9 @@ export default function LaunchDeskPage() {
               <div><h1 className="text-2xl font-bold">Launch Desk</h1><p className="text-sm text-gray-500">Personligt säljstöd. Inga automatiska utskick.</p></div>
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <button onClick={() => setImportOpen(true)} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50"><FileUp className="h-4 w-4" /> Importera</button>
+            <button disabled={batchSignalsBusy} onClick={readSignalsBatch} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium shadow-sm hover:bg-gray-50 disabled:opacity-50">{batchSignalsBusy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />} Läs 25 sajter</button>
             <button onClick={loadAccounts} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-800"><RefreshCw className="h-4 w-4" /> Uppdatera</button>
           </div>
         </header>
@@ -364,26 +412,28 @@ export default function LaunchDeskPage() {
         )}
       </main>
 
-      {selected && <AccountDrawer key={`${selected.id}:${selected.updated_at}`} account={selected} activities={activities} loading={detailsLoading} busy={busy} onClose={() => setSelected(null)} onBrief={prepareBrief} onReady={markReady} onSaveDetails={saveDetails} onLog={logOutcome} onSuppress={suppress} />}
+      {selected && <AccountDrawer key={`${selected.id}:${selected.updated_at}`} account={selected} activities={activities} loading={detailsLoading} busy={busy} onClose={() => setSelected(null)} onBrief={prepareBrief} onReadSignals={readSignals} onReady={markReady} onSaveDetails={saveDetails} onLog={logOutcome} onSuppress={suppress} />}
 
       {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold">Importera prospekt</h2><p className="mt-1 text-sm text-gray-500">CSV granskas och kvalificeras server-side. Spärrade kontakter hoppas över.</p></div><button onClick={() => setImportOpen(false)}><X className="h-5 w-5 text-gray-400" /></button></div><a href="/templates/handymate-launch-desk-import.csv" download className="mb-4 inline-flex text-sm font-medium text-primary-700 hover:underline">Ladda ned CSV-mall</a><label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-200 px-5 py-10 text-center hover:border-primary-300"><FileUp className="mb-3 h-7 w-7 text-primary-700" /><span className="font-medium">Välj CSV-fil</span><span className="mt-1 text-xs text-gray-500">Semikolon eller komma, högst 500 rader</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setImportRows(parseLaunchCsv(await file.text())) }} /></label>{importRows.length > 0 && <div className="mt-4 rounded-xl bg-primary-50 p-3 text-sm text-primary-800"><Check className="mr-2 inline h-4 w-4" />{importRows.length} rader redo för serverkontroll</div>}<div className="mt-6 flex justify-end gap-2"><button onClick={() => setImportOpen(false)} className="rounded-xl px-4 py-2.5 text-sm text-gray-600">Avbryt</button><button disabled={importRows.length === 0 || importing} onClick={importCsv} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{importing && <Loader2 className="h-4 w-4 animate-spin" />} Importera</button></div></div></div>}
     </div>
   )
 }
 
-function AccountDrawer({ account, activities, loading, busy, onClose, onBrief, onReady, onSaveDetails, onLog, onSuppress }: {
+function AccountDrawer({ account, activities, loading, busy, onClose, onBrief, onReadSignals, onReady, onSaveDetails, onLog, onSuppress }: {
   account: GtmAccount
   activities: GtmActivity[]
   loading: boolean
   busy: boolean
   onClose: () => void
   onBrief: () => void
+  onReadSignals: () => void
   onReady: () => void
   onSaveDetails: (event: React.FormEvent<HTMLFormElement>) => void
   onLog: (event: React.FormEvent<HTMLFormElement>) => void
   onSuppress: (reason: GtmSuppressionReason) => void
 }) {
   const policy = channelPolicy({ legalForm: account.legal_form, contactBasis: account.contact_basis, suppressed: account.status === 'suppressed' })
+  const signalSnapshot = signalSnapshotFromAccount(account)
   const availableChannels: GtmActivityChannel[] = [...policy.allowed.filter(channel => channel !== 'none'), 'meeting', 'demo', 'other'] as GtmActivityChannel[]
   const defaultChannel = account.suggested_channel !== 'none' && availableChannels.includes(account.suggested_channel as GtmActivityChannel) ? account.suggested_channel : availableChannels[0] || 'other'
   const tomorrow = dateTimeLocal(new Date(Date.now() + 24 * 60 * 60 * 1000))
@@ -397,7 +447,20 @@ function AccountDrawer({ account, activities, loading, busy, onClose, onBrief, o
 
     {account.status !== 'suppressed' && <section className="rounded-2xl border border-gray-200 bg-white p-5"><h2 className="mb-1 font-semibold">Kontakt och nästa steg</h2><p className="mb-4 text-xs text-gray-500">Komplettera förstahandsunderlaget innan kontakt. Servern stoppar otillåtna kanalkombinationer.</p><form onSubmit={onSaveDetails} className="space-y-3"><div className="grid grid-cols-2 gap-3"><label className="text-xs text-gray-500">Bolagsform<select name="legal_form" defaultValue={account.legal_form} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900"><option value="limited_company">Aktiebolag</option><option value="sole_trader">Enskild firma</option><option value="trading_partnership">Handels-/kommanditbolag</option><option value="association">Förening</option><option value="other">Annan</option><option value="unknown">Okänd</option></select></label><label className="text-xs text-gray-500">Kontaktgrund<select name="contact_basis" defaultValue={account.contact_basis} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900"><option value="unknown">Okänd – ingen kall kontakt</option><option value="warm_intro">Varm introduktion</option><option value="inbound">Inkommande kontakt</option><option value="customer_referral">Kundreferens</option><option value="public_business_contact">Offentlig företagskontakt</option><option value="public_professional_role">Offentlig yrkesroll</option></select></label></div><div className="grid grid-cols-2 gap-3"><label className="text-xs text-gray-500">Kontaktperson<input name="primary_contact_name" defaultValue={account.primary_contact_name || ''} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label><label className="text-xs text-gray-500">Roll<input name="primary_contact_role" defaultValue={account.primary_contact_role || ''} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label></div><div className="grid grid-cols-2 gap-3"><label className="text-xs text-gray-500">E-post<input name="primary_contact_email" type="email" defaultValue={account.primary_contact_email || ''} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label><label className="text-xs text-gray-500">Telefon<input name="primary_contact_phone" defaultValue={account.primary_contact_phone || ''} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label></div><label className="block text-xs text-gray-500">LinkedIn-profil<input name="primary_contact_linkedin" type="url" defaultValue={account.primary_contact_linkedin || ''} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label><div className="grid grid-cols-2 gap-3"><label className="text-xs text-gray-500">Föreslagen kanal<select name="suggested_channel" defaultValue={account.suggested_channel} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900"><option value="none">Bedöm manuellt</option><option value="warm_intro">Varm introduktion</option><option value="phone">Telefon</option><option value="linkedin">LinkedIn</option><option value="email">E-post</option><option value="letter">Brev</option><option value="video">Personlig video</option></select></label><label className="text-xs text-gray-500">Nästa steg<input name="next_action_at" type="datetime-local" defaultValue={account.next_action_at ? dateTimeLocal(new Date(account.next_action_at)) : tomorrow} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label></div><label className="block text-xs text-gray-500">Källbunden faktanotering<textarea name="factual_notes" rows={3} defaultValue={account.factual_notes || ''} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" placeholder="Skriv bara sådant som kan kontrolleras mot sparad källa." /></label><button disabled={busy} className="w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">Spara kontaktunderlag</button></form></section>}
 
-    <section className="rounded-2xl border border-gray-200 bg-white p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">Personligt kontaktunderlag</h2><p className="text-xs text-gray-500">Källmärkt AI-utkast. Människan granskar och kontaktar.</p></div><button disabled={busy} onClick={onBrief} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-3.5 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Förbered</button></div>{account.research_summary ? <div className="space-y-4"><BriefField label="Verifierad sammanfattning" text={account.research_summary} onCopy={copy} /><BriefField label="Relevanshypotes" text={account.relevance_hypothesis} onCopy={copy} /><BriefField label="Samtalsöppning" text={account.call_opener} onCopy={copy} /><BriefField label="E-postutkast" text={account.email_draft} onCopy={copy} /><BriefField label="LinkedIn-utkast" text={account.linkedin_draft} onCopy={copy} /><BriefField label="Videomanus" text={account.video_script} onCopy={copy} /><p className="text-[11px] text-gray-400">Skapad med {account.brief_generated_by === 'ai' ? 'AI' : 'källsäker mall'} · inga utskick sker från Launch Desk.</p></div> : <div className="rounded-xl bg-gray-50 p-5 text-center text-sm text-gray-500">Förbered underlaget när källorna är kontrollerade.</div>}{['imported', 'qualified'].includes(account.status) && account.research_summary && <button disabled={busy} onClick={onReady} className="mt-4 w-full rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-medium text-primary-800">Lägg i arbetskön</button>}</section>
+    <section className="rounded-2xl border border-gray-200 bg-white p-5"><div className="mb-3 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">Signaler från deras sajt</h2><p className="text-xs text-gray-500">Härlett automatiskt ur kontots EGEN webbplats — ingen AI, aldrig kataloger.</p></div><button disabled={busy || !account.website} onClick={onReadSignals} className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm font-medium hover:bg-gray-50 disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Globe className="h-4 w-4" />} Läs sajten</button></div>
+    {!account.website ? <p className="text-sm text-gray-400">Prospektet saknar webbplats.</p>
+      : !signalSnapshot ? <p className="text-sm text-gray-400">Inte läst ännu.</p>
+      : signalSnapshot.error ? <p className="text-sm text-red-600">Sajten gick inte att läsa: {signalSnapshot.error}</p>
+      : signalSnapshot.signals.length === 0 ? <p className="text-sm text-gray-400">Inga signaler hittades ({dateTimeLabel(signalSnapshot.fetched_at)}).</p>
+      : <div className="space-y-2">{signalSnapshot.signals.map(signal => (
+          <div key={signal.key} className="rounded-xl bg-gray-50 p-3">
+            <div className="flex items-center justify-between gap-2"><p className="text-sm font-medium">{signal.label}</p><span className="flex gap-0.5" title={`Styrka ${signal.styrka}/3`}>{[1, 2, 3].map(n => <span key={n} className={`h-1.5 w-1.5 rounded-full ${n <= signal.styrka ? 'bg-primary-600' : 'bg-gray-200'}`} />)}</span></div>
+            <p className="mt-1 text-sm italic text-gray-600">"{signal.evidence}"</p>
+          </div>
+        ))}<p className="text-[11px] text-gray-400">Hämtad {dateTimeLabel(signalSnapshot.fetched_at)} från {signalSnapshot.url}</p></div>}
+    </section>
+
+    <section className="rounded-2xl border border-gray-200 bg-white p-5"><div className="mb-4 flex flex-wrap items-center justify-between gap-2"><div><h2 className="font-semibold">Personligt kontaktunderlag</h2><p className="text-xs text-gray-500">Källmärkt AI-utkast. Människan granskar och kontaktar.</p></div><button disabled={busy} onClick={onBrief} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-3.5 py-2 text-sm font-medium text-white disabled:opacity-50">{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Förbered</button></div>{account.research_summary ? <div className="space-y-4"><BriefField label="Verifierad sammanfattning" text={account.research_summary} onCopy={copy} /><BriefField label="Relevanshypotes" text={account.relevance_hypothesis} onCopy={copy} /><BriefField label="Öppningsvinkel (signal)" text={account.opening_angle} onCopy={copy} /><BriefField label="Samtalsöppning" text={account.call_opener} onCopy={copy} /><BriefField label="E-postutkast" text={account.email_draft} onCopy={copy} /><BriefField label="LinkedIn-utkast" text={account.linkedin_draft} onCopy={copy} /><BriefField label="Videomanus" text={account.video_script} onCopy={copy} /><p className="text-[11px] text-gray-400">Skapad med {account.brief_generated_by === 'ai' ? 'AI' : 'källsäker mall'} · inga utskick sker från Launch Desk.</p></div> : <div className="rounded-xl bg-gray-50 p-5 text-center text-sm text-gray-500">Förbered underlaget när källorna är kontrollerade.</div>}{['imported', 'qualified'].includes(account.status) && account.research_summary && <button disabled={busy} onClick={onReady} className="mt-4 w-full rounded-xl border border-primary-200 bg-primary-50 px-4 py-2.5 text-sm font-medium text-primary-800">Lägg i arbetskön</button>}</section>
 
     {account.status !== 'suppressed' && <section className="rounded-2xl border border-gray-200 bg-white p-5"><h2 className="mb-4 font-semibold">Logga verkligt utfall</h2><form onSubmit={onLog} className="space-y-3"><div className="grid grid-cols-2 gap-3"><label className="text-xs text-gray-500">Kanal<select name="channel" defaultValue={defaultChannel} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900">{availableChannels.map(item => <option key={item} value={item}>{CHANNEL_LABELS[item]}</option>)}</select></label><label className="text-xs text-gray-500">Utfall<select name="outcome" defaultValue="attempted" className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900">{Object.entries(OUTCOME_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label></div><label className="block text-xs text-gray-500">Nästa uppföljning<input name="next_action_at" type="datetime-local" defaultValue={tomorrow} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" /></label><label className="block text-xs text-gray-500">Anteckning<textarea name="notes" rows={3} className="mt-1 w-full rounded-lg border border-gray-200 p-2.5 text-sm text-gray-900" placeholder="Vad hände och vad är nästa steg?" /></label><button disabled={busy} className="w-full rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">Logga utfall</button></form></section>}
 

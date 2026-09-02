@@ -139,6 +139,13 @@ export interface GtmAccount {
   video_script: string | null
   brief_generated_at: string | null
   brief_generated_by: 'ai' | 'template' | null
+  // Pass 1b (tasks/plan-launch-desk-signaler.md): innehåller bl.a.
+  // signals — antingen den fulla GtmSignalSnapshot (skriven av
+  // signaler-rutten) eller en förenklad label+evidence-lista (skriven när
+  // ett brief regenereras, se lib/launch-desk/brief.ts). Ostrukturerad med
+  // avsikt — ingen ny kolumn, ingen migration.
+  brief_source_snapshot?: Record<string, unknown>
+
   created_at: string
   updated_at: string
 }

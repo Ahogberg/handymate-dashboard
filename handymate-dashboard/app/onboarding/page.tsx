@@ -13,6 +13,7 @@ import StepProductRegister from './components/StepProductRegister'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
 import { hasStep2Draft } from './step2-draft'
+import { harForetagsskannernUnderlag } from '@/lib/foretagsskannern/skanna'
 import { FirstQuoteLaunch } from '@/components/onboarding/FirstQuoteLaunch'
 import { completeFirstQuoteOnboarding } from '@/lib/onboarding/first-quote-handoff'
 import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
@@ -65,6 +66,12 @@ export default function OnboardingPage() {
     process.env.NEXT_PUBLIC_SETUP_STUDIO_ENABLED === 'true',
   )
   const finalizeLock = useRef(false)
+  // Företagsskannern-handoff (2026-09-02, tasks/plan-foretagsskannern.md):
+  // varianten i tratten (lib/onboarding/funnel.ts) ska bli 'skanner' när
+  // besökaren kom via ?via=skanner ELLER redan hade ett underlag liggande
+  // (icke-förstörande koll — StepImportData konsumerar det faktiska
+  // underlaget senare via lasOchRensaUnderlag).
+  const [viaSkanner, setViaSkanner] = useState(false)
 
   useEffect(() => {
     setStudioMode(resolveSetupStudioMode(
@@ -72,6 +79,10 @@ export default function OnboardingPage() {
       window.location.search,
       readSetupStudioPreference(),
     ))
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('via') === 'skanner' || harForetagsskannernUnderlag()) setViaSkanner(true)
+    } catch { /* ignorera — då stämplas den vanliga varianten i stället */ }
   }, [])
 
   useEffect(() => {
@@ -200,18 +211,20 @@ export default function OnboardingPage() {
           headers: { 'Content-Type': 'application/json' },
           // variant: vilken guide kunden faktiskt såg — servern stämplar
           // tratten (lib/onboarding/funnel.ts) så A/B-testet går att läsa av.
+          // 'skanner' vinner över studio/classic — det säger VARIFRÅN kunden
+          // kom, inte vilken guide-UI som visades.
           body: JSON.stringify({
             step: s,
             data: extraData || {},
             config: config || {},
-            variant: studioMode ? 'studio' : 'classic',
+            variant: viaSkanner ? 'skanner' : (studioMode ? 'studio' : 'classic'),
           }),
         })
       } catch {
         // Silent — onboarding fortsätter ändå, kan resume senare
       }
     },
-    [data.businessId, studioMode],
+    [data.businessId, studioMode, viaSkanner],
   )
 
   const next = useCallback(async () => {

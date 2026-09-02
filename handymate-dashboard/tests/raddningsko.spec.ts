@@ -410,12 +410,16 @@ test.describe('schema', () => {
   })
 })
 
-test('facit-namnet ligger sist i package.json test:contracts och i contracts.yml', () => {
+test('raddningsko.spec.ts är inkopplad i test:contracts och contracts.yml', () => {
+  // Låste tidigare att raddningsko.spec.ts var SISTA facit-namnet — sedan
+  // 2026-09-02 (tasks/plan-foretagsskannern.md) är det foretagsskannern.spec.ts
+  // i stället (samma append-mönster, se dess egen "CI-inkoppling"-svit).
+  // Den här låser bara att raddningsko.spec.ts fortfarande är med.
   const pkg = JSON.parse(read('package.json'))
   const contractsScript = pkg.scripts['test:contracts'] as string
-  expect(contractsScript.trim().endsWith('tests/raddningsko.spec.ts --no-deps --project=chromium --reporter=line')).toBe(true)
+  expect(contractsScript).toContain('tests/raddningsko.spec.ts')
 
   const workflow = read('../.github/workflows/contracts.yml')
   const lines = workflow.split('\n').map(l => l.trim()).filter(l => l.startsWith('tests/'))
-  expect(lines.at(-1)).toBe('tests/raddningsko.spec.ts')
+  expect(lines).toContain('tests/raddningsko.spec.ts')
 })

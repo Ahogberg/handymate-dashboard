@@ -9,7 +9,14 @@ function RegistreraContent() {
 
   useEffect(() => {
     const ref = searchParams?.get('ref')
-    const target = ref ? `/onboarding?ref=${ref}` : '/onboarding'
+    const via = searchParams?.get('via')
+    const qs = new URLSearchParams()
+    if (ref) qs.set('ref', ref)
+    // Företagsskannern-handoff (tasks/plan-foretagsskannern.md): ?via=skanner
+    // måste följa med in i /onboarding — sidan läser den vid mount för att
+    // stämpla rätt tratt-variant.
+    if (via) qs.set('via', via)
+    const target = qs.toString() ? `/onboarding?${qs.toString()}` : '/onboarding'
     router.replace(target)
   }, [router, searchParams])
 

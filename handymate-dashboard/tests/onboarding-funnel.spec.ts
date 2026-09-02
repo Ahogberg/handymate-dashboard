@@ -23,6 +23,7 @@ import {
   harledMaxSteg,
   markFinalized,
   markStepReached,
+  normaliseraVariant,
   readFunnel,
   sammanstallTratt,
   stripFunnelFromClientData,
@@ -163,8 +164,21 @@ test.describe('inkoppling', () => {
 
   test('onboardingsidan skickar variant med varje saveProgress', () => {
     const src = read('app/onboarding/page.tsx')
-    expect(src).toContain("variant: studioMode ? 'studio' : 'classic'")
-    expect(src).toMatch(/\[data\.businessId, studioMode\],/)
+    expect(src).toContain("variant: viaSkanner ? 'skanner' : (studioMode ? 'studio' : 'classic')")
+    expect(src).toMatch(/\[data\.businessId, studioMode, viaSkanner\],/)
+  })
+
+  // Företagsskannern-handoff (2026-09-02, tasks/plan-foretagsskannern.md):
+  // 'skanner' stämplas när ?via=skanner eller ett underlag redan låg i
+  // sessionStorage vid mount — icke-förstörande koll, StepImportData äger
+  // den faktiska konsumtionen.
+  test("'skanner' är ett giltigt varianttecken, och onboardingsidan känner av det utan att konsumera underlaget", () => {
+    expect(readFunnel({ [FUNNEL_KEY]: { reached: {}, variant: 'skanner' } })?.variant).toBe('skanner')
+    expect(normaliseraVariant('skanner')).toBe('skanner')
+
+    const src = read('app/onboarding/page.tsx')
+    expect(src).toContain("from '@/lib/foretagsskannern/skanna'")
+    expect(src).toContain("params.get('via') === 'skanner' || harForetagsskannernUnderlag()")
   })
 
   test('admin-rutten och sidan finns, isAdmin-grindade, länkade från /admin', () => {

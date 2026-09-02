@@ -5,7 +5,10 @@ export interface FitResult {
   reasons: string[]
 }
 
-const TRADE_TERMS = [
+// Exporterad (pass 1b, tasks/plan-launch-desk-signaler.md) så att
+// lib/launch-desk/signaler.ts kan återanvända EXAKT samma bransch-ordlista
+// för tjänstesignalen istället för att duplicera den.
+export const TRADE_TERMS = [
   'bygg', 'snicker', 'elektr', 'vvs', 'rör', 'måleri', 'målare', 'tak',
   'ventilation', 'markarbete', 'golv', 'kakel', 'plattsätt', 'anlägg', 'renover',
 ]
