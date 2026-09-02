@@ -1,3 +1,21 @@
+# Nattpass 7: kundminnet, pass 2 (Claude + Sonnet-agent 2026-09-02)
+
+- [x] Gap 6: agent_memories.customer_id (sql/v200, KÖRD + verifierad).
+      extractAndSaveMemory/getRelevantMemories tar customerId; utan kund
+      läses bara företagsnivå (customer_id null), med kund läses båda och
+      kundens egna rankas först (+0.2 boost). Dedupe jämför aldrig mot
+      annan kunds minne. Fail-soft vid saknad kolumn. Anropare: agent-
+      triggern (trigger_data.customer_id) och Matte-chatten (verifierat
+      sidkontext-id). Claude la till safeMemoryCustomerId (bara säkra
+      tecken i .or-filtret)
+- [x] Gap 7: Hanna läser customer_fact före kundvårdskortet: fakta på
+      kortet (payload.kundfakta + "Att tänka på"), spärr vid "inte sms"/
+      "ej sms"/"ring" (factBlocked). SMS-texten oförändrad
+- [x] Facit tests/kundminne-pass2.spec.ts i kontraktsgrinden; tsc 0,
+      302 kontrakt gröna, build ren
+
+---
+
 # Nattpass 6: kundminnet över kanaler, pass 1 (Claude + Sonnet-agent 2026-09-02)
 
 Revision: docs/audits/KUNDMINNE_REVISION_2026-09-02.md. Plan:

@@ -86,6 +86,7 @@ jobs:
           tests/aktivera-senare.spec.ts
           tests/genomgang-fore-betalning.spec.ts
           tests/kundminne-kanaler.spec.ts
+          tests/kundminne-pass2.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

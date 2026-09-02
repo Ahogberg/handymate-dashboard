@@ -526,13 +526,16 @@ test.describe('saveExtractedMemory — 42703-fallback (pre-migration, byte-ident
     const legacyInsertOps = calls[2].ops
     expect(legacyInsertOps.find((o) => o.method === 'ilike')).toBeFalsy()
     const insertPayload = legacyInsertOps.find((o) => o.method === 'insert')!.args[0]
-    // Gårdagens exakta fält — inga v149-kolumner, ingen embedding.
+    // Gårdagens exakta fält — inga v149-kolumner, ingen embedding. v200
+    // (gap 6) lägger till customer_id (null, ingen anropare skickar en här)
+    // ovanpå insertAgentMemoryRow — se tests/kundminne-pass2.spec.ts.
     expect(insertPayload).toEqual({
       business_id: 'biz_1',
       agent_id: 'hanna',
       memory_type: 'preference',
       content: 'Kunden föredrar SMS framför mejl alltid.',
       importance_score: expect.any(Number),
+      customer_id: null,
     })
     expect(insertPayload.confirmed_at).toBeUndefined()
     expect(insertPayload.source_type).toBeUndefined()
@@ -682,11 +685,11 @@ test.describe('död embedding-kod borttagen (Etapp U — ärlighet före ambitio
     expect(signatureLine).not.toContain('context')
   })
 
-  test('anroparna (trigger-route + matte/chat) skickar aldrig ett tredje argument till getRelevantMemories', () => {
+  test('anroparna (trigger-route + matte/chat) skickar customerId som ett RIKTIGT tredje argument — v200 (gap 6), se tests/kundminne-pass2.spec.ts', () => {
     const trigger = read('app/api/agent/trigger/route.ts')
     const chat = read('app/api/matte/chat/route.ts')
-    expect(trigger).toContain('getRelevantMemories(businessId, agentId)')
-    expect(chat).toContain('getRelevantMemories(businessId, currentAgent)')
+    expect(trigger).toContain('getRelevantMemories(businessId, agentId, customerIdFromTrigger)')
+    expect(chat).toContain('getRelevantMemories(businessId, currentAgent, customerId)')
   })
 })
 

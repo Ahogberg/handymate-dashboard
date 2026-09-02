@@ -50,6 +50,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { trigger_type, trigger_data, idempotency_key } = body
 
+    // v200 (gap 6): kundens id om triggern gäller en specifik kund — bara om
+    // avsändaren faktiskt skickade en sträng, aldrig ett gissat/malformerat
+    // värde. Används för både minnesläsning och minnesskrivning nedan.
+    const customerIdFromTrigger: string | null = (() => {
+      const raw = (trigger_data as any)?.customer_id ?? (trigger_data as any)?.customerId
+      return typeof raw === 'string' ? raw : null
+    })()
+
     // ── Auth: support both user-session and internal server-to-server ──
     const internalSecret = request.headers.get('x-internal-secret')
     let businessId: string
@@ -419,7 +427,7 @@ export async function POST(request: NextRequest) {
     let messagesSuffix = ''
     try {
       const [memories, agentMsgs] = await Promise.all([
-        getRelevantMemories(businessId, agentId),
+        getRelevantMemories(businessId, agentId, customerIdFromTrigger),
         fetchAgentMessages(businessId, agentId),
       ])
       memorySuffix = buildMemoryPrompt(memories)
@@ -656,7 +664,7 @@ export async function POST(request: NextRequest) {
     extractAndSaveMemory(businessId, agentId, finalResponse, trigger_type, trigger_data || {}, {
       type: 'agent_run',
       id: runId,
-    }).catch((err) =>
+    }, customerIdFromTrigger).catch((err) =>
       console.error('[AgentTrigger] extractAndSaveMemory failed (non-blocking):', businessId, agentId, err)
     )
 

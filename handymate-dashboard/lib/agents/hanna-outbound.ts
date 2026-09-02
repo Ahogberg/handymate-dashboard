@@ -39,6 +39,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { canContactCustomer } from '@/lib/outbound/frequency-guard'
+import { arSchemaSaknas } from '@/lib/observability/driftlarm'
 import {
   HANNA_OUTBOUND_QUIET_DAYS,
   fetchQuietCustomers,
@@ -159,15 +160,75 @@ async function latestJobTypesForCustomers(
 interface ProposeCareCardResult {
   inserted: boolean
   freqBlocked: boolean
+  /** Gap 7 (kundminne-revisionen 2026-09-02): kunden har ett bekräftat
+   *  kundfaktum som spärrar SMS (t.ex. "ring inte sms") — inget kort
+   *  skapades alls. */
+  factBlocked: boolean
+}
+
+/** Kundfaktum Hanna får läsa innan hon föreslår återkontakt — se
+ *  fetchCareCustomerFacts. */
+interface CareCustomerFact {
+  fact_type: string
+  content: string
 }
 
 /**
- * Skapar (eller inte — frekvensvakten kan blockera) ETT 'proactive_care'-
- * kort för en enskild tyst kund. Exakt samma korts form (title, description,
- * payload-fälten) för mission- och vanliga kandidater — enda skillnaden är
- * ETT tillägg: missionStamp lägger payload.mission_id + payload.truth_class
- * ovanpå. Ren refaktorering av det som tidigare var batch-loopens kropp;
- * ingen ny gren i det vanliga (missionStamp===null) fallet.
+ * Gap 7 (kundminne-revisionen 2026-09-02, docs/audits/
+ * KUNDMINNE_REVISION_2026-09-02.md): läser kundens senast bekräftade fakta
+ * INNAN Hanna föreslår kontakt, så hon vet vad vi faktiskt vet — ALDRIG
+ * hittar på kontext i SMS:et. Bara icke-ersatta preference/constraint/
+ * contact-fakta, mest nya först. Fail-soft: fel eller saknad tabell
+ * (customer_fact, v122) ⇒ tom lista — samma idiom som
+ * lib/ai-quote-generator.ts:s fetchCustomerFactsForQuote.
+ */
+async function fetchCareCustomerFacts(
+  supabase: SupabaseClient,
+  businessId: string,
+  customerId: string,
+): Promise<CareCustomerFact[]> {
+  try {
+    const { data, error } = await supabase
+      .from('customer_fact')
+      .select('fact_type, content')
+      .eq('business_id', businessId)
+      .eq('customer_id', customerId)
+      .is('superseded_by', null)
+      .in('fact_type', ['preference', 'constraint', 'contact'])
+      .order('created_at', { ascending: false })
+      .limit(5)
+    if (error) {
+      if (!arSchemaSaknas(error)) {
+        console.warn('[hanna-outbound] customer_fact-läsning misslyckades (fail-soft, tom lista):', error.message)
+      }
+      return []
+    }
+    return (data || []) as CareCustomerFact[]
+  } catch (err: unknown) {
+    console.warn(
+      '[hanna-outbound] customer_fact-läsning kastade (fail-soft, tom lista):',
+      err instanceof Error ? err.message : String(err),
+    )
+    return []
+  }
+}
+
+/** Spärrar detta faktum SMS-utskick? Bara contact/constraint räknas — en
+ *  preference om t.ex. golvtyp ska aldrig blockera en kontaktkanal. */
+function isSmsBlockingFact(fact: CareCustomerFact): boolean {
+  if (fact.fact_type !== 'contact' && fact.fact_type !== 'constraint') return false
+  const lower = fact.content.toLowerCase()
+  return lower.includes('inte sms') || lower.includes('ej sms') || lower.includes('ring')
+}
+
+/**
+ * Skapar (eller inte — frekvensvakten eller en kundfakta-spärr kan blockera)
+ * ETT 'proactive_care'-kort för en enskild tyst kund. Exakt samma korts form
+ * (title, description, payload-fälten) för mission- och vanliga kandidater —
+ * enda skillnaden är ETT tillägg: missionStamp lägger payload.mission_id +
+ * payload.truth_class ovanpå. Ren refaktorering av det som tidigare var
+ * batch-loopens kropp; ingen ny gren i det vanliga (missionStamp===null)
+ * fallet.
  */
 async function proposeCareCard(
   supabase: SupabaseClient,
@@ -183,7 +244,16 @@ async function proposeCareCard(
   // samma vecka. Räknas mot samma skipped_recent-siffra i svaret, oavsett
   // om kandidaten kom från mission- eller det vanliga flödet.
   const freq = await canContactCustomer(supabase, businessId, customer.customer_id)
-  if (!freq.allowed) return { inserted: false, freqBlocked: true }
+  if (!freq.allowed) return { inserted: false, freqBlocked: true, factBlocked: false }
+
+  // Gap 7: läs kundfakta INNAN kortet byggs. Ärligt använda — aldrig som
+  // påhittad kontext i SMS-texten, bara synliga för ägaren på kortet.
+  const kundfakta = await fetchCareCustomerFacts(supabase, businessId, customer.customer_id)
+  if (kundfakta.some(isSmsBlockingFact)) {
+    // Kunden har ett bekräftat faktum om att INTE bli SMS:ad (eller att bli
+    // ringd i stället) — skapa inget SMS-förslag alls.
+    return { inserted: false, freqBlocked: false, factBlocked: true }
+  }
 
   // Skräddarsy efter senaste tjänsten om vi har den.
   let service: string | null = null
@@ -212,6 +282,9 @@ async function proposeCareCard(
     job_type: service,
     suggested_service: service || 'tidigare jobb',
     suggested_sms: sms,
+    // Gap 7: ägaren ska se vad Hanna vet om kunden INNAN godkännande —
+    // aldrig gömt, aldrig i SMS-texten.
+    kundfakta: kundfakta.map((f) => ({ fact_type: f.fact_type, content: f.content })),
   }
   // Etapp J: mission-stämpling — matchar mission-progress.ts:s attributionsregel
   // (payload.truth_class i första hand, se approvalClass()).
@@ -220,17 +293,29 @@ async function proposeCareCard(
     payload.truth_class = missionStamp.truth_class
   }
 
+  // Gap 7: max två fakta på kortet, constraint (viktigast) först.
+  const attTankaPa = kundfakta
+    .filter((f) => f.fact_type === 'constraint')
+    .concat(kundfakta.filter((f) => f.fact_type !== 'constraint'))
+    .slice(0, 2)
+    .map((f) => `Att tänka på: ${f.content}`)
+
+  const description = [
+    `Tidigare kund, inaktiv i ~${monthsInactive} mån. Förslag på varm återkontakt.`,
+    ...attTankaPa,
+  ].join('\n')
+
   const { error } = await supabase.from('pending_approvals').insert({
     id: genId('appr'),
     business_id: businessId,
     approval_type: 'proactive_care',
     title: `Hanna vill väcka ${customer.name || 'kund'}`,
-    description: `Tidigare kund, inaktiv i ~${monthsInactive} mån. Förslag på varm återkontakt.`,
+    description,
     status: 'pending',
     risk_level: 'low',
     payload,
   })
-  return { inserted: !error, freqBlocked: false }
+  return { inserted: !error, freqBlocked: false, factBlocked: false }
 }
 
 export async function runHannaOutbound(
@@ -342,7 +427,7 @@ export async function runHannaOutbound(
         mission_id: activeContactMission.id,
         truth_class: 'ateraktivering',
       })
-      if (result.freqBlocked) {
+      if (result.freqBlocked || result.factBlocked) {
         skipped_recent++
         continue
       }
@@ -358,7 +443,7 @@ export async function runHannaOutbound(
   let proposed = 0
   for (const c of batch) {
     const result = await proposeCareCard(supabase, businessId, businessName, c, now, null)
-    if (result.freqBlocked) {
+    if (result.freqBlocked || result.factBlocked) {
       skipped_recent++
       continue
     }

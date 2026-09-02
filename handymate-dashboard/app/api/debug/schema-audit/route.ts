@@ -59,6 +59,9 @@ const EXPECTED: ExpectedColumn[] = [
   { table: 'agent_memories', column: 'memory_id', migration: 'v21_agent_memory', critical: false },
   { table: 'agent_memories', column: 'embedding', migration: 'v21_agent_memory', critical: false },
 
+  // v200 agentminne per kund (kundminne-revisionen 2026-09-02, gap 6)
+  { table: 'agent_memories', column: 'customer_id', migration: 'v200_agent_memories_customer_id', critical: false },
+
   // v23 review requests
   { table: 'review_request', column: 'review_url', migration: 'v23_review_requests', critical: true },
   { table: 'review_request', column: 'sms_text', migration: 'v23_review_requests', critical: false },

@@ -141,6 +141,31 @@ export function rankByEffectiveScore<T extends { importance_score: number; creat
   )
 }
 
+/** v200 (sql/v200_agent_memories_customer_id.sql, gap 6): kundens EGNA minnen
+ *  ska rankas FÖRE likvärdiga företagsminnen. Valt: en boost på den
+ *  färskhetsviktade poängen innan sortering, hellre än att sortera i två
+ *  separata grupper — en boost låter färskhetsdecay fortfarande avgöra
+ *  ordningen både inom OCH mellan de två (ett urgammalt kundminne kan
+ *  fortfarande tappa mot ett färskt företagsminne; en ren gruppsortering hade
+ *  aldrig tillåtit det). customerId=null (den vanliga företagsnivå-frågan)
+ *  ⇒ boost alltid 0 för alla rader ⇒ identisk ordning som rankByEffectiveScore. */
+export const CUSTOMER_MEMORY_RANK_BOOST = 0.2
+
+/** v200: kund-id:t interpoleras i ett PostgREST-filter (.or). Bara id:n med
+ *  säkra tecken släpps in — annars behandlas anropet som företagsnivå. */
+export function safeMemoryCustomerId(value: string | null | undefined): string | null {
+  return typeof value === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(value) ? value : null
+}
+
+export function rankByEffectiveScoreWithCustomerBoost<
+  T extends { importance_score: number; created_at: string; customer_id?: string | null },
+>(memories: T[], customerId: string | null, now: Date = new Date()): T[] {
+  const score = (m: T) =>
+    effectiveImportance(m.importance_score, m.created_at, now) +
+    (customerId && m.customer_id === customerId ? CUSTOMER_MEMORY_RANK_BOOST : 0)
+  return [...memories].sort((a, b) => score(b) - score(a))
+}
+
 // ── Dedupe/supersede — deterministisk, ALDRIG LLM-dömd ──
 
 /**
@@ -237,6 +262,10 @@ export interface SaveExtractedMemoryInput {
   rawContent: string
   triggerType: string
   source?: MemorySource
+  /** v200 (sql/v200_agent_memories_customer_id.sql, gap 6): kundens id om
+   *  minnet gäller en specifik kund. null/saknas = företagsnivå (som innan
+   *  v200) — oförändrat beteende när ingen anropare skickar detta. */
+  customerId?: string | null
 }
 
 export type SaveExtractedMemoryResult =
@@ -256,6 +285,7 @@ export async function saveExtractedMemory(
   input: SaveExtractedMemoryInput,
 ): Promise<SaveExtractedMemoryResult> {
   const { businessId, agentId, triggerType, source } = input
+  const customerId = safeMemoryCustomerId(input.customerId)
   const trimmed = (input.rawContent || '').trim()
   if (!trimmed || trimmed === 'INGEN' || trimmed.length < 10) {
     return { action: 'discarded' }
@@ -268,13 +298,21 @@ export async function saveExtractedMemory(
   const memoryType = classifyMemoryType(content, triggerType)
   const importance = calculateImportance(triggerType, content)
 
-  const { data: candidates, error: candErr } = await supabase
+  const baseCandidatesQuery = supabase
     .from('agent_memories')
     .select('id, content, memory_type, access_count')
     .eq('business_id', businessId)
     .eq('agent_id', agentId)
     .is('superseded_by', null)
-    .limit(50)
+
+  // v200: en kunds dedupe/supersede ska bara jämföras mot samma kunds egna
+  // minnen ELLER företagsnivå (customer_id null) — ALDRIG mot en ANNAN
+  // kunds minne. Utan customerId (företagsnivå-skrivning) oförändrat.
+  const candidatesQuery = customerId
+    ? baseCandidatesQuery.or(`customer_id.is.null,customer_id.eq.${customerId}`)
+    : baseCandidatesQuery
+
+  const { data: candidates, error: candErr } = await candidatesQuery.limit(50)
 
   if (candErr) {
     if (!isMissingColumnError(candErr)) {
@@ -283,7 +321,7 @@ export async function saveExtractedMemory(
     }
     // Pre-migration (42703 på superseded_by) — kör gårdagens exakta
     // väg: substring-dedupe, ingen bekräftelsegrind, ingen ny kolumn.
-    return saveExtractedMemoryLegacy(supabase, businessId, agentId, content, memoryType, importance)
+    return saveExtractedMemoryLegacy(supabase, businessId, agentId, content, memoryType, importance, customerId)
   }
 
   const decision = decideDedupeAction(content, memoryType, candidates || [])
@@ -306,9 +344,9 @@ export async function saveExtractedMemory(
   }
 
   const needsConfirmation = requiresConfirmation(memoryType)
-  const { data: inserted, error: insertErr } = await supabase
-    .from('agent_memories')
-    .insert({
+  const { data: inserted, error: insertErr } = await insertAgentMemoryRow(
+    supabase,
+    {
       business_id: businessId,
       agent_id: agentId,
       memory_type: memoryType,
@@ -317,9 +355,9 @@ export async function saveExtractedMemory(
       confirmed_at: needsConfirmation ? null : new Date().toISOString(),
       source_type: source?.type ?? null,
       source_id: source?.id ?? null,
-    })
-    .select('id')
-    .single()
+    },
+    customerId,
+  )
 
   if (insertErr || !inserted) {
     console.error('[agent-memory] insert misslyckades:', insertErr?.message)
@@ -348,7 +386,25 @@ export async function saveExtractedMemory(
     : { action: 'inserted', memoryId: inserted.id, legacy: false, confirmationPending: needsConfirmation }
 }
 
-/** Exakt gårdagens beteende — substring-dedupe, ingen v149-kolumn rörd. */
+/** v200 (sql/v200_agent_memories_customer_id.sql): försöker alltid infoga
+ *  customer_id (null vid företagsnivå). Fail-soft: om kolumnen inte finns än
+ *  (isMissingColumnError) görs samma insert om EXAKT utan fältet — precis
+ *  samma rad som innan v200, bara ett extra om-anrop. */
+async function insertAgentMemoryRow(
+  supabase: SupabaseClient,
+  row: Record<string, unknown>,
+  customerId: string | null | undefined,
+): Promise<{ data: { id: string } | null; error: { message?: string; code?: string } | null }> {
+  const withCustomer = { ...row, customer_id: customerId ?? null }
+  const attempt = await supabase.from('agent_memories').insert(withCustomer).select('id').single()
+  if (attempt.error && isMissingColumnError(attempt.error)) {
+    return supabase.from('agent_memories').insert(row).select('id').single()
+  }
+  return attempt
+}
+
+/** Exakt gårdagens beteende — substring-dedupe, ingen v149-kolumn rörd.
+ *  customer_id (v200) läggs med i inserten ändå — se insertAgentMemoryRow. */
 async function saveExtractedMemoryLegacy(
   supabase: SupabaseClient,
   businessId: string,
@@ -356,6 +412,7 @@ async function saveExtractedMemoryLegacy(
   content: string,
   memoryType: MemoryType,
   importance: number,
+  customerId?: string | null,
 ): Promise<SaveExtractedMemoryResult> {
   const { data: existing } = await supabase
     .from('agent_memories')
@@ -377,17 +434,17 @@ async function saveExtractedMemoryLegacy(
     return { action: 'bumped', memoryId: existing[0].id }
   }
 
-  const { data: inserted, error: insertErr } = await supabase
-    .from('agent_memories')
-    .insert({
+  const { data: inserted, error: insertErr } = await insertAgentMemoryRow(
+    supabase,
+    {
       business_id: businessId,
       agent_id: agentId,
       memory_type: memoryType,
       content,
       importance_score: importance,
-    })
-    .select('id')
-    .single()
+    },
+    customerId,
+  )
 
   if (insertErr || !inserted) {
     console.error('[agent-memory] legacy insert misslyckades:', insertErr?.message)
@@ -453,6 +510,9 @@ export async function extractAndSaveMemory(
   triggerType: string,
   triggerData: Record<string, unknown>,
   source?: MemorySource,
+  /** v200 (gap 6): kundens id om körningen/turen gällde en specifik kund.
+   *  null/saknas = företagsnivå (oförändrat beteende). */
+  customerId?: string | null,
 ): Promise<void> {
   if (!finalResponse || finalResponse.length < 30) return
   if (!process.env.ANTHROPIC_API_KEY) return
@@ -502,7 +562,7 @@ Agentens svar: ${finalResponse.slice(0, 500)}`
 
     const rawContent = extraction.content?.[0]?.text?.trim() || ''
     const supabase = getServerSupabase()
-    await saveExtractedMemory(supabase, { businessId, agentId, rawContent, triggerType, source })
+    await saveExtractedMemory(supabase, { businessId, agentId, rawContent, triggerType, source, customerId })
   } catch (err) {
     console.error('[agent-memory] Failed to extract/save memory:', err)
   }
@@ -517,6 +577,9 @@ export interface RelevantMemoryRow {
   memory_type: string
   created_at: string
   access_count?: number
+  /** v200 — saknas (undefined) på legacy-fallbackens rader (kolumnen läses
+   *  inte där), null = företagsnivå, annars kundens id. */
+  customer_id?: string | null
 }
 
 const RELEVANT_MEMORIES_FETCH_LIMIT = 200
@@ -538,18 +601,27 @@ export async function fetchRelevantMemories(
   supabase: SupabaseClient,
   businessId: string,
   agentId: string,
-  opts: { now?: Date } = {},
+  opts: { now?: Date; customerId?: string | null } = {},
 ): Promise<RelevantMemoryRow[]> {
   const now = opts.now ?? new Date()
+  const customerId = safeMemoryCustomerId(opts.customerId)
 
-  const { data, error } = await supabase
+  const baseQuery = supabase
     .from('agent_memories')
-    .select('id, content, importance_score, memory_type, created_at, access_count')
+    .select('id, content, importance_score, memory_type, created_at, access_count, customer_id')
     .eq('business_id', businessId)
     .or(`agent_id.eq.${agentId},agent_id.eq.matte`)
     .is('superseded_by', null)
     .not('confirmed_at', 'is', null)
-    .limit(RELEVANT_MEMORIES_FETCH_LIMIT)
+
+  // v200 (gap 6): utan customerId bara företagsnivå (customer_id IS NULL) —
+  // en kunds minnen ska aldrig läcka in i ett sammanhang utan den kunden.
+  // Med customerId: företagsnivå OCH kundens egna.
+  const scopedQuery = customerId
+    ? baseQuery.or(`customer_id.is.null,customer_id.eq.${customerId}`)
+    : baseQuery.is('customer_id', null)
+
+  const { data, error } = await scopedQuery.limit(RELEVANT_MEMORIES_FETCH_LIMIT)
 
   let rows = data as RelevantMemoryRow[] | null
   let readErr = error
@@ -576,7 +648,7 @@ export async function fetchRelevantMemories(
   }
   if (!rows || rows.length === 0) return []
 
-  const top = rankByEffectiveScore(rows, now).slice(0, RELEVANT_MEMORIES_TOP_N)
+  const top = rankByEffectiveScoreWithCustomerBoost(rows, customerId, now).slice(0, RELEVANT_MEMORIES_TOP_N)
 
   const ids = top.map((m) => m.id)
   if (ids.length > 0) {
@@ -592,29 +664,54 @@ export async function fetchRelevantMemories(
 /**
  * Hämtar top-5 relevanta minnen via cosine similarity — NEJ: se
  * fetchRelevantMemories filhuvud, det är top-N per bekräftad relevanspoäng
- * med färskhetsdecay, ingen vektorsökning. Behåller signaturen
- * (businessId, agentId) — ingen anropare har någonsin skickat ett
- * context-argument (verifierat i app/api/agent/trigger/route.ts och
- * app/api/matte/chat/route.ts), så det tredje argumentet är borttaget
- * helt (Etapp U, ärlighet före ambition) i stället för att låtsas
- * användas.
+ * med färskhetsdecay, ingen vektorsökning. Det gamla context-argumentet
+ * (Etapp U, ärlighet före ambition) är fortfarande borta — ingen låtsad
+ * vektorsökning. v200 (gap 6) lägger till ett RIKTIGT tredje argument,
+ * customerId: en verklig kund-scopning (företagsnivå + kundens egna),
+ * inte en attrapp.
  */
-export async function getRelevantMemories(businessId: string, agentId: string): Promise<string[]> {
-  const supabase = getServerSupabase()
-  const rows = await fetchRelevantMemories(supabase, businessId, agentId)
-  return rows.map((r) => r.content)
+export interface RelevantMemoryText {
+  content: string
+  /** v200: sant om minnet är kundspecifikt för den efterfrågade kunden —
+   *  buildMemoryPrompt markerar dessa så agenten aldrig blandar ihop dem
+   *  med firmanivå-lärdomar. */
+  isCustomer: boolean
 }
 
+export async function getRelevantMemories(
+  businessId: string,
+  agentId: string,
+  customerId?: string | null,
+): Promise<RelevantMemoryText[]> {
+  const supabase = getServerSupabase()
+  const rows = await fetchRelevantMemories(supabase, businessId, agentId, { customerId })
+  return rows.map((r) => ({ content: r.content, isCustomer: !!customerId && r.customer_id === customerId }))
+}
+
+/** Antingen ett rått minne (företagsnivå, gårdagens form) eller ett
+ *  RelevantMemoryText (v200) som kan vara kundmärkt. */
+export type MemoryPromptItem = string | RelevantMemoryText
+
 /**
- * Build prompt injection for agent memories
+ * Build prompt injection for agent memories.
+ *
+ * v200 (gap 6): ett minne med isCustomer=true märks med prefixet
+ * "Om kunden: " så agenten aldrig blandar ihop ett kundspecifikt minne med
+ * en firmanivå-lärdom. Rena strängar (gårdagens form) märks aldrig.
  */
-export function buildMemoryPrompt(memories: string[]): string {
+export function buildMemoryPrompt(memories: MemoryPromptItem[]): string {
   if (memories.length === 0) return ''
+
+  const lines = memories.map((m, i) => {
+    if (typeof m === 'string') return `${i + 1}. ${m}`
+    const prefix = m.isCustomer ? 'Om kunden: ' : ''
+    return `${i + 1}. ${prefix}${m.content}`
+  })
 
   return `
 
 === Vad du vet om detta företag ===
-${memories.map((m, i) => `${i + 1}. ${m}`).join('\n')}
+${lines.join('\n')}
 === Slut på minnen ===
 Använd dessa lärdomar när du fattar beslut. Uppdatera inte minnen — fokusera på uppgiften.`
 }

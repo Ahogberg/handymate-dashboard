@@ -1280,7 +1280,7 @@ export async function POST(request: NextRequest) {
       // Fail-safe: fel här får aldrig fälla chatten — degraderar tyst.
       let memorySuffix = ''
       try {
-        const memories = workReport ? [] : await getRelevantMemories(businessId, currentAgent)
+        const memories = workReport ? [] : await getRelevantMemories(businessId, currentAgent, customerId)
         memorySuffix = buildMemoryPrompt(memories)
       } catch (err) {
         console.error('[matte/chat] memory fetch failed (non-blocking):', err)
@@ -1629,7 +1629,9 @@ export async function POST(request: NextRequest) {
       // en helt ny tråd som inte hann skapas).
       type: 'chat_thread',
       id: thread?.id ?? null,
-    }).catch((err) => console.error('[matte/chat] extractAndSaveMemory failed (non-blocking):', err))
+    // v200 (gap 6): server-verifierade sidkontext-id:t (aldrig ett
+    // ovalidat id från klienten) — se verifyPageContextOwnership ovan.
+    }, customerId).catch((err) => console.error('[matte/chat] extractAndSaveMemory failed (non-blocking):', err))
 
     await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
 
