@@ -499,3 +499,24 @@ text som innehåller backticks, ${} eller blandade citattecken skrivs ALDRIG
 inline i Bash — den går via Write till en skriptfil (eller Edit på en läst
 fil) och körs sedan med `node fil.js`. Kontrollera resultatet med grep innan
 commit.
+
+## 2026-08-30 — sociala omslag: profilöverlapp måste följa faktisk sidlayout
+
+Facebooks sidbyggare visade profilbilden centrerad med djup överlappning,
+medan det lokala provet bara testade vänsterställt överlapp. Underraden
+doldes trots att det lokala provet såg grönt ut. Utgå från användarens faktiska
+skärmbild; testa även centrerat överlapp och håll nederdelen fri från viktig
+text. Märk simulerade prov som just simuleringar. En tagline som redan står
+i sidbeskrivningen kan tas bort i stället för att pressas in bredvid loggan.
+
+## 2026-09-02 — Källskannings-specar måste normalisera CRLF
+
+`tests/kundminne-pass3.spec.ts` (Codex, skriven på Linux) läste
+`tool-router.ts` rått och matchade `"case 'get_customer':\n        return"` —
+röd på Windows-checkout eftersom arbetskopian är `w/crlf` trots `i/lf`.
+Filen var orörd; bara läsningen var fel.
+
+**Regel:** varje `read`/`kod`-helper i en källskannande spec ska sluta med
+`.replace(/\r\n/g, '\n')`. Fixa i specen, aldrig i källfilen. När en
+nypullad spec är röd direkt efter merge: kolla `git ls-files --eol <fil>`
+innan du misstänker mergen.

@@ -1,3 +1,4 @@
+-- OBS: kördes i Supabase under namnet v203_raddningsko_och_lanseringsbevis (2026-09-02) — filen omdöpt till v203 eftersom v202 togs av attribution_link_enabled på main samma dag. Innehållet oförändrat.
 -- v202: Räddningskön + lanseringsbevis (docs/launch/FORSTA_10_KUNDER_BEVIS_OCH_RADDNING.md, 2026-09-02).
 --
 -- raddningsarende — en rad per (företag, signal) som är öppen; den dagliga

@@ -9,6 +9,7 @@ import {
   selectInvoiceTemplate,
 } from '@/lib/invoice-templates'
 import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
+import { buildAttribution } from '@/lib/branding/attribution'
 
 // Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
 // @sparticuz/chromium packar upp binären vid första anropet. Samma mönster
@@ -146,6 +147,8 @@ export async function GET(request: NextRequest) {
           invoice_footer_text: businessConfig?.invoice_footer_text,
           penalty_interest: businessConfig?.penalty_interest || businessConfig?.late_fee_percent,
         },
+        // businessConfig är hela raden (select('*')) — stämpeln byggs direkt.
+        { attribution: buildAttribution(businessConfig) },
       )
 
       return new NextResponse(pdfBuffer, {

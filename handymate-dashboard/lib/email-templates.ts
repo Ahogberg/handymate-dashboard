@@ -5,6 +5,7 @@
  */
 
 import { extractFirstName, halsning } from '@/lib/customers/namn'
+import { buildAttribution, attributionEmailHtml, type Attribution } from '@/lib/branding/attribution'
 
 interface BusinessBranding {
   businessName: string
@@ -13,6 +14,12 @@ interface BusinessBranding {
   contactEmail?: string
   contactPhone?: string
   orgNumber?: string
+  /**
+   * Handymate-stämpeln i foten (lib/branding/attribution.ts). Utelämnad
+   * → texten utan länk. Anropare med business_id laddar via loadAttribution
+   * så ordet Handymate länkar till företagets rekommendationssida.
+   */
+  attribution?: Attribution
 }
 
 // ── Base Layout ────────────────────────────────────────────────
@@ -56,9 +63,7 @@ function emailLayout(branding: BusinessBranding, content: string, footerExtra?: 
                 ${branding.orgNumber ? ` | Org.nr: ${branding.orgNumber}` : ''}
                 ${branding.contactPhone ? ` | Tel: ${branding.contactPhone}` : ''}
               </p>
-              <p style="margin:4px 0 0;font-size:11px;color:#cbd5e1;">
-                Skickat via Handymate
-              </p>
+              ${attributionEmailHtml(branding.attribution ?? buildAttribution(null))}
             </td>
           </tr>
         </table>

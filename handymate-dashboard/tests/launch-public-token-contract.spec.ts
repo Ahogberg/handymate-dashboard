@@ -72,6 +72,8 @@ test.describe('Launchfacit — föränderliga publika kundrutter', () => {
     const assembleStart = lib.indexOf('export async function assembleJobbpassView(')
     expect(assembleStart).toBeGreaterThan(-1)
     expect(lib.indexOf('deriveJobbpassView({', assembleStart)).toBeGreaterThan(assembleStart)
-    expect(route).toMatch(/return NextResponse\.json\(\{\s*jobbpass:\s*view\s*\}\)/)
+    // Svaret är kundvyn + stämpeln ("Skickat via Handymate", lib/branding/
+    // attribution.ts) — inget annat ur jobbpass-raden får läcka bredvid.
+    expect(route).toMatch(/return NextResponse\.json\(\{\s*jobbpass:\s*view,\s*attribution\s*\}\)/)
   })
 })

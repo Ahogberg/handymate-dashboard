@@ -10,6 +10,7 @@ import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
+import { buildAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -240,10 +241,11 @@ function generateEmailHTML(
       </div>
     </div>
 
-    <!-- Disclaimer -->
+    <!-- Stämpeln (lib/branding/attribution.ts) — samma HTML går via Gmail och Resend -->
     <p style="text-align: center; color: #999; font-size: 11px; margin-top: 20px;">
-      Detta email skickades från ${businessName} via Handymate.
+      Detta email skickades från ${businessName}.
     </p>
+    ${attributionEmailHtml(buildAttribution(business))}
   </div>
 ${trackingPixelUrl ? `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />` : ''}
 </body>

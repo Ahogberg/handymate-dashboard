@@ -537,7 +537,7 @@ function ProjectsListView({
             ))}
           </div>
         )}
-        <PortalHandymateAttribution />
+        <PortalHandymateAttribution attribution={portal.attribution} />
       </div>
     </>
   )

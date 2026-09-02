@@ -2,7 +2,7 @@
  * Portal notifications — automatiska mail till kunden vid viktiga events.
  *
  * Mallen matchar Modern offert: hantverkarens logo + accent_color prominent,
- * "Powered by Handymate" subtle i footern.
+ * Handymate-stämpeln (lib/branding/attribution.ts) subtle i footern.
  *
  * Anti-spam: samma event till samma kund inom 1h hoppas över.
  *
@@ -10,6 +10,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { loadAttribution, attributionEmailHtml, type Attribution } from '@/lib/branding/attribution'
 
 export type PortalNotificationEvent =
   | 'new_message'
@@ -237,6 +238,9 @@ export async function sendPortalNotification(
   const copy = EVENT_COPY[event]
   const subject = copy.subject(context, businessName)
   const ctaText = typeof copy.cta === 'function' ? copy.cta(context) : copy.cta
+  // Stämpelns underlag — egen felisolerad query (business-selecten ovan är en
+  // explicit kolumnlista och attribution_link_enabled finns först i sql/v202).
+  const attribution = await loadAttribution(supabase, businessId)
   const html = buildEmailHtml({
     accentColor,
     businessName,
@@ -247,6 +251,7 @@ export async function sendPortalNotification(
     emoji: copy.emoji,
     cta: ctaText,
     portalUrl: portalUrl + eventToPortalAnchor(event, context),
+    attribution,
   })
 
   // Skicka via Resend
@@ -351,11 +356,12 @@ interface BuildOpts {
   emoji: string
   cta: string
   portalUrl: string
+  attribution: Attribution
 }
 
 /**
  * Bygg HTML-mall som matchar Modern offert. Hantverkarens branding
- * (logo + accentfärg) prominent, "Powered by Handymate" subtle.
+ * (logo + accentfärg) prominent, Handymate-stämpeln subtle.
  */
 function buildEmailHtml(opts: BuildOpts): string {
   const firstName = (opts.customerName.split(' ')[0] || opts.customerName).trim()
@@ -416,12 +422,8 @@ function buildEmailHtml(opts: BuildOpts): string {
       </p>
     </div>
 
-    <!-- Footer (subtle Handymate) -->
-    <div style="text-align: center; padding: 20px 16px 0;">
-      <p style="margin: 0; font-size: 11px; color: #94A3B8; letter-spacing: 0.3px;">
-        Powered by <a href="https://handymate.se" style="color: #94A3B8; text-decoration: none; font-weight: 500;">Handymate</a>
-      </p>
-    </div>
+    <!-- Footer (stämpeln, lib/branding/attribution.ts) -->
+    ${attributionEmailHtml(opts.attribution)}
   </div>
 </body>
 </html>`

@@ -1,7 +1,7 @@
 # Actionplan: Räddningskön + lanseringsbevis (2026-09-02, Andreas: "kör enligt din rekommendation")
 
 Program: docs/launch/FORSTA_10_KUNDER_BEVIS_OCH_RADDNING.md (läs §3 och §5).
-Migration sql/v202_raddningsko_och_lanseringsbevis.sql är REDAN KÖRD i
+Migration sql/v203_raddningsko_och_lanseringsbevis.sql är REDAN KÖRD i
 Supabase av Claude. Koden ska ändå vara fail-soft vid saknad tabell
 (arSchemaSaknas från lib/observability/driftlarm) — då loggas en varning
 och körningen svarar { skipped: 'schema' }.
@@ -109,7 +109,7 @@ Alla summaries på svenska, korta, med talen.
 - Admin: isAdmin på alla tre rutter, logAdminAction i POST, 'rescue'-flik i
   app/admin/page.tsx, RaddningskoTab innehåller "Tar det"/"Löst"/"Avfärda".
 - readiness: hamtaLanseringsbevis fail-soft, launch-readiness använder den.
-- sql/v202 finns; schema-audit får båda tabellerna (critical: false).
+- sql/v203 finns; schema-audit får båda tabellerna (critical: false).
 Lägg facit-namnet sist i BÅDE `test:contracts` i package.json och listan i
 ../.github/workflows/contracts.yml.
 

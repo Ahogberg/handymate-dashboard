@@ -1,6 +1,13 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import { generateOCR } from '@/lib/ocr'
+import { buildAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
+
+/** Valfria tillägg för jsPDF-renderarna (fallback-vägen när Chromium saknas). */
+export interface PdfGeneratorOptions {
+  /** Handymate-stämpeln (lib/branding/attribution.ts). Utelämnad → texten utan länk. */
+  attribution?: Attribution
+}
 
 interface InvoiceItem {
   description: string
@@ -76,7 +83,7 @@ const LABEL_COLOR = [203, 213, 225] as const  // #CBD5E1
 const BORDER_COLOR = [226, 232, 240] as const // #E2E8F0
 const SEPARATOR = [241, 245, 249] as const    // #F1F5F9
 
-export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData): Buffer {
+export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData, opts: PdfGeneratorOptions = {}): Buffer {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
@@ -387,6 +394,8 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData)
     doc.text(col.value, fx, y + 5)
   })
 
+  stampAttributionOnPdf(doc, opts.attribution ?? buildAttribution(null))
+
   // Return as Buffer
   const arrayBuffer = doc.output('arraybuffer')
   return Buffer.from(arrayBuffer)
@@ -498,7 +507,7 @@ function formatDateSv(iso: string | null | undefined): string {
   return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })
 }
 
-export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData): Buffer {
+export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData, opts: PdfGeneratorOptions = {}): Buffer {
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
   const margin = 20
@@ -845,6 +854,8 @@ export function generateQuotePDF(quote: QuotePdfData, business: BusinessPdfData)
   if (footerParts.length > 0) {
     doc.text(footerParts.join(' · '), margin, footerY + 5)
   }
+
+  stampAttributionOnPdf(doc, opts.attribution ?? buildAttribution(null))
 
   const arrayBuffer = doc.output('arraybuffer')
   return Buffer.from(arrayBuffer)

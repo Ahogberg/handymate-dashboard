@@ -2,6 +2,8 @@
 
 import { Suspense, useEffect, useState, useRef } from 'react'
 import { useSearchParams } from 'next/navigation'
+import type { Attribution } from '@/lib/branding/attribution'
+import AttributionStamp from '@/components/branding/AttributionStamp'
 
 interface WidgetConfig {
   business_name: string
@@ -13,6 +15,8 @@ interface WidgetConfig {
   give_estimates: boolean
   quick_questions: string[]
   logo_url: string | null
+  /** "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts). */
+  attribution?: Attribution | null
 }
 
 interface Message {
@@ -251,9 +255,7 @@ function WidgetChatContent() {
             </svg>
           </button>
         </form>
-        <p className="text-center mt-2">
-          <span className="text-[10px] text-gray-300">Powered by Handymate</span>
-        </p>
+        <AttributionStamp attribution={config.attribution} className="text-center mt-2 text-[10px] text-gray-300" />
       </div>
     </div>
   )

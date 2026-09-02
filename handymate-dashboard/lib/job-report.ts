@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { buildAttribution, loadAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
 
 /**
  * V23: Automatisk jobbrapport vid avslutat jobb.
@@ -212,8 +213,15 @@ export async function triggerJobReport(
 
 /**
  * Generera jobbrapport-PDF med jsPDF.
+ *
+ * Handymate-stämpeln (lib/branding/attribution.ts) skickas som separat option — inte i
+ * JobReportData, som är den lagrade payloaden i pending_approvals och inte
+ * ska bära ett värde som slås upp vid renderingstillfället.
  */
-export async function generateJobReportPdf(data: JobReportData): Promise<Buffer> {
+export async function generateJobReportPdf(
+  data: JobReportData,
+  opts: { attribution?: Attribution } = {},
+): Promise<Buffer> {
   // Dynamic import to avoid SSR issues
   const jsPDFModule = await import('jspdf')
   const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF
@@ -343,7 +351,7 @@ export async function generateJobReportPdf(data: JobReportData): Promise<Buffer>
   doc.setTextColor(156, 163, 175) // gray-400
   const footerY = doc.internal.pageSize.getHeight() - 10
   doc.text(`${data.businessName} · ${data.contactName}${data.orgNumber ? ` · ${data.orgNumber}` : ''}`, 15, footerY)
-  doc.text('Genererad via Handymate', pageWidth - 15, footerY, { align: 'right' })
+  stampAttributionOnPdf(doc, opts.attribution ?? buildAttribution(null))
 
   return Buffer.from(doc.output('arraybuffer'))
 }
@@ -359,8 +367,10 @@ export async function approveJobReport(
   const supabase = getServerSupabase()
 
   try {
-    // Generate PDF
-    const pdfBuffer = await generateJobReportPdf(reportData)
+    // Generate PDF — stämpeln laddas här (EN query) eftersom rutten bara
+    // har businessId, inte business_config-raden.
+    const attribution = await loadAttribution(supabase, businessId)
+    const pdfBuffer = await generateJobReportPdf(reportData, { attribution })
 
     // Upload to Supabase Storage
     const fileName = `job-report-${reportData.projectId}-${Date.now()}.pdf`

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendSmsViaElks } from '@/lib/sms-send'
+import { loadAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
 
 /**
  * Delad leverans-logik för fakturapåminnelser.
@@ -136,11 +137,14 @@ export async function deliverInvoiceReminder(
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
+      // Stämpeln läggs på vid leveransen (inte i invoice-reminder-card, som
+      // bara komponerar texten) — en query per utskick, aldrig blockerande.
+      const attribution = await loadAttribution(supabase, businessId)
       await resend.emails.send({
         from: `${businessName} <faktura@${process.env.RESEND_DOMAIN ?? 'handymate.se'}>`,
         to: customerEmail,
         subject: messages.emailSubject,
-        html: messages.emailBody,
+        html: `${messages.emailBody}${attributionEmailHtml(attribution)}`,
       })
       emailSent = true
     } catch (err) {

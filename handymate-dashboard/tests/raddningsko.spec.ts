@@ -395,8 +395,8 @@ test.describe('lanseringsbevis', () => {
 })
 
 test.describe('schema', () => {
-  test('sql/v202_raddningsko_och_lanseringsbevis.sql finns', () => {
-    expect(fs.existsSync(path.join(ROOT, 'sql', 'v202_raddningsko_och_lanseringsbevis.sql'))).toBe(true)
+  test('sql/v203_raddningsko_och_lanseringsbevis.sql finns', () => {
+    expect(fs.existsSync(path.join(ROOT, 'sql', 'v203_raddningsko_och_lanseringsbevis.sql'))).toBe(true)
   })
 
   test('schema-audit känner till båda nya tabellerna, icke-kritiskt', () => {

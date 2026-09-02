@@ -433,7 +433,7 @@ export default function PortalHome({ portal, token, passes = [], installations =
           )}
         </div>
 
-        <PortalHandymateAttribution />
+        <PortalHandymateAttribution attribution={portal.attribution} />
       </div>
     </>
   )

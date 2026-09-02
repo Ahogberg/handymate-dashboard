@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 const LEAD_PORTAL_HISTORY_DAYS = 180
 const LEAD_PORTAL_MAX_ROWS = 200
@@ -68,6 +69,11 @@ export async function GET(
       won: allLeads.filter((l: { status: string }) => l.status === 'won').length,
     }
 
+    // "Skickat via Handymate"-stämpeln i sidfoten. Business-selecten ovan
+    // är en kolumnlista (får inte utökas med attribution_link_enabled före
+    // sql/v202) — helperns fallback-säkra query, en gång per visning.
+    const attribution = await loadAttribution(supabase, source.business_id)
+
     return NextResponse.json({
       source: {
         id: source.id,
@@ -82,6 +88,7 @@ export async function GET(
       },
       leads: allLeads,
       stats,
+      attribution,
     }, { headers: corsHeaders })
   } catch (error: any) {
     console.error('Portal GET error:', error)

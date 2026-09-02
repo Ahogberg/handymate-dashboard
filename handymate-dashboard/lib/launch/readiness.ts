@@ -184,7 +184,7 @@ export interface LaunchCheckMedBevis extends LaunchCheck {
 }
 
 /**
- * lanseringsbevis (sql/v202_raddningsko_och_lanseringsbevis.sql) ersätter
+ * lanseringsbevis (sql/v203_raddningsko_och_lanseringsbevis.sql) ersätter
  * konstantens 'manual' med en riktig rad när en finns: senaste
  * icke-återkallade (revoked_at null) beviset per station. MANUAL_LAUNCH_PROOFS
  * ovan är fallbacken och stationslistan — den ändras aldrig av detta.

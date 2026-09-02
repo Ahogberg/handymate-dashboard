@@ -1,0 +1,139 @@
+/**
+ * "Skickat via Handymate" — attributionsstämpeln på alla kundvända
+ * dokument och mejl (offert, faktura, kundportal, e-post).
+ *
+ * Texten visas ALLTID. Ordet "Handymate" länkar till företagets
+ * rekommendationssida (/via/<referral_code>) när
+ *   1. företaget inte stängt av länken (business_config.attribution_link_enabled,
+ *      sql/v202 — saknad/null kolumn tolkas som PÅ), och
+ *   2. företaget har en referral_code (lib/referral/codes.ts — kan vara
+ *      null på gamla konton).
+ *
+ * Alla ytor importerar härifrån; ingen yta bygger sin egen sträng.
+ */
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { getAppBaseUrl } from '@/lib/site-url'
+
+export const ATTRIBUTION_TEXT = 'Skickat via Handymate'
+
+export type Attribution = { text: string; url: string | null }
+
+export type AttributionSource = {
+  referral_code?: string | null
+  attribution_link_enabled?: boolean | null
+}
+
+/** Ordet som länkas resp. texten före det — för React-stämpeln
+ *  (components/branding/AttributionStamp.tsx) så ingen yta skriver strängen själv. */
+export const ATTRIBUTION_BRAND = 'Handymate'
+export const ATTRIBUTION_PREFIX = 'Skickat via '
+/** Teal (#0F766E) på länken oavsett företagets egen accentfärg. */
+export const ATTRIBUTION_LINK_COLOR = '#0F766E'
+
+const BRAND = ATTRIBUTION_BRAND
+const PREFIX = ATTRIBUTION_PREFIX
+const LINK_COLOR = ATTRIBUTION_LINK_COLOR
+const MUTED_COLOR = '#6b7280'
+
+export function buildAttribution(cfg: AttributionSource | null | undefined): Attribution {
+  const code = (cfg?.referral_code ?? '').trim()
+  const linkEnabled = cfg?.attribution_link_enabled !== false
+  const url = linkEnabled && code ? `${getAppBaseUrl()}/via/${encodeURIComponent(code)}` : null
+  return { text: ATTRIBUTION_TEXT, url }
+}
+
+/**
+ * Hämtar stämpelns underlag för ett företag med EN query — för ytor som
+ * inte redan har business_config-raden i scope (`select('*')`; den som har
+ * det anropar buildAttribution(raden) direkt).
+ *
+ * Kolumnen attribution_link_enabled kommer i sql/v202. PostgREST fäller
+ * hela selecten om en begärd kolumn saknas, så innan v202 är körd faller
+ * vi tillbaka på bara referral_code (saknad kolumn = länken PÅ). Kastar
+ * aldrig — vid fel blir det texten utan länk, utskicket får inte stanna
+ * på stämpeln.
+ */
+export async function loadAttribution(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<Attribution> {
+  try {
+    const full = await supabase
+      .from('business_config')
+      .select('referral_code, attribution_link_enabled')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (!full.error) return buildAttribution(full.data)
+
+    const fallback = await supabase
+      .from('business_config')
+      .select('referral_code')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (!fallback.error) {
+      return buildAttribution({ referral_code: fallback.data?.referral_code, attribution_link_enabled: undefined })
+    }
+    return buildAttribution(null)
+  } catch {
+    return buildAttribution(null)
+  }
+}
+
+/** Ordet "Handymate" som länk (om url) eller ren text. */
+function brandMarkup(a: Attribution, linkStyle: string): string {
+  return a.url ? `<a href="${a.url}" style="${linkStyle}">${BRAND}</a>` : BRAND
+}
+
+/** Fotrad för utgående e-post (HTML). */
+export function attributionEmailHtml(a: Attribution): string {
+  const brand = brandMarkup(a, `color:${LINK_COLOR};text-decoration:none`)
+  return `<p style="margin:24px 0 0;font-size:12px;color:${MUTED_COLOR};text-align:center">${PREFIX}${brand}</p>`
+}
+
+/** Fotrad för HTML→PDF-mallarna (puppeteer) — länken blir klickbar i PDF:en. */
+export function attributionDocumentHtml(a: Attribution): string {
+  const brand = brandMarkup(a, `color:${LINK_COLOR};text-decoration:none`)
+  return `<div class="hm-attribution" style="margin-top:16pt;font-size:9pt;color:${MUTED_COLOR};text-align:center">${PREFIX}${brand}</div>`
+}
+
+/** För jsPDF (doc.textWithLink): bara text + url. */
+export function attributionPdfText(a: Attribution): { text: string; url: string | null } {
+  return { text: a.text, url: a.url }
+}
+
+/**
+ * Den lilla yta av jsPDF stämpeln behöver — strukturell typ så modulen
+ * slipper importera jspdf (job-report laddar den dynamiskt, och modulen
+ * ska förbli klient-säker).
+ */
+export type AttributionPdfDoc = {
+  getNumberOfPages(): number
+  setPage(n: number): unknown
+  internal: { pageSize: { getWidth(): number; getHeight(): number } }
+  setFontSize(size: number): unknown
+  setTextColor(r: number, g: number, b: number): unknown
+  text(text: string, x: number, y: number, options?: { align?: 'center' }): unknown
+  textWithLink(text: string, x: number, y: number, options: { url: string; align?: 'center' }): number
+}
+
+/** Stämpelns position/utseende i jsPDF-renderarna (mm respektive pt). */
+const PDF_STAMP_FONT_PT = 8
+const PDF_STAMP_BOTTOM_MM = 5
+const PDF_STAMP_RGB: [number, number, number] = [107, 114, 128] // = MUTED_COLOR #6b7280
+
+/**
+ * Ritar stämpeln grå, centrerad, längst ner på SISTA sidan i ett jsPDF-
+ * dokument. Hela raden blir klickbar (doc.textWithLink) när url finns,
+ * annars ren text. Anropas sist, precis före doc.output() — ändrar
+ * fontstorlek/färg och lämnar dokumentet på sista sidan.
+ */
+export function stampAttributionOnPdf(doc: AttributionPdfDoc, a: Attribution): void {
+  const { text, url } = attributionPdfText(a)
+  doc.setPage(doc.getNumberOfPages())
+  const x = doc.internal.pageSize.getWidth() / 2
+  const y = doc.internal.pageSize.getHeight() - PDF_STAMP_BOTTOM_MM
+  doc.setFontSize(PDF_STAMP_FONT_PT)
+  doc.setTextColor(...PDF_STAMP_RGB)
+  if (url) doc.textWithLink(text, x, y, { url, align: 'center' })
+  else doc.text(text, x, y, { align: 'center' })
+}

@@ -1,6 +1,7 @@
 /** @jsxImportSource react */
 import { EditableText, EditableDate, EditableNumber } from '@/components/quotes/editable/EditableFields'
 import { formatCurrency } from '@/lib/document-html'
+import { attributionDocumentHtml, buildAttribution } from '@/lib/branding/attribution'
 import { MODERN_DOCUMENT_CSS } from './modern-css'
 import { QuoteDocumentRow } from './QuoteDocumentRow'
 import { SignatureCta } from './SignatureCta'
@@ -792,6 +793,10 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
           <div><div className="l">F-skatt</div><div className="v">{data.business.fSkatt ? 'Innehas' : '—'}</div></div>
           {data.business.momsRegnr && <div><div className="l">Moms</div><div className="v">{data.business.momsRegnr}</div></div>}
         </footer>
+        {/* Handymate-stämpeln — sist på sista sidan. Markupen kommer
+            från helpern (EN källa för alla mallar/mejl); den innehåller
+            ingen användarstyrd text, bara den url helpern själv bygger. */}
+        <div dangerouslySetInnerHTML={{ __html: attributionDocumentHtml(data.attribution ?? buildAttribution(null)) }} />
       </div>
     </div>
   )

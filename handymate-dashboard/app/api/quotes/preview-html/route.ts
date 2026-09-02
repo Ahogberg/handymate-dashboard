@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/permissions'
 import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { stripPrintBar } from '@/lib/document-html'
+import { buildAttribution } from '@/lib/branding/attribution'
 
 /**
  * POST /api/quotes/preview-html
@@ -85,6 +86,9 @@ export async function POST(request: NextRequest) {
     }
 
     const templateData = buildQuoteTemplateData(quote, business, config, creator)
+    // Stämpeln: config är en kolumnlista, men `business` (getAuthenticatedBusiness)
+    // är hela raden — bygg direkt, ingen extra query.
+    templateData.attribution = buildAttribution(business)
     const style = body.template_style || quote.template_style || config?.quote_template_style
     const renderFn = selectTemplate(style)
     // ETAPP 1d: denna route används ENDAST för sandboxade iframe-previews

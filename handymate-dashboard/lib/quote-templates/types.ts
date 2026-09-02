@@ -3,6 +3,7 @@
  * Render-funktionerna i modern.ts/premium.ts/friendly.ts tar denna typ
  * som input — så samma underlag kan rendera alla stilar.
  */
+import type { Attribution } from '@/lib/branding/attribution'
 
 export interface QuoteTemplateBusiness {
   name: string
@@ -222,6 +223,9 @@ export interface QuoteTemplateData {
   /** Datum för signering ("13 mars 2026"), formaterat — endast relevant när
       signatureCta är (eller resolvar till) 'signed'. */
   signedDate?: string | null
+  /** Handymate-stämpeln (lib/branding/attribution.ts) — sist
+      på sista sidan i alla mallar. Utelämnad → texten utan länk. */
+  attribution?: Attribution
 }
 
 export type TemplateStyle = 'modern' | 'premium' | 'friendly'
