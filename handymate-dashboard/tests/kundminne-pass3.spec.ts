@@ -38,7 +38,7 @@ import {
 import { hamtaKundkontext, formateraKontextrad, MAX_BLOCK_LENGTH } from '../lib/context/kundkontext'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 const MEMORY = 'lib/agents/memory.ts'
 const KUNDKONTEXT = 'lib/context/kundkontext.ts'
