@@ -354,7 +354,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
 
   // ═══ TYST TID (2026-09-02) ═══
   // 21:00–07:00 svensk tid hålls hant/teamuppdatering i push_held
-  // (sql/v194) och släpps som en morgonsammanfattning av
+  // (sql/v197) och släpps som en morgonsammanfattning av
   // /api/cron/push-morgon. beslut går alltid igenom. Fail-open: kan raden
   // inte hållas (migration ej körd, DB-fel) skickas pushen direkt som förut.
   if (skaHallasUnderTystTid(policy.klass)) {

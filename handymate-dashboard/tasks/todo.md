@@ -31,7 +31,7 @@ Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
       fail-closed läsning) + ligger nu bakom agents_globally_paused i
       agent-context. Prod: 0 rader i automation_settings, 0 skickade/30 d
 - [x] 2+3. Mattes kundsvar SMS/mejl: business_config.matte_customer_reply_enabled
-      (sql/v196, KÖRD, default false). Av → svaret blir ett send_sms-kort
+      (sql/v199, KÖRD, default false). Av → svaret blir ett send_sms-kort
       ("Matte vill svara …") som ägaren godkänner. Prod: 0 matte_reply/30 d
 - [x] 4. Recensionsförfrågan via tidsutgång i maintenance BORTTAGEN: ett
       obesvarat kort expirerar i steg 1, skickar aldrig. Manuellt
@@ -63,7 +63,7 @@ Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
       teamuppdatering hålls, beslut aldrig; morgonsammanfattning (1 rad =
       som den är, flera = "N saker hände medan du var borta" + rubriker),
       gruppering per företag+riktad mottagare, rader >36 h utgår
-- [x] lib/notifications/push-held.ts + sql/v194_push_held.sql (KÖRD +
+- [x] lib/notifications/push-held.ts + sql/v197_push_held.sql (KÖRD +
       verifierad: RLS, partiellt unikt index på öppna dedupe-nycklar):
       fail-open — kan raden inte hållas skickas pushen direkt som förut
 - [x] sendApprovalPush: hållning efter dedupe, före fetch
@@ -71,7 +71,7 @@ Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
       vinter; körningen inom tyst tid hoppar): släpper per mottagare via
       sendInternalPush, stämplar released_at/release_outcome, bokför i
       push_dispatch_log. ?force=1 bara för admin
-- [x] sql/v195_push_subscriptions_hardened.sql (KÖRD): push_subscriptions
+- [x] sql/v198_push_subscriptions_hardened.sql (KÖRD): push_subscriptions
       fanns aldrig i produktion — v2 kördes aldrig, PWA-push har fallerat
       tyst hela tiden. Samma tabell utan v2:s USING(true)-policy
 - [x] tests/push-tyst-tid.spec.ts i kontraktsgrinden; cron-auth 43/42;

@@ -1,5 +1,5 @@
 /**
- * push_held (sql/v194) — hållna pushar under tyst tid.
+ * push_held (sql/v197) — hållna pushar under tyst tid.
  *
  * KONTRAKT: fail-open åt SÄNDNING. Saknad tabell (migration ej körd) eller
  * DB-fel vid hållning → 'misslyckades', och sendApprovalPush skickar då
@@ -20,7 +20,7 @@ let schemaVarnat = false
 function varnaSchema(): void {
   if (schemaVarnat) return
   schemaVarnat = true
-  console.warn('[push-held] push_held saknas — kör sql/v194_push_held.sql för tyst tid på push')
+  console.warn('[push-held] push_held saknas — kör sql/v197_push_held.sql för tyst tid på push')
 }
 
 export async function hallPush(

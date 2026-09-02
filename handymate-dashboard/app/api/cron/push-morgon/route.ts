@@ -18,7 +18,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET/POST /api/cron/push-morgon — släpper pushar som hölls under tyst tid
- * (lib/notifications/tyst-tid.ts, push_held sql/v194) som EN
+ * (lib/notifications/tyst-tid.ts, push_held sql/v197) som EN
  * morgonsammanfattning per mottagare.
  *
  * Schemalagd två gånger (05:10 och 06:10 UTC) så morgonen träffas 07:10

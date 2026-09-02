@@ -69,7 +69,7 @@ const EXPECTED: ExpectedColumn[] = [
   { table: 'business_config', column: 'job_report_enabled', migration: 'v23_job_report', critical: true },
 
   // v196 Mattes kundsvar bakom tenant-grind (Launch Truth Gate punkt 8)
-  { table: 'business_config', column: 'matte_customer_reply_enabled', migration: 'v196_matte_customer_reply_enabled', critical: false },
+  { table: 'business_config', column: 'matte_customer_reply_enabled', migration: 'v199_matte_customer_reply_enabled', critical: false },
 
   // v19 leads outbound
   { table: 'leads_outbound', column: 'lead_id', migration: 'v19_leads_outbound', critical: false },

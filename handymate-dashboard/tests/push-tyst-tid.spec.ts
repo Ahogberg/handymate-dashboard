@@ -183,7 +183,7 @@ test.describe('inkoppling', () => {
   })
 
   test('migration v194: push_held med partiellt unikt index, RLS och revoke', () => {
-    const sql = read('sql/v194_push_held.sql')
+    const sql = read('sql/v197_push_held.sql')
     expect(sql).toContain('CREATE TABLE IF NOT EXISTS public.push_held')
     expect(sql).toMatch(/CREATE UNIQUE INDEX IF NOT EXISTS push_held_open_dedupe_idx[\s\S]*?WHERE released_at IS NULL/)
     expect(sql).toContain('ALTER TABLE public.push_held ENABLE ROW LEVEL SECURITY')

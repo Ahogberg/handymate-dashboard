@@ -1,4 +1,5 @@
--- v194: Tyst tid för push (2026-09-02).
+-- OBS: kördes i Supabase under sitt ursprungliga nummer (v194/v195/v196, 2026-09-02) — filen omdöpt eftersom numren togs av ÄTA/dagbok/partner-migrationer på main samma natt. Innehållet oförändrat.
+-- v197: Tyst tid för push (2026-09-02).
 --
 -- push_held — pushar av klasserna hant/teamuppdatering som skapas under
 -- tyst tid (21:00–07:00 svensk tid, lib/notifications/tyst-tid.ts) hålls

@@ -1,4 +1,5 @@
--- v195: push_subscriptions fanns aldrig i produktion (2026-09-02).
+-- OBS: kördes i Supabase under sitt ursprungliga nummer (v194/v195/v196, 2026-09-02) — filen omdöpt eftersom numren togs av ÄTA/dagbok/partner-migrationer på main samma natt. Innehållet oförändrat.
+-- v198: push_subscriptions fanns aldrig i produktion (2026-09-02).
 --
 -- sql/v2_push_subscriptions.sql kördes aldrig: information_schema saknade
 -- tabellen 2026-09-02, så varje POST /api/push/subscribe (PWA/web-push)

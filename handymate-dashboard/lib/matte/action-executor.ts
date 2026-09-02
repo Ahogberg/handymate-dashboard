@@ -66,7 +66,7 @@ export async function executeMatteActions(
   //
   // Launch Truth Gate punkt 8 (2026-09-02): ett LLM-skrivet SMS går till
   // kunden BARA om företaget uttryckligen slagit på
-  // business_config.matte_customer_reply_enabled (sql/v196, default false)
+  // business_config.matte_customer_reply_enabled (sql/v199, default false)
   // och agenterna inte är pausade. Annars blir svaret ett send_sms-kort
   // som ägaren godkänner — kunden lämnas inte obesvarad, men ingen
   // maskin svarar i företagets namn utan att någon bett om det.

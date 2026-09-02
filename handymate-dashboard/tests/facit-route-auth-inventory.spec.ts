@@ -49,6 +49,9 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
   hmac_token: /jwtVerify\(|verifyToken\(|verifySignedToken|createHmac|timingSafeEqual/,
   google_oauth_state: /verifyOAuthState\(/,
   kalender_kanaltoken: /calendarChannelTokenMatches\(/,
+  // Byggdagboken (2026-09-02): helpern kör getAuthenticatedBusiness +
+  // getCurrentUser och returnerar 401-svaret själv (lib/diary/route-context.ts).
+  dagbokskontext: /loadDiaryContext\(/,
 }
 
 /**
@@ -58,6 +61,7 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
 const PUBLIC_BY_DESIGN: Record<string, string> = {
   'health': 'Ingen — visar bara booleans/SHA/sparat kreditläge, gör inga leverantörsanrop',
   'ata/sign/[token]': 'sign_token (randomUUID, unik) i path — atomisk statusövergång sedan 2026-09-01',
+  'ata/sign/[token]/pdf': 'sign_token i path — samma credential som signeringssidan, läsning av dokumentet',
   'field-reports/[id]/sign': 'signature_token i body MÅSTE matcha raden [id] — paret är credentialen',
   'field-reports/public': 'signature_token i query, läsning',
   'invite/[token]': 'invite_token (randomUUID) — läsning av inbjudan',

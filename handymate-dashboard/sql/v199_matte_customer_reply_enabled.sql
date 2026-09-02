@@ -1,4 +1,5 @@
--- v196: Mattes autonoma kundsvar bakom en tenant-grind (2026-09-02).
+-- OBS: kördes i Supabase under sitt ursprungliga nummer (v194/v195/v196, 2026-09-02) — filen omdöpt eftersom numren togs av ÄTA/dagbok/partner-migrationer på main samma natt. Innehållet oförändrat.
+-- v199: Mattes autonoma kundsvar bakom en tenant-grind (2026-09-02).
 --
 -- Launch Truth Gate punkt 8 (docs/reality-week/pass2-block-a-2026-08-28.md
 -- §F): Mattes SMS-svar till kund på inkommande SMS och mejl var den enda

@@ -4,7 +4,7 @@
  * Teamet i fickan: en hantverkare ska inte väckas 23:40 av "Karin har
  * sammanfattat" eller "Matte märkte något". Mellan TYST_TID.start och
  * TYST_TID.end (svensk tid) HÅLLS pushar av klasserna hant och
- * teamuppdatering i push_held (sql/v194) och släpps som EN
+ * teamuppdatering i push_held (sql/v197) och släpps som EN
  * morgonsammanfattning av /api/cron/push-morgon. Klassen beslut går alltid
  * igenom — ett fyra-ögon-beslut eller en observation som kräver ägarens
  * ja/nej är precis det ägaren sagt att den vill väckas för.

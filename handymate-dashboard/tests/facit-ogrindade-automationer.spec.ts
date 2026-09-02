@@ -7,7 +7,7 @@
  *     automation_settings.sms_day_before_reminder = true (isolerad,
  *     fail-closed läsning) och ligger bakom agents_globally_paused.
  *  2+3. Mattes kundsvar (SMS + mejl, samma executor) — kräver
- *     business_config.matte_customer_reply_enabled = true (sql/v196,
+ *     business_config.matte_customer_reply_enabled = true (sql/v199,
  *     default false); annars blir svaret ett send_sms-kort.
  *  4. Recensionsförfrågan via tidsutgång — borttagen: ett obesvarat kort
  *     expirerar i steg 1, skickar aldrig.
@@ -52,9 +52,9 @@ test('2+3. Mattes kundsvar går bara ut med tenant-flaggan på, annars som send_
   // Exakt ett ställe skickar kundsvaret
   expect(src.match(/await sendCustomerReply\(/g)?.length).toBe(1)
 
-  const sql = read('sql/v196_matte_customer_reply_enabled.sql')
+  const sql = read('sql/v199_matte_customer_reply_enabled.sql')
   expect(sql).toContain('ADD COLUMN IF NOT EXISTS matte_customer_reply_enabled BOOLEAN DEFAULT false')
-  expect(read('app/api/debug/schema-audit/route.ts')).toContain("column: 'matte_customer_reply_enabled', migration: 'v196_matte_customer_reply_enabled'")
+  expect(read('app/api/debug/schema-audit/route.ts')).toContain("column: 'matte_customer_reply_enabled', migration: 'v199_matte_customer_reply_enabled'")
 })
 
 test('4. ett obesvarat recensionskort expirerar — maintenance skickar aldrig SMS/mejl åt det', () => {
