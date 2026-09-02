@@ -8,6 +8,7 @@ import Step3HowYouWork from './components/Step3HowYouWork'
 import Step4PhoneNumber from './components/Step4PhoneNumber'
 import Step5Activate from './components/Step5Activate'
 import StepImportData from './components/StepImportData'
+import StepGenomgang from './components/StepGenomgang'
 import StepProductRegister from './components/StepProductRegister'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
@@ -25,23 +26,31 @@ import {
   writeSetupStudioPreference,
 } from '@/lib/onboarding/setup-studio'
 
-const TOTAL_STEPS = 8
+const TOTAL_STEPS = 9
 
 /**
  * Onboarding-orchestrator (Claude Design redesign).
  *
- * Step-mappning till business_config.onboarding_step:
+ * Step-mappning till business_config.onboarding_step (2026-09-02, tasks/
+ * plan-genomgang-fore-betalning.md — betalningen flyttades EFTER importen
+ * och en genomgång av kundens egen firma, ingen prova-på före betalning):
  *   0 = Step1MeetTheTeam    (intro, ingen DB)
  *   1 = Step2Business       (account skapas, businessId sätts)
  *   2 = Step3HowYouWork     (specialties + hours + price)
  *   3 = Step4PhoneNumber    (phone reserveras)
- *   4 = Step5Activate       (Stripe payment)
- *   5 = StepImportData      (hämta in kunder + öppna fakturor — Fortnox/CSV)
- *   6 = StepProductRegister (granska det redan seedade produktregistret, 2026-08-16)
- *   7 = Step6LiveTour       (live tour, klar = onboarding_completed_at)
+ *   4 = StepImportData      (hämta in kunder + öppna fakturor — Fortnox/CSV)
+ *   5 = StepGenomgang       (räknefrågor mot kundens egen firma, ingen AI)
+ *   6 = Step5Activate       (Stripe payment)
+ *   7 = StepProductRegister (granska det redan seedade produktregistret, 2026-08-16)
+ *   8 = Step6LiveTour       (live tour, klar = onboarding_completed_at)
  *
  * Resume-logik: Vid sidvisning hämtas onboarding_step från DB.
- * Användaren landar på rätt steg om de stängt mitt i flödet.
+ * Användaren landar på rätt steg om de stängt mitt i flödet. Konton sparade
+ * FÖRE 2026-09-02 kan ha ett onboarding_step 5–7 som följde den GAMLA
+ * ordningen (4 = betalning) — de landar då ett steg "för tidigt" i den nya
+ * ordningen. Ingen omräkning görs (medveten oskärpa, samma hållning som
+ * lib/onboarding/funnel.ts); redan betalande konton låses ändå aldrig ute av
+ * detta eftersom paid-guarden i Step5Activate hoppar vidare direkt.
  */
 export default function OnboardingPage() {
   const router = useRouter()
@@ -107,28 +116,30 @@ export default function OnboardingPage() {
         const dbStep = d.onboarding_step || 0
         let uiStep = Math.max(0, Math.min(dbStep, TOTAL_STEPS - 1))
 
-        // Retur från Stripe Checkout (onboarding-betalning).
-        //  ?payment=success → betalningen är genomförd (prenumeration skapad i
-        //    trialing). Gå vidare till importsteget (5) — kunden landar på
-        //    "hämta in din verksamhet" direkt efter betalning. Telefonnumret
-        //    provisioneras av webhooken; Step6 läser assigned_phone_number.
-        //  ?payment=cancelled → kunden avbröt. Landa kvar på betalsteget (4)
+        // Retur från Stripe Checkout (onboarding-betalning). Importen och
+        // genomgången ligger nu FÖRE betalningen (steg 4–5) — kunden har
+        // redan sett dem, så en lyckad betalning går direkt vidare till
+        // artikelsteget i stället för att backa igenom dem igen.
+        //  ?payment=success → betalningen är genomförd (prenumeration skapad).
+        //    Gå vidare till artikelsteget (7). Telefonnumret provisioneras av
+        //    webhooken; Step6 läser assigned_phone_number.
+        //  ?payment=cancelled → kunden avbröt. Landa kvar på betalsteget (6)
         //    så de kan försöka igen. Aldrig fastna.
         const params = new URLSearchParams(window.location.search)
         const payment = params.get('payment')
         if (payment === 'success') {
-          uiStep = 5
+          uiStep = 7
           // Persistera framsteget (best-effort) och städa URL:en.
           if (d.business_id) {
             fetch('/api/onboarding', {
               method: 'PUT',
               headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ step: 5, data: {}, config: {} }),
+              body: JSON.stringify({ step: 7, data: {}, config: {} }),
             }).catch(() => {})
           }
           window.history.replaceState({}, '', '/onboarding')
         } else if (payment === 'cancelled') {
-          uiStep = 4
+          uiStep = 6
           window.history.replaceState({}, '', '/onboarding')
         }
 
@@ -148,6 +159,10 @@ export default function OnboardingPage() {
           // Placerad EFTER spreadet så den aldrig kan skuggas av ett gammalt
           // cachat värde i onboarding_data.
           foundersAvailable: Boolean(d.founders_available),
+          // Redan betalande konton ska ALDRIG se betalsteget igen — Step5Activate
+          // hoppar vidare direkt när paid är sant (samma server-härledda fält,
+          // aldrig en klientsidan-gissning).
+          paid: Boolean(d.stripe_subscription_id) || d.subscription_status === 'active',
           // Ett äldre, uttryckligt sparat standardpris får visas igen, men
           // prismodellen väljs fortfarande av ägaren — inget inferred val.
           standardHourlyRate: (d.onboarding_data || {}).standardHourlyRate ?? d.default_hourly_rate ?? null,
@@ -327,17 +342,20 @@ export default function OnboardingPage() {
         <Step4PhoneNumber onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 4 && (
-        <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
-      )}
-      {step === 5 && (
         <StepImportData onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
+      {step === 5 && (
+        <StepGenomgang onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
       {step === 6 && (
+        <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+      )}
+      {step === 7 && (
         <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
-      {step === 7 && !launchRequested && <Step6LiveTour onFinish={finish} data={data}
+      {step === 8 && !launchRequested && <Step6LiveTour onFinish={finish} data={data}
         onFirstQuote={data.firstQuoteSelection ? () => setLaunchRequested(true) : undefined} />}
-      {step === 7 && launchRequested && (launchJob && launchTemplate ?
+      {step === 8 && launchRequested && (launchJob && launchTemplate ?
         <FirstQuoteLaunch companyName={data.companyName || 'Ditt företag'} jobName={launchJob.name} templateName={launchTemplate.name}
           onContinue={launchFirstQuote} onSkip={finish} /> :
         <section className="first-quote-launch" aria-label="Din första offert">
@@ -345,7 +363,7 @@ export default function OnboardingPage() {
           {quoteSetupError || quoteSetup ? <>
             <p role="alert">{quoteSetupError ? 'Kunde inte läsa underlaget just nu.' : 'Ditt underlag har ändrats. Välj jobbtyp och mall igen i artikelsteget.'}</p>
             <button type="button" className="first-quote-open" onClick={() => setSetupRetry(n => n + 1)}>Försök igen</button>
-            <button type="button" className="first-quote-skip" onClick={() => { setLaunchRequested(false); setStep(6) }}>Till artikelsteget</button>
+            <button type="button" className="first-quote-skip" onClick={() => { setLaunchRequested(false); setStep(7) }}>Till artikelsteget</button>
           </> : <p role="status">Kontrollerar din jobbtyp och mall…</p>}
           <button type="button" className="first-quote-skip" disabled={finishing} onClick={finish}>Till översikten i stället</button>
         </section>)}
@@ -391,15 +409,15 @@ export default function OnboardingPage() {
           {onboardingStep}
         </SetupStudioShell>
       ) : (
-        <div className="ob-stage" data-guided={step > 0 && step < 7 ? 'true' : undefined}>
-          {step > 0 && step < 7 && <MatteSetupGuide step={step} data={data} />}
+        <div className="ob-stage" data-guided={step > 0 && step < 8 ? 'true' : undefined}>
+          {step > 0 && step < 8 && <MatteSetupGuide step={step} data={data} />}
           {onboardingStep}
         </div>
       )}
 
       {/* Finalize-fel (Fynd 6): navigera ALDRIG till dashboarden på ett
           misslyckat finalize-anrop — visa fel + låt kunden försöka igen. */}
-      {step === 7 && finishError && (
+      {step === 8 && finishError && (
         <div
           role="alert"
           style={{

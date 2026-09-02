@@ -106,10 +106,10 @@ test.describe('Matte-guidningen är presentation, inte en ny onboardingmotor', (
     expect(guide).not.toMatch(/anthropic|openai|generateText|messages\.create/i)
   })
 
-  test('den befintliga åttastegswizarden och dess fallback består', () => {
+  test('den befintliga niostegswizarden och dess fallback består', () => {
     const page = source('app/onboarding/page.tsx')
     const final = source('app/onboarding/components/FirstAssignmentFinal.tsx')
-    expect(page).toContain('const TOTAL_STEPS = 8')
+    expect(page).toContain('const TOTAL_STEPS = 9')
     expect(page).toContain('<MatteSetupGuide')
     expect(final).toContain('Utforska själv')
   })

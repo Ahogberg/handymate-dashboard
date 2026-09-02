@@ -91,6 +91,20 @@ export interface OnboardingFormData {
   importedCustomers?: number
   importedInvoices?: number
 
+  // ── Steg: Genomgången (StepGenomgang, FÖRE betalningen, 2026-09-02) ──
+  // Raderna StepGenomgang hämtade från GET /api/onboarding/company-scan
+  // (samma form som lib/onboarding/company-scan-rows.ts ScanRow) — Step5Activate
+  // visar samma fynd ovanför plankorten så kunden betalar för något den
+  // redan sett i sina egna siffror. Tom lista = ny firma/ingen data, ALDRIG
+  // påhittade rader.
+  genomgang?: Array<{ key: string; text: string; agent?: 'karin' | 'daniel' | 'lars' }>
+  /**
+   * Server-härlett i GET /api/onboarding (stripe_subscription_id/
+   * subscription_status), ALDRIG en klientsidan-gissning. Redan betalande
+   * konton ska aldrig se betalsteget igen (Step5Activate onNext-guard).
+   */
+  paid?: boolean
+
   // Epic 2: preferenser i befintliga onboarding_data, aldrig offertbelopp.
   quoteJobTypes?: string[]
   firstQuoteSelection?: FirstQuoteSelection | null

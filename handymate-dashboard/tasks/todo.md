@@ -1,3 +1,32 @@
+# Nattpass 5: genomgången före betalningen (Claude + Sonnet-agent 2026-09-02)
+
+Andreas: "Kör!" — betalningen ligger EFTER importen och en genomgång av
+kundens egen firma. Ingen prova-på: ingen dashboard, inga agenter, inga
+kort före betalningen. Byggt av en Sonnet-agent efter
+tasks/plan-genomgang-fore-betalning.md, granskat och verifierat här.
+
+- [x] Ny stegordning (TOTAL_STEPS = 9): 4 Import → 5 Genomgången (NY,
+      StepGenomgang) → 6 Aktivera → 7 Artikelregister → 8 Rundtur
+- [x] lib/onboarding/company-scan-rows.ts: buildScanRows utbruten (ren) +
+      teamGorNarDuAktiverar (vad teamet gör per rad, aldrig belopp/löften)
+- [x] Step5Activate visar fynden överst; paid-guard (server-härlett via
+      GET /api/onboarding) så redan betalande aldrig ser betalsteget igen
+- [x] Prickar 7, MatteSetupGuide 9 texter, tratt-etiketter 1–9,
+      dashboard-grind onboarding_step >= 9 (prod: alla ≥ 8 är klara)
+- [x] Facit tests/genomgang-fore-betalning.spec.ts i kontraktsgrinden;
+      tsc 0, 256 kontrakt gröna, build ren
+- Medveten oskärpa: onboarding_step sparade före 2026-09-02 tolkas i nya
+  ordningen (gamla 4 = betalning läses som import)
+
+## Morgonkontroll 2026-09-02 05:40 UTC
+- Kreditbevakning: 46elks-saldo 0 kr (varning), Stripe-nyckel i TESTLÄGE,
+  Anthropic ok, databas ok
+- Nattsviten fyrade inte på schema (02:00 UTC); workflow_dispatch ger 403
+  för integrationen — Andreas kör manuellt från Actions
+- Sentry Handymate: inga nya ärenden
+
+---
+
 # Nattpass 4: Aktivera senare + fyra ogrindade automationer (Claude 2026-09-02)
 
 Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."

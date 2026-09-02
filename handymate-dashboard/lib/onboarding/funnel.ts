@@ -19,8 +19,18 @@
  *     finalized_at: iso                   // POST /api/onboarding lyckades
  *   }
  *
- * UI-stegen är 0–7 (app/onboarding/page.tsx, TOTAL_STEPS = 8); steg 0 är
- * introt och sparas aldrig. Finalize är "steg 8" i tratten.
+ * UI-stegen är 0–8 (app/onboarding/page.tsx, TOTAL_STEPS = 9); steg 0 är
+ * introt och sparas aldrig. Finalize är "steg 9" i tratten.
+ *
+ * 2026-09-02 (tasks/plan-genomgang-fore-betalning.md): betalningen flyttades
+ * EFTER importen och en ny genomgång av kundens egen firma, aldrig före.
+ * STEG_ETIKETTER nedan följer den NYA ordningen. Konton vars onboarding_data
+ * har _funnel-tidsstämplar från FÖRE detta datum stämplades enligt den GAMLA
+ * ordningen (4 = Aktivera/betalning) — samma siffra betyder nu något annat
+ * (4 = Importera data). Ingen bakåträkning görs (medveten oskärpa: gamla
+ * tidsstämplar hamnar under en annan etikett än de faktiskt nåddes vid).
+ * harledMaxSteg:s legacy-fallback (onboarding_step utan tidsstämplar) har
+ * samma oskärpa av samma skäl — se kommentaren där.
  *
  * Rena funktioner, ingen I/O. Räknade fakta — aldrig ett kausalitets-
  * påstående om varför någon föll bort.
@@ -30,7 +40,7 @@ import { arTestNamn } from '@/lib/testdata'
 
 export const FUNNEL_KEY = '_funnel'
 export const FUNNEL_VERSION = 1
-export const FUNNEL_FINAL_STEP = 8
+export const FUNNEL_FINAL_STEP = 9
 
 export type OnboardingVariant = 'studio' | 'classic'
 
@@ -41,16 +51,18 @@ export interface FunnelRecord {
   finalized_at?: string
 }
 
-/** UI-stegens etiketter (samma ordning som app/onboarding/page.tsx). */
+/** UI-stegens etiketter (samma ordning som app/onboarding/page.tsx, sedan
+ *  2026-09-02: import → genomgång → aktivera). */
 export const STEG_ETIKETTER: Record<number, string> = {
   1: 'Företaget',
   2: 'Så jobbar du',
   3: 'Telefon',
-  4: 'Aktivera (betalning)',
-  5: 'Importera data',
-  6: 'Artikelregister',
-  7: 'Rundtur',
-  8: 'Klar',
+  4: 'Importera data',
+  5: 'Genomgången',
+  6: 'Aktivera (betalning)',
+  7: 'Artikelregister',
+  8: 'Rundtur',
+  9: 'Klar',
 }
 
 function isRecord(v: unknown): v is Record<string, unknown> {
@@ -183,9 +195,12 @@ function minutesBetween(fromIso: string | undefined, toIso: string | undefined):
 }
 
 /**
- * Högsta nådda trattsteg 1–8 för en rad. Tidsstämplar vinner; saknas de
+ * Högsta nådda trattsteg 1–9 för en rad. Tidsstämplar vinner; saknas de
  * (konton från före 2026-09-01) används onboarding_step som legacy-
- * approximation (1–7 ≈ UI-steg, ≥8 = klar).
+ * approximation (1–8 ≈ UI-steg, ≥9 = klar). Legacy-siffran tolkas i den NYA
+ * ordningen utan omräkning — ett gammalt onboarding_step=4 betydde "Aktivera"
+ * (gammal ordning) men läses här som "Importera data" (ny ordning). Medveten
+ * oskärpa för konton sparade före 2026-09-02, se filkommentaren ovan.
  */
 export function harledMaxSteg(row: FunnelRow, funnel: FunnelRecord | null): number {
   if (row.onboarding_completed_at || funnel?.finalized_at) return FUNNEL_FINAL_STEP

@@ -46,9 +46,14 @@ export default function DashboardLayout({
   // Grinden var `>= 7` från 6-stegsflödet; sedan TOTAL_STEPS blev 8
   // (produktregistret, 2026-08-16) skriver steg 6 → 7 vid "Fortsätt", så
   // `>= 7` släppte in konton mitt i LiveTouren utan seedade defaults och
-  // utan startkort (hittat 2026-08-27). 8 nås aldrig av saveProgress —
-  // bara finalize passerar.
-  const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 8))
+  // utan startkort (hittat 2026-08-27). 2026-09-02 (tasks/plan-genomgang-
+  // fore-betalning.md): TOTAL_STEPS blev 9 (StepGenomgang, FÖRE betalningen)
+  // och rundturen flyttade från steg 7 till steg 8 — grinden följde med till
+  // `>= 9`. saveProgress når som högst 8 (rundturen) sedan 2026-09-02 —
+  // bara finalize skriver 9/10. Verifierat i prod: alla konton med
+  // onboarding_step ≥ 8 hade redan onboarding_completed_at, så ingen konto
+  // låstes ute av höjningen.
+  const onboardingDone = !!(business?.onboarding_completed_at || (business && business.onboarding_step >= 9))
 
   // Trial-spärr: utgången trial eller past_due skickas till billing-sidan.
   // Pilots och aktiva prenumerationer släpps förbi. Billing-sidan själv är alltid öppen.

@@ -90,20 +90,20 @@ test.describe('UX1f — timpriset från steg 3 når seedade timartiklar', () => 
 })
 
 test.describe('onboarding-flödets ledningsdragning', () => {
-  test('TOTAL_STEPS är 8 och StepProductRegister monteras mellan StepImportData och Step6LiveTour', () => {
+  test('TOTAL_STEPS är 9 och StepProductRegister monteras mellan Step5Activate och Step6LiveTour', () => {
     const src = source('app/onboarding/page.tsx')
-    expect(src).toContain('const TOTAL_STEPS = 8')
+    expect(src).toContain('const TOTAL_STEPS = 9')
     expect(src).toContain("import StepProductRegister from './components/StepProductRegister'")
 
-    const step5Index = src.indexOf('{step === 5 &&')
     const step6Index = src.indexOf('{step === 6 &&')
-    const step7Index = src.indexOf('step === 7 && !launchRequested && <Step6LiveTour')
-    expect(step5Index).toBeGreaterThan(-1)
-    expect(step6Index).toBeGreaterThan(step5Index)
+    const step7Index = src.indexOf('{step === 7 &&')
+    const step8Index = src.indexOf('step === 8 && !launchRequested && <Step6LiveTour')
+    expect(step6Index).toBeGreaterThan(-1)
     expect(step7Index).toBeGreaterThan(step6Index)
+    expect(step8Index).toBeGreaterThan(step7Index)
 
-    const step6Block = src.slice(step6Index, step7Index)
-    expect(step6Block).toContain('StepProductRegister')
+    const step7Block = src.slice(step7Index, step8Index)
+    expect(step7Block).toContain('StepProductRegister')
   })
 
   test('UX2d: prick-numreringen har EN källa (OB_DOTS/OB_DOT_TOTAL) — inga hårdkodade siffror', () => {
@@ -113,6 +113,7 @@ test.describe('onboarding-flödets ledningsdragning', () => {
       'app/onboarding/components/Step4PhoneNumber.tsx',
       'app/onboarding/components/Step5Activate.tsx',
       'app/onboarding/components/StepImportData.tsx',
+      'app/onboarding/components/StepGenomgang.tsx',
       'app/onboarding/components/StepProductRegister.tsx',
     ]
     for (const f of files) {
@@ -122,18 +123,18 @@ test.describe('onboarding-flödets ledningsdragning', () => {
       expect(src, `${f} använder inte OB_DOT_TOTAL`).toContain('total={OB_DOT_TOTAL}')
     }
     const constants = source('app/onboarding/constants.ts')
-    expect(constants).toContain('OB_DOT_TOTAL = 6')
+    expect(constants).toContain('OB_DOT_TOTAL = 7')
     // Prick-ordningen är unik och stigande — steg-index-fallgropen (CLAUDE.md).
-    expect(constants).toMatch(/business: 0[\s\S]*howYouWork: 1[\s\S]*phone: 2[\s\S]*activate: 3[\s\S]*importData: 4[\s\S]*productRegister: 5/)
+    expect(constants).toMatch(/business: 0[\s\S]*howYouWork: 1[\s\S]*phone: 2[\s\S]*importData: 3[\s\S]*genomgang: 4[\s\S]*activate: 5[\s\S]*productRegister: 6/)
   })
 
-  test('dashboard-grinden släpper bara in slutförda konton — steg >= 8, aldrig 7 (2026-08-27)', () => {
-    // Steg 6 (produktregistret) skriver steg 7 vid "Fortsätt". Med `>= 7`
-    // hamnade en användare som öppnade /dashboard från LiveTouren på en
-    // dashboard utan seedade defaults och utan startkort.
+  test('dashboard-grinden släpper bara in slutförda konton — steg >= 9, aldrig 8 (2026-09-02)', () => {
+    // Steg 7 (produktregistret) skriver steg 8 (rundturen) vid "Fortsätt".
+    // Med `>= 8` hamnade en användare som öppnade /dashboard från LiveTouren
+    // på en dashboard utan seedade defaults och utan startkort.
     const layout = source('app/dashboard/layout.tsx')
-    expect(layout).toContain('business.onboarding_step >= 8')
-    expect(layout).not.toContain('onboarding_step >= 7')
+    expect(layout).toContain('business.onboarding_step >= 9')
+    expect(layout).not.toContain('onboarding_step >= 8')
   })
 
   test('de döda V2-komponenterna är borta', () => {

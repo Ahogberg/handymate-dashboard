@@ -84,6 +84,7 @@ jobs:
           tests/push-tyst-tid.spec.ts
           tests/facit-ogrindade-automationer.spec.ts
           tests/aktivera-senare.spec.ts
+          tests/genomgang-fore-betalning.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

@@ -1,6 +1,6 @@
 ﻿'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Check, Info, Loader2, Shield } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
@@ -113,6 +113,27 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   const [error, setError] = useState<string | null>(null)
   const [infoPlanId, setInfoPlanId] = useState<string | null>(null)
 
+  // Betalgrind, andra hållet (2026-09-02, tasks/plan-genomgang-fore-
+  // betalning.md): data.paid är server-härlett i GET /api/onboarding
+  // (stripe_subscription_id/subscription_status) — redan betalande konton
+  // ska ALDRIG se betalsteget igen, t.ex. vid en resume mitt i onboardingen.
+  useEffect(() => {
+    if (data.paid) onNext()
+  }, [data.paid, onNext])
+
+  if (data.paid) {
+    return (
+      <div className="ob-screen">
+        <OnboardingHeader step={OB_DOTS.activate} total={OB_DOT_TOTAL} onBack={onBack} />
+        <div className="ob-body" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '100%' }}>
+          <p style={{ fontSize: 15, fontWeight: 600, color: 'var(--ob-ink)' }}>
+            Betalningen är klar — vi går vidare …
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   async function handleSubmit() {
     if (redirecting) return
     setRedirecting(true)
@@ -150,6 +171,35 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
     <div className="ob-screen">
       <OnboardingHeader step={OB_DOTS.activate} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
+        {/* Genomgången (StepGenomgang, steget precis före det här — tasks/
+            plan-genomgang-fore-betalning.md, 2026-09-02): kunden betalar
+            för något den redan sett i sina egna siffror, aldrig ett löfte. */}
+        {data.genomgang && data.genomgang.length > 0 ? (
+          <div className="ob-card" style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ob-ink)', marginBottom: 8 }}>
+              Det här hittade teamet i din firma
+            </div>
+            <ul style={{ listStyle: 'none', margin: 0, padding: 0, display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {data.genomgang.slice(0, 5).map(row => (
+                <li key={row.key} style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.4 }}>
+                  {row.text}
+                </li>
+              ))}
+            </ul>
+            {data.genomgang.length > 5 && (
+              <p style={{ margin: '6px 0 0', fontSize: 12, color: 'var(--ob-muted)' }}>
+                +{data.genomgang.length - 5} till
+              </p>
+            )}
+          </div>
+        ) : (
+          <div className="ob-card" style={{ marginBottom: 16 }}>
+            <p style={{ margin: 0, fontSize: 13, color: 'var(--ob-ink-2)' }}>
+              Teamet börjar med din första offert så fort du aktiverat.
+            </p>
+          </div>
+        )}
+
         {/* Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19)
             — server-härlett via data.foundersAvailable (GET /api/onboarding,
             lib/billing/founders-offer.ts). Ingen banner alls när flaggan är

@@ -74,7 +74,7 @@ test('onboarding läser om, sparar insamlade val, finaliserar, sedan får anropa
   const href = await completeFirstQuoteOnboarding(selection, { companyName: 'El AB', firstFocus: 'fler-jobb' }, network.fetcher)
   expect(href).toBe('/dashboard/quotes/new?first_quote=1&job_type=service&template_id=qtpl_service')
   expect(network.calls.map(c => c.method)).toEqual(['GET', 'PUT', 'POST'])
-  expect(network.calls[1].body).toEqual({ step: 7, data: { companyName: 'El AB', firstFocus: 'fler-jobb', firstQuoteSelection: selection } })
+  expect(network.calls[1].body).toEqual({ step: 8, data: { companyName: 'El AB', firstFocus: 'fler-jobb', firstQuoteSelection: selection } })
   expect(network.calls.some(c => /quotes|send/.test(c.url))).toBe(false)
 })
 
@@ -105,7 +105,7 @@ test('inkopplingen äger ingen ny offertskrivare, ingen ny pris-/reservationsmot
   const intake = read('app/dashboard/quotes/new/components/quick/QuickIntake.tsx')
   expect(intake.indexOf('{jobTypeStart}')).toBeGreaterThan(intake.indexOf('fixed inset-0'))
   const onboarding = read('app/onboarding/page.tsx')
-  expect(onboarding).toContain('TOTAL_STEPS = 8')
+  expect(onboarding).toContain('TOTAL_STEPS = 9')
   expect(onboarding).toContain('<FirstQuoteLaunch')
   expect(onboarding).toContain('await completeFirstQuoteOnboarding')
   // Handoffen till Matte-chatten skrivs numera av första-uppdraget-valet

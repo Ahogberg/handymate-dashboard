@@ -15,10 +15,11 @@ export const SETUP_GUIDANCE: Record<number, { eyebrow: string; title: string; bo
   1: { eyebrow: 'Jag lär känna firman', title: 'Vi börjar med grunden.', body: 'Jag hjälper dig samla företagets riktiga uppgifter så resten av teamet arbetar med rätt underlag.' },
   2: { eyebrow: 'Jag ställer in arbetssättet', title: 'Hur fungerar ni i vardagen?', body: 'Priser, jobbtyper och arbetstider blir källor teamet kan använda — aldrig något vi hittar på.' },
   3: { eyebrow: 'Lisa gör sig redo', title: 'Nästa förfrågan ska inte tappas.', body: 'Telefonkopplingen blir en av företagets riktiga vägar in. Du bestämmer hur den ska användas.' },
-  4: { eyebrow: 'Handymate aktiveras', title: 'Du behåller kontrollen.', body: 'Teamet kan föreslå och förbereda. Kundkontakt och ekonomiska handlingar följer era godkännanden.' },
-  5: { eyebrow: 'Teamet får verklig kontext', title: 'Har ni historik tar vi med den.', body: 'Importerade kunder, affärer och fakturor kan ge ett skarpare första uppdrag. Tomt konto får inga låtsasinsikter.' },
-  6: { eyebrow: 'Daniel förbereder offertstarten', title: 'Nästa offert ska inte börja från noll.', body: 'Koppla jobbtyp, arbetsartikel och upplägg. Jobbtypens uttryckliga pris går alltid före standardpriset.' },
-  7: { eyebrow: 'Teamet är redo', title: 'Vad ska vi ta tag i först?', body: 'Nu kan du ge teamet ett första riktigt uppdrag eller börja med offerten du just förberett. Inget skickas utan ditt godkännande.' },
+  4: { eyebrow: 'Teamet får verklig kontext', title: 'Har ni historik tar vi med den.', body: 'Importerade kunder, affärer och fakturor kan ge ett skarpare första uppdrag. Tomt konto får inga låtsasinsikter.' },
+  5: { eyebrow: 'Teamet går igenom firman', title: 'Vi visar vad vi ser innan du betalar.', body: 'Bara riktiga tal ur din egen data. Hittar vi inget säger vi det.' },
+  6: { eyebrow: 'Handymate aktiveras', title: 'Du behåller kontrollen.', body: 'Teamet kan föreslå och förbereda. Kundkontakt och ekonomiska handlingar följer era godkännanden.' },
+  7: { eyebrow: 'Daniel förbereder offertstarten', title: 'Nästa offert ska inte börja från noll.', body: 'Koppla jobbtyp, arbetsartikel och upplägg. Jobbtypens uttryckliga pris går alltid före standardpriset.' },
+  8: { eyebrow: 'Teamet är redo', title: 'Vad ska vi ta tag i först?', body: 'Nu kan du ge teamet ett första riktigt uppdrag eller börja med offerten du just förberett. Inget skickas utan ditt godkännande.' },
 }
 
 export function MatteSetupGuide({ step, data }: Props) {

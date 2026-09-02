@@ -109,14 +109,19 @@ Detta dokument läses automatiskt av Claude Code vid sessionsstart. Följ alltid
 
 ### Onboarding
 
-- Onboardingen har **8 UI-steg** (`app/onboarding/page.tsx`, `TOTAL_STEPS = 8`):
+- Onboardingen har **9 UI-steg** (`app/onboarding/page.tsx`, `TOTAL_STEPS = 9`):
   0 Step1MeetTheTeam · 1 Step2Business (konto skapas) · 2 Step3HowYouWork ·
-  3 Step4PhoneNumber · 4 Step5Activate (Stripe) · 5 StepImportData ·
-  6 StepProductRegister · 7 Step6LiveTour
+  3 Step4PhoneNumber · 4 StepImportData · 5 StepGenomgang · 6 Step5Activate
+  (Stripe) · 7 StepProductRegister · 8 Step6LiveTour
+- Beslut 2026-09-02 (tasks/plan-genomgang-fore-betalning.md): betalningen
+  ligger EFTER importen och en genomgång av kundens egen firma (räknefrågor
+  mot `GET /api/onboarding/company-scan`, ingen AI) — kunden betalar för
+  något den redan sett i sina egna siffror. Ingen prova-på före betalning.
 - Finalize (`POST /api/onboarding`) skriver `onboarding_step = 10` (kompat) +
   `onboarding_completed_at`, seedar defaults och startkort
 - Dashboard-grinden (`app/dashboard/layout.tsx`): `onboarding_completed_at`
-  eller `onboarding_step >= 8` — `saveProgress` når aldrig 8, bara finalize
+  eller `onboarding_step >= 9` — `saveProgress` når som högst 8 (rundturen),
+  bara finalize skriver 9/10
 - Efter finalize, på `/dashboard`: Company Scan → Hemtur (inte onboardingsteg)
 
 ### Tech stack

@@ -26,7 +26,7 @@ export async function completeFirstQuoteOnboarding(selection: FirstQuoteSelectio
   if (!href) throw new Error('Ditt offertunderlag behöver väljas på nytt.')
   const saved = await fetcher('/api/onboarding', {
     method: 'PUT', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ step: 7, data: { ...onboardingData, firstQuoteSelection: selection } }),
+    body: JSON.stringify({ step: 8, data: { ...onboardingData, firstQuoteSelection: selection } }),
   })
   if (!saved.ok) throw new Error('Kunde inte spara dina val.')
   const finalized = await fetcher('/api/onboarding', {

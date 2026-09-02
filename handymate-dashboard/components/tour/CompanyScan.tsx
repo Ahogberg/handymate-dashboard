@@ -28,9 +28,16 @@ import Link from 'next/link'
 import { Check } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
-import { fmt } from '@/lib/onboarding/instant-value'
+import { buildScanRows } from '@/lib/onboarding/company-scan-rows'
 import type { CompanyScanResult } from '@/app/api/onboarding/company-scan/route'
 import type { FirstActionResponse } from '@/app/api/onboarding/first-action/route'
+
+// Flyttad till lib/onboarding/company-scan-rows.ts (2026-09-02) så
+// StepGenomgang (onboardingens genomgång FÖRE betalningen) kan återanvända
+// exakt samma logik utan att importera en klientkomponent. Re-exporterad
+// härifrån OFÖRÄNDRAT så tests/company-scan.spec.ts (som importerar från
+// den här filen) fortsätter fungera.
+export { buildScanRows } from '@/lib/onboarding/company-scan-rows'
 
 const SEEN_KEY = 'hm_scan_klar'
 /**
@@ -52,49 +59,6 @@ const ROW_INTERVAL_MS = 700
  *  rad-timer får max 5 s innan skannen tvingas vidare i stället för att
  *  fastna. */
 const HANG_TIMEOUT_MS = 5000
-
-interface ScanRow {
-  key: string
-  text: string
-  agent?: 'karin' | 'daniel' | 'lars'
-}
-
-/**
- * Bygger raderna ur de råa talen. Bara sanna rader (n>0) — funktionen är
- * ren och testbar utan React/DOM (facit-stilen, se tests/company-scan.spec.ts).
- */
-export function buildScanRows(d: CompanyScanResult): ScanRow[] {
-  const rows: ScanRow[] = []
-  if (d.customerCount > 0) {
-    rows.push({ key: 'kunder', text: `${fmt(d.customerCount)} kund${d.customerCount > 1 ? 'er' : ''} hittade` })
-  }
-  if (d.openInvoicesCount > 0) {
-    rows.push({ key: 'fakturor', text: `${fmt(d.openInvoicesCount)} öppna faktur${d.openInvoicesCount > 1 ? 'or' : 'a'} analyserade` })
-  }
-  if (d.activeProjectsCount > 0) {
-    rows.push({ key: 'projekt', text: `${fmt(d.activeProjectsCount)} pågående projekt identifierade` })
-  }
-  if (d.openQuotesCount > 0) {
-    rows.push({ key: 'offerter', text: `${fmt(d.openQuotesCount)} offert${d.openQuotesCount > 1 ? 'er' : ''} hittade` })
-  }
-  // Karins rad är uttryckligen HENNES fynd — rutten sätter karinHeadline
-  // bara när headline verkligen är Karins (förfallet/obetalt > 0), aldrig
-  // Daniels/Hannas/Lisas generiska fallback under en Karin-etikett.
-  if (d.karinHeadline?.amount_kr) {
-    rows.push({ key: 'karin', agent: 'karin', text: `Karin hittade ${fmt(d.karinHeadline.amount_kr)} kr i utestående kundfordringar` })
-  }
-  if (d.staleQuotesCount > 0) {
-    rows.push({ key: 'daniel', agent: 'daniel', text: `Daniel hittade ${fmt(d.staleQuotesCount)} offert${d.staleQuotesCount > 1 ? 'er' : ''} som borde följas upp` })
-  }
-  if (d.activeProjectsCount > 0) {
-    rows.push({ key: 'lars', agent: 'lars', text: `Lars bevakar ${fmt(d.activeProjectsCount)} aktiv${d.activeProjectsCount > 1 ? 'a' : 't'} projekt` })
-  }
-  // Kön, sist — pekar framåt mot "Det här behöver dig idag".
-  if (d.pendingApprovalsCount > 0) {
-    rows.push({ key: 'ko', text: `${fmt(d.pendingApprovalsCount)} sak${d.pendingApprovalsCount > 1 ? 'er' : ''} behöver din uppmärksamhet` })
-  }
-  return rows
-}
 
 export default function CompanyScan({ onClose }: { onClose: (r?: CompanyScanCloseResult) => void }) {
   const business = useBusiness()

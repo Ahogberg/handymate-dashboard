@@ -44,12 +44,14 @@ test.describe('stämpling', () => {
     expect(f.variant).toBe('classic')
   })
 
-  test('steg utanför 1–7 stämplas inte; finalize är en egen stämpel som inte skrivs om', () => {
+  test('steg utanför 1–8 stämplas inte (0 och 9); steg 8 stämplas; finalize är en egen stämpel som inte skrivs om', () => {
     const f = markStepReached(null, 0, min(1))
     expect(f.reached).toEqual({})
-    const g = markStepReached(f, 8, min(2))
+    const g = markStepReached(f, 9, min(2))
     expect(g.reached).toEqual({})
-    const h = markFinalized(g, min(3))
+    const g2 = markStepReached(g, 8, min(2.5))
+    expect(g2.reached).toEqual({ '8': min(2.5) })
+    const h = markFinalized(g2, min(3))
     expect(h.finalized_at).toBe(min(3))
     expect(markFinalized(h, min(9)).finalized_at).toBe(min(3))
   })
@@ -79,11 +81,16 @@ function rad(over: Partial<FunnelRow> & { business_id: string }): FunnelRow {
 test.describe('sammanställning', () => {
   test('nådde/bortfall/median per steg + legacy-fallback + klar', () => {
     const rows: FunnelRow[] = [
-      // Full resa med tidsstämplar, betalande
-      rad({ business_id: 'a', stripe_subscription_id: 'sub_1', onboarding_completed_at: min(60), onboarding_data: { [FUNNEL_KEY]: { reached: { '1': min(2), '2': min(6), '3': min(10), '4': min(20), '5': min(30), '6': min(40), '7': min(50) }, finalized_at: min(60), variant: 'studio' } } }),
-      // Fastnade på steg 4 (betalning) med tidsstämplar
-      rad({ business_id: 'b', onboarding_data: { [FUNNEL_KEY]: { reached: { '1': min(4), '2': min(8), '3': min(14), '4': min(30) }, variant: 'classic' } } }),
-      // Legacy utan tidsstämplar — onboarding_step 4
+      // Full resa med tidsstämplar, betalande — reached 1–8 (FUNNEL_FINAL_STEP
+      // är nu 9, så det finns ett steg 8 (rundturen) innan finalize).
+      rad({ business_id: 'a', stripe_subscription_id: 'sub_1', onboarding_completed_at: min(60), onboarding_data: { [FUNNEL_KEY]: { reached: { '1': min(2), '2': min(6), '3': min(10), '4': min(20), '5': min(30), '6': min(40), '7': min(50), '8': min(55) }, finalized_at: min(60), variant: 'studio' } } }),
+      // Fastnade på steg 6 (Aktivera/betalning, den nya ordningen) med
+      // tidsstämplar — hann alltså genom import (4) och genomgången (5)
+      // innan den övergav betalsteget.
+      rad({ business_id: 'b', onboarding_data: { [FUNNEL_KEY]: { reached: { '1': min(4), '2': min(8), '3': min(14), '4': min(20), '5': min(25), '6': min(30) }, variant: 'classic' } } }),
+      // Legacy utan tidsstämplar — onboarding_step 4 sparades FÖRE 2026-09-02
+      // enligt DÅVARANDE ordning (4 = Aktivera), men tolkas nu (medveten
+      // oskärpa) som steg 4 i den NYA ordningen ('Importera data').
       rad({ business_id: 'c', onboarding_step: 4 }),
       // Testkonto — räknas inte
       rad({ business_id: 'd', business_name: 'Testkund E2E', onboarding_step: 7 }),
@@ -98,17 +105,23 @@ test.describe('sammanställning', () => {
     const s = Object.fromEntries(summering.steg.map(r => [r.steg, r]))
     expect(s[1].nadde).toBe(3)
     expect(s[4].nadde).toBe(3)
-    expect(s[5].nadde).toBe(1)
-    expect(s[5].bortfall_pct).toBe(67)
-    expect(s[8].nadde).toBe(1)
+    expect(s[5].nadde).toBe(2)
+    expect(s[5].bortfall_pct).toBe(33)
+    expect(s[9].nadde).toBe(1)
     // Median steg 1 (från kontoskapande): a=2, b=4 → 3
     expect(s[1].median_minuter).toBe(3)
     expect(s[1].med_tid).toBe(2)
-    // Steg 4 från steg 3: a=10, b=16 → 13
-    expect(s[4].median_minuter).toBe(13)
+    // Steg 4 från steg 3 ('Importera data'): a=10, b=6 → 8
+    expect(s[4].median_minuter).toBe(8)
     expect(summering.median_minuter_till_klar).toBe(60)
 
-    expect(summering.fastnade_pa).toEqual([{ steg: 4, etikett: 'Aktivera (betalning)', antal: 2 }])
+    // b (fastnade på Aktivera, nytt steg 6) och c (legacy, tolkas nu som
+    // 'Importera data', steg 4) är INTE samma trattsteg längre — den
+    // avsiktliga oskärpan för legacy-konton syns direkt här.
+    expect(summering.fastnade_pa).toEqual([
+      { steg: 6, etikett: 'Aktivera (betalning)', antal: 1 },
+      { steg: 4, etikett: 'Importera data', antal: 1 },
+    ])
     expect(summering.per_variant.map(v => [v.variant, v.foretag, v.klara])).toEqual([['studio', 1, 1], ['classic', 1, 0], ['okand', 1, 0]])
 
     const c = foretag.find(f => f.business_id === 'c')!

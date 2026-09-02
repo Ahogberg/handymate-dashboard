@@ -29,18 +29,23 @@ export interface Trade {
  * befintliga businesses.
  */
 // ─── Prick-indikatorn (UX2d, Prisslingan V2) ────────────────────────
-// SEX prickar är ett MEDVETET beslut (intro + livetour är passiva payoff-
+// SJU prickar är ett MEDVETET beslut (intro + livetour är passiva payoff-
 // skärmar, se OnboardingHeader.tsx) — felet var att mappningen låg
-// hårdkodad i sex komponenter (CLAUDE.md:s "Onboarding steg-index"-
+// hårdkodad i sju komponenter (CLAUDE.md:s "Onboarding steg-index"-
 // fallgrop). EN källa här; komponenterna får aldrig egna siffror.
-export const OB_DOT_TOTAL = 6
+//
+// Genomgången (StepGenomgang, 2026-09-02, tasks/plan-genomgang-fore-
+// betalning.md) lades in FÖRE Aktivera — betalningen ligger nu efter
+// importen och en genomgång av kundens egen firma, aldrig före.
+export const OB_DOT_TOTAL = 7
 export const OB_DOTS = {
   business: 0,
   howYouWork: 1,
   phone: 2,
-  activate: 3,
-  importData: 4,
-  productRegister: 5,
+  importData: 3,
+  genomgang: 4,
+  activate: 5,
+  productRegister: 6,
 } as const
 
 export const TRADES: Trade[] = [

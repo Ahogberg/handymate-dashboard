@@ -20,9 +20,9 @@ test.describe('Setup Studio V1.5 — flaggad presentation ovanpå samma onboardi
     expect(resolveSetupStudioMode('true', '?studio=1', 'classic')).toBe(true)
   })
 
-  test('sidan återanvänder exakt samma åtta steg i en enda rendergren', () => {
+  test('sidan återanvänder exakt samma nio steg i en enda rendergren', () => {
     const page = source('app/onboarding/page.tsx')
-    expect(page).toContain('const TOTAL_STEPS = 8')
+    expect(page).toContain('const TOTAL_STEPS = 9')
     expect(page).toContain('<SetupStudioShell')
     expect(page).toContain('{onboardingStep}')
 
@@ -31,8 +31,9 @@ test.describe('Setup Studio V1.5 — flaggad presentation ovanpå samma onboardi
       'Step2Business',
       'Step3HowYouWork',
       'Step4PhoneNumber',
-      'Step5Activate',
       'StepImportData',
+      'StepGenomgang',
+      'Step5Activate',
       'StepProductRegister',
       'Step6LiveTour',
     ]) {
