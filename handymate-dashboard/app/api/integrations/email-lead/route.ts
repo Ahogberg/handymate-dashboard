@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
+import { provisionInboundRoute } from '@/lib/email/provision-inbound-route'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -117,95 +118,20 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    try {
-      // Idempotent: redan aktiverad → returnera befintlig rad i stället för
-      // att krocka med PK-constrainten på ett andra POST-anrop.
-      const { data: existing, error: existingError } = await supabase
-        .from('email_inbound_route')
-        .select('address, active')
-        .eq('business_id', business.business_id)
-        .maybeSingle()
-      if (existingError) throw existingError
-      if (existing) {
-        return NextResponse.json({ address: existing.address, active: existing.active })
-      }
-
-      const slug = await generateUniqueSlug(business.business_name || business.business_id, supabase)
-      let address = `${slug}@leads.handymate.se`
-
-      let { error: insertError } = await supabase
-        .from('email_inbound_route')
-        .insert({ address, business_id: business.business_id, active: true })
-
-      if (insertError?.code === '23505') {
-        // Race: en annan request tog samma slug mellan kollisionskollen och
-        // insert. Ett engångsförsök till med en tidsstämpel-suffixad adress
-        // löser det utan att behöva en låst transaktion för ett så sällsynt fall.
-        address = `${slug.slice(0, 20)}-${Date.now().toString(36)}@leads.handymate.se`
-        const retry = await supabase
-          .from('email_inbound_route')
-          .insert({ address, business_id: business.business_id, active: true })
-        insertError = retry.error
-      }
-      if (insertError) throw insertError
-
-      return NextResponse.json({ address, active: true })
-    } catch (err: any) {
-      if (isMissingTableError(err)) return missingTableResponse()
-      throw err
+    // Samma provisionering som finalize kör automatiskt
+    // (lib/email/provision-inbound-route.ts) — idempotent, en sanning.
+    const result = await provisionInboundRoute(
+      supabase,
+      business.business_id,
+      business.business_name,
+    )
+    if (!result.ok) {
+      if (result.reason === 'table_missing') return missingTableResponse()
+      throw new Error(result.error || 'Adressen kunde inte skapas')
     }
+    return NextResponse.json({ address: result.address, active: result.active })
   } catch (err: any) {
     console.error('[integrations/email-lead] POST-fel', err)
     return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })
   }
-}
-
-/**
- * Bygger en URL-säker slug ur företagsnamnet: gemener, å/ä→a, ö→o, allt
- * annat än [a-z0-9] blir bindestreck, max 30 tecken, inga kant-bindestreck.
- * Tomt resultat (t.ex. ett namn som bara innehåller symboler) faller
- * tillbaka på "foretag" — kollisionshanteringen i generateUniqueSlug gör
- * den unik ändå.
- */
-function slugifyBusinessName(name: string): string {
-  const normalized = name
-    .toLowerCase()
-    .replace(/å/g, 'a')
-    .replace(/ä/g, 'a')
-    .replace(/ö/g, 'o')
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-  const truncated = normalized.slice(0, 30).replace(/-+$/, '')
-  return truncated || 'foretag'
-}
-
-/**
- * Genererar en slug som inte krockar med en befintlig rad. Kollision → lägg
- * på '-2', '-3', ... och kapa basen så hela adressen håller sig inom 30
- * tecken. 50 försök är ett skyddsnät mot en oändlig loop, inte ett
- * förväntat scenario.
- */
-async function generateUniqueSlug(
-  businessName: string,
-  supabase: ReturnType<typeof getServerSupabase>,
-): Promise<string> {
-  const base = slugifyBusinessName(businessName)
-  let candidate = base
-
-  for (let attempt = 1; attempt <= 50; attempt++) {
-    const { data, error } = await supabase
-      .from('email_inbound_route')
-      .select('address')
-      .eq('address', `${candidate}@leads.handymate.se`)
-      .maybeSingle()
-    if (error) throw error
-    if (!data) return candidate
-
-    const suffix = `-${attempt + 1}`
-    candidate = `${base.slice(0, 30 - suffix.length)}${suffix}`
-  }
-
-  // 50 kollisioner på samma bas är extremt osannolikt — men fail-safe
-  // hellre än en oändlig loop.
-  return `${base.slice(0, 20)}-${Date.now().toString(36)}`
 }

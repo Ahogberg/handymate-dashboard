@@ -6,6 +6,7 @@ import { seedAllDefaults } from '@/lib/seed-defaults'
 import { isOnboardingPaymentBlocked, arOnboardingBetald } from '@/lib/onboarding/payment-gate'
 import { skapaStartkort } from '@/lib/onboarding/starter-cards'
 import { isFoundersOfferAvailable } from '@/lib/billing/founders-offer'
+import { provisionInboundRoute } from '@/lib/email/provision-inbound-route'
 
 export const dynamic = 'force-dynamic'
 
@@ -356,6 +357,17 @@ export async function POST(request: NextRequest) {
       extraBranches,
       Number(rateRow?.default_hourly_rate) || null
     )
+
+    // Lead-adressen (<firma>@leads.handymate.se): provisioneras automatiskt
+    // här i stället för att en grundare skapar raden manuellt per kund.
+    // Best-effort — funktionen kastar aldrig och får aldrig fälla finalize.
+    provisionInboundRoute(supabase, business.business_id, business_name || business.business_name)
+      .then(result => {
+        if (!result.ok) {
+          console.warn('[onboarding finalize] lead-adressen kunde inte skapas (icke-blockerande):', result)
+        }
+      })
+      .catch(err => console.warn('[onboarding finalize] lead-adressen kunde inte skapas (icke-blockerande):', err))
 
     // Startkorten (docs/design/FORSTA-30-MINUTERNA.md): fire-and-forget, får
     // ALDRIG blockera eller fälla ett lyckat finalize-svar. Funktionen är
