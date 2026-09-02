@@ -13,10 +13,13 @@
  * service role — selectar BARA business_id, business_name, branch och
  * service_area. Inga kontaktuppgifter får läcka ut på en offentlig sida.
  *
- * Varje visning loggas till landing_events (event 'via_click', sql/v116)
- * — loggfel får aldrig fälla sidan.
+ * Varje visning av en KÄND kod loggas till landing_events (event
+ * 'via_click', sql/v116) — loggfel får aldrig fälla sidan. Okända koder
+ * loggas inte: koderna är korta (ABC-1234) och ett gissningssvep skulle
+ * annars fylla tabellen med tusentals rader som inte säger något.
  */
 import type { Metadata } from 'next'
+import { cache } from 'react'
 import { getServerSupabase } from '@/lib/supabase'
 import { branchWorker, normalizeBranch } from '@/lib/branch'
 
@@ -41,7 +44,8 @@ function normalizeCode(raw: string | undefined): string {
   return decoded.trim().toUpperCase().slice(0, 64)
 }
 
-async function lookupBusiness(code: string): Promise<ViaBusiness | null> {
+/** cache(): generateMetadata och sidan slår upp samma kod i samma request — en query, inte två. */
+const lookupBusiness = cache(async function lookupBusiness(code: string): Promise<ViaBusiness | null> {
   if (!code) return null
   try {
     const supabase = getServerSupabase()
@@ -56,19 +60,15 @@ async function lookupBusiness(code: string): Promise<ViaBusiness | null> {
     console.warn('[via] uppslag av referral_code misslyckades:', err)
     return null
   }
-}
+})
 
-async function logViaClick(code: string, business: ViaBusiness | null): Promise<void> {
+async function logViaClick(code: string, business: ViaBusiness): Promise<void> {
   try {
     const supabase = getServerSupabase()
     const { error } = await supabase.from('landing_events').insert({
       event: 'via_click',
       session_id: null,
-      payload: {
-        code,
-        ...(business ? { business_id: business.business_id } : {}),
-        found: business !== null,
-      },
+      payload: { code, business_id: business.business_id },
     })
     if (error) console.warn('[via] kunde inte logga via_click:', error.message)
   } catch (err) {
@@ -123,7 +123,7 @@ export default async function ViaPage({ params }: PageProps) {
   // inväntas ändå: en oavvaktad promise i en serverkomponent på Vercel
   // riskerar att frysas med funktionen när svaret är klart och aldrig nå
   // databasen. En insert kostar tiotals ms — sidan är inte latenskritisk.
-  await logViaClick(code, business)
+  if (business) await logViaClick(code, business)
 
   const registerHref = business ? `/registrera?ref=${encodeURIComponent(code)}` : '/registrera'
   const subtitle = business ? subtitleFor(business) : null

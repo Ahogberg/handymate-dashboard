@@ -83,11 +83,31 @@ test.describe('lib/referral/discounts.ts — Stripe-kredit', () => {
     // Grenen som saknar kredit returnerar utan att nå rewarded-uppdateringen
     const granted = fn.slice(iGranted, iRewardedAt)
     expect(granted).toMatch(/return \{ rewarded: false, referrerBusinessId, error: credit\.error \}/)
+
+    // rewarded skrivs DIREKT efter krediten — före SMS:et — och felkontrolleras
+    const iSms = fn.indexOf('sendSmsViaElks')
+    expect(iSms).toBeGreaterThan(iRewardedAt)
+    expect(fn).toContain('const { error: rewardedError } = await supabase')
+    expect(fn).toContain("rapporteraTystFel(supabase, referrerBusinessId, 'referral_rewarded_status'")
   })
 
-  test('idempotens: rewarded-raden avvisas, och Stripe får en idempotency-nyckel per referral', () => {
+  test('utebliven kredit larmar — ingen adminyta listar kund-referrals', () => {
+    expect(src).toContain("rapporteraTystFel(supabase, referrerBusinessId, 'referral_kredit'")
+  })
+
+  test('idempotens: rewarded-raden avvisas, Stripe-nyckel per referral, och permanent skydd via metadata.referral_id', () => {
     expect(src).toContain("if (existingReferral.status === 'rewarded')")
-    expect(src).toMatch(/idempotencyKey: `referral-month-\$\{existingReferral\.id\}`/)
+    expect(src).toMatch(/idempotencyKey: `referral-month-\$\{opts\.referralId\}`/)
+    // Lager 2: transaktionen märks med referral_id och historiken kontrolleras före skrivning
+    expect(src).toMatch(/metadata: \{[^}]*referral_id: opts\.referralId/)
+    expect(src).toContain('listBalanceTransactions')
+    expect(src).toMatch(/t\.metadata\?\.referral_id === opts\.referralId/)
+    const iList = src.indexOf('listBalanceTransactions')
+    const iCreate = src.indexOf('createBalanceTransaction(')
+    expect(iList).toBeGreaterThan(-1)
+    expect(iList).toBeLessThan(iCreate)
+    // Redan krediterad → inget nytt SMS
+    expect(src).toContain('if (!credit.alreadyCredited) try {')
   })
 
   test('SMS:et går genom strypunkten och ryms i EN SMS-del', () => {

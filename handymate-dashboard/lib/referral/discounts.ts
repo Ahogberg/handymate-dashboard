@@ -14,6 +14,7 @@
 import Stripe from 'stripe'
 import { getServerSupabase } from '@/lib/supabase'
 import { PLAN_PRICES_SEK, type PlanType } from '@/lib/feature-gates'
+import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY not configured')
@@ -36,13 +37,18 @@ export const REFERRAL_REWARD_SMS =
  * INGET — vi gissar aldrig belopp. Anroparen får `granted:false` + orsak och
  * lämnar referral-raden okrediterad så admin kan hantera den manuellt.
  *
- * `idempotencyKey` (t.ex. referral-radens id) skickas till Stripe så att en
- * dubbel webhook eller omkörning inte kan skriva saldot två gånger.
+ * Idempotens i två lager, båda knutna till `referralId`:
+ *   1. Stripes idempotencyKey — stoppar dubbel webhook/omkörning (Stripe
+ *      minns nyckeln i 24 h, och cachar även ett 5xx-svar lika länge).
+ *   2. `metadata.referral_id` på saldotransaktionen + en kontroll mot
+ *      kundens saldohistorik före skrivning — permanent skydd för fallet
+ *      att krediten gick igenom men `rewarded` aldrig skrevs och raden
+ *      passerar hit igen långt senare. Hittas den → `alreadyCredited`.
  */
 export async function grantReferralMonthCredit(
   referrerBusinessId: string,
-  opts: { idempotencyKey?: string } = {}
-): Promise<{ granted: boolean; amountSek?: number; error?: string }> {
+  opts: { referralId: string }
+): Promise<{ granted: boolean; amountSek?: number; alreadyCredited?: boolean; error?: string }> {
   const supabase = getServerSupabase()
 
   const { data: referrer } = await supabase
@@ -68,15 +74,28 @@ export async function grantReferralMonthCredit(
 
   try {
     const stripe = getStripe()
+
+    // Lager 2: ligger krediten för just denna referral redan i Stripe?
+    const historik = await stripe.customers.listBalanceTransactions(referrer.stripe_customer_id, { limit: 100 })
+    const redan = historik.data.find(t => t.metadata?.referral_id === opts.referralId)
+    if (redan) {
+      console.warn('[referral] Krediten låg redan i Stripe, skriver inte igen:', {
+        referrerBusinessId,
+        referralId: opts.referralId,
+        transactionId: redan.id,
+      })
+      return { granted: true, alreadyCredited: true, amountSek: Math.abs(redan.amount) / 100 }
+    }
+
     await stripe.customers.createBalanceTransaction(
       referrer.stripe_customer_id,
       {
         amount: -(amountSek * 100),
         currency: 'sek',
         description: 'Rekommendation: en månad gratis',
-        metadata: { business_id: referrerBusinessId, referral_reward: 'month' },
+        metadata: { business_id: referrerBusinessId, referral_reward: 'month', referral_id: opts.referralId },
       },
-      opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined
+      { idempotencyKey: `referral-month-${opts.referralId}` }
     )
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
@@ -177,9 +196,10 @@ export async function handleFirstPaymentReferral(
 
   // Ge referrern en månad gratis som Stripe-kundsaldo. Går det inte igenom
   // (ingen Stripe-kund, okänd plan, Stripe-fel) lämnas raden i 'active' så
-  // att en omkörning kan försöka igen och admin ser att den är okrediterad.
+  // att en omkörning kan försöka igen — och driftlarmet gör den synlig,
+  // ingen adminyta listar kund-referrals.
   const credit = await grantReferralMonthCredit(referrerBusinessId, {
-    idempotencyKey: `referral-month-${existingReferral.id}`,
+    referralId: existingReferral.id,
   })
   if (!credit.granted) {
     console.error('[referral] Belöning EJ skriven, referral kvar i active:', {
@@ -187,11 +207,37 @@ export async function handleFirstPaymentReferral(
       referrerBusinessId,
       error: credit.error,
     })
+    await rapporteraTystFel(supabase, referrerBusinessId, 'referral_kredit', credit.error || 'okänt fel', {
+      referral_id: existingReferral.id,
+      referred_business_id: businessId,
+    })
     return { rewarded: false, referrerBusinessId, error: credit.error }
   }
 
-  // Skicka SMS till referrer
-  try {
+  // Uppdatera till rewarded — skrivs BARA när krediten faktiskt ligger i
+  // Stripe, och DIREKT efter den så att fönstret där saldot finns men raden
+  // står kvar i 'active' blir så kort som möjligt. Faller skrivningen larmar
+  // vi; metadata.referral_id på transaktionen gör att en omkörning ändå
+  // inte krediterar två gånger.
+  const { error: rewardedError } = await supabase
+    .from('referrals')
+    .update({
+      status: 'rewarded',
+      rewarded_at: new Date().toISOString(),
+      referrer_discount_applied_at: new Date().toISOString(),
+    })
+    .eq('id', existingReferral.id)
+  if (rewardedError) {
+    await rapporteraTystFel(supabase, referrerBusinessId, 'referral_rewarded_status', rewardedError.message, {
+      referral_id: existingReferral.id,
+      referred_business_id: businessId,
+      credit_sek: credit.amountSek,
+    })
+  }
+
+  // Skicka SMS till referrer — men inte en gång till om krediten redan låg
+  // i Stripe sedan en tidigare körning (beskedet gick då).
+  if (!credit.alreadyCredited) try {
     const { data: referrerConfig } = await supabase
       .from('business_config')
       .select('personal_phone, business_name')
@@ -218,16 +264,6 @@ export async function handleFirstPaymentReferral(
   } catch (err) {
     console.error('[Referral] SMS-sändning misslyckades:', err)
   }
-
-  // Uppdatera till rewarded — skrivs BARA när krediten faktiskt ligger i Stripe
-  await supabase
-    .from('referrals')
-    .update({
-      status: 'rewarded',
-      rewarded_at: new Date().toISOString(),
-      referrer_discount_applied_at: new Date().toISOString(),
-    })
-    .eq('id', existingReferral.id)
 
   // Fire automation event
   try {

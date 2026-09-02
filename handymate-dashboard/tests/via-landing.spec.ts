@@ -28,11 +28,16 @@ test.describe('/via/[code] — källskanning', () => {
     expect(kod(PAGE)).toContain("export const dynamic = 'force-dynamic'")
   })
 
-  test('slår upp business_config på referral_code', () => {
+  test('slår upp business_config på referral_code — exakt fyra ofarliga kolumner, en gång per request', () => {
     const src = kod(PAGE)
     expect(src).toContain(".from('business_config')")
     expect(src).toContain(".eq('referral_code'")
-    expect(src).toContain("'business_id, business_name, branch, service_area'")
+    // Selecten är den enda vakten mot läckage — den ska vara exakt denna
+    expect(src).toMatch(/\.select\('business_id, business_name, branch, service_area'\)/)
+    expect(src.match(/\.from\('business_config'\)/g)?.length).toBe(1)
+    // generateMetadata + sidan delar uppslaget via React cache()
+    expect(src).toContain("import { cache } from 'react'")
+    expect(src).toMatch(/const lookupBusiness = cache\(/)
   })
 
   test('läcker inga kontaktuppgifter — själva strängarna får inte finnas i filen', () => {
@@ -44,11 +49,13 @@ test.describe('/via/[code] — källskanning', () => {
     expect(src).not.toContain("select('*')")
   })
 
-  test('loggar via_click till landing_events, felisolerat', () => {
+  test('loggar via_click till landing_events — bara kända koder, felisolerat', () => {
     const src = kod(PAGE)
     expect(src).toContain(".from('landing_events')")
     expect(src).toContain("event: 'via_click'")
-    expect(src).toContain('found: business !== null')
+    // Okända koder loggas inte (gissningssvep ska inte fylla tabellen)
+    expect(src).toContain('if (business) await logViaClick(code, business)')
+    expect(src).not.toContain('found:')
     // Loggningen ligger i try/catch med console.warn — ett fel får aldrig fälla sidan
     expect(src).toMatch(/catch \(err\) \{\s*console\.warn\('\[via\] kunde inte logga via_click:'/)
   })

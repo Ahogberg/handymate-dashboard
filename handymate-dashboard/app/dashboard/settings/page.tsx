@@ -1162,13 +1162,16 @@ export default function SettingsPage() {
       // Egen update för attribution_link_enabled: kolumnen kommer med
       // sql/v200 och finns inte i databasen förrän migrationen körts. Låg
       // den i updaten ovan skulle en okörd migration fälla HELA sparningen
-      // — här loggas felet bara, så resten av kortet sparas ändå.
+      // — här sparas resten av kortet ändå, men toasten får inte påstå att
+      // länkvalet gick igenom när det inte gjorde det.
       const { error: attributionError } = await supabase
         .from('business_config')
         .update({ attribution_link_enabled: attributionLinkEnabled })
         .eq('business_id', business.business_id)
       if (attributionError) {
         console.warn('[settings] kunde inte spara attribution_link_enabled (är sql/v200 körd?):', attributionError.message)
+        showToast('Övrigt sparat, men valet för rekommendationslänken kunde inte sparas', 'error')
+        return
       }
 
       showToast('Recensionsinställningar sparade', 'success')

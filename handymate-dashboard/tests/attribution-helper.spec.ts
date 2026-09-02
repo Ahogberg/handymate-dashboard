@@ -14,7 +14,11 @@ import {
   attributionEmailHtml,
   attributionDocumentHtml,
   attributionPdfText,
+  loadAttribution,
+  stampAttributionOnPdf,
+  type AttributionPdfDoc,
 } from '../lib/branding/attribution'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 const ROOT = path.resolve(__dirname, '..')
 const kod = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n')
@@ -98,6 +102,107 @@ test.describe('attributionPdfText', () => {
     const a = buildAttribution({ referral_code: 'BEE-4821' })
     expect(attributionPdfText(a)).toEqual({ text: 'Skickat via Handymate', url: a.url })
     expect(attributionPdfText(buildAttribution(null))).toEqual({ text: 'Skickat via Handymate', url: null })
+  })
+})
+
+/**
+ * Fejkad Supabase-klient: svarar per select-sträng. Så kan vi spela upp
+ * "kolumnen finns inte än" (PostgREST 400 på den fulla selecten) utan databas.
+ */
+function fakeSupabase(svar: Record<string, { data?: unknown; error?: { message: string } | null }>, logg: string[] = []) {
+  const from = (table: string) => ({
+    select: (cols: string) => {
+      logg.push(`${table}:${cols}`)
+      const r = svar[cols] ?? { data: null, error: { message: `oväntad select: ${cols}` } }
+      const chain = {
+        eq: () => chain,
+        maybeSingle: async () => ({ data: r.data ?? null, error: r.error ?? null }),
+      }
+      return chain
+    },
+  })
+  return { from } as unknown as SupabaseClient
+}
+
+test.describe('loadAttribution — tål att sql/v200 inte är körd', () => {
+  const FULL = 'referral_code, attribution_link_enabled'
+  const BARA_KOD = 'referral_code'
+
+  test('kolumnen finns: en query, enabled respekteras', async () => {
+    const logg: string[] = []
+    const sb = fakeSupabase({ [FULL]: { data: { referral_code: 'BEE-4821', attribution_link_enabled: false } } }, logg)
+    const a = await loadAttribution(sb, 'biz_1')
+    expect(a.url).toBeNull()
+    expect(a.text).toBe(ATTRIBUTION_TEXT)
+    expect(logg).toEqual([`business_config:${FULL}`])
+  })
+
+  test('kolumnen saknas (fulla selecten 400:ar): faller tillbaka på referral_code, länken PÅ', async () => {
+    const logg: string[] = []
+    const sb = fakeSupabase(
+      {
+        [FULL]: { error: { message: 'column business_config.attribution_link_enabled does not exist' } },
+        [BARA_KOD]: { data: { referral_code: 'BEE-4821' } },
+      },
+      logg,
+    )
+    const a = await loadAttribution(sb, 'biz_1')
+    expect(a.url).toMatch(/\/via\/BEE-4821$/)
+    expect(logg).toEqual([`business_config:${FULL}`, `business_config:${BARA_KOD}`])
+  })
+
+  test('båda selecterna faller: texten utan länk, kastar aldrig', async () => {
+    const sb = fakeSupabase({
+      [FULL]: { error: { message: 'nere' } },
+      [BARA_KOD]: { error: { message: 'nere' } },
+    })
+    await expect(loadAttribution(sb, 'biz_1')).resolves.toEqual({ text: ATTRIBUTION_TEXT, url: null })
+  })
+
+  test('klienten kastar: texten utan länk, kastar aldrig', async () => {
+    const sb = { from: () => { throw new Error('boom') } } as unknown as SupabaseClient
+    await expect(loadAttribution(sb, 'biz_1')).resolves.toEqual({ text: ATTRIBUTION_TEXT, url: null })
+  })
+
+  test('okänt företag (ingen rad): texten utan länk', async () => {
+    const sb = fakeSupabase({ [FULL]: { data: null } })
+    await expect(loadAttribution(sb, 'finns_inte')).resolves.toEqual({ text: ATTRIBUTION_TEXT, url: null })
+  })
+})
+
+test.describe('stampAttributionOnPdf — jsPDF-stämpeln', () => {
+  function fakeDoc(pages: number) {
+    const calls: string[] = []
+    const doc: AttributionPdfDoc = {
+      getNumberOfPages: () => pages,
+      setPage: n => calls.push(`setPage:${n}`),
+      internal: { pageSize: { getWidth: () => 210, getHeight: () => 297 } },
+      setFontSize: s => calls.push(`fontSize:${s}`),
+      setTextColor: (r, g, b) => calls.push(`color:${r},${g},${b}`),
+      text: (t, x, y, o) => calls.push(`text:${t}@${x},${y},${o?.align}`),
+      textWithLink: (t, x, y, o) => { calls.push(`link:${t}@${x},${y},${o.align}→${o.url}`); return 0 },
+    }
+    return { doc, calls }
+  }
+
+  test('med länk: sista sidan, centrerad längst ner, grå 8pt, hela raden klickbar', () => {
+    const { doc, calls } = fakeDoc(3)
+    const a = buildAttribution({ referral_code: 'BEE-4821' })
+    stampAttributionOnPdf(doc, a)
+    expect(calls[0]).toBe('setPage:3')
+    expect(calls).toContain('fontSize:8')
+    expect(calls).toContain('color:107,114,128')
+    const link = calls.find(c => c.startsWith('link:'))
+    expect(link).toBe(`link:Skickat via Handymate@105,292,center→${a.url}`)
+    expect(calls.some(c => c.startsWith('text:'))).toBe(false)
+  })
+
+  test('utan länk: ren text, ingen textWithLink', () => {
+    const { doc, calls } = fakeDoc(1)
+    stampAttributionOnPdf(doc, buildAttribution(null))
+    expect(calls[0]).toBe('setPage:1')
+    expect(calls).toContain('text:Skickat via Handymate@105,292,center')
+    expect(calls.some(c => c.startsWith('link:'))).toBe(false)
   })
 })
 
