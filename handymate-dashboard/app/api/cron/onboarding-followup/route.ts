@@ -290,7 +290,7 @@ function luckaHtml(task: KomIgangTask): string {
   </li>`
 }
 
-export function buildDay2EmailHtml(
+function buildDay2EmailHtml(
   firstName: string,
   value: WeeklyValue | null,
   luckor: KomIgangTask[],
@@ -325,7 +325,7 @@ export function buildDay2EmailHtml(
   return ram(greeting, `${gjortHtml}${nastaHtml}`, 'Öppna Handymate →', '/dashboard')
 }
 
-export function buildDay14EmailHtml(firstName: string, luckor: KomIgangTask[]): string {
+function buildDay14EmailHtml(firstName: string, luckor: KomIgangTask[]): string {
   const greeting = firstName ? `Hej ${firstName},` : 'Hej,'
   const tre = luckor.slice(0, 3)
 
@@ -347,7 +347,7 @@ export function buildDay14EmailHtml(firstName: string, luckor: KomIgangTask[]): 
   return ram(greeting, innehall, 'Öppna Handymate →', '/dashboard')
 }
 
-export function buildDay7EmailHtml(firstName: string, value: WeeklyValue, nextAction: Day7NextAction | null = null): string {
+function buildDay7EmailHtml(firstName: string, value: WeeklyValue, nextAction: Day7NextAction | null = null): string {
   const greeting = firstName ? `Hej ${firstName},` : 'Hej,'
 
   // "Nästa bästa steg" — ett riktigt väntande kort med djuplänk, aldrig ett
