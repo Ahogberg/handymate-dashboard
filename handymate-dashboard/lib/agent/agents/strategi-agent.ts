@@ -9,6 +9,7 @@
 import { toolDefinitions } from '@/app/api/agent/trigger/tool-definitions'
 import { BusinessContext } from './shared'
 import { hourlyRateField, formatHourlyRateForPrompt } from '@/lib/company/company-model'
+import { branchCompanyNoun, describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 export const STRATEGI_MODEL = 'claude-sonnet-4-6'
 export const STRATEGI_MAX_STEPS = 10
@@ -28,12 +29,9 @@ export function buildStrategiPrompt(
   const settings = ctx.v3Settings
   const prefs = ctx.learnedPreferences
 
-  const branchMap: Record<string, string> = {
-    electrician: 'Elektriker', plumber: 'Rörmokare', carpenter: 'Snickare',
-    painter: 'Målare', hvac: 'VVS-tekniker', locksmith: 'Låssmed',
-    cleaning: 'Städföretag', other: 'Hantverkare',
-  }
-  const branch = branchMap[biz.branch] || biz.branch || 'Hantverkare'
+  // Branschförståelse steg 1: etiketter ur lib/branch — ingen lokal karta.
+  const branch = describeBranches(resolveBusinessBranch(biz))
+  const branschForetag = branchCompanyNoun(biz.branch)
   // Etapp T — KVITTOPRINCIPEN: inget fallback-tal. Saknat timpris skrivs
   // ut som en explicit instruktion att fråga ägaren.
   const hourlyRateLine = formatHourlyRateForPrompt(hourlyRateField(biz.pricing_settings))
@@ -91,7 +89,7 @@ ${triggerData.rule_name ? `Regel: ${triggerData.rule_name}` : ''}`
 Komplex situation som kräver strategiskt beslut (${triggerType}).`
   }
 
-  return `Du är Strategi-agenten för ${biz.business_name}, ett ${branch.toLowerCase()}företag.
+  return `Du är Strategi-agenten för ${biz.business_name}, ett ${branschForetag}.
 Du kallas ENBART för komplexa beslut som kräver eftertanke.
 
 ## Företag

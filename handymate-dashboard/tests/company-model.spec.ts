@@ -296,7 +296,9 @@ test.describe('byggCompanyModelPromptBlock — skriver ALDRIG en gissad siffra',
     expect(block).toContain('Moms: 25%')
     expect(block).toContain('Marginalmål: 35% (bekräftat av ägaren)')
     expect(block).toContain(`Årsomsättningsmål: ${(1_200_000).toLocaleString('sv-SE')} kr/år`)
-    expect(block).toContain('Bransch: electrician (+ plumber)')
+    // Branschförståelse steg 1: svensk etikett ur lib/branch, aldrig råa ID:n.
+    expect(block).toContain('Bransch: El (+ VVS)')
+    expect(block).not.toContain('electrician')
     expect(block).toContain('Betalningsvillkor: 14 dagar')
     expect(block).not.toContain('systemets standardvärde')
   })

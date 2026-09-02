@@ -9,6 +9,8 @@
  * (boolean) i stället för timmar.
  */
 
+import { normalizeBranch, type BranchId } from '@/lib/branch'
+
 export type RotRutType = 'rot' | 'rut'
 
 export interface SkvCategory {
@@ -61,27 +63,37 @@ export function getCategory(code: string | null | undefined): SkvCategory | unde
 }
 
 /**
- * Default-kategori per bransch (business_config.industry / branch-nyckel).
+ * Default-kategori per bransch (kanoniskt bransch-ID ur lib/branch).
  * Bara ett förslag — hantverkaren kan alltid override:a per faktura, och
  * kategorin måste matcha fakturans rot_rut_type (annars valideringsfel).
+ *
+ * Branschförståelse steg 1 (2026-09-02): 'other' (allround) har medvetet
+ * INGEN default — att gissa "Bygg" åt ett städ- eller elföretag som aldrig
+ * valde bransch var fel mot Skatteverket. Saknas kategori får hantverkaren
+ * välja själv (samma fail-soft som förut, null → ingen kategori).
  */
-export const INDUSTRY_TO_CATEGORY: Record<string, string> = {
+export const INDUSTRY_TO_CATEGORY: Partial<Record<BranchId, string>> = {
   electrician: 'El',
   plumber: 'Vvs',
   hvac: 'Vvs',
   carpenter: 'Bygg',
   construction: 'Bygg',
+  general_contractor: 'Bygg',
   locksmith: 'Bygg',
   roofing: 'GlasPlatarbete',
   flooring: 'Bygg',
+  groundworks: 'MarkDraneringarbete',
   painter: 'MalningTapetsering',
   gardening: 'Tradgardsarbete', // RUT
   cleaning: 'Stadning',          // RUT
   moving: 'Flyttjanster',        // RUT
-  other: 'Bygg',
 }
 
-export function defaultCategoryForIndustry(industry: string | null | undefined): string | null {
-  if (!industry) return null
-  return INDUSTRY_TO_CATEGORY[industry.toLowerCase()] || null
+/**
+ * Tar råvärdet ur business_config.branch (ID, alias eller fritext) —
+ * normaliseras via lib/branch innan uppslag. Tomt/okänt/allround → null.
+ */
+export function defaultCategoryForIndustry(branch: string | null | undefined): string | null {
+  if (!branch) return null
+  return INDUSTRY_TO_CATEGORY[normalizeBranch(branch)] || null
 }

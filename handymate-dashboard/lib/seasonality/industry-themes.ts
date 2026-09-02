@@ -3,6 +3,8 @@
  * Mappar business_config.branch → relevanta kampanjteman.
  */
 
+import { normalizeBranch as normalizeBranchId, type BranchId } from '@/lib/branch'
+
 export interface SeasonalTheme {
   theme: string
   angle: string
@@ -74,18 +76,37 @@ const THEMES: Record<string, Record<number, SeasonalTheme>> = {
 }
 
 /**
- * Normalisera business_config.branch till temagrupp-nyckel.
+ * Kanoniskt bransch-ID (lib/branch) → temagrupp.
+ *
+ * Branschförståelse steg 1 (2026-09-02): tidigare matchades svenska
+ * substrängar mot de engelska ID:n onboardingen skriver — en substrängkoll
+ * på "el" gjorde varje "måleri"/"totalentreprenad" till elektriker och 'plumber'
+ * hamnade i allmängruppen. Nu går allt via alias-tabellen.
+ */
+const THEME_GROUP_BY_BRANCH: Record<BranchId, string> = {
+  electrician: 'el',
+  plumber: 'vvs',
+  hvac: 'ventilation',
+  construction: 'bygg',
+  carpenter: 'bygg',
+  general_contractor: 'bygg',
+  flooring: 'bygg',
+  painter: 'maleri',
+  groundworks: 'mark',
+  gardening: 'mark',
+  roofing: 'tak',
+  locksmith: 'allman',
+  cleaning: 'allman',
+  moving: 'allman',
+  other: 'allman',
+}
+
+/**
+ * Normalisera business_config.branch (ID, alias eller fritext) till
+ * temagrupp-nyckel.
  */
 export function normalizeBranch(branch: string): string {
-  const lower = (branch || '').toLowerCase()
-  if (lower.includes('el') || lower.includes('elektr')) return 'el'
-  if (lower.includes('vvs') || lower.includes('rör') || lower.includes('rörmok')) return 'vvs'
-  if (lower.includes('bygg') || lower.includes('snickar') || lower.includes('snickeri')) return 'bygg'
-  if (lower.includes('mål')) return 'maleri'
-  if (lower.includes('mark') || lower.includes('trädgård') || lower.includes('anlägg')) return 'mark'
-  if (lower.includes('tak') || lower.includes('plåt')) return 'tak'
-  if (lower.includes('vent') || lower.includes('kyl')) return 'ventilation'
-  return 'allman'
+  return THEME_GROUP_BY_BRANCH[normalizeBranchId(branch)] ?? 'allman'
 }
 
 /**

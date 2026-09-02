@@ -38,7 +38,9 @@ test.describe('lib/invoices/sync-to-fortnox.ts — husarbete i Fortnox form', ()
 
   test('kategorin gissas aldrig — saknas den bokförs utan husarbete och driftlarmet får veta', () => {
     expect(s).toContain("'fortnox:housework-category-missing'")
-    expect(s).toContain('defaultCategoryForIndustry(bizConfig?.industry)')
+    // Branschförståelse steg 1: defaulten läses ur `branch`, aldrig `industry`.
+    expect(s).toContain('defaultCategoryForIndustry(bizConfig?.branch)')
+    expect(s).not.toContain('bizConfig?.industry')
   })
 
   test('begäran skapas via POST /taxreductions efter bokföringen, best-effort', () => {

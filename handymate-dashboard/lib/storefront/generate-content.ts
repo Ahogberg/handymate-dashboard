@@ -4,6 +4,7 @@ import { getImagesForBranch } from '@/lib/industry-images'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import { getPublicPriceList } from '@/lib/products/price-list-view'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 const STOREFRONT_MODEL = 'claude-sonnet-4-6'
 
@@ -113,7 +114,7 @@ Baserat på följande företagsdata, generera:
 
 Företagsdata:
 - Namn: ${config.business_name}
-- Bransch: ${config.branch || config.industry || 'Hantverkare'}
+- Bransch: ${describeBranches(resolveBusinessBranch(config))}
 - Tjänster: ${serviceList}
 - Kontaktperson: ${config.contact_name || ''}
 - Plats: ${config.service_area || config.address || 'Sverige'}

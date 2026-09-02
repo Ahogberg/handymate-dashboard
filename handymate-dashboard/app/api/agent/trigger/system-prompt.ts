@@ -10,6 +10,8 @@ import {
   byggCompanyModelPromptBlock,
   type CompanyModel,
 } from '@/lib/company/company-model'
+import { branchCompanyNoun, branchLabel } from '@/lib/branch'
+import { formatTradeContextBlock, type TradeContext } from '@/lib/branch/trade-context'
 
 /** +46761234567 → 076-123 45 67 */
 function formatAgentPhoneHint(phone: string): string {
@@ -98,17 +100,10 @@ interface BusinessContext {
   // laddning) faller prompten tillbaka på pricing_settings direkt för
   // timpris/moms, fortfarande utan att hitta på en siffra.
   companyModel?: CompanyModel | null
-}
-
-const BRANCH_NAMES: Record<string, string> = {
-  electrician: 'Elektriker',
-  plumber: 'Rörmokare',
-  carpenter: 'Snickare',
-  painter: 'Målare',
-  hvac: 'VVS-tekniker',
-  locksmith: 'Låssmed',
-  cleaning: 'Städföretag',
-  other: 'Hantverkare',
+  // Branschförståelse steg 1 (2026-09-02) — bransch + sekundärbranscher +
+  // ägarens specialiteter + företagets egna jobbtyper (lib/branch/
+  // trade-context.ts). Valfri: saknas den byggs prompten utan blocket.
+  tradeContext?: TradeContext | null
 }
 
 export function buildSystemPrompt(
@@ -116,7 +111,10 @@ export function buildSystemPrompt(
   triggerType: string,
   triggerData?: Record<string, unknown>
 ): string {
-  const branchLabel = BRANCH_NAMES[business.branch] || business.branch || 'Hantverkare'
+  // Branschetiketten kommer ALLTID ur lib/branch — inga lokala kartor, inga
+  // råa ID:n ("electrician") i prompten.
+  const branschEtikett = branchLabel(business.branch)
+  const branschForetag = branchCompanyNoun(business.branch)
   // Etapp T — KVITTOPRINCIPEN: kontraktet har INGEN fallback-siffra för
   // timpris. Ett saknat timpris skrivs ut som en explicit instruktion att
   // fråga ägaren, aldrig som ett gissat 695. Moms behåller sin generella
@@ -203,6 +201,9 @@ export function buildSystemPrompt(
   const companyModelBlock = business.companyModel
     ? `\n${byggCompanyModelPromptBlock(business.companyModel)}\n`
     : ''
+  const tradeBlock = business.tradeContext
+    ? `\n${formatTradeContextBlock(business.tradeContext)}\n`
+    : ''
 
   const prefsBlock = business.preferences && Object.keys(business.preferences).length > 0
     ? '\n\n## Inlärda preferenser\n' +
@@ -211,18 +212,18 @@ export function buildSystemPrompt(
         .join('\n')
     : ''
 
-  return `Du är en AI-assistent för ${business.business_name}, ett ${branchLabel.toLowerCase()}företag i ${business.service_area || 'Sverige'}.
+  return `Du är en AI-assistent för ${business.business_name}, ett ${branschForetag} i ${business.service_area || 'Sverige'}.
 
 ## Din roll
 Du är en professionell affärsassistent som hjälper ${business.contact_name || 'hantverkaren'} att hantera kunder, bokningar, offerter och kommunikation.
 
 ## Företagsinformation
 - **Företag:** ${business.business_name}
-- **Bransch:** ${branchLabel}
+- **Bransch:** ${branschEtikett}
 - **Område:** ${business.service_area || 'Ej angivet'}
 - **${hourlyRateLine}**
 - **Moms:** ${vatRate}%
-
+${tradeBlock}
 ${servicesSection}
 
 ## Arbetstider

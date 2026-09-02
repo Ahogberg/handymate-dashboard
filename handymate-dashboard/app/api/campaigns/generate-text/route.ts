@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 import Anthropic from '@anthropic-ai/sdk'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
@@ -32,12 +33,12 @@ export async function POST(request: NextRequest) {
     }
     const { data: bizConfig } = await supabase
       .from('business_config')
-      .select('branch, service_area')
+      .select('branch, secondary_branches, service_area')
       .eq('business_id', business.business_id)
       .single()
 
     const businessName = business.business_name || 'Ditt Företag'
-    const branch = bizConfig?.branch || 'hantverkare'
+    const branch = describeBranches(resolveBusinessBranch(bizConfig))
     const serviceArea = bizConfig?.service_area || 'Sverige'
 
     const typeDescriptions: Record<string, string> = {

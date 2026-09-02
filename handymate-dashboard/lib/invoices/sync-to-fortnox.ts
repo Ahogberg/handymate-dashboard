@@ -157,7 +157,7 @@ export async function syncInvoiceToFortnox(
 
   const { data: bizConfig } = await supabase
     .from('business_config')
-    .select('business_name, contact_name, industry, default_rot_work_category')
+    .select('business_name, contact_name, branch, default_rot_work_category')
     .eq('business_id', businessId)
     .single()
 
@@ -166,9 +166,11 @@ export async function syncInvoiceToFortnox(
   // ToReport på VARJE rad. Kategorin (vad arbetet är) är Skatteverkets kod
   // på fakturan, annars företagets default — aldrig gissad: saknas den
   // bokförs fakturan UTAN husarbete och driftlarmet får veta.
+  // Branschdefaulten läses ur `branch` (onboardingens val) — inte `industry`,
+  // som är 'hantverkare' på alla konton och aldrig gav en kategori.
   const taxReductionType = fortnoxTaxReductionType(invoice.rot_rut_type)
   const skvCategory: string | null = taxReductionType
-    ? (invoice.rot_work_category || bizConfig?.default_rot_work_category || defaultCategoryForIndustry(bizConfig?.industry) || null)
+    ? (invoice.rot_work_category || bizConfig?.default_rot_work_category || defaultCategoryForIndustry(bizConfig?.branch) || null)
     : null
   const houseWorkType = fortnoxHouseWorkType(skvCategory)
   const rotType: RotRutType | null = taxReductionType === 'ROT' ? 'rot' : taxReductionType === 'RUT' ? 'rut' : null

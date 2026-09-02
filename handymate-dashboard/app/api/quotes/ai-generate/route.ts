@@ -5,6 +5,7 @@ import { generateQuoteFromInput, getAveragePrice, analyzeJobImage } from '@/lib/
 import { buildQuoteGenerationContext } from '@/lib/quotes/quote-generation-context'
 import { QuoteContextError } from '@/lib/quotes/job-type-generation'
 import { getServerSupabase } from '@/lib/supabase'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 export async function POST(request: NextRequest) {
   try {
@@ -43,7 +44,9 @@ export async function POST(request: NextRequest) {
 
     // Get business pricing, price list and templates in parallel
     const supabase = getServerSupabase()
-    const branch = business.industry || 'Bygg'
+    // Branschförståelse steg 1: svensk branschtext ur `branch` via lib/branch
+    // (tidigare en gissad Bygg-fallback ur den föråldrade industry-kolumnen).
+    const branch = describeBranches(resolveBusinessBranch(business))
 
     // Fas 3 (offert-omtaget, 2026-08-31): prislista + mallar + kundprislista
     // hämtas nu via EN delad helper (lib/quotes/quote-generation-context.ts)

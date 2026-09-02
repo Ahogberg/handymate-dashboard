@@ -72,6 +72,7 @@ import {
 import { buildMissionHeadline } from '@/lib/mission/mission-summary'
 import { resolveGoalType } from '@/lib/mission/goal-type'
 import { loadCompanyModel, byggCompanyModelPromptBlock, type CompanyModel } from '@/lib/company/company-model'
+import { loadTradeContext, formatTradeContextBlock } from '@/lib/branch/trade-context'
 
 const MAX_IMAGES_PER_MESSAGE = 4
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -163,6 +164,7 @@ async function getBusinessContext(businessId: string) {
     pendingApprovals,
     todayBookings,
     companyModel,
+    tradeContext,
   ] = await Promise.all([
     supabase.from('quotes')
       .select('quote_id, quote_number, total, sent_at')
@@ -203,6 +205,9 @@ async function getBusinessContext(businessId: string) {
       console.error('[matte/chat] company model kunde inte laddas (non-blocking):', err)
       return null as CompanyModel | null
     }),
+    // Branschförståelse steg 1 — bransch + specialiteter + företagets egna
+    // jobbtyper. Fail-soft (returnerar null själv vid fel).
+    loadTradeContext(supabase, businessId).catch(() => null),
   ])
 
   return {
@@ -213,6 +218,7 @@ async function getBusinessContext(businessId: string) {
     pendingApprovals: pendingApprovals.data || [],
     todayBookings: todayBookings.data || [],
     companyModel,
+    tradeContext,
   }
 }
 
@@ -279,6 +285,11 @@ function buildContextSection(ctx: Awaited<ReturnType<typeof getBusinessContext>>
     for (const p of ctx.activeProjects) {
       lines.push(`- ${p.name}`)
     }
+  }
+
+  if (ctx.tradeContext) {
+    lines.push('')
+    lines.push(formatTradeContextBlock(ctx.tradeContext))
   }
 
   if (ctx.companyModel) {

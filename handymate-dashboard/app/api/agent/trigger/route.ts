@@ -8,6 +8,7 @@ import { toolDefinitions } from './tool-definitions'
 import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
 import { loadCompanyModel } from '@/lib/company/company-model'
+import { loadTradeContext } from '@/lib/branch/trade-context'
 import { getBusinessPreferences } from '@/lib/business-preferences'
 import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
 import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
@@ -383,10 +384,15 @@ export async function POST(request: NextRequest) {
 
     // Etapp T — källmärkt "hur jobbar den här firman"-kontrakt. Fail-soft:
     // ett laddningsfel får aldrig fälla agent-turen, bara utebli ur prompten.
-    const companyModel = await loadCompanyModel(supabase, businessId).catch((err) => {
-      console.error('[AgentTrigger] company model kunde inte laddas (non-blocking):', businessId, err)
-      return null
-    })
+    // Branschförståelse steg 1 — bransch/specialiteter/jobbtyper laddas
+    // parallellt med företagsmodellen, båda fail-soft.
+    const [companyModel, tradeContext] = await Promise.all([
+      loadCompanyModel(supabase, businessId).catch((err) => {
+        console.error('[AgentTrigger] company model kunde inte laddas (non-blocking):', businessId, err)
+        return null
+      }),
+      loadTradeContext(supabase, businessId).catch(() => null),
+    ])
 
     const baseSystemPrompt = buildSystemPrompt(
       {
@@ -402,6 +408,7 @@ export async function POST(request: NextRequest) {
         learnedPreferences,
         leadPipelineContext,
         companyModel,
+        tradeContext,
       },
       trigger_type,
       trigger_data

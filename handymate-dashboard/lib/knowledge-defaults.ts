@@ -3,6 +3,8 @@
  * Auto-populated during signup based on selected branch
  */
 
+import { normalizeBranch } from '@/lib/branch'
+
 export interface ServiceItem {
   name: string
   description: string
@@ -242,46 +244,18 @@ const BRANCH_KNOWLEDGE: Record<string, BranchKnowledge> = {
   },
 }
 
-// Mapping from Swedish form values to branch keys
-const BRANCH_MAPPING: Record<string, string> = {
-  'electrician': 'electrician',
-  'plumber': 'plumber',
-  'carpenter': 'carpenter',
-  'painter': 'painter',
-  'hvac': 'hvac',
-  'locksmith': 'locksmith',
-  'cleaning': 'cleaning',
-  'construction': 'construction',
-  'roofing': 'roofing',
-  'flooring': 'flooring',
-  'gardening': 'gardening',
-  'moving': 'moving',
-  'other': 'other',
-  // Swedish names (if used)
-  'elektriker': 'electrician',
-  'rörmokare': 'plumber',
-  'snickare': 'carpenter',
-  'målare': 'painter',
-  'vvs': 'hvac',
-  'låssmed': 'locksmith',
-  'städ': 'cleaning',
-  'bygg': 'construction',
-  'tak': 'roofing',
-  'golv': 'flooring',
-  'trädgård': 'gardening',
-  'flytt': 'moving',
-  'annat': 'other',
-}
-
 /**
  * Get knowledge base defaults for a specific branch
  * @param branch - Branch identifier (e.g., 'electrician' or 'Elektriker')
  * @returns Branch-specific knowledge base or generic defaults
+ *
+ * Branschförståelse steg 1 (2026-09-02): alias-tabellen bor i lib/branch.
+ * Den lokala kartan hade 'vvs' → hvac medan resten av systemet menar
+ * plumber — nu EN översättning. Branscher utan egen kunskapsbas
+ * (mark, totalentreprenad) faller till 'other'.
  */
 export function getKnowledgeForBranch(branch: string): BranchKnowledge {
-  const normalizedBranch = branch.toLowerCase().trim()
-  const branchKey = BRANCH_MAPPING[normalizedBranch] || 'other'
-  return BRANCH_KNOWLEDGE[branchKey] || BRANCH_KNOWLEDGE.other
+  return BRANCH_KNOWLEDGE[normalizeBranch(branch)] || BRANCH_KNOWLEDGE.other
 }
 
 /**

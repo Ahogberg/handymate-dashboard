@@ -3,6 +3,7 @@ import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 import { getPublicPriceList } from '@/lib/products/price-list-view'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 /**
  * Shared action execution for AI suggestion approval.
@@ -209,7 +210,7 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
     try {
       const { data: business } = await supabase
         .from('business_config')
-        .select('branch, default_hourly_rate, pricing_settings')
+        .select('branch, secondary_branches, default_hourly_rate, pricing_settings')
         .eq('business_id', businessId)
         .single()
 
@@ -252,7 +253,9 @@ async function createQuote(supabase: SupabaseClient, suggestion: any, actionData
         const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
         aiQuote = await generateQuoteFromInput({
           businessId,
-          branch: business?.branch || 'Bygg',
+          // Svensk etikett via lib/branch — prompten ska aldrig se råa ID:n
+          // eller en gissad 'Bygg'.
+          branch: describeBranches(resolveBusinessBranch(business)),
           hourlyRate: customerPriceList?.hourly_rate_normal || hourlyRate,
           textDescription: description,
           customerId: customerId || undefined,

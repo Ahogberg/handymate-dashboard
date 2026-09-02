@@ -78,6 +78,7 @@ import { buildQuoteGenerationContext } from '@/lib/quotes/quote-generation-conte
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 import { hourlyRateField } from '@/lib/company/company-model'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 // ─────────────────────────────────────────────────────────────────
 // Trösklar
@@ -223,7 +224,7 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     // ── 5. Cost-guard (bakgrund) ───────────────────────────────────
     const { data: bizRow, error: bizErr } = await supabase
       .from('business_config')
-      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan, industry, pricing_settings, default_hourly_rate')
+      .select('business_id, agents_globally_paused, agent_cost_cap_usd_daily, subscription_plan, branch, secondary_branches, pricing_settings, default_hourly_rate')
       .eq('business_id', businessId)
       .maybeSingle()
 
@@ -253,11 +254,14 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
     )
 
     const bizConfig = bizRow as {
-      industry?: string | null
+      branch?: string | null
+      secondary_branches?: string[] | null
       pricing_settings?: { hourly_rate?: number } | null
       default_hourly_rate?: number | null
     }
-    const branch = bizConfig.industry || 'Bygg'
+    // Branschförståelse steg 1: svensk branschtext ur `branch` via lib/branch
+    // (tidigare en gissad Bygg-fallback ur den föråldrade industry-kolumnen).
+    const branch = describeBranches(resolveBusinessBranch(bizConfig))
     // Etapp T — KVITTOPRINCIPEN: aldrig ett hårdkodat 650. Riktiga källor
     // ENDAST (pricing_settings.hourly_rate, sedan onboardingens
     // default_hourly_rate) — saknas båda hoppar vi över AI-genereringen

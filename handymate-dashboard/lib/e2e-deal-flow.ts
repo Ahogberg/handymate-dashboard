@@ -7,6 +7,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 import { createQuote as createCanonicalQuote } from '@/lib/quotes/create-quote'
 import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
@@ -432,7 +433,7 @@ async function executeQuoteGeneration(
     // Hämta affärskonfiguration
     const { data: config } = await supabase
       .from('business_config')
-      .select('branch, default_hourly_rate, pricing_settings')
+      .select('branch, secondary_branches, default_hourly_rate, pricing_settings')
       .eq('business_id', businessId)
       .single()
 
@@ -447,7 +448,7 @@ async function executeQuoteGeneration(
       const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
       const aiQuote = await generateQuoteFromInput({
         businessId,
-        branch: config?.branch || 'Bygg',
+        branch: describeBranches(resolveBusinessBranch(config)),
         hourlyRate,
         textDescription: description,
         customerId: deal.customer_id || undefined,
