@@ -1,6 +1,6 @@
 /**
  * Facit: Handymate-stämpeln på de publika webbsidorna
- * (lib/branding/attribution.ts, components/branding/AttributionStamp.tsx, sql/v200).
+ * (lib/branding/attribution.ts, components/branding/AttributionStamp.tsx, sql/v202).
  *
  *   npx playwright test tests/facit-attribution-pages.spec.ts --project=chromium --no-deps
  *

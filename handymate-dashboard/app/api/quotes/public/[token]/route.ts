@@ -213,7 +213,7 @@ export async function GET(
 
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
     // Stämpeln: QUOTE_SURFACE_BUSINESS_SELECT är en kolumnlista som inte får
-    // utökas med attribution_link_enabled före sql/v200 — helperns egen
+    // utökas med attribution_link_enabled före sql/v202 — helperns egen
     // fallback-säkra query istället (kastar aldrig).
     const attribution = await loadAttribution(supabase, quote.business_id)
     const templateStyle = (quote.template_style || business?.quote_template_style || 'modern') as

@@ -1,6 +1,6 @@
 /**
  * Facit: Handymate-stämpeln i PDF-renderarna
- * (lib/branding/attribution.ts, sql/v200).
+ * (lib/branding/attribution.ts, sql/v202).
  *
  *   npx playwright test tests/facit-attribution-pdf.spec.ts --project=chromium --no-deps
  *
@@ -11,7 +11,7 @@
  *   3. jsPDF-vägen ritar en klickbar länk (doc.textWithLink) när url finns,
  *   4. anropare med hela business_config-raden bygger direkt, anropare med
  *      kolumnlista laddar via loadAttribution (aldrig attribution_link_enabled
- *      i en kolumnlista — PostgREST fäller hela selecten före v200),
+ *      i en kolumnlista — PostgREST fäller hela selecten före v202),
  *   5. mallarna faktiskt renderar stämpeln, sist i dokumentet, med länk när
  *      referral_code finns och utan när länken är avstängd.
  */

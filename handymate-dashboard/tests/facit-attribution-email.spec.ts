@@ -1,6 +1,6 @@
 /**
  * Facit: Handymate-stämpeln i de utgående e-postvägarna
- * (lib/branding/attribution.ts, sql/v200).
+ * (lib/branding/attribution.ts, sql/v202).
  *
  *   npx playwright test tests/facit-attribution-email.spec.ts --project=chromium
  *
@@ -9,7 +9,7 @@
  *      sin egen sträng — annars saknar den rekommendationslänken och
  *      Inställningar-toggeln biter inte),
  *   2. ingen av dem har kvar den gamla klartexten,
- *   3. helpern kan laddas utan att fälla utskicket innan v200 är körd
+ *   3. helpern kan laddas utan att fälla utskicket innan v202 är körd
  *      (PostgREST fäller hela selecten om en begärd kolumn saknas).
  */
 import { test, expect } from '@playwright/test'

@@ -5,7 +5,7 @@
  * Texten visas ALLTID. Ordet "Handymate" länkar till företagets
  * rekommendationssida (/via/<referral_code>) när
  *   1. företaget inte stängt av länken (business_config.attribution_link_enabled,
- *      sql/v200 — saknad/null kolumn tolkas som PÅ), och
+ *      sql/v202 — saknad/null kolumn tolkas som PÅ), och
  *   2. företaget har en referral_code (lib/referral/codes.ts — kan vara
  *      null på gamla konton).
  *
@@ -47,8 +47,8 @@ export function buildAttribution(cfg: AttributionSource | null | undefined): Att
  * inte redan har business_config-raden i scope (`select('*')`; den som har
  * det anropar buildAttribution(raden) direkt).
  *
- * Kolumnen attribution_link_enabled kommer i sql/v200. PostgREST fäller
- * hela selecten om en begärd kolumn saknas, så innan v200 är körd faller
+ * Kolumnen attribution_link_enabled kommer i sql/v202. PostgREST fäller
+ * hela selecten om en begärd kolumn saknas, så innan v202 är körd faller
  * vi tillbaka på bara referral_code (saknad kolumn = länken PÅ). Kastar
  * aldrig — vid fel blir det texten utan länk, utskicket får inte stanna
  * på stämpeln.

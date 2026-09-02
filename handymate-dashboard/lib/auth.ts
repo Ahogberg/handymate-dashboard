@@ -42,7 +42,7 @@ export interface AuthenticatedBusiness {
       Raden hämtas med select('*'), så fältet finns i runtime; stämpeln
       (lib/branding/attribution.ts) läser det via buildAttribution(business). */
   referral_code?: string | null
-  /** sql/v200 — undefined tills migrationen är körd, tolkas som PÅ. */
+  /** sql/v202 — undefined tills migrationen är körd, tolkas som PÅ. */
   attribution_link_enabled?: boolean | null
   /**
    * Om denna business returneras via superadmin-impersonation snarare än

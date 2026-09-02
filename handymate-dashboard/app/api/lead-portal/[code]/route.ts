@@ -71,7 +71,7 @@ export async function GET(
 
     // "Skickat via Handymate"-stämpeln i sidfoten. Business-selecten ovan
     // är en kolumnlista (får inte utökas med attribution_link_enabled före
-    // sql/v200) — helperns fallback-säkra query, en gång per visning.
+    // sql/v202) — helperns fallback-säkra query, en gång per visning.
     const attribution = await loadAttribution(supabase, source.business_id)
 
     return NextResponse.json({

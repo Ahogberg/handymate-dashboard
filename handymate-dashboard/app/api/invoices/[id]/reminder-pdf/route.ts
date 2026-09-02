@@ -99,7 +99,7 @@ export async function GET(
     // beloppet för en påminnelse (inkl. dröjsmålsränta + avgift) redan är
     // uträknat ovan (tvåstegs-beräkningen som HTML-läget alltid gjort).
     // Stämpeln: config ovan är en kolumnlista (får inte utökas med stämpel-
-    // kolumnen före sql/v200), men `business` från getAuthenticatedBusiness
+    // kolumnen före sql/v202), men `business` från getAuthenticatedBusiness
     // är hela raden — bygg direkt, ingen extra query.
     const attribution = buildAttribution(business)
 

@@ -413,7 +413,7 @@ export default function SettingsPage() {
   const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
   const [reviewRequestDelayDays, setReviewRequestDelayDays] = useState(3)
   const [referralAskEnabled, setReferralAskEnabled] = useState(false)
-  // "Skickat via Handymate"-länken (sql/v200). Default true — även när kolumnen
+  // "Skickat via Handymate"-länken (sql/v202). Default true — även när kolumnen
   // inte finns i databasen än (lib/branding/attribution.ts tolkar undefined som på).
   const [attributionLinkEnabled, setAttributionLinkEnabled] = useState(true)
   const [reviewStats, setReviewStats] = useState({ sent: 0, clicked: 0 })
@@ -1160,7 +1160,7 @@ export default function SettingsPage() {
       if (error) throw error
 
       // Egen update för attribution_link_enabled: kolumnen kommer med
-      // sql/v200 och finns inte i databasen förrän migrationen körts. Låg
+      // sql/v202 och finns inte i databasen förrän migrationen körts. Låg
       // den i updaten ovan skulle en okörd migration fälla HELA sparningen
       // — här sparas resten av kortet ändå, men toasten får inte påstå att
       // länkvalet gick igenom när det inte gjorde det.
@@ -1169,7 +1169,7 @@ export default function SettingsPage() {
         .update({ attribution_link_enabled: attributionLinkEnabled })
         .eq('business_id', business.business_id)
       if (attributionError) {
-        console.warn('[settings] kunde inte spara attribution_link_enabled (är sql/v200 körd?):', attributionError.message)
+        console.warn('[settings] kunde inte spara attribution_link_enabled (är sql/v202 körd?):', attributionError.message)
         showToast('Övrigt sparat, men valet för rekommendationslänken kunde inte sparas', 'error')
         return
       }

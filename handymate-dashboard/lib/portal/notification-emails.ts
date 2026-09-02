@@ -239,7 +239,7 @@ export async function sendPortalNotification(
   const subject = copy.subject(context, businessName)
   const ctaText = typeof copy.cta === 'function' ? copy.cta(context) : copy.cta
   // Stämpelns underlag — egen felisolerad query (business-selecten ovan är en
-  // explicit kolumnlista och attribution_link_enabled finns först i sql/v200).
+  // explicit kolumnlista och attribution_link_enabled finns först i sql/v202).
   const attribution = await loadAttribution(supabase, businessId)
   const html = buildEmailHtml({
     accentColor,

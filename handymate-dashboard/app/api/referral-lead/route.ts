@@ -113,7 +113,7 @@ export async function GET(request: NextRequest) {
     if (!business) return invalidLinkResponse()
 
     // "Skickat via Handymate"-stämpeln i sidfoten (kolumnlistan ovan får
-    // inte utökas med attribution_link_enabled före sql/v200) — helperns
+    // inte utökas med attribution_link_enabled före sql/v202) — helperns
     // fallback-säkra query, en gång per visning.
     const attribution = await loadAttribution(supabase, decoded.businessId)
 

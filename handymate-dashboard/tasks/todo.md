@@ -6,7 +6,7 @@ Beslut från Andreas: belöning = en månad gratis (Stripe-kundsaldo); stämpeln
 ## Etapp A — "Skickat via Handymate" (worktree `.worktrees/attribution`, branch `feature/attribution-stamp`)
 
 - [x] A1 `lib/branding/attribution.ts` — helper + rena tester (a4a072c3)
-- [x] A5 `sql/v200_attribution_link_enabled.sql` + toggle i Inställningar (1f4e4ddb) — SQL EJ körd
+- [x] A5 `sql/v202_attribution_link_enabled.sql` + toggle i Inställningar (1f4e4ddb) — omdöpt från v200 (Codex tog v200/v201), KÖRD+verifierad via MCP 2026-09-02
 - [x] A3 `app/via/[code]/page.tsx` — publik landningssida + `landing_events`-logg (33cacbf4)
 - [x] A2a e-postvägar: quotes/send, send-invoice, invoice-reminder-send, portal notification-emails, orders/send (cbe8eba6)
 - [x] A2b PDF: quote-/invoice-templates (4), pdf-generator (2), ata/pdf, job-report (cbe8eba6)
@@ -30,12 +30,12 @@ Beslut från Andreas: belöning = en månad gratis (Stripe-kundsaldo); stämpeln
 
 ### Etapp A (2026-09-02, oberoende Fable-granskare över origin/main..HEAD)
 
-Inget blockerande. Multi-tenant håller (alla `loadAttribution` på rätt business_id), v200-toleransen verklig (kolumnen bara i helperns primär-select med fallback + settings egna update), inga queries i loopar, `/via` läcker bara det som redan är publikt på storefronten. `referrals`-tabellen är tom i prod → statusändringen `active`→retry påverkar inga legacy-rader.
+Inget blockerande. Multi-tenant håller (alla `loadAttribution` på rätt business_id), v202-toleransen verklig (kolumnen bara i helperns primär-select med fallback + settings egna update), inga queries i loopar, `/via` läcker bara det som redan är publikt på storefronten. `referrals`-tabellen är tom i prod → statusändringen `active`→retry påverkar inga legacy-rader.
 
 Åtgärdat (95c6fd63):
 - **Dubbelkredit-fönstret**: `rewarded`-uppdateringen saknade felkoll och låg efter SMS:et; Stripes idempotencyKey gäller 24 h. Nu: rewarded direkt efter krediten + felkoll, `metadata.referral_id` på saldotransaktionen + kontroll mot `listBalanceTransactions` före skrivning = permanent idempotens.
 - **Osynlig utebliven kredit**: ingen adminyta listar kund-referrals → `rapporteraTystFel` i båda felgrenarna.
-- **Toasten ljög före v200**: sa "sparat" när länkvalet inte gick att spara → egen feltoast.
+- **Toasten ljög före v202**: sa "sparat" när länkvalet inte gick att spara → egen feltoast.
 - `/via`: `cache()` runt uppslaget (var två queries/visning), okända koder loggas inte.
 - Riktiga enhetstester för `loadAttribution`-fallbacken och `stampAttributionOnPdf` (var bara källskannade).
 
@@ -45,4 +45,4 @@ Medvetet lämnat:
 - Årskund som referrer får krediten på nästa faktura (kan vara 11 mån bort). Beslut, inte bugg.
 - Ingen rate-limit på `/via` (koder = ~9 000 gissningar per prefix; det som läcker är redan publikt).
 
-Kvar för Andreas: `sql/v200` (säg "kör"), skarptest enligt planen (offert → fot → `/via` → `landing_events`; toggeln av → utan länk), Stripe test-mode-prov av krediten.
+Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landing_events`; toggeln av → utan länk), Stripe test-mode-prov av krediten.

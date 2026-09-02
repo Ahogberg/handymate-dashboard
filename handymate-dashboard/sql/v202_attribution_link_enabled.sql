@@ -1,5 +1,5 @@
 -- ============================================================================
--- v200 — Rekommendationslänken i "Skickat via Handymate"-stämpeln (2026-09-02)
+-- v202 — Rekommendationslänken i "Skickat via Handymate"-stämpeln (2026-09-02)
 -- ============================================================================
 -- Alla kundvända dokument och mejl (offert, faktura, kundportal, e-post)
 -- stämplas med "Skickat via Handymate" där ordet Handymate länkar till

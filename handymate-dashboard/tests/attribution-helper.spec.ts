@@ -1,5 +1,5 @@
 /**
- * "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts, sql/v200).
+ * "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts, sql/v202).
  *
  *   npx playwright test tests/attribution-helper.spec.ts --project=chromium
  *
@@ -124,7 +124,7 @@ function fakeSupabase(svar: Record<string, { data?: unknown; error?: { message: 
   return { from } as unknown as SupabaseClient
 }
 
-test.describe('loadAttribution — tål att sql/v200 inte är körd', () => {
+test.describe('loadAttribution — tål att sql/v202 inte är körd', () => {
   const FULL = 'referral_code, attribution_link_enabled'
   const BARA_KOD = 'referral_code'
 
@@ -207,8 +207,8 @@ test.describe('stampAttributionOnPdf — jsPDF-stämpeln', () => {
 })
 
 test.describe('källskanning', () => {
-  test('sql/v200 lägger till kolumnen idempotent med default true', () => {
-    const sql = kod('sql/v200_attribution_link_enabled.sql')
+  test('sql/v202 lägger till kolumnen idempotent med default true', () => {
+    const sql = kod('sql/v202_attribution_link_enabled.sql')
     expect(sql).toContain('ADD COLUMN IF NOT EXISTS attribution_link_enabled BOOLEAN DEFAULT true')
     expect(sql).toContain('COMMENT ON COLUMN business_config.attribution_link_enabled')
   })
@@ -218,7 +218,7 @@ test.describe('källskanning', () => {
     expect(src).toContain('attribution_link_enabled')
     expect(src).toContain('data.attribution_link_enabled !== false')
     expect(src).toContain('Rekommendationslänk i dokument och mejl')
-    // Egen update så en okörd v200 inte fäller resten av sparningen
+    // Egen update så en okörd v202 inte fäller resten av sparningen
     expect(src).toMatch(/\.update\(\{ attribution_link_enabled: attributionLinkEnabled \}\)/)
   })
 })

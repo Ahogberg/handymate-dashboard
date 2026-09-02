@@ -270,7 +270,7 @@ export function buildQuoteTemplateData(
     // Stämpeln: rätt direkt när config är hela business_config-raden
     // (select('*')). Anropare med explicit kolumnlista skriver över med
     // loadAttribution — kolumnen får ALDRIG läggas i en kolumnlista
-    // (PostgREST fäller hela selecten före sql/v200).
+    // (PostgREST fäller hela selecten före sql/v202).
     attribution: buildAttribution(config),
     business: {
       name: businessName,

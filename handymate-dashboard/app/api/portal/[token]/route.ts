@@ -101,7 +101,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
 
     // Stämpeln "Skickat via Handymate" i portalens fotrader. Business-
     // selecten ovan är en kolumnlista som inte får utökas med
-    // attribution_link_enabled före sql/v200 — helperns fallback-säkra
+    // attribution_link_enabled före sql/v202 — helperns fallback-säkra
     // query i stället (kastar aldrig). EN laddning per portalbesök.
     const attribution = await loadAttribution(supabase, customer.business_id)
 

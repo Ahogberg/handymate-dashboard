@@ -246,7 +246,7 @@ export async function POST(request: NextRequest) {
     // → buildQuoteTemplateData faller tillbaka på ägarens business_config.
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
 
-    // Stämpeln: config är en kolumnlista (får inte utökas före sql/v200),
+    // Stämpeln: config är en kolumnlista (får inte utökas före sql/v202),
     // men `business` (getAuthenticatedBusiness) är hela raden — bygg direkt.
     const attribution = buildAttribution(business)
 
@@ -286,7 +286,7 @@ export async function GET(request: NextRequest) {
     // Stämpeln: id-vägen har hela business_config-raden via
     // getAuthenticatedBusiness (bygg direkt); token-vägen saknar den och
     // laddar via helpern nedan (bizConfig är en kolumnlista som inte får
-    // utökas före sql/v200).
+    // utökas före sql/v202).
     let attribution: Attribution | null = null
 
     if (signToken) {
