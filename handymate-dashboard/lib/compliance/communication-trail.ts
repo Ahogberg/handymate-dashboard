@@ -13,11 +13,15 @@
  * lib/value/load-revenue-recovery-cases.ts, men kastar inte — ETT trasigt
  * uppslag ska inte fälla de sju andra källorna.
  *
- * Källorna är samma åtta som kundtidslinjen (app/api/customers/[id]/timeline)
- * verifierade live 2026-08-16, men utan tidslinjens UI-radtak.
+ * Källorna var åtta, verifierade live 2026-08-16 mot kundtidslinjen
+ * (app/api/customers/[id]/timeline), men utan tidslinjens UI-radtak.
+ * Kundminne-revisionen (2026-09-02) lade till källa nio och tio: leads
+ * (kundens egna ord från webb/lead-formulär, gap 5) och customer_fact
+ * (godkänd kundfakta ur möten, gap 8).
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { phoneCandidates } from '@/lib/voice/find-customer-by-phone'
 
 export type TrailChannel =
   | 'sms'
@@ -28,6 +32,7 @@ export type TrailChannel =
   | 'widget'
   | 'quote_view'
   | 'note'
+  | 'form'
 
 export interface TrailEntry {
   channel: TrailChannel
@@ -55,6 +60,7 @@ export const TRAIL_CHANNEL_LABELS: Record<TrailChannel, string> = {
   widget: 'Webbchatt',
   quote_view: 'Offertöppning',
   note: 'Anteckning',
+  form: 'Formulär',
 }
 
 /** Läsbara källnamn för bortfalls-/avkortningsraderna i exporten. */
@@ -67,6 +73,8 @@ export const TRAIL_SOURCE_LABELS: Record<string, string> = {
   widget_conversation: 'webbchatt',
   quote_tracking_events: 'offertöppningar',
   customer_activity: 'anteckningar',
+  leads: 'formulärsvar',
+  customer_fact: 'kundfakta',
 }
 
 /**
@@ -216,7 +224,12 @@ export async function getCommunicationTrail(
   }
 
   // ── SMS, båda riktningar (sedan speglingen 2026-08-16) ────────────────────
-  if (customer.phone_number) {
+  // Kundminne-revisionen (2026-09-02, gap 1): skrivarna sparar alltid E.164
+  // men kunden kan vara sparad i valfri form — ett rått .eq(phone_number,
+  // customer.phone_number) gjorde SMS-delen av underlaget osynlig för en
+  // kund utan E.164-nummer. phoneCandidates ger [rå, E.164] för .in().
+  const smsPhoneCandidates = phoneCandidates(customer.phone_number)
+  if (smsPhoneCandidates.length > 0) {
     const rows = await collectSource<{ id: string; role: string; content: string | null; created_at: string }>(
       'sms_conversation',
       state,
@@ -225,7 +238,7 @@ export async function getCommunicationTrail(
           .from('sms_conversation')
           .select('id, role, content, created_at')
           .eq('business_id', businessId)
-          .eq('phone_number', customer.phone_number),
+          .in('phone_number', smsPhoneCandidates),
         'created_at',
       )
         .order('created_at', { ascending: false })
@@ -479,6 +492,64 @@ export async function getCommunicationTrail(
           duration_seconds: a.duration_seconds,
           created_by: a.created_by,
         },
+      })
+    }
+  }
+
+  // ── Kundens egna ord från webb/lead-formuläret (gap 5) ────────────────────
+  {
+    const rows = await collectSource<{ lead_id: string; notes: string | null; source: string | null; created_at: string }>(
+      'leads',
+      state,
+      () => applyRange(
+        supabase
+          .from('leads')
+          .select('lead_id, notes, source, created_at')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId),
+        'created_at',
+      )
+        .order('created_at', { ascending: false })
+        .limit(PER_SOURCE_LIMIT + 1),
+    )
+    for (const l of rows) {
+      if (!l.notes) continue
+      entries.push({
+        channel: 'form',
+        direction: 'in',
+        timestamp: l.created_at,
+        title: 'Formulärsvar (lead)',
+        body: l.notes,
+        meta: { lead_id: l.lead_id, source: l.source },
+      })
+    }
+  }
+
+  // ── Kundfakta — godkända fakta ur möten (gap 8) ────────────────────────────
+  {
+    const rows = await collectSource<{ id: string; content: string | null; fact_type: string | null; created_at: string }>(
+      'customer_fact',
+      state,
+      () => applyRange(
+        supabase
+          .from('customer_fact')
+          .select('id, content, fact_type, created_at')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .is('superseded_by', null),
+        'created_at',
+      )
+        .order('created_at', { ascending: false })
+        .limit(PER_SOURCE_LIMIT + 1),
+    )
+    for (const f of rows) {
+      entries.push({
+        channel: 'note',
+        direction: null,
+        timestamp: f.created_at,
+        title: 'Kundfakta',
+        body: f.content,
+        meta: { fact_type: f.fact_type },
       })
     }
   }

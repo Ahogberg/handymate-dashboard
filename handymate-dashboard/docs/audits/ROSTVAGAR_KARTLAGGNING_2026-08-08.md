@@ -67,6 +67,9 @@ ligger i ett annat repo och kan anropa samma API. Att radera en route som en
 klient jag inte kan läsa möjligen använder är inte mitt beslut att fatta ensam.
 `voice/execute`s faktiska defekt (opt-out-bypassen) är lagad oavsett.
 
+`voice/process` borttagen 2026-09-02 (docs/audits/KUNDMINNE_REVISION_2026-09-02.md,
+gap 9) — grep bekräftade fortfarande ingen anropare i repot.
+
 **Två edge-funktioner utan signaturverifiering.** `supabase/functions/sms-webhook`
 och `supabase/functions/vapi-webhook` triggar båda `functions/v1/agent`, som
 inte finns i `supabase/functions/`. Om de fortfarande är deployade och 46elks

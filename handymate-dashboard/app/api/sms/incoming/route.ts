@@ -5,6 +5,7 @@ import { createHash } from 'crypto'
 import { verifyElksSignature } from '@/lib/elks-signature'
 import { sendSmsViaElks, parseOptOutCommand } from '@/lib/sms-send'
 import { resolveSmsCustomer } from '@/lib/outbound/sms-gate'
+import { isTeamPhone } from '@/lib/matte/owner-sender'
 
 /**
  * Incoming SMS webhook from 46elks.
@@ -180,6 +181,17 @@ export async function POST(request: NextRequest) {
         // kvittensen misslyckades. Felet är synligt i sms_log och Vercel-logg.
         console.error('[SMS Incoming] STOPP/START-kvittens misslyckades:', confirmation.error)
       }
+      return new NextResponse('OK')
+    }
+
+    // ── Ägare vs kund (kundminne-revisionen 2026-09-02, gap 4) ──────────────
+    // En i teamet som SMS:ar till det tilldelade numret ska aldrig behandlas
+    // som kund: inget resolveEntity, ingen intent-agent, inga Matte-actions,
+    // inget automatiskt kundsvar — och meddelandet sparas inte i
+    // sms_conversation som en kundrad. Ägarintag via SMS är ett senare steg;
+    // det här stänger bara buggen att ägaren körde kundflödet.
+    if (await isTeamPhone(supabase, business.business_id, from)) {
+      console.info('[sms/incoming] avsändaren är en i teamet — kundflödet hoppas')
       return new NextResponse('OK')
     }
 

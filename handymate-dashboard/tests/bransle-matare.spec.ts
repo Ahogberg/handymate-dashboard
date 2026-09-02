@@ -357,7 +357,6 @@ test.describe('Bränslet är ett serverauktoritativt stopp, inte bara en mätare
     'app/api/jobbuddy/photo/route.ts',
     'app/api/jobbuddy/voice/route.ts',
     'app/api/matte/transcribe/route.ts',
-    'app/api/voice/process/route.ts',
     'app/api/voice/transcribe/route.ts',
     'app/api/voice/analyze/route.ts',
     'app/api/widget/chat/route.ts',

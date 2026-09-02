@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { phoneCandidates } from '@/lib/voice/find-customer-by-phone'
 import {
   emptyTimelineProjectContext,
   resolveTimelineProject,
@@ -47,6 +48,11 @@ export async function GET(
     .single()
 
   const customerPhone = customer?.phone_number || null
+  // Kundminne-revisionen (2026-09-02, gap 1): skrivarna sparar alltid E.164,
+  // men kunden kan vara sparad i valfri form ("070-123 45 67"). Ett rått
+  // .eq(phone_number, customerPhone) gjorde SMS-historiken osynlig för
+  // varannan kund. phoneCandidates ger [rå, E.164] att slå upp med .in().
+  const smsPhoneCandidates = phoneCandidates(customerPhone)
 
   // Projektkontexten läses tenant- OCH kundfiltrerat. Den används bara för
   // verifierade id-kedjor; en kontakt utan sådan kedja lämnas okopplad.
@@ -147,12 +153,12 @@ export async function GET(
   }
 
   // ── 2. sms_conversation — SMS history ─────────────────────────
-  if ((filter === 'all' || filter === 'sms') && customerPhone) {
+  if ((filter === 'all' || filter === 'sms') && smsPhoneCandidates.length > 0) {
     const { data: smsRows } = await supabase
       .from('sms_conversation')
       .select('id, role, content, created_at')
       .eq('business_id', businessId)
-      .eq('phone_number', customerPhone)
+      .in('phone_number', smsPhoneCandidates)
       .order('created_at', { ascending: false })
       .limit(50)
 
@@ -526,18 +532,23 @@ export async function GET(
   if (filter === 'all' || filter === 'leads') {
     const { data: leads } = await supabase
       .from('leads')
-      .select('lead_id, status, score, urgency, job_type, source, created_at, converted_at')
+      .select('lead_id, status, score, urgency, job_type, source, notes, created_at, converted_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(10)
 
     for (const l of leads || []) {
+      // Kundminne-revisionen (2026-09-02, gap 5): kundens egna ord från
+      // webben/leadformuläret (leads.notes) syntes ingenstans — bara
+      // score/källa. Trimmad till 300 tecken, samma tak som övriga
+      // kroppar i tidslinjen.
+      const kundensOrd = l.notes ? String(l.notes).trim().substring(0, 300) : null
       events.push({
         id: `lead_${l.lead_id}`,
         type: 'lead_created',
         title: 'Lead skapad',
-        description: `Score: ${l.score || 0}, ${l.job_type || 'Okänd typ'}, Källa: ${l.source || '–'}`,
+        description: kundensOrd || `Score: ${l.score || 0}, ${l.job_type || 'Okänd typ'}, Källa: ${l.source || '–'}`,
         timestamp: l.created_at,
         metadata: { lead_id: l.lead_id, score: l.score, urgency: l.urgency, status: l.status },
       })

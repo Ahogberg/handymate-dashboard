@@ -1,3 +1,26 @@
+# Nattpass 6: kundminnet över kanaler, pass 1 (Claude + Sonnet-agent 2026-09-02)
+
+Revision: docs/audits/KUNDMINNE_REVISION_2026-09-02.md. Plan:
+tasks/plan-kundminne-pass1.md. Byggt av Sonnet, granskat + verifierat här.
+
+- [x] Gap 1: SMS-historik per kund (phoneCandidates + .in) i tidslinje + trail
+- [x] Gap 2: Mattes resolver matchar kund via findCustomerByPhone (normaliserat)
+- [x] Gap 3: resolvern läser 5 senaste sammanfattade samtal (channel 'call')
+- [x] Gap 4: ägare/teammedlem som SMS:ar det tilldelade numret körs aldrig
+      som kund (lib/matte/owner-sender.ts isTeamPhone, fail-closed = kund)
+- [x] Gap 5: kundens egna ord från lead-formulär i tidslinjen + trailen ('form')
+- [x] Gap 8: customer_fact i compliance-trailen ('note')
+- [x] Gap 9: död röstparser app/api/voice/process borttagen
+- [x] Facit tests/kundminne-kanaler.spec.ts i kontraktsgrinden; tsc 0,
+      274 kontrakt gröna, build ren
+- Pass 2 (ej byggt, väntar på beslut): gap 6 agentminne per kund (ny kolumn),
+  gap 7 Daniel/Hanna läser kundfakta när de skriver
+- Pre-existing rött, orört: tests/lisa-launch-proof.spec.ts (2 tester,
+  voice/incoming lead/deal-koppling + product-language-copy) — röda även
+  före passet, ligger i nattsviten
+
+---
+
 # Nattpass 5: genomgången före betalningen (Claude + Sonnet-agent 2026-09-02)
 
 Andreas: "Kör!" — betalningen ligger EFTER importen och en genomgång av

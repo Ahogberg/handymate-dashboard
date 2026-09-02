@@ -85,6 +85,7 @@ jobs:
           tests/facit-ogrindade-automationer.spec.ts
           tests/aktivera-senare.spec.ts
           tests/genomgang-fore-betalning.spec.ts
+          tests/kundminne-kanaler.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

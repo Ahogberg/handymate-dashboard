@@ -4,6 +4,7 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
+import { findCustomerByPhone, phoneCandidates } from '@/lib/voice/find-customer-by-phone'
 
 export interface ResolvedEntity {
   type: 'known_customer' | 'known_lead' | 'unknown'
@@ -35,7 +36,7 @@ export interface ResolvedEntity {
     direction: 'in' | 'out'
     body: string
     timestamp: string
-    channel: 'sms' | 'email' | 'portal'
+    channel: 'sms' | 'email' | 'portal' | 'call'
   }[]
   // Customer Facts V1 (2026-08-12): godkända kundfakta ur möten
   // (customer_fact, superseded_by IS NULL). Tom array för leads/okänd —
@@ -66,25 +67,32 @@ export async function resolveEntity(
   let customerName: string | undefined
 
   if (isPhone) {
-    const { data: customer } = await supabase
-      .from('customer')
-      .select('customer_id, name')
-      .eq('business_id', businessId)
-      .eq('phone_number', cleanFrom)
-      .maybeSingle()
+    // Kundminne-revisionen (2026-09-02, gap 2): ett rått .eq(phone_number,
+    // cleanFrom) missade kunder vars sparade nummer inte var exakt samma
+    // sträng som avsändarens (E.164 vs "070-123 45 67"). Den delade
+    // findCustomerByPhone gör samma jobb som samtalsvägen redan gör.
+    let customer: { customer_id: string; name: string | null } | null = null
+    try {
+      customer = await findCustomerByPhone(supabase, businessId, cleanFrom)
+    } catch (lookupErr) {
+      console.error('[matte/resolver] kundmatchning på telefonnummer misslyckades (fail-soft):', lookupErr)
+    }
 
     if (customer) {
       customerId = customer.customer_id
-      customerName = customer.name
+      customerName = customer.name || undefined
     } else {
-      const { data: lead } = await supabase
-        .from('leads')
-        .select('lead_id, name')
-        .eq('business_id', businessId)
-        .eq('phone', cleanFrom)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+      const leadCandidates = phoneCandidates(cleanFrom)
+      const { data: lead } = leadCandidates.length > 0
+        ? await supabase
+            .from('leads')
+            .select('lead_id, name')
+            .eq('business_id', businessId)
+            .in('phone', leadCandidates)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle()
+        : { data: null }
 
       if (lead) {
         leadId = lead.lead_id
@@ -136,7 +144,7 @@ export async function resolveEntity(
 
   // ── Steg 2: Hämta kontext parallellt ──
 
-  const [projects, deals, invoices, smsHistory, emailHistory, portalHistory, customerFacts] = await Promise.all([
+  const [projects, deals, invoices, smsHistory, emailHistory, portalHistory, customerFacts, callHistory] = await Promise.all([
     customerId
       ? supabase
           .from('booking')
@@ -229,7 +237,30 @@ export async function resolveEntity(
           .order('created_at', { ascending: false })
           .limit(10)
       : Promise.resolve({ data: [] as any[] }),
+
+    // Kundminne-revisionen (2026-09-02, gap 3): resolvern läste aldrig
+    // samtal — Mattes SMS/mejl-intelligens agerade utan att veta vad kunden
+    // sagt i telefon. Bara sammanfattade, transkriberade samtal räknas.
+    // Fail-soft: fel på frågan hanteras nedan (tom lista + console.warn),
+    // aldrig kastat.
+    customerId
+      ? supabase
+          .from('call_recording')
+          .select('recording_id, transcript_summary, created_at, direction')
+          .eq('business_id', businessId)
+          .eq('customer_id', customerId)
+          .not('transcript_summary', 'is', null)
+          .order('created_at', { ascending: false })
+          .limit(5)
+      : Promise.resolve({ data: [] as any[] }),
   ])
+
+  if ((callHistory as { error?: { message: string } }).error) {
+    console.warn(
+      '[matte/resolver] samtalshistorik kunde inte hämtas (fail-soft):',
+      (callHistory as { error?: { message: string } }).error!.message,
+    )
+  }
 
   return {
     type,
@@ -277,6 +308,12 @@ export async function resolveEntity(
         body: m.message as string,
         timestamp: m.created_at as string,
         channel: 'portal' as const,
+      })),
+      ...(callHistory.data || []).map((c: any) => ({
+        direction: c.direction === 'outbound' ? 'out' as const : 'in' as const,
+        body: c.transcript_summary as string,
+        timestamp: c.created_at as string,
+        channel: 'call' as const,
       })),
     ].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
     confirmedFacts: (customerFacts.data || []).map((f: any) => ({
