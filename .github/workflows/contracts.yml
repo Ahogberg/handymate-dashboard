@@ -92,7 +92,11 @@ jobs:
           tests/foretagsskannern.spec.ts
           tests/launch-desk-signaler.spec.ts
           tests/rot-ratt.spec.ts
-            tests/schemadrift-2026-09-02.spec.ts
+          tests/schemadrift-2026-09-02.spec.ts
+          tests/adoption.spec.ts
+          tests/onboarding-lifecycle.spec.ts
+          tests/onboarding-selfhealing.spec.ts
+          tests/e2e-onboarding-fresh.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
