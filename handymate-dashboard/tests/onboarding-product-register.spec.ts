@@ -169,7 +169,8 @@ test.describe('seed-products-routen (POST /api/onboarding/seed-products)', () =>
 
   test('finalize-routen (POST /api/onboarding) delar samma betalgrind-helper', () => {
     const route = source('app/api/onboarding/route.ts')
-    expect(route).toContain("import { isOnboardingPaymentBlocked } from '@/lib/onboarding/payment-gate'")
+    expect(route).toContain("from '@/lib/onboarding/payment-gate'")
+    expect(route).toContain('isOnboardingPaymentBlocked')
     expect(route).toContain('isOnboardingPaymentBlocked(supabase, business.business_id)')
   })
 })

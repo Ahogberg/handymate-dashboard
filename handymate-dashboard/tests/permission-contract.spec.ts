@@ -108,11 +108,12 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       requires: 'owner-admin',
       why: 'Köper till lead-addon. Samma skäl som checkout.',
     },
-    {
-      route: 'billing/setup-intent',
-      requires: 'owner-admin',
-      why: 'Registrerar betalmetod på företaget — en anställd ska inte kunna knyta ett kort till abonnemanget.',
-    },
+    // billing/setup-intent + billing/confirm RADERADE 2026-09-02: de satte
+    // subscription_status:'trialing' utan att skapa någon Stripe-prenumeration
+    // och ersattes av onboarding-checkouten redan 2026-08. Kvar som död kod med
+    // trial-semantik i en produkt som inte har provperiod. Onboardingens
+    // betalvägar (billing/onboarding-checkout + .../verify) står medvetet inte
+    // i kartan — de körs av firmans ägare innan något team finns.
   ],
 
   'Lön och personal': [

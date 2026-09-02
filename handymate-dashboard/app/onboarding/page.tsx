@@ -30,6 +30,46 @@ import {
 const TOTAL_STEPS = 9
 
 /**
+ * Verifierar en genomförd Stripe Checkout mot servern (2026-09-02).
+ *
+ * Två steg, båda server-härledda — klienten avgör aldrig själv om något är
+ * betalt:
+ *   1. POST .../verify med session_id — Stripe är sanningen och statusen
+ *      skrivs direkt, så vi inte behöver vänta in webhooken.
+ *   2. Svarar den "pending" (3DS/SCA, eller webhooken hann före men vår
+ *      skrivning inte klar) pollas GET /api/onboarding tio gånger med två
+ *      sekunders mellanrum. Därefter får kunden stanna på betalsteget och
+ *      kontrollera igen — aldrig en tyst låsning.
+ */
+async function verifieraBetalning(sessionId: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/billing/onboarding-checkout/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    })
+    const svar = await res.json().catch(() => ({}))
+    if (svar?.paid) return true
+    if (!svar?.pending) return false
+  } catch {
+    // Nätverksfel — fall igenom till pollingen nedan
+  }
+
+  for (let i = 0; i < 10; i++) {
+    await new Promise(r => setTimeout(r, 2000))
+    try {
+      const res = await fetch('/api/onboarding')
+      if (!res.ok) continue
+      const d = await res.json()
+      if (d?.paid) return true
+    } catch {
+      // fortsätt försöka
+    }
+  }
+  return false
+}
+
+/**
  * Onboarding-orchestrator (Claude Design redesign).
  *
  * Step-mappning till business_config.onboarding_step (2026-09-02, tasks/
@@ -131,22 +171,36 @@ export default function OnboardingPage() {
         // genomgången ligger nu FÖRE betalningen (steg 4–5) — kunden har
         // redan sett dem, så en lyckad betalning går direkt vidare till
         // artikelsteget i stället för att backa igenom dem igen.
-        //  ?payment=success → betalningen är genomförd (prenumeration skapad).
-        //    Gå vidare till artikelsteget (7). Telefonnumret provisioneras av
-        //    webhooken; Step6 läser assigned_phone_number.
+        //  ?payment=success → VERIFIERAS mot Stripe (2026-09-02). Tidigare
+        //    räckte query-strängen för att hoppa till steg 7; nu frågar vi
+        //    /verify med session_id och går bara vidare om Stripe säger
+        //    betald. Telefonnumret provisioneras av webhooken; Step6 läser
+        //    assigned_phone_number.
         //  ?payment=cancelled → kunden avbröt. Landa kvar på betalsteget (6)
         //    så de kan försöka igen. Aldrig fastna.
         const params = new URLSearchParams(window.location.search)
         const payment = params.get('payment')
+        const sessionId = params.get('session_id')
+        let betald = Boolean(d.paid)
         if (payment === 'success') {
-          uiStep = 7
-          // Persistera framsteget (best-effort) och städa URL:en.
-          if (d.business_id) {
-            fetch('/api/onboarding', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ step: 7, data: {}, config: {} }),
-            }).catch(() => {})
+          if (!betald && sessionId) {
+            betald = await verifieraBetalning(sessionId)
+          }
+          if (betald) {
+            uiStep = 7
+            // Persistera framsteget (best-effort) och städa URL:en.
+            if (d.business_id) {
+              fetch('/api/onboarding', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 7, data: {}, config: {} }),
+              }).catch(() => {})
+            }
+          } else {
+            // Betalningen är inte bekräftad — stanna på betalsteget.
+            // Step5Activate visar "registreras just nu" och en knapp att
+            // kontrollera igen, i stället för att låsa kunden ute.
+            uiStep = 6
           }
           window.history.replaceState({}, '', '/onboarding')
         } else if (payment === 'cancelled') {
@@ -173,7 +227,8 @@ export default function OnboardingPage() {
           // Redan betalande konton ska ALDRIG se betalsteget igen — Step5Activate
           // hoppar vidare direkt när paid är sant (samma server-härledda fält,
           // aldrig en klientsidan-gissning).
-          paid: Boolean(d.stripe_subscription_id) || d.subscription_status === 'active',
+          paid: betald,
+          paymentPending: payment === 'success' && !betald,
           // Ett äldre, uttryckligt sparat standardpris får visas igen, men
           // prismodellen väljs fortfarande av ägaren — inget inferred val.
           standardHourlyRate: (d.onboarding_data || {}).standardHourlyRate ?? d.default_hourly_rate ?? null,

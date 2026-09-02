@@ -129,7 +129,10 @@ export async function POST(request: NextRequest) {
       // Tillbaka in i onboarding-flödet. page.tsx läser ?payment=success och
       // går vidare till importsteget; ?payment=cancelled → kvar på
       // betalsteget så kunden kan försöka igen.
-      success_url: `${appUrl}/onboarding?payment=success&plan=${planId}`,
+      // session_id gör att onboardingen kan VERIFIERA betalningen mot Stripe
+      // i stället för att tro på query-strängen (POST .../verify) — utan den
+      // räckte det att skriva ?payment=success i adressfältet.
+      success_url: `${appUrl}/onboarding?payment=success&plan=${planId}&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${appUrl}/onboarding?payment=cancelled`,
       metadata: {
         business_id: business.business_id,

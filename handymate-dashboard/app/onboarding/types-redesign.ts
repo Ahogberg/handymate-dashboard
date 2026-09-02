@@ -99,11 +99,18 @@ export interface OnboardingFormData {
   // påhittade rader.
   genomgang?: Array<{ key: string; text: string; agent?: 'karin' | 'daniel' | 'lars' }>
   /**
-   * Server-härlett i GET /api/onboarding (stripe_subscription_id/
-   * subscription_status), ALDRIG en klientsidan-gissning. Redan betalande
-   * konton ska aldrig se betalsteget igen (Step5Activate onNext-guard).
+   * Server-härlett i GET /api/onboarding med SAMMA regel som betalgrinden
+   * (lib/onboarding/payment-gate.ts), ALDRIG en klientsidan-gissning. Redan
+   * betalande konton ska aldrig se betalsteget igen (Step5Activate onNext-guard).
    */
   paid?: boolean
+  /**
+   * Kunden kom tillbaka från Stripe med ?payment=success men betalningen är
+   * ännu inte bekräftad (3DS/SCA, eller webhooken har inte hunnit). Steget
+   * visar då "registreras just nu" + Kontrollera igen i stället för att
+   * antingen släppa igenom obetalt eller låsa kunden ute.
+   */
+  paymentPending?: boolean
 
   // Epic 2: preferenser i befintliga onboarding_data, aldrig offertbelopp.
   quoteJobTypes?: string[]

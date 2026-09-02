@@ -112,11 +112,35 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   const [redirecting, setRedirecting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [infoPlanId, setInfoPlanId] = useState<string | null>(null)
+  const [kontrollerar, setKontrollerar] = useState(false)
+  const [kontrollSvar, setKontrollSvar] = useState<string | null>(null)
+
+  // Betalningen är gjord hos Stripe men ännu inte bekräftad hos oss (3DS/SCA,
+  // eller webhooken har inte hunnit). Kunden ska varken släppas igenom obetald
+  // eller låsas ute — härifrån frågar den servern igen.
+  async function kontrolleraBetalning() {
+    if (kontrollerar) return
+    setKontrollerar(true)
+    setKontrollSvar(null)
+    try {
+      const res = await fetch('/api/onboarding')
+      const d = await res.json().catch(() => ({}))
+      if (d?.paid) {
+        setData(prev => ({ ...prev, paid: true, paymentPending: false }))
+        onNext()
+        return
+      }
+      setKontrollSvar('Betalningen är inte registrerad än. Vänta en stund och kontrollera igen.')
+    } catch {
+      setKontrollSvar('Kunde inte kontrollera just nu — försök igen om en stund.')
+    }
+    setKontrollerar(false)
+  }
 
   // Betalgrind, andra hållet (2026-09-02, tasks/plan-genomgang-fore-
-  // betalning.md): data.paid är server-härlett i GET /api/onboarding
-  // (stripe_subscription_id/subscription_status) — redan betalande konton
-  // ska ALDRIG se betalsteget igen, t.ex. vid en resume mitt i onboardingen.
+  // betalning.md): data.paid är server-härlett i GET /api/onboarding med samma
+  // regel som betalgrinden — redan betalande konton ska ALDRIG se betalsteget
+  // igen, t.ex. vid en resume mitt i onboardingen.
   useEffect(() => {
     if (data.paid) onNext()
   }, [data.paid, onNext])
@@ -171,6 +195,35 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
     <div className="ob-screen">
       <OnboardingHeader step={OB_DOTS.activate} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
+        {/* Kunden kom tillbaka från Stripe men betalningen är inte bekräftad
+            än (verifieringen i app/onboarding/page.tsx sa nej). Visa läget
+            ärligt i stället för att antingen släppa igenom eller låsa ute. */}
+        {data.paymentPending && (
+          <div
+            className="ob-card"
+            style={{ marginBottom: 16, borderColor: '#FDE68A', background: '#FFFBEB' }}
+          >
+            <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ob-ink)', marginBottom: 4 }}>
+              Betalningen registreras
+            </div>
+            <p style={{ margin: '0 0 10px', fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
+              Det tar normalt några sekunder. Du behöver inte betala igen.
+            </p>
+            <button
+              type="button"
+              onClick={kontrolleraBetalning}
+              disabled={kontrollerar}
+              className="ob-cta ghost"
+              style={{ fontSize: 13, padding: '10px 16px', width: 'auto' }}
+            >
+              {kontrollerar ? 'Kontrollerar …' : 'Kontrollera igen'}
+            </button>
+            {kontrollSvar && (
+              <p style={{ margin: '8px 0 0', fontSize: 12, color: 'var(--ob-muted)' }}>{kontrollSvar}</p>
+            )}
+          </div>
+        )}
+
         {/* Genomgången (StepGenomgang, steget precis före det här — tasks/
             plan-genomgang-fore-betalning.md, 2026-09-02): kunden betalar
             för något den redan sett i sina egna siffror, aldrig ett löfte. */}

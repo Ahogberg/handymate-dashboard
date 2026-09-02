@@ -4,6 +4,10 @@ import { logAutomationActivity } from '@/lib/automations'
 import Stripe from 'stripe'
 import { reverseRevenueSnapshot, type PartnerRevenueSnapshot } from '@/lib/partners/revenue-classification'
 import { classifyStripeInvoiceForPartner } from '@/lib/partners/stripe-revenue'
+// Skrivningen av prenumerationsstatus är delad med betalverifieringen i
+// onboardingen (POST /api/billing/onboarding-checkout/verify) — se
+// lib/billing/write-billing-update.ts. Två vägar, exakt en sanning.
+import { writeBillingUpdate, byggAbonnemangsfalt, toIsoOrNull, STRIPE_STATUS_MAP } from '@/lib/billing/write-billing-update'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -12,16 +16,6 @@ function getStripe() {
   return new Stripe(process.env.STRIPE_SECRET_KEY, {
     apiVersion: '2026-01-28.clover' as any
   })
-}
-
-/** Unix-sekunder → ISO, eller null om värdet saknas/ogiltigt. Skyddar mot att
- *  new Date(undefined*1000).toISOString() kastar (current_period_* flyttade till
- *  subscription items i nyare API-versioner → kan vara undefined). */
-function toIsoOrNull(unixSeconds: unknown): string | null {
-  const n = Number(unixSeconds)
-  if (!n || !isFinite(n)) return null
-  const d = new Date(n * 1000)
-  return isNaN(d.getTime()) ? null : d.toISOString()
 }
 
 /**
@@ -41,47 +35,6 @@ async function reconcilePartnerRevenueSnapshot(snapshot: PartnerRevenueSnapshot)
     const result = await processCommissionPeriod(period)
     if (result.errors.length > 0) {
       throw new Error(`Partnerprovision kunde inte stämmas av för ${period}: ${result.errors.join('; ')}`)
-    }
-  }
-}
-
-/**
- * Skriver billing-uppdateringar till business_config så att en SAKNAD valfri
- * kolumn (billing_period_start/end innan sql/v69 körts i prod) ALDRIG kan
- * blockera den KRITISKA statusskrivningen. Tidigare låg period-fälten i samma
- * update som subscription_status:'active' — saknades kolumnen avvisades HELA
- * uppdateringen och prenumerationen aktiverades aldrig i vår databas trots att
- * Stripe drog pengarna.
- *
- * Kritiska fält skrivs + felkontrolleras och kastar vid fel → Stripe retriar
- * (billing_event-raden loggas först EFTER detta i handlern, så en retry kör om
- * i stället för att hoppas över). Period-fälten skrivs separat best-effort.
- */
-async function writeBillingUpdate(
-  supabase: any,
-  businessId: string,
-  critical: Record<string, any>,
-  period?: { start?: string | null; end?: string | null },
-) {
-  const { error } = await supabase
-    .from('business_config')
-    .update(critical)
-    .eq('business_id', businessId)
-  if (error) {
-    console.error('[Billing webhook] KRITISK: subscription-status kunde inte skrivas — kastar för Stripe-retry:', { businessId, error })
-    throw new Error(`business_config kritisk update misslyckades: ${error.message}`)
-  }
-
-  const periodUpdate: Record<string, any> = {}
-  if (period?.start) periodUpdate.billing_period_start = period.start
-  if (period?.end) periodUpdate.billing_period_end = period.end
-  if (Object.keys(periodUpdate).length > 0) {
-    const { error: perr } = await supabase
-      .from('business_config')
-      .update(periodUpdate)
-      .eq('business_id', businessId)
-    if (perr) {
-      console.warn('[Billing webhook] billing_period_* ej skrivet (kolumn saknas innan v69?) — icke-blockerande:', perr.message)
     }
   }
 }
@@ -261,46 +214,9 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
   // spegla statusen skyddar mot edge-fall (t.ex. 'incomplete' vid 3DS/SCA).
   const isOnboarding = session.metadata?.onboarding === 'true'
 
-  const statusMap: Record<string, string> = {
-    active: 'active',
-    trialing: 'trialing',
-    past_due: 'past_due',
-    canceled: 'cancelled',
-    unpaid: 'past_due',
-    incomplete: 'incomplete',
-    incomplete_expired: 'cancelled',
-    paused: 'paused',
-  }
-
-  const critical: Record<string, any> = {
-    stripe_customer_id: session.customer as string,
-    subscription_plan: planId || 'starter',
-    subscription_status: 'active'
-  }
-  let period: { start?: string | null; end?: string | null } | undefined
-
-  if (session.subscription) {
-    critical.stripe_subscription_id = session.subscription as string
-
-    // Hämta prenumerationsperiod (best-effort — blockerar aldrig aktiveringen)
-    try {
-      const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
-      // Vid trial: sätt trialing + trial_ends_at direkt (customer.subscription.updated
-      // följer också, men vi vill inte ha ett glapp där status felaktigt är 'active').
-      critical.subscription_status = statusMap[subscription.status] || 'active'
-      if (subscription.trial_end) {
-        critical.trial_ends_at = new Date(subscription.trial_end * 1000).toISOString()
-      }
-      period = {
-        start: toIsoOrNull((subscription as any).current_period_start),
-        end: toIsoOrNull((subscription as any).current_period_end),
-      }
-    } catch (err) {
-      console.error('Failed to retrieve subscription details:', err)
-    }
-  }
-
-  await writeBillingUpdate(supabase, businessId, critical, period)
+  // Delad med betalverifieringen i onboardingen — se
+  // lib/billing/write-billing-update.ts. Speglar Stripes verkliga status.
+  const { critical, period } = await byggAbonnemangsfalt(stripe, session)
 
   // Onboarding: provisionera telefonnummer nu när betalningen är genomförd.
   // Vi anropar INTE /api/onboarding/phone härifrån (den kräver användarens
@@ -418,19 +334,8 @@ async function updateSubscriptionData(
   subscription: Stripe.Subscription,
   eventId: string
 ) {
-  // Mappa Stripe-status till vår subscription_status
-  const statusMap: Record<string, string> = {
-    active: 'active',
-    past_due: 'past_due',
-    canceled: 'cancelled',
-    unpaid: 'past_due',
-    trialing: 'trialing',
-    incomplete: 'incomplete',
-    incomplete_expired: 'cancelled',
-    paused: 'paused'
-  }
-
-  const billingStatus = statusMap[subscription.status] || subscription.status
+  // Mappa Stripe-status till vår subscription_status (delad tabell)
+  const billingStatus = STRIPE_STATUS_MAP[subscription.status] || subscription.status
   const planId = subscription.metadata?.plan_id
 
   const critical: Record<string, any> = {

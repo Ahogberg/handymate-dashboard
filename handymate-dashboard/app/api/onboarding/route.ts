@@ -3,7 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { FUNNEL_KEY, markFinalized, markStepReached, normaliseraVariant, readFunnel, stripFunnelFromClientData } from '@/lib/onboarding/funnel'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { seedAllDefaults } from '@/lib/seed-defaults'
-import { isOnboardingPaymentBlocked } from '@/lib/onboarding/payment-gate'
+import { isOnboardingPaymentBlocked, arOnboardingBetald } from '@/lib/onboarding/payment-gate'
 import { skapaStartkort } from '@/lib/onboarding/starter-cards'
 import { isFoundersOfferAvailable } from '@/lib/billing/founders-offer'
 
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const { data, error } = await supabase
       .from('business_config')
-      .select('business_id, business_name, display_name, contact_name, contact_email, phone_number, branch, service_area, org_number, address, services_offered, default_hourly_rate, callout_fee, rot_enabled, rut_enabled, knowledge_base, assigned_phone_number, forward_phone_number, call_mode, phone_setup_type, lead_sources, lead_email_address, onboarding_step, onboarding_data, onboarding_completed_at, working_hours, industry, stripe_subscription_id, subscription_status')
+      .select('business_id, business_name, display_name, contact_name, contact_email, phone_number, branch, service_area, org_number, address, services_offered, default_hourly_rate, callout_fee, rot_enabled, rut_enabled, knowledge_base, assigned_phone_number, forward_phone_number, call_mode, phone_setup_type, lead_sources, lead_email_address, onboarding_step, onboarding_data, onboarding_completed_at, working_hours, industry, stripe_subscription_id, subscription_status, is_pilot')
       .eq('business_id', business.business_id)
       .single()
 
@@ -70,6 +70,11 @@ export async function GET(request: NextRequest) {
       google_connected: googleConnected,
       gmail_enabled: gmailEnabled,
       founders_available: foundersAvailable,
+      // Betalstatus härleds på servern med SAMMA regel som grinden i finalize
+      // (lib/onboarding/payment-gate.ts). Klienten gissade tidigare på
+      // stripe_subscription_id, vilket kunde säga "betald" om ett annat state
+      // än active/comp stod i raden.
+      paid: arOnboardingBetald(data),
     })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'
@@ -98,7 +103,10 @@ export async function PUT(request: NextRequest) {
     // Build update object
     const updates: Record<string, unknown> = {}
 
-    const harSteg = typeof step === 'number' && step >= 1 && step <= 10
+    // Taket är 8 (sista UI-steget, rundturen). 9/10 betyder "klar" för
+    // dashboard-grinden (app/dashboard/layout.tsx) och skrivs BARA av finalize
+    // efter betalgrinden — annars vore stegsparningen en väg förbi den.
+    const harSteg = typeof step === 'number' && step >= 1 && step <= 8
     if (harSteg) {
       updates.onboarding_step = step
     }

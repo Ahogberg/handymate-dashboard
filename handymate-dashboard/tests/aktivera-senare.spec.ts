@@ -23,6 +23,7 @@ import fs from 'fs'
 import path from 'path'
 import { harledForstaKvitto } from '../lib/billing/forsta-kvitto'
 import { harAktivtTeam } from '../lib/billing/aktiva-konton'
+import { arOnboardingBetald } from '../lib/onboarding/payment-gate'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
@@ -98,5 +99,105 @@ test.describe('teamet jobbar under provperioden', () => {
       expect(src).toContain('hamtaKontonMedAktivtTeam(supabase)')
       expect(src).not.toContain(".eq('subscription_status', 'active')")
     }
+  })
+})
+
+/**
+ * Betalgrinden (Etapp B2, 2026-09-02) — allowlist i stället för svartlista.
+ *
+ * Kedjan var läckande: register-rutten sätter 'trial', grinden släppte
+ * medvetet igenom 'trial', och finalize gick därmed obetalt. Ovanpå det kunde
+ * ?payment=success i adressfältet ensamt flytta kunden till steg 7, och PUT
+ * /api/onboarding accepterade steg upp till 10 medan dashboard-grinden räknar
+ * >= 9 som klar — två vägar runt betalningen.
+ */
+test.describe('betalgrinden — bara betalt öppnar', () => {
+  test('arOnboardingBetald: active och comp öppnar, allt annat stänger', () => {
+    for (const status of ['active', 'comp', 'ACTIVE', ' active ']) {
+      expect(arOnboardingBetald({ business_id: 'b', subscription_status: status }), status).toBe(true)
+    }
+    for (const status of ['trial', 'trialing', 'past_due', 'incomplete', 'cancelled', 'paused', '', null, undefined]) {
+      expect(arOnboardingBetald({ business_id: 'b', subscription_status: status }), String(status)).toBe(false)
+    }
+  })
+
+  test('pilot och demokonto är undantagna — men bara de', () => {
+    expect(arOnboardingBetald({ business_id: 'b', subscription_status: 'trial', is_pilot: true })).toBe(true)
+    expect(arOnboardingBetald({ business_id: 'demo_1', subscription_status: 'trial' }, 'demo_1')).toBe(true)
+    expect(arOnboardingBetald({ business_id: 'annat', subscription_status: 'trial' }, 'demo_1')).toBe(false)
+    // Ingen DEMO_BUSINESS_ID satt får inte göra alla konton till demokonton
+    expect(arOnboardingBetald({ business_id: undefined, subscription_status: 'trial' }, undefined)).toBe(false)
+  })
+
+  test('saknad rad är inte betald — fail closed', () => {
+    expect(arOnboardingBetald(null)).toBe(false)
+    expect(arOnboardingBetald(undefined)).toBe(false)
+  })
+
+  test('grinden blockerar också när raden inte går att läsa', () => {
+    const src = read('lib/onboarding/payment-gate.ts')
+    expect(src).toContain('// Fail closed')
+    expect(src).toMatch(/if \(error\) \{[\s\S]*return true/)
+    expect(src).not.toContain('BLOCKED_STATES')
+  })
+
+  test('PUT /api/onboarding kan inte skriva 9 eller 10 — bara finalize gör det', () => {
+    const src = read('app/api/onboarding/route.ts')
+    expect(src).toContain('step >= 1 && step <= 8')
+    expect(src).toContain('onboarding_step: 10')
+  })
+
+  test('GET /api/onboarding härleder paid på servern, med grindens egen regel', () => {
+    const src = read('app/api/onboarding/route.ts')
+    expect(src).toContain('paid: arOnboardingBetald(data)')
+    expect(src).toContain('is_pilot')
+  })
+
+  test('?payment=success flyttar ingen framåt utan verifiering mot Stripe', () => {
+    const src = read('app/onboarding/page.tsx')
+    // Den gamla ovillkorliga hoppen får inte komma tillbaka
+    expect(src).not.toMatch(/payment === 'success'\) \{\s*\n\s*uiStep = 7/)
+    expect(src).toContain('betald = await verifieraBetalning(sessionId)')
+    expect(src).toContain('paid: betald')
+    expect(src).toContain("paymentPending: payment === 'success' && !betald")
+  })
+
+  test('verify-rutten kräver rätt företag, rätt sessionstyp och betald status', () => {
+    const src = read('app/api/billing/onboarding-checkout/verify/route.ts')
+    expect(src).toContain('getAuthenticatedBusiness(request)')
+    expect(src).toContain("export const dynamic = 'force-dynamic'")
+    expect(src).toContain('session.metadata?.business_id !== business.business_id')
+    expect(src).toContain("session.metadata?.onboarding !== 'true'")
+    expect(src).toContain("session.payment_status !== 'paid' || session.status !== 'complete'")
+    // Samma skrivning som webhooken — aldrig en egen kopia
+    expect(src).toContain("from '@/lib/billing/write-billing-update'")
+  })
+
+  test('success-URL:en bär session_id, annars finns inget att verifiera', () => {
+    expect(read('app/api/billing/onboarding-checkout/route.ts')).toContain('session_id={CHECKOUT_SESSION_ID}')
+  })
+
+  test('webhooken och verify delar exakt en skrivväg', () => {
+    const webhook = read('app/api/billing/webhook/route.ts')
+    expect(webhook).toContain("from '@/lib/billing/write-billing-update'")
+    expect(webhook).toContain('byggAbonnemangsfalt(stripe, session)')
+    // Inga lokala kopior kvar
+    expect(webhook).not.toContain('async function writeBillingUpdate(')
+    expect(webhook).not.toContain('function toIsoOrNull(')
+    expect(webhook).not.toContain('const statusMap:')
+  })
+
+  test('de döda trial-rutterna är borta', () => {
+    for (const p of ['app/api/billing/confirm/route.ts', 'app/api/billing/setup-intent/route.ts']) {
+      expect(fs.existsSync(path.join(ROOT, p)), `${p} ska vara raderad`).toBe(false)
+    }
+  })
+
+  test('betalsteget visar väntande betalning i stället för att låsa ute', () => {
+    const src = read('app/onboarding/components/Step5Activate.tsx')
+    expect(src).toContain('data.paymentPending')
+    expect(src).toContain('Betalningen registreras')
+    expect(src).toContain('Kontrollera igen')
+    expect(src).toContain('kontrolleraBetalning')
   })
 })
