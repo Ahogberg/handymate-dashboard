@@ -16,8 +16,14 @@ import type { TierStep } from '@/lib/partners/commission-engine'
  * PATCH { partner_id, commission_tiers?, base_rate_after?, tier_mode?, ladder_months? }
  * POST  { action: 'run', period? }                        → ackruera period (default förra månaden)
  * POST  { action: 'create_batch', partner_id, period }    → skapa självfaktureringsunderlag
- * POST  { action: 'mark_paid', batch_id }                 → markera utbetald
+ * POST  { action: 'mark_paid', batch_id, payment_reference, paid_at? } → markera utbetald
  */
+
+function text(value: unknown, max = 300): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  return trimmed ? trimmed.slice(0, max) : null
+}
 
 export async function GET(request: NextRequest) {
   const adminCheck = await isAdmin(request)
@@ -48,7 +54,7 @@ export async function GET(request: NextRequest) {
       return q
     })(),
     supabase.from('partner_payout_batch')
-      .select('id, period, total_sek, status, created_at, paid_at, paid_by')
+      .select('id, period, total_sek, status, created_at, paid_at, paid_by, payment_reference')
       .eq('partner_id', partnerId)
       .order('created_at', { ascending: false }),
   ])
@@ -183,7 +189,10 @@ export async function POST(request: NextRequest) {
   if (action === 'mark_paid') {
     const batchId = typeof body?.batch_id === 'string' ? body.batch_id : null
     if (!batchId) return NextResponse.json({ error: 'batch_id krävs' }, { status: 400 })
-    const result = await markBatchPaid(batchId, adminCheck.email || 'admin')
+    const paymentReference = text(body?.payment_reference, 200)
+    if (!paymentReference) return NextResponse.json({ error: 'Betalningsreferens krävs' }, { status: 400 })
+    const paidAt = typeof body?.paid_at === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.paid_at) ? body.paid_at : undefined
+    const result = await markBatchPaid(batchId, adminCheck.email || 'admin', paymentReference, paidAt)
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
     return NextResponse.json({ success: true })
   }
