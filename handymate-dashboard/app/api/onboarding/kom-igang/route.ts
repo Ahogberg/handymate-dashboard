@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { GET as channelHealthGET } from '@/app/api/onboarding/channel-health/route'
 import type { ChannelHealth } from '@/lib/onboarding/channel-health'
 import { deriveKomIgangTasks, type KomIgangSignals, type KomIgangTask } from '@/lib/onboarding/kom-igang-tasks'
+import { hamtaKomIgangSignals } from '@/lib/onboarding/kom-igang-signals'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,21 +42,14 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
     const businessId = business.business_id
 
-    const [configRes, callRecRes, meetingRes, quoteRes, pushRes, invoiceRes, missionRes, customerRes, segmentedRes, pendingRes] = await Promise.all([
-      supabase.from('business_config').select('onboarding_data, fortnox_connected').eq('business_id', businessId).maybeSingle(),
-      supabase.from('call_recording').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
+    // Basluckorna delas med livscykelmailen (lib/onboarding/kom-igang-signals.ts)
+    // så startsidan och mailen aldrig kan säga olika saker om samma konto.
+    const [baseSignals, configRes, meetingRes, quoteRes] = await Promise.all([
+      hamtaKomIgangSignals(supabase, businessId),
+      supabase.from('business_config').select('onboarding_data').eq('business_id', businessId).maybeSingle(),
       supabase.from('meeting_job').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
       supabase.from('quotes').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
-      supabase.from('push_subscriptions').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
-      supabase.from('invoice').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
-      supabase.from('mission').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
-      supabase.from('customer').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
-      supabase.from('customer').select('*', { count: 'exact', head: true }).eq('business_id', businessId).not('segment_id', 'is', null),
-      supabase.from('pending_approvals').select('*', { count: 'exact', head: true }).eq('business_id', businessId).eq('status', 'pending').neq('approval_type', 'team_intro'),
     ])
-
-    const testCall = (configRes.data?.onboarding_data as Record<string, unknown> | null | undefined)
-      ?.test_call as { called_at?: string | null } | undefined
 
     // Kundinflödet (Block B): samma sanning som /api/onboarding/channel-health —
     // rutten anropas som funktion med samma request (session + tenant), ingen
@@ -81,19 +75,12 @@ export async function GET(request: NextRequest) {
       console.warn('[kom-igang] channel-health misslyckades — uppgiften utelämnas:', e instanceof Error ? e.message : e)
     }
 
-    const ring_test = Boolean(testCall?.called_at) || (callRecRes.count ?? 0) > 0
+    const ring_test = baseSignals.ring_test
     const forsta_artefakten = (meetingRes.count ?? 0) > 0 || (quoteRes.count ?? 0) > 0
-    const pwa = (pushRes.count ?? 0) > 0
+    const pwa = baseSignals.pwa
 
     const signals: KomIgangSignals = {
-      ring_test,
-      karin_has_invoice_data: Boolean(configRes.data?.fortnox_connected) || (invoiceRes.count ?? 0) > 0,
-      has_quote: (quoteRes.count ?? 0) > 0,
-      has_mission: (missionRes.count ?? 0) > 0,
-      customer_count: customerRes.count ?? 0,
-      segmented_customer_count: segmentedRes.count ?? 0,
-      pwa,
-      pending_real_cards: pendingRes.count ?? 0,
+      ...baseSignals,
       ...(kundinflode ? { kundinflode } : {}),
     }
     const tasks: KomIgangTask[] = deriveKomIgangTasks(signals)
