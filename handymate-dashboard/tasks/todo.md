@@ -1,3 +1,12 @@
+# Parkerat (Andreas 2026-09-02): minnesförstärkning 3 + 4, om några dagar
+- 3: citat ur källan som krav för varje agent_memories-rad (samma regel som
+  customer_fact); det som inte kan citeras sparas inte.
+- 4: kortens utfall tillbaka i minnesvikten — minne som ledde till godkänt
+  kort vinner, till avvisat tappar (access_count + execution_result finns).
+- Skäl att vänta: 4 kräver riktiga kortutfall (piloten + Bee Service),
+  3 ändrar skrivvägen men datamängden är 29 rader. Bäst efter en vecka
+  med genomgången före betalningen och pass 1–3 i drift.
+
 # Nattpass 8: kundminnet, pass 3 — ett läs-API + relevanssökning (Claude + Sonnet-agent 2026-09-02)
 
 - [x] sql/v201_agent_memories_fts.sql (KÖRD + verifierad): content_tsv
