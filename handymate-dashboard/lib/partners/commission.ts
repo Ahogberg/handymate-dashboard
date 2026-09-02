@@ -313,6 +313,7 @@ export async function createPayoutBatch(
   partnerId: string,
   period: string,
   createdBy = 'system',
+  options: { finalPayout?: boolean; finalPayoutReason?: string } = {},
 ): Promise<{ success: boolean; batchId?: string; invoiceNumber?: string; subtotalSek?: number; vatSek?: number; totalSek?: number; error?: string }> {
   const supabase = getServerSupabase()
   let buyer
@@ -327,6 +328,8 @@ export async function createPayoutBatch(
     p_period: period,
     p_buyer: buyer,
     p_actor: createdBy,
+    p_is_final_payout: options.finalPayout === true,
+    p_final_payout_reason: options.finalPayoutReason?.trim() || null,
   })
   if (error) return { success: false, error: error.message }
   return {

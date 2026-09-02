@@ -1,3 +1,23 @@
+# Partner Launch Gate (Codex 2026-09-02)
+
+- [x] Kartlägg partnerregistrering, attribution, provisionsmotor och självfaktura mot Partneravtal v1.
+- [x] Inför atomisk, fail-closed partnerattribution med exakt självhänvisningskontroll, dokumenterad 180-dagarsregel och en vinnande partner per företag.
+- [x] Skriv migrationerna v204/v205 i `sql/` men kör dem inte programmatiskt.
+- [x] Bygg browserlösa kontrakt och ett avgränsat riktigt DB-bevis för attribution, månad/år, refund, chargeback, churn, återkomst, månad 36/37, självfaktura och slututbetalning.
+- [x] Synka den interna publiceringskontrollen med faktisk kod och leverera ett separat partner-GO/NO-GO.
+- [x] Verifiera riktade tester, `npx tsc --noEmit` och `npm run build`.
+- [ ] Kör v204/v205 manuellt och därefter `npm run proof:partner` mot de två disponibla testkontona.
+- [ ] Bred kontraktsgrind: 341/343 gröna; två röda ligger utanför partnerlanen i `genomgang-fore-betalning.spec.ts` och `kundminne-kanaler.spec.ts` och lämnas till respektive aktiva lane.
+
+## Review
+
+- Partnergrinden är fortsatt **NO-GO** tills migrationerna och DB-beviset är körda, den publicerade 12-månaderstexten är ersatt samt juridik/redovisning och de två migrerade partnernas acceptans är stängda.
+- Riktat facit: 40/40 inklusive befintlig partnerprovision och självfakturaportal; ny grind: 10/10.
+- `npx tsc --noEmit`: rent. `npm run build`: exit 0.
+- Full browserlös kontraktsgrind: 341 gröna, två orelaterade röda i parallell onboarding-/kundminneskod; inga partnerfacit röda.
+
+---
+
 # Etapp B: Självgående onboarding härdad (Claude 2026-09-02)
 
 Plan: `C:\Users\Gaming\.claude\plans\cozy-crafting-reef.md` (godkänd 2026-09-02).

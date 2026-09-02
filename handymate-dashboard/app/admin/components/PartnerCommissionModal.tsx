@@ -193,6 +193,25 @@ export default function PartnerCommissionModal({
     .sort()
     .pop() ?? null
 
+  const accruedEjBatchat = ledger
+    .filter(r => r.status === 'accrued' && !r.payout_batch_id)
+    .reduce((sum, row) => sum + Number(row.amount_sek || 0), 0)
+
+  function createFinalPayout() {
+    if (!senastePeriodMedAccrued) return
+    const reason = window.prompt(
+      'Ange varför partneravtalet upphör och slututbetalningen ska göras. Skälet sparas i det frysta underlaget.',
+    )?.trim()
+    if (!reason) return
+    void action({
+      action: 'create_batch',
+      partner_id: partnerId,
+      period: senastePeriodMedAccrued,
+      final_payout: true,
+      final_payout_reason: reason,
+    }, 'final_batch')
+  }
+
   const forraManaden = (() => {
     const d = new Date()
     return `${d.getUTCFullYear()}-${String(d.getUTCMonth() === 0 ? 12 : d.getUTCMonth()).padStart(2, '0')}`
@@ -322,6 +341,16 @@ export default function PartnerCommissionModal({
                 >
                   <FileText className="w-4 h-4" />
                   {busy === 'batch' ? 'Skapar…' : `Skapa underlag t.o.m. ${senastePeriodMedAccrued}`}
+                </button>
+              )}
+              {senastePeriodMedAccrued && accruedEjBatchat > 0 && accruedEjBatchat < 500 && (
+                <button
+                  onClick={createFinalPayout}
+                  disabled={busy !== null}
+                  className="flex items-center gap-2 px-4 py-2 border border-amber-300 bg-amber-50 text-sm font-medium text-amber-900 rounded-lg hover:bg-amber-100 disabled:opacity-50"
+                >
+                  <FileText className="w-4 h-4" />
+                  {busy === 'final_batch' ? 'Skapar…' : `Skapa slutunderlag (${formatSek(accruedEjBatchat)})`}
                 </button>
               )}
             </div>

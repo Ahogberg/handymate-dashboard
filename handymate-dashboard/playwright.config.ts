@@ -18,7 +18,7 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/],
+  testIgnore: [/.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

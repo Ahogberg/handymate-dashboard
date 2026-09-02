@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
 import { isSuperAdmin, IMPERSONATION_COOKIE } from '@/lib/auth/superadmin'
+import { claimPartnerAttribution, isPartnerReferralCode } from '@/lib/partners/attribution'
 
 /**
  * Kolumner vars migration körs MANUELLT av Andreas i Supabase SQL Editor
@@ -125,7 +126,11 @@ if (action === 'register') {
     working_hours: defaultWorkingHours,
     call_mode: 'human_first',
     knowledge_base: knowledgeBase,
-    referred_by: referralCode || null,
+    // Kund-till-kund-koder bevaras här som tidigare. Partnerkoder skrivs
+    // först av den atomiska attributions-RPC:n efter alla avtals-/dubblett-
+    // och relationskontroller. En P-kod får aldrig bli sanning bara för att
+    // den förekom i en request-body.
+    referred_by: referralCode && !isPartnerReferralCode(referralCode) ? referralCode : null,
     website_api_key: `HM-${crypto.randomUUID().replace(/-/g, '').slice(0, 16)}`,
     // Hemsida-förgreningen (flyttad till början): frågan besvaras innan
     // kontot skapas, så website_url skickas med här direkt istället för via
@@ -214,28 +219,15 @@ if (action === 'register') {
   // 4. Referral-spårning
   if (referralCode) {
     try {
-      if (referralCode.startsWith('P-')) {
-        // Partner referral — look up partner by code
-        const { data: partner } = await supabaseAdmin
-          .from('partners')
-          .select('id')
-          .eq('referral_code', referralCode)
-          .eq('status', 'active')
-          .maybeSingle()
+      if (isPartnerReferralCode(referralCode)) {
+        const attribution = await claimPartnerAttribution(supabaseAdmin, {
+          businessId,
+          referralCode,
+        })
 
-        if (partner) {
-          await supabaseAdmin
-            .from('referrals')
-            .insert({
-              referrer_business_id: 'PARTNER',
-              referred_business_id: businessId,
-              referred_email: email,
-              referrer_type: 'partner',
-              partner_id: partner.id,
-              status: 'pending',
-            })
-
-          // Notify partner webhook about new trial
+        if (attribution.accepted) {
+          // Notify partner webhook about new trial only after the database
+          // has accepted and frozen the attribution.
           try {
             const { notifyPartnerWebhook } = await import('@/lib/partners/webhook')
             await notifyPartnerWebhook(businessId, 'trial_started')
@@ -243,10 +235,13 @@ if (action === 'register') {
             console.error('[Register] Partner webhook notification failed:', err)
           }
         } else {
-          // Fynd 1d — koden matchade ingen aktiv partner. Registreringen
-          // fortsätter ändå (koden är valfri och får aldrig blockera) men
-          // detta försvann tidigare spårlöst — logga så det syns i efterhand.
-          console.warn('[Register] Partnerkod matchade ingen aktiv partner:', { referralCode, businessId })
+          // Referral attribution is optional and must never strand a newly
+          // created account. It does however fail closed: no partner or
+          // commission truth is written when the claim cannot be proven.
+          console.warn('[Register] Partnerattribution avvisades:', {
+            businessId,
+            reason: attribution.reason,
+          })
         }
       } else {
         // Customer-to-customer referral

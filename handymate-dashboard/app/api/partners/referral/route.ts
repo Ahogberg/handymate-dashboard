@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { AGREEMENT_VERSION } from '@/lib/partners/agreement'
 
 /**
  * POST /api/partners/referral
@@ -25,44 +26,40 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
-    const { partner_name, lead_email } = body
+    const referralCode = typeof body.referral_code === 'string'
+      ? body.referral_code.trim().toUpperCase()
+      : ''
 
-    if (!partner_name || !lead_email) {
+    if (!/^P-[A-ZÅÄÖ0-9-]{3,28}$/.test(referralCode)) {
       return NextResponse.json(
-        { error: 'partner_name och lead_email krävs' },
+        { error: 'En giltig referral_code krävs' },
         { status: 400 }
       )
     }
 
     const supabase = getServerSupabase()
-
-    // Generera en unik referralkod för denna partner-referral
-    const trackingId = `partner_${Math.random().toString(36).substring(2, 10)}`
-
-    // Skapa referral-rad med partner-typ
-    const { data: referral, error } = await supabase
-      .from('referrals')
-      .insert({
-        referrer_business_id: 'PARTNER', // Speciell markör för partner-referrals
-        referred_business_id: trackingId, // Temporärt — uppdateras vid registrering
-        referred_email: lead_email,
-        referrer_type: 'partner',
-        partner_name,
-        status: 'pending',
-      })
-      .select('id')
-      .single()
+    const { data: partner, error } = await supabase
+      .from('partners')
+      .select('id, referral_url, agreement_version')
+      .eq('referral_code', referralCode)
+      .eq('status', 'active')
+      .maybeSingle()
 
     if (error) {
-      console.error('[Partner API] Insert error:', error)
-      return NextResponse.json({ error: 'Kunde inte skapa referral' }, { status: 500 })
+      console.error('[Partner API] Partner lookup error:', error)
+      return NextResponse.json({ error: 'Kunde inte kontrollera partnern' }, { status: 500 })
+    }
+    if (!partner || partner.agreement_version !== AGREEMENT_VERSION) {
+      return NextResponse.json({ error: 'Partnern är inte aktiv på gällande avtal' }, { status: 409 })
     }
 
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
     return NextResponse.json({
-      referral_url: `${appUrl}/registrera?ref=PARTNER&partner=${encodeURIComponent(partner_name)}&email=${encodeURIComponent(lead_email)}`,
-      tracking_id: referral?.id || trackingId,
+      // Ingen ekonomisk referral-rad skapas innan det finns ett verkligt
+      // företag. Den atomiska claim-rutinen avgör attributionen vid signup.
+      referral_url: partner.referral_url || `${appUrl}/registrera?ref=${encodeURIComponent(referralCode)}`,
+      attribution_status: 'pending_signup',
     })
   } catch (error: any) {
     console.error('[Partner API] Error:', error)

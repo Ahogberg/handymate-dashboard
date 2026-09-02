@@ -15,7 +15,8 @@ import type { TierStep } from '@/lib/partners/commission-engine'
  * GET   ?partner_id[&period]  → trappkonfig + liggarrader + batchar
  * PATCH { partner_id, commission_tiers?, base_rate_after?, tier_mode?, ladder_months? }
  * POST  { action: 'run', period? }                        → ackruera period (default förra månaden)
- * POST  { action: 'create_batch', partner_id, period }    → skapa självfaktureringsunderlag
+ * POST  { action: 'create_batch', partner_id, period, final_payout?, final_payout_reason? }
+ *                                                           → skapa självfaktureringsunderlag
  * POST  { action: 'mark_paid', batch_id, payment_reference, paid_at? } → markera utbetald
  */
 
@@ -174,7 +175,18 @@ export async function POST(request: NextRequest) {
     if (!partnerId || !period) {
       return NextResponse.json({ error: 'partner_id och period (YYYY-MM) krävs' }, { status: 400 })
     }
-    const result = await createPayoutBatch(partnerId, period, adminCheck.email || 'admin')
+    const finalPayout = body?.final_payout === true
+    const finalPayoutReason = text(body?.final_payout_reason, 500)
+    if (finalPayout && !finalPayoutReason) {
+      return NextResponse.json({ error: 'Skäl krävs för slututbetalning' }, { status: 400 })
+    }
+    if (!finalPayout && finalPayoutReason) {
+      return NextResponse.json({ error: 'Slututbetalningsskäl får bara anges för slututbetalning' }, { status: 400 })
+    }
+    const result = await createPayoutBatch(partnerId, period, adminCheck.email || 'admin', {
+      finalPayout,
+      finalPayoutReason: finalPayoutReason || undefined,
+    })
     if (!result.success) return NextResponse.json({ error: result.error }, { status: 400 })
     return NextResponse.json({
       success: true,
