@@ -250,7 +250,11 @@ test('no-tool follow-up has an explicit server-owned not-saved status', async ()
 
 test('route reuses model/metering/confirmation; report cannot read broad context or bypass gate', () => {
   const src = fs.readFileSync('app/api/matte/chat/route.ts', 'utf8')
-  for (const text of ['workReport ? null : await fetchBusinessContext', 'thread && !workReport', 'workReport ? [] : await getRelevantMemories', 'isWorkReportTool(t.name)', 'confirmWorkReport(pending, supabase, businessId, user, executeSharedTool)', 'pendingWorkReport(action, workReport', 'error instanceof WorkReportError']) expect(src).toContain(text)
+  // Pass 3 (tasks/plan-kundminne-pass3.md): läsvägen är ERSATT av
+  // hamtaKundkontext(...) (lib/context/kundkontext.ts) — samma
+  // workReport-grind (ingen kontext alls i rapportläget), bara ett annat
+  // anrop. Se tests/kundminne-pass3.spec.ts.
+  for (const text of ['workReport ? null : await fetchBusinessContext', 'thread && !workReport', 'if (!workReport) {\n          const kontext = await hamtaKundkontext(supabase, {', 'isWorkReportTool(t.name)', 'confirmWorkReport(pending, supabase, businessId, user, executeSharedTool)', 'pendingWorkReport(action, workReport', 'error instanceof WorkReportError']) expect(src).toContain(text)
   expect(src.indexOf('if (opts.workReport)')).toBeLessThan(src.indexOf('if (opts.requireConfirmExternal)'))
   expect(src).toContain("workReport ? 'lars'")
   expect(src).toContain('if (!workReport) extractAndSaveMemory')

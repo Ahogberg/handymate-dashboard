@@ -55,6 +55,7 @@ import { isToolAllowedForActor, EXTERNAL_TOOL_DENIED_MESSAGE, type ActorType } f
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { loadWorkReportContext, prepareWorkReportAction, isWorkReportTool, type WorkReportScope } from '@/lib/matte/work-report'
 import type { BusinessUser } from '@/lib/permissions'
+import { hamtaKundkontext } from '@/lib/context/kundkontext'
 
 interface ToolResult {
   success: boolean
@@ -175,7 +176,7 @@ export async function executeTool(
     }
     switch (name) {
       case 'get_customer':
-        return await getCustomer(supabase, businessId, input)
+        return await getCustomer(supabase, businessId, input, context)
       case 'search_customers':
         return await searchCustomers(supabase, businessId, input)
       case 'create_customer':
@@ -451,7 +452,7 @@ async function assertCustomerInBusiness(
 // ── CRM ─────────────────────────────────────────────────
 
 async function getCustomer(
-  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>, context: ToolContext
 ): Promise<ToolResult> {
   const { data, error } = await supabase
     .from('customer')
@@ -516,7 +517,24 @@ async function getCustomer(
     recentCalls = []
   }
 
-  return { success: true, data: { ...data, recent_bookings: bookings || [], confirmed_facts: confirmedFacts, recent_calls: recentCalls } }
+  // Kundminnet, pass 3 (lib/context/kundkontext.ts): samma sammanslagna
+  // kontext (företagsfakta + kundfakta/-kanaler + minnen) som chatten/
+  // triggern injicerar i systemprompten, som ett extra fält här — så Matte
+  // får samma text när hon slår upp kunden mitt i en konversation, inte
+  // bara vid uppstart. Rör inte returformen i övrigt. Fail-soft.
+  let kontext = ''
+  try {
+    const kundkontext = await hamtaKundkontext(supabase, {
+      businessId,
+      customerId: params.customer_id as string,
+      agentId: context.agentId || 'matte',
+    })
+    kontext = kundkontext.block
+  } catch {
+    kontext = ''
+  }
+
+  return { success: true, data: { ...data, recent_bookings: bookings || [], confirmed_facts: confirmedFacts, recent_calls: recentCalls, kontext } }
 }
 
 async function searchCustomers(

@@ -1,3 +1,25 @@
+# Nattpass 8: kundminnet, pass 3 — ett läs-API + relevanssökning (Claude + Sonnet-agent 2026-09-02)
+
+- [x] sql/v201_agent_memories_fts.sql (KÖRD + verifierad): content_tsv
+      (svensk ordbok) + GIN på agent_memories
+- [x] lib/agents/memory.ts: byggMinnesfraga (ord ≥ 4, max 12, OR),
+      relevansfråga via textSearch(websearch, swedish) slås ihop före
+      viktighetsrankningen (dedupe på id, TOP_N+3); buildMemoryPrompt
+      "Relevant för det här:" / "Om kunden:" / "Om företaget:"
+- [x] lib/context/kundkontext.ts: hamtaKundkontext = Företagsmodellen +
+      kundfakta + senaste samtal/SMS/mejl/portal + minnen i ETT block
+      "## Vad Handymate vet" med källspår; tak 2 500 tecken (hela sektioner,
+      aldrig mitt i mening); tomt ⇒ ''. Alla frågor scopade på business_id
+- [x] Inkopplat (ersatt, inte ovanpå): Matte-chatten (verifierat kund-id,
+      fråga = senaste meddelandet), agent-triggern, röstanalysen (efter
+      branschblocket), get_customer-verktyget (fält kontext)
+- [x] Facit tests/kundminne-pass3.spec.ts (40) i kontraktsgrinden;
+      tsc 0, 343 kontrakt gröna, build ren
+- Känt: getRelevantMemories använder getServerSupabase internt (före
+  passet) — kontextens minnesdel hoppar tyst utan env; annars normalt
+
+---
+
 # Nattpass 7: kundminnet, pass 2 (Claude + Sonnet-agent 2026-09-02)
 
 - [x] Gap 6: agent_memories.customer_id (sql/v200, KÖRD + verifierad).

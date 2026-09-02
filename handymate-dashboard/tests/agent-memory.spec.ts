@@ -685,11 +685,17 @@ test.describe('död embedding-kod borttagen (Etapp U — ärlighet före ambitio
     expect(signatureLine).not.toContain('context')
   })
 
-  test('anroparna (trigger-route + matte/chat) skickar customerId som ett RIKTIGT tredje argument — v200 (gap 6), se tests/kundminne-pass2.spec.ts', () => {
+  // Pass 3 (tasks/plan-kundminne-pass3.md): läsanropen i de två filerna är
+  // ERSATTA av hamtaKundkontext(...) (lib/context/kundkontext.ts), som i
+  // sin tur ropar getRelevantMemories med samma customerId — se
+  // tests/kundminne-pass2.spec.ts och tests/kundminne-pass3.spec.ts.
+  test('anroparna (trigger-route + matte/chat) skickar customerId till hamtaKundkontext (pass 3) — v200 (gap 6)', () => {
     const trigger = read('app/api/agent/trigger/route.ts')
     const chat = read('app/api/matte/chat/route.ts')
-    expect(trigger).toContain('getRelevantMemories(businessId, agentId, customerIdFromTrigger)')
-    expect(chat).toContain('getRelevantMemories(businessId, currentAgent, customerId)')
+    expect(trigger).toContain('hamtaKundkontext(')
+    expect(trigger).toContain('customerId: customerIdFromTrigger')
+    expect(chat).toContain('hamtaKundkontext(')
+    expect(chat).toContain('customerId,')
   })
 })
 

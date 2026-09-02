@@ -62,6 +62,9 @@ const EXPECTED: ExpectedColumn[] = [
   // v200 agentminne per kund (kundminne-revisionen 2026-09-02, gap 6)
   { table: 'agent_memories', column: 'customer_id', migration: 'v200_agent_memories_customer_id', critical: false },
 
+  // v201 relevanssökning i agentminnet (kundminne-revisionen, pass 3)
+  { table: 'agent_memories', column: 'content_tsv', migration: 'v201_agent_memories_fts', critical: false },
+
   // v23 review requests
   { table: 'review_request', column: 'review_url', migration: 'v23_review_requests', critical: true },
   { table: 'review_request', column: 'sms_text', migration: 'v23_review_requests', critical: false },

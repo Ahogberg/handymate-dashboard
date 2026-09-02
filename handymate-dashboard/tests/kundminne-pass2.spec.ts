@@ -143,17 +143,25 @@ test.describe('gap 6 — trigger-routen läser customerId från trigger_data, ov
     expect(gren).toContain("typeof raw === 'string'")
   })
 
-  test('getRelevantMemories och extractAndSaveMemory får customerIdFromTrigger', () => {
+  // Pass 3 (tasks/plan-kundminne-pass3.md, del 3): läsvägen
+  // getRelevantMemories(...)+buildMemoryPrompt(...) i trigger-routen är
+  // ERSATT av hamtaKundkontext(...) (lib/context/kundkontext.ts), som
+  // skickar customerIdFromTrigger vidare — se tests/kundminne-pass3.spec.ts.
+  // extractAndSaveMemory (SKRIVvägen) är oförändrad av pass 3.
+  test('hamtaKundkontext (pass 3) och extractAndSaveMemory får customerIdFromTrigger', () => {
     const s = read(TRIGGER_ROUTE)
-    expect(s).toContain('getRelevantMemories(businessId, agentId, customerIdFromTrigger)')
+    expect(s).toContain('customerId: customerIdFromTrigger')
     expect(s).toContain('customerIdFromTrigger).catch((err) =>')
   })
 })
 
 test.describe('gap 6 — matte/chat skickar bara det server-verifierade sidkontext-id:t', () => {
-  test('getRelevantMemories får customerId (den verifierade variabeln), inte ett rått klient-fält', () => {
+  // Pass 3: läsvägen är ERSATT av hamtaKundkontext(supabase, { ...,
+  // customerId, ... }) — se tests/kundminne-pass3.spec.ts.
+  test('hamtaKundkontext (pass 3) får customerId (den verifierade variabeln), inte ett rått klient-fält', () => {
     const s = read(CHAT_ROUTE)
-    expect(s).toContain('getRelevantMemories(businessId, currentAgent, customerId)')
+    expect(s).toContain('customerId,')
+    expect(s).toContain('hamtaKundkontext(')
   })
 
   test('customerId kommer från verifyPageContextOwnership, inte direkt från body/context', () => {

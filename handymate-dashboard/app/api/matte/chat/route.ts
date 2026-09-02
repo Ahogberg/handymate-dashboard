@@ -37,7 +37,8 @@ import {
   alertProviderOutageThrottled,
   PROVIDER_OUTAGE_REPLY,
 } from '@/lib/ai/provider-outage'
-import { getRelevantMemories, buildMemoryPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
+import { extractAndSaveMemory } from '@/lib/agents/memory'
+import { hamtaKundkontext } from '@/lib/context/kundkontext'
 import { getAgentTools } from '@/lib/agents/personalities'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd, type TokenUsage } from '@/lib/costs/meter'
@@ -1273,17 +1274,28 @@ export async function POST(request: NextRequest) {
     }
 
     while (true) {
-      // Minne: samma funktioner (getRelevantMemories/buildMemoryPrompt) som
-      // den autonoma triggern (app/api/agent/trigger/route.ts) använder för
-      // att injicera "vad du vet om detta företag" i systempromptet. Hämtas
-      // per agent (currentAgent kan bytas via handoff mitt i turen).
-      // Fail-safe: fel här får aldrig fälla chatten — degraderar tyst.
+      // Kundminnet, pass 3 (lib/context/kundkontext.ts): ETT läs-API som
+      // slår ihop Företagsmodellen + kundfakta/-kanaler + agentminnet i
+      // stället för att chatten (som förut) bara hämtade agentminnet för
+      // sig via getRelevantMemories/buildMemoryPrompt. `fraga` = kundens/
+      // användarens senaste meddelande driver relevanssökningen i minnet
+      // (v201). Hämtas per agent (currentAgent kan bytas via handoff mitt
+      // i turen). workReport-undantaget kvarstår: en personlig rapport-
+      // tråd ska aldrig se firmans/kundens delade kontext. Fail-safe: fel
+      // här får aldrig fälla chatten — degraderar tyst.
       let memorySuffix = ''
       try {
-        const memories = workReport ? [] : await getRelevantMemories(businessId, currentAgent, customerId)
-        memorySuffix = buildMemoryPrompt(memories)
+        if (!workReport) {
+          const kontext = await hamtaKundkontext(supabase, {
+            businessId,
+            customerId,
+            agentId: currentAgent,
+            fraga: newUserText || undefined,
+          })
+          memorySuffix = kontext.block
+        }
       } catch (err) {
-        console.error('[matte/chat] memory fetch failed (non-blocking):', err)
+        console.error('[matte/chat] kundkontext fetch failed (non-blocking):', err)
       }
 
       // Möjlighetsportfölj + aktivt uppdrag (Goal-to-Plan V1, Etapp B) — bara

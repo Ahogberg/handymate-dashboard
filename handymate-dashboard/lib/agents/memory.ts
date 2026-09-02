@@ -580,10 +580,91 @@ export interface RelevantMemoryRow {
   /** v200 — saknas (undefined) på legacy-fallbackens rader (kolumnen läses
    *  inte där), null = företagsnivå, annars kundens id. */
   customer_id?: string | null
+  /** v201 (pass 3) — satt när raden kom ur relevansfrågan (textSearch),
+   *  inte bara viktighetsrankningen. Odefinierad = kom ur den vanliga
+   *  frågan. Låter buildMemoryPrompt lägga den under "Relevant för det
+   *  här:" i stället för de vanliga rubrikerna. */
+  relevant?: boolean
 }
 
 const RELEVANT_MEMORIES_FETCH_LIMIT = 200
 const RELEVANT_MEMORIES_TOP_N = 5
+/** Relevansträffarna får tränga in EXTRA plats ovanpå viktighetstoppen,
+ *  aldrig helt tränga ut den — annars försvinner allt företagsminne bara
+ *  för att frågan råkade träffa tre gamla kundrader. */
+const RELEVANT_MEMORIES_QUERY_HEADROOM = 3
+
+/**
+ * Pass 3 (sql/v201_agent_memories_fts.sql) — bygger en websearch_to_tsquery-
+ * kompatibel sträng ur en fri text: ord ≥ 4 tecken (svenska bokstäver
+ * tillåtna), unika, max 12, skiljetecken strippade, ihopsatta med ' OR ' så
+ * frågan blir en bred träfftratt snarare än en exakt fras (en kund skriver
+ * sällan om sitt ärende med precis samma ordföljd två gånger). Ren funktion
+ * — ingen I/O, testbar utan Supabase.
+ */
+export function byggMinnesfraga(text: string): string | null {
+  const ord = (text || '')
+    .split(/\s+/)
+    .map((w) => w.replace(/[^a-zåäöéA-ZÅÄÖÉ0-9]/g, ''))
+    .filter((w) => w.length >= 4)
+
+  const unika = Array.from(new Set(ord)).slice(0, 12)
+  if (unika.length === 0) return null
+  return unika.join(' OR ')
+}
+
+/** Varnar bara EN gång per process om relevanssökningen inte går att
+ *  köra (saknad kolumn/index innan v201, eller ett transient DB-fel) —
+ *  samma "en varning, inte en logglavin" som customer_fact-idiomet. */
+let harVarnatOmRelevanssokning = false
+
+/**
+ * Andra frågan i fetchRelevantMemories när ett `opts.query` finns: samma
+ * scope (business, agent-eller-matte, superseded_by null, confirmed_at
+ * satt, kund-filtret från v200) men filtrerad på content_tsv i stället för
+ * rankad på ren viktighet. Fail-soft: 42703 (v201 inte körd än) eller
+ * annat fel ⇒ tom lista, ALDRIG en kastad fråga.
+ */
+async function fetchRelevanceMatches(
+  supabase: SupabaseClient,
+  businessId: string,
+  agentId: string,
+  customerId: string | null,
+  tsQuery: string,
+): Promise<RelevantMemoryRow[]> {
+  try {
+    const baseQuery = supabase
+      .from('agent_memories')
+      .select('id, content, importance_score, memory_type, created_at, access_count, customer_id')
+      .eq('business_id', businessId)
+      .or(`agent_id.eq.${agentId},agent_id.eq.matte`)
+      .is('superseded_by', null)
+      .not('confirmed_at', 'is', null)
+
+    const scopedQuery = customerId
+      ? baseQuery.or(`customer_id.is.null,customer_id.eq.${customerId}`)
+      : baseQuery.is('customer_id', null)
+
+    const { data, error } = await scopedQuery
+      .textSearch('content_tsv', tsQuery, { config: 'swedish', type: 'websearch' })
+      .limit(10)
+
+    if (error) {
+      if (!isMissingColumnError(error) && !harVarnatOmRelevanssokning) {
+        console.warn('[agent-memory] relevanssökning misslyckades, faller tillbaka på viktighet:', error.message)
+        harVarnatOmRelevanssokning = true
+      }
+      return []
+    }
+    return (data || []) as RelevantMemoryRow[]
+  } catch (err) {
+    if (!harVarnatOmRelevanssokning) {
+      console.warn('[agent-memory] relevanssökning kastade, faller tillbaka på viktighet:', err)
+      harVarnatOmRelevanssokning = true
+    }
+    return []
+  }
+}
 
 /**
  * Hämtar minnen för en agent (+ Mattes delade minnen), bekräftade och
@@ -596,12 +677,19 @@ const RELEVANT_MEMORIES_TOP_N = 5
  * färskhetsdecay" — INTE semantisk sökning. Den tidigare kommentarens
  * antydan om vektor-likhet var död kod (embedding var alltid NULL); den
  * här funktionen döps och dokumenteras som vad den faktiskt är.
+ *
+ * Pass 3 (sql/v201_agent_memories_fts.sql): med `opts.query` körs DÄRUTÖVER
+ * en andra fråga mot content_tsv (fetchRelevanceMatches) — dess träffar
+ * läggs FÖRE viktighetstoppen (i den ordning frågan gav dem), dedupas på
+ * id och klipps till RELEVANT_MEMORIES_TOP_N + headroom så en lyckad
+ * relevansträff aldrig tränger ut ALLT företagsminne. Utan `opts.query`:
+ * exakt gårdagens beteende (samma anrop, samma retur).
  */
 export async function fetchRelevantMemories(
   supabase: SupabaseClient,
   businessId: string,
   agentId: string,
-  opts: { now?: Date; customerId?: string | null } = {},
+  opts: { now?: Date; customerId?: string | null; query?: string } = {},
 ): Promise<RelevantMemoryRow[]> {
   const now = opts.now ?? new Date()
   const customerId = safeMemoryCustomerId(opts.customerId)
@@ -650,7 +738,30 @@ export async function fetchRelevantMemories(
 
   const top = rankByEffectiveScoreWithCustomerBoost(rows, customerId, now).slice(0, RELEVANT_MEMORIES_TOP_N)
 
-  const ids = top.map((m) => m.id)
+  // Pass 3: med en fråga i scope, hämta relevansträffarna och slå ihop dem
+  // FÖRE viktighetstoppen. Utan query (den överväldigande majoriteten av
+  // anropen, t.ex. legacy-vägen ovan) är `merged` bokstavligen `top` —
+  // byte-identiskt med gårdagens retur.
+  let merged: RelevantMemoryRow[] = top
+  const tsQuery = opts.query ? byggMinnesfraga(opts.query) : null
+  if (tsQuery) {
+    const relevanta = await fetchRelevanceMatches(supabase, businessId, agentId, customerId, tsQuery)
+    const setta = new Set<string>()
+    const ihopslaget: RelevantMemoryRow[] = []
+    for (const r of relevanta) {
+      if (setta.has(r.id)) continue
+      setta.add(r.id)
+      ihopslaget.push({ ...r, relevant: true })
+    }
+    for (const r of top) {
+      if (setta.has(r.id)) continue
+      setta.add(r.id)
+      ihopslaget.push(r)
+    }
+    merged = ihopslaget.slice(0, RELEVANT_MEMORIES_TOP_N + RELEVANT_MEMORIES_QUERY_HEADROOM)
+  }
+
+  const ids = merged.map((m) => m.id)
   if (ids.length > 0) {
     await supabase
       .from('agent_memories')
@@ -658,7 +769,7 @@ export async function fetchRelevantMemories(
       .in('id', ids)
   }
 
-  return top
+  return merged
 }
 
 /**
@@ -676,16 +787,27 @@ export interface RelevantMemoryText {
    *  buildMemoryPrompt markerar dessa så agenten aldrig blandar ihop dem
    *  med firmanivå-lärdomar. */
   isCustomer: boolean
+  /** Pass 3 (v201): sant om raden kom ur relevansfrågan (svarar på `query`),
+   *  inte bara viktighetsrankningen. Odefinierad/false för alla anrop utan
+   *  query — gårdagens kontrakt, oförändrat. */
+  isRelevant?: boolean
 }
 
 export async function getRelevantMemories(
   businessId: string,
   agentId: string,
   customerId?: string | null,
+  /** Pass 3: användarens/triggerns text — driver relevanssökningen
+   *  (byggMinnesfraga + content_tsv). Odefinierad = gårdagens beteende. */
+  query?: string,
 ): Promise<RelevantMemoryText[]> {
   const supabase = getServerSupabase()
-  const rows = await fetchRelevantMemories(supabase, businessId, agentId, { customerId })
-  return rows.map((r) => ({ content: r.content, isCustomer: !!customerId && r.customer_id === customerId }))
+  const rows = await fetchRelevantMemories(supabase, businessId, agentId, { customerId, query })
+  return rows.map((r) => ({
+    content: r.content,
+    isCustomer: !!customerId && r.customer_id === customerId,
+    isRelevant: !!r.relevant,
+  }))
 }
 
 /** Antingen ett rått minne (företagsnivå, gårdagens form) eller ett
@@ -698,20 +820,37 @@ export type MemoryPromptItem = string | RelevantMemoryText
  * v200 (gap 6): ett minne med isCustomer=true märks med prefixet
  * "Om kunden: " så agenten aldrig blandar ihop ett kundspecifikt minne med
  * en firmanivå-lärdom. Rena strängar (gårdagens form) märks aldrig.
+ *
+ * Pass 3 (v201): rader med isRelevant=true (relevansträffar på användarens
+ * fråga) listas FÖRST, under en egen rubrik "Relevant för det här:" — resten
+ * (företags-/kundminnen som förut) listas därefter, numrerade som innan.
+ * Utan några relevanta rader (den överväldigande majoriteten av anropen,
+ * och ALLA anrop utan query) är utseendet byte-identiskt med gårdagens.
  */
 export function buildMemoryPrompt(memories: MemoryPromptItem[]): string {
   if (memories.length === 0) return ''
 
-  const lines = memories.map((m, i) => {
+  const formatRad = (m: MemoryPromptItem, i: number): string => {
     if (typeof m === 'string') return `${i + 1}. ${m}`
     const prefix = m.isCustomer ? 'Om kunden: ' : ''
     return `${i + 1}. ${prefix}${m.content}`
-  })
+  }
+
+  const relevanta = memories.filter((m): m is RelevantMemoryText => typeof m !== 'string' && !!m.isRelevant)
+  const ovriga = memories.filter((m) => typeof m === 'string' || !m.isRelevant)
+
+  const sektioner: string[] = []
+  if (relevanta.length > 0) {
+    sektioner.push(`Relevant för det här:\n${relevanta.map(formatRad).join('\n')}`)
+  }
+  if (ovriga.length > 0) {
+    sektioner.push(ovriga.map(formatRad).join('\n'))
+  }
 
   return `
 
 === Vad du vet om detta företag ===
-${lines.join('\n')}
+${sektioner.join('\n\n')}
 === Slut på minnen ===
 Använd dessa lärdomar när du fattar beslut. Uppdatera inte minnen — fokusera på uppgiften.`
 }

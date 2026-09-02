@@ -11,7 +11,8 @@ import { loadCompanyModel } from '@/lib/company/company-model'
 import { loadTradeContext } from '@/lib/branch/trade-context'
 import { getBusinessPreferences } from '@/lib/business-preferences'
 import { routeToAgent, getAgentPromptSuffix, getAgentTools } from '@/lib/agents/personalities'
-import { getRelevantMemories, buildMemoryPrompt, getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
+import { getAgentMessages as fetchAgentMessages, buildMessagesPrompt, extractAndSaveMemory } from '@/lib/agents/memory'
+import { hamtaKundkontext } from '@/lib/context/kundkontext'
 import { checkCostGuards, meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
@@ -56,6 +57,13 @@ export async function POST(request: NextRequest) {
     const customerIdFromTrigger: string | null = (() => {
       const raw = (trigger_data as any)?.customer_id ?? (trigger_data as any)?.customerId
       return typeof raw === 'string' ? raw : null
+    })()
+
+    // Pass 3 (lib/context/kundkontext.ts): drivtexten för minnets
+    // relevanssökning — första strängen som faktiskt finns av de tre.
+    const fragaFromTrigger: string | undefined = (() => {
+      const raw = (trigger_data as any)?.text ?? (trigger_data as any)?.message ?? (trigger_data as any)?.transcript
+      return typeof raw === 'string' ? raw : undefined
     })()
 
     // ── Auth: support both user-session and internal server-to-server ──
@@ -422,15 +430,22 @@ export async function POST(request: NextRequest) {
       trigger_data
     )
 
-    // Inject agent personality + memories + messages
+    // Inject agent personality + kundkontext (pass 3, lib/context/
+    // kundkontext.ts — ersätter det tidigare separata getRelevantMemories/
+    // buildMemoryPrompt-anropet) + messages
     let memorySuffix = ''
     let messagesSuffix = ''
     try {
-      const [memories, agentMsgs] = await Promise.all([
-        getRelevantMemories(businessId, agentId, customerIdFromTrigger),
+      const [kontext, agentMsgs] = await Promise.all([
+        hamtaKundkontext(supabase, {
+          businessId,
+          customerId: customerIdFromTrigger,
+          agentId,
+          fraga: fragaFromTrigger,
+        }),
         fetchAgentMessages(businessId, agentId),
       ])
-      memorySuffix = buildMemoryPrompt(memories)
+      memorySuffix = kontext.block
       messagesSuffix = buildMessagesPrompt(agentMsgs)
     } catch (err) {
       console.error('[AgentTrigger] memory/messages fetch failed (non-blocking):', businessId, agentId, err)

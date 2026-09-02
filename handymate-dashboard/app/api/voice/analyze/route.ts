@@ -18,6 +18,7 @@ import { resolveCallProject } from '@/lib/voice/resolve-call-project'
 import { byggAtaUtkast, harPendingAtaForProjekt, shouldSuggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 import { branchWorker, describeBranches, resolveBusinessBranch } from '@/lib/branch'
 import { loadTradeContext, formatTradeContextBlock } from '@/lib/branch/trade-context'
+import { hamtaKundkontext } from '@/lib/context/kundkontext'
 
 export const maxDuration = 300
 
@@ -435,6 +436,25 @@ export async function POST(request: NextRequest) {
     const arUtgaende = !arMote && recording.direction === 'outbound'
     const samtalsriktning = arUtgaende ? 'UTGÅENDE (hantverkaren ringde upp kunden)' : 'INKOMMANDE (kund ringde)'
 
+    // Kundminnet, pass 3 (lib/context/kundkontext.ts): känd kund vid
+    // analystillfället ⇒ samma sammanslagna kontext (företagsfakta +
+    // kundfakta/-kanaler + minnen) som chatten/triggern använder, direkt
+    // efter branschblocket. Ingen känd kund ⇒ inget block. Fail-soft: ett
+    // fel här ska aldrig fälla hela samtalsanalysen.
+    let kundkontextBlock = ''
+    if (recording.customer_id) {
+      try {
+        const kundkontext = await hamtaKundkontext(supabase, {
+          businessId: recording.business_id,
+          customerId: recording.customer_id,
+          agentId: arMote ? 'matte' : 'lisa',
+        })
+        kundkontextBlock = kundkontext.block ? `\n${kundkontext.block}` : ''
+      } catch (err) {
+        console.error('[voice/analyze] kundkontext kunde inte hämtas (non-blocking):', err)
+      }
+    }
+
     // Förbättrad AI-prompt
     const prompt = `Du är en AI-assistent för en ${branschRoll} i Sverige.
 ${arMote
@@ -445,7 +465,7 @@ ${arMote
 Företag: ${business?.business_name || 'Okänt'}
 Bransch: ${branschText}
 Tjänster: ${services}
-Serviceområde: ${business?.service_area || 'Okänt'}${branschBlock}
+Serviceområde: ${business?.service_area || 'Okänt'}${branschBlock}${kundkontextBlock}
 ${productContext}
 
 === SAMTALSINFORMATION ===
