@@ -261,7 +261,9 @@ export async function sendInvoice(
             swish_number: businessConfig?.swish_number,
             swish_qr: swishQR || undefined,
             f_skatt_registered: businessConfig?.f_skatt_registered,
-          }
+          },
+          // businessConfig är hela raden (select('*')) — stämpeln byggs direkt.
+          { attribution: buildAttribution(businessConfig) },
         )
       }
 

@@ -1,5 +1,6 @@
 import type { QuoteTemplateData, QuoteTemplateItem, TemplateRenderFn } from './types'
 import { escapeHtml, formatCurrency } from '@/lib/document-html'
+import { attributionDocumentHtml, buildAttribution } from '@/lib/branding/attribution'
 
 /**
  * Premium — påkostad, dark teal + amber, Syne + DM Sans.
@@ -206,6 +207,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
 .footer { margin-top: auto; padding: 14px 20mm; background: var(--dark); color: rgba(255,255,255,0.6); display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-size: 10px; }
 .footer .l { font-size: 9px; text-transform: uppercase; letter-spacing: 0.16em; color: var(--amber-light); margin-bottom: 2px; }
 .footer .v { color: #fff; font-size: 11px; font-weight: 500; }
+.hm-attribution { padding: 0 20mm 6mm; }
 .print-bar { position: fixed; bottom: 0; left: 0; right: 0; background: #fff; border-top: 1px solid var(--line); padding: 12px 24px; display: flex; align-items: center; justify-content: center; gap: 12px; z-index: 100; }
 .print-btn { background: var(--dark); color: #fff; border: none; padding: 10px 24px; border-radius: 4px; font-size: 13px; font-weight: 500; cursor: pointer; font-family: 'DM Sans', sans-serif; }
 .print-btn.secondary { background: #f3f4f6; color: #374151; }
@@ -316,6 +318,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
     <div><div class="l">F-skatt</div><div class="v">${data.business.fSkatt ? 'Innehas' : '—'}</div></div>
     ${data.business.momsRegnr ? `<div><div class="l">Moms</div><div class="v">${escapeHtml(data.business.momsRegnr)}</div></div>` : ''}
   </footer>
+  ${attributionDocumentHtml(data.attribution ?? buildAttribution(null))}
 </div>
 </body>
 </html>`

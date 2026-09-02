@@ -2,6 +2,7 @@ import { generateOCR } from '@/lib/ocr'
 import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoiceTemplateData, selectInvoiceTemplate } from '@/lib/invoice-templates'
 import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
+import type { Attribution } from '@/lib/branding/attribution'
 
 /**
  * ETAPP 6b (offert-masterplan.md, faktura-sprinten): EN källa för hur en
@@ -36,6 +37,12 @@ import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
  *                              + påminnelseavgift, vilket kräver att
  *                              amountToPay räknas ut FÖRE QR-genereringen
  *                              (se reminder-pdf-routen).
+ * @param opts.attribution     Handymate-stämpeln
+ *                              (lib/branding/attribution.ts). Utelämnad →
+ *                              buildAttribution(config), vilket är rätt
+ *                              när config är hela raden (select('*')).
+ *                              Anropare med explicit kolumnlista skickar
+ *                              in resultatet av loadAttribution.
  * @returns PDF-buffer, eller null om Chromium-rendering misslyckades —
  *          anroparen äger beslutet om ev. jsPDF-fallback.
  */
@@ -46,6 +53,7 @@ export async function buildInvoicePdfBuffer(
     styleOverride?: string | null
     logTag?: string
     swishQrOverride?: string | null
+    attribution?: Attribution
   },
 ): Promise<Buffer | null> {
   const ocrNumber = invoice.ocr_number || generateOCR(invoice.invoice_number || '')
@@ -60,6 +68,7 @@ export async function buildInvoicePdfBuffer(
   }
 
   const templateData = buildInvoiceTemplateData(invoice, config, swishQR)
+  if (opts?.attribution) templateData.attribution = opts.attribution
   // ETAPP 6c (offert-masterplan.md, faktura-sprinten): sql/v82 —
   // invoice.template_style (satt av fakturaskaparens Stil-väljare) slår
   // business-defaulten, precis som quote.template_style redan gör för

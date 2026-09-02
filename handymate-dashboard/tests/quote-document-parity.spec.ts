@@ -119,9 +119,19 @@ function fixtureSigned(): QuoteTemplateData {
   return { ...f, isSigned: true }
 }
 
+/**
+ * Handymate-stämpeln (lib/branding/attribution.ts, tillagd 2026-09-02) renderas
+ * sist i dokumentmotorn men fanns inte i modern.ts när fixturerna frystes.
+ * Den strippas här — fixturerna förblir den historiska baslinjen, och
+ * stämpelns egen närvaro vaktas av tests/facit-attribution-pdf.spec.ts.
+ */
+function stripAttribution(html: string): string {
+  return html.replace(/<div class="hm-attribution"[\s\S]*?<\/div>/g, '')
+}
+
 /** Strippar <style>/<script>-block + alla taggar, normaliserar whitespace. */
 function extractText(html: string): string {
-  return html
+  return stripAttribution(html)
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')

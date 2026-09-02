@@ -1,5 +1,6 @@
 import type { QuoteTemplateData, QuoteTemplateItem, QuoteTemplateComponent } from './types'
 import { formatDateLong } from '@/lib/document-html'
+import { buildAttribution } from '@/lib/branding/attribution'
 import { resolveDisplayLevel, displayLevelToColumns, groupItemsForSummary } from '@/lib/quotes/display-level'
 
 const DEFAULT_ACCENT = '#0F766E'
@@ -266,6 +267,11 @@ export function buildQuoteTemplateData(
     // aldrig råkar visas via den generiska isSigned-baserade defaulten.
     signatureCta: 'hidden',
     signedDate: quote.signed_at ? formatDateLong(quote.signed_at) : null,
+    // Stämpeln: rätt direkt när config är hela business_config-raden
+    // (select('*')). Anropare med explicit kolumnlista skriver över med
+    // loadAttribution — kolumnen får ALDRIG läggas i en kolumnlista
+    // (PostgREST fäller hela selecten före sql/v200).
+    attribution: buildAttribution(config),
     business: {
       name: businessName,
       orgNumber: config?.org_number || business?.org_number || '',

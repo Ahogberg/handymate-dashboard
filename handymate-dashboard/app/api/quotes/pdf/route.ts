@@ -6,6 +6,7 @@ import { selectTemplate, buildQuoteTemplateData } from '@/lib/quote-templates'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { generateQuotePDF, type QuotePdfData, type BusinessPdfData } from '@/lib/pdf-generator'
 import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
+import { buildAttribution, loadAttribution, type Attribution } from '@/lib/branding/attribution'
 
 // Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
 // @sparticuz/chromium packar upp binären vid första anropet.
@@ -40,10 +41,16 @@ export const maxDuration = 30
  * Primärt: Chromium-utskrift av mall-HTML:en (exakt match mot live-vyn).
  * Fallback: den gamla jsPDF-renderaren (se renderHtmlToPdf ovan).
  */
-async function buildQuotePdfResponse(quote: any, config: any, creator: any): Promise<NextResponse> {
+async function buildQuotePdfResponse(
+  quote: any,
+  config: any,
+  creator: any,
+  attribution: Attribution,
+): Promise<NextResponse> {
   // ── Primär väg: samma HTML som live-vyn → Chromium → PDF ─────────────
   try {
     const templateData = buildQuoteTemplateData(quote, config, config, creator)
+    templateData.attribution = attribution
     const renderFn = selectTemplate(quote.template_style || config?.quote_template_style)
     const html = renderFn(templateData)
     const pdfFromHtml = await renderHtmlToPdf(html, 'quotes/pdf')
@@ -164,7 +171,7 @@ async function buildQuotePdfResponse(quote: any, config: any, creator: any): Pro
   // jsPDF-fallbacken faktiskt slår in (inte bara loggarna ovan om VARFÖR
   // Chromium-vägen misslyckades) — lätt att söka fram i Vercel-loggarna.
   console.error('[quotes/pdf] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, offerten laddas ner med den äldre jsPDF-renderaren')
-  const pdfBuffer = generateQuotePDF(pdfData, businessData)
+  const pdfBuffer = generateQuotePDF(pdfData, businessData, { attribution })
   return new NextResponse(pdfBuffer, {
     headers: {
       'Content-Type': 'application/pdf',
@@ -239,13 +246,18 @@ export async function POST(request: NextRequest) {
     // → buildQuoteTemplateData faller tillbaka på ägarens business_config.
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
 
+    // Stämpeln: config är en kolumnlista (får inte utökas före sql/v200),
+    // men `business` (getAuthenticatedBusiness) är hela raden — bygg direkt.
+    const attribution = buildAttribution(business)
+
     // format=pdf → riktig nedladdningsbar PDF (query eller body). Default = HTML.
     const format = request.nextUrl.searchParams.get('format') || body?.format || 'html'
     if (format === 'pdf') {
-      return buildQuotePdfResponse(quote, config, creator)
+      return buildQuotePdfResponse(quote, config, creator, attribution)
     }
 
     const templateData = buildQuoteTemplateData(quote, business, config, creator)
+    templateData.attribution = attribution
     // Per-quote override → fallback till business default
     const renderFn = selectTemplate(quote.template_style || config?.quote_template_style)
     const html = renderFn(templateData)
@@ -271,6 +283,11 @@ export async function GET(request: NextRequest) {
 
     // Stöd för publik åtkomst via sign_token (signeringssidan)
     let quote: any = null
+    // Stämpeln: id-vägen har hela business_config-raden via
+    // getAuthenticatedBusiness (bygg direkt); token-vägen saknar den och
+    // laddar via helpern nedan (bizConfig är en kolumnlista som inte får
+    // utökas före sql/v200).
+    let attribution: Attribution | null = null
 
     if (signToken) {
       const { data } = await supabase
@@ -301,6 +318,7 @@ export async function GET(request: NextRequest) {
         .eq('business_id', business.business_id)
         .single()
       quote = data
+      attribution = buildAttribution(business)
     } else {
       return NextResponse.json({ error: 'Missing quote ID or token' }, { status: 400 })
     }
@@ -308,6 +326,7 @@ export async function GET(request: NextRequest) {
     if (!quote) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
+    if (!attribution) attribution = await loadAttribution(supabase, quote.business_id)
 
     const { data: quoteItems } = await supabase
       .from('quote_items')
@@ -349,10 +368,11 @@ export async function GET(request: NextRequest) {
     // ingen auth — samma som HTML-token-vägen) och ?id= (auth redan gjord ovan).
     const format = request.nextUrl.searchParams.get('format') || 'html'
     if (format === 'pdf') {
-      return buildQuotePdfResponse(quote, bizConfig, creator)
+      return buildQuotePdfResponse(quote, bizConfig, creator, attribution)
     }
 
     const templateData = buildQuoteTemplateData(quote, bizConfig, bizConfig, creator)
+    templateData.attribution = attribution
     // Style-precedence: ?style=... (settings-preview) > quote.template_style > business default
     const styleOverride = request.nextUrl.searchParams.get('style')
     const renderFn = selectTemplate(

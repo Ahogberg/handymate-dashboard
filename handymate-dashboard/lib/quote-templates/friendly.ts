@@ -1,5 +1,6 @@
 import type { QuoteTemplateData, QuoteTemplateItem, TemplateRenderFn } from './types'
 import { escapeHtml, formatCurrency } from '@/lib/document-html'
+import { attributionDocumentHtml, buildAttribution } from '@/lib/branding/attribution'
 
 /**
  * Friendly — varm, cards + badges, DM Sans. Respekterar accent_color.
@@ -338,6 +339,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
     <div><div class="l">F-skatt</div><div class="v">${data.business.fSkatt ? 'Innehas' : '—'}</div></div>
     ${data.business.momsRegnr ? `<div><div class="l">Moms</div><div class="v">${escapeHtml(data.business.momsRegnr)}</div></div>` : ''}
   </section>
+  ${attributionDocumentHtml(data.attribution ?? buildAttribution(null))}
 </div>
 </body>
 </html>`

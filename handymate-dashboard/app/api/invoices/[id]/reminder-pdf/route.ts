@@ -5,6 +5,7 @@ import { generateOCR } from '@/lib/ocr'
 import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoiceTemplateData, selectInvoiceTemplate } from '@/lib/invoice-templates'
 import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
+import { buildAttribution } from '@/lib/branding/attribution'
 
 // Chromium-rendering (format=pdf-grenen, ETAPP 6b) kräver Node-runtime och
 // en generösare timeout — samma mönster som quotes/pdf och invoices/pdf.
@@ -97,11 +98,17 @@ export async function GET(
     // invoices/pdf och invoices/send — swishQrOverride skickas in eftersom
     // beloppet för en påminnelse (inkl. dröjsmålsränta + avgift) redan är
     // uträknat ovan (tvåstegs-beräkningen som HTML-läget alltid gjort).
+    // Stämpeln: config ovan är en kolumnlista (får inte utökas med stämpel-
+    // kolumnen före sql/v200), men `business` från getAuthenticatedBusiness
+    // är hela raden — bygg direkt, ingen extra query.
+    const attribution = buildAttribution(business)
+
     const format = request.nextUrl.searchParams.get('format') || 'html'
     if (format === 'pdf') {
       const pdfBuffer = await buildInvoicePdfBuffer(invoice, config, {
         swishQrOverride: swishQR,
         logTag: 'invoices/reminder-pdf',
+        attribution,
       })
       if (!pdfBuffer) {
         // Medvetet ingen jsPDF-fallback — se filens header-kommentar.
@@ -120,6 +127,7 @@ export async function GET(
     }
 
     const templateData = buildInvoiceTemplateData(invoice, config, swishQR)
+    templateData.attribution = attribution
     const renderFn = selectInvoiceTemplate(config?.quote_template_style)
     const html = renderFn(templateData)
 

@@ -1,5 +1,6 @@
 import type { InvoiceStatus, InvoiceTemplateData, InvoiceTemplateItem, InvoiceTemplateItemType } from './types'
 import { formatDateLong } from '@/lib/document-html'
+import { buildAttribution } from '@/lib/branding/attribution'
 
 const KNOWN_ITEM_TYPES: InvoiceTemplateItemType[] = ['item', 'heading', 'text', 'subtotal', 'discount']
 
@@ -265,5 +266,10 @@ export function buildInvoiceTemplateData(
       originalInvoiceId: invoice.original_invoice_id || invoice.credit_for_invoice_id || null,
     },
     swishQrDataUrl: swishQrDataUrl || null,
+    // Stämpeln: rätt direkt när config är hela business_config-raden
+    // (select('*')). Anropare med explicit kolumnlista skriver över med
+    // loadAttribution — kolumnen får ALDRIG läggas i en kolumnlista
+    // (PostgREST fäller hela selecten före sql/v200).
+    attribution: buildAttribution(config),
   }
 }

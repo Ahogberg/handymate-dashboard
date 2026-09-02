@@ -93,3 +93,40 @@ export function attributionDocumentHtml(a: Attribution): string {
 export function attributionPdfText(a: Attribution): { text: string; url: string | null } {
   return { text: a.text, url: a.url }
 }
+
+/**
+ * Den lilla yta av jsPDF stämpeln behöver — strukturell typ så modulen
+ * slipper importera jspdf (job-report laddar den dynamiskt, och modulen
+ * ska förbli klient-säker).
+ */
+export type AttributionPdfDoc = {
+  getNumberOfPages(): number
+  setPage(n: number): unknown
+  internal: { pageSize: { getWidth(): number; getHeight(): number } }
+  setFontSize(size: number): unknown
+  setTextColor(r: number, g: number, b: number): unknown
+  text(text: string, x: number, y: number, options?: { align?: 'center' }): unknown
+  textWithLink(text: string, x: number, y: number, options: { url: string; align?: 'center' }): number
+}
+
+/** Stämpelns position/utseende i jsPDF-renderarna (mm respektive pt). */
+const PDF_STAMP_FONT_PT = 8
+const PDF_STAMP_BOTTOM_MM = 5
+const PDF_STAMP_RGB: [number, number, number] = [107, 114, 128] // = MUTED_COLOR #6b7280
+
+/**
+ * Ritar stämpeln grå, centrerad, längst ner på SISTA sidan i ett jsPDF-
+ * dokument. Hela raden blir klickbar (doc.textWithLink) när url finns,
+ * annars ren text. Anropas sist, precis före doc.output() — ändrar
+ * fontstorlek/färg och lämnar dokumentet på sista sidan.
+ */
+export function stampAttributionOnPdf(doc: AttributionPdfDoc, a: Attribution): void {
+  const { text, url } = attributionPdfText(a)
+  doc.setPage(doc.getNumberOfPages())
+  const x = doc.internal.pageSize.getWidth() / 2
+  const y = doc.internal.pageSize.getHeight() - PDF_STAMP_BOTTOM_MM
+  doc.setFontSize(PDF_STAMP_FONT_PT)
+  doc.setTextColor(...PDF_STAMP_RGB)
+  if (url) doc.textWithLink(text, x, y, { url, align: 'center' })
+  else doc.text(text, x, y, { align: 'center' })
+}

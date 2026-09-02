@@ -5,6 +5,7 @@ import { generateSwishQR } from '@/lib/swish-qr'
 import { buildInvoiceTemplateData, selectInvoiceTemplate } from '@/lib/invoice-templates'
 import { stripPrintBar } from '@/lib/document-html'
 import { PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 // Chromium ligger inte i denna väg (bara HTML-strängar/React-rendering till
 // markup) — men buildInvoiceTemplateData/selectInvoiceTemplate går via
@@ -126,6 +127,9 @@ export async function GET(
     const swishQR = await generateSwishQR(businessConfig?.swish_number, payAmount || invoice.total, invoice.invoice_number)
 
     const templateData = buildInvoiceTemplateData(invoice, businessConfig, swishQR)
+    // Stämpeln: kolumnlistan ovan får inte utökas (se kommentaren), så
+    // underlaget hämtas med helperns egen fallback-säkra query.
+    templateData.attribution = await loadAttribution(supabase, customer.business_id)
 
     const templateStyle = (invoice.template_style || businessConfig?.quote_template_style || 'modern') as
       | 'modern' | 'premium' | 'friendly'
