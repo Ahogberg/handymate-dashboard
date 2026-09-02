@@ -1,14 +1,13 @@
 /**
- * Facit för "Aktivera senare" (2026-09-02): betalningen är inte längre en
- * spärr i onboardingen — ägaren kan gå vidare utan kort och blir tillfrågad
- * när teamet bevisat sitt första resultat, senast när provperioden går ut.
+ * Facit för den förtjänta betalfrågan (2026-09-02).
+ *
+ * "Aktivera senare"-knappen (gå vidare utan kort) togs BORT samma natt:
+ * Andreas vill uttryckligen inte ha en gratis prova-på-period som lockar
+ * folk som signar upp och avbryter direkt. Kortet krävs i steg 4 som förut.
+ * Det som är kvar är det som gör betalfrågan förtjänt och synlig:
  *
  * Låser:
- *  - Step5Activate har en sekundär "Aktivera senare"-knapp (inte i demo),
- *    Stripe-knappen och demo-grenen är orörda
- *  - sidan stämplar activationDeferredAt i onboarding_data (ingen kolumn)
- *    och hoppar till steg 5
- *  - tratten räknar "sköt upp betalning"
+ *  - Step5Activate har INGEN väg förbi Stripe utanför demoläget
  *  - första värdekvittot härleds bara ur verifierade kort
  *    (RECEIPT_APPROVAL_TYPES + execution_result.outcome = success)
  *  - /api/billing exponerar first_receipt och räknar 'trial' som provperiod
@@ -24,43 +23,16 @@ import fs from 'fs'
 import path from 'path'
 import { harledForstaKvitto } from '../lib/billing/forsta-kvitto'
 import { harAktivtTeam } from '../lib/billing/aktiva-konton'
-import { harSkjutitUppBetalning, sammanstallTratt, type FunnelRow } from '../lib/onboarding/funnel'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
-test.describe('onboardingen', () => {
-  test('Step5Activate: sekundär knapp bakom onDefer, aldrig i demo, Stripe-vägen orörd', () => {
-    const src = read('app/onboarding/components/Step5Activate.tsx')
-    expect(src).toContain('onDefer?: () => void')
-    expect(src).toContain('{!isDemo && onDefer && (')
-    expect(src).toContain('Aktivera senare — betala när teamet bevisat sitt första resultat')
-    expect(src).toContain("fetch('/api/billing/onboarding-checkout'")
-    expect(src.match(/onClick=\{onDefer\}/g)?.length).toBe(1)
-  })
-
-  test('sidan stämplar activationDeferredAt, hoppar till steg 5 och sparar via PUT', () => {
-    const page = read('app/onboarding/page.tsx')
-    expect(page).toContain('const deferActivation = useCallback(async () => {')
-    expect(page).toMatch(/const activationDeferredAt = new Date\(\)\.toISOString\(\)[\s\S]*?setStep\(5\)[\s\S]*?saveProgress\(5, \{ \.\.\.sanitizeForSave\(data\), activationDeferredAt \}\)/)
-    expect(page).toContain('onDefer={deferActivation}')
-    expect(page.match(/<Step5Activate\b/g)?.length).toBe(1)
-    expect(read('app/onboarding/types-redesign.ts')).toContain('activationDeferredAt?: string')
-  })
-
-  test('tratten räknar "sköt upp betalning" utan ny kolumn', () => {
-    expect(harSkjutitUppBetalning({ activationDeferredAt: '2026-09-02T08:00:00.000Z' })).toBe(true)
-    expect(harSkjutitUppBetalning({ activationDeferredAt: 'igår' })).toBe(false)
-    expect(harSkjutitUppBetalning(null)).toBe(false)
-    const rad = (id: string, od: unknown): FunnelRow => ({
-      business_id: id, business_name: id, created_at: '2026-09-02T08:00:00.000Z', onboarding_step: 7,
-      onboarding_completed_at: '2026-09-02T09:00:00.000Z', subscription_status: 'trial', stripe_subscription_id: null, onboarding_data: od,
-    })
-    const { summering, foretag } = sammanstallTratt([rad('a', { activationDeferredAt: '2026-09-02T08:30:00.000Z' }), rad('b', {})])
-    expect(summering.skot_upp_betalning).toBe(1)
-    expect(foretag.find(f => f.business_id === 'a')!.skot_upp_betalning).toBe(true)
-    expect(read('app/admin/onboarding-funnel/page.tsx')).toContain("label: 'Sköt upp betalning'")
-  })
+test('Step5Activate: ingen väg förbi betalningen utanför demoläget', () => {
+  const src = read('app/onboarding/components/Step5Activate.tsx')
+  expect(src).not.toContain('onDefer')
+  expect(src).not.toContain('Aktivera senare')
+  expect(src).toContain("fetch('/api/billing/onboarding-checkout'")
+  expect(read('app/onboarding/page.tsx')).not.toContain('deferActivation')
 })
 
 test.describe('första värdekvittot', () => {

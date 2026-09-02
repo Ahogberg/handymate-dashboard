@@ -145,8 +145,6 @@ export interface FunnelSammanstallning {
   exkluderade_test: number
   klara: number
   betalande: number
-  /** Valde "Aktivera senare" i betalsteget (onboarding_data.activationDeferredAt). */
-  skot_upp_betalning: number
   steg: StegRad[]
   /** Median minuter från kontoskapande till finalize. */
   median_minuter_till_klar: number | null
@@ -164,16 +162,9 @@ export interface ForetagRad {
   max_steg_etikett: string
   klar: boolean
   betalande: boolean
-  skot_upp_betalning: boolean
   /** Minuter från kontoskapande till senaste kända händelse i tratten. */
   minuter_i_tratten: number | null
   har_tidsstamplar: boolean
-}
-
-/** Aktivera senare (2026-09-02): klienten stämplar activationDeferredAt i onboarding_data. */
-export function harSkjutitUppBetalning(onboardingData: unknown): boolean {
-  const v = (onboardingData as { activationDeferredAt?: unknown } | null | undefined)?.activationDeferredAt
-  return typeof v === 'string' && Number.isFinite(Date.parse(v))
 }
 
 function median(values: number[]): number | null {
@@ -222,7 +213,6 @@ export function beskrivForetag(row: FunnelRow, nowMs: number = Date.now()): Fore
     max_steg_etikett: maxSteg === 0 ? 'Intro' : STEG_ETIKETTER[maxSteg] ?? String(maxSteg),
     klar,
     betalande: Boolean(row.stripe_subscription_id) || row.subscription_status === 'active',
-    skot_upp_betalning: harSkjutitUppBetalning(row.onboarding_data),
     minuter_i_tratten: senaste ? minutesBetween(row.created_at, senaste) : (klar ? null : Math.round((nowMs - Date.parse(row.created_at)) / 60_000)),
     har_tidsstamplar: Boolean(funnel && Object.keys(funnel.reached).length > 0),
   }
@@ -289,7 +279,6 @@ export function sammanstallTratt(rows: FunnelRow[], nowMs: number = Date.now()):
       exkluderade_test: rows.length - riktiga.length,
       klara: riktigaBeskrivna.filter(f => f.klar).length,
       betalande: riktigaBeskrivna.filter(f => f.betalande).length,
-      skot_upp_betalning: riktigaBeskrivna.filter(f => f.skot_upp_betalning).length,
       steg,
       median_minuter_till_klar: median(tillKlar),
       per_variant,

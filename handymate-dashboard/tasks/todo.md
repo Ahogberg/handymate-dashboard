@@ -2,12 +2,13 @@
 
 Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
 
-## Punkt 1 — betalningen flyttad från steg 4 till efter första värdekvittot
-- [x] Step5Activate: sekundär knapp "Aktivera senare — betala när teamet
-      bevisat sitt första resultat" (inte i demo). Stripe-vägen orörd
-- [x] app/onboarding/page.tsx deferActivation: stämplar
-      onboarding_data.activationDeferredAt (ingen kolumn), hoppar till steg 5
-- [x] Tratten (lib/onboarding/funnel.ts + admin): "Sköt upp betalning"
+## Punkt 1 — betalfrågan förtjänt, men INGEN gratis prova-på
+- [x] ~~"Aktivera senare"-knapp förbi Stripe~~ ÅTERTAGEN 03:50: Andreas
+      vill uttryckligen inte ha en gratis prova-på-period (lockar folk som
+      signar upp och avbryter direkt). Kortet krävs i steg 4 som förut.
+      Förslag i chatten: Stripe-trial MED kort (trial_period_days 14,
+      payment_method_collection always) och debitering vid första
+      värdekvittot (trial_end now) — väntar på beslut
 - [x] lib/billing/forsta-kvitto.ts: första verifierade kvittot ur
       pending_approvals (RECEIPT_APPROVAL_TYPES + execution_result.outcome
       = success + buildValueReceipt). GET /api/billing → first_receipt;

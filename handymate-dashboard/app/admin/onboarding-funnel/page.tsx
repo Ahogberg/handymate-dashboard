@@ -20,7 +20,6 @@ interface Rapport {
     exkluderade_test: number
     klara: number
     betalande: number
-    skot_upp_betalning: number
     steg: StegRad[]
     median_minuter_till_klar: number | null
     per_variant: Array<{ variant: string; foretag: number; klara: number; steg: Array<{ steg: number; nadde: number }> }>
@@ -36,7 +35,6 @@ interface Rapport {
     max_steg_etikett: string
     klar: boolean
     betalande: boolean
-    skot_upp_betalning: boolean
     minuter_i_tratten: number | null
     har_tidsstamplar: boolean
   }>
@@ -135,12 +133,11 @@ export default function OnboardingFunnelPage() {
 
         {data && s && (
           <div className="space-y-8">
-            <section className="grid grid-cols-2 sm:grid-cols-6 gap-3">
+            <section className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               {[
                 { label: 'Nya konton', value: s.foretag },
                 { label: 'Klara', value: s.klara },
                 { label: 'Betalande', value: s.betalande },
-                { label: 'Sköt upp betalning', value: s.skot_upp_betalning ?? 0 },
                 { label: 'Median till klar', value: minuter(s.median_minuter_till_klar) },
                 { label: 'Testkonton dolda', value: s.exkluderade_test },
               ].map(k => (
@@ -268,7 +265,7 @@ export default function OnboardingFunnelPage() {
                         <td className="px-3 py-2 text-right tabular-nums">{minuter(f.minuter_i_tratten)}</td>
                         <td className="px-3 py-2">
                           {f.klar ? (
-                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Klar{f.betalande ? ' · betalande' : f.skot_upp_betalning ? ' · sköt upp betalning' : ''}</span>
+                            <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700">Klar{f.betalande ? ' · betalande' : ''}</span>
                           ) : (
                             <span className="inline-block px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800">Pågår</span>
                           )}

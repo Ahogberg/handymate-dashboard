@@ -84,14 +84,6 @@ const PLANS = [
 interface Step5Props {
   onNext: () => void
   onBack: () => void
-  /**
-   * Aktivera senare (2026-09-02): betalningen är inte längre en spärr.
-   * Ägaren kan gå vidare utan kort och blir tillfrågad igen när teamet
-   * bevisat sitt första resultat (BillingStatusBanner) — senast när
-   * provperioden går ut. Saknas propen (demo/äldre anropare) visas
-   * ingen sådan knapp.
-   */
-  onDefer?: () => void
   data: OnboardingFormData
   setData: (updater: (d: OnboardingFormData) => OnboardingFormData) => void
 }
@@ -104,7 +96,7 @@ interface Step5Props {
  * subscription_status:'trialing' utan att skapa någon Stripe-prenumeration →
  * kunden debiterades aldrig). Routes finns kvar orörda men anropas inte längre.
  */
-export default function Step5Activate({ onNext, onBack, onDefer, data, setData }: Step5Props) {
+export default function Step5Activate({ onNext, onBack, data, setData }: Step5Props) {
   // Demokontot: hoppa Stripe-checkouten helt (INGA Stripe-anrop) — knappen
   // går direkt vidare. Garantitexten/plan-vyn visas som vanligt (det ÄR
   // demon av steget). Icke-demo-vägen (handleSubmit nedan) är oförändrad.
@@ -463,26 +455,6 @@ export default function Step5Activate({ onNext, onBack, onDefer, data, setData }
                 Aktivera Handymate <ArrowRight size={18} />
               </>
             )}
-          </button>
-        )}
-        {!isDemo && onDefer && (
-          <button
-            type="button"
-            onClick={onDefer}
-            disabled={redirecting}
-            style={{
-              background: 'none',
-              border: 'none',
-              padding: '6px 0',
-              fontSize: 13,
-              fontWeight: 600,
-              color: 'var(--ob-teal, #0F766E)',
-              cursor: 'pointer',
-              textAlign: 'center',
-              width: '100%',
-            }}
-          >
-            Aktivera senare — betala när teamet bevisat sitt första resultat
           </button>
         )}
         <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ob-muted)' }}>
