@@ -53,6 +53,62 @@ export function buildScanRows(d: CompanyScanResult): ScanRow[] {
   if (d.pendingApprovalsCount > 0) {
     rows.push({ key: 'ko', text: `${fmt(d.pendingApprovalsCount)} sak${d.pendingApprovalsCount > 1 ? 'er' : ''} behöver din uppmärksamhet` })
   }
+  // Firmans egna uppgifter, sist: en ny firma utan import har inga rader ovan
+  // och fick tidigare "Inget att gå igenom än" — exakt ICP:n mötte alltså en
+  // tom genomgång precis innan betalfrågan.
+  rows.push(...buildProfileRows(d.profil))
+  return rows
+}
+
+/**
+ * Räknerader ur det kunden själv fyllde i under steg 2–3 (Etapp B5,
+ * 2026-09-02). Ingen AI, ren aritmetik på kundens egna tal, och samma
+ * ärlighetsregel som resten av skannen: en rad byggs bara när underlaget
+ * finns. Aldrig ett löfte om resultat — bara vad talen betyder.
+ */
+export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[] {
+  if (!profil) return []
+  const rows: ScanRow[] = []
+
+  const timpris = Number(profil.hourlyRate) || 0
+  if (timpris > 0) {
+    const personer = Math.max(1, Number(profil.employeeCount) || 1)
+    // En missad faktureringstimme i veckan, per person, på ett år.
+    const perAr = timpris * personer * 52
+    rows.push({
+      key: 'profil_timme',
+      agent: 'lars',
+      text:
+        personer > 1
+          ? `Med ${fmt(timpris)} kr/h och ${personer} personer motsvarar en missad faktureringstimme i veckan ${fmt(perAr)} kr på ett år`
+          : `Med ${fmt(timpris)} kr/h motsvarar en missad faktureringstimme i veckan ${fmt(perAr)} kr på ett år`,
+    })
+  }
+
+  const markup = Number(profil.materialMarkupPct) || 0
+  if (markup > 0) {
+    rows.push({
+      key: 'profil_pastag',
+      agent: 'daniel',
+      text: `Ditt materialpåslag på ${fmt(markup)} % räknas in i varje offert automatiskt`,
+    })
+  }
+
+  const tjanster = Number(profil.specialtyCount) || 0
+  if (tjanster > 0) {
+    rows.push({
+      key: 'profil_tjanster',
+      text: `${fmt(tjanster)} tjänst${tjanster > 1 ? 'er' : ''} du valt styr vad teamet föreslår i offerter och svar`,
+    })
+  }
+
+  if (profil.phoneNumber) {
+    rows.push({
+      key: 'profil_telefon',
+      text: `Lisa svarar på ${profil.phoneNumber} från dag ett`,
+    })
+  }
+
   return rows
 }
 
@@ -79,6 +135,14 @@ export function teamGorNarDuAktiverar(row: ScanRow): string | null {
       return 'Lars bevakar tid och marginal per projekt'
     case 'ko':
       return 'Allt samlas i en kö där du godkänner eller avvisar'
+    case 'profil_timme':
+      return 'Lars räknar tid mot marginal på varje jobb'
+    case 'profil_pastag':
+      return 'Daniel prissätter materialet efter din regel, inte på känsla'
+    case 'profil_tjanster':
+      return 'Teamet håller sig till det du faktiskt säljer'
+    case 'profil_telefon':
+      return 'Varje samtal blir en sammanfattning du kan agera på'
     default:
       return null
   }

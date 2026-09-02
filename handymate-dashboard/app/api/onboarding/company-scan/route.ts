@@ -46,6 +46,19 @@ export interface CompanyScanResult {
    * Hanna/Lisa, och den här raden i skannen är uttryckligen Karins rad.
    */
   karinHeadline: InstantHeadline | null
+  /**
+   * Firmans egna uppgifter ur steg 2–3 (Etapp B5, 2026-09-02). En ny firma
+   * utan import har inga fynd ovan och mötte tidigare en tom genomgång precis
+   * före betalfrågan — de här raderna är räknefrågor på kundens egna tal,
+   * ingen AI och inget löfte om resultat. Fältet kan saknas (äldre svar).
+   */
+  profil?: {
+    hourlyRate: number | null
+    employeeCount: number | null
+    materialMarkupPct: number | null
+    specialtyCount: number
+    phoneNumber: string | null
+  }
 }
 
 const STALE_QUOTE_DAYS = 5 // samma cadence som pengar-sidan (app/api/dashboard/pengar/route.ts)
@@ -63,7 +76,7 @@ export async function GET(request: NextRequest) {
   const businessId = business.business_id
   const staleGrans = new Date(Date.now() - STALE_QUOTE_DAYS * 86_400_000).toISOString()
 
-  const [invoicesRes, customerRes, projectsRes, quotesRes, pendingRes] = await Promise.all([
+  const [invoicesRes, customerRes, projectsRes, quotesRes, pendingRes, configRes] = await Promise.all([
     // Öppna fakturor (sent/overdue) — samma konvention som cash-radarn och
     // instant-value. Radernas total+status matas rakt in i computeInstantValue
     // nedan, som ger både antal och Karins ev. krona-fynd på samma gång.
@@ -97,6 +110,13 @@ export async function GET(request: NextRequest) {
       .select('id', { count: 'exact', head: true })
       .eq('business_id', businessId)
       .eq('status', 'pending'),
+    // Firmans egna uppgifter ur steg 2–3 (B5) — så en ny firma utan import
+    // ändå har något sant att gå igenom före betalfrågan.
+    supabase
+      .from('business_config')
+      .select('default_hourly_rate, employee_count, specialties, assigned_phone_number, pricing_settings')
+      .eq('business_id', businessId)
+      .maybeSingle(),
   ])
 
   // Ren beräkning, delad med onboardingens payoff — inga deals/stages här
@@ -112,6 +132,12 @@ export async function GET(request: NextRequest) {
   const quoteRows = quotesRes.data ?? []
   const staleQuotesCount = quoteRows.filter(q => q.sent_at && q.sent_at < staleGrans).length
 
+  // Materialpåslaget bor i pricing_settings-JSONB:n (se PUT /api/onboarding).
+  const cfg = configRes.data
+  const pricing = (cfg?.pricing_settings as Record<string, unknown> | null) || {}
+  const markup = Number(pricing.material_markup_pct)
+  const specialties = Array.isArray(cfg?.specialties) ? cfg.specialties : []
+
   const result: CompanyScanResult = {
     customerCount: instant.customer_count,
     // unpaid_count = fakturor med status IN ('sent','overdue') — exakt samma
@@ -122,6 +148,13 @@ export async function GET(request: NextRequest) {
     staleQuotesCount,
     pendingApprovalsCount: pendingRes.count ?? 0,
     karinHeadline: instant.headline.agent === 'Karin' ? instant.headline : null,
+    profil: {
+      hourlyRate: Number(cfg?.default_hourly_rate) || null,
+      employeeCount: Number(cfg?.employee_count) || null,
+      materialMarkupPct: Number.isFinite(markup) && markup > 0 ? markup : null,
+      specialtyCount: specialties.length,
+      phoneNumber: cfg?.assigned_phone_number || null,
+    },
   }
 
   return NextResponse.json(result)

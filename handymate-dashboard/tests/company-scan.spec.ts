@@ -10,11 +10,12 @@ import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import { buildScanRows } from '../components/tour/CompanyScan'
+import { teamGorNarDuAktiverar } from '../lib/onboarding/company-scan-rows'
 import type { CompanyScanResult } from '../app/api/onboarding/company-scan/route'
 import { fmt } from '../lib/onboarding/instant-value'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 const SCAN = 'components/tour/CompanyScan.tsx'
 const ROUTE = 'app/api/onboarding/company-scan/route.ts'
@@ -296,5 +297,76 @@ test.describe('första verifierade handlingen (2026-08-27) — skanningen slutar
     expect(hem).toContain("document.getElementById(`beslut-${forstaAtgardId}`)")
     // Saknas kortet i kön (routing/utgånget/testdata) släpps turen i stället för att vänta
     expect(hem).toContain('if (!approvals.some(a => a.id === forstaAtgardId)) { setForstaAtgardId(null); return }')
+  })
+})
+
+/**
+ * Genomgången för en NY firma (Etapp B5, 2026-09-02).
+ *
+ * StepGenomgang visade "Inget att gå igenom än" för varje firma utan Fortnox
+ * eller CSV — alltså exakt ICP:n, direkt före betalfrågan. Nu byggs rader ur
+ * det kunden själv fyllt i under steg 2–3: ren aritmetik på kundens egna tal,
+ * ingen AI, samma bara-sanna-rader-regel som resten av skannen.
+ */
+test.describe('B5 — firmans egna uppgifter ger rader utan import', () => {
+  const profil = (over: Partial<NonNullable<CompanyScanResult['profil']>> = {}) => ({
+    hourlyRate: null,
+    employeeCount: null,
+    materialMarkupPct: null,
+    specialtyCount: 0,
+    phoneNumber: null,
+    ...over,
+  })
+
+  test('ny firma utan import: minst två rader, alla sanna', () => {
+    const rader = buildScanRows({
+      ...tomtResultat(),
+      profil: profil({ hourlyRate: 650, employeeCount: 3, specialtyCount: 4, phoneNumber: '+46101234567' }),
+    })
+    expect(rader.length).toBeGreaterThanOrEqual(2)
+    expect(rader.map(r => r.key)).toEqual(['profil_timme', 'profil_tjanster', 'profil_telefon'])
+  })
+
+  test('timmen räknas på kundens egna tal: 650 kr/h × 3 personer × 52 veckor', () => {
+    const rader = buildScanRows({ ...tomtResultat(), profil: profil({ hourlyRate: 650, employeeCount: 3 }) })
+    expect(rader[0].text).toContain(fmt(650 * 3 * 52))
+    expect(rader[0].text).toContain('3 personer')
+    // Ensamföretagare: ingen personformulering, men samma aritmetik
+    const en = buildScanRows({ ...tomtResultat(), profil: profil({ hourlyRate: 650 }) })
+    expect(en[0].text).toContain(fmt(650 * 52))
+    expect(en[0].text).not.toContain('personer')
+  })
+
+  test('saknat underlag ger ingen rad — aldrig en påhittad siffra', () => {
+    expect(buildScanRows({ ...tomtResultat(), profil: profil() })).toHaveLength(0)
+    expect(buildScanRows({ ...tomtResultat(), profil: profil({ hourlyRate: 0, materialMarkupPct: 0 }) })).toHaveLength(0)
+    // Fältet kan saknas helt (äldre svar) utan att något kraschar
+    expect(buildScanRows(tomtResultat())).toHaveLength(0)
+  })
+
+  test('profilraderna ligger sist — riktiga fynd först', () => {
+    const rader = buildScanRows({
+      ...tomtResultat(),
+      customerCount: 12,
+      profil: profil({ hourlyRate: 700 }),
+    })
+    expect(rader.map(r => r.key)).toEqual(['kunder', 'profil_timme'])
+  })
+
+  test('varje profilrad har en "vad teamet gör"-mening', () => {
+    const rader = buildScanRows({
+      ...tomtResultat(),
+      profil: profil({ hourlyRate: 650, materialMarkupPct: 15, specialtyCount: 2, phoneNumber: '+46101234567' }),
+    })
+    for (const rad of rader) {
+      expect(teamGorNarDuAktiverar(rad), rad.key).toBeTruthy()
+    }
+  })
+
+  test('rutten läser firmans uppgifter och materialpåslaget ur pricing_settings', () => {
+    const s = read(ROUTE)
+    expect(s).toContain("select('default_hourly_rate, employee_count, specialties, assigned_phone_number, pricing_settings')")
+    expect(s).toContain('pricing.material_markup_pct')
+    expect(s).toContain('profil: {')
   })
 })
