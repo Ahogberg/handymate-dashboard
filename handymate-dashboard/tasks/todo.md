@@ -20,6 +20,42 @@ tasks/plan-kundminne-pass1.md. Byggt av Sonnet, granskat + verifierat här.
   före passet, ligger i nattsviten
 
 ---
+# Branschförståelse steg 1 — "laga ledningen" (Claude 2026-09-02)
+
+Andreas: "Kör steg 1 direkt." Pushad 496f20a3, auto-deployad. Inga migrationer.
+
+- [x] lib/branch: 15 bransch-ID:n + svensk etikett/yrke/företagsord + alias-
+      tabell (svenska namn, snickeri, vvs, hantverkare, prefix "Måleri AB");
+      resolveBusinessBranch (branch först, industry bara reserv), describeBranches
+- [x] lib/branch/trade-context: specialties[] + företagets jobbtyper → block
+      "## Bransch och inriktning" i agent-triggern, Matte-chatten, röstanalysen
+- [x] 12 AI-/prompt-ytor rewirade från `industry` ('hantverkare' på ALLA konton)
+      till `branch`; ingen gissar 'Bygg'/'hantverkare' längre (facit hittade
+      tre till i första körningen: approve-actions, e2e-deal-flow, kampanj-SMS)
+- [x] Biblioteken normaliserar via aliastabellen: produktbank, kunskap,
+      offertmallar, säsongsteman (plumber→vvs, "Måleri AB" är inte el),
+      SKV-kategori (mark→MarkDraneringarbete, allround gissas ALDRIG som Bygg)
+- [x] Facit tests/branschledningen.spec.ts; tsc 0, 306 gröna i regressionen
+
+## Kvar i programmet (omordnat av Andreas 2026-09-02 — INTE påbörjat)
+- Princip: en bransch exponeras i onboardingen FÖRST när den har källbelagt
+  startpaket + branschprompt. Ordningen är därför jobbtyper → paket → exponering.
+- [ ] Steg 4 (sist): exponera de branscher som fått paket (snickare/golv/hvac/
+      trädgård/låssmed/städ/flytt) i onboardingen, eller ta bort ur biblioteken;
+      mark/totalentreprenad saknar innehåll
+- [ ] Steg 3: branschpaket (Codex Branschbevis V1-form) + branschspecifika
+      systemprompter
+- [ ] Steg 2 (PÅGÅR): startpaket per bransch med VERKLIGA, källbelagda jobbtyper.
+      Andreas 2026-09-02: gör ALLA branscher FÖRST, granska sedan samlat — då
+      kan jobbtyper tas bort och ROT/RUT fastställas i ett svep, konsekvent
+      över branscher (samma jobbtyp återkommer i flera).
+      docs/bransch/: el.md KLAR (11 källor, 18 startpaket + 9 tillägg + 4 ute).
+      Sonnet-agenter kör vvs, bygg, snickeri, maleri, tak, mark, ventilation,
+      totalentreprenad, allround på samma mall. ALLA märkta OGRANSKAD tills
+      Andreas sagt sitt. Golv/trädgård/låssmed/städ/flytt: utanför scope.
+      Mall per fil: källhierarki myndighet → Skatteverket ROT/RUT → 5–7 riktiga
+      firmor; ≥3 källor = startpaket, 2 = tillägg, 1 = ute; ROT-kolumn
+      ROT/RUT/ROT*/Nej/? där bara SKV:s egen sida får ge ett ROT-påstående.
 
 # Nattpass 5: genomgången före betalningen (Claude + Sonnet-agent 2026-09-02)
 
