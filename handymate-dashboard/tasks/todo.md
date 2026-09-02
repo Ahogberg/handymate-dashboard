@@ -6,9 +6,9 @@ Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
 - [x] ~~"Aktivera senare"-knapp förbi Stripe~~ ÅTERTAGEN 03:50: Andreas
       vill uttryckligen inte ha en gratis prova-på-period (lockar folk som
       signar upp och avbryter direkt). Kortet krävs i steg 4 som förut.
-      Förslag i chatten: Stripe-trial MED kort (trial_period_days 14,
-      payment_method_collection always) och debitering vid första
-      värdekvittot (trial_end now) — väntar på beslut
+      BESLUT 04:05: ingen prova-på-period alls, inte heller med kort.
+      Modellen är betala direkt + resultatgaranti. Kvar av passet:
+      första kvittot i /api/billing, bannern som nu syns, aktiva-konton
 - [x] lib/billing/forsta-kvitto.ts: första verifierade kvittot ur
       pending_approvals (RECEIPT_APPROVAL_TYPES + execution_result.outcome
       = success + buildValueReceipt). GET /api/billing → first_receipt;
@@ -43,6 +43,10 @@ Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
       2a6eda7 "ta bort Firmans användartak"; var röd på main)
 
 ## Sparade beslut (Andreas 2026-09-02: "de två besluten kan vi ju spara ner")
+- INGEN prova-på-period, varken gratis eller med kort på fil. Betala
+  direkt + resultatgaranti. Skälet: en period där man kan klicka runt och
+  avbryta lockar oinvesterade konton. Bygg aldrig en trial-väg utan att
+  Andreas sagt det uttryckligen.
 - Tyst tid för push är konstant 21:00–07:00 svensk tid. Per-företag/
   per-person-inställning ("stör inte mellan …") byggs när någon ber om det.
 - lib/smart-communication.ts isQuietHours räknar på serverns UTC-klocka
