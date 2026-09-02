@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getPublishedJobbpassByToken, assembleJobbpassView } from '@/lib/jobbpass/jobbpass'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,11 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       return NextResponse.json({ error: 'Jobbpasset hittades inte' }, { status: 404 })
     }
 
-    return NextResponse.json({ jobbpass: view })
+    // "Skickat via Handymate"-stämpeln i sidfoten — en laddning per visning,
+    // fallback-säker (kastar aldrig, texten utan länk vid fel).
+    const attribution = await loadAttribution(supabase, jobbpass.business_id)
+
+    return NextResponse.json({ jobbpass: view, attribution })
   } catch (error) {
     console.error('[jobbpass/public] oväntat fel:', error)
     return NextResponse.json({ error: 'Jobbpasset kunde inte visas' }, { status: 500 })

@@ -413,6 +413,9 @@ export default function SettingsPage() {
   const [reviewRequestEnabled, setReviewRequestEnabled] = useState(true)
   const [reviewRequestDelayDays, setReviewRequestDelayDays] = useState(3)
   const [referralAskEnabled, setReferralAskEnabled] = useState(false)
+  // "Skickat via Handymate"-länken (sql/v202). Default true — även när kolumnen
+  // inte finns i databasen än (lib/branding/attribution.ts tolkar undefined som på).
+  const [attributionLinkEnabled, setAttributionLinkEnabled] = useState(true)
   const [reviewStats, setReviewStats] = useState({ sent: 0, clicked: 0 })
   const [quoteSignedEmailEnabled, setQuoteSignedEmailEnabled] = useState(true)
   const [savingReview, setSavingReview] = useState(false)
@@ -593,6 +596,7 @@ export default function SettingsPage() {
       setReviewRequestEnabled(data.review_request_enabled ?? true)
       setReviewRequestDelayDays(data.review_request_delay_days ?? 3)
       setReferralAskEnabled(data.referral_ask_enabled ?? false)
+      setAttributionLinkEnabled(data.attribution_link_enabled !== false)
 
       // Fetch quote signed email toggle from v3_automation_settings
       try {
@@ -1154,6 +1158,22 @@ export default function SettingsPage() {
         })
         .eq('business_id', business.business_id)
       if (error) throw error
+
+      // Egen update för attribution_link_enabled: kolumnen kommer med
+      // sql/v202 och finns inte i databasen förrän migrationen körts. Låg
+      // den i updaten ovan skulle en okörd migration fälla HELA sparningen
+      // — här sparas resten av kortet ändå, men toasten får inte påstå att
+      // länkvalet gick igenom när det inte gjorde det.
+      const { error: attributionError } = await supabase
+        .from('business_config')
+        .update({ attribution_link_enabled: attributionLinkEnabled })
+        .eq('business_id', business.business_id)
+      if (attributionError) {
+        console.warn('[settings] kunde inte spara attribution_link_enabled (är sql/v202 körd?):', attributionError.message)
+        showToast('Övrigt sparat, men valet för rekommendationslänken kunde inte sparas', 'error')
+        return
+      }
+
       showToast('Recensionsinställningar sparade', 'success')
     } catch {
       showToast('Kunde inte spara', 'error')
@@ -3297,6 +3317,19 @@ export default function SettingsPage() {
                     className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${referralAskEnabled ? 'bg-primary-800' : 'bg-gray-300'}`}
                   >
                     <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${referralAskEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between p-3 bg-gray-50 rounded-xl">
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">Rekommendationslänk i dokument och mejl</p>
+                    <p className="text-xs text-gray-400">Visar &apos;Skickat via Handymate&apos; med din rekommendationslänk längst ner i offerter, fakturor, kundportalen och mejl. Kollegor som startar via länken ger dig en månad gratis.</p>
+                  </div>
+                  <button
+                    onClick={() => setAttributionLinkEnabled(!attributionLinkEnabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${attributionLinkEnabled ? 'bg-primary-800' : 'bg-gray-300'}`}
+                  >
+                    <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${attributionLinkEnabled ? 'translate-x-6' : 'translate-x-1'}`} />
                   </button>
                 </div>
 

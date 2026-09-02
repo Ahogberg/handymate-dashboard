@@ -1,7 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { Gift, Copy, Check, Users, ArrowRight, MessageSquare } from 'lucide-react'
+import { Copy, Check, Users, MessageSquare, Settings } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 
@@ -22,7 +23,6 @@ export default function ReferralPage() {
   const business = useBusiness()
   const [data, setData] = useState<ReferralData | null>(null)
   const [referrals, setReferrals] = useState<ReferralEvent[]>([])
-  const [hasPendingDiscount, setHasPendingDiscount] = useState(false)
   const [copied, setCopied] = useState<'link' | 'sms' | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -45,20 +45,6 @@ export default function ReferralPage() {
             .order('created_at', { ascending: false })
 
           setReferrals(refs || [])
-
-          // Kolla pending rabatt
-          const { data: settings } = await supabase
-            .from('v3_automation_settings')
-            .select('referral_discount_pending')
-            .eq('business_id', business.business_id)
-            .single()
-
-          if (settings?.referral_discount_pending) {
-            const discount = settings.referral_discount_pending as { expires_at: string }
-            if (new Date(discount.expires_at) > new Date()) {
-              setHasPendingDiscount(true)
-            }
-          }
         }
       } catch (err) {
         console.error('Referral fetch failed:', err)
@@ -79,7 +65,7 @@ export default function ReferralPage() {
   const pendingCount = referrals.filter(r => r.status === 'pending').length
 
   const smsMessage = data
-    ? `Hej! Jag använder Handymate för att sköta mitt företags administration med AI. Prova gratis: ${data.referral_url}`
+    ? `Hej! Jag använder Handymate för offerter, fakturor och telefonen, det sköter sig självt. Kolla här: ${data.referral_url}`
     : ''
 
   if (loading) {
@@ -95,20 +81,9 @@ export default function ReferralPage() {
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Bjud in en vän</h1>
         <p className="text-slate-500 mt-1">
-          Dela din länk och få 50% rabatt på nästa månads faktura när din vän aktiverar sitt konto.
+          Dela din länk och få en månad gratis när din vän aktiverar sitt konto. Beloppet dras automatiskt på din nästa faktura.
         </p>
       </div>
-
-      {/* Pending rabatt */}
-      {hasPendingDiscount && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex items-center gap-3">
-          <Gift className="h-6 w-6 text-emerald-600 flex-shrink-0" />
-          <div>
-            <p className="font-semibold text-emerald-800">Du har en 50% rabatt på nästa faktura!</p>
-            <p className="text-sm text-emerald-600">Rabatten appliceras automatiskt.</p>
-          </div>
-        </div>
-      )}
 
       {/* Referrallänk */}
       {data && (
@@ -144,6 +119,17 @@ export default function ReferralPage() {
               {copied === 'sms' ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
               {copied === 'sms' ? 'Kopierad!' : 'Kopiera SMS-text'}
             </button>
+          </div>
+
+          {/* Stämpeln — länken följer redan med i allt som skickas */}
+          <div className="flex items-start gap-2 pt-3 border-t border-slate-100 text-sm text-slate-600">
+            <Settings className="h-4 w-4 text-slate-400 flex-shrink-0 mt-0.5" />
+            <p>
+              Din länk finns redan i botten på varje offert, faktura och kundmejl du skickar — och i kundportalen.{' '}
+              <Link href="/dashboard/settings?tab=integrations" className="text-primary-700 hover:text-primary-800 font-medium">
+                Slå av eller på i Inställningar
+              </Link>
+            </p>
           </div>
         </div>
       )}
@@ -197,8 +183,8 @@ export default function ReferralPage() {
         <div className="space-y-3">
           {[
             'Dela din unika länk med en vän',
-            'Din vän registrerar sig och provar Handymate',
-            'När din vän aktiverar sin prenumeration får du 50% rabatt på nästa faktura',
+            'Din vän registrerar sig och kommer igång med Handymate',
+            'När din vän aktiverar sin prenumeration får du en månad gratis, dragen på din nästa faktura',
           ].map((step, i) => (
             <div key={i} className="flex items-start gap-3">
               <div className="flex-shrink-0 w-6 h-6 bg-primary-100 text-primary-700 rounded-full flex items-center justify-center text-xs font-bold">

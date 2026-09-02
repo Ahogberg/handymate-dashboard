@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkFeatureAccess } from '@/lib/auth'
+import { buildAttribution } from '@/lib/branding/attribution'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
@@ -81,6 +82,9 @@ export async function GET(request: NextRequest) {
     give_estimates: config.widget_give_estimates !== false,
     quick_questions: config.widget_quick_questions || ['Vad kostar renovering?', 'Vilka tjänster har ni?', 'Boka en tid'],
     logo_url: config.logo_url || null,
+    // "Skickat via Handymate"-stämpeln under chattfältet — hela raden är i
+    // scope (select('*')), så ingen extra query.
+    attribution: buildAttribution(config),
   }, { headers: CORS_HEADERS })
 }
 

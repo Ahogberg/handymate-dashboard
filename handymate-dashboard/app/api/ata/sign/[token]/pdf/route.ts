@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { generateAtaPDF } from '@/lib/ata/pdf'
 import { laddaAtaPdfKontext, pdfSvar } from '@/lib/ata/pdf-data'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -35,7 +36,10 @@ export async function GET(
     }
 
     const kontext = await laddaAtaPdfKontext(supabase, ata)
-    const pdf = await generateAtaPDF({ ata, ...kontext })
+    // Stämpeln: publik väg utan business_config-raden i scope — helperns
+    // egen fallback-säkra query (kastar aldrig).
+    const attribution = await loadAttribution(supabase, ata.business_id)
+    const pdf = await generateAtaPDF({ ata, ...kontext, attribution })
     return pdfSvar(pdf, ata.ata_number)
   } catch (error: any) {
     console.error('GET /api/ata/sign/[token]/pdf error:', error?.message)

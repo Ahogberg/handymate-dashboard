@@ -127,7 +127,7 @@ export async function sendMorningReport(businessId: string): Promise<{
 
           message += hasConverted
             ? `\nDina kollegor du bjudit in sparar tid med Handymate. Känner du fler? ${referralUrl}\n`
-            : `\nTips: Bjud in en kollega och få 50% rabatt på nästa månads faktura: ${referralUrl}\n`
+            : `\nTips: Bjud in en kollega och få en månad gratis när hen aktiverar: ${referralUrl}\n`
 
           // Uppdatera reminder-spårning
           if (settings) {

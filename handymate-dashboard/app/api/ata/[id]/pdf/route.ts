@@ -4,6 +4,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { generateAtaPDF } from '@/lib/ata/pdf'
 import { laddaAtaPdfKontext, pdfSvar } from '@/lib/ata/pdf-data'
+import { buildAttribution } from '@/lib/branding/attribution'
 
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags dokument
@@ -46,7 +47,8 @@ export async function GET(
     }
 
     const kontext = await laddaAtaPdfKontext(supabase, ata)
-    const pdf = await generateAtaPDF({ ata, ...kontext })
+    // Stämpeln: `business` är hela business_config-raden — bygg direkt.
+    const pdf = await generateAtaPDF({ ata, ...kontext, attribution: buildAttribution(business) })
     return pdfSvar(pdf, ata.ata_number)
   } catch (error: any) {
     console.error('GET /api/ata/[id]/pdf error:', error)

@@ -767,12 +767,18 @@ async function sendNurtureEmail(params: {
   try {
     const { sendEmail } = await import('@/lib/email')
     const { nurtureStepEmail } = await import('@/lib/email-templates')
+    const { loadAttribution } = await import('@/lib/branding/attribution')
+
+    // Stämpeln med rekommendationslänk — en felisolerad query per utskick
+    // (business-selecten i processNurtureStep är en explicit kolumnlista).
+    const attribution = await loadAttribution(getServerSupabase(), params.businessId)
 
     const { html } = nurtureStepEmail({
       branding: {
         businessName: params.businessName,
         contactEmail: params.contactEmail,
         orgNumber: params.orgNumber,
+        attribution,
       },
       subject: params.subject,
       message: params.message,

@@ -5,6 +5,7 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 /**
  * POST - Auto-generera fakturor från ofakturerade tidrapporter.
@@ -94,6 +95,9 @@ async function generateInvoicesForBusiness(params: {
   if (!business) {
     return { ...result, success: false, errors: ['Business not found'] }
   }
+
+  // Stämpeln i auto-sända mejl — laddas EN gång före kundloopen, aldrig i den.
+  const attribution = params.autoSend ? await loadAttribution(supabase, params.businessId) : null
 
   // Get all unbilled, billable time entries
   let query = supabase
@@ -313,6 +317,7 @@ async function generateInvoicesForBusiness(params: {
               businessName: business.business_name || 'Handymate',
               contactEmail: business.contact_email,
               orgNumber: business.org_number,
+              attribution: attribution ?? undefined,
             },
             customerName,
             invoiceNumber,

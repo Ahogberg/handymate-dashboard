@@ -5,6 +5,8 @@ import { useParams } from 'next/navigation'
 import { Loader2, AlertTriangle } from 'lucide-react'
 import type { JobbpassCustomerView } from '@/lib/jobbpass/jobbpass'
 import { JobbpassView } from '@/components/jobbpass/JobbpassView'
+import type { Attribution } from '@/lib/branding/attribution'
+import AttributionStamp from '@/components/branding/AttributionStamp'
 
 /**
  * Publik jobbpass-portal (Etapp Ä, Closeout-to-Lifetime). Samma
@@ -25,6 +27,7 @@ export default function JobbpassPage() {
   const [state, setState] = useState<PageState>('loading')
   const [errorMessage, setErrorMessage] = useState('')
   const [pass, setPass] = useState<JobbpassCustomerView | null>(null)
+  const [attribution, setAttribution] = useState<Attribution | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -37,6 +40,7 @@ export default function JobbpassPage() {
           return
         }
         setPass(data.jobbpass)
+        setAttribution(data.attribution || null)
         setState('ready')
       } catch {
         setErrorMessage('Kunde inte hämta jobbpasset. Försök igen senare.')
@@ -100,9 +104,7 @@ export default function JobbpassPage() {
 
         <JobbpassView pass={pass} />
 
-        <p className="text-center text-xs text-gray-400 pb-8">
-          Drivs av <span className="text-primary-700 font-medium">Handymate</span>
-        </p>
+        <AttributionStamp attribution={attribution} className="text-center text-xs text-gray-400 pb-8" linkClassName="font-medium" />
       </div>
     </div>
   )

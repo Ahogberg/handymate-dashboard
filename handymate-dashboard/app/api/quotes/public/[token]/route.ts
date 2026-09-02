@@ -12,6 +12,7 @@ import { stripPrintBar } from '@/lib/document-html'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { signAttachmentList } from '@/lib/storage-signing'
 import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
+import { loadAttribution } from '@/lib/branding/attribution'
 
 /** Frågor + bokningsönskemål per offertlänk och timme (tenant-svepet 2026-09-01). */
 const QUOTE_PUBLIC_ACTION_MAX_PER_HOUR = 10
@@ -211,12 +212,17 @@ export async function GET(
     )
 
     const creator = await fetchQuoteCreator(supabase, quote.created_by)
+    // Stämpeln: QUOTE_SURFACE_BUSINESS_SELECT är en kolumnlista som inte får
+    // utökas med attribution_link_enabled före sql/v202 — helperns egen
+    // fallback-säkra query istället (kastar aldrig).
+    const attribution = await loadAttribution(supabase, quote.business_id)
     const templateStyle = (quote.template_style || business?.quote_template_style || 'modern') as
       | 'modern' | 'premium' | 'friendly'
     let publicTemplateData: ReturnType<typeof buildQuoteTemplateData> | null = null
     let documentHtml: string | null = null
     try {
       const templateData = buildQuoteTemplateData(quote, business, business, creator)
+      templateData.attribution = attribution
       // Signatur-CTA: data-builder sätter alltid 'hidden' (PDF/förhands-
       // granskning ska förbli oförändrade) — den publika kundvyn är den ENDA
       // ytan som ska visa den, som 'active' (ej signerad) eller 'signed'.
@@ -264,6 +270,9 @@ export async function GET(
       // två-tre offerter — vår ska vara den enda som visar hur det blev.
       // null när det inte finns något att visa; aldrig ett tomt block.
       reference_photos: referencePhotos,
+      // Samma stämpel som i dokumentet, för sidans egen fotrad
+      // (components/branding/AttributionStamp.tsx) — laddad en gång ovan.
+      attribution,
     })
 
   } catch (error: any) {

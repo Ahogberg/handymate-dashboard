@@ -15,6 +15,7 @@
  * optionSelected är helt enkelt outnyttjade på fakturasidan (harmlöst).
  */
 import type { QuoteTemplateItem, QuoteTemplateItemType } from '@/lib/quote-templates/types'
+import type { Attribution } from '@/lib/branding/attribution'
 
 export type InvoiceTemplateItemType = Exclude<QuoteTemplateItemType, 'option'>
 export type InvoiceTemplateItem = QuoteTemplateItem
@@ -122,6 +123,9 @@ export interface InvoiceTemplateData {
   customer: InvoiceTemplateCustomer
   invoice: InvoiceTemplateInvoice
   swishQrDataUrl?: string | null  // base64 QR från /lib/swish-qr
+  /** Handymate-stämpeln (lib/branding/attribution.ts) — sist
+      på sista sidan i alla mallar. Utelämnad → texten utan länk. */
+  attribution?: Attribution
 }
 
 export type InvoiceTemplateStyle = 'modern' | 'premium' | 'friendly'

@@ -41,6 +41,7 @@ import { randomUUID } from 'crypto'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
+import { buildAttribution, attributionEmailHtml, type Attribution } from '@/lib/branding/attribution'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -260,7 +261,9 @@ export async function sendInvoice(
             swish_number: businessConfig?.swish_number,
             swish_qr: swishQR || undefined,
             f_skatt_registered: businessConfig?.f_skatt_registered,
-          }
+          },
+          // businessConfig är hela raden (select('*')) — stämpeln byggs direkt.
+          { attribution: buildAttribution(businessConfig) },
         )
       }
 
@@ -305,6 +308,8 @@ export async function sendInvoice(
           contactPhone: businessConfig?.contact_phone,
           portalUrl: portalUrl || pdfUrl,
           pdfUrl,
+          // businessConfig är hela raden (select('*')) → ingen extra query.
+          attribution: buildAttribution(businessConfig),
         }),
         attachments: [
           {
@@ -613,6 +618,8 @@ function buildInvoiceEmailHtml(opts: {
   contactPhone?: string | null
   portalUrl: string
   pdfUrl: string
+  /** Handymate-stämpeln i foten (lib/branding/attribution.ts). */
+  attribution: Attribution
 }): string {
   const firstName = opts.customerName.split(' ')[0] || 'Kund'
 
@@ -723,6 +730,7 @@ function buildInvoiceEmailHtml(opts: {
         ${[opts.contactEmail, opts.contactPhone].filter(Boolean).join(' · ')}
       </p>
     </div>
+    ${attributionEmailHtml(opts.attribution)}
   </div>
 </body>
 </html>`

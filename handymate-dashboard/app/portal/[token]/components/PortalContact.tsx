@@ -367,7 +367,7 @@ export default function PortalContact({ portal, onChat }: PortalContactProps) {
           </div>
         )}
 
-        <PortalHandymateAttribution />
+        <PortalHandymateAttribution attribution={portal.attribution} />
       </div>
     </>
   )

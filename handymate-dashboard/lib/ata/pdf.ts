@@ -21,6 +21,7 @@ import autoTable from 'jspdf-autotable'
 import { normaliseraAtaRader, ataRadNamn } from './items'
 import { beraknaAtaSummor } from './totals'
 import { ataStatusLabel, ataTypLabel } from './labels'
+import { buildAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
 
 const ACCENT_RGB = [15, 118, 110] as const
 const TEXT_PRIMARY = [30, 41, 59] as const
@@ -80,6 +81,8 @@ export interface GenerateAtaPdfInput {
   customer: AtaPdfCustomer | null
   project: AtaPdfProject | null
   attachments: AtaPdfBilaga[]
+  /** Handymate-stämpeln (lib/branding/attribution.ts). Utelämnad → texten utan länk. */
+  attribution?: Attribution
 }
 
 // sv-SE ger smalt hårt mellanslag (U+202F) som tusentalsavgränsare — det
@@ -454,6 +457,9 @@ export async function generateAtaPDF(input: GenerateAtaPdfInput): Promise<Buffer
       { align: 'center' },
     )
   }
+
+  // Stämpeln — bara sista sidan, under sidfoten.
+  stampAttributionOnPdf(doc, input.attribution ?? buildAttribution(null))
 
   return Buffer.from(doc.output('arraybuffer'))
 }
