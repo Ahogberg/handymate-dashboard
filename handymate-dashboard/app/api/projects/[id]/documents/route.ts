@@ -23,6 +23,8 @@ export async function GET(
     const supabase = getServerSupabase()
     const projectId = params.id
     const category = request.nextUrl.searchParams.get('category')
+    // ÄTA-bilagor (v195): ?change_id= listar bara dokument kopplade till en ÄTA.
+    const changeId = request.nextUrl.searchParams.get('change_id')
 
     let query = supabase
       .from('project_document')
@@ -33,6 +35,9 @@ export async function GET(
 
     if (category && category !== 'all') {
       query = query.eq('category', category)
+    }
+    if (changeId) {
+      query = query.eq('change_id', changeId)
     }
 
     const { data: documents, error } = await query
@@ -82,7 +87,25 @@ export async function POST(
     }
 
     const file = formData.get('file') as File | null
-    const category = (formData.get('category') as string) || 'other'
+    // Valfritt: koppla dokumentet till en ÄTA (v195). ÄTA:n måste tillhöra
+    // samma företag OCH projekt — annars kan en klient hänga bilagor på
+    // någon annans tilläggsarbete. Kategorin tvingas till 'ata'.
+    const rawChangeId = formData.get('change_id')
+    const changeId = typeof rawChangeId === 'string' && rawChangeId.trim() ? rawChangeId.trim() : null
+    const category = changeId ? 'ata' : ((formData.get('category') as string) || 'other')
+
+    if (changeId) {
+      const { data: ata } = await supabase
+        .from('project_change')
+        .select('change_id')
+        .eq('change_id', changeId)
+        .eq('business_id', business.business_id)
+        .eq('project_id', projectId)
+        .maybeSingle()
+      if (!ata) {
+        return NextResponse.json({ error: 'ÄTA:n hittades inte på det här projektet' }, { status: 404 })
+      }
+    }
 
     if (!file) {
       console.error('[projects/documents] Ingen fil i FormData', { project_id: projectId, category })
@@ -100,7 +123,9 @@ export async function POST(
 
     const timestamp = Date.now()
     const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
-    const filePath = `${business.business_id}/${projectId}/${timestamp}_${safeName}`
+    const filePath = changeId
+      ? `${business.business_id}/${projectId}/ata/${changeId}/${timestamp}_${safeName}`
+      : `${business.business_id}/${projectId}/${timestamp}_${safeName}`
 
     // Konvertera till Buffer — kritiskt för server-side Supabase upload
     let buffer: Buffer
@@ -160,6 +185,7 @@ export async function POST(
         file_size: file.size,
         mime_type: file.type || null,
         category,
+        ...(changeId ? { change_id: changeId } : {}),
       })
       .select()
       .single()

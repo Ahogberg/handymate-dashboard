@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   CheckCircle,
   FileSignature,
+  FileText,
   Hammer,
   Loader2,
   PenTool,
@@ -17,7 +18,8 @@ import SignatureCanvas, {
   type SignatureCanvasHandle,
 } from './SignatureCanvas'
 import { formatCurrency, formatDate } from '../helpers'
-import type { PortalReport, Project } from '../types'
+import type { PortalAta, PortalReport, Project } from '../types'
+import { ataKundStatusLabel, ataTypLabel } from '@/lib/ata/labels'
 
 interface PortalProjectDetailProps {
   project: Project
@@ -412,18 +414,22 @@ export default function PortalProjectDetail({
                         ÄTA-{ata.ata_number}: {ata.description}
                       </div>
                       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                        {ata.change_type === 'addition' ? 'Tillägg' : ata.change_type === 'change' ? 'Ändring' : 'Avgående'}
-                        {ata.total > 0 && ` · ${formatCurrency(ata.total)}`}
+                        {ataTypLabel(ata.change_type)}
+                        {ata.sent_at ? ` · skickad ${formatDate(ata.sent_at)}` : ''}
                       </div>
                     </div>
+                    {/* Etiketten kommer från backend (lib/ata/labels.ts) — aldrig rå status.
+                        Optimistiskt signerad → samma ord som backend skulle ge. */}
                     <span
                       className={`bp-badge ${
                         effectiveStatus(ata) === 'signed' ? 'green' : effectiveStatus(ata) === 'sent' ? 'amber' : 'gray'
                       }`}
                     >
-                      {effectiveStatus(ata) === 'signed' ? 'Signerad' : effectiveStatus(ata) === 'sent' ? 'Att signera' : ata.status}
+                      {recentlySigned.has(ata.change_id) ? ataKundStatusLabel('signed') : (ata.status_label || ataKundStatusLabel(ata.status))}
                     </span>
                   </div>
+
+                  <AtaRaderOchSummor ata={ata} />
 
                   {(() => {
                     const optimistic = recentlySigned.get(ata.change_id)
@@ -545,5 +551,98 @@ export default function PortalProjectDetail({
         />
       )}
     </>
+  )
+}
+
+/**
+ * ÄTA-dokumentet i portalen: rader, moms, ROT-avdrag och PDF-länk.
+ * Summorna räknas av backend (lib/ata/totals.ts) — samma siffror som i
+ * PDF:en och på fakturan. Avgående ÄTA visas med minus.
+ */
+function AtaRaderOchSummor({ ata }: { ata: PortalAta }) {
+  const rader = Array.isArray(ata.items) ? ata.items : []
+  const s = ata.summor
+  const rad = (label: string, belopp: number, opts?: { fet?: boolean; grön?: boolean }) => (
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        gap: 8,
+        fontSize: opts?.fet ? 14 : 12,
+        fontWeight: opts?.fet ? 700 : 400,
+        color: opts?.grön ? 'var(--green-600)' : opts?.fet ? 'var(--ink)' : 'var(--ink-2)',
+      }}
+    >
+      <span>{label}</span>
+      <span style={{ fontVariantNumeric: 'tabular-nums' }}>{formatCurrency(Math.round(belopp))}</span>
+    </div>
+  )
+
+  return (
+    <div style={{ marginTop: 6 }}>
+      {rader.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+            <thead>
+              <tr style={{ color: 'var(--muted)', textAlign: 'left' }}>
+                <th style={{ fontWeight: 500, padding: '4px 0' }}>Benämning</th>
+                <th style={{ fontWeight: 500, padding: '4px 0', textAlign: 'right', whiteSpace: 'nowrap' }}>Antal</th>
+                <th style={{ fontWeight: 500, padding: '4px 0', textAlign: 'right', whiteSpace: 'nowrap' }}>Summa</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rader.map((r, i) => (
+                <tr key={i} style={{ borderTop: '1px solid var(--border)' }}>
+                  <td style={{ padding: '6px 8px 6px 0', color: 'var(--ink)' }}>{r.name}</td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--ink-2)', fontVariantNumeric: 'tabular-nums' }}>
+                    {r.quantity} {r.unit}
+                  </td>
+                  <td style={{ padding: '6px 0', textAlign: 'right', whiteSpace: 'nowrap', color: 'var(--ink)', fontVariantNumeric: 'tabular-nums' }}>
+                    {formatCurrency(Math.round(r.quantity * r.unit_price))}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {s && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, marginTop: 8, paddingTop: 8, borderTop: '1px solid var(--border)' }}>
+          {rad('Delsumma', s.delsumma)}
+          {rad(`Moms ${ata.vat_rate} %`, s.moms)}
+          {rad('Totalt inkl. moms', s.totalt, { fet: !s.rotTyp })}
+          {s.rotTyp && s.rotAvdrag > 0 && (
+            <>
+              {rad(`${s.rotTyp === 'rot' ? 'ROT' : 'RUT'}-avdrag (prel.)`, -s.rotAvdrag, { grön: true })}
+              {rad('Att betala', s.attBetala, { fet: true })}
+              <div style={{ fontSize: 11, color: 'var(--muted)' }}>
+                Avdraget är preliminärt och förutsätter att Skatteverket godkänner det.
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {ata.pdf_url && (
+        <a
+          href={ata.pdf_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            marginTop: 10,
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--bee-700)',
+            textDecoration: 'none',
+          }}
+        >
+          <FileText size={14} /> Öppna ÄTA-dokumentet (PDF)
+        </a>
+      )}
+    </div>
   )
 }

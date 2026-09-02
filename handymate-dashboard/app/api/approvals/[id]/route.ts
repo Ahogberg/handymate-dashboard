@@ -1900,6 +1900,10 @@ async function executeApprovalPayload(
         // som reserv när projekt saknas (t.ex. mötesfynd före projektstart).
         if (pl.project_id) {
           const ataItems = quoteItems.map((qi: any) => ({
+            // ÄTA-raden heter `name` i AtaItem-formen (projektsidan, PDF:en,
+            // fakturavägarna). Tidigare skrevs bara `description` → raderna
+            // blev namnlösa i UI:t och ChangeModal droppade dem (total 0).
+            name: qi.description || qi.name || 'Arbete',
             description: qi.description || qi.name || 'Arbete',
             quantity: qi.quantity ?? 1,
             unit: qi.unit || 'st',

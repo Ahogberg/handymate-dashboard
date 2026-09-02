@@ -3,7 +3,12 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
-import { randomUUID } from 'crypto'
+import { skapaAta } from '@/lib/ata/create-ata'
+
+// Auth via request.headers i importerad helper — utan force-dynamic kan
+// GET frysas i Full Route Cache och servera fel företags ÄTA (2026-08-22-
+// klassen, se CLAUDE.md).
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/ata?projectId=xxx — Lista ÄTA för ett projekt
@@ -60,7 +65,7 @@ export async function POST(request: NextRequest) {
     const { projectId, changeType, description, items, notes, customerId } = body
 
     if (!projectId || !description || !changeType) {
-      return NextResponse.json({ error: 'projectId, description och changeType krävs' }, { status: 400 })
+      return NextResponse.json({ error: 'Projekt, beskrivning och typ av ändring krävs' }, { status: 400 })
     }
 
     // Både projekt och valfri kund kommer från request-body. Service role
@@ -86,39 +91,23 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Calculate total from items if provided
-    const parsedItems = Array.isArray(items) ? items : []
-    const total = parsedItems.reduce((sum: number, item: any) => {
-      return sum + ((item.quantity || 0) * (item.unit_price || 0))
-    }, 0)
+    // Delad skapande-väg (lib/ata/create-ata.ts): sign_token, normaliserade
+    // rader, total, fryst vat_rate, status 'draft'. ata_number sätts av
+    // DB-triggern per projekt.
+    const resultat = await skapaAta(supabase, business, {
+      projectId,
+      changeType,
+      description,
+      items,
+      hours: body.hours,
+      notes,
+      customerId,
+    })
+    if (!resultat.ok) {
+      return NextResponse.json({ error: resultat.error }, { status: resultat.status })
+    }
 
-    // Also calculate legacy amount field for backwards compat
-    const amount = changeType === 'removal' ? -Math.abs(total) : Math.abs(total)
-
-    const signToken = randomUUID()
-
-    const { data, error } = await supabase
-      .from('project_change')
-      .insert({
-        business_id: business.business_id,
-        project_id: projectId,
-        change_type: changeType,
-        description,
-        items: parsedItems,
-        total,
-        amount: Math.abs(total),
-        hours: body.hours || 0,
-        status: 'draft',
-        sign_token: signToken,
-        notes: notes || null,
-        customer_id: customerId || null,
-      })
-      .select()
-      .single()
-
-    if (error) throw error
-
-    return NextResponse.json({ ata: data })
+    return NextResponse.json({ ata: resultat.ata })
   } catch (error: any) {
     console.error('POST /api/ata error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

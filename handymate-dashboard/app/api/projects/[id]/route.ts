@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
+import { arAvtaladAta } from '@/lib/ata/lifecycle'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -122,14 +123,16 @@ export async function GET(
         return sum + (hours * (e.hourly_rate || 0))
       }, 0)
 
-    // Compute ÄTA summary
-    const approvedChanges = (changes || []).filter((c: any) => c.status === 'approved')
+    // Compute ÄTA summary — arAvtaladAta (lib/ata/lifecycle.ts) är EN sanning
+    // för "avtalad ÄTA" i stället för denna rutts egen 'approved'-definition
+    // (projektauditen 2026-09-02: tre olika definitioner i ekonomin).
+    const approvedChanges = (changes || []).filter((c: any) => arAvtaladAta(c.status))
     const ataAdditions = approvedChanges
       .filter((c: any) => c.change_type === 'addition' || c.change_type === 'change')
-      .reduce((sum: number, c: any) => sum + (c.amount || 0), 0)
+      .reduce((sum: number, c: any) => sum + (c.total ?? c.amount ?? 0), 0)
     const ataRemovals = approvedChanges
       .filter((c: any) => c.change_type === 'removal')
-      .reduce((sum: number, c: any) => sum + Math.abs(c.amount || 0), 0)
+      .reduce((sum: number, c: any) => sum + Math.abs(c.total ?? c.amount ?? 0), 0)
     const ataHours = approvedChanges.reduce((sum: number, c: any) => sum + (c.hours || 0), 0)
 
     // Compute material summary

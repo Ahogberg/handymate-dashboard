@@ -56,6 +56,22 @@ export function isAtaEditable(status: string | null | undefined): boolean {
   return status === 'draft' || status === 'pending'
 }
 
+/**
+ * Statusar som räknas som avtalade i projektekonomin (kunden/hantverkaren
+ * har sagt ja) — EN sanning i stället för tre spridda definitioner
+ * (projektauditen 2026-09-02): /api/projects/[id] räknade bara 'approved',
+ * compute-economics.ts räknade signed/invoiced, fakturavägarna approved|signed.
+ */
+export const ATA_AVTALADE_STATUSAR = ['approved', 'signed', 'invoiced'] as const
+
+/** Statusar som får hämtas in på en faktura (ännu inte fakturerade). */
+export const ATA_FAKTURERBARA_STATUSAR = ['approved', 'signed'] as const
+
+/** Räknas ÄTA:n som avtalad i projektekonomin? */
+export function arAvtaladAta(status: string | null | undefined): boolean {
+  return !!status && (ATA_AVTALADE_STATUSAR as readonly string[]).includes(status)
+}
+
 /** Svenskt besked när övergången nekas — landar i hantverkarens gränssnitt. */
 export function ataTransitionError(from: string | null | undefined, to: string): string {
   if (from === 'invoiced') {

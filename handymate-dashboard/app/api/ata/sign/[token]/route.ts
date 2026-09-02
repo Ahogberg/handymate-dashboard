@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { canTransitionAta, ataTransitionError } from '@/lib/ata/lifecycle'
+import { normaliseraAtaRader } from '@/lib/ata/items'
+import { beraknaAtaSummor } from '@/lib/ata/totals'
+import { signStorageUrl } from '@/lib/storage-signing'
 
 export const dynamic = 'force-dynamic'
+
+const BILAGE_BUCKET = 'project-files'
 
 /**
  * GET /api/ata/sign/[token] — Hämta ÄTA via publik signeringslänk (ingen auth)
@@ -59,19 +65,45 @@ export async function GET(
 
     const alreadySigned = ata.status === 'signed' && ata.signed_at
 
+    // Dokumentet (v195): rader normaliserade, summor med moms/ROT, bilagor
+    // signerade vid läsning (bucketen är privat).
+    const vatRate = Number(ata.vat_rate ?? 25)
+    const items = normaliseraAtaRader(ata.items)
+    const summor = beraknaAtaSummor(items, vatRate, ata.change_type)
+
+    const { data: bilagor } = await supabase
+      .from('project_document')
+      .select('id, name, file_path, mime_type, created_at')
+      .eq('change_id', ata.change_id)
+      .eq('business_id', ata.business_id)
+      .order('created_at', { ascending: true })
+    const attachments = await Promise.all((bilagor || []).map(async (d: any) => ({
+      id: d.id,
+      name: d.name,
+      mime_type: d.mime_type,
+      url: d.file_path ? await signStorageUrl(supabase, BILAGE_BUCKET, d.file_path, 3600) : null,
+    })))
+
     return NextResponse.json({
       ata: {
         change_id: ata.change_id,
         ata_number: ata.ata_number,
         change_type: ata.change_type,
         description: ata.description,
-        items: ata.items || [],
+        items,
         total: ata.total,
+        vat_rate: vatRate,
         status: ata.status,
         signed_at: ata.signed_at,
         signed_by_name: ata.signed_by_name,
         created_at: ata.created_at,
+        sent_at: ata.sent_at,
       },
+      summor,
+      attachments: attachments.filter(a => a.url),
+      pdf_url: ['sent', 'signed', 'approved', 'invoiced'].includes(ata.status)
+        ? `/api/ata/sign/${token}/pdf`
+        : null,
       project: {
         name: (project as any)?.name || '',
         customer: (project as any)?.customer || null,
@@ -122,6 +154,19 @@ export async function POST(
 
     if (ata.status === 'declined') {
       return NextResponse.json({ error: 'ÄTA är redan avböjd' }, { status: 400 })
+    }
+
+    // Livscykeln gäller även för kunden: bara en SKICKAD ÄTA kan signeras
+    // eller avböjas. Tidigare kunde ett utkast signeras via länken innan
+    // hantverkaren ens skickat det (status draft → signed).
+    const malStatus = action === 'decline' ? 'declined' : 'signed'
+    if (!canTransitionAta(ata.status, malStatus)) {
+      return NextResponse.json(
+        { error: ata.status === 'draft' || ata.status === 'pending'
+          ? 'ÄTA:n är inte skickad än — hantverkaren måste skicka den först'
+          : ataTransitionError(ata.status, malStatus) },
+        { status: 409 },
+      )
     }
 
     // Decline

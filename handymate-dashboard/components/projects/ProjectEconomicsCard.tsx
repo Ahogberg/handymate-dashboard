@@ -92,9 +92,12 @@ interface ProjectEconomicsCardProps {
   /** Triggas när användaren klickar 'Fakturera projekt' (kvar att
       fakturera > 0). Parent ansvarar för att öppna faktura-modal/-route. */
   onInvoiceProject?: () => void
+  /** "Ny ÄTA" i ekonomikortets ÄTA-lista — utan denna renderas knappen aldrig
+      (AtaCard visar den bara när callbacken finns). */
+  onNewAta?: () => void
 }
 
-export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProject }: ProjectEconomicsCardProps) {
+export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProject, onNewAta }: ProjectEconomicsCardProps) {
   const [data, setData] = useState<ProjectEconomics | null>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
@@ -201,7 +204,7 @@ export function ProjectEconomicsCard({ projectId, refreshKey = 0, onInvoiceProje
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         <div className="flex flex-col gap-4">
           <IntaktCard economics={data} vatRate={VAT_RATE} />
-          <AtaCard projectId={projectId} />
+          <AtaCard projectId={projectId} onNewAta={onNewAta} />
         </div>
         <div className="flex flex-col gap-4">
           <KostnadCard
