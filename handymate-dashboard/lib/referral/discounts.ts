@@ -1,93 +1,90 @@
 /**
- * V8 Referral — Rabattlogik
+ * V8 Referral — Belöningslogik (kund-till-kund)
  *
- * Sparar engångsrabatt på nästa faktura.
- * Appliceras automatiskt när faktura skapas.
+ * Belöningen är EN MÅNAD GRATIS = referrerns månadspris, skriven som
+ * Stripe-kundsaldo (negativ balance transaction i öre, SEK). Stripe drar
+ * saldot automatiskt på nästa faktura, oavsett månads- eller årsplan.
+ *
+ * Historik: fram till 2026-09-02 skrevs en "50 % på nästa faktura" som JSON
+ * i en kolumn på v3_automation_settings (se sql/v8_referral.sql) — ingen
+ * läste den vid fakturering, så rabatten drogs aldrig trots att SMS:et
+ * lovade den. Kolumnen finns kvar i databasen men används inte längre.
  */
 
+import Stripe from 'stripe'
 import { getServerSupabase } from '@/lib/supabase'
-import { sanitizeSenderId } from '@/lib/sms/sender-id'
+import { PLAN_PRICES_SEK, type PlanType } from '@/lib/feature-gates'
 
-/**
- * Spara en pending referralrabatt som appliceras på nästa faktura.
- * Lagras i v3_automation_settings.referral_discount_pending.
- */
-export async function applyNextInvoiceDiscount(
-  businessId: string,
-  percentOff: number
-): Promise<void> {
-  const supabase = getServerSupabase()
-
-  const discount = {
-    percent: percentOff,
-    expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // +30 dagar
-  }
-
-  // Upsert — skapa settings-rad om den inte finns
-  const { data: existing } = await supabase
-    .from('v3_automation_settings')
-    .select('id')
-    .eq('business_id', businessId)
-    .single()
-
-  if (existing) {
-    await supabase
-      .from('v3_automation_settings')
-      .update({ referral_discount_pending: discount })
-      .eq('business_id', businessId)
-  } else {
-    await supabase
-      .from('v3_automation_settings')
-      .insert({
-        business_id: businessId,
-        referral_discount_pending: discount,
-      })
-  }
+function getStripe() {
+  if (!process.env.STRIPE_SECRET_KEY) throw new Error('STRIPE_SECRET_KEY not configured')
+  return new Stripe(process.env.STRIPE_SECRET_KEY, { apiVersion: '2026-01-28.clover' as any })
 }
 
-/**
- * Hämta eventuell pending referralrabatt.
- * Returnerar null om ingen finns eller om den gått ut.
- */
-export async function getPendingDiscount(
-  businessId: string
-): Promise<{ percent: number; expires_at: string } | null> {
-  const supabase = getServerSupabase()
-
-  const { data } = await supabase
-    .from('v3_automation_settings')
-    .select('referral_discount_pending')
-    .eq('business_id', businessId)
-    .single()
-
-  const discount = data?.referral_discount_pending as { percent: number; expires_at: string } | null
-  if (!discount) return null
-
-  // Kontrollera utgångsdatum
-  if (new Date(discount.expires_at) < new Date()) {
-    // Rabatten har gått ut — rensa
-    await supabase
-      .from('v3_automation_settings')
-      .update({ referral_discount_pending: null })
-      .eq('business_id', businessId)
-    return null
-  }
-
-  return discount
+function isPlanType(plan: unknown): plan is PlanType {
+  return typeof plan === 'string' && Object.prototype.hasOwnProperty.call(PLAN_PRICES_SEK, plan)
 }
 
+/** SMS till referrern när kollegan aktiverat. GSM-7-tecken enbart (ingen
+ *  tankstreck) så det ryms i EN SMS-del (≤ 160 tecken). */
+export const REFERRAL_REWARD_SMS =
+  'Din kollega har nu aktiverat Handymate. Du får en månad gratis, den dras på din nästa faktura. Tack för att du spred ordet! /Handymate'
+
 /**
- * Nollställ referralrabatt efter applicering.
+ * Kreditera referrern en månad gratis som Stripe-kundsaldo.
+ *
+ * Saknas Stripe-kund (pilot-/testkonton) eller är planen okänd krediteras
+ * INGET — vi gissar aldrig belopp. Anroparen får `granted:false` + orsak och
+ * lämnar referral-raden okrediterad så admin kan hantera den manuellt.
+ *
+ * `idempotencyKey` (t.ex. referral-radens id) skickas till Stripe så att en
+ * dubbel webhook eller omkörning inte kan skriva saldot två gånger.
  */
-export async function clearPendingDiscount(
-  businessId: string
-): Promise<void> {
+export async function grantReferralMonthCredit(
+  referrerBusinessId: string,
+  opts: { idempotencyKey?: string } = {}
+): Promise<{ granted: boolean; amountSek?: number; error?: string }> {
   const supabase = getServerSupabase()
 
-  await supabase
-    .from('v3_automation_settings')
-    .update({ referral_discount_pending: null })
-    .eq('business_id', businessId)
+  const { data: referrer } = await supabase
+    .from('business_config')
+    .select('stripe_customer_id, subscription_plan, business_name')
+    .eq('business_id', referrerBusinessId)
+    .single()
+
+  if (!referrer?.stripe_customer_id) {
+    console.warn('[referral] Ingen Stripe-kund på referrern, ingen kredit skriven:', referrerBusinessId)
+    return { granted: false, error: 'no_stripe_customer' }
+  }
+
+  if (!isPlanType(referrer.subscription_plan)) {
+    console.warn('[referral] Okänd plan på referrern, ingen kredit skriven:', {
+      referrerBusinessId,
+      plan: referrer.subscription_plan,
+    })
+    return { granted: false, error: 'unknown_plan' }
+  }
+
+  const amountSek = PLAN_PRICES_SEK[referrer.subscription_plan]
+
+  try {
+    const stripe = getStripe()
+    await stripe.customers.createBalanceTransaction(
+      referrer.stripe_customer_id,
+      {
+        amount: -(amountSek * 100),
+        currency: 'sek',
+        description: 'Rekommendation: en månad gratis',
+        metadata: { business_id: referrerBusinessId, referral_reward: 'month' },
+      },
+      opts.idempotencyKey ? { idempotencyKey: opts.idempotencyKey } : undefined
+    )
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[referral] Stripe-kredit misslyckades:', { referrerBusinessId, amountSek, message })
+    return { granted: false, error: `stripe_error: ${message}` }
+  }
+
+  return { granted: true, amountSek }
 }
 
 /**
@@ -128,14 +125,20 @@ export async function handleFirstPaymentReferral(
     return { rewarded: false, error: 'Ingen referral-rad hittad' }
   }
 
-  if (existingReferral.status === 'active' || existingReferral.status === 'rewarded') {
+  // 'rewarded' är slutläget för kundgrenen — idempotensen mot dubbel webhook.
+  if (existingReferral.status === 'rewarded') {
     return { rewarded: false } // Redan hanterad
   }
 
   const referrerType = existingReferral.referrer_type || 'customer'
 
   if (referrerType === 'partner') {
-    // Partnergrenen: aktivera bara. Ingen rabatt, ingen engångsprovision —
+    // Partnergrenen: 'active' är slutläget — redan konverterad.
+    if (existingReferral.status === 'active') {
+      return { rewarded: false } // Redan hanterad
+    }
+
+    // Aktivera bara. Ingen rabatt, ingen engångsprovision —
     // löpande provision ackrueras per FAKTISKT BETALD månad av
     // processCommissionPeriod (trappa 1-12 mån, sedan basnivå), med
     // liggarrader som utbetalningsunderlag. Den gamla 50 %-engångsmodellen
@@ -159,17 +162,33 @@ export async function handleFirstPaymentReferral(
     return { rewarded: false, error: 'Referralkod kunde inte lösas' }
   }
 
-  // Uppdatera referral till active
-  await supabase
-    .from('referrals')
-    .update({
-      status: 'active',
-      converted_at: new Date().toISOString(),
-    })
-    .eq('id', existingReferral.id)
+  // Uppdatera referral till active (= konverterad, ännu inte krediterad).
+  // En rad som redan står i 'active' är en tidigare körning där krediten
+  // inte gick igenom — den får passera hit igen och försöka på nytt.
+  if (existingReferral.status !== 'active') {
+    await supabase
+      .from('referrals')
+      .update({
+        status: 'active',
+        converted_at: new Date().toISOString(),
+      })
+      .eq('id', existingReferral.id)
+  }
 
-  // Ge referrer 50% rabatt på nästa faktura
-  await applyNextInvoiceDiscount(referrerBusinessId, 50)
+  // Ge referrern en månad gratis som Stripe-kundsaldo. Går det inte igenom
+  // (ingen Stripe-kund, okänd plan, Stripe-fel) lämnas raden i 'active' så
+  // att en omkörning kan försöka igen och admin ser att den är okrediterad.
+  const credit = await grantReferralMonthCredit(referrerBusinessId, {
+    idempotencyKey: `referral-month-${existingReferral.id}`,
+  })
+  if (!credit.granted) {
+    console.error('[referral] Belöning EJ skriven, referral kvar i active:', {
+      referralId: existingReferral.id,
+      referrerBusinessId,
+      error: credit.error,
+    })
+    return { rewarded: false, referrerBusinessId, error: credit.error }
+  }
 
   // Skicka SMS till referrer
   try {
@@ -181,26 +200,26 @@ export async function handleFirstPaymentReferral(
 
     if (referrerConfig?.personal_phone) {
       // Genom strypunkten (etapp 0 batch 4). Går till hantverkarens EGET
-      // nummer — rabattbeskedet är vår notis till honom, inte ett
-      // kundutskick, därför recipient:'owner'.
+      // nummer — belöningsbeskedet är vår notis till honom, inte ett
+      // kundutskick, därför recipient:'internal'.
       const { sendSmsViaElks } = await import('@/lib/sms-send')
       const r = await sendSmsViaElks({
         supabase,
         businessId: referrerBusinessId,
         businessName: referrerConfig.business_name,
         to: referrerConfig.personal_phone,
-        message: 'Din kollega har nu aktiverat Handymate! Du får 50% rabatt på nästa månads faktura. Tack för att du spred ordet!',
+        message: REFERRAL_REWARD_SMS,
         messageType: 'referral_reward',
         recipient: 'internal',
         purpose: 'internal',
       })
-      if (!r.success) console.error('[referral] rabattnotis misslyckades:', r.error)
+      if (!r.success) console.error('[referral] belöningsnotis misslyckades:', r.error)
     }
   } catch (err) {
     console.error('[Referral] SMS-sändning misslyckades:', err)
   }
 
-  // Uppdatera till rewarded
+  // Uppdatera till rewarded — skrivs BARA när krediten faktiskt ligger i Stripe
   await supabase
     .from('referrals')
     .update({
@@ -216,6 +235,7 @@ export async function handleFirstPaymentReferral(
     await fireEvent(supabase, 'referral_converted', referrerBusinessId, {
       referred_business_id: businessId,
       amount_sek: amountSek,
+      referrer_credit_sek: credit.amountSek,
     })
   } catch { /* non-blocking */ }
 
