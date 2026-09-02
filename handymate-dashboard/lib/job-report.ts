@@ -16,6 +16,10 @@ interface JobReportData {
   workPerformed: string[]
   materials: Array<{ name: string; quantity: number; unit: string }>
   photos: Array<{ url: string; caption: string | null }>
+  /** Avvikelser ur byggdagboken ("YYYY-MM-DD: text"). Valfri — äldre payloads saknar fältet. */
+  deviations?: string[]
+  /** Summerade timmar enligt byggdagboken, null om inga rader har timmar. */
+  diaryHours?: number | null
   businessName: string
   contactName: string
   orgNumber: string | null
@@ -80,6 +84,40 @@ export async function triggerJobReport(
     .filter((r: any) => r.work_performed)
     .map((r: any) => r.work_performed as string)
 
+  // Byggdagboken (project_log) — Etapp E3, 2026-09-02. Slutrapporten läste
+  // tidigare bara field_reports och missade allt hantverkaren skrev dag för
+  // dag. `log_report_%`-raderna är Mattes egna slutrapportsutkast (Work
+  // Report V1) — utan vakten skulle rapporten läsa sina egna rader.
+  const { data: diaryRows } = await supabase
+    .from('project_log')
+    .select('id, date, work_performed, issues, hours_worked, photos')
+    .eq('order_id', projectId)
+    .eq('business_id', businessId)
+    .not('id', 'like', 'log_report_%')
+    .order('date', { ascending: true })
+
+  const diary = (diaryRows || []) as Array<{
+    id: string; date: string; work_performed: string | null; issues: string | null
+    hours_worked: number | null; photos: unknown
+  }>
+  for (const row of diary) {
+    if (row.work_performed && !workPerformed.includes(row.work_performed)) {
+      workPerformed.push(`${row.date}: ${row.work_performed}`)
+    }
+  }
+  const deviations = diary
+    .filter(r => r.issues)
+    .map(r => `${r.date}: ${r.issues}`)
+  const diaryHoursSum = diary.reduce((s, r) => s + (typeof r.hours_worked === 'number' ? r.hours_worked : 0), 0)
+  const diaryHours = diaryHoursSum > 0 ? Math.round(diaryHoursSum * 100) / 100 : null
+  // Privat bucket (project-files) — vi lagrar SÖKVÄGEN, aldrig en signerad
+  // URL, i ett payload som kan ligga i kön i dagar (v151-principen).
+  const diaryPhotos = diary.flatMap(r =>
+    (Array.isArray(r.photos) ? (r.photos as unknown[]) : [])
+      .filter((p): p is string => typeof p === 'string')
+      .map(p => ({ url: p, caption: `Byggdagbok ${r.date}` })),
+  )
+
   // Fetch materials
   const { data: materials } = await supabase
     .from('project_material')
@@ -103,9 +141,11 @@ export async function triggerJobReport(
     .eq('business_id', businessId)
     .limit(6)
 
+  // Dagboksfoton fyller upp till 6 om fältrapporter/projektfoton inte räcker.
   const allPhotos = [
     ...(photos || []),
     ...(projectPhotos || []),
+    ...diaryPhotos,
   ].slice(0, 6)
 
   const reportData: JobReportData = {
@@ -122,6 +162,8 @@ export async function triggerJobReport(
       unit: m.unit || 'st',
     })),
     photos: allPhotos.map(p => ({ url: p.url, caption: p.caption || null })),
+    deviations,
+    diaryHours,
     businessName: business?.business_name || '',
     contactName: business?.contact_name || '',
     orgNumber: business?.org_number || null,
@@ -219,7 +261,12 @@ export async function generateJobReportPdf(data: JobReportData): Promise<Buffer>
   doc.text(`Avslutat: ${new Date(data.completedAt).toLocaleDateString('sv-SE')}`, 15, y)
   y += 5
   doc.text(`Utfört av: ${data.contactName}`, 15, y)
-  y += 10
+  y += 5
+  if (data.diaryHours != null && data.diaryHours > 0) {
+    doc.text(`Arbetstid enligt byggdagbok: ${data.diaryHours} h`, 15, y)
+    y += 5
+  }
+  y += 5
 
   // Utfört arbete
   doc.setTextColor(30, 41, 59)
@@ -236,6 +283,28 @@ export async function generateJobReportPdf(data: JobReportData): Promise<Buffer>
     if (y > 270) { doc.addPage(); y = 15 }
   }
   y += 4
+
+  // Avvikelser ur byggdagboken — kunden ska se vad som hände, inte bara vad som gjordes
+  const deviations = Array.isArray(data.deviations) ? data.deviations : []
+  if (deviations.length > 0) {
+    if (y > 250) { doc.addPage(); y = 15 }
+    doc.setTextColor(30, 41, 59)
+    doc.setFontSize(12)
+    doc.setFont('helvetica', 'bold')
+    doc.text('Avvikelser under arbetet', 15, y)
+    y += 6
+    doc.setFontSize(9)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(180, 83, 9)
+    for (const dev of deviations) {
+      const lines = doc.splitTextToSize(`• ${dev}`, pageWidth - 30)
+      doc.text(lines, 15, y)
+      y += lines.length * 4.5
+      if (y > 270) { doc.addPage(); y = 15 }
+    }
+    doc.setTextColor(30, 41, 59)
+    y += 4
+  }
 
   // Material
   if (data.materials.length > 0) {

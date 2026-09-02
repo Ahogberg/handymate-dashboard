@@ -635,8 +635,14 @@ test.describe('N2 — service-role-vägar verifierar tenant explicit', () => {
     )
     expect(projectPost).toContain('idValue: body.customer_id')
 
+    // Sedan Etapp B (2026-09-02) ligger själva insert:en i lib/ata/create-ata.ts
+    // (skapaAta) — delad av POST /api/ata och projects/[id]/changes. Policyn är
+    // densamma: ägarskapet verifieras FÖRE anropet som skriver.
+    const createAta = fs.readFileSync(path.join(process.cwd(), 'lib/ata/create-ata.ts'), 'utf8')
+    expect(createAta).toContain(".from('project_change')")
     expect(ataPost.indexOf('verifyOwnership(')).toBeGreaterThanOrEqual(0)
-    expect(ataPost.indexOf(".from('project_change')")).toBeGreaterThan(
+    expect(ataPost).not.toContain(".from('project_change')\n      .insert(")
+    expect(ataPost.indexOf('skapaAta(')).toBeGreaterThan(
       ataPost.indexOf('verifyOwnership('),
     )
     expect(ataPost).toContain('idValue: projectId')

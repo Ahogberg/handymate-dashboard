@@ -5,6 +5,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { ATA_FAKTURERBARA_STATUSAR } from '@/lib/ata/lifecycle'
 
 export const dynamic = 'force-dynamic'
 
@@ -200,7 +201,7 @@ export async function POST(
       .select('change_id, ata_number, description, change_type, status, total, items, signed_at')
       .eq('project_id', projectId)
       .eq('business_id', business.business_id)
-      .in('status', ['signed', 'approved'])
+      .in('status', [...ATA_FAKTURERBARA_STATUSAR])
       .order('ata_number', { ascending: true })
 
     if (changesError) {

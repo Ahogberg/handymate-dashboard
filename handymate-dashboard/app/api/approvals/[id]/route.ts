@@ -7,6 +7,7 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 import type { SmsPurpose } from '@/lib/outbound/sms-gate'
 import { classifyExecutionResult, extractExecutionArtifacts } from '@/lib/approvals/execution-outcome'
 import { canActOnApproval } from '@/lib/approvals/routing'
+import { createDiaryEntry } from '@/lib/diary/write'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
@@ -1389,10 +1390,9 @@ async function executeApprovalPayload(
         // Samtalsefterarbete (2026-09-01): samtalet blir en dagboksrad i
         // project_log NÄR hantverkaren godkänner — intern anteckning, inget
         // kundutskick. Samma fältlokala, tenant-scopade mönster som
-        // meeting_followup ovan. Förlaga för skrivningen: addWorkNote i
-        // app/api/agent/trigger/tool-router.ts (LIVE-kolumnerna är
-        // order_id/date/work_performed/description — inte project_id/log_date,
-        // se tests/column-contract.spec.ts PRODUKTIONSVERIFIERADE_KOLUMNER).
+        // meeting_followup ovan. Skrivningen går via createDiaryEntry
+        // (lib/diary/write.ts) — dagbokens enda väg in i project_log — som
+        // gör projektvakten igen och skriver revisionsloggen.
         const pl = payload as any
         if (!pl.project_id || !pl.recording_id || !pl.summary) {
           return { action: 'project_log_note', ok: false, error: 'Kortet saknar projekt, samtal eller sammanfattning.' }
@@ -1419,25 +1419,27 @@ async function executeApprovalPayload(
         const logDate = samtalsDatum.toISOString().slice(0, 10)
 
         // Deterministiskt id per samtal: godkänns kortet två gånger (retry,
-        // dubbeltryck) blir det ändå EN rad — 23505 kvitteras som dubblett.
+        // dubbeltryck) blir det ändå EN rad — helpern kvitterar 23505 som
+        // dubblett. Den generella dubblettkontrollen (samma text inom kort
+        // tid) hoppas: id:t är redan samtalets egna nyckel, och två olika
+        // samtal samma dag SKA ge två rader.
         const logId = `log_call_${pl.recording_id}`
-        const { error: logErr } = await supabasePL
-          .from('project_log')
-          .insert({
-            id: logId,
-            order_id: pl.project_id,
-            business_id: businessId,
-            business_user_id: resolvedByUserId ?? null,
-            date: logDate,
-            work_performed: 'Samtal med kund',
-            description: String(pl.summary),
-            photos: [],
-          })
-        if (logErr) {
-          if (logErr.code === '23505') {
-            return { action: 'project_log_note', ok: true, log_id: logId, duplicate: true }
-          }
-          return { action: 'project_log_note', ok: false, error: logErr.message || 'Kunde inte spara dagboksraden.' }
+        const dagbok = await createDiaryEntry(supabasePL, {
+          id: logId,
+          order_id: pl.project_id,
+          business_id: businessId,
+          business_user_id: resolvedByUserId ?? null,
+          date: logDate,
+          work_performed: 'Samtal med kund',
+          description: String(pl.summary),
+          photos: [],
+          skipDuplicateCheck: true,
+        })
+        if (!dagbok.ok) {
+          return { action: 'project_log_note', ok: false, error: dagbok.error || 'Kunde inte spara dagboksraden.' }
+        }
+        if (dagbok.duplicate) {
+          return { action: 'project_log_note', ok: true, log_id: logId, duplicate: true }
         }
         return { action: 'project_log_note', ok: true, log_id: logId, project_id: pl.project_id }
       }
@@ -1900,6 +1902,10 @@ async function executeApprovalPayload(
         // som reserv när projekt saknas (t.ex. mötesfynd före projektstart).
         if (pl.project_id) {
           const ataItems = quoteItems.map((qi: any) => ({
+            // ÄTA-raden heter `name` i AtaItem-formen (projektsidan, PDF:en,
+            // fakturavägarna). Tidigare skrevs bara `description` → raderna
+            // blev namnlösa i UI:t och ChangeModal droppade dem (total 0).
+            name: qi.description || qi.name || 'Arbete',
             description: qi.description || qi.name || 'Arbete',
             quantity: qi.quantity ?? 1,
             unit: qi.unit || 'st',

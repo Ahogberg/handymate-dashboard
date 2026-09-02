@@ -117,32 +117,44 @@ test.describe('5. fältkommandon: material och arbetsanteckning', () => {
     }
     // Projektet måste bevisligen tillhöra företaget innan något skrivs —
     // ett id från en röstkontext är en referens, aldrig ett tenantbevis.
-    for (const fn of ['async function logMaterial', 'async function addWorkNote']) {
+    // Skrivningen: logMaterial gör sin egen insert, addWorkNote går via
+    // dagbokens enda skrivväg (createDiaryEntry) sedan 2026-09-02.
+    for (const [fn, skrivning] of [
+      ['async function logMaterial', '.insert('],
+      ['async function addWorkNote', 'createDiaryEntry('],
+    ] as const) {
       const start = router.indexOf(fn)
       expect(start, `${fn} saknas`).toBeGreaterThan(-1)
       const kropp = router.slice(start, router.indexOf('\nasync function ', start + 10))
       const vakt = kropp.indexOf("eq('business_id', businessId)")
       expect(vakt, `${fn} verifierar inte projektet`).toBeGreaterThan(-1)
-      expect(kropp.indexOf('.insert('), `${fn} skriver före tenantvakten`).toBeGreaterThan(vakt)
+      expect(kropp.indexOf(skrivning), `${fn} skriver före tenantvakten`).toBeGreaterThan(vakt)
     }
   })
 
   test('byggdagboken skrivs med databasens faktiska kolumnnamn', () => {
     // project_log heter order_id/date/work_performed i live-schemat — INTE
-    // project_id/log_date/work_description som sql/rot_rut_documents.sql
-    // antyder. Fel namn här ger 42703 och en tyst förlorad anteckning.
-    // Mät på SJÄLVA insert-anropet: returvärdet nedanför bär project_id som
-    // ett svarsfält, och det är helt korrekt.
+    // project_id/log_date/work_description. Fel namn ger 42703 och en tyst
+    // förlorad anteckning. Sedan byggdagboken (2026-09-02) sitter den enda
+    // insert-satsen i lib/diary/write.ts; addWorkNote får inte ha en egen.
     const start = router.indexOf('async function addWorkNote')
     const kropp = router.slice(start, router.indexOf('\nasync function ', start + 10))
-    const insertStart = kropp.indexOf("from('project_log').insert({")
-    expect(insertStart, 'ingen insert mot project_log').toBeGreaterThan(-1)
-    const insertBlock = kropp.slice(insertStart, kropp.indexOf('})', insertStart))
-    expect(insertBlock).toContain('order_id:')
-    expect(insertBlock).toContain('work_performed:')
-    expect(insertBlock).toContain('date:')
+    expect(kropp, 'addWorkNote ska inte skriva project_log själv').not.toContain("from('project_log')")
+    expect(kropp).toContain('createDiaryEntry(')
+    expect(kropp).toContain('order_id: projectId')
+    expect(kropp).toContain('work_performed: workPerformed')
+    expect(kropp).toContain('date: logDate')
+
+    const helper = kod('lib/diary/write.ts')
+    const insertStart = helper.indexOf("from('project_log').insert(")
+    expect(insertStart, 'ingen insert mot project_log i helpern').toBeGreaterThan(-1)
+    const payloadStart = helper.indexOf('const payload = {')
+    const payloadBlock = helper.slice(payloadStart, helper.indexOf('\n  }', payloadStart))
+    expect(payloadBlock).toContain('order_id:')
+    expect(payloadBlock).toContain('work_performed:')
+    expect(payloadBlock).toContain('date:')
     for (const fantom of ['project_id:', 'log_date:', 'work_description:']) {
-      expect(insertBlock, `${fantom} finns inte som kolumn i project_log`).not.toContain(fantom)
+      expect(payloadBlock, `${fantom} finns inte som kolumn i project_log`).not.toContain(fantom)
     }
   })
 

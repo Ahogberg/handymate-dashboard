@@ -63,22 +63,37 @@ CREATE INDEX IF NOT EXISTS idx_project_document_business ON project_document(bus
 
 CREATE TABLE IF NOT EXISTS project_log (
   id TEXT PRIMARY KEY,
-  project_id TEXT NOT NULL REFERENCES project(project_id),
   business_id TEXT NOT NULL,
+  -- OBS: heter order_id (inte project_id) i LIVE-schemat — historiskt namn
+  -- från när projekt hette order. Pekar på project.project_id.
+  order_id TEXT NOT NULL,
   business_user_id TEXT,
-  log_date DATE NOT NULL,
+  date DATE NOT NULL,
   weather TEXT,
-  temperature NUMERIC,
-  work_description TEXT,
-  materials_used TEXT,
+  temperature INTEGER,
+  description TEXT,
+  work_performed TEXT,
+  issues TEXT,
+  workers_count INTEGER,
   hours_worked NUMERIC,
-  notes TEXT,
-  photos JSONB DEFAULT '[]',
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  materials_used TEXT,
+  photos TEXT[],
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  signed_by_customer BOOLEAN,
+  customer_signed_at TIMESTAMPTZ
+  -- + ata_change_id, attested_by_user_id, attested_at, locked_at, addendum
+  --   (sql/v196_byggdagboken.sql)
 );
 
-CREATE INDEX IF NOT EXISTS idx_project_log_project ON project_log(project_id);
-CREATE INDEX IF NOT EXISTS idx_project_log_date ON project_log(project_id, log_date);
+-- Den här DEL:en beskrev fram till 2026-09-02 ett schema som ALDRIG matchade
+-- databasen (project_id/log_date/work_description/notes). Tre skrivvägar
+-- kopierade kolumnnamnen härifrån och 42703:ade tyst. Kolumnlistan ovan är
+-- verifierad mot information_schema i prod 2026-09-02; tests/column-contract
+-- .spec.ts läser den.
+
+CREATE INDEX IF NOT EXISTS idx_project_log_project ON project_log(order_id);
+CREATE INDEX IF NOT EXISTS idx_project_log_date ON project_log(order_id, date);
 
 -- ==========================================
 -- DEL 5: Checklistor

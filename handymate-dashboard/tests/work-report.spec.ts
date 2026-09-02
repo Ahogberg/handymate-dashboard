@@ -65,6 +65,9 @@ function router() {
     '@/lib/agent/recent-duplicate': { hittaNyligDubblett },
     '@/lib/dates': { svDateStr },
     '@/lib/project-ai-engine': { handleProjectEvent: async () => {} },
+    // Byggdagboken (2026-09-02): addWorkNote skriver via den RIKTIGA helpern —
+    // det är dess plain .insert() mot mock-DB:n som facitet nedan mäter.
+    '@/lib/diary/write': require('../lib/diary/write'),
   }
   const exports: any = {}
   new Function('require', 'exports', code)((id: string) => imports[id] || new Proxy({}, { get: (_t, name) => () => { throw new Error(`Unexpected dependency: ${id}.${String(name)}`) } }), exports)

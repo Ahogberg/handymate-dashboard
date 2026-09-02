@@ -91,6 +91,50 @@ Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
 
 ---
 
+# ÄTA + byggdagbok-sprinten (Claude 2026-09-02)
+
+Plan: ~/.claude/plans/recursive-painting-possum.md. Beslut: project_log = Byggdagbok,
+field_reports = Fältrapport; ÄTA = fällorna + dokumentet (fullt affärssystem = spår framåt);
+mobil = dagboksvy + ÄTA-skicka + etiketter; väder = GPS→SMHI i mobilen, manuellt på desktop.
+Deploy-ordning: v195 → ÄTA-kod → v196 → dagbokskod → mobil.
+
+## DEL 1 — ÄTA
+- [x] A1 En sanning för "avtalad": ATA_AVTALADE_STATUSAR/ATA_FAKTURERBARA_STATUSAR i lifecycle.ts, fyra ekonomisiter
+- [x] A2 sql/v195_ata_dokumentet.sql (vat_rate, project_document.change_id, backfill av namnlösa rader)
+- [x] A3 lib/ata/{labels,items,totals,send-message,create-ata}.ts
+- [x] B API-fällorna: send (canTransitionAta + business_id + ingen JSON-fallback + GET), sign (livscykel), [id] (404/400), changes (skapaAta, svenska), executor name:, portal (items/summor/pdf_url), documents change_id
+- [x] C1 lib/ata/pdf.ts + /api/ata/[id]/pdf + /api/ata/sign/[token]/pdf
+- [x] C2 Portal: kundetiketter, rader, summor, PDF, foton
+- [x] C3 Desktop: SendAtaDialog, synliga åtgärder, Kopiera länk, PDF-knapp, invoice-preview, foton, ChangeModal-fix, "Skapa & skicka", onNewAta, preview.items
+- [x] C4 tests/ata-dokumentet.spec.ts + regressionslistan grön
+- [x] v195 KÖRD + verifierad 2026-09-02 (3/7 ÄTA:er backfillade; rad.change_id→src.change_id rättad vid körning)
+
+## DEL 2 — Byggdagbok
+- [x] D1 rot_rut_documents DEL 4 → live-schema; kundtidslinjen; voice/execute; jobbuddy; addWorkNote; project_log_note via helper
+- [x] D2 sql/v196_byggdagboken.sql (ata_change_id, attest, locked_at, addendum, project_log_revision + RLS)
+- [x] D3 lib/diary/{weather,locking,permissions,write,photos,smhi,time-summary}.ts
+- [x] D4 API: GET/POST logs, PATCH/DELETE [logId] med lås 409 + actions, POST/DELETE photos, GET /api/weather
+- [x] E1 components/projects/diary/* + montering i page.tsx (LogModal bort)
+- [x] E2 PDF: foton, timmar, attest, LÅST, from/to, ensureSpace före ritning
+- [x] E3 lib/job-report.ts läser dagboken (log_report_%-vakt)
+- [x] E4 tests/byggdagboken.spec.ts + work-report/matte-time-logging uppdaterade + regressionslistan grön
+- [x] F display:{type_label,agent,approve_label} i GET /api/approvals + /api/mobile/home
+- [x] v196 KÖRD + verifierad 2026-09-02 (5 kolumner, 2 index, project_log_revision + 2 RLS-policyer)
+
+## DEL 3 — Mobil (handymate-mobile, main)
+- [ ] E1 lib/api: Byggdagbok-block, väder, display, Project.customer_id
+- [ ] E2 ÄTA-skicka från projektvyn + beskrivningsvakt
+- [ ] E3 DiaryList + CreateDiarySheet + projektkort + /projects/[id]/diary + lib/weather + GDPR-text
+- [ ] E4 approvals: etiketter från backend, Projekt-filter, död Bokningar bort
+- [ ] E5 (villkorad) foton på ÄTA
+- [ ] tsc + jest gröna
+
+## Verifiering
+- [ ] tsc 0, next build ren, playwright-listan i planen grön
+- [ ] Skarptest ÄTA + dagbok (plan §Verifiering 4–5); mobil efter EAS
+
+---
+
 # Nattpass 2: onboardingtratten (Claude 2026-09-02)
 
 Stöd för Andreas onboarding-A/B. Ingen migration — tidsstämplarna bor under

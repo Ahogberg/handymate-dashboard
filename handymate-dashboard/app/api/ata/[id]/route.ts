@@ -3,6 +3,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 import { canTransitionAta, isAtaEditable, ataTransitionError } from '@/lib/ata/lifecycle'
+import { normaliseraAtaRader } from '@/lib/ata/items'
+import { beraknaAtaSummor } from '@/lib/ata/totals'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -32,9 +34,12 @@ export async function GET(
       .select('*')
       .eq('change_id', params.id)
       .eq('business_id', business.business_id)
-      .single()
+      .maybeSingle()
 
     if (error) throw error
+    if (!data) {
+      return NextResponse.json({ error: 'ÄTA hittades inte' }, { status: 404 })
+    }
 
     // Återanvänd list-helpern via singel-array-wrap
     const result = await maybeStripAtaList(request, data ? [data] : [])
@@ -75,17 +80,30 @@ export async function PATCH(
 
     const updates: Record<string, any> = {}
 
-    // Editable fields — bara i redigerbara lägen (lib/ata/lifecycle.ts)
+    // Editable fields — bara i redigerbara lägen (lib/ata/lifecycle.ts).
+    // Innehåll på en låst ÄTA avvisas med besked — tidigare droppades det
+    // tyst och UI:t trodde att ändringen sparats.
+    const harInnehall =
+      body.description !== undefined || body.change_type !== undefined ||
+      body.items !== undefined || body.hours !== undefined || body.notes !== undefined
+    if (harInnehall && !isAtaEditable(existing.status)) {
+      return NextResponse.json(
+        { error: 'ÄTA:n är låst efter utskick. Skapa en ny ÄTA.' },
+        { status: 400 }
+      )
+    }
     if (isAtaEditable(existing.status)) {
       if (body.description !== undefined) updates.description = body.description
       if (body.change_type !== undefined) updates.change_type = body.change_type
       if (body.items !== undefined) {
-        updates.items = body.items
-        const total = (body.items || []).reduce((sum: number, item: any) => {
-          return sum + ((item.quantity || 0) * (item.unit_price || 0))
-        }, 0)
+        // Samma normalisering + summering som vid skapande (lib/ata/*):
+        // total = delsumma exkl. moms, alltid positiv (tecknet läggs på av
+        // konsumenterna ur change_type).
+        const rader = normaliseraAtaRader(body.items)
+        updates.items = rader
+        const total = Math.abs(beraknaAtaSummor(rader, 0).delsumma)
         updates.total = total
-        updates.amount = Math.abs(total)
+        updates.amount = total
       }
       if (body.hours !== undefined) updates.hours = body.hours
       if (body.notes !== undefined) updates.notes = body.notes

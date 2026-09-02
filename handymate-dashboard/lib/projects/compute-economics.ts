@@ -24,6 +24,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { isCustomerSettled } from '@/lib/invoices/status'
+import { arAvtaladAta } from '@/lib/ata/lifecycle'
 
 // ─────────────────────────────────────────────────────────────────
 // Public types
@@ -283,7 +284,10 @@ export async function computeProjectEconomics(
   let ataPendingKr = 0
   for (const c of changes) {
     const v = Math.abs(Number(c.amount || 0))
-    const isSigned = c.signed_at !== null || c.status === 'signed' || c.status === 'invoiced'
+    // arAvtaladAta (lib/ata/lifecycle.ts) är EN sanning för "avtalad" —
+    // ersätter denna funktions egen signed/invoiced-uppräkning (projektauditen
+    // 2026-09-02: tre olika definitioner spridda i ekonomin).
+    const isSigned = arAvtaladAta(c.status) || c.signed_at !== null
     const isDeclined = c.declined_at !== null || c.status === 'declined'
     if (isSigned) {
       ataSigneratKr += v

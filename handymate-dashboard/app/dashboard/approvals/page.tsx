@@ -1295,6 +1295,38 @@ export default function ApprovalsPage() {
                             </div>
                           )
                         })()}
+                        {/* Enkla utkastrader (create_ata_draft, missad_intakt m.fl. bär
+                            payload.preview.items) — samma sak som JarvisHome visar: man ska
+                            se VAD man tar ställning till utan att öppna något. */}
+                        {approval.approval_type !== 'create_quote_draft'
+                          && Array.isArray((approval.payload as any)?.preview?.items)
+                          && (approval.payload as any).preview.items.length > 0 && (() => {
+                          const preview = (approval.payload as any).preview
+                          const rader = preview.items as any[]
+                          const summa = typeof preview.total_before_vat === 'number' ? preview.total_before_vat
+                            : rader.reduce((s, r) => s + (r.amount_kr ?? (Number(r.quantity) || 0) * (Number(r.unit_price) || 0)), 0)
+                          return (
+                            <div className="mt-2 rounded-lg border border-[#E2E8F0] bg-white px-3 py-1 divide-y divide-slate-100">
+                              {rader.slice(0, 6).map((rad, i) => {
+                                const belopp = rad.amount_kr ?? (Number(rad.quantity) || 0) * (Number(rad.unit_price) || 0)
+                                return (
+                                  <div key={i} className="flex items-center gap-3 py-1.5 text-[13px] text-slate-600">
+                                    <span className="flex-1 min-w-0 truncate">{rad.name || rad.description || 'Rad'}</span>
+                                    {typeof belopp === 'number' && belopp > 0 && (
+                                      <span className="tabular-nums font-semibold shrink-0">{belopp.toLocaleString('sv-SE')} kr</span>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                              {summa > 0 && (
+                                <div className="flex items-baseline justify-between py-1.5">
+                                  <span className="text-[13px] font-semibold text-slate-700">Summa exkl. moms</span>
+                                  <span className="tabular-nums text-[15px] font-bold text-slate-900">{summa.toLocaleString('sv-SE')} kr</span>
+                                </div>
+                              )}
+                            </div>
+                          )
+                        })()}
                         {messagePreview && !isEditing && (
                           <div className="mt-2 px-3 py-2 bg-gray-50 rounded-lg border-l-2 border-gray-200">
                             <p className="text-sm text-gray-600 italic line-clamp-3">"{messagePreview}"</p>

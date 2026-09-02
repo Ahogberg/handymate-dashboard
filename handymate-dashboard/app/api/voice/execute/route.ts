@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { createQuote } from '@/lib/quotes/create-quote'
+import { createDiaryEntry } from '@/lib/diary/write'
 
 /**
  * POST /api/voice/execute
@@ -84,58 +85,55 @@ export async function POST(request: NextRequest) {
       }
 
       case 'work_log': {
-        // Find project by name
-        const { data: project } = await supabase
-          .from('project')
-          .select('project_id')
-          .eq('business_id', businessId)
-          .ilike('name', `%${action.data.project_name || ''}%`)
-          .limit(1)
-          .maybeSingle()
+        // Byggdagboken (2026-09-02): raden måste ha ett projekt — order_id är
+        // NOT NULL, och tidigare föll skrivningen på 23502 varje gång namnet
+        // inte matchade. Nu: hitta projektet eller säg ifrån.
+        const projekt = await resolveProject(supabase, businessId, action.data)
+        if (!projekt) return projektSaknas()
 
-        const logId = 'pl_' + Math.random().toString(36).substr(2, 9)
-
-        const { error: wlError } = await supabase.from('project_log').insert({
-          id: logId,
-          order_id: project?.project_id || null,
+        const dagbok = await createDiaryEntry(supabase, {
           business_id: businessId,
-          date: new Date().toISOString().split('T')[0],
+          order_id: projekt.project_id,
+          business_user_id: currentUser.id,
+          date: action.data.date || svIdag(),
           work_performed: action.data.description || '',
         })
-        if (wlError) {
-          console.error('[voice/execute] work_log insert error:', wlError)
-          return NextResponse.json({ success: false, error: 'Kunde inte spara arbetslogg' }, { status: 500 })
+        if (!dagbok.ok) {
+          console.error('[voice/execute] work_log error:', dagbok.error)
+          return NextResponse.json({ success: false, error: 'Kunde inte spara dagboksraden' }, { status: dagbok.status })
         }
 
         return NextResponse.json({
           success: true,
-          message: 'Arbetslogg skapad',
-          data: { log_id: logId },
+          message: dagbok.duplicate ? 'Dagboksraden fanns redan' : `Dagboksrad sparad på ${projekt.name}`,
+          data: { log_id: dagbok.id, project_id: projekt.project_id },
         })
       }
 
       case 'material': {
-        // Log as a note with material tag since there's no dedicated material table
-        const noteId = 'note_' + Math.random().toString(36).substr(2, 9)
+        // Material bokförs som en dagboksrad på projektet (ingen egen
+        // materialtabell i röstflödet) — materials_used är dagbokens fält.
+        const projekt = await resolveProject(supabase, businessId, action.data)
+        if (!projekt) return projektSaknas()
         const content = `Material: ${action.data.description || ''}\nBelopp: ${action.data.amount_sek || 0} kr`
 
-        // Try to insert into notes if table exists, otherwise use project_log
-        const { error } = await supabase.from('project_log').insert({
-          id: noteId,
+        const dagbok = await createDiaryEntry(supabase, {
           business_id: businessId,
-          date: new Date().toISOString().split('T')[0],
+          order_id: projekt.project_id,
+          business_user_id: currentUser.id,
+          date: svIdag(),
           work_performed: content,
           materials_used: action.data.description || '',
         })
-
-        if (error) {
-          console.error('[voice/execute] Material log error:', error)
-          return NextResponse.json({ success: false, error: 'Kunde inte logga material' }, { status: 500 })
+        if (!dagbok.ok) {
+          console.error('[voice/execute] material error:', dagbok.error)
+          return NextResponse.json({ success: false, error: 'Kunde inte logga material' }, { status: dagbok.status })
         }
 
         return NextResponse.json({
           success: true,
-          message: `Material loggat: ${action.data.amount_sek || 0} kr`,
+          message: `Material loggat på ${projekt.name}: ${action.data.amount_sek || 0} kr`,
+          data: { log_id: dagbok.id, project_id: projekt.project_id },
         })
       }
 
@@ -188,25 +186,28 @@ export async function POST(request: NextRequest) {
       }
 
       case 'note': {
-        // Store as project_log entry (no dedicated notes table)
-        const noteId = 'note_' + Math.random().toString(36).substr(2, 9)
+        // Anteckningen lever i projektets byggdagbok (ingen fristående
+        // anteckningstabell) — alltså måste den höra till ett projekt.
+        const projekt = await resolveProject(supabase, businessId, action.data)
+        if (!projekt) return projektSaknas()
 
-        const { error: noteError } = await supabase.from('project_log').insert({
-          id: noteId,
+        const dagbok = await createDiaryEntry(supabase, {
           business_id: businessId,
-          date: new Date().toISOString().split('T')[0],
+          order_id: projekt.project_id,
+          business_user_id: currentUser.id,
+          date: svIdag(),
           work_performed: action.data.title || 'Anteckning',
           description: action.data.content || '',
         })
-        if (noteError) {
-          console.error('[voice/execute] note insert error:', noteError)
-          return NextResponse.json({ success: false, error: 'Kunde inte spara anteckning' }, { status: 500 })
+        if (!dagbok.ok) {
+          console.error('[voice/execute] note error:', dagbok.error)
+          return NextResponse.json({ success: false, error: 'Kunde inte spara anteckning' }, { status: dagbok.status })
         }
 
         return NextResponse.json({
           success: true,
-          message: 'Anteckning sparad',
-          data: { note_id: noteId },
+          message: dagbok.duplicate ? 'Anteckningen fanns redan' : `Anteckning sparad på ${projekt.name}`,
+          data: { note_id: dagbok.id, log_id: dagbok.id, project_id: projekt.project_id },
         })
       }
 
@@ -354,4 +355,49 @@ async function findOrCreateCustomer(
     .single()
 
   return created || { customer_id: customerId }
+}
+
+/** Dagens datum i svensk tid (YYYY-MM-DD) — dagboken daterar efter bygget, inte UTC. */
+function svIdag(): string {
+  return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' }).format(new Date())
+}
+
+/**
+ * Löser projektet en dagboksrad hör till: `project_id` när klienten redan
+ * vet det, annars namnsökning inom företaget. Returnerar null när inget
+ * projekt går att peka ut — då får anroparen säga ifrån i stället för att
+ * skriva en rad utan projekt (order_id är NOT NULL).
+ */
+async function resolveProject(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+  data: { project_id?: unknown; project_name?: unknown } | null | undefined,
+): Promise<{ project_id: string; name: string } | null> {
+  const projectId = typeof data?.project_id === 'string' ? data.project_id.trim() : ''
+  if (projectId) {
+    const { data: byId } = await supabase
+      .from('project')
+      .select('project_id, name')
+      .eq('business_id', businessId)
+      .eq('project_id', projectId)
+      .maybeSingle()
+    if (byId) return byId
+  }
+  const projectName = typeof data?.project_name === 'string' ? data.project_name.trim() : ''
+  if (!projectName) return null
+  const { data: byName } = await supabase
+    .from('project')
+    .select('project_id, name')
+    .eq('business_id', businessId)
+    .ilike('name', `%${projectName}%`)
+    .limit(1)
+    .maybeSingle()
+  return byName ?? null
+}
+
+function projektSaknas() {
+  return NextResponse.json(
+    { success: false, error: 'Ange vilket projekt anteckningen gäller' },
+    { status: 400 },
+  )
 }

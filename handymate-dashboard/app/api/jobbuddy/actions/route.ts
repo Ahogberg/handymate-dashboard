@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { executeTool as executeSharedTool } from '@/app/api/agent/trigger/tool-router'
+import { getCurrentUser } from '@/lib/permissions'
+import { createDiaryEntry } from '@/lib/diary/write'
 
 export async function POST(request: NextRequest) {
   try {
@@ -123,24 +125,34 @@ export async function POST(request: NextRequest) {
       }
 
       case 'update_project': {
+        // Byggdagboken (2026-09-02): grenen skrev tidigare fem kolumner som
+        // inte finns i project_log (log_id/project_id/entry_type/title/
+        // created_at), svalde felet och svarade "Projekt uppdaterat" — varje
+        // uppdatering försvann tyst. Nu via dagbokens enda skrivväg, och ett
+        // fel är ett fel.
         const { project_id, update } = data
-
-        if (project_id && update) {
-          // Add a log entry to the project
-          await supabase
-            .from('project_log')
-            .insert({
-              log_id: `log-${Date.now()}`,
-              project_id,
-              business_id: businessId,
-              entry_type: 'note',
-              title: 'Uppdatering via Jobbkompisen',
-              description: update,
-              created_at: new Date().toISOString(),
-            })
+        if (!project_id || typeof update !== 'string' || !update.trim()) {
+          return NextResponse.json({ error: 'Ange projekt och vad som ska antecknas' }, { status: 400 })
         }
 
-        return NextResponse.json({ success: true, message: 'Projekt uppdaterat' })
+        const currentUser = await getCurrentUser(request)
+        const dagbok = await createDiaryEntry(supabase, {
+          business_id: businessId,
+          order_id: String(project_id),
+          business_user_id: currentUser?.id ?? null,
+          date: new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' }).format(new Date()),
+          work_performed: 'Uppdatering via Jobbkompisen',
+          description: update.trim(),
+        })
+        if (!dagbok.ok) {
+          return NextResponse.json({ error: dagbok.error }, { status: dagbok.status })
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: dagbok.duplicate ? 'Uppdateringen fanns redan i dagboken' : 'Dagboksrad sparad',
+          log_id: dagbok.id,
+        })
       }
 
       case 'send_sms': {

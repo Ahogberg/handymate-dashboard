@@ -49,6 +49,16 @@ export interface PortalActivity {
   link?: { route: string }
 }
 
+export interface PortalAtaSummor {
+  delsumma: number
+  moms: number
+  totalt: number
+  rotTyp: 'rot' | 'rut' | null
+  rotArbetskostnadExMoms: number
+  rotAvdrag: number
+  attBetala: number
+}
+
 export interface PortalAta {
   change_id: string
   ata_number: number
@@ -56,8 +66,17 @@ export interface PortalAta {
   description: string
   items: Array<{ name: string; quantity: number; unit: string; unit_price: number }>
   total: number
+  /** Momssats fryst vid skapandet (v195) */
+  vat_rate: number
+  /** Delsumma/moms/totalt/ROT — räknade av backend (lib/ata/totals.ts) */
+  summor: PortalAtaSummor
+  /** Svensk kundetikett (lib/ata/labels.ts) — aldrig rå status i UI:t */
+  status_label: string
+  /** ÄTA-dokumentet som PDF — bara efter utskick */
+  pdf_url: string | null
   status: string
   sign_token: string | null
+  sent_at: string | null
   signed_at: string | null
   signed_by_name: string | null
   created_at: string

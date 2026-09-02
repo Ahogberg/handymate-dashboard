@@ -24,6 +24,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { mapQuoteItemsToInvoiceItems, rotRutLaborBasis } from '@/lib/invoices/quote-to-invoice-items'
+import { ATA_FAKTURERBARA_STATUSAR } from '@/lib/ata/lifecycle'
 
 export interface ProjektFakturaUnderlag {
   ok: true
@@ -150,7 +151,7 @@ export async function byggProjektFakturaUnderlag(
     .select('change_id, description, items, total, change_type')
     .eq('project_id', projectId)
     .eq('business_id', businessId)
-    .in('status', ['approved', 'signed'])
+    .in('status', [...ATA_FAKTURERBARA_STATUSAR])
 
   const ataItems: any[] = []
   if (atas && atas.length > 0) {

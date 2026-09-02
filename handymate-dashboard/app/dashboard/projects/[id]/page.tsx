@@ -94,6 +94,10 @@ import { ProjectCustomerFactsCard } from '@/components/projects/ProjectCustomerF
 import { FramdriftCard } from '@/components/projects/economy/FramdriftCard'
 import { ProjectQuoteSpec } from '@/components/projects/ProjectQuoteSpec'
 import { useFilePreview } from '@/components/documents/FilePreviewProvider'
+import AtaCard from '@/components/projects/ata/AtaCard'
+import ChangeModal from '@/components/projects/ata/ChangeModal'
+import SendAtaDialog from '@/components/projects/ata/SendAtaDialog'
+import DiaryTab from '@/components/projects/diary/DiaryTab'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
@@ -614,9 +618,6 @@ export default function ProjectDetailPage() {
   const [docCategory, setDocCategory] = useState('all')
   const [uploading, setUploading] = useState(false)
   const [generatedDocs, setGeneratedDocs] = useState<any[]>([])
-  const [logs, setLogs] = useState<any[]>([])
-  const [showLogModal, setShowLogModal] = useState(false)
-  const [editingLog, setEditingLog] = useState<any>(null)
   const [checklists, setChecklists] = useState<any[]>([])
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([])
   const [showChecklistCreate, setShowChecklistCreate] = useState(false)
@@ -660,7 +661,8 @@ export default function ProjectDetailPage() {
   // utanför komponenten ändras (status, milestones, tid). Ersätter
   // tidigare setEconomicsRefreshKey(k => k + 1)-mönster.
   const [economicsRefreshKey, setEconomicsRefreshKey] = useState(0)
-  const [sendingAtaId, setSendingAtaId] = useState<string | null>(null)
+  // Vilken ÄTA som just nu skickas (öppnar SendAtaDialog)
+  const [sendAtaId, setSendAtaId] = useState<string | null>(null)
   const [expandedAtaId, setExpandedAtaId] = useState<string | null>(null)
 
   // Projektvy Fas 1 (2026-07-31): statuskortets ekonomistaplar/prognosrad
@@ -1090,7 +1092,6 @@ export default function ProjectDetailPage() {
     if (activeGroup === 'documentation') {
       fetchDocuments()
       fetchGeneratedDocs()
-      fetchLogs()
       fetchChecklists()
       fetchChecklistTemplates()
       fetchFormSubmissions()
@@ -1243,16 +1244,6 @@ export default function ProjectDetailPage() {
     } catch { /* ignore */ }
   }
 
-  const fetchLogs = async () => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/logs`)
-      if (res.ok) {
-        const data = await res.json()
-        setLogs(data.logs || [])
-      }
-    } catch { /* ignore */ }
-  }
-
   const fetchWorkOrders = async () => {
     try {
       const res = await fetch(`/api/work-orders?project_id=${projectId}`)
@@ -1353,38 +1344,6 @@ export default function ProjectDetailPage() {
     })
   }
 
-  const handleSaveLog = async (logData: any) => {
-    try {
-      const method = editingLog ? 'PATCH' : 'POST'
-      const url = editingLog
-        ? `/api/projects/${projectId}/logs/${editingLog.id}`
-        : `/api/projects/${projectId}/logs`
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logData),
-      })
-      if (!res.ok) throw new Error()
-      showToast(editingLog ? 'Anteckning uppdaterad!' : 'Anteckning skapad!', 'success')
-      setShowLogModal(false)
-      setEditingLog(null)
-      fetchLogs()
-    } catch {
-      showToast('Något gick fel', 'error')
-    }
-  }
-
-  const handleDeleteLog = async (logId: string) => {
-    if (!confirm('Ta bort denna dagboksanteckning?')) return
-    try {
-      const res = await fetch(`/api/projects/${projectId}/logs/${logId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
-      showToast('Anteckning borttagen', 'success')
-      fetchLogs()
-    } catch {
-      showToast('Kunde inte ta bort', 'error')
-    }
-  }
 
   const handleCreateChecklist = async (templateId: string, name: string, items: any[]) => {
     try {
@@ -1753,26 +1712,6 @@ export default function ProjectDetailPage() {
     } catch (err: any) {
       showToast(err.message || 'Kunde inte ta bort', 'error')
     }
-  }
-
-  const sendAta = async (changeId: string) => {
-    setSendingAtaId(changeId)
-    try {
-      const res = await fetch(`/api/ata/${changeId}/send`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ method: 'sms' })
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        throw new Error(data.error || 'Error')
-      }
-      showToast('ÄTA skickad till kund', 'success')
-      await fetchProjectData()
-    } catch (err: any) {
-      showToast(err.message || 'Kunde inte skicka ÄTA', 'error')
-    }
-    setSendingAtaId(null)
   }
 
   const createInvoiceFromTime = async () => {
@@ -2165,7 +2104,7 @@ export default function ProjectDetailPage() {
           Nytt tilläggsarbete
         </button>
         <button
-          onClick={() => { setMoreMenuOpen(false); showToast('Faktura-förhandsgranskning kommer snart', 'success') }}
+          onClick={() => { setMoreMenuOpen(false); router.push(`/dashboard/projects/${project.project_id}/invoice-preview`) }}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
         >
           <Receipt className="w-4 h-4 text-slate-400" />
@@ -2820,197 +2759,24 @@ export default function ProjectDetailPage() {
               </div>
             ) : (
               <div className="space-y-3">
-                {changes.map(change => {
-                  const isExpanded = expandedAtaId === change.change_id
-                  // Fyra semantiska lägen, inte nio nyanser (Projektytor-
-                  // redesign 2026-08-14): draft/gray→slate (ej igång),
-                  // sent/blue→teal (pågår, väntar på kund), invoiced/purple
-                  // →emerald (samma "pengarna är i rörelse eller hemma"-
-                  // semantik som getLifecycleStyle i projects/page.tsx).
-                  const statusConfig: Record<string, { label: string; bg: string; text: string; border: string }> = {
-                    draft: { label: 'Utkast', bg: 'bg-slate-100', text: 'text-slate-500', border: 'border-slate-300' },
-                    pending: { label: 'Väntande', bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' },
-                    sent: { label: 'Skickad', bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-200' },
-                    signed: { label: 'Signerad', bg: 'bg-primary-50', text: 'text-primary-700', border: 'border-primary-200' },
-                    approved: { label: 'Godkänd', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
-                    rejected: { label: 'Avslagen', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-                    declined: { label: 'Avböjd', bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
-                    invoiced: { label: 'Fakturerad', bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
-                  }
-                  const sc = statusConfig[change.status] || statusConfig.draft
-
-                  return (
-                    <div key={change.change_id} className="bg-white rounded-xl border border-[#E2E8F0] overflow-hidden">
-                      {/* Header row */}
-                      <button
-                        onClick={() => setExpandedAtaId(isExpanded ? null : change.change_id)}
-                        className="w-full flex items-center gap-3 p-4 text-left hover:bg-gray-50 transition-all"
-                      >
-                        <ChevronRight className={`w-4 h-4 text-gray-400 transition-transform ${isExpanded ? 'rotate-90' : ''}`} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-0.5">
-                            <span className="text-sm font-semibold text-gray-900">
-                              ÄTA-{change.ata_number || '?'}
-                            </span>
-                            <span className={`px-2 py-0.5 text-xs rounded-full border ${
-                              change.change_type === 'addition'
-                                ? 'bg-emerald-100 text-emerald-600 border-emerald-500/30'
-                                : change.change_type === 'change'
-                                ? 'bg-amber-50 text-amber-600 border-amber-200'
-                                : 'bg-red-100 text-red-600 border-red-500/30'
-                            }`}>
-                              {change.change_type === 'addition' ? 'Tillägg' : change.change_type === 'change' ? 'Ändring' : 'Avgående'}
-                            </span>
-                            <span className={`px-2 py-0.5 text-xs rounded-full border ${sc.bg} ${sc.text} ${sc.border}`}>
-                              {sc.label}
-                            </span>
-                          </div>
-                          <p className="text-sm text-gray-600 truncate">{change.description}</p>
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <p className="text-sm font-semibold text-gray-900">
-                            {change.total ? formatCurrency(change.total) : change.amount > 0 ? formatCurrency(change.amount) : '–'}
-                          </p>
-                          <p className="text-xs text-gray-400">{formatDate(change.created_at)}</p>
-                        </div>
-                      </button>
-
-                      {/* Expanded content */}
-                      {isExpanded && (
-                        <div className="border-t border-gray-100 px-4 pb-4">
-                          {/* Items table */}
-                          {change.items && change.items.length > 0 && (
-                            <div className="mt-3">
-                              <table className="w-full text-sm">
-                                <thead>
-                                  <tr className="text-xs text-gray-400 border-b border-gray-100">
-                                    <th className="text-left py-2 font-medium">Rad</th>
-                                    <th className="text-right py-2 font-medium w-16">Antal</th>
-                                    <th className="text-left py-2 font-medium w-16 pl-2">Enhet</th>
-                                    <th className="text-right py-2 font-medium w-24">à-pris</th>
-                                    <th className="text-right py-2 font-medium w-24">Summa</th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {change.items.map((item, idx) => (
-                                    <tr key={idx} className="border-b border-gray-50">
-                                      <td className="py-2 text-gray-700">{item.name}</td>
-                                      <td className="py-2 text-right text-gray-600">{item.quantity}</td>
-                                      <td className="py-2 text-left pl-2 text-gray-500">{item.unit}</td>
-                                      <td className="py-2 text-right text-gray-600">{formatCurrency(item.unit_price)}</td>
-                                      <td className="py-2 text-right font-medium text-gray-900">{formatCurrency(item.quantity * item.unit_price)}</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          )}
-
-                          {/* Notes */}
-                          {change.notes && (
-                            <div className="mt-3 p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
-                              <p className="text-xs text-gray-400 mb-1">Anteckning</p>
-                              {change.notes}
-                            </div>
-                          )}
-
-                          {/* Signing info */}
-                          {change.signed_at && change.signed_by_name && (
-                            <div className="mt-3 flex items-center gap-2 text-xs text-primary-700">
-                              <FileSignature className="w-3.5 h-3.5" />
-                              Signerad av {change.signed_by_name} {formatDate(change.signed_at)}
-                            </div>
-                          )}
-
-                          {change.declined_at && (
-                            <div className="mt-3 flex items-center gap-2 text-xs text-red-600">
-                              <XCircle className="w-3.5 h-3.5" />
-                              Avböjd {formatDate(change.declined_at)}
-                              {change.declined_reason && <span>— {change.declined_reason}</span>}
-                            </div>
-                          )}
-
-                          {/* Actions */}
-                          <div className="mt-4 flex items-center gap-2 flex-wrap">
-                            {/* Send to customer */}
-                            {(change.status === 'draft' || change.status === 'pending') && (
-                              <button
-                                onClick={() => sendAta(change.change_id)}
-                                disabled={sendingAtaId === change.change_id}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-primary-50 text-primary-700 border border-primary-200 rounded-lg text-sm font-medium hover:bg-primary-100 disabled:opacity-50 transition-all"
-                              >
-                                {sendingAtaId === change.change_id
-                                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                  : <Send className="w-3.5 h-3.5" />
-                                }
-                                Skicka till kund
-                              </button>
-                            )}
-
-                            {/* Approve */}
-                            {(change.status === 'pending' || change.status === 'sent' || change.status === 'signed') && (
-                              <button
-                                onClick={() => updateChangeStatus(change.change_id, 'approved')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 text-emerald-600 border border-emerald-200 rounded-lg text-sm font-medium hover:bg-emerald-100 transition-all"
-                              >
-                                <CheckCircle className="w-3.5 h-3.5" />
-                                Godkänn
-                              </button>
-                            )}
-
-                            {/* Reject */}
-                            {(change.status === 'pending' || change.status === 'sent') && (
-                              <button
-                                onClick={() => updateChangeStatus(change.change_id, 'rejected')}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-red-50 text-red-600 border border-red-200 rounded-lg text-sm font-medium hover:bg-red-100 transition-all"
-                              >
-                                <XCircle className="w-3.5 h-3.5" />
-                                Avslå
-                              </button>
-                            )}
-
-                            {/* Edit */}
-                            {(change.status === 'draft' || change.status === 'pending') && (
-                              <button
-                                onClick={() => setChangeModal({ open: true, editing: change })}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-[#E2E8F0] rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
-                              >
-                                <Edit className="w-3.5 h-3.5" />
-                                Redigera
-                              </button>
-                            )}
-
-                            {/* Copy sign link */}
-                            {change.sign_token && change.status === 'sent' && (
-                              <button
-                                onClick={() => {
-                                  const url = `${window.location.origin}/sign/ata/${change.sign_token}`
-                                  navigator.clipboard.writeText(url)
-                                  showToast('Signeringslänk kopierad', 'success')
-                                }}
-                                className="flex items-center gap-1.5 px-3 py-1.5 bg-gray-50 text-gray-600 border border-[#E2E8F0] rounded-lg text-sm font-medium hover:bg-gray-100 transition-all"
-                              >
-                                <Copy className="w-3.5 h-3.5" />
-                                Kopiera länk
-                              </button>
-                            )}
-
-                            {/* Delete */}
-                            {(change.status === 'draft' || change.status === 'pending') && (
-                              <button
-                                onClick={() => deleteChange(change.change_id)}
-                                className="flex items-center gap-1.5 px-3 py-1.5 text-red-500 hover:bg-red-50 rounded-lg text-sm transition-all ml-auto"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                Ta bort
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
+                {changes.map(change => (
+                  <AtaCard
+                    key={change.change_id}
+                    change={change}
+                    projectId={projectId}
+                    pricesRedacted={ataPricesRedacted}
+                    expanded={expandedAtaId === change.change_id}
+                    onToggle={() => setExpandedAtaId(expandedAtaId === change.change_id ? null : change.change_id)}
+                    onSend={() => setSendAtaId(change.change_id)}
+                    onApprove={() => updateChangeStatus(change.change_id, 'approved')}
+                    onReject={() => updateChangeStatus(change.change_id, 'rejected')}
+                    onEdit={() => setChangeModal({ open: true, editing: change })}
+                    onDelete={() => deleteChange(change.change_id)}
+                    onToast={showToast}
+                    formatCurrency={formatCurrency}
+                    formatDate={formatDate}
+                  />
+                ))}
               </div>
             )}
           </div>
@@ -3879,141 +3645,17 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* === TAB: Byggdagbok === */}
+        {/* === TAB: Byggdagbok ===
+            Etapp E1 (2026-09-02): hela dagboken bor i components/projects/diary/
+            (DiaryTab äger state, filter, modal, attest, foton). Sidan
+            skickar bara projekt + ÄTA-lista för kopplingsvalet. */}
         {activeGroup === 'documentation' && (
-          <div className="space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="min-w-0 text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-amber-400" />
-                Byggdagbok {project?.name ? `\u2014 ${project.name}` : ''}
-              </h2>
-              <div className="flex flex-wrap items-center gap-2">
-                {logs.length > 0 && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch(`/api/projects/${projectId}/logs/pdf`)
-                        if (!res.ok) throw new Error()
-                        const blob = await res.blob()
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = `byggdagbok-${project?.name || projectId}.pdf`
-                        a.click()
-                        URL.revokeObjectURL(url)
-                      } catch {
-                        showToast('Kunde inte exportera PDF', 'error')
-                      }
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors"
-                  >
-                    <Download className="w-4 h-4" /> Exportera PDF
-                  </button>
-                )}
-                <button
-                  onClick={() => { setEditingLog(null); setShowLogModal(true) }}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
-                >
-                  <Plus className="w-4 h-4" /> Ny dagbokspost
-                </button>
-              </div>
-            </div>
-
-            {logs.length > 0 ? (
-              <div className="space-y-4">
-                {logs.map((log: any) => {
-                  const weatherMap: Record<string, string> = { sunny: '\u2600\uFE0F Sol', cloudy: '\u26C5 Mulet', rainy: '\uD83C\uDF27\uFE0F Regn', snowy: '\u2744\uFE0F Snö', windy: '\uD83C\uDF2C\uFE0F Blåsigt' }
-                  const weatherLabel = log.weather ? weatherMap[log.weather] || log.weather : null
-                  return (
-                    <div key={log.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="text-gray-900 font-semibold">
-                            {new Date(log.date + 'T00:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                          </p>
-                          {log.business_user && (
-                            <p className="text-xs text-gray-400 mt-0.5">{log.business_user.name}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
-                          {weatherLabel && (
-                            <span>{weatherLabel}{log.temperature != null ? `, ${log.temperature}°C` : ''}</span>
-                          )}
-                          {log.workers_count != null && (
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3.5 h-3.5" />
-                              {log.workers_count} arbetare
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {log.work_performed && (
-                        <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{log.work_performed}</p>
-                      )}
-
-                      {log.materials_used && (
-                        <p className="text-xs text-gray-500 mb-2">
-                          <span className="font-medium text-gray-600">Material:</span> {log.materials_used}
-                        </p>
-                      )}
-
-                      {log.issues && (
-                        <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800">{log.issues}</p>
-                        </div>
-                      )}
-
-                      {log.description && (
-                        <p className="text-xs text-gray-400 italic">{log.description}</p>
-                      )}
-
-                      {log.photos && log.photos.length > 0 && (
-                        <div className="flex gap-2 mt-2 overflow-x-auto">
-                          {log.photos.map((photo: any, i: number) => (
-                            <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                              <img src={photo.url} alt={photo.caption || `Foto ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-[#E2E8F0]" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <button
-                          onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                          className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
-                        >
-                          <Edit className="w-3.5 h-3.5" /> Redigera
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLog(log.id)}
-                          className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 ml-auto"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Ta bort
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-400">Inga dagboksanteckningar ännu</p>
-                <p className="text-xs text-gray-400 mt-1">Dokumentera arbetet dag för dag</p>
-              </div>
-            )}
-
-            {/* Log Modal */}
-            {showLogModal && (
-              <LogModal
-                editing={editingLog}
-                onClose={() => { setShowLogModal(false); setEditingLog(null) }}
-                onSave={handleSaveLog}
-              />
-            )}
-          </div>
+          <DiaryTab
+            projectId={projectId}
+            projectName={project?.name || null}
+            atas={changes.map(c => ({ change_id: c.change_id, ata_number: c.ata_number ?? null, description: c.description, status: c.status }))}
+            showToast={showToast}
+          />
         )}
 
         {/* === TAB: Checklistor === */}
@@ -4314,6 +3956,7 @@ export default function ProjectDetailPage() {
               projectId={projectId}
               refreshKey={economicsRefreshKey}
               onInvoiceProject={() => setShowInvoiceModal(true)}
+              onNewAta={() => setChangeModal({ open: true, editing: null })}
             />
           </>
         )}
@@ -4791,11 +4434,28 @@ export default function ProjectDetailPage() {
           editing={changeModal.editing}
           customerId={project?.customer_id || null}
           onClose={() => setChangeModal({ open: false, editing: null })}
-          onSaved={() => {
+          onSaved={({ changeId, sendNow }) => {
             setChangeModal({ open: false, editing: null })
             setEconomicsRefreshKey(k => k + 1)
             fetchProjectData()
             showToast(changeModal.editing ? 'ÄTA uppdaterad' : 'ÄTA skapad', 'success')
+            // "Skapa & skicka": öppna utskicksdialogen direkt för den nya ÄTA:n.
+            if (sendNow) setSendAtaId(changeId)
+          }}
+          onError={(msg) => showToast(msg, 'error')}
+        />
+      )}
+
+      {/* === Skicka ÄTA (bekräftelse med mottagare + SMS-text) === */}
+      {sendAtaId && (
+        <SendAtaDialog
+          changeId={sendAtaId}
+          ataNumber={changes.find(c => c.change_id === sendAtaId)?.ata_number ?? null}
+          onClose={() => setSendAtaId(null)}
+          onSent={() => {
+            setSendAtaId(null)
+            showToast('ÄTA skickad till kund', 'success')
+            fetchProjectData()
           }}
           onError={(msg) => showToast(msg, 'error')}
         />
@@ -5179,455 +4839,9 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
   )
 }
 
-// --- Change (ATA) Modal ---
+// ÄTA-modalen bor i components/projects/ata/ChangeModal.tsx (2026-09-02).
 
-function ChangeModal({ projectId, editing, customerId, onClose, onSaved, onError }: {
-  projectId: string
-  editing: Change | null
-  customerId: string | null
-  onClose: () => void
-  onSaved: () => void
-  onError: (msg: string) => void
-}) {
-  const [changeType, setChangeType] = useState<'addition' | 'change' | 'removal'>(
-    (editing?.change_type as any) || 'addition'
-  )
-  const [description, setDescription] = useState(editing?.description || '')
-  const [notes, setNotes] = useState(editing?.notes || '')
-  const [hours, setHours] = useState(editing?.hours?.toString() || '')
-  const [saving, setSaving] = useState(false)
-
-  // Item rows. A6 (Prisslingan V2, stänger TD-26): rot_rut_type per rad —
-  // utan flaggan blev VARJE ÄTA-rad ROT-lös på fakturan (40 000 kr arbete
-  // → 0 kr avdrag). '' = inget avdrag (default, som förut).
-  const [items, setItems] = useState<{ id: string; name: string; quantity: number; unit: string; unit_price: number; rot_rut_type: '' | 'rot' | 'rut' }[]>(
-    editing?.items?.map((item, idx) => ({
-      id: `item_${idx}`,
-      name: item.name || '',
-      quantity: item.quantity || 1,
-      unit: item.unit || 'st',
-      unit_price: item.unit_price || 0,
-      rot_rut_type: item.rot_rut_type === 'rot' ? 'rot' : item.rot_rut_type === 'rut' ? 'rut' : '',
-    })) || [{ id: 'item_0', name: '', quantity: 1, unit: 'st', unit_price: 0, rot_rut_type: '' as const }]
-  )
-
-  const addItem = () => {
-    setItems(prev => [...prev, { id: `item_${Date.now()}`, name: '', quantity: 1, unit: 'st', unit_price: 0, rot_rut_type: '' }])
-  }
-
-  const updateItemField = (id: string, field: string, value: any) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, [field]: value } : item))
-  }
-
-  const removeItem = (id: string) => {
-    if (items.length <= 1) return
-    setItems(prev => prev.filter(item => item.id !== id))
-  }
-
-  const total = items.reduce((sum, item) => sum + (item.quantity * item.unit_price), 0)
-
-  const handleSave = async () => {
-    if (!description.trim()) {
-      onError('Beskrivning krävs')
-      return
-    }
-    setSaving(true)
-    try {
-      const validItems = items.filter(i => i.name.trim()).map(i => ({
-        name: i.name.trim(),
-        quantity: i.quantity,
-        unit: i.unit,
-        unit_price: i.unit_price,
-        // A6: både rot_rut_type (AtaItem-formen) och de explicita flaggorna
-        // som faktureringsvägarna läser (create-final-invoice, invoice-draft).
-        rot_rut_type: i.rot_rut_type || null,
-        is_rot_eligible: i.rot_rut_type === 'rot',
-        is_rut_eligible: i.rot_rut_type === 'rut',
-      }))
-
-      if (editing) {
-        // Update existing
-        const res = await fetch(`/api/ata/${editing.change_id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            change_type: changeType,
-            description: description.trim(),
-            items: validItems,
-            hours: hours ? parseFloat(hours) : 0,
-            notes: notes.trim() || null,
-          })
-        })
-        if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'Error')
-        }
-      } else {
-        // Create new
-        const res = await fetch('/api/ata', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            projectId,
-            changeType,
-            description: description.trim(),
-            items: validItems,
-            hours: hours ? parseFloat(hours) : 0,
-            notes: notes.trim() || null,
-            customerId,
-          })
-        })
-        if (!res.ok) {
-          const data = await res.json()
-          throw new Error(data.error || 'Error')
-        }
-      }
-      onSaved()
-    } catch (err: any) {
-      onError(err.message || 'Kunde inte spara ÄTA')
-      setSaving(false)
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-gray-900">{editing ? 'Redigera ÄTA' : 'Ny ÄTA'}</h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="space-y-4">
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Typ</label>
-            <div className="grid grid-cols-3 gap-2">
-              {([
-                { key: 'addition' as const, label: 'Tillägg', color: 'emerald' },
-                { key: 'change' as const, label: 'Ändring', color: 'amber' },
-                { key: 'removal' as const, label: 'Avgående', color: 'red' }
-              ]).map(opt => (
-                <button
-                  key={opt.key}
-                  onClick={() => setChangeType(opt.key)}
-                  className={`p-3 rounded-xl text-sm font-medium text-center transition-all border ${
-                    changeType === opt.key
-                      ? opt.color === 'emerald'
-                        ? 'bg-emerald-100 border-emerald-500/30 text-emerald-600'
-                        : opt.color === 'amber'
-                        ? 'bg-amber-50 border-amber-200 text-amber-600'
-                        : 'bg-red-100 border-red-500/30 text-red-600'
-                      : 'bg-gray-100 border-gray-300 text-gray-500'
-                  }`}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-          </div>
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Beskrivning *</label>
-            <textarea
-              value={description}
-              onChange={e => setDescription(e.target.value)}
-              rows={2}
-              placeholder="Beskriv ändringar/tillägg..."
-              autoFocus
-              className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E] resize-none"
-            />
-          </div>
-
-          {/* Item rows */}
-          <div>
-            <label className="text-sm text-gray-500 mb-2 block">Rader</label>
-            <div className="space-y-2">
-              {items.map(item => (
-                <div key={item.id} className="flex items-center gap-2">
-                  <input
-                    type="text"
-                    value={item.name}
-                    onChange={e => updateItemField(item.id, 'name', e.target.value)}
-                    placeholder="Namn"
-                    className="flex-1 min-w-0 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-                  />
-                  <input
-                    type="number"
-                    value={item.quantity || ''}
-                    onChange={e => updateItemField(item.id, 'quantity', Number(e.target.value) || 0)}
-                    placeholder="Antal"
-                    min="0"
-                    step="0.5"
-                    className="w-16 px-2 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:border-[#0F766E]"
-                  />
-                  <select
-                    value={item.unit}
-                    onChange={e => updateItemField(item.id, 'unit', e.target.value)}
-                    className="w-16 px-1 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-600 text-sm focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value="st">st</option>
-                    <option value="timme">tim</option>
-                    <option value="kvm">m²</option>
-                    <option value="m">m</option>
-                    <option value="lpm">lpm</option>
-                    <option value="kg">kg</option>
-                    <option value="paket">pkt</option>
-                  </select>
-                  <select
-                    value={item.rot_rut_type}
-                    onChange={e => updateItemField(item.id, 'rot_rut_type', e.target.value)}
-                    title="ROT-/RUT-berättigat arbete — styr avdraget när ÄTA:n faktureras"
-                    className="w-16 px-1 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-600 text-sm focus:outline-none focus:border-[#0F766E]"
-                  >
-                    <option value="">–</option>
-                    <option value="rot">ROT</option>
-                    <option value="rut">RUT</option>
-                  </select>
-                  <input
-                    type="number"
-                    value={item.unit_price || ''}
-                    onChange={e => updateItemField(item.id, 'unit_price', Number(e.target.value) || 0)}
-                    placeholder="à-pris"
-                    min="0"
-                    className="w-24 px-2 py-2 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 text-sm text-right focus:outline-none focus:border-[#0F766E]"
-                  />
-                  <button
-                    onClick={() => removeItem(item.id)}
-                    className="p-1.5 text-gray-300 hover:text-red-500 transition-colors"
-                    disabled={items.length <= 1}
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              ))}
-              <button
-                onClick={addItem}
-                className="flex items-center gap-1.5 text-sm text-primary-700 hover:text-primary-700 font-medium"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Lägg till rad
-              </button>
-            </div>
-            {total > 0 && (
-              <div className="mt-2 text-right text-sm font-semibold text-gray-900">
-                Summa: {total.toLocaleString('sv-SE')} kr
-              </div>
-            )}
-          </div>
-
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Timmar (valfritt)</label>
-              <input
-                type="number"
-                value={hours}
-                onChange={e => setHours(e.target.value)}
-                placeholder="0"
-                min="0"
-                step="0.5"
-                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-              />
-            </div>
-            <div>
-              <label className="text-sm text-gray-500 mb-2 block">Anteckning</label>
-              <input
-                type="text"
-                value={notes}
-                onChange={e => setNotes(e.target.value)}
-                placeholder="Intern notering..."
-                className="w-full px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:border-[#0F766E]"
-              />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex gap-3 mt-6">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-3 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 hover:bg-gray-200"
-          >
-            Avbryt
-          </button>
-          <button
-            onClick={handleSave}
-            disabled={saving || !description.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-3 bg-primary-700 rounded-xl text-white font-medium hover:opacity-90 disabled:opacity-50"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {editing ? 'Spara' : 'Skapa'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// --- Log Modal (Byggdagbok) ---
-
-function LogModal({ editing, onClose, onSave }: {
-  editing: any
-  onClose: () => void
-  onSave: (data: any) => void
-}) {
-  const [logDate, setLogDate] = useState(editing?.date || new Date().toISOString().split('T')[0])
-  const [weather, setWeather] = useState(editing?.weather || '')
-  const [temperature, setTemperature] = useState(editing?.temperature?.toString() || '')
-  const [workDescription, setWorkDescription] = useState(editing?.work_performed || '')
-  const [materialsUsed, setMaterialsUsed] = useState(editing?.materials_used || '')
-  const [hoursWorked, setHoursWorked] = useState(editing?.hours_worked?.toString() || '')
-  const [workersPresent, setWorkersPresent] = useState(editing?.workers_count?.toString() || '')
-  const [deviations, setDeviations] = useState(editing?.issues || '')
-  const [notes, setNotes] = useState(editing?.description || '')
-  const [saving, setSaving] = useState(false)
-
-  const weatherOptions = [
-    { value: 'sunny', emoji: '\u2600\uFE0F', label: 'Sol' },
-    { value: 'cloudy', emoji: '\u26C5', label: 'Mulet' },
-    { value: 'rainy', emoji: '\uD83C\uDF27\uFE0F', label: 'Regn' },
-    { value: 'snowy', emoji: '\u2744\uFE0F', label: 'Snö' },
-  ]
-
-  const handleSubmit = () => {
-    if (!workDescription.trim()) return
-    setSaving(true)
-    onSave({
-      log_date: logDate,
-      weather: weather || null,
-      temperature: temperature ? parseFloat(temperature) : null,
-      work_description: workDescription.trim(),
-      materials_used: materialsUsed.trim() || null,
-      hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
-      workers_present: workersPresent ? parseInt(workersPresent) : null,
-      deviations: deviations.trim() || null,
-      notes: notes.trim() || null,
-    })
-  }
-
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {editing ? 'Redigera dagbokspost' : 'Ny dagbokspost'}
-          </h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Datum */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Datum</label>
-            <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} className={inputCls} />
-          </div>
-
-          {/* Väder — emoji knappar */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Väder</label>
-            <div className="flex gap-2">
-              {weatherOptions.map(w => (
-                <button
-                  key={w.value}
-                  type="button"
-                  onClick={() => setWeather(weather === w.value ? '' : w.value)}
-                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-lg border text-sm transition-all ${
-                    weather === w.value
-                      ? 'bg-primary-50 border-primary-400 text-primary-700 ring-1 ring-primary-400'
-                      : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="text-lg">{w.emoji}</span>
-                  <span className="text-xs">{w.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Temperatur + Arbetare */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Temperatur (°C)</label>
-              <input type="number" value={temperature} onChange={e => setTemperature(e.target.value)} placeholder="0" className={inputCls} />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Antal arbetare</label>
-              <input type="number" value={workersPresent} onChange={e => setWorkersPresent(e.target.value)} placeholder="0" min="0" className={inputCls} />
-            </div>
-          </div>
-
-          {/* Vad gjordes idag */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Vad gjordes idag *</label>
-            <textarea
-              value={workDescription}
-              onChange={e => setWorkDescription(e.target.value)}
-              rows={3}
-              placeholder="Beskriv dagens arbete..."
-              autoFocus
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {/* Material */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Material som användes</label>
-            <textarea
-              value={materialsUsed}
-              onChange={e => setMaterialsUsed(e.target.value)}
-              rows={2}
-              placeholder="T.ex. 10m kopparrör, 5 kopplingar..."
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {/* Avvikelser */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Avvikelser</label>
-            <textarea
-              value={deviations}
-              onChange={e => setDeviations(e.target.value)}
-              rows={2}
-              placeholder="Avvikelser från plan, problem eller hinder..."
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {/* Anteckningar */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Anteckningar</label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Övriga anteckningar..."
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Avbryt
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !workDescription.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {editing ? 'Spara' : 'Skapa dagbokspost'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+// Dagboksmodalen bor i components/projects/diary/DiaryEntryModal.tsx (2026-09-02).
 
 // --- Work Order Modal ---
 

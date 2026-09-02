@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 import { canTransitionAta, isAtaEditable, ataTransitionError } from '@/lib/ata/lifecycle'
+import { skapaAta } from '@/lib/ata/create-ata'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -68,26 +69,39 @@ export async function POST(
     const body = await request.json()
 
     if (!body.description || !body.change_type) {
-      return NextResponse.json({ error: 'Description and change_type required' }, { status: 400 })
+      return NextResponse.json({ error: 'Beskrivning och typ av ändring krävs' }, { status: 400 })
     }
 
-    const { data: change, error } = await supabase
-      .from('project_change')
-      .insert({
-        business_id: business.business_id,
-        project_id: params.id,
-        change_type: body.change_type,
-        description: body.description,
-        amount: body.amount || 0,
-        hours: body.hours || 0,
-        status: 'pending'
-      })
-      .select()
-      .single()
+    // Projektet kommer ur URL:en — verifiera att det tillhör företaget
+    // innan något skrivs (service role kringgår RLS).
+    const { data: project } = await supabase
+      .from('project')
+      .select('project_id, customer_id')
+      .eq('project_id', params.id)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
+    if (!project) {
+      return NextResponse.json({ error: 'Projektet hittades inte' }, { status: 404 })
+    }
 
-    if (error) throw error
+    // Samma skapande-väg som /api/ata (lib/ata/create-ata.ts). Tidigare
+    // skapade den här rutten ÄTA utan sign_token/rader/total i status
+    // 'pending' — en sådan ÄTA gick aldrig att skicka till kund.
+    const resultat = await skapaAta(supabase, business, {
+      projectId: params.id,
+      changeType: body.change_type,
+      description: body.description,
+      items: body.items,
+      hours: body.hours,
+      notes: body.notes,
+      amount: body.amount,
+      customerId: body.customer_id || project.customer_id || null,
+    })
+    if (!resultat.ok) {
+      return NextResponse.json({ error: resultat.error }, { status: resultat.status })
+    }
 
-    return NextResponse.json({ change })
+    return NextResponse.json({ change: resultat.ata })
 
   } catch (error: any) {
     console.error('Create change error:', error)
@@ -112,7 +126,7 @@ export async function PUT(
     const body = await request.json()
 
     if (!body.change_id) {
-      return NextResponse.json({ error: 'Missing change_id' }, { status: 400 })
+      return NextResponse.json({ error: 'ÄTA-id saknas' }, { status: 400 })
     }
 
     /**
@@ -224,19 +238,28 @@ export async function DELETE(
     const changeId = request.nextUrl.searchParams.get('changeId')
 
     if (!changeId) {
-      return NextResponse.json({ error: 'Missing changeId' }, { status: 400 })
+      return NextResponse.json({ error: 'ÄTA-id saknas' }, { status: 400 })
     }
 
-    // Only allow deleting pending changes
+    // Uppslaget inom företaget+projektet — annars kan en främmande
+    // change_id svara "kan inte tas bort" i stället för 404.
     const { data: existing } = await supabase
       .from('project_change')
       .select('status')
       .eq('change_id', changeId)
-      .single()
+      .eq('project_id', params.id)
+      .eq('business_id', business.business_id)
+      .maybeSingle()
 
-    if (existing?.status !== 'pending') {
+    if (!existing) {
+      return NextResponse.json({ error: 'ÄTA hittades inte' }, { status: 404 })
+    }
+
+    // Bara oskickade ÄTA (draft/pending) får raderas — allt kunden sett
+    // ska finnas kvar som spår.
+    if (!isAtaEditable(existing.status)) {
       return NextResponse.json(
-        { error: 'Kan bara ta bort väntande ÄTA' },
+        { error: 'Bara oskickade ÄTA kan tas bort' },
         { status: 400 }
       )
     }

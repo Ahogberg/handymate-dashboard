@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCustomerFromPortalToken } from '@/lib/portal-link'
+import { normaliseraAtaRader } from '@/lib/ata/items'
+import { beraknaAtaSummor } from '@/lib/ata/totals'
+import { ataKundStatusLabel } from '@/lib/ata/labels'
 
 // Force-dynamic så Vercel Edge inte cachar respons. Token-baserade publika
 // routes är cache-känsliga (samma URL = samma key) och nyligen ändrade rader
@@ -112,10 +115,12 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
             .order('start_datetime', { ascending: true }),
           supabase
             .from('project_change')
-            .select('project_id, change_id, ata_number, change_type, description, items, total, status, sign_token, signed_at, signed_by_name, created_at')
+            .select('project_id, change_id, ata_number, change_type, description, items, total, vat_rate, status, sign_token, sent_at, signed_at, signed_by_name, created_at')
             .in('project_id', ids)
             .eq('business_id', customer.business_id)
-            .in('status', ['sent', 'signed', 'approved'])
+            // Kunden ser allt hen fått: skickat, signerat, godkänt och
+            // fakturerat. Utkast/väntande är hantverkarens interna.
+            .in('status', ['sent', 'signed', 'approved', 'invoiced'])
             .order('ata_number', { ascending: true }),
           supabase
             .from('project_stages')
@@ -166,11 +171,27 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       milestones: (milestonesPer.get(p.project_id) || []).map(({ project_id: _p, ...m }: any) => m),
       latestLog: (logsPer.get(p.project_id) || [])[0] || null,
       nextVisit: (schedulePer.get(p.project_id) || [])[0] || null,
-      atas: (ataPer.get(p.project_id) || []).map((a: any) => ({
-        ...a,
-        // Only expose sign_token for ÄTAs that need signing
-        sign_token: a.status === 'sent' ? a.sign_token : null,
-      })),
+      atas: (ataPer.get(p.project_id) || []).map((a: any) => {
+        // ÄTA-dokumentet (v195): normaliserade rader + summor med moms/ROT
+        // räknade på samma sätt som PDF:en och signeringssidan.
+        const vatRate = Number(a.vat_rate ?? 25)
+        const items = normaliseraAtaRader(a.items)
+        const summor = beraknaAtaSummor(items, vatRate, a.change_type)
+        return {
+          ...a,
+          items,
+          vat_rate: vatRate,
+          summor,
+          status_label: ataKundStatusLabel(a.status),
+          // Publika PDF-rutten svarar 404 för draft/pending, så länken är
+          // bara meningsfull för det kunden faktiskt fått.
+          pdf_url: a.sign_token && ['sent', 'signed', 'approved', 'invoiced'].includes(a.status)
+            ? `/api/ata/sign/${a.sign_token}/pdf`
+            : null,
+          // Only expose sign_token for ÄTAs that need signing
+          sign_token: a.status === 'sent' ? a.sign_token : null,
+        }
+      }),
       tracker_stages: (stagesPer.get(p.project_id) || []).map(({ project_id: _p, ...s }: any) => s),
       photos: (photosPer.get(p.project_id) || []).slice(0, 12),
       // Samma driftläge som hantverkarens lista — en sanning, två läsare.
