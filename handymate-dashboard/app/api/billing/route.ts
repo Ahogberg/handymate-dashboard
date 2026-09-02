@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { isFoundersOfferAvailable } from '@/lib/billing/founders-offer'
+import { hamtaForstaKvitto } from '@/lib/billing/forsta-kvitto'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -75,9 +76,11 @@ export async function GET(request: NextRequest) {
     // källa — inte innan.
     const now = new Date()
 
-    // Beräkna trial-dagar kvar
+    // Beräkna trial-dagar kvar. 'trial' = nyregistrerad utan Stripe,
+    // 'trialing' = Stripe-prenumeration i trial — båda har trial_ends_at.
+    const iProvperiod = billingData?.subscription_status === 'trialing' || billingData?.subscription_status === 'trial'
     let trialDaysLeft = 0
-    if (billingData?.subscription_status === 'trialing' && billingData?.trial_ends_at) {
+    if (iProvperiod && billingData?.trial_ends_at) {
       const trialEnd = new Date(billingData.trial_ends_at)
       const diffMs = trialEnd.getTime() - now.getTime()
       trialDaysLeft = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
@@ -88,6 +91,11 @@ export async function GET(request: NextRequest) {
     // GET /api/billing (redan anropad av sidan vid load) i stället för en
     // ny fetch. Server-härlett, se lib/billing/founders-offer.ts.
     const foundersAvailable = await isFoundersOfferAvailable(supabase)
+
+    // Aktivera senare (2026-09-02): första verifierade värdekvittot avgör
+    // när betalfrågan ställs igen (components/BillingStatusBanner.tsx).
+    // Bara för konton utan Stripe-prenumeration — betalande behöver ingen.
+    const firstReceipt = billingData?.stripe_subscription_id ? null : await hamtaForstaKvitto(supabase, businessId)
 
     return NextResponse.json({
       plan: {
@@ -106,10 +114,11 @@ export async function GET(request: NextRequest) {
         period_end: billingData?.billing_period_end || null
       },
       trial: {
-        is_trialing: billingData?.subscription_status === 'trialing',
+        is_trialing: iProvperiod,
         ends_at: billingData?.trial_ends_at || null,
         days_left: trialDaysLeft
       },
+      first_receipt: firstReceipt,
       all_plans: allPlans
     })
   } catch (error: any) {

@@ -1,3 +1,58 @@
+# Nattpass 4: Aktivera senare + fyra ogrindade automationer (Claude 2026-09-02)
+
+Andreas beslut i chatten: "Ta punkt 1 och 5 du så tar vi 3 och 4 imorgon."
+
+## Punkt 1 — betalningen flyttad från steg 4 till efter första värdekvittot
+- [x] Step5Activate: sekundär knapp "Aktivera senare — betala när teamet
+      bevisat sitt första resultat" (inte i demo). Stripe-vägen orörd
+- [x] app/onboarding/page.tsx deferActivation: stämplar
+      onboarding_data.activationDeferredAt (ingen kolumn), hoppar till steg 5
+- [x] Tratten (lib/onboarding/funnel.ts + admin): "Sköt upp betalning"
+- [x] lib/billing/forsta-kvitto.ts: första verifierade kvittot ur
+      pending_approvals (RECEIPT_APPROVAL_TYPES + execution_result.outcome
+      = success + buildValueReceipt). GET /api/billing → first_receipt;
+      'trial' räknas nu som provperiod (is_trialing/days_left)
+- [x] components/BillingStatusBanner.tsx: läste data.subscription_status som
+      rutten aldrig returnerat → bannern var osynlig för ALLA. Läser nu
+      subscription.status/trial.ends_at/first_receipt. Ny teal-banner
+      "Teamet har levererat sitt första resultat: … Aktivera Handymate" när
+      kontot saknar Stripe-prenumeration. Utgången provperiod vinner
+- [x] lib/billing/aktiva-konton.ts: morgonbrief + nästa-bästa-handling
+      filtrerade hårt på subscription_status = 'active' — provperiodskonton
+      fick varken brief eller kort och kunde aldrig få ett kvitto. Nu ingår
+      trial/trialing med klar onboarding och giltig trial_ends_at
+- Kvar oförändrat (beslut): 14 dagars trial_ends_at är fortfarande gränsen
+  (lib/auth.ts checkSubscriptionStatus). Betalfrågan ställs vid kvittot,
+  senast vid provperiodens slut
+
+## Punkt 5 — Launch Truth Gate punkt 8 (fyra ogrindade mot kund)
+- [x] 1. Bokningspåminnelse 24 h: kräver uttryckligt
+      automation_settings.sms_day_before_reminder = true (isolerad,
+      fail-closed läsning) + ligger nu bakom agents_globally_paused i
+      agent-context. Prod: 0 rader i automation_settings, 0 skickade/30 d
+- [x] 2+3. Mattes kundsvar SMS/mejl: business_config.matte_customer_reply_enabled
+      (sql/v196, KÖRD, default false). Av → svaret blir ett send_sms-kort
+      ("Matte vill svara …") som ägaren godkänner. Prod: 0 matte_reply/30 d
+- [x] 4. Recensionsförfrågan via tidsutgång i maintenance BORTTAGEN: ett
+      obesvarat kort expirerar i steg 1, skickar aldrig. Manuellt
+      godkännande kvar. Prod: 0 väntande kort
+- [x] Facit: tests/facit-ogrindade-automationer.spec.ts +
+      tests/aktivera-senare.spec.ts i kontraktsgrinden
+- [x] tests/pricing-truth.spec.ts: Firman users 5 → null (följer Andreas
+      2a6eda7 "ta bort Firmans användartak"; var röd på main)
+
+## Sparade beslut (Andreas 2026-09-02: "de två besluten kan vi ju spara ner")
+- Tyst tid för push är konstant 21:00–07:00 svensk tid. Per-företag/
+  per-person-inställning ("stör inte mellan …") byggs när någon ber om det.
+- lib/smart-communication.ts isQuietHours räknar på serverns UTC-klocka
+  (canSendMessage, kund-SMS via communication-ai). Ska peka på
+  lib/tysta-timmar.ts som hub-gate och push gör. Inte rört.
+
+## Imorgon (Andreas + Claude): punkt 3 "Säg det en gång" mobilt och
+   punkt 4 veckorapport med värdekvitton — spec först, sedan bygge.
+
+---
+
 # Nattpass 3: tyst tid för push + två gamla facit (Claude 2026-09-02)
 
 - [x] tests/first-focus + tests/job-type-start: pekade på Step6LiveTour för

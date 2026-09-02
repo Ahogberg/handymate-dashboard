@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
-import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -37,7 +36,8 @@ export async function GET(request: NextRequest) {
       .from('pending_approvals')
       .update({ status: 'expired' })
       .eq('status', 'pending')
-      .neq('approval_type', 'scheduled_review_request') // Hanteras i steg 3
+      // scheduled_review_request ingår: ett obesvarat kort är ett nej,
+      // aldrig ett samtycke (punkt 8, 2026-09-02 — se steg 3 nedan).
       .lt('expires_at', new Date().toISOString())
       .select('id')
 
@@ -94,103 +94,17 @@ export async function GET(request: NextRequest) {
     results.phone_sync_error = err.message
   }
 
-  // ── 3. Skicka schemalagda recensionsförfrågningar ────────────
-  try {
-    const { data: dueReviews } = await supabase
-      .from('pending_approvals')
-      .select('id, business_id, payload')
-      .eq('approval_type', 'scheduled_review_request')
-      .eq('status', 'pending')
-      .lt('expires_at', new Date().toISOString())
-
-    // Pre-fetch assigned_phone_number för alla berörda företag
-    const reviewBizIds = Array.from(new Set((dueReviews || []).map((r: any) => r.business_id as string)))
-    const reviewPhoneMap = new Map<string, string | null>()
-    if (reviewBizIds.length > 0) {
-      const { data: bizPhones } = await supabase
-        .from('business_config')
-        .select('business_id, assigned_phone_number')
-        .in('business_id', reviewBizIds)
-      for (const b of bizPhones || []) {
-        reviewPhoneMap.set(b.business_id, b.assigned_phone_number)
-      }
-    }
-
-    let reviewsSent = 0
-    for (const review of dueReviews || []) {
-      const p = review.payload as any
-      if (!p?.customer_phone || !p?.google_review_url) {
-        await supabase.from('pending_approvals').update({ status: 'expired' }).eq('id', review.id)
-        continue
-      }
-
-      try {
-        const firstName = (p.customer_name || '').split(' ')[0]
-        const bizName = p.business_name || 'Handymate'
-        const suffix = buildSmsSuffix(bizName, reviewPhoneMap.get(review.business_id))
-
-        // Portal-länk istället för extern Google-URL — kunden landar i sin kundportal
-        const { getOrCreatePortalLink } = await import('@/lib/portal-link')
-        const portalUrl = p.customer_id
-          ? await getOrCreatePortalLink(supabase, p.customer_id, 'review')
-          : null
-        const reviewLink = portalUrl || p.google_review_url
-
-        // ═══ GENOM STRYPUNKTEN (etapp 0 batch 3, 2026-08-08) ═══
-        //
-        // Den ENDA av de tre cron-vägarna som går till en KUND — alltså den
-        // enda där opt-out ska gälla, och den gällde inte. En kund som svarat
-        // STOPP fick ändå en förfrågan om att lämna recension.
-        //
-        // Meddelandet innehåller dessutom ett långt tankstreck ("recension —
-        // det hjälper"), vilket tvingade hela SMS:et till UCS-2 och dubblade
-        // kostnaden. Typografitvätten rättar det.
-        //
-        // Den lokala sms_log-insert:en tas bort: helpern skriver den nu, med
-        // delantal och kostnad. message_type och related_id går med som
-        // parametrar i stället.
-        const { sendSmsViaElks } = await import('@/lib/sms-send')
-        const smsRes = await sendSmsViaElks({
-          supabase,
-          businessId: review.business_id,
-          businessName: bizName,
-          to: p.customer_phone,
-          message: `Hej${firstName ? ' ' + firstName : ''}! Tack igen för att du valde oss. Om du är nöjd skulle vi uppskatta en recension — det hjälper oss enormt! ${reviewLink}\n${suffix}`,
-          customerId: p.customer_id || null,
-          relatedId: p.invoice_id || null,
-          messageType: 'review_request',
-          recipient: 'customer',
-          purpose: 'proactive',
-        })
-
-        if (smsRes.success) {
-          reviewsSent++
-          await supabase.from('pending_approvals').update({ status: 'approved' }).eq('id', review.id)
-          // Komplettera SMS:et med ett portal-mail (kunden får båda kanalerna)
-          if (p.customer_id) {
-            try {
-              const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-              await sendPortalNotification(review.business_id, p.customer_id, 'review_request', {
-                context: { project_name: p.project_name || null },
-              })
-            } catch (notifErr) {
-              console.error('[maintenance] review portal-notif failed:', notifErr)
-            }
-          }
-        } else {
-          await supabase.from('pending_approvals').update({ status: 'expired' }).eq('id', review.id)
-        }
-      } catch {
-        await supabase.from('pending_approvals').update({ status: 'expired' }).eq('id', review.id)
-      }
-    }
-
-    results.reviews_sent = reviewsSent
-    if (reviewsSent > 0) console.log(`[maintenance] Sent ${reviewsSent} review requests`)
-  } catch (err: any) {
-    console.error('[maintenance] review-request error:', err.message)
-    results.reviews_error = err.message
-  }
+  // ── 3. Recensionsförfrågningar via tidsutgång — BORTTAGET ────
+  //
+  // Launch Truth Gate punkt 8 (2026-09-02): det här steget auto-godkände
+  // ett OBESVARAT scheduled_review_request-kort när expires_at passerats
+  // och skickade SMS + portalmejl till kunden — det enda stället i huset
+  // där ett obesvarat kort blev ett kundutskick, utan att
+  // review_request_enabled eller agents_globally_paused lästes. Ett
+  // obesvarat kort är ett nej: det expirerar i steg 1 som alla andra.
+  // Ägaren kan fortfarande godkänna kortet manuellt innan det går ut
+  // (app/api/approvals/[id]/route.ts, scheduled_review_request-casen).
+  results.reviews_sent = 0
 
   // ── 4. Jobb igång-svepet (2026-08-10) ──────────────────────────────
   //

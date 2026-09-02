@@ -79,6 +79,8 @@ export interface OnboardingFormData {
 
   // ── Step 5: Aktivera ─────────────────────────────────────
   plan?: string  // 'starter' | 'professional' | 'business'
+  /** Aktivera senare (2026-09-02): ISO-tid när ägaren sköt upp betalningen i steg 4. */
+  activationDeferredAt?: string
   /**
    * Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19) —
    * server-härlett i GET /api/onboarding (lib/billing/founders-offer.ts),

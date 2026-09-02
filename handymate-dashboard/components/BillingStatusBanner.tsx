@@ -2,20 +2,28 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { AlertTriangle, CreditCard, Clock } from 'lucide-react'
+import { AlertTriangle, CreditCard, Clock, Sparkles } from 'lucide-react'
 
 interface BillingStatus {
   subscription_status: string | null
+  stripe_subscription_id: string | null
   trial_ends_at: string | null
+  first_receipt: { text: string; link: string | null; at: string } | null
 }
 
 /**
- * Visar en varningsbanner högst upp på dashboarden om:
- * - Trial går ut snart (≤ 7 dagar kvar)
- * - Trial har gått ut
+ * Visar en banner högst upp på dashboarden om:
  * - Betalning misslyckades (past_due)
+ * - Provperioden har gått ut
+ * - Teamet har bevisat sitt första resultat och kontot saknar betalning
+ *   ("Aktivera senare", 2026-09-02) — betalfrågan ställs när den är förtjänt
+ * - Provperioden går ut snart (≤ 7 dagar kvar)
  *
- * Tyst och osynlig för aktiva prenumerationer.
+ * Tyst och osynlig för aktiva prenumerationer och comp-konton.
+ *
+ * Läser GET /api/billing (svarsformen subscription.status / trial.ends_at /
+ * first_receipt). Tidigare lästes data.subscription_status, som rutten
+ * aldrig returnerat — bannern var alltså osynlig för alla, alltid.
  */
 export default function BillingStatusBanner() {
   const [status, setStatus] = useState<BillingStatus | null>(null)
@@ -27,8 +35,10 @@ export default function BillingStatusBanner() {
       .then(data => {
         if (data) {
           setStatus({
-            subscription_status: data.subscription_status || null,
-            trial_ends_at: data.trial_ends_at || null,
+            subscription_status: data.subscription?.status || null,
+            stripe_subscription_id: data.subscription?.stripe_subscription_id || null,
+            trial_ends_at: data.trial?.ends_at || null,
+            first_receipt: data.first_receipt || null,
           })
         }
       })
@@ -61,8 +71,9 @@ export default function BillingStatusBanner() {
     )
   }
 
-  // Trial-status
-  if (sub === 'trialing' && status.trial_ends_at) {
+  // Provperiod — 'trial' (nyregistrerad utan kort) och 'trialing' (Stripe-trial)
+  const iProvperiod = sub === 'trial' || sub === 'trialing'
+  if (iProvperiod && status.trial_ends_at) {
     const trialEnd = new Date(status.trial_ends_at)
     const daysLeft = Math.ceil((trialEnd.getTime() - Date.now()) / 86_400_000)
 
@@ -74,15 +85,47 @@ export default function BillingStatusBanner() {
             <div className="flex items-center gap-2 min-w-0">
               <AlertTriangle className="w-4 h-4 text-red-700 flex-shrink-0" />
               <p className="text-sm text-red-900 truncate">
-                <strong>Din provperiod har gått ut.</strong> Uppgradera för att fortsätta använda Handymate.
+                <strong>Din provperiod har gått ut.</strong> Aktivera Handymate för att fortsätta.
               </p>
             </div>
             <Link
               href="/dashboard/settings/billing"
               className="flex-shrink-0 px-3 py-1 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700"
             >
-              Uppgradera nu
+              Aktivera nu
             </Link>
+          </div>
+        </div>
+      )
+    }
+
+    // Första bevisade resultatet utan betalning — den förtjänta betalfrågan
+    if (!status.stripe_subscription_id && status.first_receipt) {
+      return (
+        <div className="bg-teal-50 border-b border-teal-200 px-4 py-2.5">
+          <div className="max-w-7xl mx-auto flex items-center justify-between gap-3">
+            <div className="flex items-center gap-2 min-w-0">
+              <Sparkles className="w-4 h-4 text-teal-700 flex-shrink-0" />
+              <p className="text-sm text-teal-900 truncate">
+                <strong>Teamet har levererat sitt första resultat:</strong> {status.first_receipt.text}.{' '}
+                Aktivera Handymate så fortsätter det efter provperioden ({daysLeft} dag{daysLeft === 1 ? '' : 'ar'} kvar).
+              </p>
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <Link
+                href="/dashboard/settings/billing"
+                className="px-3 py-1 bg-teal-700 text-white text-xs font-medium rounded-lg hover:bg-teal-800"
+              >
+                Aktivera Handymate
+              </Link>
+              <button
+                onClick={() => setDismissed(true)}
+                className="text-teal-700 hover:text-teal-900 text-xs font-medium"
+                title="Dölj"
+              >
+                ×
+              </button>
+            </div>
           </div>
         </div>
       )
@@ -97,7 +140,7 @@ export default function BillingStatusBanner() {
               <Clock className="w-4 h-4 text-amber-700 flex-shrink-0" />
               <p className="text-sm text-amber-900 truncate">
                 <strong>{daysLeft} dag{daysLeft === 1 ? '' : 'ar'} kvar på provperioden.</strong>{' '}
-                Lägg till betalkort för att fortsätta utan avbrott.
+                Aktivera Handymate för att fortsätta utan avbrott.
               </p>
             </div>
             <div className="flex items-center gap-2 flex-shrink-0">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
+import { hamtaKontonMedAktivtTeam } from '@/lib/billing/aktiva-konton'
 import { genereraNextBestAction } from '@/lib/jarvis/next-best-action'
 
 export const dynamic = 'force-dynamic'
@@ -23,11 +24,13 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getServerSupabase()
-  const { data: businesses, error } = await supabase
-    .from('business_config')
-    .select('business_id')
-    .eq('subscription_status', 'active')
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  // Provperiodskonton med klar onboarding ingår (lib/billing/aktiva-konton.ts).
+  let businesses: Array<{ business_id: string }>
+  try {
+    businesses = await hamtaKontonMedAktivtTeam(supabase)
+  } catch (err) {
+    return NextResponse.json({ error: err instanceof Error ? err.message : String(err) }, { status: 500 })
+  }
 
   const counts = {
     processed: 0,

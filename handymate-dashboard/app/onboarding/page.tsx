@@ -242,6 +242,20 @@ export default function OnboardingPage() {
     }
   }, [step, data, saveProgress])
 
+  // Aktivera senare (2026-09-02): lämnar betalsteget utan kort. Stämpeln
+  // sparas i onboarding_data (ingen kolumn) så tratten kan räkna "sköt
+  // upp betalningen" och betalfrågan kan ställas igen efter första
+  // värdekvittot. Kontot är redan 'trial' med trial_ends_at sedan
+  // registreringen — inget i behörighetslagret ändras här.
+  const deferActivation = useCallback(async () => {
+    const activationDeferredAt = new Date().toISOString()
+    setData(d => ({ ...d, activationDeferredAt }))
+    setStep(5)
+    if (data.businessId) {
+      await saveProgress(5, { ...sanitizeForSave(data), activationDeferredAt })
+    }
+  }, [data, saveProgress])
+
   const back = useCallback(() => {
     setStep(s => Math.max(0, s - 1))
   }, [])
@@ -327,7 +341,7 @@ export default function OnboardingPage() {
         <Step4PhoneNumber onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 4 && (
-        <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        <Step5Activate onNext={next} onBack={back} onDefer={deferActivation} data={data} setData={setDataUpdater} />
       )}
       {step === 5 && (
         <StepImportData onNext={next} onBack={back} data={data} setData={setDataUpdater} />

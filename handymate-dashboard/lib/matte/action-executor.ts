@@ -63,12 +63,23 @@ export async function executeMatteActions(
   }
 
   // Skicka kundsvar om alla actions är autonoma
+  //
+  // Launch Truth Gate punkt 8 (2026-09-02): ett LLM-skrivet SMS går till
+  // kunden BARA om företaget uttryckligen slagit på
+  // business_config.matte_customer_reply_enabled (sql/v196, default false)
+  // och agenterna inte är pausade. Annars blir svaret ett send_sms-kort
+  // som ägaren godkänner — kunden lämnas inte obesvarad, men ingen
+  // maskin svarar i företagets namn utan att någon bett om det.
   if (
     decision.customerReply?.send &&
     decision.actions.every(a => a.autonomous) &&
     entity.phone
   ) {
-    await sendCustomerReply(decision.customerReply.message, entity, businessId)
+    if (await isCustomerReplyEnabled(supabase, businessId)) {
+      await sendCustomerReply(decision.customerReply.message, entity, businessId)
+    } else {
+      await queueCustomerReplyForApproval(decision.customerReply.message, decision, entity, businessId, supabase)
+    }
   }
 
   // Logga
@@ -219,6 +230,76 @@ async function createApproval(
       url: '/dashboard/approvals',
     }),
   }).catch(() => {})
+}
+
+/**
+ * Isolerad, fail-closed läsning (samma idiom som isReferralAskEnabled i
+ * cron/review-requests): saknad kolumn, DB-fel eller pausade agenter ⇒ false.
+ */
+export async function isCustomerReplyEnabled(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('business_config')
+      .select('matte_customer_reply_enabled, agents_globally_paused')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (error) return false
+    const row = data as { matte_customer_reply_enabled?: boolean; agents_globally_paused?: boolean } | null
+    return row?.matte_customer_reply_enabled === true && row?.agents_globally_paused !== true
+  } catch {
+    return false
+  }
+}
+
+/** Svaret som ett send_sms-kort (samma executor-kontrakt som Karin/Daniel/Lisa: payload.to + payload.message). */
+async function queueCustomerReplyForApproval(
+  message: string,
+  decision: MatteDecision,
+  entity: ResolvedEntity,
+  businessId: string,
+  supabase: SupabaseClient,
+): Promise<void> {
+  if (!entity.phone) return
+  const id = `appr_matte_reply_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
+  const { error } = await supabase.from('pending_approvals').insert({
+    id,
+    business_id: businessId,
+    approval_type: 'send_sms',
+    title: `Matte vill svara ${entity.customerName ?? 'kunden'}`,
+    description: `Förslag till svar: "${message}"`,
+    payload: {
+      agent_id: 'matte',
+      to: entity.phone,
+      message,
+      customer_id: entity.customerId ?? null,
+      customer_name: entity.customerName ?? null,
+      reasoning: decision.reasoning,
+    },
+    status: 'pending',
+    risk_level: 'medium',
+    expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  })
+  if (error) {
+    console.error('[Matte] kunde inte köa kundsvaret som kort:', error.message)
+    return
+  }
+  // Push som ett beslut (samma idiom som createApproval ovan, via den
+  // autentiserade interna adaptern). Best-effort — kortet finns oavsett.
+  try {
+    const { sendInternalPush } = await import('@/lib/notifications/push-internal')
+    await sendInternalPush({
+      business_id: businessId,
+      title: `Matte vill svara ${entity.customerName ?? 'kunden'}`,
+      body: message.slice(0, 90),
+      url: '/dashboard/approvals',
+      tag: 'approval:send_sms',
+    })
+  } catch {
+    // Pushen är best-effort — kortet finns.
+  }
 }
 
 async function sendCustomerReply(

@@ -82,6 +82,8 @@ jobs:
           tests/facit-route-auth-inventory.spec.ts
           tests/onboarding-funnel.spec.ts
           tests/push-tyst-tid.spec.ts
+          tests/facit-ogrindade-automationer.spec.ts
+          tests/aktivera-senare.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

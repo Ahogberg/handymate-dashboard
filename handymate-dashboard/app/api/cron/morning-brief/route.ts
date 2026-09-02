@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
+import { hamtaKontonMedAktivtTeam } from '@/lib/billing/aktiva-konton'
 import { svDateStr } from '@/lib/dates'
 import { currentWeekMonday } from '@/lib/capacity/week-capacity'
 import { genereraMandagskort, insertMandagskort } from '@/lib/jarvis/monday-brief'
@@ -58,11 +59,8 @@ async function runMondayBrief(): Promise<MondayBriefRunResult> {
     if (svDateStr() !== currentWeekMonday()) return { ran: false }
 
     const supabase = getServerSupabase()
-    const { data: businesses, error } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .eq('subscription_status', 'active')
-    if (error) throw new Error(error.message)
+    // Provperiodskonton med klar onboarding ingår (lib/billing/aktiva-konton.ts).
+    const businesses = await hamtaKontonMedAktivtTeam(supabase)
 
     let created = 0
     let duplicates = 0

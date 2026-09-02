@@ -136,13 +136,17 @@ async function runAgentContext() {
       }
     }
 
-    // Bokningspåminnelser (SMS 24h före)
-    try {
-      const reminderResult = await sendBookingReminders(biz.business_id)
-      if (reminderResult.sent > 0) {
-        console.log(`[AgentContext Cron] ${biz.business_id}: ${reminderResult.sent} bokningspåminnelser skickade`)
-      }
-    } catch { /* non-blocking */ }
+    // Bokningspåminnelser (SMS 24h före) — kundriktat, alltså bakom samma
+    // kill-switch som garanti/kundvård (punkt 8, 2026-09-02). Per-tenant-
+    // reglaget läses i sendBookingReminders.
+    if (!outboundPaused) {
+      try {
+        const reminderResult = await sendBookingReminders(biz.business_id)
+        if (reminderResult.sent > 0) {
+          console.log(`[AgentContext Cron] ${biz.business_id}: ${reminderResult.sent} bokningspåminnelser skickade`)
+        }
+      } catch { /* non-blocking */ }
+    }
 
     results.push({
       business_id: biz.business_id,

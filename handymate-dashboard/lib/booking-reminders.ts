@@ -7,10 +7,39 @@ import { getServerSupabase } from '@/lib/supabase'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { halsning } from '@/lib/customers/namn'
 
+/**
+ * Launch Truth Gate punkt 8 (2026-09-02): påminnelsen gick tidigare utan
+ * någon grind alls — reglaget "Påminnelse dagen innan besök" fanns i
+ * Automationscentret men lästes aldrig här. Nu krävs ett uttryckligt
+ * automation_settings.sms_day_before_reminder = true. Isolerad, fail-closed
+ * läsning: saknad rad (defaulten i getAutomationSettings räknas INTE),
+ * saknad tabell eller DB-fel ⇒ av.
+ */
+export async function isDayBeforeReminderEnabled(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+): Promise<boolean> {
+  try {
+    const { data, error } = await supabase
+      .from('automation_settings')
+      .select('sms_day_before_reminder')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (error) return false
+    return (data as { sms_day_before_reminder?: boolean } | null)?.sms_day_before_reminder === true
+  } catch {
+    return false
+  }
+}
+
 export async function sendBookingReminders(
   businessId: string
 ): Promise<{ success: boolean; sent: number; error?: string }> {
   const supabase = getServerSupabase()
+
+  if (!(await isDayBeforeReminderEnabled(supabase, businessId))) {
+    return { success: true, sent: 0, error: 'Avstängd — reglaget "Påminnelse dagen innan besök" är inte påslaget' }
+  }
 
   try {
     // Hitta bokningar imorgon (24h framåt)

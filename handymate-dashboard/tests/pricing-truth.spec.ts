@@ -24,7 +24,8 @@ test.describe('en kanonisk prissanning', () => {
       smsPerMonth: 300,
       smsHardCap: 1000,
       callsPerMonth: 400,
-      users: 5,
+      // Firmans användartak togs bort 2026-09-01 (2a6eda7) — differentiering bara på volym.
+      users: null,
     })
   })
 
