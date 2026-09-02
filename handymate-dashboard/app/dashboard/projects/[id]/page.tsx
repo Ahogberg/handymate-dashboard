@@ -97,6 +97,7 @@ import { useFilePreview } from '@/components/documents/FilePreviewProvider'
 import AtaCard from '@/components/projects/ata/AtaCard'
 import ChangeModal from '@/components/projects/ata/ChangeModal'
 import SendAtaDialog from '@/components/projects/ata/SendAtaDialog'
+import DiaryTab from '@/components/projects/diary/DiaryTab'
 import { ProjectQuoteDocumentCard } from '@/components/projects/ProjectQuoteDocumentCard'
 import { getStageBucket } from '@/components/projects/ProjectStatusCard'
 import ProjectTodoBlock, { type TodoMode, type TodoRow, type OverBudgetAlert } from '@/components/projects/ProjectTodoBlock'
@@ -617,9 +618,6 @@ export default function ProjectDetailPage() {
   const [docCategory, setDocCategory] = useState('all')
   const [uploading, setUploading] = useState(false)
   const [generatedDocs, setGeneratedDocs] = useState<any[]>([])
-  const [logs, setLogs] = useState<any[]>([])
-  const [showLogModal, setShowLogModal] = useState(false)
-  const [editingLog, setEditingLog] = useState<any>(null)
   const [checklists, setChecklists] = useState<any[]>([])
   const [checklistTemplates, setChecklistTemplates] = useState<any[]>([])
   const [showChecklistCreate, setShowChecklistCreate] = useState(false)
@@ -1094,7 +1092,6 @@ export default function ProjectDetailPage() {
     if (activeGroup === 'documentation') {
       fetchDocuments()
       fetchGeneratedDocs()
-      fetchLogs()
       fetchChecklists()
       fetchChecklistTemplates()
       fetchFormSubmissions()
@@ -1247,16 +1244,6 @@ export default function ProjectDetailPage() {
     } catch { /* ignore */ }
   }
 
-  const fetchLogs = async () => {
-    try {
-      const res = await fetch(`/api/projects/${projectId}/logs`)
-      if (res.ok) {
-        const data = await res.json()
-        setLogs(data.logs || [])
-      }
-    } catch { /* ignore */ }
-  }
-
   const fetchWorkOrders = async () => {
     try {
       const res = await fetch(`/api/work-orders?project_id=${projectId}`)
@@ -1357,38 +1344,6 @@ export default function ProjectDetailPage() {
     })
   }
 
-  const handleSaveLog = async (logData: any) => {
-    try {
-      const method = editingLog ? 'PATCH' : 'POST'
-      const url = editingLog
-        ? `/api/projects/${projectId}/logs/${editingLog.id}`
-        : `/api/projects/${projectId}/logs`
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(logData),
-      })
-      if (!res.ok) throw new Error()
-      showToast(editingLog ? 'Anteckning uppdaterad!' : 'Anteckning skapad!', 'success')
-      setShowLogModal(false)
-      setEditingLog(null)
-      fetchLogs()
-    } catch {
-      showToast('Något gick fel', 'error')
-    }
-  }
-
-  const handleDeleteLog = async (logId: string) => {
-    if (!confirm('Ta bort denna dagboksanteckning?')) return
-    try {
-      const res = await fetch(`/api/projects/${projectId}/logs/${logId}`, { method: 'DELETE' })
-      if (!res.ok) throw new Error()
-      showToast('Anteckning borttagen', 'success')
-      fetchLogs()
-    } catch {
-      showToast('Kunde inte ta bort', 'error')
-    }
-  }
 
   const handleCreateChecklist = async (templateId: string, name: string, items: any[]) => {
     try {
@@ -3690,141 +3645,17 @@ export default function ProjectDetailPage() {
           </div>
         )}
 
-        {/* === TAB: Byggdagbok === */}
+        {/* === TAB: Byggdagbok ===
+            Etapp E1 (2026-09-02): hela dagboken bor i components/projects/diary/
+            (DiaryTab äger state, filter, modal, attest, foton). Sidan
+            skickar bara projekt + ÄTA-lista för kopplingsvalet. */}
         {activeGroup === 'documentation' && (
-          <div className="space-y-6">
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <h2 className="min-w-0 text-lg font-semibold text-gray-900 flex items-center gap-2">
-                <BookOpen className="w-5 h-5 text-amber-400" />
-                Byggdagbok {project?.name ? `\u2014 ${project.name}` : ''}
-              </h2>
-              <div className="flex flex-wrap items-center gap-2">
-                {logs.length > 0 && (
-                  <button
-                    onClick={async () => {
-                      try {
-                        const res = await fetch(`/api/projects/${projectId}/logs/pdf`)
-                        if (!res.ok) throw new Error()
-                        const blob = await res.blob()
-                        const url = URL.createObjectURL(blob)
-                        const a = document.createElement('a')
-                        a.href = url
-                        a.download = `byggdagbok-${project?.name || projectId}.pdf`
-                        a.click()
-                        URL.revokeObjectURL(url)
-                      } catch {
-                        showToast('Kunde inte exportera PDF', 'error')
-                      }
-                    }}
-                    className="flex items-center gap-2 px-3 py-2 bg-white border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 hover:border-gray-300 transition-colors"
-                  >
-                    <Download className="w-4 h-4" /> Exportera PDF
-                  </button>
-                )}
-                <button
-                  onClick={() => { setEditingLog(null); setShowLogModal(true) }}
-                  className="flex items-center gap-2 px-4 py-2 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90"
-                >
-                  <Plus className="w-4 h-4" /> Ny dagbokspost
-                </button>
-              </div>
-            </div>
-
-            {logs.length > 0 ? (
-              <div className="space-y-4">
-                {logs.map((log: any) => {
-                  const weatherMap: Record<string, string> = { sunny: '\u2600\uFE0F Sol', cloudy: '\u26C5 Mulet', rainy: '\uD83C\uDF27\uFE0F Regn', snowy: '\u2744\uFE0F Snö', windy: '\uD83C\uDF2C\uFE0F Blåsigt' }
-                  const weatherLabel = log.weather ? weatherMap[log.weather] || log.weather : null
-                  return (
-                    <div key={log.id} className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                      <div className="flex items-start justify-between mb-3">
-                        <div>
-                          <p className="text-gray-900 font-semibold">
-                            {new Date(log.date + 'T00:00:00').toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
-                          </p>
-                          {log.business_user && (
-                            <p className="text-xs text-gray-400 mt-0.5">{log.business_user.name}</p>
-                          )}
-                        </div>
-                        <div className="flex items-center gap-3 text-xs text-gray-500 flex-shrink-0">
-                          {weatherLabel && (
-                            <span>{weatherLabel}{log.temperature != null ? `, ${log.temperature}°C` : ''}</span>
-                          )}
-                          {log.workers_count != null && (
-                            <span className="flex items-center gap-1">
-                              <Users className="w-3.5 h-3.5" />
-                              {log.workers_count} arbetare
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {log.work_performed && (
-                        <p className="text-sm text-gray-700 mb-2 whitespace-pre-line">{log.work_performed}</p>
-                      )}
-
-                      {log.materials_used && (
-                        <p className="text-xs text-gray-500 mb-2">
-                          <span className="font-medium text-gray-600">Material:</span> {log.materials_used}
-                        </p>
-                      )}
-
-                      {log.issues && (
-                        <div className="flex items-start gap-2 mb-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">
-                          <AlertTriangle className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-amber-800">{log.issues}</p>
-                        </div>
-                      )}
-
-                      {log.description && (
-                        <p className="text-xs text-gray-400 italic">{log.description}</p>
-                      )}
-
-                      {log.photos && log.photos.length > 0 && (
-                        <div className="flex gap-2 mt-2 overflow-x-auto">
-                          {log.photos.map((photo: any, i: number) => (
-                            <a key={i} href={photo.url} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
-                              <img src={photo.url} alt={photo.caption || `Foto ${i + 1}`} className="w-16 h-16 object-cover rounded-lg border border-[#E2E8F0]" />
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
-                      <div className="flex items-center gap-2 mt-3 pt-3 border-t border-gray-100">
-                        <button
-                          onClick={() => { setEditingLog(log); setShowLogModal(true) }}
-                          className="flex items-center gap-1 text-xs text-primary-700 hover:text-primary-800"
-                        >
-                          <Edit className="w-3.5 h-3.5" /> Redigera
-                        </button>
-                        <button
-                          onClick={() => handleDeleteLog(log.id)}
-                          className="flex items-center gap-1 text-xs text-red-600 hover:text-red-700 ml-auto"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" /> Ta bort
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            ) : (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-12 text-center">
-                <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                <p className="text-gray-400">Inga dagboksanteckningar ännu</p>
-                <p className="text-xs text-gray-400 mt-1">Dokumentera arbetet dag för dag</p>
-              </div>
-            )}
-
-            {/* Log Modal */}
-            {showLogModal && (
-              <LogModal
-                editing={editingLog}
-                onClose={() => { setShowLogModal(false); setEditingLog(null) }}
-                onSave={handleSaveLog}
-              />
-            )}
-          </div>
+          <DiaryTab
+            projectId={projectId}
+            projectName={project?.name || null}
+            atas={changes.map(c => ({ change_id: c.change_id, ata_number: c.ata_number ?? null, description: c.description, status: c.status }))}
+            showToast={showToast}
+          />
         )}
 
         {/* === TAB: Checklistor === */}
@@ -5010,172 +4841,7 @@ function MilestoneModal({ projectId, editing, existingNames, onClose, onSaved, o
 
 // ÄTA-modalen bor i components/projects/ata/ChangeModal.tsx (2026-09-02).
 
-// --- Log Modal (Byggdagbok) ---
-
-function LogModal({ editing, onClose, onSave }: {
-  editing: any
-  onClose: () => void
-  onSave: (data: any) => void
-}) {
-  const [logDate, setLogDate] = useState(editing?.date || new Date().toISOString().split('T')[0])
-  const [weather, setWeather] = useState(editing?.weather || '')
-  const [temperature, setTemperature] = useState(editing?.temperature?.toString() || '')
-  const [workDescription, setWorkDescription] = useState(editing?.work_performed || '')
-  const [materialsUsed, setMaterialsUsed] = useState(editing?.materials_used || '')
-  const [hoursWorked, setHoursWorked] = useState(editing?.hours_worked?.toString() || '')
-  const [workersPresent, setWorkersPresent] = useState(editing?.workers_count?.toString() || '')
-  const [deviations, setDeviations] = useState(editing?.issues || '')
-  const [notes, setNotes] = useState(editing?.description || '')
-  const [saving, setSaving] = useState(false)
-
-  const weatherOptions = [
-    { value: 'sunny', emoji: '\u2600\uFE0F', label: 'Sol' },
-    { value: 'cloudy', emoji: '\u26C5', label: 'Mulet' },
-    { value: 'rainy', emoji: '\uD83C\uDF27\uFE0F', label: 'Regn' },
-    { value: 'snowy', emoji: '\u2744\uFE0F', label: 'Snö' },
-  ]
-
-  const handleSubmit = () => {
-    if (!workDescription.trim()) return
-    setSaving(true)
-    onSave({
-      log_date: logDate,
-      weather: weather || null,
-      temperature: temperature ? parseFloat(temperature) : null,
-      work_description: workDescription.trim(),
-      materials_used: materialsUsed.trim() || null,
-      hours_worked: hoursWorked ? parseFloat(hoursWorked) : null,
-      workers_present: workersPresent ? parseInt(workersPresent) : null,
-      deviations: deviations.trim() || null,
-      notes: notes.trim() || null,
-    })
-  }
-
-  const inputCls = 'w-full px-3 py-2.5 bg-gray-50 border border-[#E2E8F0] rounded-lg text-gray-900 text-sm placeholder-gray-400 focus:outline-none focus:border-primary-400'
-
-  return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 rounded-t-2xl">
-          <h2 className="text-lg font-semibold text-gray-900">
-            {editing ? 'Redigera dagbokspost' : 'Ny dagbokspost'}
-          </h2>
-          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-900">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <div className="p-6 space-y-4">
-          {/* Datum */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Datum</label>
-            <input type="date" value={logDate} onChange={e => setLogDate(e.target.value)} className={inputCls} />
-          </div>
-
-          {/* Väder — emoji knappar */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Väder</label>
-            <div className="flex gap-2">
-              {weatherOptions.map(w => (
-                <button
-                  key={w.value}
-                  type="button"
-                  onClick={() => setWeather(weather === w.value ? '' : w.value)}
-                  className={`flex-1 flex flex-col items-center gap-0.5 py-2.5 rounded-lg border text-sm transition-all ${
-                    weather === w.value
-                      ? 'bg-primary-50 border-primary-400 text-primary-700 ring-1 ring-primary-400'
-                      : 'bg-gray-50 border-gray-200 text-gray-500 hover:border-gray-300'
-                  }`}
-                >
-                  <span className="text-lg">{w.emoji}</span>
-                  <span className="text-xs">{w.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Temperatur + Arbetare */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Temperatur (°C)</label>
-              <input type="number" value={temperature} onChange={e => setTemperature(e.target.value)} placeholder="0" className={inputCls} />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Antal arbetare</label>
-              <input type="number" value={workersPresent} onChange={e => setWorkersPresent(e.target.value)} placeholder="0" min="0" className={inputCls} />
-            </div>
-          </div>
-
-          {/* Vad gjordes idag */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Vad gjordes idag *</label>
-            <textarea
-              value={workDescription}
-              onChange={e => setWorkDescription(e.target.value)}
-              rows={3}
-              placeholder="Beskriv dagens arbete..."
-              autoFocus
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {/* Material */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Material som användes</label>
-            <textarea
-              value={materialsUsed}
-              onChange={e => setMaterialsUsed(e.target.value)}
-              rows={2}
-              placeholder="T.ex. 10m kopparrör, 5 kopplingar..."
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {/* Avvikelser */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Avvikelser</label>
-            <textarea
-              value={deviations}
-              onChange={e => setDeviations(e.target.value)}
-              rows={2}
-              placeholder="Avvikelser från plan, problem eller hinder..."
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-
-          {/* Anteckningar */}
-          <div>
-            <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Anteckningar</label>
-            <textarea
-              value={notes}
-              onChange={e => setNotes(e.target.value)}
-              rows={2}
-              placeholder="Övriga anteckningar..."
-              className={`${inputCls} resize-none`}
-            />
-          </div>
-        </div>
-
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-200">
-          <button
-            onClick={onClose}
-            className="flex-1 px-4 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm text-gray-600 hover:text-gray-900 transition-colors"
-          >
-            Avbryt
-          </button>
-          <button
-            onClick={handleSubmit}
-            disabled={saving || !workDescription.trim()}
-            className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-primary-700 rounded-lg text-white text-sm font-medium hover:opacity-90 disabled:opacity-50 transition-all"
-          >
-            {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-            {editing ? 'Spara' : 'Skapa dagbokspost'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
+// Dagboksmodalen bor i components/projects/diary/DiaryEntryModal.tsx (2026-09-02).
 
 // --- Work Order Modal ---
 
