@@ -10,7 +10,13 @@ interface DealRow {
   created_at: string
   updated_at: string
   source: string | null
-  loss_reason: string | null
+  // Kolumnen på deal heter lost_reason, inte loss_reason (2026-09-02).
+  // Skrivvägen (app/api/pipeline/deals/[id]/move/route.ts, /api/leads,
+  // agentens tool-router) har alltid skrivit lost_reason — det var BARA
+  // den här filen som läste ett namn som aldrig funnits. Och eftersom
+  // PostgREST underkänner HELA selecten när en kolumn är okänd gav rutten
+  // 42703 varje gång, inte bara ett tomt fält.
+  lost_reason: string | null
   loss_reason_detail: string | null
   won_value: number | null
   lost_value: number | null
@@ -59,7 +65,7 @@ export async function GET(request: NextRequest) {
 
     const { data: deals } = await supabase
       .from('deal')
-      .select('id, stage_id, value, created_at, updated_at, source, loss_reason, loss_reason_detail, won_value, lost_value, lead_source_platform')
+      .select('id, stage_id, value, created_at, updated_at, source, lost_reason, loss_reason_detail, won_value, lost_value, lead_source_platform')
       .eq('business_id', business.business_id)
       .gte('created_at', since.toISOString())
 
@@ -91,7 +97,7 @@ export async function GET(request: NextRequest) {
     // Loss reasons
     const reasonMap = new Map<string, { count: number; value: number }>()
     for (const d of lostDeals) {
-      const reason = d.loss_reason || 'Okänd'
+      const reason = d.lost_reason || 'Okänd'
       const entry = reasonMap.get(reason) || { count: 0, value: 0 }
       entry.count++
       entry.value += d.lost_value || d.value || 0

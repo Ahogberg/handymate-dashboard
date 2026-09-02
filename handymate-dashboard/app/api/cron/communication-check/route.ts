@@ -25,20 +25,45 @@ export async function GET(request: NextRequest) {
     const today = new Date().toISOString().split('T')[0]
 
     // Find explicitly disabled businesses
-    const { data: disabledSettings } = await supabase
+    // AV-KNAPPEN FANNS INTE (2026-09-02). Den här cronen bad agenten
+    // "Skicka lämpliga uppföljningar via SMS eller email" för VARJE företag,
+    // och den enda spärren var communication_settings.auto_enabled = false.
+    // Tabellen communication_settings har aldrig skapats i produktionen —
+    // felet swäljdes (bara `data` lästes, aldrig `error`), disabledBusinesses
+    // blev tom, och alla behandlades som påslagna. Fail-open på en utgående
+    // automation, precis den sort som stängdes av i 46c9f7d; den här överlevde
+    // för att grinden bodde i en tabell som inte fanns.
+    //
+    // Nu: samma grind som resten (agents_globally_paused, se
+    // app/api/cron/agent-context/route.ts) OCH den ursprungliga per-företags-
+    // inställningen när tabellen väl finns. Saknas tabellen ⇒ FAIL-CLOSED:
+    // ingen får utgående uppföljningar automatiskt. Tystnad är rätt default
+    // för något som skickar SMS till hantverkarens kunder.
+    const { data: disabledSettings, error: settingsError } = await supabase
       .from('communication_settings')
       .select('business_id')
       .eq('auto_enabled', false)
 
+    if (settingsError) {
+      console.warn('[cron/communication-check] communication_settings kunde inte läsas — hoppar över allt utgående:', settingsError.message)
+      return NextResponse.json({
+        success: true,
+        businesses: 0,
+        agent_triggered: 0,
+        skipped: 'communication_settings saknas — fail-closed',
+      })
+    }
+
     const disabledBusinesses = new Set((disabledSettings || []).map((d: any) => d.business_id))
 
-    // Get all active businesses (excluding disabled)
+    // Get all active businesses (excluding disabled and globally paused)
     const { data: allBusinesses } = await supabase
       .from('business_config')
-      .select('business_id')
+      .select('business_id, agents_globally_paused')
       .limit(100)
 
     const activeBusinessIds = (allBusinesses || [])
+      .filter((b: any) => b.agents_globally_paused !== true)
       .map((b: any) => b.business_id)
       .filter((id: string) => !disabledBusinesses.has(id))
 
