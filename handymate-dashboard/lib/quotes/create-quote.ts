@@ -254,6 +254,14 @@ export async function createQuote(
         cost_price: r.cost_price ?? null,
         article_number: r.article_number ?? null,
         category_slug: r.category_slug ?? null,
+        // ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02):
+        // is_rot_eligible/is_rut_eligible tas emot rakt av från anroparen
+        // här — den här funktionen är INTE sanningen om vad som ger ROT.
+        // Den sanningen är lib/rot/ratt.ts (bedomAvdrag), källbelagd mot
+        // docs/bransch/*.md. Anropare som sätter dessa booleaner utan att
+        // ha frågat bedomAvdrag riskerar exakt det pengafel branschgenom-
+        // gången hittade (t.ex. fasadmålning i bostadsrätt eller rena
+        // servicejobb markerade ROT).
         is_rot_eligible: r.is_rot_eligible ?? false,
         is_rut_eligible: r.is_rut_eligible ?? false,
         rot_rut_type: r.rot_rut_type ?? null,

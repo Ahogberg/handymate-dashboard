@@ -91,6 +91,7 @@ jobs:
           tests/raddningsko.spec.ts
           tests/foretagsskannern.spec.ts
           tests/launch-desk-signaler.spec.ts
+          tests/rot-ratt.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

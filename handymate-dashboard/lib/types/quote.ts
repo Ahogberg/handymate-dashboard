@@ -83,6 +83,15 @@ export interface QuoteItem {
       svår att bedöma från fotot"). Tom/undefined på rader ≥ tröskeln —
       tystnad är normalläget. Samma strip-regel som ai_uncertain. */
   ai_note?: string | null
+  /** ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): frågan
+      bedomAvdrag() (lib/rot/ratt.ts) ställde när avdragsrätten för radens
+      jobbtyp inte är belagd. Editor-internt, exakt samma livscykel som
+      ai_uncertain — sätts vid AI-konvertering, visas dämpat i edit-läge och
+      strippas i buildQuotePayload innan quote_items POSTas. */
+  avdrags_fraga?: string | null
+  /** true när jobbtypen aldrig ger ROT (service, kontroll, felsökning) —
+      varnar om raden ändå kryssas som ROT. Samma strip-regel. */
+  avdrags_utan_avdrag?: boolean
 }
 
 export interface QuoteTemplate {

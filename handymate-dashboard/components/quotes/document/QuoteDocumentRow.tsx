@@ -62,8 +62,12 @@ function componentSpec(components: QuoteTemplateItem['components']) {
     tyst till "ROT/RUT —" utan visar nu "+ROT?" (dämpad) så det är tydligt att
     ett klick FÖRESLÅR nästa steg i cykeln (null→rot→rut→null), inte bara
     rapporterar ett tomt läge. */
+function currentRotRutType(item: QuoteTemplateItem) {
+  return item.rotRutType ?? (item.isRotEligible ? 'rot' : item.isRutEligible ? 'rut' : null)
+}
+
 function RotBadge({ item, onCycle }: { item: QuoteTemplateItem; onCycle?: () => void }) {
-  const type = item.rotRutType ?? (item.isRotEligible ? 'rot' : item.isRutEligible ? 'rut' : null)
+  const type = currentRotRutType(item)
   const isGron = type === 'gron_solceller' || type === 'gron_lagring' || type === 'gron_laddpunkt'
   const isEmpty = type === null && !isGron
   const label = type === 'rot' ? 'ROT' : type === 'rut' ? 'RUT' : isGron ? 'Grön teknik' : '+ROT?'
@@ -81,6 +85,37 @@ function RotBadge({ item, onCycle }: { item: QuoteTemplateItem; onCycle?: () => 
       {label}
     </span>
   )
+}
+
+/**
+ * ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): en dämpad
+ * rad under artikeln — ALDRIG en blockering, hantverkaren kan fortfarande
+ * kryssa i ROT/RUT själv (RotBadge ovan). Två lägen, aldrig båda samtidigt:
+ *  1. bedomAvdrag (lib/rot/ratt.ts) gav 'okant' för radens jobbtyp →
+ *     avdragsFraga är satt. Vi påstår ingenting, vi frågar.
+ *  2. Jobbtypen ger ALDRIG ROT (arArbeteUtanAvdrag) och raden ändå står
+ *     kryssad som ROT — varnar utan att hindra klicket.
+ * Samma återanvända stil som Kvittoprincipens "Osäker"-markering
+ * (.item-ai-uncertain) — ingen ny CSS-klass för samma dämpade känsla.
+ */
+function RotSanningNotice({ item }: { item: QuoteTemplateItem }) {
+  if (item.avdragsFraga) {
+    return (
+      <div className="item-ai-uncertain">
+        <span className="pill">ROT/RUT?</span>
+        <span className="note">Vi vet inte — du avgör. {item.avdragsFraga}</span>
+      </div>
+    )
+  }
+  if (item.avdragsUtanAvdrag && currentRotRutType(item) === 'rot') {
+    return (
+      <div className="item-ai-uncertain">
+        <span className="pill">ROT?</span>
+        <span className="note">Skatteverket: servicearbeten, kontroll och översyn ger inte rotavdrag.</span>
+      </div>
+    )
+  }
+  return null
 }
 
 /** Ta bort-knappen — fungerar OFÖRÄNDRAT i både desktop-inline-läget och
@@ -283,6 +318,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
             {item.isHidden && <>{' '}<span className="hidden-badge" title="Raden syns inte för kunden — priset ingår ändå i summan">Dold</span></>}
           </div>
           {item.description ? <div className="item-desc">{item.description}</div> : null}
+          {isEdit ? <RotSanningNotice item={item} /> : null}
           {componentSpec(item.components)}
         </td>
         {qtyCell}
@@ -321,6 +357,7 @@ export function QuoteDocumentRow({ item, mode, showQty, showPrice, colCount, han
             {item.aiNote ? <span className="note">{item.aiNote}</span> : null}
           </div>
         ) : null}
+        {isEdit ? <RotSanningNotice item={item} /> : null}
         {componentSpec(item.components)}
       </td>
       {qtyCell}

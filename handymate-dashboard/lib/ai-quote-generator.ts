@@ -8,6 +8,7 @@ import { llmCostUsd } from '@/lib/costs/meter'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildJobTypePrompt, type JobTypeGenerationContext } from '@/lib/quotes/job-type-generation'
 import { applyGeneratedPriceTruth } from '@/lib/quotes/generated-price-truth'
+import { bedomAvdrag, arArbeteUtanAvdrag, type Boendeform } from '@/lib/rot/ratt'
 
 export interface PriceListItem {
   name: string
@@ -75,6 +76,23 @@ export interface GeneratedQuoteItem {
   /** Hur träffen gjordes — loggas så träffkvaliteten kan mätas. */
   productMatchType?: 'handle' | 'exact' | 'fuzzy' | null
   quantitySource?: 'proposal'
+  /**
+   * ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): sätts
+   * ALLTID av bedomAvdrag() (lib/rot/ratt.ts) nedan i generateQuoteFromInput,
+   * ALDRIG av modellens egen gissning. true bara när bedomAvdrag gav
+   * utfall 'ja' och typ 'rot' — vid 'okant' är den false OCH frågan hamnar i
+   * GeneratedQuote.avdragsfragor, aldrig en tyst gissning.
+   */
+  is_rot_eligible?: boolean
+  /** Samma sanningskälla som is_rot_eligible — true bara vid typ 'rut'. */
+  is_rut_eligible?: boolean
+  /** Satt när bedomAvdrag gav 'okant': frågan hantverkaren ska tillfrågas.
+   *  Då lämnas is_rot_eligible/is_rut_eligible OSATTA (undefined) — ett
+   *  okänt läge får inte se ut som ett belagt nej nedströms. */
+  avdragsFraga?: string
+  /** true när jobbtypen ALDRIG ger ROT (service, kontroll, felsökning) —
+   *  UI:t varnar då om raden ändå kryssas som ROT. Hindrar ingen. */
+  avdragsUtanAvdrag?: boolean
 }
 
 export interface GeneratedQuote {
@@ -119,6 +137,15 @@ export interface GeneratedQuote {
    * gett.
    */
   notIncludedSuggestions: string[]
+  /**
+   * ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): frågor
+   * till hantverkaren när bedomAvdrag() inte kunde ge ett belagt ja/nej för
+   * en rad (jobbtypen är okänd i lib/rot/tabell.ts, eller boendeformen
+   * behövs men inte är känd). Tom lista är det normala när alla rader var
+   * antingen tydligt ROT/RUT-berättigade eller tydligt inte det. INGEN av
+   * frågorna är en gissning — se lib/rot/ratt.ts.
+   */
+  avdragsfragor: string[]
   /**
    * Modellen som FAKTISKT producerade svaret (spår 1.1, 2026-08-06).
    *
@@ -1071,6 +1098,42 @@ Svara ENDAST med JSON (ingen markdown):
   items = applyGeneratedPriceTruth(items, parsed.items || [], input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
   options = applyGeneratedPriceTruth(options, (parsed.options || []).slice(0, 3), input.priceList || [], input.hourlyRate, input.customerPriceList, input.jobTypeContext)
 
+  // ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): modellen
+  // föreslår ALDRIG längre om en rad är ROT/RUT-berättigad — det avgörs här,
+  // en gång per genererad offert, av lib/rot/ratt.ts mot det källbelagda
+  // underlaget i lib/rot/tabell.ts. `input.jobType` är den enda jobbtyps-
+  // uppgift den här filen har att slå upp mot (raderna har ingen egen
+  // jobbtypskoppling) — saknas den blir bedomAvdrag ärligt 'okant' i stället
+  // för att gissa. Boendeform (`rot_property_type`) hör hemma i SKV-lagret
+  // (lib/skv/validate-rot-request.ts) och når aldrig hit — se sökningen i
+  // tasks/plan-rot-ratt.md Del 3.1 — så den är 'okand' tills en anropare
+  // faktiskt börjar skicka den med.
+  const boendeform: Boendeform = 'okand'
+  const rotBesked = bedomAvdrag(input.jobType || '', boendeform)
+  const avdragsfragor = rotBesked.utfall === 'okant' ? [rotBesked.fraga] : []
+  const utanAvdrag = arArbeteUtanAvdrag(input.jobType || '')
+  // 'okant' får ALDRIG bli ett tyst nej. Ett belagt ja sätter flaggan, ett
+  // belagt nej nollställer den — men när vi inte vet lämnas raden orörd (den
+  // gamla vägen via suggestedDeductionType får avgöra, precis som förut) och
+  // frågan följer med raden ut i offertbyggaren i stället. Att slå av ROT på
+  // varje offert vi inte kan belägga hade varit ett lika stort påstående som
+  // att slå på det — och ett pengafel för hantverkaren.
+  const applyRotSanning = (list: GeneratedQuoteItem[]) =>
+    list.forEach(item => {
+      if (rotBesked.utfall === 'ja') {
+        item.is_rot_eligible = rotBesked.typ === 'rot'
+        item.is_rut_eligible = rotBesked.typ === 'rut'
+      } else if (rotBesked.utfall === 'nej') {
+        item.is_rot_eligible = false
+        item.is_rut_eligible = false
+      } else {
+        item.avdragsFraga = rotBesked.fraga
+      }
+      if (utanAvdrag) item.avdragsUtanAvdrag = true
+    })
+  applyRotSanning(items)
+  applyRotSanning(options)
+
   const missingPriceCount = [...items, ...options].filter(i => i.unitPrice === 0 || i.note?.includes('PRIS SAKNAS')).length
   const laborCost = items.filter(i => i.type === 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
   const materialCost = items.filter(i => i.type !== 'labor').reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)
@@ -1114,6 +1177,7 @@ Svara ENDAST med JSON (ingen markdown):
           .map((s: string) => s.trim())
           .slice(0, 4)
       : [],
+    avdragsfragor,
     model: MODEL,
     ...(input.jobTypeContext ? { quoteBasis: {
       status: input.jobTypeContext.status, jobType: input.jobTypeContext.jobType,

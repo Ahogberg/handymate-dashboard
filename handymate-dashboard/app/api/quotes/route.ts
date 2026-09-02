@@ -787,6 +787,13 @@ export async function PUT(request: NextRequest) {
           cost_price: item.cost_price || null,
           article_number: item.article_number || null,
           category_slug: item.category_slug || null,
+          // ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02):
+          // is_rot_eligible/is_rut_eligible tas emot rakt av från anroparen
+          // här — den här rutten är INTE sanningen om vad som ger ROT. Den
+          // sanningen är lib/rot/ratt.ts (bedomAvdrag), källbelagd mot
+          // docs/bransch/*.md. En anropare som sätter dessa booleaner utan
+          // att ha frågat bedomAvdrag riskerar exakt det pengafel bransch-
+          // genomgången hittade.
           is_rot_eligible: item.is_rot_eligible || false,
           is_rut_eligible: item.is_rut_eligible || false,
           rot_rut_type: item.rot_rut_type || null,

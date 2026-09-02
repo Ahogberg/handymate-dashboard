@@ -81,13 +81,14 @@ export interface BuildQuotePayloadInput extends QuotePayloadContext {
  * samma utdata, inga side effects.
  *
  * Städar bort editor-interna flaggor (P4 + Kvittoprincipen Fall 3:
- * `ai_price_missing`/`save_to_products`/`ai_uncertain`/`ai_note`) från
+ * `ai_price_missing`/`save_to_products`/`ai_uncertain`/`ai_note`, samt
+ * ROT-sanningens `avdrags_fraga`/`avdrags_utan_avdrag`) från
  * raderna innan de skickas — de ska aldrig fastna i den sparade offerten.
  */
 export function buildQuotePayload(input: BuildQuotePayloadInput) {
   const finalItems = recalculateItems(input.items)
     .map((item, idx) => ({ ...item, sort_order: idx }))
-    .map(({ ai_price_missing, save_to_products, ai_uncertain, ai_note, ...rest }) => rest)
+    .map(({ ai_price_missing, save_to_products, ai_uncertain, ai_note, avdrags_fraga, avdrags_utan_avdrag, ...rest }) => rest)
 
   const base = {
     ...(input.mode === 'edit' ? { quote_id: input.quoteId } : {}),

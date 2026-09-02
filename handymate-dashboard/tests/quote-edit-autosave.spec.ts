@@ -66,7 +66,12 @@ test('offerteditorn bevarar dolda rader genom laddning och autosave', () => {
     /buildQuotePayload\(\{\s*\.\.\.ctx,[\s\S]{0,200}items: workingItems,\s*mode,\s*quoteId,\s*\}\)[\s\S]{0,300}method: mode === 'edit' \? 'PUT' : 'POST'/,
   )
   expect(save).toMatch(/buildQuotePayload\(\{ \.\.\.ctx, items, mode, quoteId \}\)[\s\S]{0,300}method: 'PUT'/)
-  expect(payload).toContain("({ ai_price_missing, save_to_products, ai_uncertain, ai_note, ...rest }) => rest")
+  // Listan över strippade fält växer när nya editor-interna flaggor
+  // tillkommer (2026-09-02: ROT-sanningens avdrags_fraga/avdrags_utan_avdrag).
+  // Poängen facit vaktar är oförändrad: allt ANNAT passerar via `...rest`.
+  expect(payload).toContain(
+    "({ ai_price_missing, save_to_products, ai_uncertain, ai_note, avdrags_fraga, avdrags_utan_avdrag, ...rest }) => rest",
+  )
 })
 
 test('Skicka i edit-läge sparar och öppnar riktiga skicka-dialogen', () => {

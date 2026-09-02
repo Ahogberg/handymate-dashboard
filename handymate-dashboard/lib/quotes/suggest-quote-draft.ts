@@ -385,6 +385,10 @@ export async function suggestQuoteDraftForLead(businessId: string, leadId: strin
         preview: {
           job_title: generated.jobTitle,
           job_description: generated.jobDescription,
+          // ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02):
+          // generated.items/options bär redan is_rot_eligible/is_rut_eligible
+          // satta av bedomAvdrag() i lib/ai-quote-generator.ts — den här
+          // filen sätter ALDRIG avdraget själv, den vidarebefordrar bara.
           items: generated.items,
           options: generated.options,
           suggested_deduction_type: generated.suggestedDeductionType,

@@ -108,6 +108,23 @@ export interface QuoteTemplateItem {
   aiUncertain?: boolean
   /** Modellens egen not till aiUncertain — samma edit-läge-bara-regel. */
   aiNote?: string | null
+  /**
+   * ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): satt när
+   * bedomAvdrag() (lib/rot/ratt.ts) gav utfall 'okant' för radens jobbtyp —
+   * frågan hantverkaren ska tillfrågas, ALDRIG en gissning. Renderas som en
+   * dämpad rad under artikeln av QuoteDocumentRow, bara i edit-läge (samma
+   * regel som aiUncertain/aiNote ovan — en kvarhållen fråga i hantverkarens
+   * eget verktyg, inte ett påstående i kundens dokument).
+   */
+  avdragsFraga?: string | null
+  /**
+   * true när radens jobbtyp ALDRIG ger ROT (arArbeteUtanAvdrag,
+   * lib/rot/ratt.ts) — t.ex. service, kontroll, översyn eller felsökning.
+   * Hindrar ingen: hantverkaren kan fortfarande kryssa i ROT för raden, men
+   * QuoteDocumentRow visar då en varning i stället för att tyst acceptera
+   * kryssat ROT på ett jobb Skatteverket uttryckligen sagt nej till.
+   */
+  avdragsUtanAvdrag?: boolean
 }
 
 /** En komponentrad ur component_snapshot som får visas för kunden. */

@@ -38,7 +38,7 @@ import {
   applyOptionRowDefaults,
   resolveLegacyItemFields,
 } from '@/lib/quote-calculations'
-import type { QuoteItem } from '@/lib/types/quote'
+import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 
 /** Formen på en rad i ai-generate-svarets `quote.items`/`quote.options`
     (GeneratedQuoteItem, lib/ai-quote-generator.ts) — `description`/
@@ -61,6 +61,41 @@ export interface GeneratedQuoteItemInput {
       mall-/legacy-rader — de har ingen AI-bedömning att rapportera. Används
       bara när `sourceIsAi` är true (Kvittoprincipen Fall 3). */
   confidence?: number | null
+  /** ROT-rätten som en sanning (tasks/plan-rot-ratt.md, 2026-09-02): satta av
+      bedomAvdrag() i lib/ai-quote-generator.ts när avdragsrätten är BELAGD —
+      true vid belagt ja, false vid belagt nej, UNDEFINED när vi inte vet.
+      Skillnaden mellan false och undefined är hela poängen: se
+      rotRutFranSanning nedan. */
+  is_rot_eligible?: boolean
+  is_rut_eligible?: boolean
+  /** Frågan som ska följa med raden in i offertbyggaren när avdragsrätten är
+      okänd (QuoteDocumentRow visar den dämpat i edit-läge). */
+  avdragsFraga?: string | null
+  /** true när jobbtypen aldrig ger ROT (service/kontroll/felsökning). */
+  avdragsUtanAvdrag?: boolean
+}
+
+/**
+ * Vilken ROT/RUT-typ raden faktiskt ska få. Sanningen (lib/rot/ratt.ts, via
+ * GeneratedQuoteItem-flaggorna) går FÖRE modellens `suggestedDeductionType` —
+ * men bara när den är belagd:
+ *  - Belagt ja  ⇒ typen, men fortfarande bara på 'labor'-rader (material och
+ *    underleverantörsvaror ger aldrig ROT — samma regel som legacy).
+ *  - Belagt nej ⇒ ingen avdragstyp alls. Det här är själva buggfixen: ett
+ *    rent servicejobb kan inte längre ROT-märkas för att modellen gissade så.
+ *  - Okänt (båda flaggorna undefined) ⇒ oförändrat beteende, legacy-mappningen
+ *    avgör. Vi slår inte av ROT på en offert vi inte kan belägga.
+ */
+export function rotRutFranSanning(
+  item: GeneratedQuoteItemInput,
+  suggestedDeductionType: 'rot' | 'rut' | 'none' | null | undefined,
+): RotRutType {
+  if (item.is_rot_eligible === true || item.is_rut_eligible === true) {
+    if (item.type !== 'labor') return null
+    return item.is_rot_eligible === true ? 'rot' : 'rut'
+  }
+  if (item.is_rot_eligible === false && item.is_rut_eligible === false) return null
+  return legacyItemRotRutType(item.type, suggestedDeductionType)
 }
 
 /** Same unit map as the original client-side converter. */
@@ -125,8 +160,12 @@ export function mapGeneratedItemToQuoteItem(
         ...(item.linkedProductId ? { linked_product_id: item.linkedProductId } : {}),
         ...(priceMissing ? { ai_price_missing: true, save_to_products: true } : {}),
         ...(uncertain ? { ai_uncertain: true, ai_note: item.note || null } : {}),
+        // Editor-interna fält, samma livscykel som ai_uncertain: de strippas
+        // i buildQuotePayload innan quote_items POSTas och når aldrig basen.
+        ...(item.avdragsFraga ? { avdrags_fraga: item.avdragsFraga } : {}),
+        ...(item.avdragsUtanAvdrag ? { avdrags_utan_avdrag: true } : {}),
       },
-      legacyItemRotRutType(item.type, suggestedDeductionType),
+      rotRutFranSanning(item, suggestedDeductionType),
     ),
   )
 }

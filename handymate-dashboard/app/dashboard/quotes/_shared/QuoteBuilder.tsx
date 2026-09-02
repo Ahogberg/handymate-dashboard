@@ -726,6 +726,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             // dessa fält — se typkommentaren i lib/quote-templates/types.ts.
             aiUncertain: i.ai_uncertain || undefined,
             aiNote: i.ai_uncertain ? i.ai_note : undefined,
+            // ROT-rätten som en sanning — samma edit-läge-bara-regel.
+            avdragsFraga: i.avdrags_fraga || undefined,
+            avdragsUtanAvdrag: i.avdrags_utan_avdrag || undefined,
           }
         }),
         subtotalExVat: totals.subtotal,
