@@ -30,6 +30,9 @@ export interface InternalPushPayload {
   tag?: string
   target_user_id?: string | null
   data?: Record<string, unknown>
+  /** Klassens TTL/prioritet (lib/notifications/push-policy.ts). Utelämnad = beslut-klassens. */
+  ttl_seconds?: number
+  priority?: 'high' | 'normal'
 }
 
 export interface InternalPushResult {

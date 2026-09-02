@@ -134,6 +134,14 @@
       "schedule": "5 5 * * *"
     },
     {
+      "path": "/api/cron/push-morgon",
+      "schedule": "10 5 * * *"
+    },
+    {
+      "path": "/api/cron/push-morgon",
+      "schedule": "10 6 * * *"
+    },
+    {
       "path": "/api/cron/driftlarm",
       "schedule": "15 5 * * *"
     },

@@ -81,6 +81,7 @@ jobs:
           tests/facit-tenant-sweep.spec.ts
           tests/facit-route-auth-inventory.spec.ts
           tests/onboarding-funnel.spec.ts
+          tests/push-tyst-tid.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

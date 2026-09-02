@@ -17,6 +17,7 @@
  */
 import { getServerSupabase } from '@/lib/supabase'
 import { getCommunicationSettings } from '@/lib/smart-communication'
+import { isWithinQuietHours, stockholmMinutesNow } from '@/lib/tysta-timmar'
 
 export interface HubGateDecision {
   allowed: boolean
@@ -25,27 +26,9 @@ export interface HubGateDecision {
   code?: 'quiet_hours' | 'weekly_cap'
 }
 
-/** Ren: är klockslaget (minuter sedan midnatt) inom tysta timmar? Hanterar över midnatt (21:00–07:00). */
-export function isWithinQuietHours(startStr: string, endStr: string, minutesNow: number): boolean {
-  const parse = (s: string): number | null => {
-    const m = /^(\d{1,2}):(\d{2})$/.exec((s || '').trim())
-    if (!m) return null
-    const h = Number(m[1]), min = Number(m[2])
-    if (h > 23 || min > 59) return null
-    return h * 60 + min
-  }
-  const start = parse(startStr), end = parse(endStr)
-  if (start === null || end === null || start === end) return false
-  if (start > end) return minutesNow >= start || minutesNow < end
-  return minutesNow >= start && minutesNow < end
-}
-
-export function stockholmMinutesNow(now: Date = new Date()): number {
-  const parts = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm', hour: '2-digit', minute: '2-digit', hour12: false }).formatToParts(now)
-  const h = Number(parts.find(p => p.type === 'hour')?.value ?? 0)
-  const m = Number(parts.find(p => p.type === 'minute')?.value ?? 0)
-  return (h % 24) * 60 + m
-}
+// Tidsfunktionerna bor i lib/tysta-timmar.ts (delade med push-pausen,
+// lib/notifications/tyst-tid.ts) och re-exporteras här för befintliga anropare.
+export { isWithinQuietHours, stockholmMinutesNow }
 
 export async function hubAllowsProactiveSend(businessId: string, customerId: string | null, now: Date = new Date()): Promise<HubGateDecision> {
   const settings = await getCommunicationSettings(businessId)

@@ -1,3 +1,41 @@
+# Nattpass 3: tyst tid för push + två gamla facit (Claude 2026-09-02)
+
+- [x] tests/first-focus + tests/job-type-start: pekade på Step6LiveTour för
+      logik som flyttat till FirstAssignmentFinal — gröna igen (d4abcf9)
+- [x] lib/tysta-timmar.ts: isWithinQuietHours + stockholmMinutesNow flyttade
+      ut ur hub-gate (re-export kvar) så SMS-grind och push delar klocka
+- [x] lib/notifications/tyst-tid.ts: 21:00–07:00 svensk tid; hant +
+      teamuppdatering hålls, beslut aldrig; morgonsammanfattning (1 rad =
+      som den är, flera = "N saker hände medan du var borta" + rubriker),
+      gruppering per företag+riktad mottagare, rader >36 h utgår
+- [x] lib/notifications/push-held.ts + sql/v194_push_held.sql (KÖRD +
+      verifierad: RLS, partiellt unikt index på öppna dedupe-nycklar):
+      fail-open — kan raden inte hållas skickas pushen direkt som förut
+- [x] sendApprovalPush: hållning efter dedupe, före fetch
+- [x] /api/cron/push-morgon (05:10 + 06:10 UTC = 07:10 svensk tid sommar/
+      vinter; körningen inom tyst tid hoppar): släpper per mottagare via
+      sendInternalPush, stämplar released_at/release_outcome, bokför i
+      push_dispatch_log. ?force=1 bara för admin
+- [x] sql/v195_push_subscriptions_hardened.sql (KÖRD): push_subscriptions
+      fanns aldrig i produktion — v2 kördes aldrig, PWA-push har fallerat
+      tyst hela tiden. Samma tabell utan v2:s USING(true)-policy
+- [x] tests/push-tyst-tid.spec.ts i kontraktsgrinden; cron-auth 43/42;
+      tsc 0; test:contracts 225 gröna
+
+## Att läsa av
+- push_held: SELECT release_outcome, count(*) FROM push_held GROUP BY 1
+  efter första morgonen. Cron-svaret loggar held/expired/released/groups.
+- push_subscriptions: efter nästa PWA-installation ska en rad dyka upp.
+
+## Beslut för Andreas
+- Fönstret är konstant (21:00–07:00). Per-företag/per-person-inställning
+  ("stör inte mellan …") är nästa steg om någon ber om det.
+- lib/smart-communication.ts isQuietHours räknar på serverns UTC-klocka
+  (canSendMessage) — SMS-grinden i hub-gate är rätt, men communication-ai
+  går via canSendMessage. Inte rört i natt.
+
+---
+
 # Nattpass 2: onboardingtratten (Claude 2026-09-02)
 
 Stöd för Andreas onboarding-A/B. Ingen migration — tidsstämplarna bor under
