@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { Resend } from 'resend'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkEmailRateLimitDb } from '@/lib/rate-limit-db'
+import { buildAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -186,8 +187,8 @@ export async function POST(request: NextRequest) {
       ` : ''}
     </div>
     <div class="footer">
-      <p>Beställning skickad via Handymate</p>
       <p>${business?.business_name || ''} | ${business?.contact_email || ''} | ${business?.contact_phone || ''}</p>
+      ${attributionEmailHtml(buildAttribution(business))}
     </div>
   </div>
 </body>

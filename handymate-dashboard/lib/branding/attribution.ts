@@ -11,6 +11,7 @@
  *
  * Alla ytor importerar härifrån; ingen yta bygger sin egen sträng.
  */
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { getAppBaseUrl } from '@/lib/site-url'
 
 export const ATTRIBUTION_TEXT = 'Skickat via Handymate'
@@ -32,6 +33,43 @@ export function buildAttribution(cfg: AttributionSource | null | undefined): Att
   const linkEnabled = cfg?.attribution_link_enabled !== false
   const url = linkEnabled && code ? `${getAppBaseUrl()}/via/${encodeURIComponent(code)}` : null
   return { text: ATTRIBUTION_TEXT, url }
+}
+
+/**
+ * Hämtar stämpelns underlag för ett företag med EN query — för ytor som
+ * inte redan har business_config-raden i scope (`select('*')`; den som har
+ * det anropar buildAttribution(raden) direkt).
+ *
+ * Kolumnen attribution_link_enabled kommer i sql/v200. PostgREST fäller
+ * hela selecten om en begärd kolumn saknas, så innan v200 är körd faller
+ * vi tillbaka på bara referral_code (saknad kolumn = länken PÅ). Kastar
+ * aldrig — vid fel blir det texten utan länk, utskicket får inte stanna
+ * på stämpeln.
+ */
+export async function loadAttribution(
+  supabase: SupabaseClient,
+  businessId: string,
+): Promise<Attribution> {
+  try {
+    const full = await supabase
+      .from('business_config')
+      .select('referral_code, attribution_link_enabled')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (!full.error) return buildAttribution(full.data)
+
+    const fallback = await supabase
+      .from('business_config')
+      .select('referral_code')
+      .eq('business_id', businessId)
+      .maybeSingle()
+    if (!fallback.error) {
+      return buildAttribution({ referral_code: fallback.data?.referral_code, attribution_link_enabled: undefined })
+    }
+    return buildAttribution(null)
+  } catch {
+    return buildAttribution(null)
+  }
 }
 
 /** Ordet "Handymate" som länk (om url) eller ren text. */

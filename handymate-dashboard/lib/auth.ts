@@ -38,6 +38,12 @@ export interface AuthenticatedBusiness {
   specialties: unknown
   bankgiro: string | null
   services_offered: string[] | null
+  /** Rekommendationskod (lib/referral/codes.ts) — null på gamla konton.
+      Raden hämtas med select('*'), så fältet finns i runtime; stämpeln
+      (lib/branding/attribution.ts) läser det via buildAttribution(business). */
+  referral_code?: string | null
+  /** sql/v200 — undefined tills migrationen är körd, tolkas som PÅ. */
+  attribution_link_enabled?: boolean | null
   /**
    * Om denna business returneras via superadmin-impersonation snarare än
    * användarens egen koppling. API-routes kan kolla denna för att blockera
