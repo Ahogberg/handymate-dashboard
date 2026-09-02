@@ -122,16 +122,16 @@ Deploy-ordning: v195 → ÄTA-kod → v196 → dagbokskod → mobil.
 - [x] v196 KÖRD + verifierad 2026-09-02 (5 kolumner, 2 index, project_log_revision + 2 RLS-policyer)
 
 ## DEL 3 — Mobil (handymate-mobile, main)
-- [ ] E1 lib/api: Byggdagbok-block, väder, display, Project.customer_id
-- [ ] E2 ÄTA-skicka från projektvyn + beskrivningsvakt
-- [ ] E3 DiaryList + CreateDiarySheet + projektkort + /projects/[id]/diary + lib/weather + GDPR-text
-- [ ] E4 approvals: etiketter från backend, Projekt-filter, död Bokningar bort
-- [ ] E5 (villkorad) foton på ÄTA
-- [ ] tsc + jest gröna
+- [x] E1 lib/api: Byggdagbok-block, väder, display, Project.customer_id (90a12f9)
+- [x] E2 ÄTA-skicka från projektvyn + beskrivningsvakt (77f8362)
+- [x] E3 DiaryList + CreateDiarySheet + projektkort + /projects/[id]/diary + lib/weather + GDPR-text (ee61dae)
+- [x] E4 approvals: etiketter från backend, Projekt-filter, död Bokningar bort (c995f2a)
+- [x] E5 foton på ÄTA bakom ATA_ATTACHMENTS_ENABLED=true (a53c737)
+- [x] tsc + jest gröna (26 suiter / 188 tester), pushat till origin/main 2026-09-02
 
 ## Verifiering
-- [ ] tsc 0, next build ren, playwright-listan i planen grön
-- [ ] Skarptest ÄTA + dagbok (plan §Verifiering 4–5); mobil efter EAS
+- [x] tsc 0, next build ren, playwright-listan i planen grön
+- [ ] Skarptest ÄTA + dagbok (plan §Verifiering 4–5); mobil efter EAS-bygge (Andreas)
 
 ---
 
