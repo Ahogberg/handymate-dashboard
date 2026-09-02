@@ -1,3 +1,60 @@
+# Etapp B: Självgående onboarding härdad (Claude 2026-09-02)
+
+Plan: `C:\Users\Gaming\.claude\plans\cozy-crafting-reef.md` (godkänd 2026-09-02).
+Måttet: ett nytt företag aktivt på ≥4 ytor inom 30 dagar utan att en grundare
+varit inblandad. Worktree `.worktrees/onboarding-hardening`, branch
+`feature/onboarding-hardening`, basad på origin/main (Codex arbetar parallellt).
+
+- [x] B1 `lib/admin/adoption.ts` — 8 ytor, 30-dagarsfönster från
+      onboarding_completed_at (utesluter importen i steg 4), tröskel 4;
+      kolumn + KPI-kort i adminvyn; `tests/adoption.spec.ts` (05521ca8)
+- [x] B2 betalgrinden: allowlist (active/comp) + fail closed, server-härlett
+      `paid` i GET, ny verify-rutt mot Stripe med session_id, PUT-tak 8,
+      delad `lib/billing/write-billing-update.ts`, döda trial-rutterna
+      raderade, `paymentPending`-läge i Step5Activate (54003bf3)
+- [x] B3 självläkning: `lib/email/provision-inbound-route.ts` (lead-adress vid
+      finalize + Inställningar delar en funktion), daglig cron
+      `phone-provision-retry` med larm efter tre dygn (3941d75c)
+- [x] B4 livscykelmail dag 2/7/14 ur kontots verkliga luckor;
+      `lib/onboarding/lifecycle-emails.ts` + `kom-igang-signals.ts`;
+      dag 14 bara till konton under adoptionströskeln (d6da9166)
+- [x] B5 genomgången får rader för en ny firma utan import — timpris ×
+      personer × 52, materialpåslag, tjänster, AI-numret (3f2fc3e7)
+- [x] B6 `app/api/debug/e2e-onboarding-fresh` + facit: grinden bevisas i BÅDA
+      riktningarna för ett färskt konto, adoptionen måste vara 0/8 (fa52ee07)
+- [x] Verifiering: tsc 0 fel, `npm run build` ren, 6859 playwright gröna
+      (hela chromium-sviten), 0 röda
+- [x] Egen granskning av diffen mot origin/main — se nedan
+
+## Granskning (2026-09-02)
+
+Åtgärdat:
+- **Demoregression**: `paid` i GET använde grindens demoundantag → demokontot
+  hade hoppat över HELA betalsteget i stället för att visa demon av det.
+  `arOnboardingBetald(rad, null)` stänger av undantaget där; facit låser båda
+  riktningarna.
+- **Tyst 20-sekundersspinner** efter Stripe-retur när verify svarar pending →
+  fem försök (10 s), sedan tar "Kontrollera igen" på betalsteget vid.
+- Noterat i cron-kommentaren att numret svepet köper är samma köp webhooken
+  redan gör — ingen ny kostnadskälla.
+
+Medvetet lämnat:
+- `hamtaAdoptionHandelser` skickar alla business_id i en `.in()` — fine vid
+  27 konton, kan behöva batchas långt över hundra.
+- Dag 30 (månadskvittot) ingår inte i livscykeln; egen punkt på bygglistan,
+  skelettet gör det till en mall till.
+- B2:s kontrollfråga mot prod kördes: sex rader utan betald status, alla
+  E2E-harnessens och egna testkonton. Inga riktiga kunder, ingen backfill.
+
+Kvar för Andreas (skarptest):
+- `POST /api/debug/e2e-onboarding-fresh` mot prod som admin — ska ge alla steg
+  gröna och tomt `leftover`
+- Registrera ett riktigt konto och försöka finalisera utan att betala → 402
+- `?payment=success` utan session_id landar INTE på steg 7
+- `GET /api/admin/pilots` → adoptionsraden + KPI-kortet i /admin/onboard
+
+---
+
 # Nattpass 10: Lanseringsboost pass 1 — Företagsskannern + webbplatssignaler (Claude + 3 Sonnet-agenter 2026-09-02)
 
 Program: docs/gtm/LANSERINGSBOOST_PROGRAM.md (sju idéer som pass).

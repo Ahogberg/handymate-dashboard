@@ -126,7 +126,7 @@ test.describe('betalgrinden — bara betalt öppnar', () => {
     expect(arOnboardingBetald({ business_id: 'demo_1', subscription_status: 'trial' }, 'demo_1')).toBe(true)
     expect(arOnboardingBetald({ business_id: 'annat', subscription_status: 'trial' }, 'demo_1')).toBe(false)
     // Ingen DEMO_BUSINESS_ID satt får inte göra alla konton till demokonton
-    expect(arOnboardingBetald({ business_id: undefined, subscription_status: 'trial' }, undefined)).toBe(false)
+    expect(arOnboardingBetald({ business_id: undefined, subscription_status: 'trial' }, null)).toBe(false)
   })
 
   test('saknad rad är inte betald — fail closed', () => {
@@ -149,7 +149,7 @@ test.describe('betalgrinden — bara betalt öppnar', () => {
 
   test('GET /api/onboarding härleder paid på servern, med grindens egen regel', () => {
     const src = read('app/api/onboarding/route.ts')
-    expect(src).toContain('paid: arOnboardingBetald(data)')
+    expect(src).toContain('paid: arOnboardingBetald(data, null)')
     expect(src).toContain('is_pilot')
   })
 
@@ -199,5 +199,24 @@ test.describe('betalgrinden — bara betalt öppnar', () => {
     expect(src).toContain('Betalningen registreras')
     expect(src).toContain('Kontrollera igen')
     expect(src).toContain('kontrolleraBetalning')
+  })
+})
+
+test.describe('demokontot — grinden släpper igenom, men steget visas ändå', () => {
+  test('demoundantaget kan stängas av med null — två olika frågor om samma konto', () => {
+    const demo = { business_id: 'demo_1', subscription_status: 'trial' }
+    // Finalize-grinden: demokontot måste kunna köra om onboardingen
+    expect(arOnboardingBetald(demo, 'demo_1')).toBe(true)
+    // GET /api/onboarding: demon ska SE betalsteget (det är demon av steget)
+    expect(arOnboardingBetald(demo, null)).toBe(false)
+  })
+
+  test('GET använder null-varianten, finalize-grinden gör det inte', () => {
+    const route = read('app/api/onboarding/route.ts')
+    expect(route).toContain('paid: arOnboardingBetald(data, null)')
+    // Grinden i finalize går fortfarande via helpern med demoundantaget kvar
+    expect(route).toContain('isOnboardingPaymentBlocked(supabase, business.business_id)')
+    // Step5Activate visar fortfarande demons egen väg förbi Stripe
+    expect(read('app/onboarding/components/Step5Activate.tsx')).toContain('isDemoBusinessId(data.businessId)')
   })
 })

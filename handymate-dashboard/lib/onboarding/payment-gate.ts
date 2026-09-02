@@ -33,10 +33,15 @@ export interface PaymentGateRow {
 /**
  * Ren funktion — hela grindens logik på ett ställe, testbar utan databas.
  * En saknad rad (null/undefined) är INTE betald.
+ *
+ * `demoBusinessId` kan sättas till null för att stänga av demoundantaget.
+ * GET /api/onboarding gör det: demokontot ska fortfarande SE betalsteget (det
+ * är demon av steget, med simulerad betalning), medan finalize-grinden måste
+ * släppa igenom det. Två olika frågor om samma konto.
  */
 export function arOnboardingBetald(
   rad: PaymentGateRow | null | undefined,
-  demoBusinessId: string | undefined = process.env.DEMO_BUSINESS_ID,
+  demoBusinessId: string | null | undefined = process.env.DEMO_BUSINESS_ID,
 ): boolean {
   if (!rad) return false
   if (rad.is_pilot === true) return true

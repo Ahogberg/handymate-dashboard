@@ -21,6 +21,11 @@ export const dynamic = 'force-dynamic'
  * onboardingen men saknar nummer. Efter tre dagars misslyckanden larmas
  * driften — då är det inte längre en tillfällig störning.
  *
+ * Att svepet KÖPER ett nummer (en verklig 46elks-kostnad) är samma sak som
+ * Stripe-webhooken redan gör för varje genomförd onboarding-checkout: alla
+ * betalande konton ska ha ett AI-nummer. Svepet lägger alltså inte till en
+ * ny kostnadskälla, det gör bara om ett köp som skulle ha skett.
+ *
  * SCHEMAT: "42 6 * * *" i vercel.json — en gång per dag, före morgonbriefen,
  * ingen kollision med befintliga rader.
  */

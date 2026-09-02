@@ -37,9 +37,10 @@ const TOTAL_STEPS = 9
  *   1. POST .../verify med session_id — Stripe är sanningen och statusen
  *      skrivs direkt, så vi inte behöver vänta in webhooken.
  *   2. Svarar den "pending" (3DS/SCA, eller webhooken hann före men vår
- *      skrivning inte klar) pollas GET /api/onboarding tio gånger med två
- *      sekunders mellanrum. Därefter får kunden stanna på betalsteget och
- *      kontrollera igen — aldrig en tyst låsning.
+ *      skrivning inte klar) pollas GET /api/onboarding fem gånger med två
+ *      sekunders mellanrum. Tio sekunder är så länge det är rimligt att låta
+ *      kunden se en spinner; därefter tar betalstegets "Kontrollera igen"
+ *      vid — aldrig en tyst låsning, och aldrig en tyst väntan.
  */
 async function verifieraBetalning(sessionId: string): Promise<boolean> {
   try {
@@ -55,7 +56,7 @@ async function verifieraBetalning(sessionId: string): Promise<boolean> {
     // Nätverksfel — fall igenom till pollingen nedan
   }
 
-  for (let i = 0; i < 10; i++) {
+  for (let i = 0; i < 5; i++) {
     await new Promise(r => setTimeout(r, 2000))
     try {
       const res = await fetch('/api/onboarding')

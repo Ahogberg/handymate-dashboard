@@ -75,7 +75,11 @@ export async function GET(request: NextRequest) {
       // (lib/onboarding/payment-gate.ts). Klienten gissade tidigare på
       // stripe_subscription_id, vilket kunde säga "betald" om ett annat state
       // än active/comp stod i raden.
-      paid: arOnboardingBetald(data),
+      //
+      // null = utan demoundantaget: demokontot ska fortfarande SE betalsteget
+      // (det ÄR demon av steget, med simulerad betalning) även om
+      // finalize-grinden släpper igenom det.
+      paid: arOnboardingBetald(data, null),
     })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'
