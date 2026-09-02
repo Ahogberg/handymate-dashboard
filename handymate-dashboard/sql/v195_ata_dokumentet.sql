@@ -38,7 +38,7 @@ UPDATE project_change pc
 SET items = normaliserat.items
 FROM (
   SELECT
-    rad.change_id,
+    src.change_id,
     jsonb_agg(
       rad.item
         || jsonb_build_object('name', COALESCE(rad.item->>'name', rad.item->>'description', 'Arbete'))
@@ -53,7 +53,7 @@ FROM (
       SELECT 1 FROM jsonb_array_elements(src.items) i2
       WHERE (i2->>'name') IS NULL OR (i2->>'unit') IS NULL
     )
-  GROUP BY rad.change_id
+  GROUP BY src.change_id
 ) AS normaliserat
 WHERE pc.change_id = normaliserat.change_id;
 
