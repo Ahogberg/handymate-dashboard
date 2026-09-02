@@ -17,6 +17,7 @@ export interface AuthenticatedBusiness {
   contact_email: string | null
   contact_phone: string | null
   phone_number: string | null
+  public_phone?: string | null
   assigned_phone_number: string | null
   forward_phone_number: string | null
   call_recording_enabled: boolean
@@ -53,6 +54,16 @@ export interface AuthenticatedBusiness {
     admin_user_id: string
     admin_email: string
   } | null
+}
+
+function normalizeAuthenticatedBusiness(row: Record<string, any>): AuthenticatedBusiness {
+  return {
+    ...row,
+    // contact_phone fanns i den historiska TypeScript-typen men aldrig i
+    // live-tabellen. Behåll API-kontraktet för alla anropare, härlett från
+    // den uttryckligt publika telefonen och därefter företagets huvudnummer.
+    contact_phone: row.public_phone || row.phone_number || null,
+  } as AuthenticatedBusiness
 }
 
 /**
@@ -119,7 +130,7 @@ export async function getAuthenticatedBusiness(
 
         if (!targetError && targetBusiness) {
           return {
-            ...(targetBusiness as AuthenticatedBusiness),
+            ...normalizeAuthenticatedBusiness(targetBusiness),
             _impersonation: {
               admin_user_id: user.id,
               admin_email: user.email || '',
@@ -139,7 +150,7 @@ export async function getAuthenticatedBusiness(
       .single()
 
     if (!businessError && business) {
-      return business as AuthenticatedBusiness
+      return normalizeAuthenticatedBusiness(business)
     }
 
     // Fallback: kolla om användaren är anställd via business_users
@@ -158,7 +169,7 @@ export async function getAuthenticatedBusiness(
         .single()
 
       if (employeeBusiness) {
-        return employeeBusiness as AuthenticatedBusiness
+        return normalizeAuthenticatedBusiness(employeeBusiness)
       }
     }
 

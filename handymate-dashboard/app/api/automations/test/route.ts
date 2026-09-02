@@ -75,15 +75,18 @@ export async function POST(request: NextRequest) {
       case 'calendar': {
         const { getServerSupabase } = await import('@/lib/supabase')
         const supabase = getServerSupabase()
-        const { data: config } = await supabase
-          .from('business_config')
-          .select('google_calendar_token')
+        const { data: connection } = await supabase
+          .from('calendar_connection')
+          .select('id, calendar_id, sync_enabled')
           .eq('business_id', business.business_id)
-          .single()
+          .eq('provider', 'google')
+          .order('connected_at', { ascending: true })
+          .limit(1)
+          .maybeSingle()
 
         result = {
-          success: !!config?.google_calendar_token,
-          message: config?.google_calendar_token
+          success: !!connection?.calendar_id && connection.sync_enabled !== false,
+          message: connection?.calendar_id && connection.sync_enabled !== false
             ? 'Google Calendar är ansluten'
             : 'Google Calendar är inte ansluten - gå till Inställningar → Integrationer',
         }

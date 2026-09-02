@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Merge action_data om det skickades med
-    const finalActionData = action_data || suggestion.action_data || {}
+    const finalActionData = action_data || suggestion.suggested_data || {}
 
     // Utför åtgärden baserat på typ
     let result: any = { success: true }
@@ -115,15 +115,20 @@ export async function POST(request: NextRequest) {
     // Uppdatera förslaget
     const newStatus = result.success ? 'completed' : 'approved'
 
-    await supabase
+    const { error: suggestionUpdateError } = await supabase
       .from('ai_suggestion')
       .update({
         status: newStatus,
-        approved_at: new Date().toISOString(),
-        completed_at: result.success ? new Date().toISOString() : null,
-        action_data: { ...finalActionData, result }
+        actioned_at: new Date().toISOString(),
+        suggested_data: { ...finalActionData, result }
       })
       .eq('suggestion_id', suggestion_id)
+      .eq('business_id', authBusiness.business_id)
+
+    if (suggestionUpdateError) {
+      console.error('[suggestions/approve] status update failed:', suggestionUpdateError.message)
+      return NextResponse.json({ error: 'Åtgärden utfördes men förslagsstatus kunde inte sparas' }, { status: 500 })
+    }
 
     return NextResponse.json({
       success: result.success,

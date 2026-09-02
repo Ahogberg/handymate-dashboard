@@ -88,8 +88,11 @@ export async function POST(request: NextRequest) {
       // Kolla calendar_connection för mer info
       const { data: conn } = await supabase
         .from('calendar_connection')
-        .select('gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, account_email')
+        .select('gmail_scope_granted, gmail_send_scope_granted, gmail_sync_enabled, account_email, access_token, refresh_token')
         .eq('business_id', business.business_id)
+        .eq('provider', 'google')
+        .order('connected_at', { ascending: true })
+        .limit(1)
         .maybeSingle()
 
       results.gmail.calendar_connection = conn ? {
@@ -97,21 +100,9 @@ export async function POST(request: NextRequest) {
         gmail_send_scope_granted: conn.gmail_send_scope_granted,
         gmail_sync_enabled: conn.gmail_sync_enabled,
         account_email: conn.account_email,
+        has_access_token: !!conn.access_token,
+        has_refresh_token: !!conn.refresh_token,
       } : 'Ingen calendar_connection hittad'
-
-      // Kolla business_config
-      const { data: biz } = await supabase
-        .from('business_config')
-        .select('gmail_send_enabled, gmail_email, google_access_token, google_refresh_token')
-        .eq('business_id', business.business_id)
-        .single()
-
-      results.gmail.business_config = {
-        gmail_send_enabled: biz?.gmail_send_enabled,
-        gmail_email: biz?.gmail_email,
-        has_access_token: !!biz?.google_access_token,
-        has_refresh_token: !!biz?.google_refresh_token,
-      }
     }
   } catch (err: any) {
     results.gmail.tested = true

@@ -326,10 +326,26 @@ export async function POST(request: NextRequest) {
     }
 
     // ══════════════════════════════════════════════════════════
-    // 3. Status-ytan — de fem business_config-kolumnerna
-    // app/api/integrations/fortnox/status/route.ts läser.
+    // 3. Status-ytan — metadata i business_config, tokenstatus i den
+    // kanoniska business_integration_credentials-tabellen.
     // ══════════════════════════════════════════════════════════
     const nowIso = new Date().toISOString()
+    const { error: credentialsErr } = await supabase
+      .from('business_integration_credentials')
+      .upsert({
+        business_id: businessId,
+        // Demo-only-markörer. Routen är hårt DEMO_BUSINESS_ID-grindad och
+        // dessa används bara för statusytans verklighetstrogna läsning.
+        fortnox_access_token: 'demo-fortnox-access-token',
+        fortnox_refresh_token: 'demo-fortnox-refresh-token',
+        fortnox_token_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+        updated_at: nowIso,
+      }, { onConflict: 'business_id' })
+    if (credentialsErr) {
+      console.error('[demo-fortnox-sim] credential status update failed:', credentialsErr.message)
+      return NextResponse.json({ error: 'Kunde inte markera Fortnox som anslutet.' }, { status: 500 })
+    }
+
     const { error: statusErr } = await supabase
       .from('business_config')
       .update({
@@ -337,10 +353,19 @@ export async function POST(request: NextRequest) {
         fortnox_company_name: businessName,
         fortnox_connected_at: nowIso,
         fortnox_last_synced_at: nowIso,
-        fortnox_token_expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
       })
       .eq('business_id', businessId)
     if (statusErr) {
+      // Lämna aldrig en demo-tokenrad bakom en status som säger "inte
+      // ansluten". Det här är inte en generell rollback av den simulerade
+      // importen, bara kompensation för de två statuslagren.
+      const { error: cleanupError } = await supabase
+        .from('business_integration_credentials')
+        .delete()
+        .eq('business_id', businessId)
+      if (cleanupError) {
+        console.error('[demo-fortnox-sim] credential rollback failed:', cleanupError.message)
+      }
       console.error('[demo-fortnox-sim] business_config status update failed:', statusErr.message)
       return NextResponse.json({ error: 'Kunde inte markera Fortnox som anslutet.' }, { status: 500 })
     }

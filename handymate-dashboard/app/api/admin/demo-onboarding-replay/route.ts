@@ -18,10 +18,8 @@ export const dynamic = 'force-dynamic'
  *      lämnas ORÖRD — den förifyllda datan gör nästa genomkörning snabb i
  *      stället för att presentatören måste fylla i formuläret på nytt.
  *   2. Fortnox-simläget (se demo-fortnox-sim/route.ts) återställs så replay
- *      nummer N+1 ser orört ut: de fem status-kolumnerna business_config
- *      läser (samma fem som app/api/integrations/fortnox/status/route.ts:
- *      fortnox_connected, fortnox_company_name, fortnox_connected_at,
- *      fortnox_last_synced_at, fortnox_token_expires_at) → false/NULL, och
+ *      nummer N+1 ser orört ut: metadata i business_config nollställs,
+ *      demo-tokenraden i business_integration_credentials tas bort, och
  *      raderna simmen skrev i fortnox_api_log + fortnox_sync raderas.
  *      sql/v155_demo_reset_v2.sql (den "riktiga" demo-resetten) rör INTE de
  *      två tabellerna idag — de är sim-specifika och städas här istället.
@@ -79,13 +77,21 @@ export async function POST(request: NextRequest) {
         fortnox_company_name: null,
         fortnox_connected_at: null,
         fortnox_last_synced_at: null,
-        fortnox_token_expires_at: null,
       })
       .eq('business_id', business.business_id)
 
     if (updateError) {
       console.error('[demo-onboarding-replay] business_config update failed:', updateError.message)
       return NextResponse.json({ error: 'Kunde inte nollställa onboardingen.' }, { status: 500 })
+    }
+
+    const { error: credentialsError } = await supabase
+      .from('business_integration_credentials')
+      .delete()
+      .eq('business_id', business.business_id)
+    if (credentialsError) {
+      console.error('[demo-onboarding-replay] credential cleanup failed:', credentialsError.message)
+      return NextResponse.json({ error: 'Kunde inte nollställa Fortnox-simuleringen.' }, { status: 500 })
     }
 
     // Rensning av logg-/synkspår från en ev. tidigare Fortnox-simulering.

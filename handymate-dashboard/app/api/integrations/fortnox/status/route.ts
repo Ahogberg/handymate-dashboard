@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getFortnoxConfig } from '@/lib/fortnox'
 
 /**
  * GET /api/integrations/fortnox/status
@@ -25,18 +26,22 @@ export async function GET(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { data } = await supabase
-      .from('business_config')
-      .select('fortnox_connected, fortnox_company_name, fortnox_connected_at, fortnox_last_synced_at, fortnox_token_expires_at')
-      .eq('business_id', business.business_id)
-      .maybeSingle()
+    const [{ data: metadata, error: metadataError }, config] = await Promise.all([
+      supabase
+        .from('business_config')
+        .select('fortnox_connected, fortnox_last_synced_at')
+        .eq('business_id', business.business_id)
+        .maybeSingle(),
+      getFortnoxConfig(business.business_id),
+    ])
+    if (metadataError) throw metadataError
 
     return NextResponse.json({
-      connected: !!data?.fortnox_connected,
-      company_name: data?.fortnox_company_name || null,
-      connected_at: data?.fortnox_connected_at || null,
-      last_synced_at: data?.fortnox_last_synced_at || null,
-      token_expires_at: data?.fortnox_token_expires_at || null,
+      connected: !!metadata?.fortnox_connected && !!config?.fortnox_access_token,
+      company_name: config?.fortnox_company_name || null,
+      connected_at: config?.fortnox_connected_at || null,
+      last_synced_at: metadata?.fortnox_last_synced_at || null,
+      token_expires_at: config?.fortnox_token_expires_at || null,
     })
   } catch (err: any) {
     return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })

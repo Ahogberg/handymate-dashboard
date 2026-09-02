@@ -1,26 +1,52 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { ensureValidToken, refreshGoogleToken } from '@/lib/google-calendar'
 
-/**
- * Refresh Google OAuth access token using refresh_token.
- */
-async function refreshGoogleToken(refreshToken: string): Promise<string | null> {
-  try {
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        client_id: process.env.GOOGLE_CLIENT_ID!,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET!,
-        refresh_token: refreshToken,
-        grant_type: 'refresh_token',
-      }),
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.access_token || null
-  } catch {
+type GmailConnection = {
+  id: string
+  access_token: string | null
+  refresh_token: string | null
+  token_expires_at: string | null
+  account_email: string | null
+  gmail_send_scope_granted: boolean | null
+  gmail_sync_enabled: boolean | null
+}
+
+async function getGmailConnection(businessId: string): Promise<GmailConnection | null> {
+  const supabase = getServerSupabase()
+  const { data, error } = await supabase
+    .from('calendar_connection')
+    .select('id, access_token, refresh_token, token_expires_at, account_email, gmail_send_scope_granted, gmail_sync_enabled')
+    .eq('business_id', businessId)
+    .eq('provider', 'google')
+    .eq('gmail_send_scope_granted', true)
+    .eq('gmail_sync_enabled', true)
+    .order('connected_at', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[gmail-send] Kunde inte läsa Google-anslutningen:', error.message)
     return null
   }
+  return data as GmailConnection | null
+}
+
+async function persistAccessToken(connectionId: string, accessToken: string, expiryDate: number): Promise<boolean> {
+  const supabase = getServerSupabase()
+  const { error } = await supabase
+    .from('calendar_connection')
+    .update({
+      access_token: accessToken,
+      token_expires_at: new Date(expiryDate).toISOString(),
+      sync_error: null,
+    })
+    .eq('id', connectionId)
+
+  if (error) {
+    console.error('[gmail-send] Kunde inte spara förnyad Google-token:', error.message)
+    return false
+  }
+  return true
 }
 
 /**
@@ -66,30 +92,25 @@ export async function sendViaGmail(
     bcc?: string[]
   }
 ): Promise<boolean> {
-  const supabase = getServerSupabase()
-
-  // Hämta OAuth-tokens
-  const { data: biz } = await supabase
-    .from('business_config')
-    .select('google_access_token, google_refresh_token, gmail_send_enabled')
-    .eq('business_id', businessId)
-    .single()
-
-  if (!biz?.google_refresh_token || !biz?.gmail_send_enabled) {
+  // OAuth-hemligheter hör hemma i integrationslagret. business_config har
+  // aldrig haft de gamla google_*/gmail_*-kolumner som denna funktion läste.
+  const connection = await getGmailConnection(businessId)
+  if (!connection?.refresh_token || !connection.access_token) {
     return false
   }
 
-  // Refresha token
-  let accessToken = biz.google_access_token
-  if (!accessToken) {
-    accessToken = await refreshGoogleToken(biz.google_refresh_token)
-    if (!accessToken) return false
+  const tokenResult = await ensureValidToken({
+    id: connection.id,
+    access_token: connection.access_token,
+    refresh_token: connection.refresh_token,
+    token_expires_at: connection.token_expires_at,
+  })
+  if (!tokenResult) return false
 
-    // Spara ny token
-    await supabase
-      .from('business_config')
-      .update({ google_access_token: accessToken })
-      .eq('business_id', businessId)
+  let accessToken = tokenResult.access_token
+  if (accessToken !== connection.access_token) {
+    const saved = await persistAccessToken(connection.id, accessToken, tokenResult.expiry_date)
+    if (!saved) return false
   }
 
   const rawMime = buildMimeMessage({
@@ -119,18 +140,21 @@ export async function sendViaGmail(
 
   if (res.status === 401) {
     // Token expired — retry med refreshad token
-    const newToken = await refreshGoogleToken(biz.google_refresh_token)
-    if (!newToken) return false
-
-    await supabase
-      .from('business_config')
-      .update({ google_access_token: newToken })
-      .eq('business_id', businessId)
+    let refreshed
+    try {
+      refreshed = await refreshGoogleToken(connection.refresh_token)
+    } catch (error) {
+      console.error('[gmail-send] Google-token kunde inte förnyas efter 401:', error)
+      return false
+    }
+    const saved = await persistAccessToken(connection.id, refreshed.access_token, refreshed.expiry_date)
+    if (!saved) return false
+    accessToken = refreshed.access_token
 
     const retryRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${newToken}`,
+        'Authorization': `Bearer ${accessToken}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ raw: encoded }),
@@ -146,15 +170,10 @@ export async function sendViaGmail(
  * Kolla om Gmail-sändning är aktiverad för ett företag.
  */
 export async function isGmailSendEnabled(businessId: string): Promise<{ enabled: boolean; email?: string }> {
-  const supabase = getServerSupabase()
-  const { data } = await supabase
-    .from('business_config')
-    .select('gmail_send_enabled, gmail_email')
-    .eq('business_id', businessId)
-    .single()
+  const connection = await getGmailConnection(businessId)
 
   return {
-    enabled: !!data?.gmail_send_enabled,
-    email: data?.gmail_email || undefined,
+    enabled: !!connection?.account_email,
+    email: connection?.account_email || undefined,
   }
 }

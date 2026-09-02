@@ -5,6 +5,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { createQuote } from '@/lib/quotes/create-quote'
 import { createDiaryEntry } from '@/lib/diary/write'
+import { createGoogleEvent, ensureValidToken } from '@/lib/google-calendar'
 
 /**
  * POST /api/voice/execute
@@ -263,20 +264,42 @@ export async function POST(request: NextRequest) {
       case 'calendar': {
         // Create calendar event via Google Calendar if connected
         try {
-          const { data: googleAuth } = await supabase
-            .from('business_config')
-            .select('google_access_token, google_calendar_id')
+          const { data: connection } = await supabase
+            .from('calendar_connection')
+            .select('id, access_token, refresh_token, token_expires_at, calendar_id, sync_enabled')
             .eq('business_id', businessId)
-            .single()
+            .eq('provider', 'google')
+            .order('connected_at', { ascending: true })
+            .limit(1)
+            .maybeSingle()
 
-          if (!googleAuth?.google_access_token || !googleAuth?.google_calendar_id) {
+          if (!connection?.access_token || !connection.refresh_token || !connection.calendar_id || connection.sync_enabled === false) {
             return NextResponse.json({
               success: false,
               error: 'Google Calendar ej kopplad',
             }, { status: 400 })
           }
 
-          const { createGoogleEvent } = await import('@/lib/google-calendar')
+          const tokenResult = await ensureValidToken({
+            id: connection.id,
+            access_token: connection.access_token,
+            refresh_token: connection.refresh_token,
+            token_expires_at: connection.token_expires_at,
+          })
+          if (!tokenResult) {
+            return NextResponse.json({ success: false, error: 'Google Calendar behöver återanslutas' }, { status: 400 })
+          }
+          if (tokenResult.access_token !== connection.access_token) {
+            const { error: tokenSaveError } = await supabase
+              .from('calendar_connection')
+              .update({
+                access_token: tokenResult.access_token,
+                token_expires_at: new Date(tokenResult.expiry_date).toISOString(),
+                sync_error: null,
+              })
+              .eq('id', connection.id)
+            if (tokenSaveError) throw tokenSaveError
+          }
 
           const dateStr = action.data.date || new Date().toISOString().split('T')[0]
           const timeStr = action.data.time || '09:00'
@@ -286,8 +309,8 @@ export async function POST(request: NextRequest) {
           const end = new Date(start.getTime() + durationHours * 60 * 60 * 1000)
 
           const eventId = await createGoogleEvent(
-            googleAuth.google_access_token,
-            googleAuth.google_calendar_id,
+            tokenResult.access_token,
+            connection.calendar_id,
             {
               summary: action.data.title || 'Händelse (röstkommando)',
               start,

@@ -281,7 +281,7 @@ export function buildQuoteTemplateData(
       contactName: creator?.name ?? (config?.contact_name || business?.contact_name || ''),
       phone: creator?.phone ?? (config?.phone_number || business?.phone_number || ''),
       email: creator?.email ?? (config?.contact_email || business?.contact_email || ''),
-      website: config?.website || null,
+      website: config?.website_url || null,
       bankgiro: config?.bankgiro || null,
       plusgiro: config?.plusgiro || null,
       swish: config?.swish_number || null,
@@ -289,7 +289,7 @@ export function buildQuoteTemplateData(
       momsRegnr: config?.vat_number || null,
       accentColor: config?.accent_color || DEFAULT_ACCENT,
       logoUrl: config?.logo_url || null,
-      tagline: config?.tagline || config?.service_area || null,
+      tagline: config?.service_area || null,
     },
     customer: {
       name: cust.name || 'Kund',

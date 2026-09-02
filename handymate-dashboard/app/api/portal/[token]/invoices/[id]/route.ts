@@ -105,9 +105,9 @@ export async function GET(
     const { data: businessConfig } = await supabase
       .from('business_config')
       .select(`
-        business_name, contact_name, contact_email, contact_phone, phone_number,
-        address, service_area, website, org_number, f_skatt_registered,
-        logo_url, accent_color, tagline, bankgiro, plusgiro, swish_number,
+        business_name, contact_name, contact_email, public_phone, phone_number,
+        address, service_area, website_url, org_number, f_skatt_registered,
+        logo_url, accent_color, bankgiro, plusgiro, swish_number,
         penalty_interest, late_fee_percent, reminder_fee, quote_template_style
       `)
       .eq('business_id', customer.business_id)

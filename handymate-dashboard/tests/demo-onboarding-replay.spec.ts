@@ -64,16 +64,18 @@ test.describe('POST /api/admin/demo-onboarding-replay — samma grindordning som
     expect(replaySource).not.toMatch(/onboarding_data:\s*(null|\{\})/)
   })
 
-  test('nollställer alla fem Fortnox-statuskolumner (samma fem status-routen läser)', () => {
+  test('nollställer Fortnox-metadata och tar bort tokenraden ur det kanoniska lagret', () => {
     for (const column of [
       'fortnox_connected: false',
       'fortnox_company_name: null',
       'fortnox_connected_at: null',
       'fortnox_last_synced_at: null',
-      'fortnox_token_expires_at: null',
     ]) {
       expect(replaySource).toContain(column)
     }
+    expect(replaySource).toContain("from('business_integration_credentials')")
+    expect(replaySource).toMatch(/from\('business_integration_credentials'\)\s*\n\s*\.delete\(\)/)
+    expect(replaySource).not.toContain('fortnox_token_expires_at: null')
   })
 
   test('städar fortnox_api_log och fortnox_sync (sim-specifika spår), rör inte customer/invoice', () => {
@@ -132,6 +134,10 @@ test.describe('POST /api/admin/demo-fortnox-sim — samma grindordning', () => {
     ]) {
       expect(simSource).toContain(column)
     }
+    expect(simSource.indexOf("from('business_integration_credentials')")).toBeLessThan(
+      simSource.indexOf("from('business_config')\n      .update({\n        fortnox_connected: true")
+    )
+    expect(simSource).toContain('[demo-fortnox-sim] credential rollback failed:')
   })
 
   test('svarar med {imported, skipped, unlinked, total_outstanding_kr} per resurs (samma form som riktiga importen)', () => {

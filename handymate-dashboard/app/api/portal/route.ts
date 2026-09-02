@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     // Get business name
     const { data: businessConfig } = await supabase
       .from('business_config')
-      .select('business_name, contact_email, contact_phone')
+      .select('business_name, contact_email, public_phone, phone_number')
       .eq('business_id', customer.business_id)
       .single()
 
@@ -90,7 +90,7 @@ export async function GET(request: NextRequest) {
       business: {
         name: businessConfig?.business_name || '',
         email: businessConfig?.contact_email || '',
-        phone: businessConfig?.contact_phone || '',
+        phone: businessConfig?.public_phone || businessConfig?.phone_number || '',
       },
       bookings: bookings || [],
       invoices: invoices || [],

@@ -75,7 +75,7 @@ export async function GET(request: NextRequest) {
   // Hämta business-inställningar
   const { data: config } = await supabase
     .from('business_config')
-    .select('default_hourly_rate, default_payment_days, invoice_prefix, next_invoice_number, bankgiro_number, plusgiro, swish_number, f_skatt_registered, org_number')
+    .select('default_hourly_rate, default_payment_days, invoice_prefix, next_invoice_number, bankgiro, plusgiro, swish_number, f_skatt_registered, org_number')
     .eq('business_id', business.business_id)
     .single()
 
@@ -150,7 +150,7 @@ export async function GET(request: NextRequest) {
       default_payment_days: config?.default_payment_days || 30,
       invoice_prefix: config?.invoice_prefix || 'FV',
       next_invoice_number: config?.next_invoice_number || 1,
-      bankgiro_number: config?.bankgiro_number,
+      bankgiro_number: config?.bankgiro,
       plusgiro: config?.plusgiro,
       swish_number: config?.swish_number,
       f_skatt_registered: config?.f_skatt_registered,
@@ -211,7 +211,7 @@ export async function POST(request: NextRequest) {
   // Betalkonton + betalningsvillkor (nummer/OCR sköts nu av createInvoice-kärnan)
   const { data: config } = await supabase
     .from('business_config')
-    .select('bankgiro_number, plusgiro, swish_number, default_payment_days')
+    .select('bankgiro, plusgiro, swish_number, default_payment_days')
     .eq('business_id', business.business_id)
     .single()
 
@@ -314,7 +314,7 @@ export async function POST(request: NextRequest) {
         rut_customer_pays: rot_rut_type === 'rut' ? customerPays : null,
         rot_personal_number: rot_personal_number || null,
         rot_property_designation: rot_property_designation || null,
-        bankgiro_number: config?.bankgiro_number || null,
+        bankgiro_number: config?.bankgiro || null,
         // OBS: plusgiro/swish_number finns INTE som kolumner på invoice
         // (PDF/utskick läser betalkonton från business_config).
       },

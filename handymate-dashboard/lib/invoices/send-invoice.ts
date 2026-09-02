@@ -254,7 +254,7 @@ export async function sendInvoice(
             business_name: businessConfig?.business_name,
             org_number: businessConfig?.org_number,
             contact_email: businessConfig?.contact_email,
-            contact_phone: businessConfig?.contact_phone,
+            contact_phone: businessConfig?.public_phone || businessConfig?.phone_number,
             address: businessConfig?.address,
             bankgiro: businessConfig?.bankgiro,
             plusgiro: businessConfig?.plusgiro,
@@ -305,7 +305,7 @@ export async function sendInvoice(
           swishNumber: businessConfig?.swish_number,
           orgNumber: businessConfig?.org_number,
           contactEmail: businessConfig?.contact_email,
-          contactPhone: businessConfig?.contact_phone,
+          contactPhone: businessConfig?.public_phone || businessConfig?.phone_number,
           portalUrl: portalUrl || pdfUrl,
           pdfUrl,
           // businessConfig är hela raden (select('*')) → ingen extra query.

@@ -237,7 +237,7 @@ export async function POST(request: NextRequest) {
 
     const { data: config } = await supabase
       .from('business_config')
-      .select('business_name, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website, quote_template_style')
+      .select('business_name, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website_url, quote_template_style')
       .eq('business_id', business.business_id)
       .single()
 
@@ -357,7 +357,7 @@ export async function GET(request: NextRequest) {
     // Hämta business-config (används som business-objekt i PDF-generatorn)
     const { data: bizConfig } = await supabase
       .from('business_config')
-      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, quote_template_style')
+      .select('business_name, contact_name, contact_email, phone_number, address, service_area, website_url, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, quote_template_style')
       .eq('business_id', quote.business_id)
       .single()
 

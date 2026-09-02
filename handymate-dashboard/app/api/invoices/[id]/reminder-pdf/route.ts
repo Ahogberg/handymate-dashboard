@@ -65,7 +65,7 @@ export async function GET(
     // Get business config — quote_template_style styr även påminnelsens stil
     const { data: config } = await supabase
       .from('business_config')
-      .select('business_name, display_name, org_number, contact_name, contact_email, contact_phone, phone_number, address, service_area, bankgiro, plusgiro, swish_number, f_skatt_registered, penalty_interest, late_fee_percent, reminder_fee, accent_color, logo_url, tagline, invoice_footer_text, quote_template_style')
+      .select('business_name, display_name, org_number, contact_name, contact_email, public_phone, phone_number, address, service_area, website_url, bankgiro, plusgiro, swish_number, f_skatt_registered, penalty_interest, late_fee_percent, reminder_fee, accent_color, logo_url, invoice_footer_text, quote_template_style')
       .eq('business_id', business.business_id)
       .single()
 

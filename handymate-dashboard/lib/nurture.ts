@@ -603,7 +603,7 @@ async function escalateCompletedSequence(params: {
     } catch { /* non-blocking */ }
 
     // Create AI suggestion for follow-up
-    await supabase.from('ai_suggestion').insert({
+    const { error: suggestionError } = await supabase.from('ai_suggestion').insert({
       business_id: params.businessId,
       customer_id: params.customerId,
       suggestion_type: 'follow_up',
@@ -611,7 +611,7 @@ async function escalateCompletedSequence(params: {
       description: `Uppföljningssekvensen "${sequenceName}" slutfördes utan att kunden svarade. Ring eller besök kunden för personlig kontakt.`,
       priority: 'high',
       status: 'pending',
-      action_data: {
+      suggested_data: {
         reason: 'nurture_sequence_completed_without_conversion',
         sequence_name: sequenceName,
         sequence_id: params.sequenceId,
@@ -620,6 +620,9 @@ async function escalateCompletedSequence(params: {
       },
       source_text: `Automatisk eskalering från "${sequenceName}"`,
     })
+    if (suggestionError) {
+      throw new Error(`Kunde inte skapa uppföljningsförslaget: ${suggestionError.message}`)
+    }
   } catch (err: any) {
     console.error('Escalation error (non-blocking):', err.message)
   }

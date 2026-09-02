@@ -641,7 +641,6 @@ export async function resetDemoAccount(
       progress_percent: 35,
       start_date: dateOnly(-9),
       end_date: dateOnly(5),
-      address: 'Björkvägen 14, 122 33 Enskede',
       job_type: 'badrum',
       created_at: isoAt(-9, 8, 0),
     })
@@ -662,7 +661,6 @@ export async function resetDemoAccount(
       start_date: dateOnly(-5),
       end_date: dateOnly(-4),
       completed_at: isoAt(-4, 15, 30),
-      address: 'Ekbacken 3, 168 36 Bromma',
       job_type: 'vvs',
       created_at: isoAt(-5, 9, 0),
     })
@@ -1494,7 +1492,6 @@ export async function resetDemoAccount(
       start_date: dateOnly(-16),
       end_date: dateOnly(-10),
       completed_at: isoAt(-10, 14, 0),
-      address: 'Sjövägen 19, 131 40 Nacka',
       job_type: 'badrum',
       created_at: isoAt(-16, 8, 0),
     })

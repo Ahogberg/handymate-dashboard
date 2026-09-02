@@ -142,19 +142,6 @@ export async function GET(request: NextRequest) {
       if (insertErr) return errorRedirect('Kunde inte spara anslutningen: ' + insertErr.message)
     }
 
-    // Synka Gmail-sändning till business_config så att gmail-send.ts hittar det
-    // refresh_token skrivs bara när Google faktiskt gav ett nytt — samma
-    // regel som calendar_connection ovan; annars nollades det vid re-consent.
-    await supabase
-      .from('business_config')
-      .update({
-        gmail_send_enabled: true,
-        gmail_email: tokens.email,
-        google_access_token: tokens.access_token,
-        ...(hasNewRefreshToken ? { google_refresh_token: tokens.refresh_token } : {}),
-      })
-      .eq('business_id', state.business_id)
-
     return NextResponse.redirect(
       `${APP_URL}/dashboard/settings?tab=integrations&google=connected`
     )

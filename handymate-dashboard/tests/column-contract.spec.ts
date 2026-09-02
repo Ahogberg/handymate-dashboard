@@ -1,5 +1,6 @@
 /**
- * Kolumnkontraktet — varje select/filter/order mot en verifierbar tabell (2026-08-07).
+ * Kolumnkontraktet — varje select/filter/order och explicit skrivnyckel mot
+ * en verifierbar tabell (2026-08-07, utökat 2026-09-02).
  *
  * ═══ VARFÖR DEN FINNS ═══
  *
@@ -33,6 +34,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import ts from 'typescript'
 
 const ROOT = path.resolve(__dirname, '..')
 
@@ -205,40 +207,20 @@ const PRODUKTIONSVERIFIERADE_KOLUMNER = new Set([
  * kanoniska fältet (bankgiro, phone_number, website_url) i respektive lane.
  */
 const LIVE_SCHEMA_GAPS = new Set([
-  'app/api/automations/test/route.ts:business_config.google_calendar_token',
-  'app/api/debug/mail/route.ts:business_config.gmail_send_enabled',
-  'app/api/debug/mail/route.ts:business_config.gmail_email',
-  'app/api/debug/mail/route.ts:business_config.google_access_token',
-  'app/api/debug/mail/route.ts:business_config.google_refresh_token',
   'app/api/gdpr/delete/route.ts:business_config.deletion_requested_at',
-  'app/api/integrations/fortnox/status/route.ts:business_config.fortnox_token_expires_at',
-  'app/api/invoices/from-project/route.ts:business_config.bankgiro_number',
-  'app/api/invoices/[id]/reminder-pdf/route.ts:business_config.contact_phone',
-  'app/api/invoices/[id]/reminder-pdf/route.ts:business_config.tagline',
-  'app/api/portal/route.ts:business_config.contact_phone',
-  'app/api/portal/[token]/invoices/[id]/route.ts:business_config.contact_phone',
-  'app/api/portal/[token]/invoices/[id]/route.ts:business_config.website',
-  'app/api/portal/[token]/invoices/[id]/route.ts:business_config.tagline',
-  'app/api/projects/[id]/logs/pdf/route.ts:business_config.contact_phone',
-  'app/api/quotes/pdf/route.ts:business_config.website',
-  'app/api/quotes/preview-html/route.ts:business_config.website',
-  'app/api/time-entry/report/route.ts:business_config.website',
-  'app/api/voice/execute/route.ts:business_config.google_access_token',
-  'lib/e2e-deal-flow.ts:business_config.bankgiro_number',
-  'lib/gmail-send.ts:business_config.google_access_token',
-  'lib/gmail-send.ts:business_config.google_refresh_token',
-  'lib/gmail-send.ts:business_config.gmail_send_enabled',
-  'lib/gmail-send.ts:business_config.gmail_email',
+  'app/api/gdpr/delete/route.ts:business_config.deletion_reason',
 ])
 
 const FILTER_METHODS = ['eq', 'neq', 'gt', 'lt', 'in', 'is', 'contains', 'order'] as const
 type FilterMethod = typeof FILTER_METHODS[number]
+const MUTATION_METHODS = ['insert', 'update', 'upsert'] as const
+type MutationMethod = typeof MUTATION_METHODS[number]
 
 interface Ref {
   tabell: string
   kolumn: string
   fil: string
-  metod: 'select' | FilterMethod
+  metod: 'select' | FilterMethod | MutationMethod
 }
 
 function collectSelectRefs(): Ref[] {
@@ -427,6 +409,75 @@ function collectFilterRefs(roots = [path.join(ROOT, 'app'), path.join(ROOT, 'lib
   ))
 }
 
+/**
+ * Plockar explicita nycklar ur direkta insert/update/upsert-objekt via
+ * TypeScripts AST. Select-vakten fångar inte en tyst felande skrivning — det
+ * var därför Google-callbacken kunde skriva fyra fantomfält i flera månader.
+ * Variabelbyggda payloads kräver fortsatt ett separat domänfacit; här låses de
+ * direkta objekt som går att bevisa mekaniskt utan falska antaganden.
+ */
+function collectMutationRefs(): Ref[] {
+  const refs: Ref[] = []
+  const files = [...walk(path.join(ROOT, 'app')), ...walk(path.join(ROOT, 'lib'))]
+
+  const tableFromReceiver = (node: ts.Expression): string | null => {
+    if (ts.isCallExpression(node)) {
+      if (
+        ts.isPropertyAccessExpression(node.expression) &&
+        node.expression.name.text === 'from' &&
+        node.arguments.length > 0 &&
+        ts.isStringLiteralLike(node.arguments[0])
+      ) {
+        return node.arguments[0].text.toLowerCase()
+      }
+      if (ts.isPropertyAccessExpression(node.expression)) {
+        return tableFromReceiver(node.expression.expression)
+      }
+    }
+    if (ts.isPropertyAccessExpression(node)) return tableFromReceiver(node.expression)
+    return null
+  }
+
+  const objectLiterals = (node: ts.Expression | undefined): ts.ObjectLiteralExpression[] => {
+    if (!node) return []
+    if (ts.isObjectLiteralExpression(node)) return [node]
+    if (ts.isArrayLiteralExpression(node)) {
+      return node.elements.filter(ts.isObjectLiteralExpression)
+    }
+    return []
+  }
+
+  for (const file of files) {
+    const source = fs.readFileSync(file, 'utf8')
+    const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true, file.endsWith('.tsx') ? ts.ScriptKind.TSX : ts.ScriptKind.TS)
+    const relative = path.relative(ROOT, file).replace(/\\/g, '/')
+
+    const visit = (node: ts.Node) => {
+      if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
+        const method = node.expression.name.text as MutationMethod
+        if (MUTATION_METHODS.includes(method)) {
+          const table = tableFromReceiver(node.expression.expression)
+          if (table) {
+            for (const object of objectLiterals(node.arguments[0])) {
+              for (const property of object.properties) {
+                if (ts.isSpreadAssignment(property)) continue
+                const name = property.name
+                if (!name) continue
+                if (ts.isIdentifier(name) || ts.isStringLiteralLike(name)) {
+                  refs.push({ tabell: table, kolumn: name.text.toLowerCase(), fil: relative, metod: method })
+                }
+              }
+            }
+          }
+        }
+      }
+      ts.forEachChild(node, visit)
+    }
+    visit(ast)
+  }
+  return refs
+}
+
 test.describe('kolumnkontraktet', () => {
   test('SANITY — facit läser faktiskt sql/', () => {
     // Utan detta kan parsern gå sönder och hela sviten bli grön av fel skäl.
@@ -446,7 +497,7 @@ test.describe('kolumnkontraktet', () => {
 
   test('varje selectad, filtrerad och sorterad kolumn finns i tabellen', () => {
     const facit = buildColumnFacit()
-    const refs = [...collectSelectRefs(), ...collectFilterRefs()]
+    const refs = [...collectSelectRefs(), ...collectFilterRefs(), ...collectMutationRefs()]
     expect(refs.length, 'inga kolumnreferenser hittades — parsern är trasig').toBeGreaterThan(100)
 
     const fel: string[] = []
@@ -480,7 +531,12 @@ test.describe('kolumnkontraktet', () => {
   })
 
   test('kända live-schemaavvikelser är filbundna och blir inte fler', () => {
-    expect(LIVE_SCHEMA_GAPS.size, 'Ny live-schemaavvikelse — laga frågan i stället').toBe(24)
+    expect(LIVE_SCHEMA_GAPS.size, 'Ny live-schemaavvikelse — laga frågan i stället').toBe(2)
+    const refs = [...collectSelectRefs(), ...collectFilterRefs(), ...collectMutationRefs()]
+    const actual = new Set(refs.map(ref => `${ref.fil}:${ref.tabell}.${ref.kolumn}`))
+    for (const gap of Array.from(LIVE_SCHEMA_GAPS)) {
+      expect(actual.has(gap), `Inaktuellt undantag — ta bort det: ${gap}`).toBe(true)
+    }
   })
 
   test('app/dashboard/quotes ingår i filtervakten', () => {

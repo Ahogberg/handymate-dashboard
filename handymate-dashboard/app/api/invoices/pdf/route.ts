@@ -135,7 +135,7 @@ export async function GET(request: NextRequest) {
           business_name: businessConfig?.business_name,
           org_number: businessConfig?.org_number,
           contact_email: businessConfig?.contact_email,
-          contact_phone: businessConfig?.contact_phone || businessConfig?.phone_number,
+          contact_phone: businessConfig?.public_phone || businessConfig?.phone_number,
           address: businessConfig?.address || businessConfig?.service_area,
           bankgiro: businessConfig?.bankgiro,
           plusgiro: businessConfig?.plusgiro,

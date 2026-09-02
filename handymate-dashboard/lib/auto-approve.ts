@@ -165,7 +165,7 @@ export async function tryAutoApprove(params: {
   // 6. Execute the action using the approve logic
   try {
     const { executeApproveAction } = await import('@/lib/approve-actions')
-    const result = await executeApproveAction(supabase, suggestion, suggestion.action_data || {})
+    const result = await executeApproveAction(supabase, suggestion, suggestion.suggested_data || {})
 
     if (!result.success) {
       // Log failed auto-approve attempt
@@ -188,17 +188,27 @@ export async function tryAutoApprove(params: {
     }
 
     // 7. Mark suggestion as auto-approved
-    await supabase
+    const { error: suggestionUpdateError } = await supabase
       .from('ai_suggestion')
       .update({
         status: 'completed',
         auto_approved: true,
         auto_approved_at: new Date().toISOString(),
-        approved_at: new Date().toISOString(),
-        completed_at: new Date().toISOString(),
-        action_data: { ...suggestion.action_data, result },
+        actioned_at: new Date().toISOString(),
+        suggested_data: { ...suggestion.suggested_data, result },
       })
       .eq('suggestion_id', suggestionId)
+      .eq('business_id', businessId)
+
+    if (suggestionUpdateError) {
+      return {
+        suggestion_id: suggestionId,
+        action_type: actionType,
+        auto_approved: false,
+        reason: `Åtgärden utfördes men förslagsstatus kunde inte sparas: ${suggestionUpdateError.message}`,
+        confidence: confidencePercent,
+      }
+    }
 
     // 8. Increment daily counter
     try {

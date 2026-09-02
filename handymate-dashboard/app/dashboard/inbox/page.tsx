@@ -39,7 +39,7 @@ interface AISuggestion {
   description: string | null
   priority: string
   status: string
-  action_data: any
+  suggested_data: any
   confidence_score: number | null
   source_text: string | null
   created_at: string
@@ -188,12 +188,12 @@ export default function InboxPage() {
       const extractedInfo: GroupedSuggestions['extractedInfo'] = {}
 
       suggs.forEach(s => {
-        if (s.action_data) {
-          if (s.action_data.customer_name) extractedInfo.customerName = s.action_data.customer_name
-          if (s.action_data.phone_number) extractedInfo.phoneNumber = s.action_data.phone_number
-          if (s.action_data.address) extractedInfo.address = s.action_data.address
-          if (s.action_data.service) extractedInfo.jobType = s.action_data.service
-          if (s.action_data.date) extractedInfo.preferredDate = s.action_data.date
+        if (s.suggested_data) {
+          if (s.suggested_data.customer_name) extractedInfo.customerName = s.suggested_data.customer_name
+          if (s.suggested_data.phone_number) extractedInfo.phoneNumber = s.suggested_data.phone_number
+          if (s.suggested_data.address) extractedInfo.address = s.suggested_data.address
+          if (s.suggested_data.service) extractedInfo.jobType = s.suggested_data.service
+          if (s.suggested_data.date) extractedInfo.preferredDate = s.suggested_data.date
         }
       })
 
@@ -293,7 +293,7 @@ export default function InboxPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           suggestion_id: suggestion.suggestion_id,
-          action_data: editingId === suggestion.suggestion_id ? editForm : suggestion.action_data
+          action_data: editingId === suggestion.suggestion_id ? editForm : suggestion.suggested_data
         })
       })
 
@@ -360,7 +360,7 @@ export default function InboxPage() {
 
   const startEdit = (suggestion: AISuggestion) => {
     setEditingId(suggestion.suggestion_id)
-    setEditForm(suggestion.action_data || {})
+    setEditForm(suggestion.suggested_data || {})
   }
 
   const cancelEdit = () => {

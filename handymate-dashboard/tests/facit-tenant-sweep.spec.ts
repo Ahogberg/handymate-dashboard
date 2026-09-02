@@ -98,8 +98,11 @@ test.describe('Google OAuth-state', () => {
     expect(cb).toContain('verifyOAuthState(stateParam)')
     expect(cb).toContain('sessionBusiness.business_id !== state.business_id')
     expect(cb).not.toMatch(/JSON\.parse\(Buffer\.from\(stateParam/)
-    // refresh_token skrivs bara när Google gav ett nytt.
-    expect(cb).toContain('...(hasNewRefreshToken ? { google_refresh_token: tokens.refresh_token } : {})')
+    // refresh_token skrivs bara till calendar_connection när Google gav ett
+    // nytt. Integrationshemligheter får aldrig kopieras till business_config.
+    expect(cb).toContain('const refreshTokenField = hasNewRefreshToken ? { refresh_token: tokens.refresh_token } : {}')
+    expect(cb).toContain(".from('calendar_connection')")
+    expect(cb).not.toMatch(/\.from\('business_config'\)[\s\S]{0,300}google_(?:access|refresh)_token/)
   })
 })
 

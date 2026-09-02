@@ -144,7 +144,7 @@ export async function GET(request: NextRequest) {
     if (exportFormat === 'html') {
       const { data: config } = await supabase
         .from('business_config')
-        .select('business_name, contact_name, phone_number, contact_email, org_number, f_skatt_registered, website')
+        .select('business_name, contact_name, phone_number, contact_email, org_number, f_skatt_registered, website_url')
         .eq('business_id', business.business_id)
         .single()
 

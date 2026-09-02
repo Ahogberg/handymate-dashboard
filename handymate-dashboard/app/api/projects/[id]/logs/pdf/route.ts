@@ -105,7 +105,7 @@ export async function GET(
     const [{ data: business }, { data: project }] = await Promise.all([
       supabase
         .from('business_config')
-        .select('business_name, contact_phone, contact_email')
+        .select('business_name, public_phone, phone_number, contact_email')
         .eq('business_id', businessId)
         .maybeSingle(),
       supabase
@@ -187,7 +187,7 @@ export async function GET(
     doc.text(businessName, margin, y + 6)
     doc.setFontSize(9)
     doc.setTextColor(...TEXT_SECONDARY)
-    const contactLine = [business?.contact_phone, business?.contact_email].filter(Boolean).join(' · ')
+    const contactLine = [business?.public_phone || business?.phone_number, business?.contact_email].filter(Boolean).join(' · ')
     if (contactLine) doc.text(contactLine, margin, y + 12)
     doc.setFontSize(8)
     doc.setTextColor(...ACCENT_RGB)

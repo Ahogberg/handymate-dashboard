@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     const { data: config } = await supabase
       .from('business_config')
       .select(
-        'business_name, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website, quote_template_style'
+        'business_name, accent_color, logo_url, bankgiro, plusgiro, default_quote_terms, swish_number, org_number, f_skatt_registered, contact_email, phone_number, address, service_area, contact_name, website_url, quote_template_style'
       )
       .eq('business_id', business.business_id)
       .maybeSingle()

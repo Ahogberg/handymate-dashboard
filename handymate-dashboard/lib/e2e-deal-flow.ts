@@ -677,7 +677,7 @@ async function executeInvoiceGeneration(
 
     const { data: config } = await supabase
       .from('business_config')
-      .select('default_hourly_rate, default_payment_days, invoice_prefix, next_invoice_number, bankgiro_number, plusgiro, swish_number')
+      .select('default_hourly_rate, default_payment_days, invoice_prefix, next_invoice_number, bankgiro, plusgiro, swish_number')
       .eq('business_id', businessId)
       .single()
 
@@ -753,7 +753,7 @@ async function executeInvoiceGeneration(
       customer_pays: total,
       invoice_date: new Date().toISOString().split('T')[0],
       due_date: dueDate.toISOString().split('T')[0],
-      bankgiro_number: config?.bankgiro_number || null,
+      bankgiro_number: config?.bankgiro || null,
       plusgiro: config?.plusgiro || null,
       swish_number: config?.swish_number || null,
     })
