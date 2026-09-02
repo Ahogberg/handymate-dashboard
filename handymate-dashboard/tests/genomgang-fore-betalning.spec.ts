@@ -84,8 +84,28 @@ test.describe('app/onboarding/page.tsx — ny stegordning', () => {
     expect(src.match(/<StepGenomgang\b/g)?.length).toBe(1)
   })
 
-  test('resume: paid härleds server-sidan ur stripe_subscription_id/subscription_status', () => {
-    expect(src).toContain("paid: Boolean(d.stripe_subscription_id) || d.subscription_status === 'active'")
+  // Uppdaterat 2026-09-02: härledningen flyttade in i lib/onboarding/
+  // payment-gate.ts (arOnboardingBetald) och blev strängare — bara en
+  // status i PAID_STATES räknas, inte enbart att ett stripe_subscription_id
+  // finns (ett avbrutet abonnemang har också ett id). Facit vaktar därför
+  // kontraktet, inte längre den exakta gamla raden: klienten läser serverns
+  // `paid`, och ?payment=success ensamt får aldrig öppna grinden.
+  test('resume: klienten läser serverns paid, aldrig query-strängen ensam', () => {
+    expect(src).toContain('Boolean(d.paid)')
+    // ?payment=success måste gå via en verifiering mot Stripe innan
+    // uiStep flyttas fram — annars räcker en handskriven URL.
+    expect(src).toMatch(/payment === 'success'[\s\S]{0,400}verifieraBetalning\(/)
+  })
+
+  test('serverns onboarding-rutt härleder paid via payment-gate, inte på egen hand', () => {
+    const rutt = read('app/api/onboarding/route.ts')
+    expect(rutt).toContain('arOnboardingBetald(')
+  })
+
+  test('arOnboardingBetald är fail-closed och kräver en status ur allowlistan', () => {
+    const gate = read('lib/onboarding/payment-gate.ts')
+    expect(gate).toContain('if (!rad) return false')
+    expect(gate).toContain('PAID_STATES')
   })
 })
 

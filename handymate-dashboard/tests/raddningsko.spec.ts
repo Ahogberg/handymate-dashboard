@@ -282,10 +282,23 @@ test.describe('cronrutten /api/cron/raddningsko', () => {
     expect(cron.schedule).toBe('25 5 * * *')
   })
 
+  // Uppdaterat 2026-09-02: taket var hårdkodat till 44/43 och sprack varje
+  // gång någon annan lade till en cron-rutt någon annanstans i repot — ett
+  // facit som larmar om fel sak är brus, inte skydd. Nu härleds siffrorna ur
+  // filsystemet: cron-auth ska räkna ALLA cron-rutter, och Karin-fillåset är
+  // det enda undantaget (därför N och N-1).
   test('tests/cron-auth.spec.ts räknar med den nya rutten', () => {
     const spec = read('tests/cron-auth.spec.ts')
-    expect(spec).toContain('toHaveLength(44)')
-    expect(spec).toContain('toHaveLength(43)')
+    const cronDir = path.join(process.cwd(), 'app', 'api', 'cron')
+    // Samma fulla rekursion som routeFiles i cron-auth.spec.ts — annars
+    // räknar de två facit olika och det här testet larmar om sig självt.
+    const rakna = (dir: string): number =>
+      fs.readdirSync(dir, { withFileTypes: true }).reduce((summa, e) =>
+        summa + (e.isDirectory() ? rakna(path.join(dir, e.name)) : e.name === 'route.ts' ? 1 : 0), 0)
+    const antal = rakna(cronDir)
+    expect(fs.existsSync(path.join(cronDir, 'raddningsko', 'route.ts'))).toBe(true)
+    expect(spec, `cron-auth ska räkna alla ${antal} cron-rutter`).toContain(`toHaveLength(${antal})`)
+    expect(spec, 'Karin-fillåset ska vara det enda undantaget').toContain(`toHaveLength(${antal - 1})`)
   })
 })
 

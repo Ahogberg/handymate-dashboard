@@ -79,11 +79,15 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // docs/launch/FORSTA_10_KUNDER_BEVIS_OCH_RADDNING.md §3,
   // tasks/plan-raddningsko.md) och använder helpern korrekt (dubbelgrind
   // med isAdmin, samma mönster som credit-watch).
-  expect(files).toHaveLength(44)
+  // 45 (2026-09-02): onboarding-followup och phone-provision-retry tillkom
+  // (livscykelmail dag 2/14, retry-svep för AI-numret) — men raddningsko
+  // fanns redan, så nettot är +1 sedan raden ovan. Båda nya använder
+  // verifyCronSecret; verifierat genom att köra kontrollen nedan.
+  expect(files).toHaveLength(45)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(43)
+  expect(ownedRoutes).toHaveLength(44)
 
   const missing = ownedRoutes
     .filter(file => {
