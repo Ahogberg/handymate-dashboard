@@ -23,10 +23,17 @@ Andreas: "Kör steg 1 direkt." Pushad 496f20a3, auto-deployad. Inga migrationer.
       mark/totalentreprenad saknar innehåll
 - [ ] Steg 3: branschpaket (Codex Branschbevis V1-form) + branschspecifika
       systemprompter
-- [ ] Steg 2 (PÅGÅR): startpaket per bransch med VERKLIGA, källbelagda jobbtyper —
-      El: docs/bransch/el.md skriven 2026-09-02 (11 källor, 18 i startpaketet,
-      9 tillägg, 4 enkällor) — OGRANSKAD, väntar på Andreas. Sedan Bygg → Snickare → VVS → Måleri.
-      aldrig AI-påhitt; ogranskade listor märks som ogranskade
+- [ ] Steg 2 (PÅGÅR): startpaket per bransch med VERKLIGA, källbelagda jobbtyper.
+      Andreas 2026-09-02: gör ALLA branscher FÖRST, granska sedan samlat — då
+      kan jobbtyper tas bort och ROT/RUT fastställas i ett svep, konsekvent
+      över branscher (samma jobbtyp återkommer i flera).
+      docs/bransch/: el.md KLAR (11 källor, 18 startpaket + 9 tillägg + 4 ute).
+      Sonnet-agenter kör vvs, bygg, snickeri, maleri, tak, mark, ventilation,
+      totalentreprenad, allround på samma mall. ALLA märkta OGRANSKAD tills
+      Andreas sagt sitt. Golv/trädgård/låssmed/städ/flytt: utanför scope.
+      Mall per fil: källhierarki myndighet → Skatteverket ROT/RUT → 5–7 riktiga
+      firmor; ≥3 källor = startpaket, 2 = tillägg, 1 = ute; ROT-kolumn
+      ROT/RUT/ROT*/Nej/? där bara SKV:s egen sida får ge ett ROT-påstående.
 
 # Nattpass 5: genomgången före betalningen (Claude + Sonnet-agent 2026-09-02)
 

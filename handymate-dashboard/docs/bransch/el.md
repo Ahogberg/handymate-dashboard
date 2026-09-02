@@ -65,7 +65,7 @@ ROT-kolumnen: **ROT** = Skatteverket listar arbetet uttryckligen; **GT** = grön
 | 20 | Utomhus-/fasadbelysning | EFS, DRY | ROT*/Nej | på huset: ROT*; **"dra el i trädgården" ger inte ROT** |
 | 21 | Byte av termostat (golvvärme) | DRY, E.SE | ? | |
 | 22 | Installation av elgolvvärme | EFS, DRY | ROT* | |
-| 23 | Värmepump — elinstallation | EFS, MAT | ROT* | ROT för värmepump listas under värme/VVS, inte El — verifiera |
+| 23 | Värmepump — elinstallation | EFS, MAT | ROT (schablon) | UTREDD via [vvs.md](vvs.md): värmepump är **inte** grön teknik utan ROT med schablon (luftvärmepump 30 %, vätska-vatten/bergvärme 35 % av totalkostnaden räknas som arbete; ej i bostadsrätt). Elektrikern gör oftast bara elanslutningen — själva installationen är VVS |
 | 24 | Larm och passagesystem | GUL, EFS | **Nej** | SKV: "installera och reparera larm eller övervakningskameror" ger inte ROT |
 | 25 | Nätverk, fiber, data/svagström | GUL, HBEL, EFS | ? | |
 | 26 | Service och underhåll av elanläggning | GUL, MAT | ROT* | "reparation och underhåll" ger ROT oavsett husets ålder |
