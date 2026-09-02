@@ -75,11 +75,15 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // lib/observability/credit-watch.ts) och använder helpern korrekt.
   // 43 (2026-09-02): push-morgon tillkom (tyst tid för push,
   // lib/notifications/tyst-tid.ts) och använder helpern korrekt.
-  expect(files).toHaveLength(43)
+  // 44 (2026-09-02): raddningsko tillkom (Räddningskön,
+  // docs/launch/FORSTA_10_KUNDER_BEVIS_OCH_RADDNING.md §3,
+  // tasks/plan-raddningsko.md) och använder helpern korrekt (dubbelgrind
+  // med isAdmin, samma mönster som credit-watch).
+  expect(files).toHaveLength(44)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(42)
+  expect(ownedRoutes).toHaveLength(43)
 
   const missing = ownedRoutes
     .filter(file => {

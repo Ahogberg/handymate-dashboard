@@ -161,6 +161,10 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   const alla = routes(API)
   const utanStandard = alla.filter(f => !/getAuthenticatedBusiness\(/.test(fs.readFileSync(f, 'utf8')))
   // Räknade fakta 2026-09-01: 554 rutter, 120 utanför standardgrinden.
+  // 2026-09-02 (räddningskön + lanseringsbevis, tasks/plan-raddningsko.md):
+  // fem nya admin/cron-rutter utan tenant-kontext (isAdmin/verifyCronSecret
+  // — cron/raddningsko, admin/raddningsko, admin/raddningsko/[id],
+  // admin/raddningsko/manuell-fix, admin/launch-readiness/bevis) → 135.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(130)
+  expect(utanStandard.length).toBeLessThanOrEqual(140)
 })

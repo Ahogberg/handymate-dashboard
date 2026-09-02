@@ -88,6 +88,7 @@ jobs:
           tests/kundminne-kanaler.spec.ts
           tests/kundminne-pass2.spec.ts
           tests/kundminne-pass3.spec.ts
+          tests/raddningsko.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

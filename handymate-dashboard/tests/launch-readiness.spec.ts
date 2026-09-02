@@ -62,6 +62,11 @@ test.describe('körande databas och leverantörsbevis', () => {
     })
   })
 
+  // MANUAL_LAUNCH_PROOFS är fallbacken/stationslistan (tasks/plan-raddningsko.md
+  // Del 4) — den ändras aldrig och alla dess poster är 'manual'. Att en
+  // riktig lanseringsbevis-rad kan lyfta EN station till 'pass' är
+  // hamtaLanseringsbevis() jobb (lib/launch/readiness.ts), testat separat i
+  // tests/raddningsko.spec.ts — den funktionen rör aldrig den här konstanten.
   test('externa leverantörer och fysisk mobil förblir manuella stationer', () => {
     expect(MANUAL_LAUNCH_PROOFS.map((proof) => proof.key)).toEqual(expect.arrayContaining([
       'proof_stripe',

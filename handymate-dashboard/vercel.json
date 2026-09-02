@@ -146,6 +146,10 @@
       "schedule": "15 5 * * *"
     },
     {
+      "path": "/api/cron/raddningsko",
+      "schedule": "25 5 * * *"
+    },
+    {
       "path": "/api/cron/tidrapport-forslag",
       "schedule": "5 7 * * *"
     },

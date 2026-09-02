@@ -1,3 +1,6 @@
+import type { SupabaseClient } from '@supabase/supabase-js'
+import { arSchemaSaknas } from '@/lib/observability/driftlarm'
+
 export type LaunchCheckStatus = 'pass' | 'blocked' | 'manual'
 
 export interface LaunchCheck {
@@ -172,3 +175,58 @@ export const MANUAL_LAUNCH_PROOFS: LaunchCheck[] = [
     detail: 'Kör den separata Fortnox-checklistan och kontrollera idempotent återkörning.',
   },
 ]
+
+export interface LaunchCheckMedBevis extends LaunchCheck {
+  evidence?: string
+  evidence_url?: string | null
+  proven_at?: string
+  proven_by?: string
+}
+
+/**
+ * lanseringsbevis (sql/v202_raddningsko_och_lanseringsbevis.sql) ersätter
+ * konstantens 'manual' med en riktig rad när en finns: senaste
+ * icke-återkallade (revoked_at null) beviset per station. MANUAL_LAUNCH_PROOFS
+ * ovan är fallbacken och stationslistan — den ändras aldrig av detta.
+ *
+ * Fail-soft: saknas tabellen (arSchemaSaknas) returneras
+ * MANUAL_LAUNCH_PROOFS oförändrad, som innan bevistabellen fanns.
+ */
+export async function hamtaLanseringsbevis(supabase: SupabaseClient): Promise<LaunchCheckMedBevis[]> {
+  try {
+    const { data, error } = await supabase
+      .from('lanseringsbevis')
+      .select('station, evidence, evidence_url, proven_at, proven_by')
+      .is('revoked_at', null)
+      .order('proven_at', { ascending: false })
+
+    if (error) {
+      if (!arSchemaSaknas(error)) {
+        console.error('[launch/readiness] kunde inte läsa lanseringsbevis (fail-soft, visar manual):', error.message)
+      }
+      return MANUAL_LAUNCH_PROOFS
+    }
+
+    const senasteByStation = new Map<string, { evidence: string; evidence_url: string | null; proven_at: string; proven_by: string }>()
+    for (const rad of (data || []) as Array<{ station: string; evidence: string; evidence_url: string | null; proven_at: string; proven_by: string }>) {
+      if (!senasteByStation.has(rad.station)) senasteByStation.set(rad.station, rad)
+    }
+
+    return MANUAL_LAUNCH_PROOFS.map((proof) => {
+      const bevis = senasteByStation.get(proof.key)
+      if (!bevis) return proof
+      return {
+        ...proof,
+        status: 'pass',
+        detail: bevis.evidence,
+        evidence: bevis.evidence,
+        evidence_url: bevis.evidence_url,
+        proven_at: bevis.proven_at,
+        proven_by: bevis.proven_by,
+      }
+    })
+  } catch (err) {
+    console.error('[launch/readiness] hamtaLanseringsbevis kraschade (fail-soft, visar manual):', err)
+    return MANUAL_LAUNCH_PROOFS
+  }
+}

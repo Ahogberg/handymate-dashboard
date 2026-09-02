@@ -5,6 +5,7 @@ import {
   evaluateBillingPlans,
   evaluateLaunchEnvironment,
   evaluateStorageBuckets,
+  hamtaLanseringsbevis,
   MANUAL_LAUNCH_PROOFS,
   SELLABLE_BILLING_PLAN_IDS,
   type LaunchCheck,
@@ -113,6 +114,10 @@ export async function GET(request: NextRequest) {
     : evaluateStorageBuckets((buckets || []).map((bucket) => bucket.id)))
 
   const blockers = checks.filter((check) => check.status === 'blocked')
+  // manual_proofs kommer från riktiga rader (lanseringsbevis) när de finns —
+  // verdicten ovan räknar fortfarande BARA env/schema-blockerare (§2 i
+  // programmet: manuella stationer blockerar aldrig Grind A).
+  const manualProofs = await hamtaLanseringsbevis(supabase)
 
   return NextResponse.json({
     generated_at: new Date().toISOString(),
@@ -123,7 +128,7 @@ export async function GET(request: NextRequest) {
       manual: MANUAL_LAUNCH_PROOFS.length,
     },
     checks,
-    manual_proofs: MANUAL_LAUNCH_PROOFS,
+    manual_proofs: manualProofs,
   }, {
     headers: {
       'Cache-Control': 'no-store',

@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import PartnerCommissionModal from './components/PartnerCommissionModal'
 import SupportQueueTab from './components/SupportQueueTab'
+import RaddningskoTab from './components/RaddningskoTab'
 
 interface Customer {
   business_id: string
@@ -129,7 +130,7 @@ export default function AdminDashboardPage() {
   const [customers, setCustomers] = useState<Customer[]>([])
   const [customerSearch, setCustomerSearch] = useState('')
   const [planFilter, setPlanFilter] = useState<string>('all')
-  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'support'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'customers' | 'partners' | 'support' | 'rescue'>('overview')
   const [updatingPlan, setUpdatingPlan] = useState<string | null>(null)
   const [toast, setToast] = useState<string | null>(null)
   const [partners, setPartners] = useState<Partner[]>([])
@@ -140,6 +141,13 @@ export default function AdminDashboardPage() {
     fetchMetrics()
     fetchCustomers()
     fetchPartners()
+    // Digest-mejlet från räddningskön (app/api/cron/raddningsko) länkar till
+    // /admin?tab=rescue — läses direkt ur window.location så vi slipper
+    // useSearchParams (och dess Suspense-krav) på en redan client-sidan.
+    const tab = new URLSearchParams(window.location.search).get('tab')
+    if (tab === 'rescue' || tab === 'support' || tab === 'customers' || tab === 'partners') {
+      setActiveTab(tab)
+    }
   }, [])
 
   useEffect(() => {
@@ -445,12 +453,12 @@ export default function AdminDashboardPage() {
 
         {/* Tabs */}
         <div className="flex gap-1 mb-6 bg-gray-100 rounded-lg p-1 w-fit">
-          {(['overview', 'customers', 'partners', 'support'] as const).map(tab => (
+          {(['overview', 'customers', 'partners', 'support', 'rescue'] as const).map(tab => (
             <button key={tab} onClick={() => setActiveTab(tab)}
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}>
-              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : tab === 'partners' ? `Partners (${partners.length})` : 'Support'}
+              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : tab === 'partners' ? `Partners (${partners.length})` : tab === 'support' ? 'Support' : 'Räddning'}
             </button>
           ))}
         </div>
@@ -898,6 +906,9 @@ export default function AdminDashboardPage() {
 
         {/* SUPPORT TAB */}
         {activeTab === 'support' && <SupportQueueTab />}
+
+        {/* RÄDDNINGS TAB */}
+        {activeTab === 'rescue' && <RaddningskoTab />}
 
         {/* Partner-provisionsmodal */}
         {commissionPartnerId && (

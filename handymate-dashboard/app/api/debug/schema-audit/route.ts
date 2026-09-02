@@ -113,6 +113,10 @@ const EXPECTED: ExpectedColumn[] = [
 
   // v38 calendar realtime
   { table: 'booking', column: 'updated_at', migration: 'v38_calendar_realtime', critical: false },
+
+  // v202 räddningskön + lanseringsbevis
+  { table: 'raddningsarende', column: 'signal', migration: 'v202_raddningsko_och_lanseringsbevis', critical: false },
+  { table: 'lanseringsbevis', column: 'station', migration: 'v202_raddningsko_och_lanseringsbevis', critical: false },
 ]
 
 async function checkColumn(supabase: any, table: string, column: string): Promise<'ok' | 'missing_column' | 'missing_table' | 'error'> {

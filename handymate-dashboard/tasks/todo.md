@@ -1,3 +1,30 @@
+# Nattpass 9: Första 10 kunderna — räddningskön + lanseringsbevis (Claude + Sonnet-agent 2026-09-02)
+
+Program: docs/launch/FORSTA_10_KUNDER_BEVIS_OCH_RADDNING.md (Codex förslag,
+Claudes justering: två bevisnivåer, P1 = kunden når inte första värdet,
+inga manuella DB-fixar, frysdatum). Plan: tasks/plan-raddningsko.md.
+
+- [x] sql/v202 (KÖRD + verifierad): raddningsarende (unik öppen rad per
+      företag+signal), lanseringsbevis (Grind B-stationer som rader)
+- [x] lib/raddning/signaler.ts: nio rena bedömare med trösklar
+- [x] /api/cron/raddningsko 05:25 UTC (cron-hemlighet eller admin): urval
+      pilot/klar/ny ≤ 30 d, aldrig demo/test; svep per signal (fail-soft);
+      upsert öppna, stänger försvunna (resolved_by system), rör aldrig
+      manuell_fix_kravdes; digest-mejl bara när något är öppet
+- [x] Admin: flik "Räddning" (/admin?tab=rescue): Tar det / Löst / Avfärda,
+      bokför manuell fix, sektion Lanseringsbevis med formulär
+- [x] /api/admin/launch-readiness: manual_proofs läses ur lanseringsbevis
+      (pass ur riktig rad, annars manual som förut)
+- [x] Facit tests/raddningsko.spec.ts i kontraktsgrinden; cron-auth 44/43;
+      tsc 0, 397 kontrakt gröna, build ren
+- Kända val: Fortnox-synkfel utan tidsstämpel (proxy: registrerat fel);
+  företag som åldrats ut ur 30-dagarsfönstret rörs inte av cronen
+- Byggagenten fastnade ~2 h i utforskning innan den skrev; nudge via
+  meddelande löste det. Lärdom: sätt "börja skriva efter N minuter" i
+  agentprompten
+
+---
+
 # Parkerat (Andreas 2026-09-02): minnesförstärkning 3 + 4, om några dagar
 - 3: citat ur källan som krav för varje agent_memories-rad (samma regel som
   customer_fact); det som inte kan citeras sparas inte.
