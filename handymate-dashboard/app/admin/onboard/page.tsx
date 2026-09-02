@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { YTOR } from '@/lib/admin/adoption'
 import {
   Zap,
   Plus,
@@ -32,6 +33,9 @@ const BRANCHES = [
   { value: 'other', label: 'Annat' },
 ]
 
+/** De åtta ytorna i klartext, för tooltipen på adoptionskolumnen */
+const ADOPTIONSYTOR = Object.values(YTOR).join(' · ')
+
 interface Pilot {
   businessId: string
   businessName: string
@@ -49,6 +53,9 @@ interface Pilot {
   onboardingCompleted: boolean
   /** Aktiveringsmått (B8): "fynd 2 h · beslut 5 h · utfört 5 h · kvitto —", null före slutförd onboarding */
   activationLabel?: string | null
+  /** Adoptionsmåttet: "3/8 ytor · dag 12" / "5/8 ytor · aktiv" / "—" */
+  adoptionLabel?: string | null
+  adoption?: { ytor: string[]; antal: number; dag: number | null; fonsterKlart: boolean; aktiv: boolean }
   callMode: string
   userEmail: string
 }
@@ -372,6 +379,24 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                 <p className="text-2xl font-bold text-primary-700">{stats.withPhone}</p>
                 <p className="text-xs text-gray-400">Med nummer</p>
               </div>
+              {stats.adoption && (
+                <div
+                  className="text-center border-l border-gray-200 pl-4"
+                  title={`Egna handlingar på minst fyra av åtta ytor inom 30 dagar från slutförd onboarding: ${ADOPTIONSYTOR}. Demokontot räknas inte.`}
+                >
+                  <p className="text-2xl font-bold text-emerald-600">
+                    {stats.adoption.andel == null
+                      ? '—'
+                      : `${stats.adoption.aktivaKlara}/${stats.adoption.klara}`}
+                  </p>
+                  <p className="text-xs text-gray-400">
+                    Aktiva inom 30 d
+                    {stats.adoption.andel != null && ` (${Math.round(stats.adoption.andel * 100)} %)`}
+                    {stats.adoption.pagaende > 0 &&
+                      ` · ${stats.adoption.pagaende} pågår, ${stats.adoption.aktivaPagaende} redan aktiva`}
+                  </p>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -588,6 +613,7 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Skapad</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Aktivering</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Adoption</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase">Åtgärd</th>
                   </tr>
                 </thead>
@@ -626,6 +652,12 @@ Din provperiod är på 14 dagar. Har du frågor? Svara på detta meddelande!
                       </td>
                       <td className="px-4 py-3 text-gray-500 text-xs whitespace-nowrap" title="Timmar från slutförd onboarding till första fynd / beslut / utförda handling / kvitto">
                         {pilot.activationLabel ?? '—'}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-xs whitespace-nowrap ${pilot.adoption?.aktiv ? 'text-emerald-700 font-medium' : 'text-gray-500'}`}
+                        title={`Egna handlingar på minst fyra av åtta ytor inom 30 dagar: ${ADOPTIONSYTOR}. Använt hittills: ${pilot.adoption?.ytor?.length ? pilot.adoption.ytor.join(', ') : 'inget än'}`}
+                      >
+                        {pilot.adoptionLabel ?? '—'}
                       </td>
                       <td className="px-4 py-3">
                         <button

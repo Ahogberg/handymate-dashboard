@@ -56,6 +56,7 @@ test('admin-rutten räknar måtten ur pending_approvals och tål läsfel', () =>
   const s = kod('app/api/admin/pilots/route.ts')
   expect(s).toContain("outcome:payload->execution_result->>outcome")
   expect(s).toContain(".neq('approval_type', 'team_intro')")
-  expect(s).toContain('activation: computeActivation(')
+  expect(s).toContain('const activation = computeActivation(activationRowsByBusiness')
+  expect(s).toContain('activation,')
   expect(s).toContain('måtten utelämnas')
 })

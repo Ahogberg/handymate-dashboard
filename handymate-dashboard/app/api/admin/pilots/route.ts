@@ -1,6 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin, getAdminSupabase } from '@/lib/admin-auth'
 import { computeActivation, formatActivation, type ActivationRow } from '@/lib/admin/activation-metrics'
+import {
+  hamtaAdoptionHandelser,
+  computeAdoption,
+  formatAdoption,
+  aggregateAdoption,
+  type AdoptionHandelse,
+} from '@/lib/admin/adoption'
 
 interface BusinessConfig {
   business_id: string
@@ -95,8 +102,35 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Adoptionsmåttet (GTM "De första femton", 2026-09-02): aktiv på ≥4 av 8
+    // ytor inom 30 dagar från slutförd onboarding. Läsfel per källa utelämnar
+    // bara den ytan; ett fel på hela hämtningen utelämnar adoptionen, aldrig 500.
+    const nowIso = new Date().toISOString()
+    let adoptionHandelser = new Map<string, AdoptionHandelse[]>()
+    try {
+      adoptionHandelser = await hamtaAdoptionHandelser(
+        supabase,
+        (typedBusinesses || []).map(b => ({
+          business_id: b.business_id,
+          onboarding_completed_at: b.onboarding_completed_at,
+        })),
+      )
+    } catch (adoptionErr) {
+      console.warn('[admin/pilots] adoptionen utelämnas:', adoptionErr)
+    }
+
     // Enrich business data with user info
-    const pilots = typedBusinesses?.map(business => ({
+    const pilots = typedBusinesses?.map(business => {
+    const activation = computeActivation(activationRowsByBusiness.get(business.business_id) || [], {
+      created_at: business.created_at,
+      onboarding_completed_at: business.onboarding_completed_at,
+    })
+    const adoption = computeAdoption(
+      adoptionHandelser.get(business.business_id) || [],
+      { business_id: business.business_id, onboarding_completed_at: business.onboarding_completed_at },
+      nowIso,
+    )
+    return ({
       businessId: business.business_id,
       businessName: business.business_name,
       contactName: business.contact_name,
@@ -111,20 +145,14 @@ export async function GET(request: NextRequest) {
       isPilot: business.is_pilot,
       createdAt: business.created_at,
       onboardingCompleted: !!business.onboarding_completed_at,
-      activation: computeActivation(activationRowsByBusiness.get(business.business_id) || [], {
-        created_at: business.created_at,
-        onboarding_completed_at: business.onboarding_completed_at,
-      }),
-      activationLabel: business.onboarding_completed_at
-        ? formatActivation(computeActivation(activationRowsByBusiness.get(business.business_id) || [], {
-            created_at: business.created_at,
-            onboarding_completed_at: business.onboarding_completed_at,
-          }))
-        : null,
+      activation,
+      activationLabel: business.onboarding_completed_at ? formatActivation(activation) : null,
+      adoption,
+      adoptionLabel: formatAdoption(adoption),
       callMode: business.call_mode,
       hasWorkingHours: !!business.working_hours,
       userEmail: userEmails[business.user_id] || business.contact_email
-    })) || []
+    })}) || []
 
     // Calculate stats
     const stats = {
@@ -133,7 +161,13 @@ export async function GET(request: NextRequest) {
       trial: pilots.filter(p => p.subscriptionStatus === 'trial').length,
       active: pilots.filter(p => p.subscriptionStatus === 'active').length,
       withPhone: pilots.filter(p => p.assignedPhoneNumber).length,
-      onboardingComplete: pilots.filter(p => p.onboardingCompleted).length
+      onboardingComplete: pilots.filter(p => p.onboardingCompleted).length,
+      // Demokontot är seedat, inte självgående — det skulle ljuga uppåt i måttet
+      adoption: aggregateAdoption(
+        pilots
+          .filter(p => p.businessId !== process.env.DEMO_BUSINESS_ID)
+          .map(p => p.adoption),
+      ),
     }
 
     return NextResponse.json({
