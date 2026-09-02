@@ -216,3 +216,24 @@ export function deepLinkFor(approval: ApprovalLike): { label: string; href: stri
   }
   return null
 }
+
+/**
+ * Presentationskontraktet som API:et skickar med varje kort (Etapp F,
+ * 2026-09-02): `display: {type_label, agent, approve_label}`. Mobilen och
+ * andra klienter slipper då sina egna etikettkartor — som drev isär
+ * (create_ata_draft/project_log_note föll till "Förslag" i appen fast
+ * desktop sa "ÄTA-förslag"/"Dagboksanteckning").
+ */
+export interface ApprovalDisplay {
+  type_label: string
+  agent: string
+  approve_label: string
+}
+
+export function approvalDisplay(approval: ApprovalLike): ApprovalDisplay {
+  return {
+    type_label: typeLabel(approval.approval_type),
+    agent: agentForApproval(approval),
+    approve_label: approveLabel(approval.approval_type, approval.payload ?? null),
+  }
+}

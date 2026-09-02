@@ -6,6 +6,7 @@ import { canActOnApproval, type ApprovalRoutingRow } from '@/lib/approvals/routi
 import { arTestdataApproval } from '@/lib/testdata'
 import { svDateStr } from '@/lib/dates'
 import { arAktivt, fallbackSortera, senasteKvallsgrans } from '@/lib/approvals/mobile-home'
+import { approvalDisplay } from '@/lib/jarvis/approval-view'
 
 // Auth-helpern läser request.headers — utan force-dynamic cachas svaret
 // statiskt och kan visa FEL FÖRETAGS data (force-dynamic-cachebuggen
@@ -77,7 +78,10 @@ export async function GET(request: NextRequest) {
       .filter(row => arAktivt(row as any, nu))
     const permits = await Promise.all(radar.map(row => canActOnApproval(supabase, currentUser, row)))
     const synliga = radar.filter((_, i) => permits[i]) as any[]
-    const synligaById = new Map(synliga.map(a => [a.id as string, a]))
+    // Etapp F (2026-09-02): presentationen (etikett/agent/knapptext) följer
+    // med kortet — mobilen slipper egna etikettkartor som driver isär.
+    const medDisplay = synliga.map(a => ({ ...a, display: approvalDisplay(a) }))
+    const synligaById = new Map(medDisplay.map(a => [a.id as string, a]))
 
     // Prioriterade kön: NBA-ordning om dagens rad finns och träffar synliga
     // kort — annars fallback-sortering. Aldrig en blandning.
@@ -105,7 +109,7 @@ export async function GET(request: NextRequest) {
     if (kort.length > 0) {
       source = 'nba'
     } else {
-      kort = fallbackSortera(synliga)
+      kort = fallbackSortera(medDisplay)
         .slice(0, MAX_KORT)
         .map(approval => ({ approval }))
     }

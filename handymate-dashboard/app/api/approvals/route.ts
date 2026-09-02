@@ -5,6 +5,7 @@ import { getCurrentUser } from '@/lib/permissions'
 import { canActOnApproval, type ApprovalRoutingRow } from '@/lib/approvals/routing'
 import { arTestdataApproval } from '@/lib/testdata'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
+import { approvalDisplay } from '@/lib/jarvis/approval-view'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,7 +98,14 @@ export async function GET(request: NextRequest) {
     const permits = await Promise.all(rows.map((row) => canActOnApproval(supabase, currentUser, row)))
     const visible = rows.filter((_, i) => permits[i])
 
-    return NextResponse.json({ approvals: visible })
+    // Etapp F (2026-09-02): presentationen följer med kortet så klienterna
+    // (mobilen) inte behöver egna etikettkartor som driver isär.
+    const approvals = visible.map(row => ({
+      ...row,
+      display: approvalDisplay(row as unknown as { approval_type: string; payload?: Record<string, unknown> | null }),
+    }))
+
+    return NextResponse.json({ approvals })
   } catch (error: any) {
     console.error('GET /api/approvals error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
