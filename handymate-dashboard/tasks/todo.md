@@ -1,3 +1,33 @@
+# Branschförståelse steg 1 — "laga ledningen" (Claude 2026-09-02)
+
+Andreas: "Kör steg 1 direkt." Pushad 496f20a3, auto-deployad. Inga migrationer.
+
+- [x] lib/branch: 15 bransch-ID:n + svensk etikett/yrke/företagsord + alias-
+      tabell (svenska namn, snickeri, vvs, hantverkare, prefix "Måleri AB");
+      resolveBusinessBranch (branch först, industry bara reserv), describeBranches
+- [x] lib/branch/trade-context: specialties[] + företagets jobbtyper → block
+      "## Bransch och inriktning" i agent-triggern, Matte-chatten, röstanalysen
+- [x] 12 AI-/prompt-ytor rewirade från `industry` ('hantverkare' på ALLA konton)
+      till `branch`; ingen gissar 'Bygg'/'hantverkare' längre (facit hittade
+      tre till i första körningen: approve-actions, e2e-deal-flow, kampanj-SMS)
+- [x] Biblioteken normaliserar via aliastabellen: produktbank, kunskap,
+      offertmallar, säsongsteman (plumber→vvs, "Måleri AB" är inte el),
+      SKV-kategori (mark→MarkDraneringarbete, allround gissas ALDRIG som Bygg)
+- [x] Facit tests/branschledningen.spec.ts; tsc 0, 306 gröna i regressionen
+
+## Kvar i programmet (omordnat av Andreas 2026-09-02 — INTE påbörjat)
+- Princip: en bransch exponeras i onboardingen FÖRST när den har källbelagt
+  startpaket + branschprompt. Ordningen är därför jobbtyper → paket → exponering.
+- [ ] Steg 4 (sist): exponera de branscher som fått paket (snickare/golv/hvac/
+      trädgård/låssmed/städ/flytt) i onboardingen, eller ta bort ur biblioteken;
+      mark/totalentreprenad saknar innehåll
+- [ ] Steg 3: branschpaket (Codex Branschbevis V1-form) + branschspecifika
+      systemprompter
+- [ ] Steg 2 (PÅGÅR): startpaket per bransch med VERKLIGA, källbelagda jobbtyper —
+      El: docs/bransch/el.md skriven 2026-09-02 (11 källor, 18 i startpaketet,
+      9 tillägg, 4 enkällor) — OGRANSKAD, väntar på Andreas. Sedan Bygg → Snickare → VVS → Måleri.
+      aldrig AI-påhitt; ogranskade listor märks som ogranskade
+
 # Nattpass 5: genomgången före betalningen (Claude + Sonnet-agent 2026-09-02)
 
 Andreas: "Kör!" — betalningen ligger EFTER importen och en genomgång av
