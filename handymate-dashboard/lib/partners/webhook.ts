@@ -24,7 +24,7 @@ export async function notifyPartnerWebhook(
   // Look up business + referral code
   const { data: business } = await supabase
     .from('business_config')
-    .select('referred_by, business_name, plan, subscription_plan')
+    .select('referred_by, business_name, subscription_plan')
     .eq('business_id', businessId)
     .maybeSingle()
 

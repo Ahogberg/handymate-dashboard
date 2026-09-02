@@ -109,6 +109,21 @@ function buildColumnFacit(): Map<string, Set<string>> {
     }
   }
 
+  // Centrala legacy-tabeller vars CREATE TABLE aldrig checkades in får ett
+  // versionshanterat facit från PostgREST:s skarpa OpenAPI-schema. Snapshoten
+  // hämtas read-only och uppdateras avsiktligt när en migration ändrar tabellen.
+  // Detta gör att serverkodens explicita select-listor kan valideras även när
+  // tabellens historiska bas-DDL saknas ur sql/.
+  const snapshotPath = path.join(ROOT, 'tests', 'fixtures', 'production-schema-columns.json')
+  if (fs.existsSync(snapshotPath)) {
+    const snapshot = JSON.parse(fs.readFileSync(snapshotPath, 'utf8')) as {
+      tables?: Record<string, string[]>
+    }
+    for (const [table, columns] of Object.entries(snapshot.tables || {})) {
+      facit.set(table.toLowerCase(), new Set(columns.map(column => column.toLowerCase())))
+    }
+  }
+
   return facit
 }
 
@@ -178,6 +193,42 @@ const PRODUKTIONSVERIFIERADE_KOLUMNER = new Set([
   'project_log.date',
   'project_log.order_id',
   'project_log.work_performed',
+])
+
+/**
+ * Serverreferenser som live-snapshoten bevisar är fel men som tillhör andra
+ * sammanhängande produktlaner. Nyckeln innehåller FILEN så en gammal skuld
+ * aldrig får kopieras till ännu en anropare. Listan ska bara krympa.
+ *
+ * De känsliga Google-/Fortnoxfälten får inte mekaniskt döpas om: deras rätta
+ * källa är integrationslagret, inte business_config. Övriga ersätts med det
+ * kanoniska fältet (bankgiro, phone_number, website_url) i respektive lane.
+ */
+const LIVE_SCHEMA_GAPS = new Set([
+  'app/api/automations/test/route.ts:business_config.google_calendar_token',
+  'app/api/debug/mail/route.ts:business_config.gmail_send_enabled',
+  'app/api/debug/mail/route.ts:business_config.gmail_email',
+  'app/api/debug/mail/route.ts:business_config.google_access_token',
+  'app/api/debug/mail/route.ts:business_config.google_refresh_token',
+  'app/api/gdpr/delete/route.ts:business_config.deletion_requested_at',
+  'app/api/integrations/fortnox/status/route.ts:business_config.fortnox_token_expires_at',
+  'app/api/invoices/from-project/route.ts:business_config.bankgiro_number',
+  'app/api/invoices/[id]/reminder-pdf/route.ts:business_config.contact_phone',
+  'app/api/invoices/[id]/reminder-pdf/route.ts:business_config.tagline',
+  'app/api/portal/route.ts:business_config.contact_phone',
+  'app/api/portal/[token]/invoices/[id]/route.ts:business_config.contact_phone',
+  'app/api/portal/[token]/invoices/[id]/route.ts:business_config.website',
+  'app/api/portal/[token]/invoices/[id]/route.ts:business_config.tagline',
+  'app/api/projects/[id]/logs/pdf/route.ts:business_config.contact_phone',
+  'app/api/quotes/pdf/route.ts:business_config.website',
+  'app/api/quotes/preview-html/route.ts:business_config.website',
+  'app/api/time-entry/report/route.ts:business_config.website',
+  'app/api/voice/execute/route.ts:business_config.google_access_token',
+  'lib/e2e-deal-flow.ts:business_config.bankgiro_number',
+  'lib/gmail-send.ts:business_config.google_access_token',
+  'lib/gmail-send.ts:business_config.google_refresh_token',
+  'lib/gmail-send.ts:business_config.gmail_send_enabled',
+  'lib/gmail-send.ts:business_config.gmail_email',
 ])
 
 const FILTER_METHODS = ['eq', 'neq', 'gt', 'lt', 'in', 'is', 'contains', 'order'] as const
@@ -383,6 +434,8 @@ test.describe('kolumnkontraktet', () => {
     expect(facit.size, 'inga tabeller lästes ur sql/').toBeGreaterThan(30)
     expect(facit.get('project_change')?.has('change_id'), 'project_change.change_id saknas i facit').toBe(true)
     expect(facit.get('project_change')?.has('invoiced_at'), 'ALTER-tillägg fångas inte').toBe(true)
+    expect(facit.get('business_config')?.has('business_name'), 'live-snapshoten läses inte').toBe(true)
+    expect(facit.get('business_config')?.has('company_name'), 'snapshoten innehåller en fantomkolumn').toBe(false)
   })
 
   test('SANITY — project_change har INGEN id-kolumn', () => {
@@ -402,6 +455,7 @@ test.describe('kolumnkontraktet', () => {
       if (!kolumner) continue // tabellen saknar CREATE TABLE — inte verifierbar
       if (KANDA_LUCKOR.has(`${r.tabell}.${r.kolumn}`)) continue
       if (PRODUKTIONSVERIFIERADE_KOLUMNER.has(`${r.tabell}.${r.kolumn}`)) continue
+      if (LIVE_SCHEMA_GAPS.has(`${r.fil}:${r.tabell}.${r.kolumn}`)) continue
       if (!kolumner.has(r.kolumn)) {
         fel.push(`${r.fil}: ${r.tabell}.${r.kolumn} (${r.metod})`)
       }
@@ -423,6 +477,10 @@ test.describe('kolumnkontraktet', () => {
       'project_log.order_id',
       'project_log.work_performed',
     ])
+  })
+
+  test('kända live-schemaavvikelser är filbundna och blir inte fler', () => {
+    expect(LIVE_SCHEMA_GAPS.size, 'Ny live-schemaavvikelse — laga frågan i stället').toBe(24)
   })
 
   test('app/dashboard/quotes ingår i filtervakten', () => {
