@@ -13,7 +13,7 @@ import fs from 'fs'
 import path from 'path'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 const TIMELINE = 'app/api/customers/[id]/timeline/route.ts'
 const TRAIL = 'lib/compliance/communication-trail.ts'

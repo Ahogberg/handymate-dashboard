@@ -19,7 +19,7 @@ import { harledSignaler, valjOppning, type GtmSignal } from '../lib/launch-desk/
 import { htmlToExtractableText } from '../lib/onboarding/website-scrape'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
+const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8').replace(/\r\n/g, '\n')
 
 const NOW = new Date('2026-09-02T10:00:00Z')
 

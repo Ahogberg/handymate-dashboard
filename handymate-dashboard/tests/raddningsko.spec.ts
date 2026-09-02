@@ -26,7 +26,7 @@ import type { ChannelHealth } from '../lib/onboarding/channel-health'
 import { hamtaLanseringsbevis, MANUAL_LAUNCH_PROOFS } from '../lib/launch/readiness'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
+const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8').replace(/\r\n/g, '\n')
 
 const TIMME = 3_600_000
 const NOW = new Date('2026-09-02T12:00:00.000Z')

@@ -25,7 +25,7 @@ import path from 'path'
 import { rankByEffectiveScoreWithCustomerBoost, buildMemoryPrompt } from '../lib/agents/memory'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 const MEMORY = 'lib/agents/memory.ts'
 const TRIGGER_ROUTE = 'app/api/agent/trigger/route.ts'
@@ -304,7 +304,7 @@ test('v200: kund-id:t som interpoleras i .or-filtret släpps bara igenom med sä
   expect(safeMemoryCustomerId('x,business_id.eq.annan')).toBeNull()
   expect(safeMemoryCustomerId('')).toBeNull()
   expect(safeMemoryCustomerId(undefined)).toBeNull()
-  const src = fs.readFileSync(path.join(__dirname, '..', 'lib/agents/memory.ts'), 'utf8')
+  const src = fs.readFileSync(path.join(__dirname, '..', 'lib/agents/memory.ts'), 'utf8').replace(/\r\n/g, '\n')
   expect(src).toContain('const customerId = safeMemoryCustomerId(input.customerId)')
   expect(src).toContain('const customerId = safeMemoryCustomerId(opts.customerId)')
 })

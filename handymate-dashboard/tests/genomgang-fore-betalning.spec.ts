@@ -21,7 +21,7 @@ import { FUNNEL_FINAL_STEP, STEG_ETIKETTER } from '../lib/onboarding/funnel'
 import type { CompanyScanResult } from '../app/api/onboarding/company-scan/route'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 function tomtResultat(): CompanyScanResult {
   return {
@@ -206,7 +206,7 @@ test.describe('lib/onboarding/funnel.ts — nya etiketter', () => {
 
 test.describe('CLAUDE.md — dokumentationen följer med', () => {
   test('nämner TOTAL_STEPS = 9', () => {
-    const claude = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8')
+    const claude = fs.readFileSync(path.join(ROOT, 'CLAUDE.md'), 'utf8').replace(/\r\n/g, '\n')
     expect(claude).toContain('TOTAL_STEPS = 9')
   })
 })
