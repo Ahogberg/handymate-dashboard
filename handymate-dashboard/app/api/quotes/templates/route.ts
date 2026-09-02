@@ -55,7 +55,9 @@ export async function POST(request: NextRequest) {
         business_id: business.business_id,
         name,
         description: description || null,
-        branch: branch || business.industry || null,
+        // Branschförståelse steg 1: kanoniskt bransch-ID ur `branch`, inte
+        // den föråldrade `industry` ('hantverkare' på alla konton).
+        branch: branch || business.branch || null,
         estimated_hours: estimatedHours || null,
         labor_cost: laborCost || null,
         materials: materials || [],

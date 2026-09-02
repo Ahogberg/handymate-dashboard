@@ -6,6 +6,7 @@
  */
 
 import { BusinessContext, escalateToolDefinition, filterTools } from './shared'
+import { branchCompanyNoun, describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 export const LEAD_MODEL = 'claude-haiku-4-5-20251001'
 export const LEAD_MAX_STEPS = 6
@@ -37,12 +38,9 @@ export function buildLeadPrompt(
   const settings = ctx.v3Settings
   const prefs = ctx.learnedPreferences
 
-  const branchMap: Record<string, string> = {
-    electrician: 'Elektriker', plumber: 'Rörmokare', carpenter: 'Snickare',
-    painter: 'Målare', hvac: 'VVS-tekniker', locksmith: 'Låssmed',
-    cleaning: 'Städföretag', other: 'Hantverkare',
-  }
-  const branch = branchMap[biz.branch] || biz.branch || 'Hantverkare'
+  // Branschförståelse steg 1: etiketter ur lib/branch — ingen lokal karta.
+  const branch = describeBranches(resolveBusinessBranch(biz))
+  const branschForetag = branchCompanyNoun(biz.branch)
 
   const workHours = settings
     ? `${settings.work_start}–${settings.work_end}`
@@ -92,7 +90,7 @@ ${triggerData?.instruction || 'Hantera lead-relaterad uppgift.'}
 ${triggerData?.rule_name ? `Regel: ${triggerData.rule_name}` : ''}`
   }
 
-  return `Du är Lead-agenten för ${biz.business_name}, ett ${branch.toLowerCase()}företag.
+  return `Du är Lead-agenten för ${biz.business_name}, ett ${branschForetag}.
 Du hanterar ENBART leads, kundkontakt och pipeline-beslut. Snabba, korta svar.
 
 ## Företag

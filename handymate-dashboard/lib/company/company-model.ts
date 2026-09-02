@@ -45,6 +45,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 import { normalizeExplicitMarginTarget } from '@/lib/projects/margin-guardian'
 import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
 import {
@@ -630,11 +631,12 @@ export function byggCompanyModelPromptBlock(model: CompanyModel): string {
       : '- Marginalmål: (ej angivet — hitta aldrig på en tröskel)',
   )
 
+  // Svensk etikett ur lib/branch — aldrig råa ID:n ("electrician") i prompten.
   const branch = model.branch.value
   const extra = model.secondary_branches.value
   lines.push(
     branch
-      ? `- Bransch: ${branch}${extra && extra.length > 0 ? ` (+ ${extra.join(', ')})` : ''}`
+      ? `- Bransch: ${describeBranches(resolveBusinessBranch({ branch, secondary_branches: extra }))}`
       : '- Bransch: (ej angivet)',
   )
 

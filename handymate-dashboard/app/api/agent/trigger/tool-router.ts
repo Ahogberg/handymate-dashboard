@@ -9,6 +9,7 @@ import { getStageBySlug } from '@/lib/pipeline'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { shouldQueueForApproval } from '@/lib/autonomy/agent-gating'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 import {
   buildHandoffBriefing,
   handoffIdempotencyKey,
@@ -780,12 +781,14 @@ async function createQuoteDraft(
 
   const { data: bizRow, error: bizErr } = await supabase
     .from('business_config')
-    .select('industry, pricing_settings, default_hourly_rate, default_vat_rate')
+    .select('branch, secondary_branches, pricing_settings, default_hourly_rate, default_vat_rate')
     .eq('business_id', businessId)
     .maybeSingle()
   if (bizErr || !bizRow) return { success: false, error: 'Kunde inte läsa företagsinställningarna' }
 
-  const branch = bizRow.industry || 'Bygg'
+  // Branschförståelse steg 1: svensk branschtext ur `branch` via lib/branch
+  // (tidigare en gissad Bygg-fallback ur den föråldrade industry-kolumnen).
+  const branch = describeBranches(resolveBusinessBranch(bizRow))
   const vatRate = bizRow.default_vat_rate ?? bizRow.pricing_settings?.vat_rate ?? 25
 
   // KVITTOPRINCIPEN (samma som suggestQuoteDraftForLead): aldrig ett

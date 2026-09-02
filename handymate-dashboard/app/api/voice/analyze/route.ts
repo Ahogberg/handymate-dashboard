@@ -16,6 +16,8 @@ import { getPublicPriceList } from '@/lib/products/price-list-view'
 import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
 import { resolveCallProject } from '@/lib/voice/resolve-call-project'
 import { byggAtaUtkast, harPendingAtaForProjekt, shouldSuggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
+import { branchWorker, describeBranches, resolveBusinessBranch } from '@/lib/branch'
+import { loadTradeContext, formatTradeContextBlock } from '@/lib/branch/trade-context'
 
 export const maxDuration = 300
 
@@ -393,11 +395,16 @@ export async function POST(request: NextRequest) {
     }
 
     // Hämta business-info för kontext
-    const { data: business } = await supabase
-      .from('business_config')
-      .select('business_name, services_offered, contact_name, industry, service_area')
-      .eq('business_id', recording.business_id)
-      .single()
+    // Branschförståelse steg 1: branschen kommer ur `branch` (onboardingens
+    // val) via lib/branch — aldrig ur `industry` som är 'hantverkare' överallt.
+    const [{ data: business }, tradeContext] = await Promise.all([
+      supabase
+        .from('business_config')
+        .select('business_name, services_offered, contact_name, branch, secondary_branches, service_area')
+        .eq('business_id', recording.business_id)
+        .single(),
+      loadTradeContext(supabase, recording.business_id).catch(() => null),
+    ])
 
     // B1 (Prisslingan V2): priskontexten läser HANTVERKARENS egna säljpriser
     // ur kanoniska products (sales_price>0) — tidigare lästes
@@ -410,7 +417,9 @@ export async function POST(request: NextRequest) {
       ? `\n\nHANTVERKARENS PRISLISTA (säljpriser):\n${produktRader.map(p => `- ${p.name}: ${p.unit_price} kr/${p.unit}`).join('\n')}`
       : ''
 
-    const industry = business?.industry || 'hantverkare'
+    const branschRoll = branchWorker(business?.branch).toLowerCase()
+    const branschText = describeBranches(tradeContext ?? resolveBusinessBranch(business))
+    const branschBlock = tradeContext ? `\n${formatTradeContextBlock(tradeContext)}` : ''
     const services = Array.isArray(business?.services_offered)
       ? business.services_offered.join(', ')
       : business?.services_offered || 'Hantverkstjänster'
@@ -427,16 +436,16 @@ export async function POST(request: NextRequest) {
     const samtalsriktning = arUtgaende ? 'UTGÅENDE (hantverkaren ringde upp kunden)' : 'INKOMMANDE (kund ringde)'
 
     // Förbättrad AI-prompt
-    const prompt = `Du är en AI-assistent för en ${industry} i Sverige.
+    const prompt = `Du är en AI-assistent för en ${branschRoll} i Sverige.
 ${arMote
   ? 'Läs detta transkript från ett PLATSBESÖK — hantverkaren spelade själv in mötet med kunden på plats. Analysera noggrant.'
   : 'Lyssna på detta transkript från ett kundsamtal och analysera noggrant.'}
 
 === FÖRETAGSINFORMATION ===
 Företag: ${business?.business_name || 'Okänt'}
-Bransch: ${industry}
+Bransch: ${branschText}
 Tjänster: ${services}
-Serviceområde: ${business?.service_area || 'Okänt'}
+Serviceområde: ${business?.service_area || 'Okänt'}${branschBlock}
 ${productContext}
 
 === SAMTALSINFORMATION ===

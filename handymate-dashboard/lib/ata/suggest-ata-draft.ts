@@ -75,6 +75,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildDecisionRecord, withDecisionRecord } from '@/lib/ai/decision-record'
 import { hourlyRateField } from '@/lib/company/company-model'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { describeBranches, resolveBusinessBranch } from '@/lib/branch'
 
 // ─────────────────────────────────────────────────────────────────
 // shouldSuggestAtaDraft — ren, facit-testbar gate
@@ -336,13 +337,14 @@ export async function byggAtaUtkast(
           .limit(5),
         supabase
           .from('business_config')
-          .select('industry, pricing_settings, default_hourly_rate')
+          .select('branch, secondary_branches, pricing_settings, default_hourly_rate')
           .eq('business_id', params.businessId)
           .maybeSingle(),
       ])
 
       const biz = (bizResult.data || {}) as {
-        industry?: string | null
+        branch?: string | null
+        secondary_branches?: string[] | null
         pricing_settings?: { hourly_rate?: number } | null
         default_hourly_rate?: number | null
       }
@@ -376,7 +378,9 @@ export async function byggAtaUtkast(
         const { generateQuoteFromInput } = await import('@/lib/ai-quote-generator')
         generated = await generateQuoteFromInput({
           businessId: params.businessId,
-          branch: biz.industry || 'Bygg',
+          // Branschförståelse steg 1: svensk branschtext ur `branch` via
+          // lib/branch (tidigare en gissad Bygg-fallback ur industry).
+          branch: describeBranches(resolveBusinessBranch(biz)),
           hourlyRate,
           textDescription: ataUnderlag,
           priceList: (priceListResult.data || []).map((p: any) => ({

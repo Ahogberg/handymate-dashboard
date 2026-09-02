@@ -12,6 +12,7 @@
  */
 
 import type { QuoteItem, PaymentPlanEntry, RotRutType } from '@/lib/types/quote'
+import { normalizeBranch } from '@/lib/branch'
 
 function genItemId(): string {
   return 'qi_' + Math.random().toString(36).substr(2, 12)
@@ -131,19 +132,10 @@ export interface DefaultQuoteTemplate {
 }
 
 // ─── Branschnyckel-normalisering ────────────────────────────────────────
-// Onboarding-rymden (app/onboarding/constants.ts) är sanningen. Gamla/
-// inkonsekventa nycklar som förekommit i äldre kod behålls som alias.
-const BRANCH_ALIASES: Record<string, string> = {
-  bygg: 'construction',
-  snickeri: 'carpenter',
-  el: 'electrician',
-  vvs: 'plumber',
-  maleri: 'painter',
-}
-
+// Branschförståelse steg 1 (2026-09-02): alias-tabellen bor i lib/branch —
+// samma översättning här som i prompterna, produktbanken och kunskapsbasen.
 export function normalizeTemplateBranch(branch?: string | null): string {
-  if (!branch) return 'other'
-  return BRANCH_ALIASES[branch] || branch
+  return normalizeBranch(branch)
 }
 
 // ─── ALLROUND (seedas till alla branscher) ─────────────────────────────

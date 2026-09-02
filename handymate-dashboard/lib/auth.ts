@@ -28,7 +28,14 @@ export interface AuthenticatedBusiness {
   knowledge_base: Record<string, any> | null
   org_number: string | null
   address: string | null
+  /** FÖRÅLDRAD — 'hantverkare' på alla konton, skrivs aldrig av appen.
+      Läs branschen via `branch` + lib/branch (Branschförståelse steg 1). */
   industry: string | null
+  /** Onboardingens branschval (engelska ID:n, app/onboarding/constants.ts). */
+  branch: string | null
+  secondary_branches: string[] | null
+  /** Ägarens valda specialiteter (JSONB, onboardingens steg 2). */
+  specialties: unknown
   bankgiro: string | null
   services_offered: string[] | null
   /**

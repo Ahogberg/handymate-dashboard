@@ -35,6 +35,7 @@
 // 11 branscher som saknade en. Egen fil av ren storlek; typ-importen åt
 // andra hållet är `import type` → ingen runtime-cykel.
 import { LONGTAIL_PRODUCTS } from './product-defaults-longtail'
+import { resolveBusinessBranch } from './branch'
 
 export interface ProductDefault {
   /** Stabil seed-nyckel, även artikelnummer i offerten. */
@@ -619,15 +620,19 @@ export function getStarterProducts(branch: string | string[]): ProductDefault[] 
  * används av äldre kod, så den tas som reserv (samma ordning som
  * backfill-rutten redan använder). `secondary_branches` kom med v93 och kan
  * saknas på rader som seedats innan dess — därför den defensiva läsningen.
+ *
+ * Branschförståelse steg 1 (2026-09-02): råvärdena normaliseras via
+ * lib/branch, så 'snickeri' (prod) landar på snickarsortimentet och
+ * 'hantverkare' (gamla industry-defaulten) på 'other' i stället för att
+ * missa BRANCH_PRODUCTS helt.
  */
 export function resolveBranches(row: {
   branch?: string | null
   industry?: string | null
   secondary_branches?: string[] | null
 }): string[] {
-  const primary = row.branch || row.industry || 'other'
-  const extras = (row.secondary_branches ?? []).filter(b => b && b !== primary)
-  return [primary, ...extras]
+  const resolved = resolveBusinessBranch(row)
+  return [resolved.primary, ...resolved.secondary]
 }
 
 /** Alla branschnycklar som har ett eget sortiment (exkl. 'other'-fallbacken). */

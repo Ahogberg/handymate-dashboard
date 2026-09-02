@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   const { data: config } = await supabase
     .from('business_config')
-    .select('org_number, industry, default_rot_work_category')
+    .select('org_number, branch, default_rot_work_category')
     .eq('business_id', business.business_id)
     .single()
 
@@ -54,7 +54,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 
-  const defaultCategory = config?.default_rot_work_category || defaultCategoryForIndustry(config?.industry)
+  const defaultCategory = config?.default_rot_work_category || defaultCategoryForIndustry(config?.branch)
 
   const rows = (invoices || [])
     .map((inv: any) => {
