@@ -60,7 +60,7 @@ export async function GET(request: NextRequest) {
   const [bizRes, ledgerRes, followupRes, eventsRes, paymentsRes, batchesRes] = await Promise.all([
     bizIds.length
       ? supabase.from('business_config')
-          .select('business_id, company_name, business_name, subscription_status, onboarding_completed_at, referred_by')
+          .select('business_id, business_name, subscription_status, onboarding_completed_at, referred_by')
           .in('business_id', bizIds)
       : Promise.resolve({ data: [] as any[] }),
     supabase.from('partner_commission_ledger')
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
       id: ref.id,
       business_id: ref.referred_business_id,
       email: ref.referred_email,
-      business_name: biz?.company_name || biz?.business_name || null,
+      business_name: biz?.business_name || null,
       status: ref.status,
       created_at: ref.created_at,
       converted_at: ref.converted_at,
@@ -148,7 +148,7 @@ export async function GET(request: NextRequest) {
   // provisionssektion — partnerns egna rader, utan basbelopp.
   const nameForStatement = (bid: string) => {
     const b = bizFor.get(bid)
-    return b?.company_name || b?.business_name || bid
+    return b?.business_name || bid
   }
   const statementByPeriod = new Map<string, { rows: any[]; total: number; all_paid: boolean }>()
   for (const row of ledgerRes.data || []) {

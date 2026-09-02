@@ -6,7 +6,9 @@
 - [x] Bygg browserlösa kontrakt och ett avgränsat riktigt DB-bevis för attribution, månad/år, refund, chargeback, churn, återkomst, månad 36/37, självfaktura och slututbetalning.
 - [x] Synka den interna publiceringskontrollen med faktisk kod och leverera ett separat partner-GO/NO-GO.
 - [x] Verifiera riktade tester, `npx tsc --noEmit` och `npm run build`.
-- [ ] Kör v204/v205 manuellt och därefter `npm run proof:partner` mot de två disponibla testkontona.
+- [x] Kör v204/v205 manuellt.
+- [ ] Kör `sql/v206_partner_self_billing_business_name.sql` manuellt. Första riktiga partnerbeviset stoppade korrekt på att v193/v205 använde den obefintliga `business_config.company_name`.
+- [ ] Kör därefter `npm run proof:partner` igen och kräv hela claim → konflikt → 180 dagar → självfaktura → betalning → slututbetalning grönt innan push/GO.
 - [ ] Bred kontraktsgrind: 341/343 gröna; två röda ligger utanför partnerlanen i `genomgang-fore-betalning.spec.ts` och `kundminne-kanaler.spec.ts` och lämnas till respektive aktiva lane.
 
 ## Review

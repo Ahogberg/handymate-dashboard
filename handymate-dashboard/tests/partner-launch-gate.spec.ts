@@ -15,6 +15,7 @@ import { buildSelfBillingDocument } from '../lib/partners/self-billing'
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 const finalPayoutSql = read('sql/v205_partner_final_payout.sql')
+const billingNameFixSql = read('sql/v206_partner_self_billing_business_name.sql')
 
 test.describe('Partner Launch Gate — attributionen är en enda sanningsgräns', () => {
   test('bara riktiga P-koder går till partnerclaimen', () => {
@@ -190,6 +191,21 @@ test.describe('Partner Launch Gate — en sammanhängande pengakedja', () => {
 })
 
 test.describe('Partner Launch Gate — avtalsenlig slututbetalning', () => {
+  test('självfakturan och partnerns läsvägar använder business_configs verkliga namnkolumn', () => {
+    expect(billingNameFixSql).toContain("NULLIF(b.business_name, '')")
+    expect(billingNameFixSql).not.toContain('b.company_name')
+
+    for (const file of [
+      'app/api/partners/dashboard/route.ts',
+      'app/api/admin/partners/commission/route.ts',
+      'lib/partners/webhook.ts',
+    ]) {
+      const source = read(file)
+      expect(source).toContain('business_name')
+      expect(source).not.toContain('company_name')
+    }
+  })
+
   test('ordinarie underlag behåller 500-kronorsgränsen men explicit slututbetalning får passera', () => {
     expect(finalPayoutSql).toContain('IF v_subtotal < 500 AND NOT p_is_final_payout THEN')
     expect(finalPayoutSql).toContain("RAISE EXCEPTION 'Minsta ordinarie utbetalning är 500 kr'")

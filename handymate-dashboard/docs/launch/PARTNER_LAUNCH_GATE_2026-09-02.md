@@ -12,8 +12,8 @@
 
 Motorn, acceptansflödet, självfaktureringen och den nya attributionsgränsen är kodmässigt sammanhängande. NO-GO beror på tydliga kvarvarande aktiverings- och externkontroller, inte på att modellen behöver ritas om:
 
-1. `sql/v204_partner_attribution_claim.sql` och `sql/v205_partner_final_payout.sql` är skrivna men inte manuellt körda.
-2. Det riktiga databasbeviset är därför inte kört.
+1. `sql/v204_partner_attribution_claim.sql` och `sql/v205_partner_final_payout.sql` är manuellt körda.
+2. Första riktiga databasbeviset stoppade korrekt vid en verklig schemaavvikelse: självfaktureringsfunktionen refererade `business_config.company_name`, men skarpt schema har `business_name`. `sql/v206_partner_self_billing_business_name.sql` korrigerar funktionen och ska köras manuellt innan omprov.
 3. Den publicerade partnersidan säger fortfarande 20 % i 12 månader och motsäger avtalet.
 4. Juridisk identitet, juristgranskning och redovisningsgodkännande av självfaktureringen saknas.
 5. De två partnerkonfigurationer som v189 migrerade behöver informeras och acceptera Partneravtal v1; databasmigration är inte avtalsacceptans.
@@ -73,7 +73,7 @@ Facitet täcker attributionsordning, body-spoofing, service-role-grants, placeho
 
 Förutsättningar:
 
-1. Kör v204 och v205 manuellt i Supabase SQL Editor i nummerordning.
+1. Kör v204, v205 och v206 manuellt i Supabase SQL Editor i nummerordning.
 2. Använd endast de två disponibla testföretagen i `.env.integration`.
 3. Kontrollera först att båda företagens `business_config.referred_by` är `NULL`.
 4. Sätt säkerhetsspärren:
@@ -114,7 +114,8 @@ Testet avbryter före skrivningar om företagen inte är uttryckligt disponibla,
 - [ ] Redovisningskonsult har godkänt självfaktureringsprocessen och momshanteringen.
 - [ ] Exakt accepterad avtalsversion kan tillhandahållas varaktigt; gamla versioner arkiveras.
 - [ ] De två migrerade partnerna har informerats och accepterat v1 innan nya hänvisningar.
-- [ ] v204 och v205 är manuellt körda och verifierade.
+- [x] v204 och v205 är manuellt körda.
+- [ ] v206 är manuellt körd och hela databasbeviset omkört grönt.
 - [ ] `npm run proof:partner` är grönt mot avsedd testdatabas.
 - [ ] Ett visuellt klickpass är gjort: registrering → acceptans → adminaktivering → portal → självfaktura → granskning → utbetalningsreferens.
 

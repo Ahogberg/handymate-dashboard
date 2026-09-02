@@ -67,9 +67,9 @@ export async function GET(request: NextRequest) {
   // Kundnamn för läsbarhet i admin (batchat).
   const bizIds = Array.from(new Set((ledgerRes.data || []).map(r => r.business_id)))
   const { data: businesses } = bizIds.length
-    ? await supabase.from('business_config').select('business_id, company_name, business_name').in('business_id', bizIds)
+    ? await supabase.from('business_config').select('business_id, business_name').in('business_id', bizIds)
     : { data: [] as any[] }
-  const nameFor = new Map((businesses || []).map((b: any) => [b.business_id, b.company_name || b.business_name || b.business_id]))
+  const nameFor = new Map((businesses || []).map((b: any) => [b.business_id, b.business_name || b.business_id]))
 
   return NextResponse.json({
     partner: partnerRes.data,
