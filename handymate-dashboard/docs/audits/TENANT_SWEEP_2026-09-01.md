@@ -13,6 +13,11 @@ igenkänd grind granskades rad för rad i tre parallella granskningar
 sveptes alla 554 efter två felmönster: `=== \`Bearer ${process.env.X}\``
 (blir "Bearer undefined" utan env) och reservhemligheter i källkod.
 
+**Tillägg 2026-09-03:** inventeringen omfattar nu 565 rutter, varav 131
+ligger utanför standardgrinden. Den nya raden är
+`/api/admin/support-operations`, som är `isAdmin(request)`-grindad och
+endast läser de befintliga driftkällorna till plattformens Support & drift-vy.
+
 ## Fynd och åtgärd
 
 | # | Rutt | Allvar | Fynd | Åtgärd |

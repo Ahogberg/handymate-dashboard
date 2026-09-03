@@ -1,3 +1,39 @@
+# Launch Truth & Operations (Codex 2026-09-03)
+
+- [x] Baslinjegranska den lokala Support & drift-leveransen mot befintliga
+      driftkällor, auth, mobilvy och felbeteende.
+- [x] Kartlägg publika produktlöften, pris-/planvillkor, onboardinglöften,
+      agentlöften och synliga integrationer mot faktisk kod och skarpbevis.
+- [x] Skapa ett underordnat löfte–bevis-register som pekar på den befintliga
+      `GO_NO_GO.md`-grinden och `LAUNCH_TEST_SUITE.md`-manualen utan att bli en
+      ny konkurrerande checklista.
+- [x] Åtgärda endast konkreta P0/P1-fynd som är isolerade och säkra; övriga
+      blockerare får ägare och exakt beviskrav.
+- [x] Kör riktade facit, full kontraktsgrind, `npx tsc --noEmit` och
+      `npm run build`; diffgranska endast denna lanes filer.
+- [x] Dokumentera verifiering, kända externa blockerare och nästa mänskliga
+      skarpa prov i en review-sektion här.
+
+## Review
+
+- Support & drift återanvänder den befintliga supportytan och läser fyra
+  verkliga driftkällor plus kredit-/leverantörshälsa. Källfel visas som
+  `unavailable`, aldrig som en tom grön kö.
+- Publika löften har synkats med bevisläget: ingen gratisperiod, ingen gissad
+  Easoft-prisuppgift, ingen 15-minuters- eller 24-timmarsgaranti och
+  leverantörsberoende funktioner är villkorade.
+- Löfte–bevis-index: `docs/launch/LAUNCH_PROMISE_PROOF_MATRIX.md`.
+- Verifiering 2026-09-03: riktade facit 20/20, kontraktsgrind 355/355,
+  partnerns browserlösa grind 11/11, `npx tsc --noEmit` rent,
+  `npm run build` exit 0 och publikt rökprov 5/5.
+- Kvarvarande blockerare: det skrivande partnerbeviset får inte köras utan
+  uttryckligt godkännande för att skapa och rensa testattribution, liggare och
+  självfakturaunderlag på de två disponibla testföretagen. v206 är rapporterad
+  körd, men detta är inte samma sak som ett grönt databasbevis.
+- Nästa mänskliga prov är färsk-konto-resan enligt
+  `docs/launch/LAUNCH_TEST_SUITE.md`, därefter externa 46elks-, Stripe-,
+  e-post-, Google-, Gmail- och Fortnox-stationer på exakt release-SHA.
+
 # Partner Launch Gate (Codex 2026-09-02)
 
 - [x] Kartlägg partnerregistrering, attribution, provisionsmotor och självfaktura mot Partneravtal v1.
@@ -745,3 +781,21 @@ Medvetet lämnat:
 - Ingen rate-limit på `/via` (koder = ~9 000 gissningar per prefix; det som läcker är redan publikt).
 
 Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landing_events`; toggeln av → utan länk), Stripe test-mode-prov av krediten.
+# Admin Support & drift — samma operativa yta (Codex 2026-09-03)
+
+- [x] Kartlägg och lås befintliga support-/driftkällor utan ny tabell eller parallellt incidentflöde.
+- [x] Bygg en superadmin-grindad läsrutt för senaste 25 timmarnas leveransfel och sparad plattformshälsa.
+- [x] Utöka befintliga `SupportQueueTab` med lägesrad, oförändrad supportkö och tydligt separat driftsektion.
+- [x] Visa trasiga/otillgängliga kontroller som okända — aldrig som gröna eller tomma.
+- [x] Lägg browserlösa kontrakttester och koppla dem till den befintliga kontraktsgrinden.
+- [x] Verifiera riktade tester, `npx tsc --noEmit` och `npm run build`.
+
+## Review
+
+- `/admin`-fliken heter nu `Support & drift`: fyra lägeskort, befintlig
+  supportkö, fyra driftkällor och sparad plattforms-/leverantörshälsa.
+- Ingen migration och inga nya incidentrader. Vyn läser samma sanning som
+  driftlarmet; en trasig källa visas uttryckligen som okänd.
+- Riktigt DB-prov 2026-09-03: samtliga fem queries gröna; 1 SMS-fel,
+  0 mejlfel, 0 betalningsfel, 8 automationsfel och 4 hälsokontroller.
+- Kontraktsgrind 350/350, `npx tsc --noEmit` rent, `npm run build` exit 0.

@@ -27,8 +27,8 @@ const features: FeatureCategory[] = [
   {
     category: 'AI & Automation',
     items: [
-      { name: 'Lisa fångar missade samtal och återkopplar via SMS', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
-      { name: 'Automatisk SMS-svar till kunder', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
+      { name: 'Lisa fångar missade samtal och återkopplar via SMS', handymate: 'partial', easoft: 'none', bygglet: 'none', highlight: true },
+      { name: 'Automatiska SMS-svar till kunder', handymate: 'partial', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'AI-kvalificering av leads', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'Proaktiv offertuppföljning', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'Morgonrapport med dagöversikt', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
@@ -43,7 +43,7 @@ const features: FeatureCategory[] = [
       { name: 'ROT/RUT-avdrag automatiskt', handymate: 'full', easoft: 'full', bygglet: 'full' },
       { name: 'Swish QR-kod på faktura', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
       { name: 'Betalningsplan med delfakturor', handymate: 'full', easoft: 'full', bygglet: 'partial' },
-      { name: 'AI skapar offert från samtal', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
+      { name: 'AI skapar offertutkast från samtal', handymate: 'partial', easoft: 'none', bygglet: 'none', highlight: true },
     ],
   },
   {
@@ -68,8 +68,8 @@ const features: FeatureCategory[] = [
   {
     category: 'Integrationer',
     items: [
-      { name: 'Google Calendar', handymate: 'full', easoft: 'partial', bygglet: 'partial' },
-      { name: 'Gmail', handymate: 'full', easoft: 'none', bygglet: 'none' },
+      { name: 'Google Kalender', handymate: 'partial', easoft: 'partial', bygglet: 'partial' },
+      { name: 'Gmail', handymate: 'partial', easoft: 'none', bygglet: 'none' },
       { name: 'Fortnox', handymate: 'planned', easoft: 'full', bygglet: 'full' },
       { name: 'Egen hemsida med SEO', handymate: 'full', easoft: 'none', bygglet: 'none', highlight: true },
     ],
@@ -78,7 +78,7 @@ const features: FeatureCategory[] = [
     category: 'Användarvänlighet',
     items: [
       { name: 'Mobilanpassad app', handymate: 'full', easoft: 'full', bygglet: 'full' },
-      { name: 'Onboarding på 15 minuter', handymate: 'full', easoft: 'none', bygglet: 'partial' },
+      { name: 'Guidad onboarding', handymate: 'full', easoft: 'none', bygglet: 'partial' },
       { name: 'AI-chatbot för support', handymate: 'full', easoft: 'none', bygglet: 'none' },
       { name: 'Allt på svenska', handymate: 'full', easoft: 'full', bygglet: 'full' },
     ],
@@ -92,11 +92,11 @@ const faqs = [
   },
   {
     q: 'Kan jag byta från Easoft till Handymate?',
-    a: 'Ja! Vi hjälper dig migrera kunder, offerter och projektdata. De flesta är igång inom 24 timmar. Kontakta oss för en kostnadsfri migrering.',
+    a: 'Ja. Du kan importera ditt kundregister och får en guidad start i Handymate. Behöver du flytta annan historik bedömer vi omfattning och upplägg tillsammans innan något lovas.',
   },
   {
     q: 'Har Handymate Fortnox-integration?',
-    a: 'Ja. Fortnox-kopplingen finns i Handymate och aktiveras med företagets egen Fortnox-anslutning och licens. Kontrollera integrationsstatusen i onboarding innan skarp drift.',
+    a: 'Fortnox-kopplingen är byggd och kräver företagets egen Fortnox-anslutning och licens. Den aktiveras för nya kunder först efter ett verifierat skarpprov mot rätt Fortnox-bolag.',
   },
   {
     q: 'Funkar det för stora team?',
@@ -164,35 +164,38 @@ export default function JamforPage() {
       bg: '#F0FDFA',
       border: '#99F6E4',
       tagline: 'AI back office',
+      priceUnit: 'kr/mån',
       perks: ['Chefsagenten Matte samlar rätt team', 'Offert på minuter, inte dagar', 'AI-teamet ingår i planerna'],
       featured: true,
     },
     {
       name: 'Bygglet',
-      price: '1 089',
-      range: '1 089 – 2 289',
+      price: '1 049',
+      range: '1 049 – 2 289',
       color: '#64748B',
       bg: '#F8FAFC',
       border: '#E2E8F0',
       tagline: 'Projektverktyg',
+      priceUnit: 'kr/mån',
       perks: ['Bra projekthantering', 'Enkel tidrapportering', 'Fokuserat på bygg'],
       featured: false,
     },
     {
       name: 'Easoft',
-      price: '~3 500',
+      price: 'Offert',
       range: 'Kontakta för pris',
       color: '#64748B',
       bg: '#F8FAFC',
       border: '#E2E8F0',
       tagline: 'Enterprise ERP',
+      priceUnit: '',
       perks: ['Komplett ERP-system', 'Fortnox-integration', 'Stort för stora team'],
       featured: false,
     },
   ]
 
   const whyItems = [
-    { icon: '📞', title: 'Fånga nästa kund', desc: 'Lisa fångar samtalet, skapar affären och återkopplar via SMS när du inte hann svara.' },
+    { icon: '📞', title: 'Fånga nästa kund', desc: 'När telefonkanalen är aktiverad kan Lisa följa upp missade samtal via SMS och låta kundinflödet gå vidare i samma pipeline.' },
     { icon: '📋', title: 'Offert på minuter', desc: 'Bygg professionella offerter med digital signering och tydligt kundunderlag.' },
     { icon: '🔄', title: 'Uppföljning som inte glöms', desc: 'Teamet hittar offerter och fakturor som behöver nästa steg. Du godkänner innan externa utskick.' },
     { icon: '☀️', title: 'Morgonrapport', desc: 'Vakna till en sammanfattning: dagens bokningar, heta leads, vad som behöver uppmärksamhet.' },
@@ -260,7 +263,7 @@ export default function JamforPage() {
               padding: '14px 32px', borderRadius: 12, background: '#0D9488',
               color: 'white', fontWeight: 700, fontSize: 16, textDecoration: 'none',
             }}>
-              Testa Handymate gratis →
+              Kom igång med Handymate →
             </a>
             <a href="#jamforelse" style={{
               padding: '14px 32px', borderRadius: 12, background: 'transparent',
@@ -276,9 +279,8 @@ export default function JamforPage() {
       {/* ── Differentiator banner ─────────────────────────────────────────────── */}
       <div style={{ background: '#0F766E', padding: '20px 24px', textAlign: 'center' }}>
         <p style={{ color: 'white', fontSize: 16, fontWeight: 600, maxWidth: 700, margin: '0 auto' }}>
-          💡 Handymate är det enda systemet med en{' '}
-          <span style={{ color: '#5EEAD4' }}>AI-assistent som faktiskt utför uppgifter</span>
-          {' '}— inte bara organiserar dem
+          💡 Handymate kombinerar affärssystemet med ett{' '}
+          <span style={{ color: '#5EEAD4' }}>AI-team som kan föreslå och utföra godkända uppgifter</span>
         </p>
       </div>
 
@@ -288,7 +290,7 @@ export default function JamforPage() {
           Prisöversikt
         </h2>
         <p style={{ textAlign: 'center', color: '#64748B', marginBottom: 36, fontSize: 15 }}>
-          Månadspriser exkl. moms. Alla plattformar erbjuder tester.
+          Månadspriser exkl. moms. Handymates pris hämtas från produktens prissanning; övriga villkor kontrolleras hos respektive leverantör.
         </p>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(280px,1fr))', gap: 20 }}>
@@ -316,10 +318,10 @@ export default function JamforPage() {
               </div>
               <div style={{ marginBottom: 20 }}>
                 <span style={{ fontSize: 32, fontWeight: 800, color: plan.color }}>{plan.price}</span>
-                <span style={{ fontSize: 14, color: '#94A3B8' }}> kr/mån</span>
+                {plan.priceUnit && <span style={{ fontSize: 14, color: '#94A3B8' }}> {plan.priceUnit}</span>}
               </div>
               <div style={{ fontSize: 12, color: '#94A3B8', marginBottom: 16 }}>
-                Prisintervall: {plan.range} kr/mån
+                Prisintervall: {plan.range}{plan.priceUnit ? ` ${plan.priceUnit}` : ''}
               </div>
               {plan.perks.map((perk, j) => (
                 <div key={j} style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
@@ -350,7 +352,7 @@ export default function JamforPage() {
           {(['full', 'partial', 'planned', 'none'] as Status[]).map((s) => (
             <span key={s} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
               <StatusIcon status={s} />
-              {s === 'full' ? 'Ingår' : s === 'partial' ? 'Delvis' : s === 'planned' ? 'Kommer' : 'Saknas'}
+              {s === 'full' ? 'Ingår' : s === 'partial' ? 'Kräver aktivering eller skarpbevis' : s === 'planned' ? 'Kommer' : 'Ej verifierat publikt'}
             </span>
           ))}
         </div>
@@ -395,7 +397,7 @@ export default function JamforPage() {
                         fontSize: 10, fontWeight: 700, color: '#0F766E',
                         background: '#CCFBF1', padding: '2px 6px', borderRadius: 4, letterSpacing: '0.03em',
                       }}>
-                        UNIKT
+                        HANDYMATE
                       </span>
                     )}
                   </div>
@@ -502,7 +504,7 @@ export default function JamforPage() {
           background: 'white', color: '#0F766E', fontWeight: 700, fontSize: 17,
           textDecoration: 'none', boxShadow: '0 4px 15px rgba(0,0,0,0.15)',
         }}>
-          Testa Handymate gratis →
+          Kom igång med Handymate →
         </a>
         <p style={{ color: '#B2DFDB', fontSize: 13, marginTop: 16 }}>
           Eller ring oss: +46 708 379 552
@@ -511,7 +513,7 @@ export default function JamforPage() {
 
       {/* ── Footer ────────────────────────────────────────────────────────────── */}
       <div style={{ padding: '24px', textAlign: 'center', color: '#94A3B8', fontSize: 12 }}>
-        © 2026 Handymate. Jämförelsen baseras på offentligt tillgänglig information per mars 2026.
+        © 2026 Handymate. Konkurrentuppgifter bygger på offentligt material granskat 3 september 2026 och kan ändras. “Ej verifierat publikt” betyder inte att funktionen säkert saknas.
       </div>
     </div>
   )

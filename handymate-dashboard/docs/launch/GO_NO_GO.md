@@ -2,6 +2,11 @@
 
 Det här protokollet ersätter inte den levande lanseringschecklistan. Det är
 beviskedjan som avgör om en viss release får gå till betalande kunder.
+Den kompletta utförandemanualen finns i
+`docs/launch/LAUNCH_TEST_SUITE.md`.
+Kopplingen mellan publika kundlöften och respektive bevisstation finns i
+`docs/launch/LAUNCH_PROMISE_PROOF_MATRIX.md`; den är ett index, inte en egen
+beslutsgrind.
 
 ## Grind A — maskinell sanning
 

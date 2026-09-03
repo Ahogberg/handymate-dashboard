@@ -458,7 +458,7 @@ export default function AdminDashboardPage() {
               className={`px-4 py-2 rounded-md text-sm font-medium transition-all ${
                 activeTab === tab ? 'bg-white shadow text-gray-900' : 'text-gray-500 hover:text-gray-700'
               }`}>
-              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : tab === 'partners' ? `Partners (${partners.length})` : tab === 'support' ? 'Support' : 'Räddning'}
+              {tab === 'overview' ? 'Översikt' : tab === 'customers' ? `Kunder (${customers.length})` : tab === 'partners' ? `Partners (${partners.length})` : tab === 'support' ? 'Support & drift' : 'Räddning'}
             </button>
           ))}
         </div>

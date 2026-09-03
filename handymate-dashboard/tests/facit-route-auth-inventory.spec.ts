@@ -169,6 +169,10 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // admin/raddningsko/manuell-fix, admin/launch-readiness/bevis) → 135.
   // 2026-09-03 (veckopulsen, tasks/plan-veckopuls.md): en ny admin-rutt
   // (admin/launch/veckopuls) — plattformsadmin, ingen tenant-kontext → 141.
+  // 2026-09-03 (Launch Truth & Operations): den superadmin-grindade
+  // support-operations-rutten → 142. Talet är RÄKNAT efter cherry-picken,
+  // inte adderat på höft: de två grenarna räknade var sin delmängd av
+  // rutterna och båda taken var för låga för det sammanslagna trädet.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(141)
+  expect(utanStandard.length).toBeLessThanOrEqual(142)
 })

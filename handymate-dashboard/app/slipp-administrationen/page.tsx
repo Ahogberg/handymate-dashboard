@@ -15,7 +15,7 @@ const content: OutcomeLandingContent = {
   proofBody: 'Säg till chefsagenten Matte vad du vill uppnå. Han samlar Lisa, Daniel, Lars, Karin eller andra relevanta specialister, visar planen och håller ihop vad som hände.',
   quote: 'Fyll nästa veckas luckor utan att vi tappar kontrollen.',
   benefits: [
-    { title: 'Lisa fångar nästa kund', body: 'Nya och missade samtal blir kund, lead och affär. När du inte hann svara återkopplar Lisa via SMS.' },
+    { title: 'Lisa fångar nästa kund', body: 'När telefonkanalen är aktiverad och verifierad kan missade samtal följas upp via SMS och gå vidare som kundinflöde med rätt kontroll.' },
     { title: 'Specialisterna arbetar i samma verklighet', body: 'Kundkontakt, offert, projekt och fakturering delar sammanhang — inte fem separata AI-chattar.' },
     { title: 'Matte håller ihop arbetet', body: 'Du behöver inte veta vilken agent eller meny som äger frågan. Beskriv utfallet du vill nå.' },
   ],
