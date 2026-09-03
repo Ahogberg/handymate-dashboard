@@ -99,6 +99,7 @@ jobs:
           tests/e2e-onboarding-fresh.spec.ts
           tests/transcription.spec.ts
           tests/launch-preflight.spec.ts
+          tests/google-revoke.spec.ts
           tests/veckopuls.spec.ts
             tests/launch-desk-kallkrav.spec.ts
           --no-deps

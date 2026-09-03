@@ -87,6 +87,45 @@ export async function refreshGoogleToken(refreshToken: string): Promise<{
 }
 
 /**
+ * Återkallar Handymates behörighet hos Google (2026-09-03).
+ *
+ * Frånkopplingen raderade kopplingsraden hos oss men lämnade behörigheten kvar
+ * i användarens Google-konto — den låg under "Appar med åtkomst till ditt
+ * konto" tills användaren själv plockade bort den. För den som kopplat bort
+ * betyder "bortkopplad" rimligen att åtkomsten upphör i BÅDA ändar, och det är
+ * också vad integritetspolicyn utlovar inför OAuth-verifieringen.
+ *
+ * Google återkallar hela beviljandet när man skickar antingen access- eller
+ * refresh-token. Refresh-token är att föredra: access-token har ofta redan
+ * hunnit gå ut, och en utgången token går inte att återkalla.
+ *
+ * Kastar aldrig. En misslyckad återkallning får inte hindra att raden raderas
+ * hos oss — då hade användaren fastnat med en koppling de bett om att bli av
+ * med. Utfallet returneras så anroparen kan logga det.
+ */
+export async function revokeGoogleAccess(token: string): Promise<{ ok: boolean; error?: string }> {
+  const rensad = (token || '').trim()
+  if (!rensad) return { ok: false, error: 'ingen token att återkalla' }
+
+  try {
+    const res = await fetch('https://oauth2.googleapis.com/revoke', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ token: rensad }),
+    })
+
+    // 200 = återkallad. 400 betyder i praktiken att token redan var ogiltig
+    // eller återkallad — slutläget är det vi ville ha, så det räknas som ok.
+    if (res.ok || res.status === 400) return { ok: true }
+
+    const text = await res.text().catch(() => '')
+    return { ok: false, error: `Google svarade ${res.status}: ${text.slice(0, 120)}` }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
  * Get user's calendar list
  */
 export async function getCalendarList(accessToken: string): Promise<Array<{
