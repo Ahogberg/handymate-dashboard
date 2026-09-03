@@ -97,6 +97,7 @@ jobs:
           tests/onboarding-lifecycle.spec.ts
           tests/onboarding-selfhealing.spec.ts
           tests/e2e-onboarding-fresh.spec.ts
+          tests/transcription.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

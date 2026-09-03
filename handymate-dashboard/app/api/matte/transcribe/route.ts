@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { recordCost } from '@/lib/costs/record'
-import { whisperCostOre } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
+import { transcribe } from '@/lib/transcription/transcribe'
+import { laddaVokabular } from '@/lib/transcription/vocabulary'
 
 export const maxDuration = 30
 
@@ -41,49 +41,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Filen är för stor (max 25 MB)' }, { status: 400 })
     }
 
-    // Forward to OpenAI Whisper
-    const whisperForm = new FormData()
-    whisperForm.append('file', file, file.name || 'audio.m4a')
-    whisperForm.append('model', 'whisper-1')
-    whisperForm.append('language', 'sv')
-    // verbose_json ger en FAKTISK ljudlängd (Whisper mäter, gissar inte ur
-    // filstorlek) — det är vad som gör den mätbar, se app/api/voice/transcribe/route.ts.
-    whisperForm.append('response_format', 'verbose_json')
-
-    const res = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: whisperForm,
+    // Delad transkribering (lib/transcription). Ensamtalaryta: ingen
+    // diarisering, men egennamnsprompten väger tungt — det är här ägaren
+    // dikterar kundnamn, ortsnamn och artiklar.
+    const vocabulary = await laddaVokabular(supabase, business.business_id)
+    const resultat = await transcribe(supabase, business.business_id, {
+      yta: 'matte',
+      file,
+      filename: file.name || 'audio.m4a',
+      vocabulary,
+      refType: 'matte_transcribe',
+      refId: `matte_transcribe_${Date.now()}`,
     })
 
-    if (!res.ok) {
-      const err = await res.text()
-      console.error('[matte/transcribe] Whisper error:', err)
-      return NextResponse.json(
-        { error: 'Kunde inte transkribera ljudet' },
-        { status: 500 }
-      )
+    // Vakten: hellre "inget tal hittades" än en hallucination som skickas
+    // vidare in i Matte-chatten som om ägaren hade sagt den.
+    if (resultat.avvisad) {
+      return NextResponse.json({ text: '', error: resultat.avvisad.meddelande }, { status: 422 })
     }
-
-    const data = await res.json()
-
-    const ljudSekunder = Number(data.duration) || 0
-    if (ljudSekunder > 0) {
-      await recordCost({
-        supabase,
-        businessId: business.business_id,
-        resource: 'whisper',
-        units: ljudSekunder,
-        costOre: whisperCostOre(ljudSekunder),
-        refType: 'matte_transcribe',
-        refId: `matte_transcribe_${Date.now()}`,
-      })
+    if (!resultat.ok) {
+      console.error('[matte/transcribe] transkribering misslyckades:', resultat.error)
+      return NextResponse.json({ error: 'Kunde inte transkribera ljudet' }, { status: 500 })
     }
 
     return NextResponse.json({
-      text: data.text || '',
+      text: resultat.text,
     })
   } catch (error: any) {
     console.error('[matte/transcribe] Error:', error)

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { recordCost } from '@/lib/costs/record'
-import { whisperCostOre } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { transcribe } from '@/lib/transcription/transcribe'
+import { laddaVokabular } from '@/lib/transcription/vocabulary'
 
 export const maxDuration = 300
 
@@ -121,36 +121,53 @@ export async function POST(request: NextRequest) {
     const audioBuffer = await audioResponse.arrayBuffer()
     const audioBlob = new Blob([audioBuffer], { type: 'audio/wav' })
 
-    // Skicka till OpenAI Whisper för transkribering
-    const formData = new FormData()
-    formData.append('file', audioBlob, 'recording.wav')
-    formData.append('model', 'whisper-1')
-    formData.append('language', 'sv') // Svenska
-
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${OPENAI_API_KEY}`
-      },
-      body: formData
+    // Transkriberingen går via den delade modulen (lib/transcription): samma
+    // motorval, samma egennamnsprompt och samma hallucinationsvakt som möten,
+    // Matte och JobBuddy. Kostnaden bokförs där, en gång per anrop.
+    const vocabulary = await laddaVokabular(supabase, recording.business_id, recording.customer_id)
+    const resultat = await transcribe(supabase, recording.business_id, {
+      yta: 'samtal',
+      file: audioBlob,
+      filename: 'recording.wav',
+      knownDurationSeconds: Number(recording.duration_seconds) || 0,
+      vocabulary,
+      refType: 'call_recording',
+      refId: recording_id,
     })
 
-    if (!whisperResponse.ok) {
-      const errorText = await whisperResponse.text()
-      throw new Error(`Whisper API error: ${whisperResponse.status} - ${errorText}`)
+    // Vakten sa nej: tystnad eller en känd Whisper-artefakt. Spara ANLEDNINGEN
+    // i stället för texten — inget transkript, ingen analys, inga kort byggda
+    // på en hallucination. Samtalsvyn kan säga det i klartext.
+    if (resultat.avvisad) {
+      await supabase
+        .from('call_recording')
+        .update({ transcript: null, transcribed_at: new Date().toISOString(), transcript_skipped_reason: resultat.avvisad.skal })
+        .eq('recording_id', recording_id)
+        .eq('business_id', recording.business_id)
+        .is('raw_deleted_at', null)
+      return NextResponse.json({
+        success: false,
+        transcribed: false,
+        recording_id,
+        reason: resultat.avvisad.skal,
+        error: resultat.avvisad.meddelande,
+      }, { status: 422 })
     }
 
-    const whisperResult = await whisperResponse.json()
-    const transcript = whisperResult.text
-
-    if (typeof transcript !== 'string' || !transcript.trim()) throw new Error('Inget tal kunde transkriberas.')
+    if (!resultat.ok) throw new Error(resultat.error || 'Inget tal kunde transkriberas.')
+    const transcript = resultat.text
 
     // Spara transkriptet i databasen
     const { data: savedTranscript, error: updateError } = await supabase
       .from('call_recording')
       .update({
         transcript: transcript,
-        transcribed_at: new Date().toISOString()
+        transcribed_at: new Date().toISOString(),
+        // Talaruppmärkta segment när diariseringsmotorn användes — det är
+        // dessa som låter analysen skilja på vad hantverkaren lovade och vad
+        // kunden bad om. NULL när motorn inte ger segment (sql/v210).
+        transcript_segments: resultat.segments,
+        transcript_skipped_reason: null,
       })
       .eq('recording_id', recording_id)
       .eq('business_id', recording.business_id)
@@ -161,28 +178,11 @@ export async function POST(request: NextRequest) {
       throw new Error('Transkriptet kunde inte sparas. Ingen analys startades.')
     }
 
-    // ═══ WHISPER-KOSTNADEN BOKFÖRS (COGS-mätaren, 2026-08-08) ═══
-    //
-    // Detta är enda Whisper-anropet i kedjan med KÄND ljudlängd
-    // (recording.duration_seconds) och enda som skalar med kundvolym — de tre
-    // användarinitierade (matte/transcribe, jobbuddy/voice,
-    // quotes/transcribe-voice) lämnas medvetet omätta: att estimera längd ur
-    // filstorlek ger ett tal som ser exakt ut utan att vara det.
-    //
-    // Idempotens-checken högre upp (returnerar tidigt om transcript redan
-    // finns) gör att en retry inte dubbelbokför.
-    const ljudSekunder = Number(recording.duration_seconds) || 0
-    if (ljudSekunder > 0) {
-      await recordCost({
-        supabase,
-        businessId: recording.business_id,
-        resource: 'whisper',
-        units: ljudSekunder,
-        costOre: whisperCostOre(ljudSekunder),
-        refType: 'call_recording',
-        refId: recording_id,
-      })
-    }
+    // Whisper-kostnaden bokförs i lib/transcription/transcribe.ts, en gång per
+    // anrop och med samma refType som förut ('call_recording' — mappad i
+    // REF_TYPE_BUCKET, lib/costs/fuel.ts). Idempotens-checken högre upp
+    // (returnerar tidigt om transcript redan finns) gör att en retry inte
+    // dubbelbokför.
 
     // ═══ EN MOTTAGARE, REVIEW-FIRST (prelaunch Voice V1) ═══
     //

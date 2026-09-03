@@ -24,8 +24,8 @@
 import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { assembleTranscript, type TranscriptSegment } from './assemble-transcript'
-import { recordCost } from '@/lib/costs/record'
-import { whisperCostOre } from '@/lib/costs/meter'
+import { transcribe } from '@/lib/transcription/transcribe'
+import { laddaVokabular } from '@/lib/transcription/vocabulary'
 
 const BUCKET = 'meeting-audio'
 
@@ -293,41 +293,54 @@ async function transcribeSegment(
   }
 
   const ext = segment.storage_path.toLowerCase().endsWith('.mp4') ? 'mp4' : 'webm'
-  const whisperForm = new FormData()
-  whisperForm.append('file', blob, `${segment.seq}.${ext}`)
-  whisperForm.append('model', 'whisper-1')
-  whisperForm.append('language', 'sv')
-  whisperForm.append('response_format', 'verbose_json')
 
-  let whisperRes: Response
-  try {
-    whisperRes = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` },
-      body: whisperForm,
-    })
-  } catch (fetchErr: any) {
-    console.error('[meeting-worker] Whisper-anropet kastade:', segment.id, fetchErr?.message)
-    await bumpRetry(supabase, segment, fetchErr?.message || 'Whisper-anropet misslyckades')
+  // Delad transkribering (lib/transcription): samma motorval, egennamnsprompt
+  // och hallucinationsvakt som samtalsvägen. Kostnaden bokförs där.
+  const vocabulary = await laddaVokabular(supabase, businessId)
+  const resultat = await transcribe(supabase, businessId, {
+    yta: 'mote',
+    file: blob,
+    filename: `${segment.seq}.${ext}`,
+    knownDurationSeconds: segment.duration_seconds || 0,
+    vocabulary,
+    refType: 'meeting_segment',
+    refId: segment.id,
+  })
+
+  // Vakten sa nej — tystnad eller en känd artefakt. Segmentet markeras som
+  // transkriberat med en ÄRLIG anledning i stället för att retrias i evighet:
+  // ett tyst segment blir inte mindre tyst av ett omförsök. assembleTranscript
+  // hoppar över segment utan text precis som förut.
+  if (resultat.avvisad) {
+    const { error: skipError } = await supabase
+      .from('meeting_segment')
+      .update({
+        status: 'transcribed',
+        transcript: '',
+        whisper_segments: null,
+        transcript_skipped_reason: resultat.avvisad.skal,
+        error: null,
+      })
+      .eq('id', segment.id)
+    if (skipError) {
+      console.error('[meeting-worker] kunde inte spara avvisat segment:', segment.id, skipError.message)
+    }
     return
   }
 
-  if (!whisperRes.ok) {
-    const errText = await whisperRes.text().catch(() => '')
-    console.error('[meeting-worker] Whisper-fel:', segment.id, whisperRes.status, errText)
-    await bumpRetry(supabase, segment, `Whisper ${whisperRes.status}: ${errText.slice(0, 200)}`)
+  if (!resultat.ok) {
+    console.error('[meeting-worker] transkribering misslyckades:', segment.id, resultat.error)
+    await bumpRetry(supabase, segment, resultat.error || 'Transkriberingen misslyckades')
     return
   }
 
-  const result = await whisperRes.json().catch(() => null)
-  const text: string = typeof result?.text === 'string' ? result.text : ''
-  const whisperSegments = Array.isArray(result?.segments)
-    ? result.segments.map((s: { start: number; end: number; text: string }) => ({
-        start: s.start,
-        end: s.end,
-        text: s.text,
-      }))
+  const text = resultat.text
+  const whisperSegments = resultat.segments
+    ? resultat.segments.map(s => ({ start: s.start, end: s.end, text: s.text }))
     : null
+  // Talarna sparas separat så whisper_segments behåller sin form — två fält,
+  // ingen migrering av gammal data (sql/v210).
+  const speakerSegments = resultat.harTalare ? resultat.segments : null
 
   const { error: updateError } = await supabase
     .from('meeting_segment')
@@ -335,6 +348,8 @@ async function transcribeSegment(
       status: 'transcribed',
       transcript: text,
       whisper_segments: whisperSegments,
+      speaker_segments: speakerSegments,
+      transcript_skipped_reason: null,
       error: null,
     })
     .eq('id', segment.id)
@@ -348,19 +363,9 @@ async function transcribeSegment(
     return
   }
 
-  // Whisper-kostnaden bokförs — samma mätare som telefoni-/platsbesöksvägen.
-  const durationSeconds = segment.duration_seconds || 0
-  if (durationSeconds > 0) {
-    await recordCost({
-      supabase,
-      businessId,
-      resource: 'whisper',
-      units: durationSeconds,
-      costOre: whisperCostOre(durationSeconds),
-      refType: 'meeting_segment',
-      refId: segment.id,
-    })
-  }
+  // Whisper-kostnaden bokförs i lib/transcription/transcribe.ts — samma
+  // mätare och samma refType ('meeting_segment') som förut, men på ett ställe
+  // för alla fyra transkriberingsytor.
 
   // RETENTIONSREGELN: ljudet är en transient buffert — bara texten består.
   // Best effort: en misslyckad radering blockerar aldrig transkriberingen,

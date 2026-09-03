@@ -103,6 +103,12 @@ async function extraheraFyndFranChunk(
   chunk: string,
   chunkIndex: number,
   totalChunks: number,
+  /**
+   * Samtalets datum (YYYY-MM-DD). Utan ankaret kan modellen INTE räkna ut vad
+   * "på fredag" betyder — prompten bad om ett datum den saknade underlag för,
+   * och promise-bevakningen (due_at, cron-svepet) stod därför tom.
+   */
+  samtalsdatum: string,
 ): Promise<{ fynd: MapReduceFynd[]; usage: Anthropic.Usage | null }> {
   const prompt = `Du analyserar DEL ${chunkIndex + 1} av ${totalChunks} av ett transkript från ett hantverkarmöte (platsbesök hos kund). Transkriptdelen innehåller tidsstämpel-markörer som "[mm:ss]" eller "[h:mm:ss]" på egna rader.
 
@@ -133,6 +139,8 @@ Regler för "customer_fact" (striktare än övriga typer):
 - ENDAST för fact_type "commitment": nämns ett datum eller en tidsram
   EXPLICIT för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") —
   sätt "due_date_iso" till det datumet i formatet YYYY-MM-DD.
+  Samtalet ägde rum ${samtalsdatum} — räkna ut relativa uttryck ("på fredag",
+  "imorgon", "om två veckor") mot DET datumet, inte mot något annat.
   Gissa ALDRIG ett datum om det inte uttryckligen sades — sätt då
   "due_date_iso" till null. För övriga fact_types: utelämna fältet helt.
 - SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
@@ -241,13 +249,15 @@ async function runMeetingMapReduce(params: {
   transcript: string
   businessId: string
   recordingId: string
+  /** Samtalets datum (YYYY-MM-DD) — ankaret för relativa löftesdatum. */
+  samtalsdatum: string
 }): Promise<Anthropic.Message> {
-  const { anthropic, supabase, model, transcript, businessId, recordingId } = params
+  const { anthropic, supabase, model, transcript, businessId, recordingId, samtalsdatum } = params
   const chunks = splitTranscript(transcript)
 
   const alltFynd: MapReduceFynd[] = []
   for (let i = 0; i < chunks.length; i++) {
-    const { fynd, usage } = await extraheraFyndFranChunk(anthropic, model, chunks[i], i, chunks.length)
+    const { fynd, usage } = await extraheraFyndFranChunk(anthropic, model, chunks[i], i, chunks.length, samtalsdatum)
     alltFynd.push(...fynd)
 
     // COGS: varje MAP-anrop mäts för sig — annars syns bara sista/enda
@@ -430,6 +440,16 @@ export async function POST(request: NextRequest) {
     // föreslås, återuppringning är meningslös (de stod bredvid varandra).
     // Kolumnen kommer med sql/v102; saknas den är allt telefoni som förut.
     const arMote = recording.source === 'site_visit'
+
+    // Datumankaret för löften (Kundkoll-jämförelsen 2026-09-03). Prompten bad
+    // redan om ett YYYY-MM-DD för "senast fredag", men modellen fick aldrig
+    // veta vilken dag samtalet ägde rum — den KUNDE alltså inte räkna ut det,
+    // samtidigt som prompten (rätteligen) förbjuder den att gissa. Följden var
+    // att due_date_iso i praktiken alltid blev null och promise_deadlines-
+    // bevakningen stod tom trots att hela kedjan fanns byggd.
+    // Inspelningens egen tidpunkt, inte serverns "nu" — en analys som körs om
+    // i efterhand ska räkna mot samtalet, inte mot omkörningsdagen.
+    const samtalsdatum = new Date(recording.created_at || Date.now()).toISOString().slice(0, 10)
     // "Ring via Handymate" (2026-09-01): utgående samtal spelas in med kunden
     // som A-ben. Kunden är alltid känd (raden skapades före uppringningen) —
     // därför ingen lead-/deal-kvalificering och ingen "ring tillbaka".
@@ -534,8 +554,11 @@ affären framåt efter besöket:
   eller "contact", och citera ordagrant i source_text.
   ENDAST för fact_type "commitment": nämns ett datum eller en tidsram
   EXPLICIT för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") —
-  sätt "due_date_iso" till det datumet (YYYY-MM-DD). Gissa ALDRIG ett datum
-  om det inte uttryckligen sades — sätt då "due_date_iso" till null.
+  sätt "due_date_iso" till det datumet (YYYY-MM-DD). Samtalet ägde rum
+  ${samtalsdatum} — räkna ut relativa uttryck ("på fredag", "imorgon",
+  "om två veckor") mot DET datumet, aldrig mot något annat.
+  Gissa ALDRIG ett datum om det inte uttryckligen sades — sätt då
+  "due_date_iso" till null.
   SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
   nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
   sägs uttryckligen. Hoppa över det helt.
@@ -571,8 +594,11 @@ utifrån transkriptet ALDRIG. ${arUtgaende
   eller "contact", och citera ordagrant i source_text.
   ENDAST för fact_type "commitment": nämns ett datum eller en tidsram
   EXPLICIT för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") —
-  sätt "due_date_iso" till det datumet (YYYY-MM-DD). Gissa ALDRIG ett datum
-  om det inte uttryckligen sades — sätt då "due_date_iso" till null.
+  sätt "due_date_iso" till det datumet (YYYY-MM-DD). Samtalet ägde rum
+  ${samtalsdatum} — räkna ut relativa uttryck ("på fredag", "imorgon",
+  "om två veckor") mot DET datumet, aldrig mot något annat.
+  Gissa ALDRIG ett datum om det inte uttryckligen sades — sätt då
+  "due_date_iso" till null.
   SÄKERHET: extrahera ALDRIG åtkomstkoder — portkoder, larmkoder,
   nyckelgömmor, lösenord eller liknande. Sådant får inte lagras, även om det
   sägs uttryckligen. Hoppa över det helt.`}
@@ -655,6 +681,7 @@ Svara ENDAST med JSON i följande format:
           transcript: recording.transcript,
           businessId: recording.business_id,
           recordingId: recording_id,
+          samtalsdatum,
         })
       : await anthropic.messages.create({
           // Post-call analys av transkript — background extraction (kunden har redan

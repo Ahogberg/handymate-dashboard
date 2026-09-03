@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import Anthropic from '@anthropic-ai/sdk'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkAiApiRateLimit } from '@/lib/auth'
-import { recordCost } from '@/lib/costs/record'
-import { whisperCostOre } from '@/lib/costs/meter'
+import { transcribe } from '@/lib/transcription/transcribe'
+import { laddaVokabular } from '@/lib/transcription/vocabulary'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 import { checkFuelGate } from '@/lib/costs/fuel'
@@ -45,45 +45,33 @@ export async function POST(request: NextRequest) {
     // Sonnet-kostnadsraderna nedan så de går att koppla ihop i cost_event.
     const requestId = `jobbuddy_voice_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
 
-    // Step 1: Transcribe with Whisper. response_format=verbose_json ger en
-    // FAKTISK ljudlängd (Whisper mäter den, gissar inte ur filstorlek) —
-    // det var just den skillnaden som höll den här routen omätt tidigare
-    // (se app/api/voice/transcribe/route.ts, som varnar för att uppskatta
-    // längd ur filstorlek).
+    // Step 1: transkribera via den delade modulen (lib/transcription).
+    // Ensamtalaryta som Matte-röstläget: ingen diarisering, men
+    // egennamnsprompten gör skillnad — hantverkaren dikterar kundnamn,
+    // ortsnamn och artiklar i fält.
     const audioBuffer = Buffer.from(await audioFile.arrayBuffer())
-    const whisperFormData = new FormData()
-    whisperFormData.append('file', new Blob([audioBuffer], { type: audioFile.type }), 'recording.webm')
-    whisperFormData.append('model', 'whisper-1')
-    whisperFormData.append('language', 'sv')
-    whisperFormData.append('response_format', 'verbose_json')
-
-    const whisperResponse = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
-      },
-      body: whisperFormData,
+    const supabaseForTranscription = getServerSupabase()
+    const vocabulary = await laddaVokabular(supabaseForTranscription, authBusiness.business_id)
+    const resultat = await transcribe(supabaseForTranscription, authBusiness.business_id, {
+      yta: 'jobbuddy',
+      file: new Blob([audioBuffer], { type: audioFile.type }),
+      filename: 'recording.webm',
+      vocabulary,
+      refType: 'jobbuddy_voice',
+      refId: requestId,
     })
 
-    if (!whisperResponse.ok) {
+    // Vakten: tystnad eller en känd artefakt går inte vidare som om
+    // hantverkaren hade sagt något.
+    if (resultat.avvisad) {
+      return NextResponse.json({ transcript: '', error: resultat.avvisad.meddelande }, { status: 422 })
+    }
+    if (!resultat.ok) {
+      console.error('[jobbuddy/voice] transkribering misslyckades:', resultat.error)
       return NextResponse.json({ error: 'Transcription failed' }, { status: 500 })
     }
 
-    const whisperData = await whisperResponse.json()
-    const transcript = whisperData.text
-
-    const ljudSekunder = Number(whisperData.duration) || 0
-    if (ljudSekunder > 0) {
-      await recordCost({
-        supabase: getServerSupabase(),
-        businessId: authBusiness.business_id,
-        resource: 'whisper',
-        units: ljudSekunder,
-        costOre: whisperCostOre(ljudSekunder),
-        refType: 'jobbuddy_voice',
-        refId: requestId,
-      })
-    }
+    const transcript = resultat.text
 
     // Matte-flytten (Andreas 2026-08-03): hörnbubblan skickar transcribe_only
     // och matar transkriptet genom /api/matte/chat (multi-agent, dirigering,
