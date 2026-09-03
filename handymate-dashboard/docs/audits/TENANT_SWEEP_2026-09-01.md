@@ -57,3 +57,21 @@ endast läser de befintliga driftkällorna till plattformens Support & drift-vy.
 - Ett facit på main var rött redan före passet (`cogs-matare`: tredje
   `bokforMatteUsage`-grenen tillkom i efb8d69) — uppdaterat till 3.
 - `next build`: se rapporten i chatten
+
+## Tillägg 2026-09-03 — lanseringsprovets infrastruktur
+
+`app/api/admin/launch-preflight` tillkom: en adminspärrad förkravssond som
+läser saldo, domän- och tokenstatus hos leverantörerna inför ett bevisprotokoll
+(`docs/launch/evidence/README.md`).
+
+Ingen tenant-kontext, avsiktligt — den svarar på om *plattformen* är redo att
+provas, inte på något om ett enskilt företag. Grindad med `isAdmin` som övriga
+`admin/*`. Läsande enbart: den skickar aldrig SMS eller mejl.
+
+Ruttinventeringen: **577 rutter, 143 utanför standardgrinden** (räknat
+2026-09-03, `tests/facit-route-auth-inventory.spec.ts`).
+
+Sonden finns för att `evaluateLaunchEnvironment` bara kontrollerar att
+miljövariabler är satta. Mätt samma dag mot prod: `ELKS_API_USER: ✅ Set`
+samtidigt som 46elks svarade *"Not enough credits on your account"* — hela
+Grind B blockerad medan env-checken rapporterade grönt.

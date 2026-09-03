@@ -173,6 +173,8 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // support-operations-rutten → 142. Talet är RÄKNAT efter cherry-picken,
   // inte adderat på höft: de två grenarna räknade var sin delmängd av
   // rutterna och båda taken var för låga för det sammanslagna trädet.
+  // 2026-09-03 (lanseringsprovets infrastruktur): admin/launch-preflight —
+  // adminspärrad förkravssond, ingen tenant-kontext → 143.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(142)
+  expect(utanStandard.length).toBeLessThanOrEqual(143)
 })

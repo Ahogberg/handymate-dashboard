@@ -23,3 +23,7 @@ scripts/scraping/output/*.csv
 docs/marketing/recordings/*/
 docs/marketing/reference-pack/assets/
 docs/marketing/*.zip
+
+# Färskkontoprovets utfallsfil — en körningsartefakt, inte källkod.
+# Ifyllda bevisprotokoll (docs/launch/evidence/*.md) checkas DÄREMOT in.
+docs/launch/evidence/fresh-account-senaste.json

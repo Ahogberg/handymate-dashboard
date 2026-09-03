@@ -18,7 +18,7 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/],
+  testIgnore: [/.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /.*\.launch\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/, /tests[\\/]launch[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
@@ -190,6 +190,22 @@ export default defineConfig({
       testMatch: /f\d\d-.*\.spec\.ts/,
       testIgnore: [],
       timeout: 240_000,
+      retries: 0,
+      use: { storageState: { cookies: [], origins: [] } },
+    },
+    // ── Färskkontoprovet (LAUNCH_TEST_SUITE §9) ──────────────────────────
+    // Skapar HELT NYA företag i produktion och kör kedjan registrering →
+    // offert → projekt. Körs aldrig av standardsviten: egen testDir som
+    // ligger utanför de andra projektens testMatch, och kräver dessutom
+    // LAUNCH_PROOF_LIVE=1 för att göra något alls (utan flaggan rapporterar
+    // den torrläge och skippar). Blank storageState — provet ska logga in
+    // som det nya kontot, inte ärva testanvändarens session.
+    {
+      name: 'launch-proof',
+      testDir: './tests/launch',
+      testMatch: /.*\.launch\.spec\.ts/,
+      testIgnore: [],
+      timeout: 180_000,
       retries: 0,
       use: { storageState: { cookies: [], origins: [] } },
     },
