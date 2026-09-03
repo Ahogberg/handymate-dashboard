@@ -119,15 +119,106 @@ function channel(value: string): GtmChannel {
   return map[normalized] || 'none'
 }
 
-export function parseLaunchCsv(text: string): GtmAccountInput[] {
+/**
+ * Varför en rad avvisades. Texten visas rakt av för den som importerar, så
+ * den ska säga vad som ska rättas — inte vilket fält som var tomt.
+ */
+export interface AvvisadRad {
+  rad: number          // radnummer i filen, 1-indexerat inklusive rubrikraden
+  namn: string         // företagsnamnet om det fanns, annars '(namn saknas)'
+  skal: string
+}
+
+export interface GranskadCsv {
+  giltiga: GtmAccountInput[]
+  avvisade: AvvisadRad[]
+}
+
+/** Kall kontakt = allt utom inkommande förfrågan och en varm relation. Det är
+ *  där bolagsformen är materiell: en enskild firma ÄR en fysisk person och
+ *  organisationsnumret är personnumret. */
+const VARMA_GRUNDER = ['inbound', 'warm_intro', 'customer_referral']
+
+/**
+ * Granskar en CSV och skiljer giltiga rader från avvisade, med skäl.
+ *
+ * Bakgrund (2026-09-03): tidigare krävdes bara `company_name`. Två hål:
+ *
+ *  1. Saknades `source_checked_at` byggde importrutten
+ *     `new Date(new Date('').getTime() + 180 dagar).toISOString()` — vilket
+ *     kastar `RangeError: Invalid time value` och fäller HELA importen, utan
+ *     att säga vilken rad eller vilket fält som saknades.
+ *  2. `source_name: ''` uppfyller kolumnens NOT NULL (tom sträng är inte
+ *     null), så en rad helt utan källhänvisning kunde landa i basen och se
+ *     komplett ut. Det är precis den efterlevnadsskuld fältet finns för att
+ *     förhindra — hundra rader går att städa, tiotusen gör det inte.
+ *
+ * Ren funktion. Ingen I/O.
+ */
+export function granskaLaunchCsv(text: string): GranskadCsv {
   const rows = parseCsvRows(text)
-  if (rows.length < 2) return []
+  if (rows.length < 2) return { giltiga: [], avvisade: [] }
   const headers = rows[0].map(canonicalHeader)
-  return rows.slice(1).flatMap(values => {
+
+  const giltiga: GtmAccountInput[] = []
+  const avvisade: AvvisadRad[] = []
+
+  rows.slice(1).forEach((values, index) => {
+    const radnummer = index + 2 // +1 för rubrikraden, +1 för 1-indexering
     const record: Record<string, string> = {}
-    headers.forEach((header, index) => { record[header] = values[index] || '' })
-    if (!record.company_name?.trim()) return []
-    return [{
+    headers.forEach((header, i) => { record[header] = values[i] || '' })
+    const namn = record.company_name?.trim() || '(namn saknas)'
+
+    if (!record.company_name?.trim()) {
+      avvisade.push({ rad: radnummer, namn, skal: 'Företagsnamn saknas' })
+      return
+    }
+    if (!record.source_name?.trim()) {
+      avvisade.push({ rad: radnummer, namn, skal: 'Källa saknas — varifrån kommer uppgiften?' })
+      return
+    }
+
+    const kontrolldatum = record.source_checked_at?.trim()
+    if (!kontrolldatum) {
+      avvisade.push({ rad: radnummer, namn, skal: 'Kontrolldatum saknas — när kontrollerades källan?' })
+      return
+    }
+    const parsat = new Date(kontrolldatum)
+    if (Number.isNaN(parsat.getTime())) {
+      avvisade.push({ rad: radnummer, namn, skal: `Kontrolldatumet går inte att tolka: "${kontrolldatum}"` })
+      return
+    }
+    // Ett datum i framtiden är alltid ett skrivfel — man kan inte ha
+    // kontrollerat en källa imorgon. Dygnets marginal tål tidszonsslarv.
+    if (parsat.getTime() > Date.now() + 24 * 60 * 60 * 1000) {
+      avvisade.push({ rad: radnummer, namn, skal: `Kontrolldatumet ligger i framtiden: "${kontrolldatum}"` })
+      return
+    }
+
+    const grund = contactBasis(record.contact_basis || '')
+    const form = legalForm(record.legal_form || '')
+    if (form === 'unknown' && !VARMA_GRUNDER.includes(grund)) {
+      avvisade.push({
+        rad: radnummer,
+        namn,
+        skal: 'Bolagsform okänd. Krävs för kall kontakt — enskild firma är en fysisk person.',
+      })
+      return
+    }
+
+    giltiga.push(byggRad(record))
+  })
+
+  return { giltiga, avvisade }
+}
+
+export function parseLaunchCsv(text: string): GtmAccountInput[] {
+  return granskaLaunchCsv(text).giltiga
+}
+
+function byggRad(record: Record<string, string>): GtmAccountInput {
+  {
+    return {
       company_name: record.company_name,
       org_number: record.org_number || null,
       legal_form: legalForm(record.legal_form || ''),
@@ -151,6 +242,6 @@ export function parseLaunchCsv(text: string): GtmAccountInput[] {
       primary_contact_linkedin: record.primary_contact_linkedin || null,
       contact_basis: contactBasis(record.contact_basis || ''),
       suggested_channel: channel(record.suggested_channel || ''),
-    }]
-  })
+    }
+  }
 }

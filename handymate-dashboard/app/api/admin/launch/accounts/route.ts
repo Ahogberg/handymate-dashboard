@@ -3,7 +3,7 @@ import { getAdminSupabase, isAdmin, logAdminAction } from '@/lib/admin-auth'
 import { deriveFunnel } from '@/lib/launch-desk/funnel'
 import { normalizeAccountBatch } from '@/lib/launch-desk/normalize'
 import { recommendChannel } from '@/lib/launch-desk/policy'
-import { GTM_STATUSES, type GtmStatus } from '@/lib/launch-desk/types'
+import { GTM_STATUSES, type GtmStatus, type GtmAccountInput } from '@/lib/launch-desk/types'
 import { arSchemaSaknas } from '@/lib/observability/driftlarm'
 
 export const dynamic = 'force-dynamic'
@@ -99,8 +99,32 @@ export async function POST(request: NextRequest) {
 
   const duplicates: string[] = []
   const blocked: string[] = []
+  const ogiltiga: Array<{ namn: string; skal: string }> = []
   const seenOrgNumbers = new Set<string>()
+
+  // Källkravet gäller HÄR, inte bara i CSV-parsern. Klienten kan hoppas över
+  // — en handskriven POST når den här rutten direkt, och en automatiserad
+  // källa kommer aldrig gå via filuppladdningen alls.
+  //
+  // Utan det här kraschade rutten på en rad utan source_checked_at:
+  // new Date(new Date('').getTime() + 180 dagar).toISOString() kastar
+  // RangeError och fäller HELA importen, utan att säga vilken rad det var.
+  const kallaSaknas = (account: GtmAccountInput): string | null => {
+    if (!account.source_name?.trim()) return 'Källa saknas'
+    const datum = account.source_checked_at?.trim()
+    if (!datum) return 'Kontrolldatum saknas'
+    const parsat = new Date(datum)
+    if (Number.isNaN(parsat.getTime())) return `Kontrolldatumet går inte att tolka: "${datum}"`
+    if (parsat.getTime() > Date.now() + 24 * 60 * 60 * 1000) return `Kontrolldatumet ligger i framtiden: "${datum}"`
+    return null
+  }
+
   const rows = normalized.flatMap(account => {
+    const kallfel = kallaSaknas(account)
+    if (kallfel) {
+      ogiltiga.push({ namn: account.company_name, skal: kallfel })
+      return []
+    }
     const org = identifier(account.org_number)
     if (org && (existingOrgNumbers.has(org) || seenOrgNumbers.has(org))) {
       duplicates.push(account.company_name)
@@ -146,7 +170,7 @@ export async function POST(request: NextRequest) {
   })
 
   if (rows.length === 0) {
-    return NextResponse.json({ inserted: [], count: 0, duplicates, blocked })
+    return NextResponse.json({ inserted: [], count: 0, duplicates, blocked, ogiltiga })
   }
 
   const { data, error } = await supabase.from('gtm_account').insert(rows).select('*')
@@ -162,5 +186,5 @@ export async function POST(request: NextRequest) {
     source_names: Array.from(new Set(normalized.map(account => account.source_name))),
   })
 
-  return NextResponse.json({ inserted: data || [], count: data?.length || 0, duplicates, blocked }, { status: 201 })
+  return NextResponse.json({ inserted: data || [], count: data?.length || 0, duplicates, blocked, ogiltiga }, { status: 201 })
 }

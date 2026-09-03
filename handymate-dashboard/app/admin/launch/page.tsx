@@ -23,7 +23,7 @@ import {
   Trophy,
   X,
 } from 'lucide-react'
-import { parseLaunchCsv } from '@/lib/launch-desk/csv'
+import { granskaLaunchCsv, type AvvisadRad } from '@/lib/launch-desk/csv'
 import { channelPolicy } from '@/lib/launch-desk/policy'
 import { priorityScore } from '@/lib/launch-desk/scoring'
 import type { GtmSignalSnapshot } from '@/lib/launch-desk/signaler'
@@ -110,6 +110,7 @@ export default function LaunchDeskPage() {
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [importRows, setImportRows] = useState<unknown[]>([])
+  const [avvisadeRader, setAvvisadeRader] = useState<AvvisadRad[]>([])
   const [importing, setImporting] = useState(false)
   const [busy, setBusy] = useState(false)
   const [batchSignalsBusy, setBatchSignalsBusy] = useState(false)
@@ -346,9 +347,10 @@ export default function LaunchDeskPage() {
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Importen misslyckades')
-      setToast(`${data.count} prospekt importerade · ${data.duplicates?.length || 0} dubbletter · ${data.blocked?.length || 0} spärrade`)
+      setToast(`${data.count} prospekt importerade · ${data.duplicates?.length || 0} dubbletter · ${data.blocked?.length || 0} spärrade${data.ogiltiga?.length ? ` · ${data.ogiltiga.length} utan giltig källa` : ''}`)
       setImportOpen(false)
       setImportRows([])
+      setAvvisadeRader([])
       await loadAccounts()
     } catch (err: any) {
       setToast(err?.message || 'Importen misslyckades')
@@ -417,7 +419,8 @@ export default function LaunchDeskPage() {
 
       {selected && <AccountDrawer key={`${selected.id}:${selected.updated_at}`} account={selected} activities={activities} loading={detailsLoading} busy={busy} onClose={() => setSelected(null)} onBrief={prepareBrief} onReadSignals={readSignals} onReady={markReady} onSaveDetails={saveDetails} onLog={logOutcome} onSuppress={suppress} />}
 
-      {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold">Importera prospekt</h2><p className="mt-1 text-sm text-gray-500">CSV granskas och kvalificeras server-side. Spärrade kontakter hoppas över.</p></div><button onClick={() => setImportOpen(false)}><X className="h-5 w-5 text-gray-400" /></button></div><a href="/templates/handymate-launch-desk-import.csv" download className="mb-4 inline-flex text-sm font-medium text-primary-700 hover:underline">Ladda ned CSV-mall</a><label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-200 px-5 py-10 text-center hover:border-primary-300"><FileUp className="mb-3 h-7 w-7 text-primary-700" /><span className="font-medium">Välj CSV-fil</span><span className="mt-1 text-xs text-gray-500">Semikolon eller komma, högst 500 rader</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setImportRows(parseLaunchCsv(await file.text())) }} /></label>{importRows.length > 0 && <div className="mt-4 rounded-xl bg-primary-50 p-3 text-sm text-primary-800"><Check className="mr-2 inline h-4 w-4" />{importRows.length} rader redo för serverkontroll</div>}<div className="mt-6 flex justify-end gap-2"><button onClick={() => setImportOpen(false)} className="rounded-xl px-4 py-2.5 text-sm text-gray-600">Avbryt</button><button disabled={importRows.length === 0 || importing} onClick={importCsv} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{importing && <Loader2 className="h-4 w-4 animate-spin" />} Importera</button></div></div></div>}
+      {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold">Importera prospekt</h2><p className="mt-1 text-sm text-gray-500">CSV granskas och kvalificeras server-side. Spärrade kontakter hoppas över.</p></div><button onClick={() => setImportOpen(false)}><X className="h-5 w-5 text-gray-400" /></button></div><a href="/templates/handymate-launch-desk-import.csv" download className="mb-4 inline-flex text-sm font-medium text-primary-700 hover:underline">Ladda ned CSV-mall</a><label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-200 px-5 py-10 text-center hover:border-primary-300"><FileUp className="mb-3 h-7 w-7 text-primary-700" /><span className="font-medium">Välj CSV-fil</span><span className="mt-1 text-xs text-gray-500">Semikolon eller komma, högst 500 rader</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; const granskad = granskaLaunchCsv(await file.text()); setImportRows(granskad.giltiga); setAvvisadeRader(granskad.avvisade) }} /></label>{importRows.length > 0 && <div className="mt-4 rounded-xl bg-primary-50 p-3 text-sm text-primary-800"><Check className="mr-2 inline h-4 w-4" />{importRows.length} rader redo för serverkontroll</div>}
+{avvisadeRader.length > 0 && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div className="mb-2 font-medium">{avvisadeRader.length} rader tas inte med</div><ul className="max-h-40 space-y-1 overflow-y-auto">{avvisadeRader.slice(0, 25).map(rad => <li key={rad.rad} className="flex gap-2"><span className="shrink-0 tabular-nums text-amber-700">Rad {rad.rad}</span><span className="truncate font-medium">{rad.namn}</span><span className="text-amber-800">— {rad.skal}</span></li>)}</ul>{avvisadeRader.length > 25 && <div className="mt-2 text-xs text-amber-700">…och {avvisadeRader.length - 25} till. Rätta i filen och ladda upp igen.</div>}</div>}<div className="mt-6 flex justify-end gap-2"><button onClick={() => setImportOpen(false)} className="rounded-xl px-4 py-2.5 text-sm text-gray-600">Avbryt</button><button disabled={importRows.length === 0 || importing} onClick={importCsv} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{importing && <Loader2 className="h-4 w-4 animate-spin" />} Importera</button></div></div></div>}
     </div>
   )
 }
