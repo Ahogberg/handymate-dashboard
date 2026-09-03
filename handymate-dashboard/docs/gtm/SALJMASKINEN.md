@@ -231,24 +231,26 @@ en referens.
 
 ---
 
-## Provision
+## Vad "sålt" betyder
 
-Två regler, båda av samma skäl: provisionen ska inte äta den kassa som är hela
-poängen med att sälja år.
+Christoffer är medgrundare, inte säljare på provision. Incitamentet är redan
+rätt — han äger utfallet, inte transaktionen. Det behövs ingen konstruktion
+för att få honom att vilja ha kunder som stannar.
 
-1. **Betala ut över månader, inte direkt.** En årsprepay på 59 950 kr där 15 %
-   går ut samma vecka tar bort en sjättedel av det vi just säkrade.
-2. **Villkora på dag 60.** Full provision först när kunden fortfarande är kvar
-   efter två månader.
+Men **definitionen** är fortfarande värd att skriva ner, för den är lätt att
+glida på när det går trögt:
 
-Regel 2 gör att Christoffer säljer rätt saker till rätt personer utan att
-någon behöver kontrollera manuset. Han vill inte ha kunder som churnar, för
-han får inte betalt för dem.
+> En kund är såld när hon **fortfarande är kvar och aktiv på dag 60** —
+> inte när hon signerat.
 
-Maskineriet finns redan: `partner_commission_ledger`, självfakturering och
-utbetalningsbatchar (`partner_payout_batch`).
+Det låter som en formalitet. Det är det inte. Skillnaden avgör vad man gör en
+tisdag i november när pipen är tunn: jagar man en signatur till, eller ringer
+man kunden från förra månaden som slutat logga in? Med den här definitionen är
+svaret alltid det andra, utan att någon behöver ta diskussionen.
 
----
+Räkna därför alltid två tal bredvid varandra, aldrig bara det första:
+**signerade** och **aktiva på dag 60**. Glider de isär vet ni det direkt, och
+då är det inte fler samtal som saknas.
 
 ## Ett tal per fredag
 
