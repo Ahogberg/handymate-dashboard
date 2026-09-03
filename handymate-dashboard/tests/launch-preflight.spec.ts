@@ -94,6 +94,24 @@ test.describe('Resend-kontrollen', () => {
   })
 })
 
+test.describe('Stripe-läget — testnyckel i prod är inte klart', () => {
+  const src = kod('lib/launch/preflight.ts')
+
+  test('livemode:false blockerar, oavsett att credit-watch säger ok', () => {
+    // Första skarpa körningen 2026-09-03 visade att prod kör en TESTNYCKEL.
+    // credit-watch svarar 'ok' (nyckeln fungerar ju) — rätt för drift, fel för
+    // ett lanseringsprov. Gränsen måste ligga i sonden.
+    expect(src).toContain("r.key === 'stripe_key' && r.detail?.livemode === false")
+    expect(src).toContain('return blockerad'.replace('blockerad', "'blockerad'"))
+  })
+
+  test('orsaken säger vad som ska göras, inte bara att det är fel', () => {
+    expect(src).toContain('TESTNYCKEL')
+    expect(src).toContain('Byt till live-nyckeln före lansering')
+    expect(src).toContain('orsak: orsakFor(r)')
+  })
+})
+
 test.describe('källskanning — sonden bygger på credit-watch, inte vid sidan av', () => {
   const src = kod('lib/launch/preflight.ts')
 

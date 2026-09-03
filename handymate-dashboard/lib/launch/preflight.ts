@@ -72,11 +72,25 @@ export interface PreflightResultat {
 
 /** credit-watch: 'ok' → klar, 'error' → blockerad, 'warn' → blockerad om det rör kredit. */
 function franKreditbevakning(r: KontrollResultat): PreflightStatus {
+  // UNDANTAG som första skarpa körningen 2026-09-03 avslöjade: en Stripe-
+  // TESTNYCKEL i produktion får credit-watch att svara 'ok' — nyckeln fungerar
+  // ju, och för en drifthälsokoll är det rätt svar. För ett lanseringsprov är
+  // det motsatsen till klart: en produkt som ska ta betalt på riktigt kan inte
+  // köra på testnycklar. Sonden läser därför livemode och blockerar på false.
+  if (r.key === 'stripe_key' && r.detail?.livemode === false) return 'blockerad'
   if (r.status === 'ok') return 'klar'
   if (r.status === 'error') return 'blockerad'
   // 'warn' på saldo betyder "räcker inte länge till" — för ett provprotokoll
   // som ska skicka riktiga SMS är det blockerande, inte en varning.
   return r.key === 'elks_balance' ? 'blockerad' : 'okand'
+}
+
+/** Tydligare orsak än credit-watch:s drift-formulering, för protokollraden. */
+function orsakFor(r: KontrollResultat): string {
+  if (r.key === 'stripe_key' && r.detail?.livemode === false) {
+    return 'Stripe-nyckeln i den här miljön är en TESTNYCKEL — riktiga betalningar kan inte tas emot. Byt till live-nyckeln före lansering.'
+  }
+  return r.summary
 }
 
 const GRIND: Record<string, string> = {
@@ -262,7 +276,7 @@ export async function korPreflight(supabase: SupabaseClient): Promise<PreflightR
     grind: GRIND[r.key] || 'Grind A',
     label: ETIKETT[r.key] || r.key,
     status: franKreditbevakning(r),
-    orsak: r.summary,
+    orsak: orsakFor(r),
   }))
 
   // En kontroll som inte kom tillbaka från credit-watch är okänd, inte klar.
