@@ -167,6 +167,8 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // fem nya admin/cron-rutter utan tenant-kontext (isAdmin/verifyCronSecret
   // — cron/raddningsko, admin/raddningsko, admin/raddningsko/[id],
   // admin/raddningsko/manuell-fix, admin/launch-readiness/bevis) → 135.
+  // 2026-09-03 (veckopulsen, tasks/plan-veckopuls.md): en ny admin-rutt
+  // (admin/launch/veckopuls) — plattformsadmin, ingen tenant-kontext → 141.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(140)
+  expect(utanStandard.length).toBeLessThanOrEqual(141)
 })

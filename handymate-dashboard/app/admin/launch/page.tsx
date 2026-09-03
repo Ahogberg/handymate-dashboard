@@ -36,6 +36,7 @@ import type {
   GtmStatus,
   GtmSuppressionReason,
 } from '@/lib/launch-desk/types'
+import type { Veckopuls } from '@/lib/launch-desk/veckopuls'
 
 const STATUS_LABELS: Record<GtmStatus, string> = {
   imported: 'Importerad',
@@ -384,6 +385,8 @@ export default function LaunchDeskPage() {
           </div>
         </header>
 
+        <VeckopulsPanel />
+
         <section className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
           {cards.map(card => <div key={card.label} className="rounded-2xl border border-gray-200 bg-white p-4 shadow-sm"><card.icon className="mb-3 h-5 w-5 text-primary-700" /><p className="text-2xl font-bold">{card.value}</p><p className="text-xs text-gray-500">{card.label}</p></div>)}
         </section>
@@ -415,6 +418,108 @@ export default function LaunchDeskPage() {
       {selected && <AccountDrawer key={`${selected.id}:${selected.updated_at}`} account={selected} activities={activities} loading={detailsLoading} busy={busy} onClose={() => setSelected(null)} onBrief={prepareBrief} onReadSignals={readSignals} onReady={markReady} onSaveDetails={saveDetails} onLog={logOutcome} onSuppress={suppress} />}
 
       {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold">Importera prospekt</h2><p className="mt-1 text-sm text-gray-500">CSV granskas och kvalificeras server-side. Spärrade kontakter hoppas över.</p></div><button onClick={() => setImportOpen(false)}><X className="h-5 w-5 text-gray-400" /></button></div><a href="/templates/handymate-launch-desk-import.csv" download className="mb-4 inline-flex text-sm font-medium text-primary-700 hover:underline">Ladda ned CSV-mall</a><label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-200 px-5 py-10 text-center hover:border-primary-300"><FileUp className="mb-3 h-7 w-7 text-primary-700" /><span className="font-medium">Välj CSV-fil</span><span className="mt-1 text-xs text-gray-500">Semikolon eller komma, högst 500 rader</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; setImportRows(parseLaunchCsv(await file.text())) }} /></label>{importRows.length > 0 && <div className="mt-4 rounded-xl bg-primary-50 p-3 text-sm text-primary-800"><Check className="mr-2 inline h-4 w-4" />{importRows.length} rader redo för serverkontroll</div>}<div className="mt-6 flex justify-end gap-2"><button onClick={() => setImportOpen(false)} className="rounded-xl px-4 py-2.5 text-sm text-gray-600">Avbryt</button><button disabled={importRows.length === 0 || importing} onClick={importCsv} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{importing && <Loader2 className="h-4 w-4 animate-spin" />} Importera</button></div></div></div>}
+    </div>
+  )
+}
+
+/**
+ * Veckopuls — "ett tal per fredag" (docs/gtm/SALJMASKINEN.md,
+ * tasks/plan-veckopuls.md). Läser GET /api/admin/launch/veckopuls, som är
+ * fail-soft per fråga — den här panelen behöver alltså aldrig visa ett
+ * felmeddelande, bara siffror (eller "Inget loggat än" när tomt läge är
+ * det sanna svaret).
+ */
+function VeckopulsPanel() {
+  const [data, setData] = useState<Veckopuls | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    fetch('/api/admin/launch/veckopuls')
+      .then(response => response.json())
+      .then(json => { if (!cancelled) setData(json) })
+      .catch(() => { /* fail-soft: panelen visar bara inget, huvudlistan fungerar ändå */ })
+      .finally(() => { if (!cancelled) setLoading(false) })
+    return () => { cancelled = true }
+  }, [])
+
+  if (loading) return <div className="mb-6 h-28 animate-pulse rounded-2xl border border-gray-100 bg-white" />
+  if (!data) return null
+
+  // GTM-talen (raderna VECKAN + signerade totalt/betalande) är sanningsenligt
+  // tomma före lansering — gtm_account/gtm_activity har noll rader idag och
+  // det finns ännu inga betalande kunder. En bar "0" hade sett ut som ett
+  // utfall. Det är det inte.
+  const gtmTal = (n: number) => (n === 0 ? 'Inget loggat än' : String(n))
+
+  const diff = data.signeradeTotalt - data.betalandeKonton
+  const diffNotis =
+    diff > 0
+      ? `${diff} markerade som kund men utan betalande konto`
+      : diff < 0
+        ? `${Math.abs(diff)} betalande konto${Math.abs(diff) === 1 ? '' : 'n'} utan matchande "vunnen" i Launch Desk`
+        : undefined
+
+  const veckostartLabel = new Date(data.veckostart).toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'short' })
+
+  return (
+    <section className="mb-6 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
+      <div className="mb-4 flex flex-wrap items-baseline justify-between gap-2">
+        <h2 className="font-semibold text-gray-900">Veckopulsen</h2>
+        <p className="text-xs text-gray-400">Sedan {veckostartLabel}, svensk tid</p>
+      </div>
+
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Veckan — det vi styr</p>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <VeckopulsCell
+          label="Kontakter"
+          value={String(data.kontakter)}
+          warn={data.kontakter === 0}
+          warnText="Ingen kontakt loggad den här veckan."
+        />
+        <VeckopulsCell label="Genomgångar bokade" value={gtmTal(data.genomgangarBokade)} />
+        <VeckopulsCell label="Erbjudanden" value={gtmTal(data.erbjudandenSkickade)} />
+        <VeckopulsCell label="Signerade denna vecka" value={gtmTal(data.signeradeVeckan)} />
+      </div>
+
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Läget — det vi bygger</p>
+      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <VeckopulsCell label="Signerade totalt" value={gtmTal(data.signeradeTotalt)} note={diffNotis} />
+        <VeckopulsCell label="Betalande konton" value={gtmTal(data.betalandeKonton)} />
+        <VeckopulsCell label="Aktiva (≥4 ytor/30 d)" value={String(data.aktivaKonton)} />
+        <VeckopulsCell
+          label="Kontant inne"
+          value="Inte kopplad än"
+          muted
+          note='Kopplas när första riktiga betalningen landat och webhookens form är verifierad.'
+        />
+      </div>
+
+      <p className="mb-2 text-xs font-medium uppercase tracking-wide text-gray-400">Varningar</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <VeckopulsCell label="Konton äldre än 60 dagar" value={String(data.konton60Dagar)} />
+        <VeckopulsCell label="Öppna räddningsärenden" value={String(data.raddningskoOppna)} />
+      </div>
+    </section>
+  )
+}
+
+function VeckopulsCell({ label, value, warn, warnText, note, muted }: {
+  label: string
+  value: string
+  warn?: boolean
+  warnText?: string
+  note?: string
+  muted?: boolean
+}) {
+  return (
+    <div className={`rounded-xl p-3 ${warn ? 'bg-red-50' : 'bg-slate-50'}`}>
+      <p className="text-xs text-gray-500">{label}</p>
+      <p className={`mt-1 font-bold ${warn ? 'text-xl text-red-700' : muted ? 'text-sm text-gray-500' : 'text-xl text-gray-900'}`}>
+        {value}
+      </p>
+      {warn && warnText && <p className="mt-1 text-xs font-medium text-red-600">{warnText}</p>}
+      {note && <p className="mt-1 text-xs text-gray-400">{note}</p>}
     </div>
   )
 }
