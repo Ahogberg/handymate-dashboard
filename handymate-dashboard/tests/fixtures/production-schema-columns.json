@@ -1,5 +1,5 @@
 {
-  "verified_at": "2026-09-02",
+  "verified_at": "2026-09-03",
   "source": "Supabase PostgREST OpenAPI, service_role, read-only",
   "tables": {
     "business_config": [
@@ -245,7 +245,8 @@
       "transcript_segments",
       "transcript_summary",
       "transcript_text",
-      "updated_at"
+      "updated_at",
+      "transcript_skipped_reason"
     ],
     "ai_suggestion": [
       "actioned_at",

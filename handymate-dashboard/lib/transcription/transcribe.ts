@@ -46,8 +46,33 @@ const ENDPOINT = 'https://api.openai.com/v1/audio/transcriptions'
 
 export type TranscriptionYta = 'samtal' | 'mote' | 'matte' | 'jobbuddy'
 
-/** Ytor där flera personer talar och talaruppmärkning är värd att offra prompten för. */
+/**
+ * Ytor där FLERA personer talar. Bara här är talaruppmärkning värd att offra
+ * egennamnsprompten för — det är enda stället `yta` faktiskt förgrenar.
+ */
 const FLERPARTSYTOR: ReadonlySet<TranscriptionYta> = new Set<TranscriptionYta>(['samtal', 'mote'])
+
+/**
+ * Ytor där EN person talar: ägaren dikterar. Diarisering ger ingenting, så
+ * prompten (egennamn) vinner alltid.
+ *
+ * 'matte' och 'jobbuddy' behandlas i dag IDENTISKT. De hålls ändå isär, av två
+ * skäl som båda är verkliga i dag och inte spekulation:
+ *   - mätrutten (/api/admin/transcription-bench) kan köras per yta, och
+ *     inspelningsförhållandena skiljer sig genuint: JobBuddy används i fält
+ *     med bakgrundsljud, Matte inomhus. Vakten och modellvalet kan behöva
+ *     skilja sig när mätningen visar hur mycket det spelar roll.
+ *   - de fyra värdena är kartan över var i produkten vi transkriberar. En
+ *     sammanslagning hade dolt att det finns fyra ingångar att bevaka.
+ *
+ * Facit låser likheten (tests/transcription.spec.ts) så att en framtida
+ * skillnad blir ett medvetet beslut, inte en slump.
+ */
+const ENSAMTALARYTOR: ReadonlySet<TranscriptionYta> = new Set<TranscriptionYta>(['matte', 'jobbuddy'])
+
+/** Alla ytor hör till exakt en av de två grupperna — se facit. */
+export const _FLERPARTSYTOR = FLERPARTSYTOR
+export const _ENSAMTALARYTOR = ENSAMTALARYTOR
 
 export interface TranscriptSegment {
   start: number

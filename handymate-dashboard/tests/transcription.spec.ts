@@ -21,7 +21,7 @@ import {
   buildKeywords,
   MAX_PROMPT_TECKEN,
 } from '../lib/transcription/vocabulary'
-import { valjModell } from '../lib/transcription/transcribe'
+import { valjModell, _FLERPARTSYTOR, _ENSAMTALARYTOR } from '../lib/transcription/transcribe'
 
 const ROOT = path.resolve(__dirname, '..')
 const kod = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').replace(/\r\n/g, '\n')
@@ -166,6 +166,23 @@ test.describe('motorvalet', () => {
     // Ensamtalarytor: diarisering ger inget, prompten allt
     expect(valjModell('matte')).toBe('whisper-1')
     expect(valjModell('jobbuddy')).toBe('whisper-1')
+  })
+
+  test('varje yta hör till exakt en grupp — ingen kan glömmas bort', () => {
+    const alla = ['samtal', 'mote', 'matte', 'jobbuddy'] as const
+    for (const yta of alla) {
+      const iFlerpart = _FLERPARTSYTOR.has(yta)
+      const iEnsam = _ENSAMTALARYTOR.has(yta)
+      expect(iFlerpart !== iEnsam, yta + ' måste ligga i exakt en grupp').toBe(true)
+    }
+    expect(_FLERPARTSYTOR.size + _ENSAMTALARYTOR.size).toBe(alla.length)
+  })
+
+  test('matte och jobbuddy behandlas lika — en skillnad ska vara ett beslut, inte en slump', () => {
+    process.env.TRANSCRIPTION_DIARIZE = '1'
+    expect(valjModell('matte')).toBe(valjModell('jobbuddy'))
+    delete process.env.TRANSCRIPTION_DIARIZE
+    expect(valjModell('matte')).toBe(valjModell('jobbuddy'))
   })
 
   test('mätrutten kan tvinga en modell utan att röra produktionens val', () => {
