@@ -256,8 +256,13 @@ export async function transcribe(
   }
 
   if (!granskning.ok) {
+    // Texten följer med tillbaka trots avvisningen. Anroparen kollar `avvisad`
+    // FÖRST och sparar aldrig något i den grenen (facit låser det) — men
+    // mätrutten måste kunna VISA vad motorn hittade på, annars går det inte
+    // att bedöma om vaktens tröskel sitter rätt. Att kasta bort bevisningen
+    // hade gjort vakten omätbar.
     return {
-      ok: false, text: '', segments: null, harTalare: false, durationSeconds, modell,
+      ok: false, text, segments: null, harTalare: false, durationSeconds, modell,
       avvisad: granskning,
       error: granskning.meddelande,
     }

@@ -359,3 +359,28 @@ test.describe('datumankaret för löften', () => {
     expect(build).toContain(String.raw`\d{4}-\d{2}-\d{2}`)
   })
 })
+
+/**
+ * Avvisad text får FÖLJA MED tillbaka (mätrutten måste kunna visa vad motorn
+ * hittade på) men får ALDRIG sparas eller skickas vidare. Gränsen ligger hos
+ * anroparen, och den här grinden är vad som gör den återvändande texten säker.
+ */
+test.describe('avvisad text når mätningen men aldrig databasen', () => {
+  test('modulen behåller texten så vaktens tröskel går att bedöma', () => {
+    const modul = kod('lib/transcription/transcribe.ts')
+    expect(modul).toContain('ok: false, text, segments: null')
+    expect(modul).toContain('mätrutten måste kunna VISA')
+  })
+
+  for (const [namn, fil] of YTOR) {
+    test(`${namn} sparar inte den avvisade texten`, () => {
+      const src = kod(fil)
+      const start = src.indexOf('if (resultat.avvisad)')
+      expect(start, 'avvisningsgrenen måste finnas').toBeGreaterThan(-1)
+      // Grenen slutar vid nästa toppnivåkontroll av resultatet
+      const slut = src.indexOf('if (!resultat.ok)', start)
+      const gren = src.slice(start, slut > -1 ? slut : start + 1200)
+      expect(gren, 'den avvisade texten får aldrig skrivas').not.toContain('resultat.text')
+    })
+  }
+})
