@@ -520,3 +520,24 @@ Filen var orörd; bara läsningen var fel.
 `.replace(/\r\n/g, '\n')`. Fixa i specen, aldrig i källfilen. När en
 nypullad spec är röd direkt efter merge: kolla `git ls-files --eol <fil>`
 innan du misstänker mergen.
+
+## 2026-09-04 — "Rött som var rött före" är en regression, inte ett tillstånd
+
+Två byggagenter rapporterade fyra röda facit (aktivera-senare,
+genomgang-fore-betalning, onboarding-funnel) som "pre-existerande, filer jag
+inte rört". Sant — men orsaken var 6ea39c3, som från en annan session skrev
+`app/onboarding/page.tsx` utifrån en GAMMAL kopia och därmed tyst tog bort
+Stripe-verifieringen av `?payment=success` och skannervarianten. Betalgrinden
+stod öppen på main i fyra timmar, tio dagar före lansering.
+
+**Regler:**
+- Ett facit som är rött på main root-causeas alltid (`git log -- <fil>`,
+  `git show <sha> -- <fil>`), aldrig bara "bekräftas pre-existerande".
+  Facit är till för att fånga exakt detta.
+- En commit med "+21/-83" i en fil som "bara skulle lägga till ett undantag"
+  är en stale-copy-skrivning. Kolla insertions/deletions mot avsikten innan
+  push. Sessioner som kör parallellt måste `git pull` innan de skriver om
+  en fil som en annan lane nyligen ändrat.
+- Commit-meddelanden som hävdar "66/66 gröna" utan att specarna faktiskt
+  kördes mot den committade filen är värre än inget — de får nästa läsare
+  att sluta leta.
