@@ -6,6 +6,7 @@ import { obligationToEvent } from '@/lib/karin/calendar'
 import { HANDLED_KEY, parseHandled } from '@/lib/karin/handled-store'
 import { daysBetween } from '@/lib/karin/business-days'
 import type { CompanyProfile } from '@/lib/karin/obligation-rules'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 
 export const dynamic = 'force-dynamic'
 
@@ -139,7 +140,7 @@ async function kor(request: NextRequest) {
         }
         if ((count ?? 0) > 0) { hoppade++; continue }
 
-        const { error: insertFel } = await supabase.from('pending_approvals').insert({
+        const nyttKort = await skapaKort(supabase, {
           id: `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
           business_id: businessId,
           approval_type: 'karin_deadline',
@@ -163,8 +164,8 @@ async function kor(request: NextRequest) {
           expires_at: new Date(new Date(e.due_date + 'T12:00:00').getTime() + 3 * 86400000).toISOString(),
         })
 
-        if (insertFel) {
-          console.error('[karin-deadlines] insert misslyckades:', dedupeNyckel, insertFel.message)
+        if (!nyttKort) {
+          console.error('[karin-deadlines] insert misslyckades:', dedupeNyckel)
           continue
         }
         skapade++

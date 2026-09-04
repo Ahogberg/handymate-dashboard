@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { Smartphone, X, Bell } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
+import { PUSH_SUBSCRIBED_KEY, PUBLIC_VAPID_KEY, arIOS, prenumereraPaPush } from '@/lib/push/prenumerera-klient'
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
@@ -10,16 +11,6 @@ interface BeforeInstallPromptEvent extends Event {
 }
 
 const DISMISSED_KEY = 'handymate_pwa_banner_dismissed'
-const PUSH_SUBSCRIBED_KEY = 'handymate_push_subscribed'
-
-const PUBLIC_VAPID_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || ''
-
-function urlBase64ToUint8Array(base64String: string): Uint8Array {
-  const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
-  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const rawData = atob(base64)
-  return Uint8Array.from(Array.from(rawData).map(c => c.charCodeAt(0)))
-}
 
 export default function PWAInstallBanner() {
   const business = useBusiness()
@@ -46,50 +37,20 @@ export default function PWAInstallBanner() {
     return () => window.removeEventListener('beforeinstallprompt', handler)
   }, [])
 
-  // If standalone, subscribe to push automatically
+  // Fråga om push i standalone (installerad PWA) ELLER i en vanlig flik på
+  // en icke-iOS-plattform — bara iOS kräver installation innan push funkar.
   useEffect(() => {
-    if (!isStandalone || !PUBLIC_VAPID_KEY) return
+    if (!PUBLIC_VAPID_KEY) return
+    if (!isStandalone && arIOS()) return
     if (localStorage.getItem(PUSH_SUBSCRIBED_KEY)) return
     subscribeToPush()
   }, [isStandalone])
 
+  // Delad med "Notiser"-kortet i inställningarna (lib/push/prenumerera-klient.ts)
+  // — exakt samma kod, ingen dubblerad pushManager.subscribe.
   async function subscribeToPush() {
-    if (!('PushManager' in window) || !('serviceWorker' in navigator)) return
-    if (!PUBLIC_VAPID_KEY) return
-
-    try {
-      const reg = await navigator.serviceWorker.ready
-      const existing = await reg.pushManager.getSubscription()
-      if (existing) {
-        setPushGranted(true)
-        localStorage.setItem(PUSH_SUBSCRIBED_KEY, '1')
-        return
-      }
-
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') return
-
-      const subscription = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY),
-      })
-
-      const { endpoint, keys } = subscription.toJSON() as {
-        endpoint: string
-        keys: { p256dh: string; auth: string }
-      }
-
-      await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endpoint, p256dh: keys.p256dh, auth: keys.auth }),
-      })
-
-      setPushGranted(true)
-      localStorage.setItem(PUSH_SUBSCRIBED_KEY, '1')
-    } catch (err) {
-      console.warn('Push subscription failed:', err)
-    }
+    const ok = await prenumereraPaPush()
+    if (ok) setPushGranted(true)
   }
 
   async function handleInstall() {

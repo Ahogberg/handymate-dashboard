@@ -13,6 +13,7 @@ import {
 } from '@/lib/value/missed-revenue'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { byggProjektFakturaUnderlag, type ProjektFakturaUnderlag } from '@/lib/invoices/project-invoice-draft'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -331,14 +332,13 @@ async function persistCard(
   }
 
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-  const { error } = await supabase.from('pending_approvals').insert({
+  const nyttKort = await skapaKort(supabase, {
     id,
     business_id: businessId,
     ...fields,
   })
 
-  if (error) {
-    console.error('[cron/missed-revenue] kunde inte skapa kort:', error.message, { businessId, dedupeKey: f.dedupeKey })
-    throw new Error(`kort ${f.dedupeKey}: ${error.message}`)
+  if (!nyttKort) {
+    throw new Error(`kort ${f.dedupeKey}: insert misslyckades`)
   }
 }

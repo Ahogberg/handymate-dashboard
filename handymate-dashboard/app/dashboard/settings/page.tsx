@@ -51,6 +51,7 @@ import { isLaunchHidden, launchGateForPath } from '@/lib/launch-visibility'
 import { visibleAreas, allEntries } from '@/lib/settings/areas'
 import { SettingsHub, SettingsAreaView } from '@/components/settings/SettingsHub'
 import UpgradePrompt from '@/components/UpgradePrompt'
+import { hamtaPushStatus, prenumereraPaPush, arIOS, type PushStatus } from '@/lib/push/prenumerera-klient'
 
 interface BusinessConfig {
   business_id: string
@@ -364,6 +365,13 @@ export default function SettingsPage() {
   const [visaAvancerat, setVisaAvancerat] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
+  // Notiser (Pass A, 2026-09-04) — samma prenumerationslogik som
+  // components/PWAInstallBanner.tsx, se lib/push/prenumerera-klient.ts.
+  const [pushStatus, setPushStatus] = useState<PushStatus | null>(null)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushArIOSUtanStandalone, setPushArIOSUtanStandalone] = useState(false)
+  const [testNotisStatus, setTestNotisStatus] = useState<'skickar' | 'skickad' | 'fel' | null>(null)
+
   const [config, setConfig] = useState<BusinessConfig | null>(null)
   // Varför läsningen misslyckades. Sidan sa förut bara "Kunde inte ladda
   // inställningar" — samma återvändsgränd oavsett om det var behörighet,
@@ -482,6 +490,37 @@ export default function SettingsPage() {
     fetchGrossistStatus()
     fetchLeadSources()
   }, [business.business_id])
+
+  // Notiser: läs status en gång — kräver inga businessdata, bara webbläsarens
+  // egen tillståndsAPI:er.
+  useEffect(() => {
+    const isStandaloneNu = typeof window !== 'undefined' && window.matchMedia('(display-mode: standalone)').matches
+    setPushArIOSUtanStandalone(arIOS() && !isStandaloneNu)
+    hamtaPushStatus().then(setPushStatus)
+  }, [])
+
+  async function aktiveraNotiser() {
+    setPushBusy(true)
+    try {
+      const ok = await prenumereraPaPush()
+      setPushStatus(await hamtaPushStatus())
+      if (!ok) {
+        setToast({ show: true, message: 'Kunde inte aktivera notiser — försök igen', type: 'error' })
+      }
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  async function skickaTestnotis() {
+    setTestNotisStatus('skickar')
+    try {
+      const res = await fetch('/api/push/test-approval?type=quote_signed')
+      setTestNotisStatus(res.ok ? 'skickad' : 'fel')
+    } catch {
+      setTestNotisStatus('fel')
+    }
+  }
 
   useEffect(() => {
     // Handle tab param
@@ -4273,6 +4312,82 @@ export default function SettingsPage() {
 
             {/* Referral */}
             <ReferralWidget businessId={business.business_id} />
+          </div>
+        )}
+
+        {/*
+          Notiser (Pass A, 2026-09-04) — se docs/audits/AUTOPILOT_REVISION_2026-09-04.md
+          avsnitt 1: bannern var det ENDA stället att slå på push, och den frågade
+          bara installerade PWA:er. Här kan kunden slå på notiser medvetet, se
+          status, och skicka en testnotis för att bevisa att det fungerar.
+          Samma kod som bannern — lib/push/prenumerera-klient.ts.
+        */}
+        {activeTab === 'notiser' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
+              <div className="flex items-center justify-between mb-1">
+                <h2 className="text-lg font-semibold text-gray-900">Notiser</h2>
+                <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
+                  pushStatus === 'pa' ? 'bg-emerald-100 text-emerald-700'
+                    : pushStatus === 'blockerad' ? 'bg-red-100 text-red-700'
+                    : 'bg-gray-100 text-gray-500'
+                }`}>
+                  {pushStatus === 'pa' ? 'På' : pushStatus === 'blockerad' ? 'Blockerad i webbläsaren' : pushStatus === 'av' ? 'Av' : 'Läser status…'}
+                </span>
+              </div>
+              <p className="text-gray-500 text-sm mb-4">
+                Få en push direkt när något väntar på ditt godkännande, i stället för att upptäcka det när du råkar öppna appen.
+              </p>
+
+              {pushStatus === 'blockerad' && (
+                <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">
+                  Webbläsaren blockerar notiser för Handymate. Slå på dem i webbläsarens
+                  eller telefonens inställningar för app.handymate.se, ladda om sidan och försök igen.
+                </p>
+              )}
+
+              {pushStatus !== 'blockerad' && pushArIOSUtanStandalone && (
+                <p className="text-sm text-gray-600 bg-gray-50 border border-[#E2E8F0] rounded-xl p-4">
+                  På iPhone måste Handymate ligga på hemskärmen för att notiser ska fungera:
+                  öppna app.handymate.se i Safari, tryck på dela-knappen och välj
+                  &quot;Lägg till på hemskärmen&quot;. Öppna appen därifrån och kom tillbaka hit.
+                </p>
+              )}
+
+              {pushStatus !== 'blockerad' && !pushArIOSUtanStandalone && pushStatus !== 'pa' && (
+                <button
+                  onClick={aktiveraNotiser}
+                  disabled={pushBusy}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50"
+                >
+                  {pushBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                  Aktivera notiser
+                </button>
+              )}
+            </div>
+
+            {pushStatus === 'pa' && (
+              <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
+                <h2 className="text-sm font-semibold text-gray-900 mb-1">Skicka testnotis</h2>
+                <p className="text-gray-500 text-sm mb-4">
+                  Bevisa för dig själv att det fungerar — en push kommer inom några sekunder.
+                </p>
+                <button
+                  onClick={skickaTestnotis}
+                  disabled={testNotisStatus === 'skickar'}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-white hover:bg-gray-50 text-gray-900 text-sm font-medium rounded-xl border border-[#E2E8F0] transition-all disabled:opacity-50"
+                >
+                  {testNotisStatus === 'skickar' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
+                  Skicka testnotis
+                </button>
+                {testNotisStatus === 'skickad' && (
+                  <p className="text-emerald-600 text-sm mt-3">Skickad — kolla din notisruta.</p>
+                )}
+                {testNotisStatus === 'fel' && (
+                  <p className="text-red-600 text-sm mt-3">Gick inte att skicka. Försök igen om en stund.</p>
+                )}
+              </div>
+            )}
           </div>
         )}
 

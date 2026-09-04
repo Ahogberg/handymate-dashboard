@@ -88,6 +88,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { svDateStr, svDateStrPlusDays, svStartOfDay, svTimeStr } from '@/lib/dates'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 
 // ─────────────────────────────────────────────────────────────────
 // Typer
@@ -472,7 +473,7 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
             ? `Ingen tidrapport för ${projectName} i går (${assignedPersonName}) — förbered en?`
             : `Ingen tidrapport för ${projectName} i går — förbered en?`
 
-      const { error: insertErr } = await supabase.from('pending_approvals').insert({
+      const nyttKort = await skapaKort(supabase, {
         id: approvalId,
         business_id: businessId,
         approval_type: 'tidrapport_forslag',
@@ -495,8 +496,8 @@ export async function suggestTimeEntriesForBusiness(businessId: string): Promise
         },
       })
 
-      if (insertErr) {
-        console.error('[egenkontroll/suggest-time-entry] kunde inte skapa förslag:', insertErr, {
+      if (!nyttKort) {
+        console.error('[egenkontroll/suggest-time-entry] kunde inte skapa förslag:', {
           project_id: m.project_id,
         })
       }
