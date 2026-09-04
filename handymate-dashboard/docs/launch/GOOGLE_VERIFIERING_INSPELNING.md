@@ -1,68 +1,103 @@
 # Demovideon för Googles OAuth-verifiering
 
 Ha den här öppen på telefonen eller en andra skärm medan du spelar in.
+**Filmen behöver vara ~90 sekunder.** Inloggningen ska inte vara med.
 
-## Innan du trycker på inspelning
+---
+
+## Innan du trycker rec
 
 - [ ] **Ändra `Application home page` i Google Cloud Console** → `https://handymate.se`
       (står nu på `app.handymate.se`, som är en ren inloggningssida — Googles krav
       säger uttryckligen *"not just a login page"*, så det underkänns annars)
-- [ ] Klistra in scope-motiveringen i fältet "How will the scopes be used?" (finns nedan)
-- [ ] Stäng alla flikar utom de två du behöver: Handymate och Google Kalender
-- [ ] Logga in på `app.handymate.se` i förväg — inloggningen ska inte vara med i filmen
-- [ ] Öppna Google Kalender i flik 2, redan inloggad
-- [ ] Starta OBS (eller `Win + G`) — **hela skärmen**, inte ett fönster
+- [ ] Klistra in scope-motiveringen i "How will the scopes be used?" (finns längst ner)
+- [ ] **Logga in på `app.handymate.se`** — inloggningen ska inte filmas
+- [ ] Öppna **Google Kalender i flik 2**, redan inloggad
+- [ ] Stäng alla andra flikar
+- [ ] Starta OBS (eller `Win + G`) — **hela skärmen**, inte ett enskilt fönster
 
-## De fyra som fäller ansökan om de saknas
+## De fyra som fäller ansökan
 
 1. **Adressfältet synligt** när medgivandeskärmen visas — client ID ska gå att läsa
-2. **Språket på medgivandeskärmen = English** (växla längst ner till vänster **innan** du filmar)
+2. **Medgivandeskärmen på engelska** — lägg till `&hl=en` sist i URL:en och tryck enter
 3. **Varje scope demonstrerat i faktisk användning** — inte bara nämnt
-4. **YouTube, olistad** — länken klistras in i ansökan
+4. **YouTube, olistad**
 
 ---
 
-## Manus (~3 min)
+## Manus — 90 sekunder
 
-### 0:00 · Hemsidan
-`handymate.se`. Adressfältet synligt. Scrolla lugnt så funktionsbeskrivningarna syns.
-*Detta är också ditt hemsida-bevis: Google ska se att sidan beskriver produkten.*
+Tiderna är ungefärliga. Klicka långsammare än det känns naturligt.
 
-### 0:20 · Appen
-Växla till `app.handymate.se` (redan inloggad). Visa att det står **Nordström El AB**
-och att logotypen matchar det du angett under Branding.
+### 0:00 — Appen (10 s)
+Handymate öppen och inloggad. Låt **Nordström El AB** synas i sidomenyn ett ögonblick.
+*Google ska se att det är samma app som i ansökan, med samma namn och logotyp.*
 
-### 0:40 · Starta kopplingen
+### 0:10 — Starta kopplingen (10 s)
 Inställningar → Integrationer. Google Calendar står **"Ej kopplad"**. Klicka koppla.
-**Klicka långsamt.**
 
-### 0:50 · Medgivandeskärmen — viktigaste bilden i filmen
-- Låt den ligga **stilla minst 5 sekunder**
-- Adressfältet med client ID måste synas
-- Språket ska stå på **English**
-- Alla tre scopes syns i listan
+### 0:20 — Medgivandeskärmen (15 s) · **viktigaste bilden i filmen**
+- Klicka i adressfältet, lägg till **`&hl=en`** sist, enter
+- Låt skärmen ligga **stilla 5–8 sekunder**
+- Adressfältet med client ID måste synas hela tiden
+- Alla tre behörigheter syns i listan
 - Godkänn
 
-### 1:10 · `calendar.readonly` — del 1
-Kalenderväljaren visas. Det är `calendarList.list()`.
-Säg/texta: *"Here the user picks which of their own calendars to connect."*
+### 0:35 — Kalenderväljaren (10 s) · `calendar.readonly`
+Listan över dina egna kalendrar visas. Välj en.
 
-### 1:25 · `calendar.readonly` — del 2
+> **Textremsa:** `User selects which of their own calendars to connect (calendar.readonly)`
+
+### 0:45 — Schema (15 s) · `calendar.readonly`
 Gå till **Schema**. Bokningarna syns: Karin Lindqvist (elcentral), Mikael Bergström
-(laddbox), BRF Ekbacken (elbesiktning). Det är `events.list()`.
+(laddbox), BRF Ekbacken (elbesiktning).
 
-### 1:45 · `calendar.events` — det starkaste beviset
-Skapa en ny bokning i Handymate. **Växla sedan till Google Kalender-fliken och visa
-att händelsen dök upp där.**
-Det visar skrivrättigheten i faktisk användning — hela motiveringen för scopet.
+> **Textremsa:** `Existing calendar events shown alongside jobs in Handymate (calendar.readonly)`
 
-### 2:15 · `userinfo.email`
+### 1:00 — Skapa bokning, växla till Google (25 s) · `calendar.events`
+Skapa en ny bokning i Handymate. **Växla till Google Kalender-fliken och visa att
+händelsen dök upp där.**
+*Det starkaste beviset i hela filmen — skrivrättigheten i faktisk användning.*
+
+> **Textremsa:** `Booking created in Handymate appears in the user's Google Calendar (calendar.events)`
+
+### 1:25 — E-postadressen (5 s) · `userinfo.email`
 Visa var den kopplade e-postadressen syns i Handymate.
 
-### 2:25 · Frånkopplingen *(frivillig, men stark)*
-Koppla bort i Inställningar → växla till `myaccount.google.com/permissions` →
-visa att **Handymate inte längre står listad**.
-Det bevisar att åtkomsten upphör i båda ändar, precis som integritetspolicyn lovar.
+> **Textremsa:** `Connected Google account email shown to the user (userinfo.email)`
+
+---
+
+## Textningen
+
+Fyra remsor, en per scope. **Engelska** — granskaren ska kunna matcha varje scope i
+ansökan mot en bild i filmen utan att gissa.
+
+| Vid | Text |
+|---|---|
+| 0:35 | `User selects which of their own calendars to connect (calendar.readonly)` |
+| 0:45 | `Existing calendar events shown alongside jobs in Handymate (calendar.readonly)` |
+| 1:00 | `Booking created in Handymate appears in the user's Google Calendar (calendar.events)` |
+| 1:25 | `Connected Google account email shown to the user (userinfo.email)` |
+
+Lägg dem som text i bild (inte som undertextfil) så de syns oavsett hur granskaren
+spelar upp filmen. Låt varje remsa ligga kvar hela momentet.
+
+Textning är **inget formellt krav** — men ansökningar bounce:ar på att granskaren
+inte hittar ett scope i filmen, och en omgång kostar dagar.
+
+---
+
+## Frivilligt, om du vill ha en starkare film
+
+**Hemsidan först (20 s).** Börja på `handymate.se`, scrolla så funktionsbeskrivningarna
+syns. Google granskar sajten separat ändå, men det skadar inte.
+
+**Frånkopplingen sist (20 s).** Koppla bort i Inställningar → växla till
+`myaccount.google.com/permissions` → visa att **Handymate inte längre står listad**.
+Bevisar att åtkomsten upphör i båda ändar, precis som integritetspolicyn lovar.
+
+> **Textremsa:** `Disconnecting in Handymate also revokes access with Google`
 
 ---
 
@@ -89,9 +124,19 @@ deleted when the user disconnects, and access is revoked with Google at the
 same time.
 ```
 
-Varje påstående i texten är sant och verifierat mot koden:
-`calendarList.list()`, `events.list()`, `events.insert/patch/delete` i
-`lib/google-calendar.ts`, och återkallningen i `app/api/google/disconnect/route.ts`.
+Varje påstående är verifierat mot koden: `calendarList.list()`, `events.list()`,
+`events.insert/patch/delete` i `lib/google-calendar.ts`, och återkallningen i
+`app/api/google/disconnect/route.ts`.
+
+---
+
+## Bra att veta
+
+**Du kan filma om hur många gånger du vill.** `prompt: 'consent'` är satt i
+`lib/google-calendar.ts:42`, så medgivandeskärmen visas alltid — även efter att du
+redan godkänt. Ingen omställning behövs mellan tagningar.
+
+**Seedningen är beständig.** Kunder och bokningar ligger kvar tills du raderar dem.
 
 ---
 
@@ -103,13 +148,11 @@ Kontot `biz_al7pjuu5smi` (`andreashogberg93@gmail.com`):
 |---|---|---|
 | Firmanamn | `Test` | `Nordström El AB` |
 | Ort | tom | `Sollentuna` |
-| Specialiteter | tom | Elinstallation, Laddboxar, Elbesiktning |
+| Specialiteter | tomma | Elinstallation, Laddboxar, Elbesiktning |
 
-Tre kunder tillagda: **Karin Lindqvist**, **Mikael Bergström**, **BRF Ekbacken**
-(id:n med prefix `cust_film_`).
-
-Fem bokningar från och med i morgon (id:n med prefix `book_film_`) — alla
-befintliga bokningar var passerade sedan 27 juli, så kalendern hade varit tom.
+Tre kunder: **Karin Lindqvist**, **Mikael Bergström**, **BRF Ekbacken** (`cust_film_*`).
+Fem bokningar från 5 september och en vecka fram (`book_film_*`) — alla befintliga
+bokningar var passerade sedan 27 juli, så kalendern hade varit tom mitt i filmen.
 
 Verifierat i gränssnittet: startsidan, Schema och Kunder visar den nya datan;
 integrationssidan säger "Google Calendar — Ej kopplad".
@@ -125,10 +168,10 @@ update business_config set business_name='Test', service_area='""'::jsonb,
 
 ## Efter inspelningen
 
-- [ ] Ladda upp till YouTube, **Visibility: Unlisted**
-- [ ] Klistra in länken i ansökan
+- [ ] YouTube, **Visibility: Unlisted**
+- [ ] Länken in i ansökan
 - [ ] Räkna med **10 arbetsdagar** för sensitive scope-granskning
 
-**Lägg inte till Gmail-scopes innan ansökan är godkänd.** Restricted scopes
-kräver en årlig säkerhetsgranskning (CASA) och tar ungefär sex veckor i stället
-för tio dagar.
+**Lägg inte till Gmail-scopes innan ansökan är godkänd.** Restricted scopes kräver
+en årlig säkerhetsgranskning (CASA) och tar ungefär sex veckor i stället för tio
+dagar.
