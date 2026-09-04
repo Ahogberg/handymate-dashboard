@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { CheckCircle2, File as FileIcon, Loader2, Plus, Search, Upload, X } from 'lucide-react'
 import { CustomerModal } from '@/app/dashboard/customers/components/CustomerModal'
@@ -97,6 +97,33 @@ export function NewDealModal() {
     duplicates: DealDuplicateMatch[]
     retry: () => Promise<void>
   } | null>(null)
+
+  // Prissättningsdata (2026-09-04, Christoffers observation): CustomerModal är
+  // SAMMA komponent som på Kunder-sidan, men här skickades tomma listor in —
+  // så kundsegment, avtalstyp och prislista blev tomma dropdowns och
+  // formuläret kändes som en äldre version. Hämtas lazy när modalen öppnas.
+  const [pricingSegments, setPricingSegments] = useState<any[]>([])
+  const [pricingContractTypes, setPricingContractTypes] = useState<any[]>([])
+  const [pricingPriceLists, setPricingPriceLists] = useState<any[]>([])
+  const [pricingLoaded, setPricingLoaded] = useState(false)
+
+  useEffect(() => {
+    if (!showFullCustomerModal || pricingLoaded) return
+    let cancelled = false
+    ;(async () => {
+      const [segRes, ctRes, plRes] = await Promise.all([
+        fetch('/api/pricing/segments').then(r => r.json()).catch(() => ({ segments: [] })),
+        fetch('/api/pricing/contract-types').then(r => r.json()).catch(() => ({ contractTypes: [] })),
+        fetch('/api/pricing/price-lists').then(r => r.json()).catch(() => ({ priceLists: [] })),
+      ])
+      if (cancelled) return
+      setPricingSegments(segRes.segments || [])
+      setPricingContractTypes(ctRes.contractTypes || [])
+      setPricingPriceLists(plRes.priceLists || [])
+      setPricingLoaded(true)
+    })()
+    return () => { cancelled = true }
+  }, [showFullCustomerModal, pricingLoaded])
 
   function pickExistingCustomer(match: DealDuplicateMatch) {
     setCustomers(prev =>
@@ -463,9 +490,9 @@ export function NewDealModal() {
         editingCustomer={null}
         form={fullCustomerForm}
         setForm={setFullCustomerForm}
-        pricingSegments={[]}
-        pricingContractTypes={[]}
-        pricingPriceLists={[]}
+        pricingSegments={pricingSegments}
+        pricingContractTypes={pricingContractTypes}
+        pricingPriceLists={pricingPriceLists}
         actionLoading={fullCustomerSubmitting}
         onClose={() => setShowFullCustomerModal(false)}
         onSubmit={() => handleCreateFullCustomer(false)}
