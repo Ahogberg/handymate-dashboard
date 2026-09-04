@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   // Fetch all businesses
   const { data: businesses, error: bizErr } = await supabase
     .from('business_config')
-    .select('business_id')
+    .select('business_id, agents_globally_paused')
 
   if (bizErr || !businesses) {
     console.error('[evaluate-thresholds] Failed to fetch businesses:', bizErr)
@@ -38,7 +38,17 @@ export async function GET(request: NextRequest) {
     cron: { executed: number; errors: number }
   }> = []
 
+  // Pausade agenter ska vara tysta — samma grind som övriga cronar
+  // (t.ex. app/api/cron/karin-deadlines/route.ts). evaluate-thresholds kan
+  // via v3-regler skicka SMS/e-post till kundens kunder
+  // (lib/automation-engine.ts), så grinden saknades hittills här.
+  let skipped_paused = 0
+
   for (const biz of businesses) {
+    if (biz.agents_globally_paused === true) {
+      skipped_paused++
+      continue
+    }
     try {
       const [thresholdResult, cronResult] = await Promise.all([
         evaluateThresholds(supabase, biz.business_id),
@@ -68,12 +78,13 @@ export async function GET(request: NextRequest) {
   const totalTriggered = results.reduce((sum, r) => sum + r.thresholds.triggered + r.cron.executed, 0)
   const totalErrors = results.reduce((sum, r) => sum + r.thresholds.errors + r.cron.errors, 0)
 
-  console.log(`[evaluate-thresholds] Done. Triggered: ${totalTriggered}, Errors: ${totalErrors}`)
+  console.log(`[evaluate-thresholds] Done. Triggered: ${totalTriggered}, Errors: ${totalErrors}, Skipped (paused): ${skipped_paused}`)
 
   return NextResponse.json({
     success: true,
     total_triggered: totalTriggered,
     total_errors: totalErrors,
+    skipped_paused,
     businesses: results,
   })
 }

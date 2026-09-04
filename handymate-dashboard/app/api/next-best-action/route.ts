@@ -90,7 +90,10 @@ export async function GET(request: NextRequest) {
         financialImpactKind: entry.financial_impact_kind,
         urgencyNote: entry.urgency_note,
         reasoning: nba.reasoning,
-        principlesApplied: nba.principles_applied || [],
+        // principles_applied (jsonb) är { source, citerat } sedan
+        // Pass D (husregler som standard-fallback, lib/jarvis/husregler.ts)
+        // — UI:t vill bara ha citaten, aldrig källflaggan.
+        principlesApplied: (nba.principles_applied as { citerat?: string[] } | null)?.citerat || [],
       })
     }
 

@@ -30,6 +30,7 @@ import {
 } from './next-best-action-normalize'
 import { callNextBestActionModel, NEXT_BEST_ACTION_MODEL, type NextBestActionModelOutput } from './next-best-action-prompt'
 import { getGoalContext } from './next-best-action-goals'
+import { HUSREGLER } from './husregler'
 
 const MIN_CANDIDATES = 2
 const MIN_PRINCIPLES = 1
@@ -50,6 +51,15 @@ export interface NextBestAction {
   top_approval_id: string
   reasoning: string
   principles_applied: string[]
+  /**
+   * Vilka principer som faktiskt gällde den här dagen: kontots egna
+   * (business_knowledge, priority_rule) eller husreglerna
+   * (lib/jarvis/husregler.ts) som standard-fallback när kontot saknar
+   * egna. ALDRIG bådadera — se genereraNextBestAction. Sparas i den
+   * insatta radens principles_applied-kolumn (jsonb) tillsammans med
+   * citaten, så källan syns i efterhand utan egen kolumn/migration.
+   */
+  principles_source: 'husregler' | 'kontot'
   ranked_candidates: RankedCandidateRow[]
   candidate_count: number
   model: string
@@ -72,8 +82,10 @@ export function byggNextBestAction(input: {
   computedDate: string
   candidates: NormalizedCandidate[]
   modelOutput: NextBestActionModelOutput
+  /** Standard 'kontot' för bakåtkompatibilitet med anrop som inte bryr sig. */
+  principlesSource?: 'husregler' | 'kontot'
 }): NextBestAction {
-  const { businessId, computedDate, candidates, modelOutput } = input
+  const { businessId, computedDate, candidates, modelOutput, principlesSource = 'kontot' } = input
   const byId = new Map(candidates.map(c => [c.approval_id, c]))
 
   const ranked_candidates: RankedCandidateRow[] = modelOutput.ranked.map(r => {
@@ -95,6 +107,7 @@ export function byggNextBestAction(input: {
     top_approval_id: modelOutput.top_pick_approval_id,
     reasoning: modelOutput.reasoning,
     principles_applied: modelOutput.principles_applied,
+    principles_source: principlesSource,
     ranked_candidates,
     candidate_count: candidates.length,
     model: NEXT_BEST_ACTION_MODEL,
@@ -133,7 +146,17 @@ export async function genereraNextBestAction(supabase: SupabaseClient, businessI
     .is('dismissed_at', null)
   if (principleErr) throw new Error(`business_knowledge (priority_rule)-uppslag misslyckades: ${principleErr.message}`)
 
-  const principles = (principleRows || []).map(r => r.observation as string).filter(Boolean)
+  const accountPrinciples = (principleRows || []).map(r => r.observation as string).filter(Boolean)
+
+  // Husregler som standard (2026-09-04, tasks/plan-autopilot-D-nba.md):
+  // inget betalande konto har någonsin skrivit en egen priority_rule, så
+  // spärren nedan slog till för ALLA — next_best_action fick noll rader,
+  // någonsin. Kontots egna principer gäller om de finns, annars
+  // husreglerna (lib/jarvis/husregler.ts) — ALDRIG bådadera samtidigt.
+  // Spärren nedan finns kvar oförändrad; den kan bara aldrig slå till
+  // längre eftersom listan aldrig är tom när husreglerna räknas in.
+  const principlesSource: 'husregler' | 'kontot' = accountPrinciples.length > 0 ? 'kontot' : 'husregler'
+  const principles = principlesSource === 'kontot' ? accountPrinciples : HUSREGLER
   if (principles.length < MIN_PRINCIPLES) return { status: 'skipped_no_principles' }
 
   const nowIso = new Date().toISOString()
@@ -151,7 +174,7 @@ export async function genereraNextBestAction(supabase: SupabaseClient, businessI
   const modelOutput = await callNextBestActionModel(candidates, principles, businessId, supabase, goalContext)
   if (!modelOutput) return { status: 'skipped_model_failed' }
 
-  const nba = byggNextBestAction({ businessId, computedDate, candidates, modelOutput })
+  const nba = byggNextBestAction({ businessId, computedDate, candidates, modelOutput, principlesSource })
   return insertNextBestAction(supabase, nba)
 }
 
@@ -167,7 +190,10 @@ export async function insertNextBestAction(supabase: SupabaseClient, nba: NextBe
     computed_date: nba.computed_date,
     top_approval_id: nba.top_approval_id,
     reasoning: nba.reasoning,
-    principles_applied: nba.principles_applied,
+    // principles_applied (jsonb) bär BÅDE citaten och källflaggan — ingen
+    // egen kolumn/migration för principles_source (den finns inte i DB).
+    // app/api/next-best-action/route.ts läser ut .citerat till UI:t.
+    principles_applied: { source: nba.principles_source, citerat: nba.principles_applied },
     ranked_candidates: nba.ranked_candidates,
     candidate_count: nba.candidate_count,
     model: nba.model,
