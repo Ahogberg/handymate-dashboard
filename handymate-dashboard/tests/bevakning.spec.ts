@@ -24,7 +24,7 @@ test.describe('hela teamet syns — men bara när datat finns', () => {
   test('noll händelser är ÄRLIG standby, inte tystnad (produktbeslut 2026-08-10)', () => {
     // Andreas fynd: "hela teamets kollegor syns inte" kändes som ett fel.
     // Karin bevakar fakturorna även när noll är obetalda — raden säger det.
-    const rader = byggBevakning({ fakturor: { bevakade: 0 }, offerter: { oppna: 0, followupDagar: 5 } })
+    const rader = byggBevakning({ fakturor: { bevakade: 0 }, offerter: { oppna: 0, followupDagar: 5, paminnelseAktiv: true } })
     expect(rader.map(r => r.agentId)).toEqual(['karin', 'daniel'])
     expect(rader[0].rubrik).toBe('Bevakar fakturorna')
     expect(rader[0].detalj).toBe('inga obetalda just nu')
@@ -36,7 +36,7 @@ test.describe('hela teamet syns — men bara när datat finns', () => {
   test('full indata ger hela teamet — sex rader', () => {
     const rader = byggBevakning({
       fakturor: { bevakade: 2 },
-      offerter: { oppna: 1, followupDagar: 5 },
+      offerter: { oppna: 1, followupDagar: 5, paminnelseAktiv: true },
       telefon: { aktiv: true, samtal: 0 },
       nastaBokning: null,
       veckosammanfattning: true,
@@ -63,21 +63,30 @@ test.describe('hela teamet syns — men bara när datat finns', () => {
 
   test('singular när det är en', () => {
     expect(byggBevakning({ fakturor: { bevakade: 1 } })[0].rubrik).toBe('Bevakar 1 faktura')
-    expect(byggBevakning({ offerter: { oppna: 1, followupDagar: 5 } })[0].rubrik).toBe('1 öppna offert')
+    expect(byggBevakning({ offerter: { oppna: 1, followupDagar: 5, paminnelseAktiv: true } })[0].rubrik).toBe('1 öppna offert')
   })
 })
 
 test.describe('Daniels dag-nummer följer inställningarna', () => {
   test('dagen kommer ur indata — inte mockupens 7', () => {
-    const [rad] = byggBevakning({ offerter: { oppna: 4, followupDagar: 5 } })
+    const [rad] = byggBevakning({ offerter: { oppna: 4, followupDagar: 5, paminnelseAktiv: true } })
     expect(rad.agentId).toBe('daniel')
     expect(rad.rubrik).toBe('4 öppna offerter')
     expect(rad.detalj).toBe('föreslår påminnelse på dag 5')
   })
 
   test('en ändrad cadence syns direkt', () => {
-    expect(byggBevakning({ offerter: { oppna: 2, followupDagar: 9 } })[0].detalj)
+    expect(byggBevakning({ offerter: { oppna: 2, followupDagar: 9, paminnelseAktiv: true } })[0].detalj)
       .toBe('föreslår påminnelse på dag 9')
+  })
+
+  test('sann agentstatus: avstängd sms_quote_followup ger ingen dag-siffra — han bevakar ändå', () => {
+    const [rad] = byggBevakning({ offerter: { oppna: 3, followupDagar: 5, paminnelseAktiv: false } })
+    expect(rad.agentId).toBe('daniel')
+    expect(rad.rubrik).toBe('3 öppna offerter')
+    expect(rad.detalj).toBe('automatisk påminnelse är avstängd')
+    expect(rad.detalj).not.toContain('dag 5')
+    expect(rad.aktiv).toBe(true)
   })
 })
 
@@ -88,11 +97,28 @@ test.describe('Lisa, Lars och Matte', () => {
   })
 
   test('Lars: nästa bokning med kund och deterministisk etikett', () => {
-    const [rad] = byggBevakning({ nastaBokning: { start: '2026-08-12T09:00:00.000Z', kund: 'Eriksson' } })
+    const [rad] = byggBevakning({
+      nastaBokning: { start: '2026-08-12T09:00:00.000Z', kund: 'Eriksson' },
+      dagenInnanPaminnelseAktiv: true,
+    })
     expect(rad.agentId).toBe('lars')
     expect(rad.rubrik).toContain('Nästa bokning')
-    expect(rad.detalj).toContain('hos Eriksson')
+    expect(rad.detalj).toBe('hos Eriksson — påminner kunden dagen innan')
     expect(rad.aktiv).toBe(true)
+  })
+
+  test('sann agentstatus: avstängd sms_day_before_reminder — ingen påstådd påminnelse', () => {
+    const [rad] = byggBevakning({
+      nastaBokning: { start: '2026-08-12T09:00:00.000Z', kund: 'Eriksson' },
+      dagenInnanPaminnelseAktiv: false,
+    })
+    expect(rad.detalj).toBe('hos Eriksson — automatisk påminnelse är avstängd')
+
+    const [utanKund] = byggBevakning({
+      nastaBokning: { start: '2026-08-12T09:00:00.000Z' },
+      dagenInnanPaminnelseAktiv: false,
+    })
+    expect(utanKund.detalj).toBe('automatisk påminnelse är avstängd')
   })
 
   test('Lars: trasigt datum eller ingen bokning ger standby — aldrig en gissad tid', () => {

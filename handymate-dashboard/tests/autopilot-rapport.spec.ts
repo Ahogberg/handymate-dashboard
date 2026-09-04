@@ -410,16 +410,17 @@ test.describe('Del 2 — dygnsdigest.ts: `from`-fältet finns redan (Owner Absen
 })
 
 test.describe('CI-inkoppling', () => {
-  test('facit-namnet finns i test:contracts (package.json) och contracts.yml, sist i listan', () => {
+  test('facit-namnet finns i test:contracts (package.json) och contracts.yml — i BÅDA', () => {
+    // Inte "sist i listan": den invarianten blev röd så fort nästa pass
+    // (agent-tillstand, ata-utkast-sparas) kopplade in sina facit efter det
+    // här, precis som autopilot-utgang.spec.ts en gång hårdkodade cron-taket.
+    // Det som ska gälla är att specen körs i CI och lokalt — inte platsen.
     const pkg = JSON.parse(read('package.json'))
     const script: string = pkg.scripts['test:contracts']
     expect(script).toContain('tests/autopilot-rapport.spec.ts')
-    expect(script.trim().endsWith('tests/autopilot-rapport.spec.ts')).toBe(true)
 
     const yamlPath = path.join(ROOT, '..', '.github', 'workflows', 'contracts.yml')
     const yaml = fs.readFileSync(yamlPath, 'utf8')
     expect(yaml).toContain('tests/autopilot-rapport.spec.ts')
-    const listade = Array.from(yaml.matchAll(/tests\/[a-z0-9-]+\.spec\.ts/g)).map(m => m[0])
-    expect(listade[listade.length - 1]).toBe('tests/autopilot-rapport.spec.ts')
   })
 })

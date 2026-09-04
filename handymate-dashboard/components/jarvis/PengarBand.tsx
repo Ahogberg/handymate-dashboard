@@ -25,7 +25,7 @@ export function PengarBand({ summary }: { summary: PengarSummary }) {
     return (
       <div className="bg-white border border-slate-200 rounded-2xl px-4 py-3.5">
         <p className="m-0 text-sm font-medium text-slate-900">Inget som kräver uppmärksamhet just nu</p>
-        <p className="mt-0.5 text-xs text-slate-500 m-0">Karin och Daniel bevakar fakturor och offerter</p>
+        <p className="mt-0.5 text-xs text-slate-500 m-0">Fakturor och offerter som behöver dig dyker upp här</p>
       </div>
     )
   }

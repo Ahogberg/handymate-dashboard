@@ -23,6 +23,15 @@
  *   (quote_followup_days, default 5) — aldrig ett hårdkodat mockup-värde.
  * - Inga belopp någonstans: bevakningen bor på en yta hela personalen ser.
  *   Kronorna bor i ägargrindade "Att hämta" (etapp 5).
+ *
+ * ═══ SANN AGENTSTATUS (tasks/plan-sann-agentstatus.md) ═══
+ *
+ * "föreslår påminnelse på dag N" och "påminner kunden dagen innan" är LÖFTEN
+ * om en automation som faktiskt körs. Båda kräver nu ett uttryckligt påslaget
+ * reglage (automation_settings.sms_quote_followup respektive
+ * .sms_day_before_reminder) — annars är fraserna en osanning: bevakningen
+ * finns kvar (Daniel/Lars syns fortfarande, ärlig standby), men löftesraden
+ * byts mot vad som verkligen händer.
  */
 
 export interface BevakningsRad {
@@ -38,12 +47,22 @@ export interface BevakningsRad {
 export interface BevakningsIndata {
   /** Karin: antal skickade/förfallna fakturor under bevakning. */
   fakturor?: { bevakade: number } | null
-  /** Daniel: öppna offerter + uppföljningsdagen ur inställningarna. */
-  offerter?: { oppna: number; followupDagar: number } | null
+  /**
+   * Daniel: öppna offerter + uppföljningsdagen ur inställningarna.
+   * `paminnelseAktiv` = automation_settings.sms_quote_followup === true —
+   * utan den föreslår Daniel ingen dag, han bara bevakar.
+   */
+  offerter?: { oppna: number; followupDagar: number; paminnelseAktiv: boolean } | null
   /** Lisa: telefonbevakningen aktiv (nummer tilldelat) + samtal senaste dygnet. */
   telefon?: { aktiv: boolean; samtal: number } | null
   /** Lars: nästa bekräftade bokning. */
   nastaBokning?: { start: string; kund?: string | null } | null
+  /**
+   * Lars: automation_settings.sms_day_before_reminder === true — utan den
+   * skickas ingen automatisk påminnelse dagen innan, raden säger det ärligt.
+   * Bara relevant tillsammans med nastaBokning.
+   */
+  dagenInnanPaminnelseAktiv?: boolean
   /** Matte: veckosammanfattningen (generate-insights-cronen, söndag 06:00). */
   veckosammanfattning?: boolean
   /** Hanna: mjuka frågor — bara den första används. */
@@ -110,13 +129,17 @@ export function byggBevakning(indata: BevakningsIndata): BevakningsRad[] {
   }
 
   // Daniel — öppna offerter + cadencen ur inställningarna (INTE mockupens 7).
+  // Utan sms_quote_followup är löftet om en dag en osanning — han bevakar
+  // ändå, men föreslår ingen automatisk påminnelse.
   if (indata.offerter) {
     const n = indata.offerter.oppna
     rader.push(n > 0
       ? {
           agentId: 'daniel',
           rubrik: `${n} öppn${n === 1 ? 'a offert' : 'a offerter'}`,
-          detalj: `föreslår påminnelse på dag ${indata.offerter.followupDagar}`,
+          detalj: indata.offerter.paminnelseAktiv
+            ? `föreslår påminnelse på dag ${indata.offerter.followupDagar}`
+            : 'automatisk påminnelse är avstängd',
           aktiv: true,
         }
       : {
@@ -152,10 +175,15 @@ export function byggBevakning(indata: BevakningsIndata): BevakningsRad[] {
     const nar = indata.nastaBokning ? bokningsEtikett(indata.nastaBokning.start) : null
     if (nar) {
       const kund = indata.nastaBokning!.kund?.trim()
+      // Utan sms_day_before_reminder skickas ingen automatisk påminnelse —
+      // raden lovar det inte.
+      const paminnelseText = indata.dagenInnanPaminnelseAktiv
+        ? 'påminner kunden dagen innan'
+        : 'automatisk påminnelse är avstängd'
       rader.push({
         agentId: 'lars',
         rubrik: `Nästa bokning ${nar}`,
-        detalj: kund ? `hos ${kund} — påminner kunden dagen innan` : 'påminner kunden dagen innan',
+        detalj: kund ? `hos ${kund} — ${paminnelseText}` : paminnelseText,
         aktiv: true,
       })
     } else {

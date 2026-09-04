@@ -649,7 +649,7 @@ export default function IdagCore({
               <span className="block font-heading text-2xl font-bold text-gray-900">{formatKr(economics.unpaidAmount)}</span>
               <span className="block text-xs text-gray-500 mt-0.5">
                 {economics.unpaidCount === 0
-                  ? 'Inga obetalda — Karin bevakar'
+                  ? 'Inga obetalda just nu'
                   : `${economics.unpaidCount} obetalda · Karin bevakar`}
               </span>
             </>

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Sparkles, Check, X, ArrowRight, Loader2 } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 import type { AgentBrief, MorningBrief } from '@/lib/matte/morning-brief'
+import type { AgentTillstand } from '@/lib/agents/agent-tillstand'
 
 interface AgentActivity {
   id: string
@@ -11,6 +12,13 @@ interface AgentActivity {
   action: string
   meta: string | null
   idle: boolean
+  /**
+   * Sann agentstatus (tasks/plan-sann-agentstatus.md). Matte har ingen —
+   * han filtreras bort innan render (se visibleAgents nedan) precis som
+   * tidigare. `behover_aktiveras` och `pausad` får ALDRIG samma gröna
+   * "Standby"-badge som en riktigt aktiverad, vakande agent.
+   */
+  tillstand?: AgentTillstand
 }
 
 export interface TeamActivitySummary {
@@ -221,7 +229,12 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
           // (/api/morning-brief) → visa Mattes lägesrapport i stället för
           // den generiska "Standby"-statusen. Aldrig för agenter med riktig
           // aktivitet eller en aktiv observation — de har redan bättre data.
-          const agentBrief = activity.idle && !obs ? briefByAgent.get(activity.id) : undefined
+          // Aldrig heller för `behover_aktiveras`/`pausad` — Mattes generiska
+          // lägesrapport ("Ekonomin ser bra ut idag") vore en osanning över
+          // en agent som ännu inte har en uppfylld förutsättning, eller som
+          // är avstängd (sann agentstatus, tasks/plan-sann-agentstatus.md).
+          const behoverEgenText = activity.tillstand === 'behover_aktiveras' || activity.tillstand === 'pausad'
+          const agentBrief = activity.idle && !obs && !behoverEgenText ? briefByAgent.get(activity.id) : undefined
           const briefUrgent = !!agentBrief && (
             agentBrief.badgeType === 'danger' ||
             agentBrief.details.some(d => d.urgency === 'high')
@@ -247,16 +260,34 @@ export default function TeamActivityStrip({ onLoaded }: TeamActivityStripProps) 
                 )}
                 <span
                   className={`absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white ${
-                    activity.idle ? 'bg-emerald-300' : 'bg-emerald-500'
+                    activity.tillstand === 'pausad'
+                      ? 'bg-gray-300'
+                      : activity.tillstand === 'behover_aktiveras'
+                        ? 'bg-amber-400'
+                        : activity.idle ? 'bg-emerald-300' : 'bg-emerald-500'
                   }`}
-                  title={activity.idle ? 'Standby' : 'Aktiv'}
+                  title={
+                    activity.tillstand === 'pausad'
+                      ? 'Pausad'
+                      : activity.tillstand === 'behover_aktiveras'
+                        ? 'Behöver aktiveras'
+                        : activity.idle ? 'Standby' : 'Aktiv'
+                  }
                 />
               </div>
 
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
                   <p className="text-sm font-semibold text-gray-900 leading-tight">{agent.name}</p>
-                  {activity.idle && !obs && !agentBrief && (
+                  {activity.tillstand === 'pausad' ? (
+                    <span className="text-[10px] font-medium text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded-full">
+                      Pausad
+                    </span>
+                  ) : activity.tillstand === 'behover_aktiveras' ? (
+                    <span className="text-[10px] font-medium text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded-full">
+                      Behöver aktiveras
+                    </span>
+                  ) : activity.idle && !obs && !agentBrief && (
                     <span className="text-[10px] font-medium text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-full">
                       Standby
                     </span>

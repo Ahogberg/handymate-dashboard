@@ -54,8 +54,9 @@ export default function WelcomeModal() {
         </p>
 
         <p className="text-sm text-gray-600 leading-relaxed mb-3">
-          Sen börjar de jobba. Lisa fångar samtalen du missar. Karin håller
-          koll på fakturorna. Daniel följer upp offerterna. Och du?
+          Snart börjar de jobba. Lisa kommer att fånga samtalen du missar.
+          Karin kommer att hålla koll på fakturorna. Daniel kommer att följa
+          upp offerterna. Och du?
         </p>
 
         <p className="text-sm text-gray-600 leading-relaxed mb-6">
