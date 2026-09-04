@@ -10,7 +10,8 @@
  * node:dns) — får bara anropas från route-handlers.
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { harledSignaler, type GtmSignalSnapshot } from './signaler'
+import { harledSignaler, type GtmSignal, type GtmSignalSnapshot } from './signaler'
+import { hamtaPlatsbankenTraffar, harledRekryteringssignal } from './rekryteringssignal'
 import {
   normalizeWebsiteUrl,
   isBlockedHostname,
@@ -42,10 +43,31 @@ function isBlockedTarget(hostname: string): boolean {
  */
 export async function korSignalerForAccount(
   supabase: SupabaseClient,
-  account: { id: string; website: string | null; brief_source_snapshot?: unknown },
+  account: {
+    id: string
+    website: string | null
+    company_name?: string | null
+    org_number?: string | null
+    brief_source_snapshot?: unknown
+  },
   adminUserId: string,
 ): Promise<SignalRunResult> {
   const fetchedAt = new Date().toISOString()
+
+  // Rekryteringssignalen hämtas OBEROENDE av webbplatsen. Många av de bästa
+  // prospekten — små firmor med en telefon och inget mer — har ingen sajt
+  // alls, och de ska inte tappa signalen bara för att webbläsningen faller.
+  // Den behöver bara organisationsnumret och företagsnamnet.
+  const rekryteringPromise: Promise<GtmSignal | null> = (async () => {
+    if (!account.org_number || !account.company_name) return null
+    try {
+      const traffar = await hamtaPlatsbankenTraffar(account.company_name)
+      return harledRekryteringssignal(traffar, account.org_number, new Date())
+    } catch (err) {
+      console.warn('[signaler-runner] rekryteringssignalen kunde inte hämtas:', err instanceof Error ? err.message : err)
+      return null
+    }
+  })()
   const existingSnapshot = (account.brief_source_snapshot && typeof account.brief_source_snapshot === 'object')
     ? account.brief_source_snapshot as Record<string, unknown>
     : {}
@@ -66,10 +88,14 @@ export async function korSignalerForAccount(
   }
 
   async function fel(reason: string): Promise<SignalRunResult> {
+    // Även när webbplatsen inte gick att läsa sparas rekryteringssignalen om
+    // den finns — annars hade en trasig sajt tystat en fullt giltig signal
+    // från en helt annan källa.
+    const rekrytering = await rekryteringPromise
     const felSnapshot: GtmSignalSnapshot & { error: string } = {
       fetched_at: fetchedAt,
       url: account.website || '',
-      signals: [],
+      signals: rekrytering ? [rekrytering] : [],
       text_chars: 0,
       error: reason,
     }
@@ -93,7 +119,11 @@ export async function korSignalerForAccount(
     return fel('Sidan innehöll för lite text för att läsas')
   }
 
-  const signals = harledSignaler(text, fetchResult.html, new Date())
+  const webbsignaler = harledSignaler(text, fetchResult.html, new Date())
+  const rekrytering = await rekryteringPromise
+  // Rekryteringen först: en firma som växer är den starkaste öppningen vi har,
+  // och valjOppning() tar den starkaste signalen.
+  const signals = rekrytering ? [rekrytering, ...webbsignaler] : webbsignaler
   const snapshot: GtmSignalSnapshot = { fetched_at: fetchedAt, url: normalized.url, signals, text_chars: text.length }
   const saved = await spara(snapshot)
   return { ok: true, account_id: account.id, snapshot, account: saved }

@@ -85,6 +85,14 @@ function signalSnapshotFromAccount(account: GtmAccount): (GtmSignalSnapshot & { 
   return raw && typeof raw === 'object' ? raw as GtmSignalSnapshot & { error?: string } : null
 }
 
+/** Rekryteringssignalen ur snapshoten (2026-09-03). Att en firma söker folk
+ *  betyder att den växer — och en växande firma har precis fått det
+ *  administrativa problemet vi löser. Därför syns den i LISTAN, inte bara i
+ *  lådan: den ska gå att sortera och sålla på utan att öppna varje rad. */
+function rekryteringssignal(account: GtmAccount) {
+  return signalSnapshotFromAccount(account)?.signals?.find(s => s.key === 'rekryterar') || null
+}
+
 function dateTimeLocal(value: Date): string {
   const local = new Date(value.getTime() - value.getTimezoneOffset() * 60_000)
   return local.toISOString().slice(0, 16)
@@ -106,6 +114,7 @@ export default function LaunchDeskPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('active')
   const [selected, setSelected] = useState<GtmAccount | null>(null)
+  const [baraRekryterande, setBaraRekryterande] = useState(false)
   const [activities, setActivities] = useState<GtmActivity[]>([])
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -154,10 +163,17 @@ export default function LaunchDeskPage() {
     const active = status === 'active'
       ? accounts.filter(account => !['won', 'lost', 'suppressed'].includes(account.status))
       : accounts
-    return [...active].sort((a, b) => priorityScore({
-      fitScore: b.fit_score, nextActionAt: b.next_action_at, status: b.status,
-    }) - priorityScore({ fitScore: a.fit_score, nextActionAt: a.next_action_at, status: a.status }))
-  }, [accounts, status])
+    const filtrerad = baraRekryterande ? active.filter(a => rekryteringssignal(a)) : active
+    return [...filtrerad].sort((a, b) => {
+      // Rekryterande firmor först — den starkaste öppningen vi har. Inom
+      // varje grupp gäller den befintliga prioriteringen oförändrat.
+      const rek = Number(Boolean(rekryteringssignal(b))) - Number(Boolean(rekryteringssignal(a)))
+      if (rek !== 0) return rek
+      return priorityScore({
+        fitScore: b.fit_score, nextActionAt: b.next_action_at, status: b.status,
+      }) - priorityScore({ fitScore: a.fit_score, nextActionAt: a.next_action_at, status: a.status })
+    })
+  }, [accounts, status, baraRekryterande])
 
   async function openAccount(account: GtmAccount) {
     setSelected(account)
@@ -399,15 +415,26 @@ export default function LaunchDeskPage() {
             <option value="active">Aktiv arbetskö</option><option value="all">Alla prospekt</option>
             {Object.entries(STATUS_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
+          <button
+            type="button"
+            onClick={() => setBaraRekryterande(v => !v)}
+            aria-pressed={baraRekryterande}
+            title="Firmor som annonserar efter folk växer — och en växande firma har precis fått problemet vi löser."
+            className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${baraRekryterande ? 'border-emerald-300 bg-emerald-50 text-emerald-800' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'}`}
+          >
+            Rekryterar{baraRekryterande ? ' ✓' : ''}
+          </button>
         </section>
 
         {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
         {loading ? <div className="flex justify-center py-24"><Loader2 className="h-7 w-7 animate-spin text-primary-700" /></div> : (
           <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm">
             {visibleAccounts.length === 0 ? <div className="px-6 py-20 text-center"><Building2 className="mx-auto mb-3 h-9 w-9 text-gray-300" /><p className="font-medium">Arbetskön är tom</p><p className="mt-1 text-sm text-gray-500">Importera officiellt företagsunderlag för att börja.</p></div> : visibleAccounts.map(account => (
-              <button key={account.id} onClick={() => openAccount(account)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 border-b border-gray-100 px-4 py-4 text-left last:border-0 hover:bg-gray-50 sm:grid-cols-[minmax(240px,1fr)_130px_130px_110px_auto]">
+              <button key={account.id} onClick={() => openAccount(account)} className="grid w-full grid-cols-[1fr_auto] items-center gap-3 border-b border-gray-100 px-4 py-4 text-left last:border-0 hover:bg-gray-50 sm:grid-cols-[minmax(200px,1fr)_90px_110px_100px_120px_110px_auto]">
                 <div className="min-w-0"><div className="flex items-center gap-2"><p className="truncate font-semibold">{account.company_name}</p><span className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass(account.status)}`}>{STATUS_LABELS[account.status]}</span></div><p className="mt-1 truncate text-xs text-gray-500">{account.industry || 'Bransch ej angiven'} · {account.municipality || 'Ort ej angiven'}</p></div>
                 <div className="hidden sm:block"><p className="text-xs text-gray-400">Fit</p><p className="font-semibold">{account.fit_score}/100</p></div>
+                <div className="hidden sm:block"><p className="text-xs text-gray-400">Anställda</p><p className="text-sm">{account.employee_band || '—'}</p></div>
+                <div className="hidden sm:block"><p className="text-xs text-gray-400">Växer</p>{rekryteringssignal(account) ? <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700" title={rekryteringssignal(account)!.evidence}>Rekryterar</span> : <p className="text-sm text-gray-300">—</p>}</div>
                 <div className="hidden sm:block"><p className="text-xs text-gray-400">Nästa steg</p><p className="text-sm">{dateLabel(account.next_action_at)}</p></div>
                 <div className="hidden sm:block"><p className="text-xs text-gray-400">Kanal</p><p className="text-sm">{CHANNEL_LABELS[account.suggested_channel]}</p></div>
                 <ChevronRight className="h-5 w-5 text-gray-300" />

@@ -125,3 +125,41 @@ test.describe('hämtningen är fail-soft', () => {
     expect(src).not.toMatch(/search\?[^`'"]*employer=/)
   })
 })
+
+test.describe('inkopplingen', () => {
+  const runner = fs.readFileSync(path.resolve(__dirname, '../lib/launch-desk/signaler-runner.ts'), 'utf8')
+  const rutt = fs.readFileSync(path.resolve(__dirname, '../app/api/admin/launch/accounts/[id]/signaler/route.ts'), 'utf8')
+  const sida = fs.readFileSync(path.resolve(__dirname, '../app/admin/launch/page.tsx'), 'utf8')
+
+  test('runnern hämtar rekryteringen OBEROENDE av webbplatsen', () => {
+    // Många av de bästa prospekten — små firmor med en telefon och inget mer
+    // — har ingen sajt alls. De ska inte tappa signalen för det.
+    expect(runner).toContain('rekryteringPromise')
+    expect(runner.indexOf('const rekryteringPromise')).toBeLessThan(runner.indexOf('if (!account.website)'))
+  })
+
+  test('signalen sparas även när webbläsningen faller', () => {
+    const felBlock = runner.slice(runner.indexOf('async function fel('), runner.indexOf('if (!account.website)'))
+    expect(felBlock).toContain('await rekryteringPromise')
+    expect(felBlock).toContain('rekrytering ? [rekrytering] : []')
+  })
+
+  test('rutten kräver inte längre en webbplats när orgnummer finns', () => {
+    expect(rutt).toContain('!account.website && !account.org_number')
+  })
+
+  test('rekryteringen läggs först bland signalerna — starkast öppning', () => {
+    expect(runner).toContain('[rekrytering, ...webbsignaler]')
+  })
+
+  test('listan visar anställda och rekrytering som egna kolumner', () => {
+    expect(sida).toContain('>Anställda<')
+    expect(sida).toContain('>Växer<')
+    expect(sida).toContain('Rekryterar')
+  })
+
+  test('rekryterande firmor sorteras först och går att sålla på', () => {
+    expect(sida).toContain('baraRekryterande')
+    expect(sida).toContain('const rek = Number(Boolean(rekryteringssignal(b)))')
+  })
+})

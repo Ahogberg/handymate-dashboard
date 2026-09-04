@@ -32,7 +32,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return NextResponse.json({ error: readError.message }, { status: 500 })
   }
   if (!account) return NextResponse.json({ error: 'Prospektet hittades inte' }, { status: 404 })
-  if (!account.website) return NextResponse.json({ error: 'Prospektet saknar webbplats' }, { status: 400 })
+  // Tidigare krävdes en webbplats. Men rekryteringssignalen hämtas ur
+  // Platsbanken och behöver bara organisationsnumret — och många av de bästa
+  // prospekten (små firmor med en telefon och inget mer) har ingen sajt alls.
+  // Saknas BÅDA finns det inget att läsa.
+  if (!account.website && !account.org_number) {
+    return NextResponse.json({ error: 'Prospektet saknar både webbplats och organisationsnummer' }, { status: 400 })
+  }
 
   const result = await korSignalerForAccount(supabase, account, admin.userId)
 
