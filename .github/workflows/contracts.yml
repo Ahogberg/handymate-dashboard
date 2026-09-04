@@ -102,6 +102,7 @@ jobs:
           tests/google-revoke.spec.ts
           tests/veckopuls.spec.ts
             tests/launch-desk-kallkrav.spec.ts
+            tests/rekryteringssignal.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

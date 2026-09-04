@@ -1,0 +1,55 @@
+{
+  "total": {
+    "value": 287
+  },
+  "hits": [
+    {
+      "id": "31435071",
+      "webpage_url": "https://arbetsformedlingen.se/platsbanken/annonser/31435071",
+      "headline": "Elektriker",
+      "number_of_vacancies": 1,
+      "publication_date": "2026-09-03T14:50:44",
+      "last_publication_date": "2026-09-29T23:59:59",
+      "removed": false,
+      "employer": {
+        "organization_number": "2120000530",
+        "name": "Jönköpings kommun",
+        "workplace": "Tekniska kontoret"
+      },
+      "occupation": {
+        "label": "Serviceelektriker, installation"
+      },
+      "occupation_group": {
+        "label": "Installations- och serviceelektriker"
+      },
+      "workplace_address": {
+        "municipality": "Jönköping",
+        "region": "Jönköpings län"
+      }
+    },
+    {
+      "id": "31422979",
+      "webpage_url": "https://arbetsformedlingen.se/platsbanken/annonser/31422979",
+      "headline": "Elektriker",
+      "number_of_vacancies": 1,
+      "publication_date": "2026-09-01T11:40:41",
+      "last_publication_date": "2026-09-20T23:59:59",
+      "removed": false,
+      "employer": {
+        "organization_number": "5560936949",
+        "name": "SkiStar Aktiebolag",
+        "workplace": "SkiStar Åre"
+      },
+      "occupation": {
+        "label": "Anläggningsingenjör, elkraft"
+      },
+      "occupation_group": {
+        "label": "Ingenjörer och tekniker inom elektroteknik"
+      },
+      "workplace_address": {
+        "municipality": "Åre",
+        "region": "Jämtlands län"
+      }
+    }
+  ]
+}
