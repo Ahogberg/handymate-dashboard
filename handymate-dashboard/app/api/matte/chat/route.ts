@@ -637,7 +637,22 @@ async function runAgentTurn(opts: {
   const MISSION_TOOL_NAMES = new Set(['propose_mission_plan', 'confirm_mission'])
   // Agentens allowlist låses för hela turen — byts agenten sker det via en
   // NY runAgentTurn efter handoff, med den nya agentens lista.
-  const candidates = opts.workReport ? filterTools(['log_time', 'add_work_note']).filter(t => isToolAllowedForAgent(opts.agent, t.name)) : toolsForAgent(opts.agent)
+  //
+  // Rapportläget (tasks/plan-faltrapport.md) har en EGEN, snävare allowlista
+  // — bara de fyra work-report-verktygen — än agentens (lib/agents/
+  // personalities.ts), och hoppar därför MEDVETET över
+  // isToolAllowedForAgent(...) här. Skälet är create_ata_draft: det verktyget
+  // ägs av Daniel i personalities.ts, men rapportläget tvingar alltid Lars.
+  // Att i stället lägga create_ata_draft i Lars egen allowedTools-array
+  // skulle vidga hans AUTONOMA cron-körningar (agent-observations/lars) —
+  // det vill vi inte, rapportläget är ett helt separat, hårdare låst spår.
+  // Listan nedan är redan strikt smalare än någon agents fulla lista och
+  // kontrolleras dessutom två gånger till (isWorkReportTool-kontrollen
+  // nedan + prepareWorkReportAction i lib/matte/work-report.ts), så
+  // skärningen mot agentlistan tillför ingen säkerhet här.
+  const candidates = opts.workReport
+    ? filterTools(['log_time', 'add_work_note', 'log_material', 'create_ata_draft'])
+    : toolsForAgent(opts.agent)
   const agentTools = candidates.filter(
     t => (opts.missionToolsAllowed || !MISSION_TOOL_NAMES.has(t.name)) && (!opts.workReport || isWorkReportTool(t.name)),
   )
@@ -676,8 +691,8 @@ async function runAgentTurn(opts: {
     if (opts.workReport) {
       try {
       // A real execution boundary, not just an instruction to the model.
-      if (toolUseBlocks.some((b: any) => !isWorkReportTool(b.name)) || toolUseBlocks.length > 2 || new Set(toolUseBlocks.map((b: any) => b.name)).size !== toolUseBlocks.length) {
-        throw new WorkReportError(409, 'Rapportläget kan bara föreslå en tidpost och en arbetsanteckning. Inget har sparats.')
+      if (toolUseBlocks.some((b: any) => !isWorkReportTool(b.name)) || toolUseBlocks.length > 4 || new Set(toolUseBlocks.map((b: any) => b.name)).size !== toolUseBlocks.length) {
+        throw new WorkReportError(409, 'Rapportläget kan bara föreslå en tidpost, en arbetsanteckning, en materialrad och ett tilläggsförslag åt gången. Inget har sparats.')
       }
       const actions = toolUseBlocks.map((b: any) => prepareWorkReportAction(b.name, b.input || {}, opts.workReport!))
       if (actions.length) return {

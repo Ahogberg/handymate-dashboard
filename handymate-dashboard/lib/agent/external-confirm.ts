@@ -40,8 +40,16 @@ export function isExternalSendTool(toolName: string): boolean {
  * Verktygen är interna och reversibla, så verbet på knappen är Logga/Bokför/
  * Spara — aldrig "Skicka", som antyder att något lämnar huset.
  */
+// create_ata_draft tillkom med Rapportläget (tasks/plan-faltrapport.md):
+// verifyPendingExternalAction nedan nekar (return null) VARJE token vars
+// toolName inte står i den här listan — helt oavsett om token bär ett giltigt
+// workReport-scope. Utan create_ata_draft här skulle varje ÄTA-förslags
+// bekräftelsekort alltid svara "ogiltig/utgången" trots en korrekt signerad
+// token. Verktyget är aldrig nåbart i den vanliga kurerade chatten (saknas i
+// CURATED_TOOL_NAMES, app/api/matte/chat/route.ts) så tillägget påverkar
+// inget annat flöde än rapportläget.
 const CONFIRM_GATED_TOOL_NAMES = new Set(
-  Array.from(EXTERNAL_SEND_TOOL_NAMES).concat('log_time', 'log_material', 'add_work_note')
+  Array.from(EXTERNAL_SEND_TOOL_NAMES).concat('log_time', 'log_material', 'add_work_note', 'create_ata_draft')
 )
 
 export function isConfirmGatedTool(toolName: string): boolean {

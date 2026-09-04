@@ -7,7 +7,10 @@ import { loadWorkReportContext, prepareWorkReportAction, workReportSummary, Work
 export function pendingWorkReport(action: WorkReportAction, ctx: WorkReportContext, businessId: string, threadId: string | null, remaining: WorkReportAction[] = [], requestId: string = crypto.randomUUID()) {
   return {
     tool_name: action.toolName, args: action.toolInput, summary: workReportSummary(action, ctx),
-    confirm_label: action.toolName === 'log_time' ? 'Lägg till tiden' : 'Spara anteckningen',
+    confirm_label: action.toolName === 'log_time' ? 'Lägg till tiden'
+      : action.toolName === 'add_work_note' ? 'Spara anteckningen'
+      : action.toolName === 'log_material' ? 'Bokför materialet'
+      : 'Spara förslaget',
     token: signPendingExternalAction({ ...action, businessId, threadId, agent: 'lars', workReport: { projectId: ctx.projectId, userId: ctx.userId, date: ctx.date, requestId, remaining } }),
   }
 }
@@ -22,7 +25,7 @@ export async function confirmWorkReport(
   const scope = pending.workReport
   if (!scope || !user || scope.userId !== user.id || pending.businessId !== businessId) throw new WorkReportError(403, 'Bekräftelsen tillhör en annan användare.')
   const ctx = await loadWorkReportContext(db, businessId, user, scope.projectId, scope.date)
-  if (!scope.requestId || scope.remaining.length > 1) throw new WorkReportError(400, 'Rapportens bekräftelse är ogiltig.')
+  if (!scope.requestId || scope.remaining.length > 3) throw new WorkReportError(400, 'Rapportens bekräftelse är ogiltig.')
   // A deterministic unique key is the concurrent/retry guard. Same token or
   // reissued next card can never insert a second row for this action.
   const confirmationId = crypto.createHash('sha256').update(`${businessId}:${user.id}:${scope.requestId}:${pending.toolName}`).digest('hex').slice(0, 32)
@@ -36,10 +39,17 @@ export async function confirmWorkReport(
   if (ok && scope.remaining.length) {
     try {
       const nextAction = prepareWorkReportAction(scope.remaining[0].toolName, scope.remaining[0].toolInput, ctx)
-      next = pendingWorkReport(nextAction, ctx, businessId, pending.threadId, [], scope.requestId)
+      // scope.remaining kan nu vara upp till 3 långt (taket höjt till fyra
+      // förslag/tur, se app/api/matte/chat/route.ts). Bär vidare RESTEN av
+      // kedjan (index 1+) till nästa kort — annars tappas senare kort tyst
+      // så fort en tur innehåller fler än två förslag.
+      next = pendingWorkReport(nextAction, ctx, businessId, pending.threadId, scope.remaining.slice(1), scope.requestId)
     } catch (error) { nextError = error instanceof Error ? error.message : 'Nästa förslag kunde inte kontrolleras.' }
   }
-  const label = pending.toolName === 'log_time' ? 'Tiden' : 'Arbetsanteckningen'
+  const label = pending.toolName === 'log_time' ? 'Tiden'
+    : pending.toolName === 'add_work_note' ? 'Arbetsanteckningen'
+    : pending.toolName === 'log_material' ? 'Materialet'
+    : 'Förslaget'
   const reply = ok
     ? `${result.data?.message || `${label} sparad.`}${next ? '\nNästa del är inte sparad ännu. Kontrollera nästa kort.' : ''}${nextError ? `\nNästa del sparades inte: ${nextError}` : ''}`
     : `${label} kunde inte sparas: ${result?.error || 'Skrivningen kunde inte bekräftas.'} Ingen senare del har utförts.`
