@@ -179,9 +179,17 @@ test.describe('Del 2 — vercel.json', () => {
 
 test.describe('Del 2 — cron-auth-taket och route-auth-inventeringen', () => {
   test('tests/cron-auth.spec.ts räknar med den nya rutten (+1)', () => {
+    // Härlett i stället för hardkodat (Pass C, 2026-09-04): en senare pass
+    // som lägger till ÄNNU en cron-rutt höjer båda talen igen — ett
+    // hardkodat '46'/'45' här skulle då fälla en helt korrekt ändring,
+    // exakt den stelt-kodade-tal-fällan cron-auth.spec.ts själv varnar för.
+    // Invarianten Pass B faktiskt brydde sig om består: totalt = ägda + 1
+    // (karin-deadlines-undantaget).
     const cronAuth = read('tests/cron-auth.spec.ts')
-    expect(cronAuth).toContain('toHaveLength(46)')
-    expect(cronAuth).toContain('toHaveLength(45)')
+    const tal = Array.from(cronAuth.matchAll(/toHaveLength\((\d+)\)/g)).map(m => Number(m[1]))
+    expect(tal, 'förväntade exakt två toHaveLength(N) i cron-auth.spec.ts').toHaveLength(2)
+    const [totalt, agda] = tal
+    expect(totalt - agda).toBe(1)
   })
 
   test('facit-route-auth-inventory har höjt eller behållit taket för utan-standardgrind', () => {

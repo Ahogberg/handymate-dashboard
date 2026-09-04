@@ -107,6 +107,7 @@ jobs:
             tests/autopilot-nba.spec.ts
             tests/autopilot-push.spec.ts
             tests/autopilot-utgang.spec.ts
+            tests/autopilot-rapport.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

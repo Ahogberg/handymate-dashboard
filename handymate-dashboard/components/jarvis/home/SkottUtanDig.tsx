@@ -21,8 +21,13 @@ import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
  *
  * Datat är exakt samma dygnsRader som förut (byggDygnsdigest +
  * executeSends färska rader, byggda i JarvisHome) — ingen ny hämtning,
- * inga nya grindar. Fönstret är ett RULLANDE dygn
- * (lib/jarvis/dygnsdigest.ts), därav "sedan i går".
+ * inga nya grindar. Fönstret var ett RULLANDE dygn, därav "sedan i går".
+ *
+ * Pass C, del 2 (2026-09-04): fönstret kan nu vara längre än ett dygn (se
+ * lib/jarvis/senast-sedd.ts) — `titel` byggs av JarvisHome utifrån SAMMA
+ * fönster som `rader` filtrerades mot, så rubriken aldrig ljuger om vad som
+ * faktiskt visas. Standardvärdet håller den gamla texten för den enda andra
+ * (hypotetiska) anroparen som inte skickar en egen.
  */
 
 export interface SkottRad {
@@ -36,7 +41,7 @@ export interface SkottRad {
 
 const MAX_HOPFALLDA = 4
 
-export function SkottUtanDig({ rader }: { rader: SkottRad[] }) {
+export function SkottUtanDig({ rader, titel = 'Skött utan dig sedan i går' }: { rader: SkottRad[]; titel?: string }) {
   const [open, setOpen] = useState(false)
   if (rader.length === 0) return null
 
@@ -47,7 +52,7 @@ export function SkottUtanDig({ rader }: { rader: SkottRad[] }) {
     <section className="mb-2.5 bg-white border border-slate-200 rounded-card p-4">
       <div className="flex items-baseline gap-2 mb-1">
         <h3 className="m-0 font-heading text-[15px] font-semibold text-slate-900 flex-1 min-w-0">
-          Skött utan dig sedan i går
+          {titel}
         </h3>
         <button
           type="button"

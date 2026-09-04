@@ -7,6 +7,7 @@ import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
 import { byggBevakning, fyndPerAgent, type BevakningsRad } from '@/lib/jarvis/bevakning'
 import { byggDygnsdigest, halsningsBevis, type DigestAktivitet } from '@/lib/jarvis/dygnsdigest'
+import { SENAST_SEDD_KEY, digestFonsterStartMs, skottUtanDigRubrik } from '@/lib/jarvis/senast-sedd'
 import { TeamBevakning } from '@/components/jarvis/TeamBevakning'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -365,6 +366,25 @@ export default function JarvisHome({
     } catch { /* trasig localStorage får aldrig fälla sidan */ }
   }, [])
 
+  // ═══ "SEDAN DU VAR HÄR SENAST" (Pass C, del 2, 2026-09-04) ═══
+  //
+  // Läs FÖRE skriv, i samma effekt: värdet som redan låg där är förra
+  // besökets tidsstämpel — den vi vill räkna fönstret mot. Skriver vi
+  // FÖRST skulle vi bara någonsin se "nu", och fönstret vore alltid 24h.
+  // null (första besöket / trasig localStorage) ger digestFonsterStartMs
+  // sin 24h-fallback — dagens beteende, oförändrat.
+  const [senastSeddMs, setSenastSeddMs] = useState<number | null>(null)
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(SENAST_SEDD_KEY)
+      const parsed = raw ? Number(raw) : NaN
+      if (Number.isFinite(parsed)) setSenastSeddMs(parsed)
+    } catch { /* trasig localStorage → 24h-fallback, oförändrat */ }
+    try {
+      localStorage.setItem(SENAST_SEDD_KEY, String(Date.now()))
+    } catch { /* best effort — nästa laddning får bara 24h-fallback */ }
+  }, [])
+
   const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
   // Det köade beslutet i sin helhet — så att en sidlämning kan SKICKA det i
   // stället för att tyst kasta det (Andreas fynd 2026-08-10: godkända kort
@@ -573,12 +593,18 @@ export default function JarvisHome({
 
   useEffect(() => {
     let active = true
-    fetch('/api/automations/activity?limit=30')
+    // limit=100, inte 30 (Pass C, del 2): fönstret kan nu sträcka sig upp
+    // till 7 dagar bakåt (lib/jarvis/senast-sedd.ts) — automation_activity
+    // (huvudkällan i /api/automations/activity) har ingen egen tidsgräns,
+    // bara `limit`, så en för snål gräns hade tyst klippt bort äldre rader
+    // innan byggDygnsdigest ens fick chansen att filtrera på fönstret.
+    fetch('/api/automations/activity?limit=100')
       .then(r => (r.ok ? r.json() : null))
       .then(res => {
         if (!active || !res?.data) return
-        // Rådata till digesten — fönstret (24 h rullande) och grindarna
-        // bor i lib/jarvis/dygnsdigest.ts, inte här.
+        // Rådata till digesten — fönstret (default 24 h rullande, utökat
+        // upp till 7 dagar via `from`) och grindarna bor i
+        // lib/jarvis/dygnsdigest.ts, inte här.
         setAktiviteter(res.data as DigestAktivitet[])
       })
       .catch(() => { /* loggen är en bekvämlighet, aldrig blockerande */ })
@@ -967,12 +993,19 @@ export default function JarvisHome({
   const synligaNbaIds = new Set(synligaNba.map(r => r.approval.id))
   const synliga = approvals.filter(a => !hiddenIds.has(a.id) && !synligaNbaIds.has(a.id))
 
-  // Dygnsdigesten: 24 h rullande fönster + grindar (lib/jarvis/dygnsdigest.ts).
-  // Färska rader från executeSend (doneRows) står alltid först — de är det
-  // man nyss beslutade och ska synas direkt.
+  // Dygnsdigesten: fönster + grindar (lib/jarvis/dygnsdigest.ts). Färska
+  // rader från executeSend (doneRows) står alltid först — de är det man
+  // nyss beslutade och ska synas direkt.
+  //
+  // Pass C, del 2 (2026-09-04): fönstret är inte längre hårdkodat 24 h —
+  // "sedan du var här senast" (lib/jarvis/senast-sedd.ts), golv 24 h/tak
+  // 7 dagar, så en hantverkare som varit på bygget i tre dagar ser tre
+  // dagars arbete i stället för ett nästan tomt kort.
+  const nuMs = Date.now()
+  const dygnsFonsterStartMs = digestFonsterStartMs(nuMs, senastSeddMs)
   const dygnsRader: DoneRow[] = [
     ...doneRows,
-    ...byggDygnsdigest({ aktiviteter, samtal, nu: new Date() }).map(r => ({
+    ...byggDygnsdigest({ aktiviteter, samtal, nu: new Date(nuMs), from: new Date(dygnsFonsterStartMs) }).map(r => ({
       key: r.key,
       time: formatClock(r.tid),
       agent: r.agentId,
@@ -980,6 +1013,10 @@ export default function JarvisHome({
       auto: r.auto,
     })),
   ]
+  // Rubriken byggs av SAMMA fönster som filtrerade raderna ovan — den ljuger
+  // aldrig om vad "Skött utan dig" faktiskt visar (filens egen regel, se
+  // lib/jarvis/senast-sedd.ts).
+  const skottUtanDigTitel = skottUtanDigRubrik(nuMs, dygnsFonsterStartMs)
   // Räknaren visar BESLUT, inte databasrader. Två förfallna fakturor från
   // samma agent samma dygn är ett beslut — "4" när tre av korten är samma
   // ärende läser som att man ligger efter mer än man gör. De rankade
@@ -1377,7 +1414,7 @@ export default function JarvisHome({
               till home/SkottUtanDig (Etapp C3): auto-raderna som synlig
               checklista, hela listan bakom "Visa alla". Samma dygnsRader
               som förut — EN sanning, ingen andra hämtning. */}
-          <SkottUtanDig rader={dygnsRader} />
+          <SkottUtanDig rader={dygnsRader} titel={skottUtanDigTitel} />
 
           {/* data-tour-target: Hemturens andra stopp. */}
           <div data-tour-target="hemtur-team">

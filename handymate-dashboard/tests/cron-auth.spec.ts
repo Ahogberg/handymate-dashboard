@@ -86,11 +86,14 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // 46 (2026-09-04, Pass B — kortdiet/kortutgång): kort-gar-ut tillkom
   // (push dagen innan ett väntande kort går ut, tasks/plan-autopilot-B-
   // utgang.md del 2) och använder helpern korrekt.
-  expect(files).toHaveLength(46)
+  // 47 (2026-09-04, Pass C — veckorapporten): cron/veckorapport tillkom
+  // (SMS varje fredag med veckans bevis, tasks/plan-autopilot-C-rapport.md
+  // del 1) och använder helpern korrekt.
+  expect(files).toHaveLength(47)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(45)
+  expect(ownedRoutes).toHaveLength(46)
 
   const missing = ownedRoutes
     .filter(file => {

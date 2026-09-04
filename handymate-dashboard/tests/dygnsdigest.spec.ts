@@ -119,8 +119,11 @@ test.describe('ytan', () => {
   const skott = fs.readFileSync(path.join(ROOT, 'components/jarvis/home/SkottUtanDig.tsx'), 'utf8')
 
   test('digesten ligger under besluten, före bevakningen — monterad som SkottUtanDig', () => {
-    expect(home).toContain('<SkottUtanDig rader={dygnsRader} />')
-    const digestPos = home.indexOf('<SkottUtanDig rader={dygnsRader} />')
+    // Pass C, del 2 (2026-09-04): SkottUtanDig fick en `titel`-prop byggd av
+    // "sedan du var här senast"-fönstret (lib/jarvis/senast-sedd.ts) —
+    // monteringspunkten/ordningen den här texten faktiskt testar är orörd.
+    expect(home).toContain('<SkottUtanDig rader={dygnsRader} titel={skottUtanDigTitel} />')
+    const digestPos = home.indexOf('<SkottUtanDig rader={dygnsRader} titel={skottUtanDigTitel} />')
     const bevakningPos = home.indexOf('<TeamBevakning')
     const nyheterPos = home.indexOf('── Värt att veta ──')
     expect(digestPos).toBeLessThan(bevakningPos)

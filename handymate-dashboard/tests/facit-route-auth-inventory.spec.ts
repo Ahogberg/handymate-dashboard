@@ -181,6 +181,9 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // till huset, inte till ett kundkonto → 144.
   // 2026-09-04 (Pass B — kortutgång): cron/kort-gar-ut — cron-hemlighet,
   // ingen tenant-kontext (svepet grupperar per business_id själv) → 145.
+  // 2026-09-04 (Pass C — veckorapporten): cron/veckorapport —
+  // cron-hemlighet, ingen tenant-kontext (svepet grupperar per
+  // business_id själv, exakt samma motivering som kort-gar-ut) → 146.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(145)
+  expect(utanStandard.length).toBeLessThanOrEqual(146)
 })
