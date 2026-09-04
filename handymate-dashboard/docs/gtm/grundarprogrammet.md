@@ -12,7 +12,16 @@ från säljfluff.
 
 ## A. Säljtexten
 
-### Hero
+**Beslut 2026-09-04 (Andreas):** sajtens befintliga hero — *"De ger dig ett
+verktyg. Vi ger dig ett team."* + uppdrags-mockupen ("Få in 90 000 kr före
+den 30:e") — **behålls som toppnivå**. Den är en kategorikontrast och slår
+utfallsrubriken nedan. Texterna i §A är därför **erbjudandelagret under
+heron** (Grundarprogrammet-sektion + garantier), inte en ersättning.
+Två justeringar i den levande hero-undertexten krävs dock (se §D/§E):
+"tar samtalen" → "fångar samtalen", och "15 min till fullt igång" ska
+bekräftas av färskkontoprovet eller mjukas.
+
+### Utfallsraden (underrubrik/erbjudandesektionens ingress)
 
 > **Du missar aldrig ett jobb. Offerten går ut samma dag.
 > Och Skatteverket blir aldrig ditt problem.**
@@ -126,9 +135,9 @@ antal nya jobb/leads (marknaden styr), specifika belopp sparade.
 
 ## C. Pris & knapphet
 
-- Grundarpris = ordinarie plan med **priset låst 12 månader** (exakt
-  rabattnivå: Andreas beslut — förslag: inget avdrag, bara låsning +
-  programmet; rabatt devalverar).
+- **BESLUTAT (Andreas 2026-09-04):** Grundarpris = ordinarie pris med
+  **låsning i 12 månader, ingen rabatt.** Värdet ligger i programmet
+  (dag 0–14, grundaren personligen) och pristaket — rabatt devalverar.
 - Ingen provperiod (beslut sedan tidigare) — genomgången-före-betalningen
   ÄR provperioden, fast med kundens riktiga data.
 - Referensutbytet formaliseras i dag 7-uppföljningen: omdöme + Google-
@@ -151,6 +160,7 @@ antal nya jobb/leads (marknaden styr), specifika belopp sparade.
 | "branschpaketet ingår / de fyra ROT-nej:en" | Andreas granskat docs/bransch/el.md (+ den bransch kunden har) | docs/bransch/ statusrad → GRANSKAD |
 | "byggt av hantverkare, drivet i vår egen firma" | Samma som dogfooding-blocket | — |
 | 30-dagarsgarantin som helhet | ALLA fyra första raderna PASS | Grind B i GO_NO_GO.md |
+| "15 min till fullt igång" (**LIVE på sajten idag, obevisad**) | Färskkontoprovet mäter minuter till slutförd onboarding — bekräfta siffran eller mjuka formuleringen | docs/launch/ |
 
 **Regel:** en rad som inte nått sitt villkor stryks eller märks "Kommer snart"
 — den mjukas aldrig om till något vagt sant. Samma princip som GO_NO_GO:
@@ -162,6 +172,9 @@ BLOCKERAD ≠ PASS.
 
 - **"Lisa svarar åt dig" / "AI-receptionist"** — Lisa gör efterarbetet
   (kontakt, matchning, SMS), hon svarar inte live. Falskt påstående = P0.
+  **OBS: sajtens hero-undertext säger idag "Sex AI-kollegor som tar
+  samtalen" — gränsar till detta. Byt till "fångar samtalen" (sant och
+  nästan lika starkt) i handymate-landing.**
 - **Bee Service som neutral kund eller anonymt omdöme** — Christoffer är
   medgrundare. Endast öppet dogfooding-spår.
 - **BankID** — påståendet togs bort från sajten (aug 2026), återinför inte.
