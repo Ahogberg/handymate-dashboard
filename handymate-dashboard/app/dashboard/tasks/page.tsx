@@ -54,6 +54,10 @@ export default function TasksPage() {
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all')
   const [showCreate, setShowCreate] = useState(false)
   const [editTask, setEditTask] = useState<Task | null>(null)
+  // Läsvy (2026-09-04): ett klick på raden ska VISA uppgiften — vad den är
+  // och vad den hör till — inte öppna redigeringsformuläret. Pennan
+  // redigerar som förut.
+  const [viewTask, setViewTask] = useState<Task | null>(null)
   const [saving, setSaving] = useState(false)
   const [toast, setToast] = useState<{ show: boolean; message: string; type: 'success' | 'error' }>({ show: false, message: '', type: 'success' })
 
@@ -358,7 +362,7 @@ export default function TasksPage() {
                 className={`bg-white border rounded-xl p-3 sm:p-4 transition-all hover:border-gray-300 cursor-pointer ${
                   isOverdue(task) ? 'border-red-200 bg-red-50/30' : 'border-[#E2E8F0]'
                 } ${task.status === 'done' ? 'opacity-60' : ''}`}
-                onClick={() => openEdit(task)}
+                onClick={() => setViewTask(task)}
               >
                 <div className="flex items-start gap-3">
                   <button
@@ -431,6 +435,124 @@ export default function TasksPage() {
           </div>
         )}
       </div>
+
+      {/* Detaljvy — läsläge. Öppnas av ett klick på raden. */}
+      {viewTask && (() => {
+        const t = viewTask
+        const proj = t.project_id ? projectOptions.find(p => p.id === t.project_id) : null
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setViewTask(null)}>
+            <div className="bg-white border border-[#E2E8F0] rounded-xl w-full max-w-lg max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+              <div className="flex items-start justify-between gap-3 p-5 border-b border-gray-100">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2 mb-1">
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${PRIORITY_COLORS[t.priority]}`}>
+                      {PRIORITY_LABELS[t.priority]}
+                    </span>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                      {STATUS_LABELS[t.status]}
+                    </span>
+                    {isOverdue(t) && (
+                      <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-red-50 text-red-700">Försenad</span>
+                    )}
+                  </div>
+                  <h2 className="text-lg font-semibold text-gray-900 break-words">{t.title}</h2>
+                </div>
+                <button onClick={() => setViewTask(null)} className="p-2 text-gray-400 hover:text-gray-700 rounded-lg flex-shrink-0">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-xs text-[#64748B] font-medium mb-1 block">Beskrivning</label>
+                  {t.description ? (
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap break-words">{t.description}</p>
+                  ) : (
+                    <p className="text-sm text-gray-400">Ingen beskrivning</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs text-[#64748B] font-medium mb-1 block">Förfaller</label>
+                    <p className={`text-sm ${isOverdue(t) ? 'text-red-600 font-medium' : 'text-gray-700'}`}>
+                      {t.due_date
+                        ? `${formatDueDate(t.due_date)}${t.due_time ? ` ${t.due_time.slice(0, 5)}` : ''}`
+                        : 'Inget datum'}
+                    </p>
+                  </div>
+                  <div>
+                    <label className="text-xs text-[#64748B] font-medium mb-1 block">Tilldelad</label>
+                    {t.assigned_user ? (
+                      <p className="text-sm text-gray-700 flex items-center gap-1.5">
+                        <span
+                          className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] text-white font-bold flex-shrink-0"
+                          style={{ backgroundColor: t.assigned_user.color || '#64748B' }}
+                        >
+                          {t.assigned_user.name.charAt(0)}
+                        </span>
+                        {t.assigned_user.name}
+                      </p>
+                    ) : (
+                      <p className="text-sm text-gray-400">Ingen</p>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-xs text-[#64748B] font-medium mb-1 block">Hör till</label>
+                  <div className="flex flex-col gap-1.5">
+                    {proj && (
+                      <a href={`/dashboard/projects/${t.project_id}`} className="text-sm text-primary-700 hover:underline flex items-center gap-1.5">
+                        <FolderKanban className="w-3.5 h-3.5 flex-shrink-0" />
+                        {proj.name}
+                        <ArrowUpRight className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                    )}
+                    {t.customer_id && (
+                      <a href={`/dashboard/customers/${t.customer_id}`} className="text-sm text-primary-700 hover:underline flex items-center gap-1.5">
+                        <User className="w-3.5 h-3.5 flex-shrink-0" />
+                        Öppna kunden
+                        <ArrowUpRight className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                    )}
+                    {/* Affärer saknar egen detaljroute — pipeline-tavlan är
+                        rätt destination, och texten lovar inte mer än så. */}
+                    {t.deal_id && (
+                      <a href="/dashboard/pipeline" className="text-sm text-primary-700 hover:underline flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 flex-shrink-0" />
+                        Kopplad till en affär — öppna tavlan
+                        <ArrowUpRight className="w-3 h-3 flex-shrink-0" />
+                      </a>
+                    )}
+                    {!proj && !t.customer_id && !t.deal_id && (
+                      <p className="text-sm text-gray-400">Fristående uppgift</p>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 p-5 border-t border-gray-100">
+                <button
+                  onClick={() => { toggleStatus(t); setViewTask(null) }}
+                  className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-800 text-white rounded-xl text-sm font-medium transition-colors"
+                >
+                  {t.status === 'done' ? <Square className="w-4 h-4" /> : <CheckSquare className="w-4 h-4" />}
+                  {t.status === 'done' ? 'Återöppna' : 'Markera klar'}
+                </button>
+                <button
+                  onClick={() => { setViewTask(null); openEdit(t) }}
+                  className="flex items-center gap-2 px-4 py-2.5 border border-[#E2E8F0] hover:bg-gray-50 text-gray-700 rounded-xl text-sm font-medium transition-colors"
+                >
+                  <Edit3 className="w-4 h-4" />
+                  Redigera
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Create/Edit Modal */}
       {showCreate && (
