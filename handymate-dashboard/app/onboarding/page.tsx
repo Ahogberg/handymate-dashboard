@@ -13,6 +13,7 @@ import StepProductRegister from './components/StepProductRegister'
 import Step6LiveTour from './components/Step6LiveTour'
 import type { OnboardingFormData } from './types-redesign'
 import { hasStep2Draft } from './step2-draft'
+import { harForetagsskannernUnderlag } from '@/lib/foretagsskannern/skanna'
 import { FirstQuoteLaunch } from '@/components/onboarding/FirstQuoteLaunch'
 import { completeFirstQuoteOnboarding } from '@/lib/onboarding/first-quote-handoff'
 import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
@@ -28,6 +29,47 @@ import {
 } from '@/lib/onboarding/setup-studio'
 
 const TOTAL_STEPS = 9
+
+/**
+ * Verifierar en genomförd Stripe Checkout mot servern (2026-09-02).
+ *
+ * Två steg, båda server-härledda — klienten avgör aldrig själv om något är
+ * betalt:
+ *   1. POST .../verify med session_id — Stripe är sanningen och statusen
+ *      skrivs direkt, så vi inte behöver vänta in webhooken.
+ *   2. Svarar den "pending" (3DS/SCA, eller webhooken hann före men vår
+ *      skrivning inte klar) pollas GET /api/onboarding fem gånger med två
+ *      sekunders mellanrum. Tio sekunder är så länge det är rimligt att låta
+ *      kunden se en spinner; därefter tar betalstegets "Kontrollera igen"
+ *      vid — aldrig en tyst låsning, och aldrig en tyst väntan.
+ */
+async function verifieraBetalning(sessionId: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/billing/onboarding-checkout/verify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ session_id: sessionId }),
+    })
+    const svar = await res.json().catch(() => ({}))
+    if (svar?.paid) return true
+    if (!svar?.pending) return false
+  } catch {
+    // Nätverksfel — fall igenom till pollingen nedan
+  }
+
+  for (let i = 0; i < 5; i++) {
+    await new Promise(r => setTimeout(r, 2000))
+    try {
+      const res = await fetch('/api/onboarding')
+      if (!res.ok) continue
+      const d = await res.json()
+      if (d?.paid) return true
+    } catch {
+      // fortsätt försöka
+    }
+  }
+  return false
+}
 
 /**
  * Onboarding-orchestrator (Claude Design redesign).
@@ -66,6 +108,12 @@ export default function OnboardingPage() {
     process.env.NEXT_PUBLIC_SETUP_STUDIO_ENABLED === 'true',
   )
   const finalizeLock = useRef(false)
+  // Företagsskannern-handoff (2026-09-02, tasks/plan-foretagsskannern.md):
+  // varianten i tratten (lib/onboarding/funnel.ts) ska bli 'skanner' när
+  // besökaren kom via ?via=skanner ELLER redan hade ett underlag liggande
+  // (icke-förstörande koll — StepImportData konsumerar det faktiska
+  // underlaget senare via lasOchRensaUnderlag).
+  const [viaSkanner, setViaSkanner] = useState(false)
 
   useEffect(() => {
     setStudioMode(resolveSetupStudioMode(
@@ -73,6 +121,10 @@ export default function OnboardingPage() {
       window.location.search,
       readSetupStudioPreference(),
     ))
+    try {
+      const params = new URLSearchParams(window.location.search)
+      if (params.get('via') === 'skanner' || harForetagsskannernUnderlag()) setViaSkanner(true)
+    } catch { /* ignorera — då stämplas den vanliga varianten i stället */ }
   }, [])
 
   useEffect(() => {
@@ -121,22 +173,36 @@ export default function OnboardingPage() {
         // genomgången ligger nu FÖRE betalningen (steg 4–5) — kunden har
         // redan sett dem, så en lyckad betalning går direkt vidare till
         // artikelsteget i stället för att backa igenom dem igen.
-        //  ?payment=success → betalningen är genomförd (prenumeration skapad).
-        //    Gå vidare till artikelsteget (7). Telefonnumret provisioneras av
-        //    webhooken; Step6 läser assigned_phone_number.
+        //  ?payment=success → VERIFIERAS mot Stripe (2026-09-02). Tidigare
+        //    räckte query-strängen för att hoppa till steg 7; nu frågar vi
+        //    /verify med session_id och går bara vidare om Stripe säger
+        //    betald. Telefonnumret provisioneras av webhooken; Step6 läser
+        //    assigned_phone_number.
         //  ?payment=cancelled → kunden avbröt. Landa kvar på betalsteget (6)
         //    så de kan försöka igen. Aldrig fastna.
         const params = new URLSearchParams(window.location.search)
         const payment = params.get('payment')
+        const sessionId = params.get('session_id')
+        let betald = Boolean(d.paid)
         if (payment === 'success') {
-          uiStep = 7
-          // Persistera framsteget (best-effort) och städa URL:en.
-          if (d.business_id) {
-            fetch('/api/onboarding', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ step: 7, data: {}, config: {} }),
-            }).catch(() => {})
+          if (!betald && sessionId) {
+            betald = await verifieraBetalning(sessionId)
+          }
+          if (betald) {
+            uiStep = 7
+            // Persistera framsteget (best-effort) och städa URL:en.
+            if (d.business_id) {
+              fetch('/api/onboarding', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ step: 7, data: {}, config: {} }),
+              }).catch(() => {})
+            }
+          } else {
+            // Betalningen är inte bekräftad — stanna på betalsteget.
+            // Step5Activate visar "registreras just nu" och en knapp att
+            // kontrollera igen, i stället för att låsa kunden ute.
+            uiStep = 6
           }
           window.history.replaceState({}, '', '/onboarding')
         } else if (payment === 'cancelled') {
@@ -163,7 +229,8 @@ export default function OnboardingPage() {
           // Redan betalande konton ska ALDRIG se betalsteget igen — Step5Activate
           // hoppar vidare direkt när paid är sant (samma server-härledda fält,
           // aldrig en klientsidan-gissning).
-          paid: Boolean(d.stripe_subscription_id) || d.subscription_status === 'active',
+          paid: betald,
+          paymentPending: payment === 'success' && !betald,
           // Ett äldre, uttryckligt sparat standardpris får visas igen, men
           // prismodellen väljs fortfarande av ägaren — inget inferred val.
           standardHourlyRate: (d.onboarding_data || {}).standardHourlyRate ?? d.default_hourly_rate ?? null,
@@ -173,13 +240,14 @@ export default function OnboardingPage() {
         // konto) — men "Visa onboardingen"-replayen ska visa betalsteget i
         // simulerat läge, inte hoppa över det via paid-guarden. Demo är
         // aldrig en riktig resume-mitt-i-betalning, så undantaget är säkert.
+        // (Återinfört 2026-09-04: 6ea39c3 skrev in undantaget från en gammal
+        // kopia av filen och tappade Stripe-verifieringen och skannervarianten.)
         if (isDemoBusinessId(d.business_id)) restored.paid = false
 
-        // Demo-A/B: presentatörsbarens "Onboarding · med Matte" navigerar
-        // med ?studio=1 — för demokontot tänder det Setup Studio-lagret
-        // även utan den publika byggflaggan. Riktiga konton påverkas inte
-        // (kräver både demo-id och explicit query); klassiskt läge är
-        // fortsatt default överallt där flaggan saknas.
+        // Demo-override (f707054): presentatören väljer flöde per knapp i
+        // PresenterBar — ?studio=1 tänder Setup Studio-lagret för demokontot
+        // utan den publika byggflaggan. resolveSetupStudioMode är orörd,
+        // riktiga konton opåverkade, klassiskt förblir default överallt.
         if (isDemoBusinessId(d.business_id) && params.get('studio') === '1') {
           setStudioMode(true)
         }
@@ -216,18 +284,20 @@ export default function OnboardingPage() {
           headers: { 'Content-Type': 'application/json' },
           // variant: vilken guide kunden faktiskt såg — servern stämplar
           // tratten (lib/onboarding/funnel.ts) så A/B-testet går att läsa av.
+          // 'skanner' vinner över studio/classic — det säger VARIFRÅN kunden
+          // kom, inte vilken guide-UI som visades.
           body: JSON.stringify({
             step: s,
             data: extraData || {},
             config: config || {},
-            variant: studioMode ? 'studio' : 'classic',
+            variant: viaSkanner ? 'skanner' : (studioMode ? 'studio' : 'classic'),
           }),
         })
       } catch {
         // Silent — onboarding fortsätter ändå, kan resume senare
       }
     },
-    [data.businessId, studioMode],
+    [data.businessId, studioMode, viaSkanner],
   )
 
   const next = useCallback(async () => {
