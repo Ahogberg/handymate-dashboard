@@ -91,7 +91,23 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      // Sanning (2026-09-04): samma fix som /api/actions create_customer fick
+      // 2026-08-27, men den gjordes bara på den ena vägen. Ny deal-modalen
+      // går hit, och ett upptaget telefonnummer blev ett anonymt 500 —
+      // hantverkaren såg "Kunde inte skapa kund" utan att förstå varför,
+      // trots att svaret är enkelt: numret finns redan på en annan kund.
+      if ((error as { code?: string }).code === '23505' && error.message?.includes('unique_phone_per_business')) {
+        return NextResponse.json(
+          {
+            error: 'phone_taken',
+            message: 'Telefonnumret används redan av en annan kund — sök upp den befintliga kunden i stället.',
+          },
+          { status: 409 },
+        )
+      }
+      throw error
+    }
 
     // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
     // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking.

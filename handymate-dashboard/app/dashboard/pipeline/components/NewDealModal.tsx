@@ -108,7 +108,12 @@ export function NewDealModal() {
           invoice_email: fullCustomerForm.invoice_email,
         }),
       })
-      if (!res.ok) throw new Error()
+      // Serverns förklaring vinner över vår generiska text — annars döljer
+      // vi t.ex. "telefonnumret är upptaget" bakom "Kunde inte skapa kund".
+      if (!res.ok) {
+        const body = await res.json().catch(() => null)
+        throw new Error(body?.message || body?.error || 'Kunde inte skapa kund')
+      }
       const data = await res.json()
       const created = data.customer
       setCustomers(prev => [
@@ -120,8 +125,8 @@ export function NewDealModal() {
       setShowFullCustomerModal(false)
       setFullCustomerForm(EMPTY_CUSTOMER_FORM)
       showToast('Kund skapad', 'success')
-    } catch {
-      showToast('Kunde inte skapa kund', 'error')
+    } catch (err) {
+      showToast(err instanceof Error && err.message ? err.message : 'Kunde inte skapa kund', 'error')
     } finally {
       setFullCustomerSubmitting(false)
     }
@@ -248,7 +253,10 @@ export function NewDealModal() {
                             email: newCustomerForm.email.trim() || null,
                           })
                         })
-                        if (!res.ok) throw new Error()
+                        if (!res.ok) {
+                          const body = await res.json().catch(() => null)
+                          throw new Error(body?.message || body?.error || 'Kunde inte skapa kund')
+                        }
                         const data = await res.json()
                         const created = data.customer
                         setCustomers(prev => [{ customer_id: created.customer_id, name: created.name, phone_number: created.phone_number || '', email: created.email }, ...prev])
@@ -257,8 +265,8 @@ export function NewDealModal() {
                         setShowNewCustomerForm(false)
                         setNewCustomerForm({ firstName: '', lastName: '', phone: '', email: '' })
                         showToast('Kund skapad', 'success')
-                      } catch {
-                        showToast('Kunde inte skapa kund', 'error')
+                      } catch (err) {
+                        showToast(err instanceof Error && err.message ? err.message : 'Kunde inte skapa kund', 'error')
                       } finally {
                         setNewCustomerSubmitting(false)
                       }
