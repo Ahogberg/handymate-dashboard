@@ -179,7 +179,10 @@ export function PresenterBar() {
     }
   }
 
-  async function showOnboarding() {
+  // mode: presentatören väljer flöde per knapp — 'studio' tänder Setup
+  // Studio-lagret för demokontot via ?studio=1 (se demo-överridden i
+  // app/onboarding/page.tsx), 'classic' kör klassiska guiden.
+  async function showOnboarding(mode: 'classic' | 'studio') {
     setReplaying(true)
     setError(null)
     try {
@@ -197,7 +200,7 @@ export function PresenterBar() {
       }
 
       clearDemoStoryState()
-      window.location.assign('/onboarding')
+      window.location.assign(mode === 'studio' ? '/onboarding?studio=1' : '/onboarding?classic=1')
     } catch {
       setError('Onboardingen kunde inte visas. Försök igen från demosidan.')
       setReplaying(false)
@@ -256,12 +259,22 @@ export function PresenterBar() {
 
         <button
           type="button"
-          onClick={showOnboarding}
+          onClick={() => showOnboarding('classic')}
           disabled={replaying}
           className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/15 px-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-60"
         >
           {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
-          Visa onboardingen
+          Onboarding · klassisk
+        </button>
+
+        <button
+          type="button"
+          onClick={() => showOnboarding('studio')}
+          disabled={replaying}
+          className="inline-flex h-8 items-center gap-1 rounded-lg border border-white/15 px-2 text-xs font-semibold hover:bg-white/10 disabled:opacity-60"
+        >
+          {replaying ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <PlayCircle className="h-3.5 w-3.5" />}
+          Onboarding · med Matte
         </button>
 
         <button
