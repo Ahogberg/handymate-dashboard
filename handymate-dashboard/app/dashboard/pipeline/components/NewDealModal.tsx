@@ -7,6 +7,22 @@ import { CustomerModal } from '@/app/dashboard/customers/components/CustomerModa
 import type { CustomerForm } from '@/app/dashboard/customers/components/types'
 import { usePipelineContext } from '../context'
 
+/** Matchning från /api/customers 409 duplicate_customer (lib/customer-dedupe). */
+interface DealDuplicateMatch {
+  customer_id: string
+  name: string
+  phone_number: string | null
+  email: string | null
+  address_line: string | null
+  match_type: 'phone' | 'email' | 'name_address'
+}
+
+const DUP_MATCH_LABELS: Record<DealDuplicateMatch['match_type'], string> = {
+  phone: 'Samma telefon',
+  email: 'Samma e-post',
+  name_address: 'Samma namn + adress',
+}
+
 const EMPTY_CUSTOMER_FORM: CustomerForm = {
   name: '',
   phone_number: '',
@@ -73,7 +89,32 @@ export function NewDealModal() {
   const [fullCustomerForm, setFullCustomerForm] = useState<CustomerForm>(EMPTY_CUSTOMER_FORM)
   const [fullCustomerSubmitting, setFullCustomerSubmitting] = useState(false)
 
-  async function handleCreateFullCustomer() {
+  // Dubbletthantering (2026-09-04): samma kontroll som Kunder-sidan, men i
+  // deal-flödet är "använd den befintliga" nästan alltid rätt svar — man är
+  // ju här för att koppla EN kund till affären. Därför väljer ett klick
+  // kunden direkt i stället för att navigera bort till kundvyn.
+  const [dupConflict, setDupConflict] = useState<{
+    duplicates: DealDuplicateMatch[]
+    retry: () => Promise<void>
+  } | null>(null)
+
+  function pickExistingCustomer(match: DealDuplicateMatch) {
+    setCustomers(prev =>
+      prev.some(c => c.customer_id === match.customer_id)
+        ? prev
+        : [{ customer_id: match.customer_id, name: match.name, phone_number: match.phone_number || '', email: match.email }, ...prev],
+    )
+    setNewDealForm(prev => ({ ...prev, customer_id: match.customer_id }))
+    setCustomerSearch(match.name)
+    setDupConflict(null)
+    setShowFullCustomerModal(false)
+    setShowNewCustomerForm(false)
+    setFullCustomerForm(EMPTY_CUSTOMER_FORM)
+    setNewCustomerForm({ firstName: '', lastName: '', phone: '', email: '' })
+    showToast('Befintlig kund vald', 'success')
+  }
+
+  async function handleCreateFullCustomer(forceCreate = false) {
     if (!fullCustomerForm.name.trim()) {
       showToast('Ange ett namn', 'error')
       return
@@ -106,12 +147,17 @@ export function NewDealModal() {
           price_list_id: fullCustomerForm.price_list_id || null,
           default_payment_days: fullCustomerForm.default_payment_days ? Number(fullCustomerForm.default_payment_days) : 30,
           invoice_email: fullCustomerForm.invoice_email,
+          force_create: forceCreate,
         }),
       })
       // Serverns förklaring vinner över vår generiska text — annars döljer
       // vi t.ex. "telefonnumret är upptaget" bakom "Kunde inte skapa kund".
       if (!res.ok) {
         const body = await res.json().catch(() => null)
+        if (res.status === 409 && body?.error === 'duplicate_customer' && Array.isArray(body.duplicates)) {
+          setDupConflict({ duplicates: body.duplicates, retry: () => handleCreateFullCustomer(true) })
+          return
+        }
         throw new Error(body?.message || body?.error || 'Kunde inte skapa kund')
       }
       const data = await res.json()
@@ -124,6 +170,7 @@ export function NewDealModal() {
       setCustomerSearch(created.name)
       setShowFullCustomerModal(false)
       setFullCustomerForm(EMPTY_CUSTOMER_FORM)
+      setDupConflict(null)
       showToast('Kund skapad', 'success')
     } catch (err) {
       showToast(err instanceof Error && err.message ? err.message : 'Kunde inte skapa kund', 'error')
@@ -421,8 +468,62 @@ export function NewDealModal() {
         pricingPriceLists={[]}
         actionLoading={fullCustomerSubmitting}
         onClose={() => setShowFullCustomerModal(false)}
-        onSubmit={handleCreateFullCustomer}
+        onSubmit={() => handleCreateFullCustomer(false)}
       />
+
+      {/* Dubbletter — samma kontroll som Kunder-sidan, men här väljer ett
+          klick den befintliga kunden till affären i stället för att navigera
+          bort. "Skapa ändå" finns kvar för de fall det faktiskt är två
+          olika kunder (t.ex. delad hushållstelefon). */}
+      {dupConflict && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/50 backdrop-blur-sm p-4" onClick={() => setDupConflict(null)}>
+          <div className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-xl" onClick={e => e.stopPropagation()}>
+            <div className="flex items-start justify-between gap-3 mb-1">
+              <h3 className="text-base font-semibold text-gray-900">Kunden verkar redan finnas</h3>
+              <button onClick={() => setDupConflict(null)} className="p-1 text-gray-400 hover:text-gray-700 rounded-lg flex-shrink-0">
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <p className="text-sm text-gray-500 mb-4">Välj den befintliga kunden för affären, eller skapa en ny ändå.</p>
+
+            <div className="space-y-2 mb-4 max-h-56 overflow-y-auto">
+              {dupConflict.duplicates.map(match => (
+                <button
+                  key={match.customer_id}
+                  onClick={() => pickExistingCustomer(match)}
+                  className="w-full text-left p-3 border border-[#E2E8F0] rounded-lg hover:border-primary-400 hover:bg-primary-50/40 transition-colors"
+                >
+                  <div className="flex items-center justify-between gap-2 mb-0.5">
+                    <span className="text-sm font-medium text-gray-900 truncate">{match.name}</span>
+                    <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-700 border border-amber-200 flex-shrink-0">
+                      {DUP_MATCH_LABELS[match.match_type]}
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500 truncate">
+                    {[match.phone_number, match.email, match.address_line].filter(Boolean).join(' · ') || 'Inga kontaktuppgifter'}
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => { const again = dupConflict.retry; setDupConflict(null); again() }}
+                disabled={fullCustomerSubmitting}
+                className="px-4 py-2 border border-[#E2E8F0] hover:bg-gray-50 text-gray-700 rounded-lg text-sm font-medium disabled:opacity-50"
+              >
+                Skapa ändå
+              </button>
+              <button
+                onClick={() => setDupConflict(null)}
+                className="px-4 py-2 text-gray-500 hover:text-gray-700 rounded-lg text-sm font-medium"
+              >
+                Avbryt
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }

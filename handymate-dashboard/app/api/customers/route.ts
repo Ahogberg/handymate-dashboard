@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getNextCustomerNumber } from '@/lib/numbering'
+import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 
 /**
  * GET - Lista alla kunder för ett företag
@@ -58,6 +59,30 @@ export async function POST(request: NextRequest) {
 
     if (!name) {
       return NextResponse.json({ error: 'Missing name' }, { status: 400 })
+    }
+
+    // Dubblettkontroll (2026-09-04): samma sanning som /api/actions
+    // create_customer. Ny deal-modalen gick tidigare förbi den helt, så
+    // samma kund kunde läggas upp två gånger med olika nummer. force_create
+    // är klientens uttryckliga "skapa ändå".
+    if (!body.force_create) {
+      const duplicates = await findCustomerDuplicates(supabase, {
+        business_id: business.business_id,
+        phone: phone_number,
+        email,
+        name,
+        address: address_line,
+      })
+      if (duplicates.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'duplicate_customer',
+            message: 'En eller flera kunder matchar redan på telefon, e-post eller namn+adress.',
+            duplicates,
+          },
+          { status: 409 },
+        )
+      }
     }
 
     const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
