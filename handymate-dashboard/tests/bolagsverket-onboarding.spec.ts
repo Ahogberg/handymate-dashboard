@@ -155,3 +155,42 @@ test.describe('migrationen — nullable, ingen default, rör inte det gamla död
     expect(migration).not.toMatch(/ADD COLUMN[^,]*\baddress\b(?!_)/)
   })
 })
+
+test.describe('tidsbudget — de två uppslagen dog på Vercels 10-sekundersdefault', () => {
+  const scrapeRoute = read('app/api/onboarding/scrape-website/route.ts')
+
+  test('båda rutterna sätter maxDuration uttryckligt', () => {
+    // Utan raden gäller Vercels default på 10 s för serverless-funktioner.
+    // Hemsidan får läsas i 8 s (SCRAPE_TIMEOUT_MS) och sedan extraheras av
+    // Haiku — det spräcker 10 s så fort kundens sajt är lite långsam, och
+    // funktionen dödades mitt i. Samma sak för Bolagsverket: OAuth-token
+    // plus uppslag är två hopp. Hobby-planens tak är 60 s.
+    for (const [namn, src] of [['scrape-website', scrapeRoute], ['bolagsverket-lookup', route]] as const) {
+      const match = src.match(/export const maxDuration = (\d+)/)
+      expect(match, `${namn} saknar maxDuration`).not.toBeNull()
+      expect(Number(match![1]), `${namn} måste rymma hämtning + extraktion`).toBeGreaterThanOrEqual(20)
+      expect(Number(match![1]), `${namn} över Hobby-taket 60 s`).toBeLessThanOrEqual(60)
+    }
+  })
+
+  test('klientens avbrottstak är längre än serverns egna hämtningsbudget', () => {
+    // Klienten fick aldrig avbryta FÖRE servern hunnit svara — då visas ett
+    // fel för något som var på väg att lyckas.
+    const tak = Array.from(step2.matchAll(/controller\.abort\(\), (\d+)_?(\d*)\)/g))
+      .map(m => Number(`${m[1]}${m[2]}`))
+    expect(tak.length).toBeGreaterThanOrEqual(2)
+    for (const t of tak) expect(t).toBeGreaterThanOrEqual(20_000)
+  })
+
+  test('serverns skäl visas för ALLA utfall, inte bara vid 429', () => {
+    // Rutten svarar med ett läsbart svenskt skäl per utfall ("Sidan innehöll
+    // för lite text för att läsas", "Kunde inte nå sidan (timeout eller
+    // nätverksfel)", "Uppslag mot Bolagsverket är inte aktiverat än"). Att
+    // dölja det bakom en generisk mening gjorde felet omöjligt att förstå.
+    expect(step2).not.toMatch(/json\?\.reason && res\.status === 429/)
+    expect(step2).toMatch(/json\?\.reason\s*\n?\s*\?\s*`\$\{json\.reason\} — vi fyller i manuellt istället\.`/)
+    // Ett klientavbrott ska säga just det, inte "kunde inte läsa sidan".
+    expect(step2).toContain("err.name === 'AbortError'")
+    expect(step2).toContain('Sidan tog för lång tid att läsa')
+  })
+})

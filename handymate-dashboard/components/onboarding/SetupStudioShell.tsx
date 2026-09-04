@@ -1,6 +1,6 @@
 'use client'
 
-import type { ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import { Check, MessageCircle, ShieldCheck } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 import type { OnboardingFormData } from '@/app/onboarding/types-redesign'
@@ -18,6 +18,20 @@ export function SetupStudioShell({ step, totalSteps, data, onUseClassic, childre
   const matte = getAgentById('matte')
   const guidance = SETUP_GUIDANCE[step] ?? SETUP_GUIDANCE[0]
   const configured = deriveConfiguredFacts(data)
+
+  // "Det här har teamet lärt sig" lovar att listan kommer från det kunden
+  // just svarat. Uppgifter som redan låg på kontot när studion öppnades
+  // (ett tidigare påbörjat besök, eller demokontots färdiga konfiguration)
+  // har teamet inte lärt sig här — de stod bockade innan kunden skrivit ett
+  // enda tecken, vilket gör hela kvittot otrovärdigt. Därför: ögonblicksbild
+  // vid montering, och bara det som tillkommit sedan dess visas.
+  //
+  // Skalet monteras först när page.tsx laddat klart (loading-grinden), så
+  // ögonblicksbilden ser den återställda datan — inte ett tomt formulär.
+  const redanPaPlats = useRef<Set<string> | null>(null)
+  if (redanPaPlats.current === null) redanPaPlats.current = new Set(configured)
+  const larda = configured.filter(fakta => !redanPaPlats.current!.has(fakta))
+  const antalSedanTidigare = redanPaPlats.current.size
 
   return (
     <section className="setup-studio" aria-label="Onboarding med Matte">
@@ -48,14 +62,21 @@ export function SetupStudioShell({ step, totalSteps, data, onUseClassic, childre
 
           <div className="setup-studio__receipt">
             <h2>Det här har teamet lärt sig</h2>
-            {configured.length > 0 ? (
+            {larda.length > 0 ? (
               <ul>
-                {configured.slice(-5).map(fact => (
+                {larda.slice(-5).map(fact => (
                   <li key={fact}><Check size={14} aria-hidden="true" /><span>{fact}</span></li>
                 ))}
               </ul>
             ) : (
               <p>Vi fyller på medan du svarar. Tomma fält blir aldrig gissningar.</p>
+            )}
+            {antalSedanTidigare > 0 && (
+              <p className="setup-studio__receipt-earlier">
+                {antalSedanTidigare === 1
+                  ? 'En uppgift fanns redan sedan tidigare.'
+                  : `${antalSedanTidigare} uppgifter fanns redan sedan tidigare.`}
+              </p>
             )}
           </div>
 

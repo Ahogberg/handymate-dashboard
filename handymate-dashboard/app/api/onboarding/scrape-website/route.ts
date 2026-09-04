@@ -20,6 +20,16 @@ import { fetchWebsiteWithSsrfGuard } from '@/lib/onboarding/website-fetch'
 export const dynamic = 'force-dynamic'
 
 /**
+ * Hämtningen får kosta upp till 8 s (SCRAPE_TIMEOUT_MS) och Haiku-
+ * extraktionen några sekunder till. Utan den här raden gäller Vercels
+ * default på 10 s för serverless-funktioner — funktionen dödades alltså
+ * mitt i extraktionen så fort kundens sajt svarade långsamt, och kunden
+ * fick "Jag kunde inte läsa sidan" trots att läsningen var på väg att
+ * lyckas. 30 s ligger tryggt under Hobby-planens tak på 60 s.
+ */
+export const maxDuration = 30
+
+/**
  * POST /api/onboarding/scrape-website
  *
  * Del 2 av hemsida-förgreningen (tasks/hemsida-forgrening-spec.md). Kunden

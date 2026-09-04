@@ -49,6 +49,23 @@ test.describe('Setup Studio V1.5 — flaggad presentation ovanpå samma onboardi
     expect(shell).not.toMatch(/anthropic|openai|generateText|messages\.create/i)
   })
 
+  test('kvittot visar bara det teamet lärt sig HÄR — inte vad som redan låg på kontot', () => {
+    // Fyndet 2026-09-04: på demokontot stod "Företag: Bee Service AB",
+    // "Huvudbransch vald" och "Standardpris: 500 kr/tim" bockade på steg 2,
+    // innan kunden skrivit ett tecken — kvittot bockade av den ÅTERSTÄLLDA
+    // datan. Rubriken lovar något annat, och ett kvitto som bockar av sådant
+    // kunden inte gjort är precis den sortens påstående utan täckning som
+    // resten av produkten är byggd för att undvika.
+    const shell = source('components/onboarding/SetupStudioShell.tsx')
+    expect(shell).toContain('const redanPaPlats = useRef<Set<string> | null>(null)')
+    // Ögonblicksbilden tas EN gång och listan är differensen mot den.
+    expect(shell).toMatch(/if \(redanPaPlats\.current === null\) redanPaPlats\.current = new Set\(configured\)/)
+    expect(shell).toContain('const larda = configured.filter(fakta => !redanPaPlats.current!.has(fakta))')
+    // Det är differensen som renderas, aldrig hela listan.
+    expect(shell).toContain('{larda.slice(-5).map(fact => (')
+    expect(shell).not.toMatch(/\{configured\.slice\(-5\)/)
+  })
+
   test('publik flagga, omedelbar fallback och rörelsereducering är uttryckliga', () => {
     const page = source('app/onboarding/page.tsx')
     const css = source('app/onboarding/onboarding.css')

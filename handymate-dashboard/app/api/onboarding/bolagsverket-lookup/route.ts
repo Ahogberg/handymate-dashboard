@@ -8,6 +8,13 @@ import { lookupCompany } from '@/lib/bolagsverket/client'
 export const dynamic = 'force-dynamic'
 
 /**
+ * Två nätverkshopp (OAuth-token + organisationsuppslag) mot Bolagsverket
+ * ryms inte alltid i Vercels default på 10 s — se samma resonemang i
+ * app/api/onboarding/scrape-website/route.ts.
+ */
+export const maxDuration = 30
+
+/**
  * POST /api/onboarding/bolagsverket-lookup
  *
  * Org.nr flyttat till FÖRSTA frågan i Step2Business (2026-08-15, se

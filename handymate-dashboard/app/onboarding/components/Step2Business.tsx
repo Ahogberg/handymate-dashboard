@@ -217,7 +217,9 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     setWebPhase('orgnrLookup')
     setOrgResultError('')
     const controller = new AbortController()
-    const clientTimeout = setTimeout(() => controller.abort(), 10_000)
+    // 25 s: OAuth-token + uppslag är två hopp mot Bolagsverket (se samma
+    // resonemang vid runScrape).
+    const clientTimeout = setTimeout(() => controller.abort(), 25_000)
     try {
       const res = await fetch('/api/onboarding/bolagsverket-lookup', {
         method: 'POST',
@@ -299,7 +301,12 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
     setWebPhase('scraping')
     setWebResultError('')
     const controller = new AbortController()
-    const clientTimeout = setTimeout(() => controller.abort(), 10_000)
+    // 25 s, inte 10: servern får läsa sajten i upp till 8 s och sedan köra
+    // Haiku-extraktionen. Det gamla taket på 10 s avbröt alltså anropet
+    // från klientsidan medan servern fortfarande jobbade, och kunden fick
+    // "kunde inte läsa sidan" för sajter som bara var lite långsamma.
+    // Ligger under ruttens maxDuration (30 s) så servern hinner svara först.
+    const clientTimeout = setTimeout(() => controller.abort(), 25_000)
     let normalizedUrl = url
     try {
       const res = await fetch('/api/onboarding/scrape-website', {
@@ -318,16 +325,24 @@ export default function Step2Business({ onNext, onBack, data, setData }: Step2Pr
       if (json?.ok && json.extracted) {
         applyExtraction(json.extracted)
       } else {
-        setWebResultError(json?.reason && res.status === 429
-          ? json.reason
+        // Serverns skäl visas ALLTID, inte bara vid 429. Rutten svarar med
+        // ett läsbart svenskt skäl för varje utfall ("Sidan innehöll för
+        // lite text för att läsas", "Kunde inte nå sidan", ...) — att dölja
+        // det bakom en generisk mening gjorde felet omöjligt att förstå
+        // både för kunden och för oss.
+        setWebResultError(json?.reason
+          ? `${json.reason} — vi fyller i manuellt istället.`
           : 'Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
       }
-    } catch {
+    } catch (err) {
       if (!mountedRef.current) {
         persistWebsiteUrl(normalizedUrl)
         return
       }
-      setWebResultError('Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
+      const avbrutet = err instanceof Error && err.name === 'AbortError'
+      setWebResultError(avbrutet
+        ? 'Sidan tog för lång tid att läsa — vi fyller i manuellt istället.'
+        : 'Jag kunde inte läsa sidan — vi fyller i manuellt istället.')
     } finally {
       clearTimeout(clientTimeout)
     }

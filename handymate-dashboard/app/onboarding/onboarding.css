@@ -163,6 +163,7 @@
 .setup-studio__receipt ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
 .setup-studio__receipt li { display: flex; align-items: flex-start; gap: 7px; color: var(--ob-ink-2); font-size: 11.5px; line-height: 1.35; }
 .setup-studio__receipt li svg { margin-top: 1px; flex-shrink: 0; color: var(--ob-emerald-600); }
+.setup-studio__receipt > p.setup-studio__receipt-earlier { margin: 8px 0 0; font-size: 11px; color: var(--ob-muted); opacity: .85; }
 .setup-studio__receipt > p { margin: 0; color: var(--ob-muted); font-size: 11.5px; line-height: 1.45; }
 .setup-studio__truth { display: flex; align-items: flex-start; gap: 6px; margin: 10px 2px 0; color: var(--ob-muted); font-size: 10.5px; line-height: 1.4; }
 .setup-studio__truth svg { flex-shrink: 0; color: var(--ob-primary-700); }
