@@ -268,12 +268,19 @@ test.describe('källskanning — team-activity-rutten', () => {
     expect(ren).toContain('veckosammanfattning: harNummer')
   })
 
-  test('fail-soft: en saknad automation_settings-rad ger false, aldrig krasch — inget ovillkorat "=== true" på rådata', () => {
-    // Läsningen görs defensivt (`autoSettings?.x === true`), aldrig ett
+  test('flaggorna läses med cronens semantik: "inte uttryckligen av", inte "uttryckligen på"', () => {
+    // Fyndet 2026-09-04: noll konton i produktionen har en
+    // automation_settings-rad. Cronen (app/api/cron/quote-follow-up/route.ts)
+    // behandlar saknad rad som PÅ (`enabled` startar true och sänks bara av
+    // ett uttryckligt false). Med `=== true` här hade remsan sagt "Daniel
+    // behöver aktiveras" på varenda konto medan uppföljningarna faktiskt
+    // skickades — samma sorts lögn som passet skulle ta bort, fast tvärtom.
+    // Läsningen är fortfarande defensiv (`autoSettings?.x`), aldrig ett
     // direkt `.data.sms_auto_enabled` som kastar på null.
-    expect(ren).toContain('autoSettings?.sms_auto_enabled === true')
-    expect(ren).toContain('autoSettings?.sms_quote_followup === true')
-    expect(ren).toContain('autoSettings?.sms_day_before_reminder === true')
+    expect(ren).toContain('autoSettings?.sms_auto_enabled !== false')
+    expect(ren).toContain('autoSettings?.sms_quote_followup !== false')
+    expect(ren).toContain('autoSettings?.sms_day_before_reminder !== false')
+    expect(ren).not.toContain('autoSettings?.sms_auto_enabled === true')
   })
 })
 

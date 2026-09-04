@@ -275,9 +275,17 @@ export async function GET(request: NextRequest) {
     sms_quote_followup?: boolean | null
     sms_day_before_reminder?: boolean | null
   } | null
-  const smsAutoEnabled = autoSettings?.sms_auto_enabled === true
-  const smsQuoteFollowup = autoSettings?.sms_quote_followup === true
-  const smsDayBeforeReminder = autoSettings?.sms_day_before_reminder === true
+  // "Inte uttryckligen av" — INTE "uttryckligen på". Det är exakt semantiken
+  // cronen kör med (app/api/cron/quote-follow-up/route.ts: `enabled =
+  // sms_auto_enabled !== false && sms_quote_followup !== false`, och saknad
+  // rad lämnar enabled = true). Mot databasen 2026-09-04 har NOLL konton en
+  // automation_settings-rad — med `=== true` hade remsan sagt "Daniel behöver
+  // aktiveras" på varenda konto medan cronen samtidigt skickade uppföljningar.
+  // Statusen måste beskriva vad automationen faktiskt gör, inte vad en
+  // strängare tolkning av samma rad skulle betyda.
+  const smsAutoEnabled = autoSettings?.sms_auto_enabled !== false
+  const smsQuoteFollowup = autoSettings?.sms_quote_followup !== false
+  const smsDayBeforeReminder = autoSettings?.sms_day_before_reminder !== false
 
   const karinHasInvoiceData = (invoiceAnyRes.count ?? 0) > 0
   const hannaHasSegment = (segmenteradeKunderRes.count ?? 0) > 0
