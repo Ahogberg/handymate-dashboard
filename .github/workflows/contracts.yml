@@ -103,6 +103,7 @@ jobs:
           tests/veckopuls.spec.ts
             tests/launch-desk-kallkrav.spec.ts
             tests/rekryteringssignal.spec.ts
+            tests/platsbanken-kalla.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

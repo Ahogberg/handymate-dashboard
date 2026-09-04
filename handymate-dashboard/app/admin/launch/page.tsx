@@ -115,6 +115,8 @@ export default function LaunchDeskPage() {
   const [status, setStatus] = useState('active')
   const [selected, setSelected] = useState<GtmAccount | null>(null)
   const [baraRekryterande, setBaraRekryterande] = useState(false)
+  const [hamtar, setHamtar] = useState(false)
+  const [kallaResultat, setKallaResultat] = useState<{ kandidater: number; traffar_totalt: number; bortsorterade: Record<string, number> } | null>(null)
   const [activities, setActivities] = useState<GtmActivity[]>([])
   const [detailsLoading, setDetailsLoading] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
@@ -353,6 +355,29 @@ export default function LaunchDeskPage() {
     }
   }
 
+  /** Hämtar prospekt ur Platsbanken och lägger dem i SAMMA importflöde som
+   *  CSV:n — förhandsvisningen och serverkontrollen är identiska, bara
+   *  källan skiljer. Rutten skriver ingenting; det gör importen. */
+  async function hamtaFranPlatsbanken() {
+    setHamtar(true)
+    setKallaResultat(null)
+    try {
+      const response = await fetch('/api/admin/launch/kallor/platsbanken', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}),
+      })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Hämtningen misslyckades')
+      setImportRows(data.prospekt || [])
+      setAvvisadeRader([])
+      setKallaResultat({ kandidater: data.kandidater, traffar_totalt: data.traffar_totalt, bortsorterade: data.bortsorterade })
+      setImportOpen(true)
+    } catch (err: any) {
+      setToast(err?.message || 'Hämtningen misslyckades')
+    } finally {
+      setHamtar(false)
+    }
+  }
+
   async function importCsv() {
     if (importRows.length === 0) return
     setImporting(true)
@@ -367,6 +392,7 @@ export default function LaunchDeskPage() {
       setImportOpen(false)
       setImportRows([])
       setAvvisadeRader([])
+      setKallaResultat(null)
       await loadAccounts()
     } catch (err: any) {
       setToast(err?.message || 'Importen misslyckades')
@@ -424,6 +450,16 @@ export default function LaunchDeskPage() {
           >
             Rekryterar{baraRekryterande ? ' ✓' : ''}
           </button>
+          <button
+            type="button"
+            onClick={hamtaFranPlatsbanken}
+            disabled={hamtar}
+            title="Hämtar hantverksfirmor som annonserar efter folk. Inget skrivs förrän du godkänt listan."
+            className="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm font-medium text-gray-700 hover:border-gray-300 disabled:opacity-50"
+          >
+            {hamtar && <Loader2 className="h-4 w-4 animate-spin" />}
+            Hämta från Platsbanken
+          </button>
         </section>
 
         {error && <div className="mb-5 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">{error}</div>}
@@ -447,6 +483,7 @@ export default function LaunchDeskPage() {
       {selected && <AccountDrawer key={`${selected.id}:${selected.updated_at}`} account={selected} activities={activities} loading={detailsLoading} busy={busy} onClose={() => setSelected(null)} onBrief={prepareBrief} onReadSignals={readSignals} onReady={markReady} onSaveDetails={saveDetails} onLog={logOutcome} onSuppress={suppress} />}
 
       {importOpen && <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 p-4"><div className="w-full max-w-xl rounded-2xl bg-white p-6 shadow-2xl"><div className="mb-5 flex items-start justify-between"><div><h2 className="text-lg font-bold">Importera prospekt</h2><p className="mt-1 text-sm text-gray-500">CSV granskas och kvalificeras server-side. Spärrade kontakter hoppas över.</p></div><button onClick={() => setImportOpen(false)}><X className="h-5 w-5 text-gray-400" /></button></div><a href="/templates/handymate-launch-desk-import.csv" download className="mb-4 inline-flex text-sm font-medium text-primary-700 hover:underline">Ladda ned CSV-mall</a><label className="flex cursor-pointer flex-col items-center rounded-xl border-2 border-dashed border-gray-200 px-5 py-10 text-center hover:border-primary-300"><FileUp className="mb-3 h-7 w-7 text-primary-700" /><span className="font-medium">Välj CSV-fil</span><span className="mt-1 text-xs text-gray-500">Semikolon eller komma, högst 500 rader</span><input type="file" accept=".csv,text/csv" className="hidden" onChange={async event => { const file = event.target.files?.[0]; if (!file) return; const granskad = granskaLaunchCsv(await file.text()); setImportRows(granskad.giltiga); setAvvisadeRader(granskad.avvisade) }} /></label>{importRows.length > 0 && <div className="mt-4 rounded-xl bg-primary-50 p-3 text-sm text-primary-800"><Check className="mr-2 inline h-4 w-4" />{importRows.length} rader redo för serverkontroll</div>}
+{kallaResultat && <div className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-3 text-sm text-gray-700"><div className="font-medium">Platsbanken: {kallaResultat.kandidater} firmor av {kallaResultat.traffar_totalt} annonser</div><div className="mt-1 text-xs text-gray-500">Bortsorterat: {kallaResultat.bortsorterade.offentliga} offentliga · {kallaResultat.bortsorterade.dubbletter} dubbletter · {kallaResultat.bortsorterade.utanOrgnummer} utan organisationsnummer · {kallaResultat.bortsorterade.borttagnaAnnonser} borttagna annonser</div><div className="mt-2 text-xs text-gray-500">Inget är skrivet än. Serverkontrollen dedupar mot kön och spärrlistan när du importerar.</div></div>}
 {avvisadeRader.length > 0 && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><div className="mb-2 font-medium">{avvisadeRader.length} rader tas inte med</div><ul className="max-h-40 space-y-1 overflow-y-auto">{avvisadeRader.slice(0, 25).map(rad => <li key={rad.rad} className="flex gap-2"><span className="shrink-0 tabular-nums text-amber-700">Rad {rad.rad}</span><span className="truncate font-medium">{rad.namn}</span><span className="text-amber-800">— {rad.skal}</span></li>)}</ul>{avvisadeRader.length > 25 && <div className="mt-2 text-xs text-amber-700">…och {avvisadeRader.length - 25} till. Rätta i filen och ladda upp igen.</div>}</div>}<div className="mt-6 flex justify-end gap-2"><button onClick={() => setImportOpen(false)} className="rounded-xl px-4 py-2.5 text-sm text-gray-600">Avbryt</button><button disabled={importRows.length === 0 || importing} onClick={importCsv} className="inline-flex items-center gap-2 rounded-xl bg-primary-700 px-4 py-2.5 text-sm font-medium text-white disabled:opacity-50">{importing && <Loader2 className="h-4 w-4 animate-spin" />} Importera</button></div></div></div>}
     </div>
   )

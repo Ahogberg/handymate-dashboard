@@ -175,6 +175,10 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // rutterna och båda taken var för låga för det sammanslagna trädet.
   // 2026-09-03 (lanseringsprovets infrastruktur): admin/launch-preflight —
   // adminspärrad förkravssond, ingen tenant-kontext → 143.
+  // 2026-09-03 (Platsbanken som prospektkälla): admin/launch/kallor/
+  // platsbanken — adminspärrad, läser ett öppet myndighets-API och SKRIVER
+  // ingenting. Ingen tenant-kontext finns eller ska finnas: prospekt hör
+  // till huset, inte till ett kundkonto → 144.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(143)
+  expect(utanStandard.length).toBeLessThanOrEqual(144)
 })
