@@ -110,6 +110,8 @@ jobs:
             tests/autopilot-rapport.spec.ts
             tests/ata-utkast-sparas.spec.ts
             tests/agent-tillstand.spec.ts
+            tests/kontoradering.spec.ts
+            tests/work-report.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

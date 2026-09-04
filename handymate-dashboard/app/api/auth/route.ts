@@ -301,11 +301,11 @@ if (action === 'login') {
   }
 
   // Hämta business_config (owner) eller via business_users (teammedlem)
-  let business: { business_id: string; business_name: string; contact_name?: string } | null = null
+  let business: { business_id: string; business_name: string; contact_name?: string; deleted_at?: string | null } | null = null
 
   const { data: directBusiness } = await getServerSupabase()
     .from('business_config')
-    .select('business_id, business_name, contact_name, contact_email, subscription_plan, subscription_status, is_pilot, trial_ends_at, onboarding_step, onboarding_completed_at')
+    .select('business_id, business_name, contact_name, contact_email, subscription_plan, subscription_status, is_pilot, trial_ends_at, onboarding_step, onboarding_completed_at, deleted_at')
     .eq('user_id', authData.user.id)
     .single()
 
@@ -323,7 +323,7 @@ if (action === 'login') {
     if (bu) {
       const { data: bc } = await getServerSupabase()
         .from('business_config')
-        .select('business_id, business_name, contact_name, contact_email, subscription_plan, subscription_status, is_pilot, trial_ends_at, onboarding_step, onboarding_completed_at')
+        .select('business_id, business_name, contact_name, contact_email, subscription_plan, subscription_status, is_pilot, trial_ends_at, onboarding_step, onboarding_completed_at, deleted_at')
         .eq('business_id', bu.business_id)
         .single()
       if (bc) business = bc
@@ -332,6 +332,15 @@ if (action === 'login') {
 
   if (!business) {
     return NextResponse.json({ error: 'Inget företag kopplat till kontot' }, { status: 401 })
+  }
+
+  // Kontoradering (tasks/plan-kontoradering.md): raden ligger kvar
+  // mjukraderad (fakturaunderlaget behöver kunna härledas i 7 år), och
+  // inloggningarna är redan borta — men bältet och hängslena gäller om någon
+  // skapar en NY auth-användare med samma e-post: den ska inte hitta en död
+  // firma och kunna logga in i den.
+  if (business.deleted_at) {
+    return NextResponse.json({ error: 'Kontot är avslutat' }, { status: 401 })
   }
 
   return NextResponse.json({

@@ -38,6 +38,13 @@ const MANUAL_TABLES = [
   'customer_activity',
   'sms_campaign',
   'sms_campaign_recipient',
+  // Samtalstranskripten. Verifierade i prod 2026-09-04 (information_schema,
+  // läsande) i samband med kontoraderingen — de bär persondata och måste
+  // därför tömmas när en firma avslutas (lib/account/radera.ts), men de har
+  // aldrig fått någon CREATE-fil. Dokumenterad skuld: skriv sql-filen om de
+  // ändras.
+  'transcript',
+  'transcript_turn',
   'material_order',
 ]
 

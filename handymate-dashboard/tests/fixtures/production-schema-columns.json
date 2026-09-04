@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-09-03",
-  "source": "Supabase PostgREST OpenAPI, service_role, read-only",
+  "verified_at": "2026-09-04",
+  "source": "Supabase PostgREST OpenAPI, service_role, read-only. business_config uppdaterad 2026-09-04 efter migration v211 (deleted_at, deleted_by).",
   "tables": {
     "business_config": [
       "accent_color",
@@ -56,6 +56,8 @@
       "default_quote_terms",
       "default_rot_work_category",
       "default_vat_rate",
+      "deleted_at",
+      "deleted_by",
       "display_name",
       "elks_number_id",
       "email",

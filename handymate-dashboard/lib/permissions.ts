@@ -74,8 +74,14 @@ export function isOwnerOrAdmin(user: BusinessUser): boolean {
 
 /**
  * Extraherar user_id från request (samma logik som getAuthenticatedBusiness)
+ *
+ * Exporterad (2026-09-04, tasks/plan-kontoradering.md): kontoraderingsrutten
+ * (app/api/account/delete/route.ts) måste jämföra DEN INLOGGADE ANVÄNDARENS
+ * egna auth-id mot business_config.user_id på servern — inte bara mot
+ * business_users.role — för att avgöra om det är ägaren som anropar. Det är
+ * exakt den här funktionen, inte en ny kopia av token-parsningen.
  */
-async function extractUserId(request: NextRequest): Promise<string | null> {
+export async function extractUserId(request: NextRequest): Promise<string | null> {
   const supabase = getSupabase()
 
   const authHeader = request.headers.get('authorization')
