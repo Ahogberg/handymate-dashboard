@@ -645,6 +645,83 @@ async function fetchBusinessName(
 }
 
 /**
+ * Idempotens för ÄTA/offert-utkast (Sista milen, del 2 — 2026-09-04).
+ *
+ * Status-flippen till 'approved' är atomisk (CAS, se POST-handlern ovan) så
+ * ETT vanligt godkänn-klick kan aldrig exekvera caset två gånger. Men
+ * `executeApprovalPayload` har ett internt catch-all: om POSTen till
+ * /api/ata eller /api/quotes lyckas (raden är skapad) men något EFTER det
+ * kastar innan caset hinner returnera (nätverksglapp när svaret läses,
+ * timeout, etc.) klassas hela försöket som 'failed' trots att raden redan
+ * finns — och en efterföljande "Kör om" (retry-vägen, tillåten just för
+ * outcome 'failed') skulle då köra caset igen och skapa EN TILL rad för
+ * samma kort.
+ *
+ * Nyckeln är kortets eget id (approvalId), inbränt som en markör i ett
+ * internt textfält på den skapade raden: `notes` för ÄTA (project_change),
+ * `source_transcript` för offerter (quotes saknar ett fritt "payload"-fält
+ * och använder redan source_transcript för precis den här sortens interna
+ * spårbarhet — fältet strippas ur kundens publika DTO, se
+ * tests/quote-public-dto.spec.ts, så markören syns aldrig för kunden).
+ *
+ * Kastar ALDRIG: en misslyckad uppslagning får aldrig blockera ett giltigt
+ * FÖRSTA försök att skapa utkastet — den faller tillbaka till "ingen
+ * befintlig rad hittad" och låter caset skapa som vanligt (fail-soft,
+ * samma princip som resten av filen).
+ */
+function idempotensMarkorFor(approvalId: string): string {
+  return `[kort:${approvalId}]`
+}
+
+async function hittaBefintligAtaForKort(
+  supabase: SupabaseClient,
+  businessId: string,
+  projectId: string,
+  approvalId: string,
+): Promise<{ change_id: string; total: number | null } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('project_change')
+      .select('change_id, total')
+      .eq('business_id', businessId)
+      .eq('project_id', projectId)
+      .ilike('notes', `%${idempotensMarkorFor(approvalId)}%`)
+      .limit(1)
+    if (error) {
+      console.error('[create_ata_draft] idempotens-uppslag misslyckades (fail-soft, skapar som vanligt):', error.message)
+      return null
+    }
+    return data?.[0] ?? null
+  } catch (err: any) {
+    console.error('[create_ata_draft] idempotens-uppslag kastade (fail-soft):', err?.message || err)
+    return null
+  }
+}
+
+async function hittaBefintligOffertForKort(
+  supabase: SupabaseClient,
+  businessId: string,
+  approvalId: string,
+): Promise<{ quote_id: string; quote_number: string | null; total: number | null } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('quotes')
+      .select('quote_id, quote_number, total')
+      .eq('business_id', businessId)
+      .ilike('source_transcript', `%${idempotensMarkorFor(approvalId)}%`)
+      .limit(1)
+    if (error) {
+      console.error('[create_quote_draft] idempotens-uppslag misslyckades (fail-soft, skapar som vanligt):', error.message)
+      return null
+    }
+    return data?.[0] ?? null
+  } catch (err: any) {
+    console.error('[create_quote_draft] idempotens-uppslag kastade (fail-soft):', err?.message || err)
+    return null
+  }
+}
+
+/**
  * Execute the payload action based on approval_type.
  * Returns result info (non-fatal — approval is already marked approved).
  *
@@ -1735,6 +1812,22 @@ async function executeApprovalPayload(
         const pl = payload as any
         const textDescription = pl.description || pl.job_description || pl.customer_reply_pending
 
+        // Idempotens (2026-09-04) — se hittaBefintligOffertForKort ovan.
+        // Kolla FÖRE en ny AI-generering körs: en omkörning som redan gav en
+        // rad ska varken kosta ett nytt modellanrop eller skapa en till rad.
+        const supabaseIdemQ = (await import('@/lib/supabase')).getServerSupabase()
+        const befintligOffert = await hittaBefintligOffertForKort(supabaseIdemQ, businessId, approvalId)
+        if (befintligOffert) {
+          return {
+            action: 'create_quote_draft',
+            ok: true,
+            quote_id: befintligOffert.quote_id,
+            quote_number: befintligOffert.quote_number,
+            total: befintligOffert.total,
+            idempotent: true,
+          }
+        }
+
         // ═══ ETAPP B4 (2026-08-06): GODKÄNNANDET SPARAR DET HANTVERKAREN SÅG ═══
         //
         // Tidigare kördes ALLTID en ny AI-generering här, på samma fritext som
@@ -1828,7 +1921,9 @@ async function executeApprovalPayload(
                 : null,
             ai_generated: true,
             ai_confidence: generated.confidence ?? null,
-            source_transcript: textDescription || null,
+            // Idempotensmarkören bränns in i source_transcript (internt fält,
+            // strippas ur kundens publika DTO) — se hittaBefintligOffertForKort.
+            source_transcript: [textDescription, idempotensMarkorFor(approvalId)].filter(Boolean).join('\n'),
             // B3: AI:ns förslag på vad som inte ingår följer med in i utkastet.
             // Hantverkaren ser dem i redigeraren och kan stryka det som inte
             // stämmer — men slipper börja från ett tomt fält, vilket är det
@@ -1861,6 +1956,38 @@ async function executeApprovalPayload(
       case 'create_ata_draft': {
         // Audit-4 Fix DEF (2026-06-02): cookie-forwarding
         const pl = payload as any
+
+        // Idempotens (2026-09-04) — se hittaBefintligAtaForKort/
+        // hittaBefintligOffertForKort ovan. Kolla FÖRE AI-genereringen körs,
+        // mot rätt tabell beroende på om kortet har ett projekt eller inte
+        // (samma gren som avgör vart raden faktiskt skapas nedan).
+        const supabaseIdemA = (await import('@/lib/supabase')).getServerSupabase()
+        if (pl.project_id) {
+          const befintligAta = await hittaBefintligAtaForKort(supabaseIdemA, businessId, pl.project_id, approvalId)
+          if (befintligAta) {
+            return {
+              action: 'create_ata_draft',
+              ok: true,
+              ata_id: befintligAta.change_id,
+              project_id: pl.project_id,
+              total: befintligAta.total,
+              idempotent: true,
+            }
+          }
+        } else {
+          const befintligOffertA = await hittaBefintligOffertForKort(supabaseIdemA, businessId, approvalId)
+          if (befintligOffertA) {
+            return {
+              action: 'create_ata_draft',
+              ok: true,
+              quote_id: befintligOffertA.quote_id,
+              quote_number: befintligOffertA.quote_number,
+              total: befintligOffertA.total,
+              idempotent: true,
+            }
+          }
+        }
+
         const res = await fetch(`${appUrl}/api/quotes/ai-generate`, {
           method: 'POST',
           headers: forwardHeaders(),
@@ -1926,7 +2053,13 @@ async function executeApprovalPayload(
               description: generated.jobDescription || pl.description || 'ÄTA-tillägg',
               items: ataItems,
               customerId: pl.entity?.customerId || null,
-              notes: pl.source_text ? `Ur mötet/samtalet: "${pl.source_text}"` : null,
+              // Idempotensmarkören bränns in i notes (internt fält, se
+              // hittaBefintligAtaForKort ovan) — den syns bara i projektets
+              // interna ÄTA-flik, aldrig i signeringsflödet till kunden.
+              notes: [
+                pl.source_text ? `Ur mötet/samtalet: "${pl.source_text}"` : null,
+                idempotensMarkorFor(approvalId),
+              ].filter(Boolean).join('\n'),
             }),
           })
           const ataR = await classifyResponse(ataRes)
@@ -1973,7 +2106,9 @@ async function executeApprovalPayload(
                 : null,
             ai_generated: true,
             ai_confidence: generated.confidence ?? null,
-            source_transcript: pl.description || null,
+            // Idempotensmarkören bränns in i source_transcript, samma
+            // mönster som create_quote_draft ovan.
+            source_transcript: [pl.description, idempotensMarkorFor(approvalId)].filter(Boolean).join('\n'),
           }),
         })
         const createR = await classifyResponse(createRes)

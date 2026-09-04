@@ -32,21 +32,38 @@
  * men rekommenderad (styr kundspecifik prislista, se
  * resolveCustomerPriceList i lib/ai-quote-generator.ts).
  *
- * VIKTIG KÄND BEGRÄNSNING (verifierad 2026-08-03 — INTE denna körnings
- * scope att fixa, men bör flaggas): exekveraren sparar INTE offerten den
- * genererar någonstans — /api/quotes/ai-generate returnerar bara ett
- * genererat offert-objekt i HTTP-svaret, det skrivs aldrig till `quotes`-
- * eller `project_change`-tabellen, och approvals/[id]/route.ts persisterar
- * bara utfallet (success/failed) på pending_approvals-raden, inte själva
- * utkastet. Samma begränsning gäller redan idag för 'create_quote_draft'
- * (etapp 2a) — alltså inget NYTT hål som denna körning inför. Men i
- * praktiken betyder det: en godkänd ÄTA-kort-rad skapar INGEN rad i
- * project_change och kopplas INTE automatiskt till signeringsflödet
- * (POST /api/ata, /api/ata/sign/[token]) — hantverkaren måste fortfarande
- * själv skapa den riktiga ÄTA:n manuellt efter att ha sett AI-förslaget.
- * En separat uppföljande körning bör antingen (a) byta exekverarens mål
- * till POST /api/ata, eller (b) visa upp AI-förslaget som startvärde i
- * ÄTA-formuläret. Rapporterat, inte fixat här (utanför 2b:s scope).
+ * TIDIGARE KÄND BEGRÄNSNING — STÄNGD (verifierad 2026-08-03, stängd Epic 2
+ * 2026-08-11, offertvägen Etapp B4 2026-08-04/06, idempotens 2026-09-04):
+ * exekveraren returnerade tidigare bara AI-genereringens objekt i HTTP-
+ * svaret utan att skriva någonstans — ett godkänt kort lämnade alltså inget
+ * spår i `quotes` eller `project_change`. Det hålet är stängt:
+ *
+ *  - Har kortet ett `payload.project_id`: exekveraren POSTAR till
+ *    POST /api/ata (samma väg som ChangeModal, `lib/ata/create-ata.ts`) —
+ *    en riktig `project_change`-rad i status 'draft', med `sign_token`,
+ *    normaliserade rader och `ata_number` satt av DB-triggern. Den dyker
+ *    upp i projektets ÄTA-flik och kan skickas/signeras precis som en
+ *    manuellt skapad ÄTA.
+ *  - Saknas projekt (t.ex. mötesfynd före projektstart): reservvägen
+ *    POSTar till POST /api/quotes precis som 'create_quote_draft' —
+ *    en `quotes`-rad i status 'draft', `ai_generated: true`, med
+ *    strukturerade `quote_items` via `generatedQuoteToQuoteItems`
+ *    (lib/quotes/generated-to-quote-items.ts). `quotes` saknar en
+ *    `project_id`-kolumn, så kopplingen här är textuell (titel/beskrivning),
+ *    aldrig en riktig FK — det är därför projektvägen ovan är förstahandsval.
+ *
+ * Idempotens (2026-09-04): en omkörning av samma godkända kort (retry-vägen,
+ * eller ett dubbelklick som hinner före CAS-flippen) skapar inte en andra
+ * rad — exekveraren nycklar på kortets eget id (bränt in som en markör i
+ * `notes` respektive `source_transcript`, se hittaBefintligAtaForKort/
+ * hittaBefintligOffertForKort i app/api/approvals/[id]/route.ts) och
+ * returnerar den befintliga raden om en redan finns.
+ *
+ * Se app/api/approvals/[id]/route.ts, case 'create_ata_draft' (~rad 1956)
+ * för hela exekveringen. Denna fil (suggest-ata-draft.ts) bygger bara
+ * FÖRSLAGET — pending_approvals-kortet med AI-genererad förhandsvisning i
+ * payload.preview — aldrig själva ÄTA:n/offerten. Det är exekverarens jobb,
+ * och det är dit ovanstående länkar.
  *
  * ROUTING/RISK: routing_role 'project_team' (ÄTA hör till projektteamet —
  * se lib/approvals/routing.ts, samma bucket som checklist_forslag/
