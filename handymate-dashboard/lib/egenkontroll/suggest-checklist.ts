@@ -141,9 +141,12 @@ export async function suggestChecklistForProject(input: SuggestChecklistInput): 
     const requiredCount = suggestion.items.filter(it => it.required).length
     const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    // Pass B, del 3: checklist_forslag är kortkanal-typad 'digest'
-    // (lib/approvals/kortkanal.ts) — skapaKort skriver då en
-    // automation_activity-rad i stället för ett kort, tyst.
+    // checklist_forslag är kortkanal-typad 'kort' (lib/approvals/
+    // kortkanal.ts) — förslaget kräver ett beslut av ägaren, så det blir
+    // ett riktigt kort. Men ingen push: ägaren skapade precis projektet
+    // och är kvar i appen, och typen har medvetet ingen push-template i
+    // lib/notifications/approval-push.ts. Utan `push: false` hade varje
+    // projektskapande loggat "no template for approval_type" i onödan.
     await skapaKort(supabase, {
       id: approvalId,
       business_id: businessId,
@@ -163,7 +166,7 @@ export async function suggestChecklistForProject(input: SuggestChecklistInput): 
         template_category: suggestion.category,
         template_items: suggestion.items,
       },
-    })
+    }, { push: false })
   } catch (err) {
     // Fail-safe: förslaget får ALDRIG störa projekt-skapandet som anropar
     // detta fire-and-forget. Se filens header.

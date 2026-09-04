@@ -199,11 +199,13 @@ test.describe('Del 2 — cron-auth-taket och route-auth-inventeringen', () => {
 })
 
 test.describe('Del 3 — kortkanal.ts', () => {
-  test('de fyra typerna är digest, allt annat implicit kort', () => {
+  test('de tre informationstyperna är digest — checklist_forslag är kort', () => {
     expect(kortkanalRen).toMatch(/agent_observation:\s*'digest'/)
     expect(kortkanalRen).toMatch(/dispatch_suggestion:\s*'digest'/)
     expect(kortkanalRen).toMatch(/monthly_review:\s*'digest'/)
-    expect(kortkanalRen).toMatch(/checklist_forslag:\s*'digest'/)
+    // Lars checklistförslag kräver ett beslut av ägaren (fästa checklistan
+    // vid projektet) — det är inte information. Beslut 2026-09-04.
+    expect(kortkanalRen).toMatch(/checklist_forslag:\s*'kort'/)
   })
 
   test('kanalFor är en ren funktion — ingen I/O, ingen Supabase-import', () => {
@@ -218,7 +220,7 @@ test.describe('Del 3 — kortkanal.ts', () => {
     expect(mod.kanalFor('agent_observation')).toBe('digest')
     expect(mod.kanalFor('dispatch_suggestion')).toBe('digest')
     expect(mod.kanalFor('monthly_review')).toBe('digest')
-    expect(mod.kanalFor('checklist_forslag')).toBe('digest')
+    expect(mod.kanalFor('checklist_forslag')).toBe('kort')
     expect(mod.kanalFor('karin_deadline')).toBe('kort')
     expect(mod.kanalFor('four_eyes_quote')).toBe('kort')
     expect(mod.kanalFor('nagot_okant_helt_paIntat')).toBe('kort')
@@ -285,12 +287,18 @@ test.describe('Del 3 — de fyra skapande call-sites använder skapaKort', () =>
     expect(typIdx).toBeGreaterThan(kortIdx)
   })
 
-  test('lib/egenkontroll/suggest-checklist.ts: checklist_forslag-inserten går via skapaKort', () => {
+  test('lib/egenkontroll/suggest-checklist.ts: checklist_forslag-inserten går via skapaKort — kort, men utan push', () => {
     const src = utanKommentarer(read('lib/egenkontroll/suggest-checklist.ts'))
     const kortIdx = src.indexOf('skapaKort(supabase, {')
     const typIdx = src.indexOf("approval_type: 'checklist_forslag'")
     expect(kortIdx).toBeGreaterThan(-1)
     expect(typIdx).toBeGreaterThan(kortIdx)
+    // Kortet skapas (ägaren ska ta ställning) men pushar inte: hen skapade
+    // precis projektet och är kvar i appen. Typen har medvetet ingen
+    // push-template i lib/notifications/approval-push.ts.
+    expect(src).toContain('{ push: false }')
+    const template = utanKommentarer(read('lib/notifications/approval-push.ts'))
+    expect(template).not.toContain("case 'checklist_forslag'")
   })
 
   test('lib/dispatch.ts och suggest-checklist.ts anropar brusgrind FÖRE skapaKort (oförändrad ordning)', () => {
