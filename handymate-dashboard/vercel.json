@@ -192,6 +192,10 @@
     {
       "path": "/api/cron/phone-provision-retry",
       "schedule": "42 6 * * *"
+    },
+    {
+      "path": "/api/cron/kort-gar-ut",
+      "schedule": "30 16 * * *"
     }
   ]
 }

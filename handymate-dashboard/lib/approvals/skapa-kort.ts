@@ -18,10 +18,18 @@
  *   ändå skapat — call-sitens retur (`{ id }`) står fast.
  * - `opts.push === false` hoppar över pushen helt (t.ex. bulk-import eller
  *   typer som redan har egen pushlogik).
+ *
+ * Pass B, del 3 (kortdiet, docs/audits/AUTOPILOT_REVISION_2026-09-04.md
+ * avsnitt 4): innan insert grenar funktionen på kanalFor(approval_type).
+ * Typer märkta 'digest' i lib/approvals/kortkanal.ts blir ALDRIG ett kort —
+ * de skriver en rad i automation_activity (tyst, ingen push) och
+ * returnerar `{ id, kanal: 'digest' }` i stället. Reversibelt: att flytta
+ * en typ tillbaka till 'kort' är en ändring i kortkanal.ts, inte här.
  */
 
 import { getServerSupabase } from '@/lib/supabase'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { kanalFor } from '@/lib/approvals/kortkanal'
 
 type SupabaseServerClient = ReturnType<typeof getServerSupabase>
 
@@ -57,7 +65,11 @@ export async function skapaKort(
   supabase: SupabaseServerClient,
   kort: NyttKort,
   opts?: { push?: boolean },
-): Promise<{ id: string } | null> {
+): Promise<{ id: string; kanal?: 'kort' | 'digest' } | null> {
+  if (kanalFor(kort.approval_type) === 'digest') {
+    return skrivDigestrad(supabase, kort)
+  }
+
   const { data, error } = await supabase
     .from('pending_approvals')
     .insert({ status: 'pending', ...kort })
@@ -96,4 +108,50 @@ export async function skapaKort(
   }
 
   return { id }
+}
+
+/**
+ * Digestgrenen (Pass B, del 3) — typen kräver inget beslut, så den blir
+ * aldrig ett kort. Skriver EN automation_activity-rad ("Skött utan dig" —
+ * se app/api/automations/activity/route.ts) och pushar ALDRIG (digestrader
+ * är tysta per definition).
+ *
+ * OBS status: automation_activity.status har en CHECK-kolumn
+ * (sql/automation_center.sql) som bara tillåter 'success' | 'failed' |
+ * 'skipped' — inte 'auto'. 'success' används här: att observationen
+ * registrerades är i sig lyckat, ingenting misslyckades eller hölls
+ * tillbaka.
+ */
+async function skrivDigestrad(
+  supabase: SupabaseServerClient,
+  kort: NyttKort,
+): Promise<{ id: string; kanal: 'digest' } | null> {
+  const forstaMeningen = (kort.description || '').split(/(?<=[.!?])\s/)[0]?.trim()
+  const beskrivning =
+    forstaMeningen && forstaMeningen !== kort.title
+      ? `${kort.title} — ${forstaMeningen}`
+      : kort.title
+
+  const { data, error } = await supabase
+    .from('automation_activity')
+    .insert({
+      business_id: kort.business_id,
+      automation_type: kort.approval_type,
+      action: 'observed',
+      description: beskrivning,
+      metadata: kort.payload ?? {},
+      status: 'success',
+    })
+    .select('id')
+    .single()
+
+  if (error || !data) {
+    console.warn('[skapa-kort] digest-insert misslyckades:', error?.message, {
+      business_id: kort.business_id,
+      approval_type: kort.approval_type,
+    })
+    return null
+  }
+
+  return { id: data.id as string, kanal: 'digest' }
 }

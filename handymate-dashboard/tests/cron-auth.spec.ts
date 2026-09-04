@@ -83,11 +83,14 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // (livscykelmail dag 2/14, retry-svep för AI-numret) — men raddningsko
   // fanns redan, så nettot är +1 sedan raden ovan. Båda nya använder
   // verifyCronSecret; verifierat genom att köra kontrollen nedan.
-  expect(files).toHaveLength(45)
+  // 46 (2026-09-04, Pass B — kortdiet/kortutgång): kort-gar-ut tillkom
+  // (push dagen innan ett väntande kort går ut, tasks/plan-autopilot-B-
+  // utgang.md del 2) och använder helpern korrekt.
+  expect(files).toHaveLength(46)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(44)
+  expect(ownedRoutes).toHaveLength(45)
 
   const missing = ownedRoutes
     .filter(file => {

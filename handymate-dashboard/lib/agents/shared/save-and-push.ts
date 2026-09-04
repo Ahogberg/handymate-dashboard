@@ -20,6 +20,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 import type { AgentObservation } from './normalize'
 import {
   computeDedupKey,
@@ -233,39 +234,28 @@ export async function saveAndPush(
         if (obs.action.related_id) approvalPayload.related_id = obs.action.related_id
       }
 
-      const { data: approval } = await supabase
-        .from('pending_approvals')
-        .insert({
-          business_id: businessId,
-          approval_type: approvalType,
-          title: obs.title,
-          description: obs.observation,
-          payload: approvalPayload,
-          status: 'pending',
-          risk_level: obs.confidence > 0.8 ? 'medium' : 'low',
-        })
-        .select('id')
-        .single()
-
-      if (approval?.id && knowledgeId) {
-        await supabase
-          .from('business_knowledge')
-          .update({ related_approval_id: approval.id })
-          .eq('id', knowledgeId)
-      }
-
-      void sendApprovalPush({
-        // Kortets id blir dedupe-objektet (lib/notifications/push-policy.ts)
-        // — samma observation pushas inte två gånger inom fönstret.
-        id: approval?.id ?? null,
+      // skapaKort (Pass A) gör insert + push i EN sak. Pass B, del 3:
+      // agent_observation är kortkanal-typad 'digest' (lib/approvals/
+      // kortkanal.ts) — den grenen skriver bara en automation_activity-rad
+      // och pushar aldrig, så `kort.kanal` avgör om det finns ett riktigt
+      // kort att länka business_knowledge till. Typed send_sms-observationer
+      // (isTypedSms ovan) är inte digest-typade och går genom den vanliga
+      // insert+push-vägen precis som förut.
+      const kort = await skapaKort(supabase, {
         business_id: businessId,
         approval_type: approvalType,
-        payload: {
-          agent_id: agentId,
-          title: obs.title,
-          observation: obs.observation,
-        },
+        title: obs.title,
+        description: obs.observation,
+        payload: approvalPayload,
+        risk_level: obs.confidence > 0.8 ? 'medium' : 'low',
       })
+
+      if (kort?.id && knowledgeId && kort.kanal !== 'digest') {
+        await supabase
+          .from('business_knowledge')
+          .update({ related_approval_id: kort.id })
+          .eq('id', knowledgeId)
+      }
       approvalsCreated++
     } else {
       // Ren info utan suggestion → bara push, ingen approval-rad

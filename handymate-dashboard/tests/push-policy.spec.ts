@@ -135,8 +135,13 @@ test.describe('källskanning — inkopplingen', () => {
   })
 
   test('agent-observationens kort-id skickas med som dedupe-objekt', () => {
+    // Sedan Pass A/B (2026-09-04) skapar save-and-push kortet via skapaKort,
+    // som gör insert + push i ett. Invarianten är densamma: det INSATTA
+    // kortets id är dedupe-objektet — aldrig null, aldrig ett gissat värde.
     const src = read('lib/agents/shared/save-and-push.ts')
-    expect(src).toMatch(/sendApprovalPush\(\{[\s\S]*?id: approval\?\.id \?\? null,[\s\S]*?approval_type: approvalType/)
+    expect(src).toMatch(/await skapaKort\(supabase, \{[\s\S]*?approval_type: approvalType/)
+    const kort = read('lib/approvals/skapa-kort.ts')
+    expect(kort).toMatch(/const id = data\.id as string[\s\S]*?sendApprovalPush\(\{\s*\n\s*id,/)
   })
 
   test('/api/push/send skickar TTL + urgency till web-push och ttl/priority till Expo', () => {

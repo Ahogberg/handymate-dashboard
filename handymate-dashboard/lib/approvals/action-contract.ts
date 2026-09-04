@@ -272,6 +272,12 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   // framtida rad-skapande väg aldrig får hamna i default-grenen.
   external_delivery_failure_signal: 'INFORMATIONAL',
   payment_failed_signal: 'INFORMATIONAL',
+  // Pass B, del 2 (2026-09-04, app/api/cron/kort-gar-ut/route.ts): samma
+  // mönster som ovan — skapar ALDRIG en pending_approvals-rad. Strängen
+  // används bara som approval_type-fältet i push_dispatch_log (dedupe/
+  // bokföring av EN daglig påminnelsepush om kort som går ut i morgon),
+  // men producentskanningen ser den ändå.
+  kort_gar_ut: 'INFORMATIONAL',
 }
 
 /** Vad är det här kortet? `null` = okänt, och okänt godkänns inte. */

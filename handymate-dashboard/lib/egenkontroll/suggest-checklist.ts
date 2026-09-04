@@ -27,6 +27,7 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getChecklistsForBranch, type ChecklistTemplate } from '@/lib/checklist-defaults'
 import { brusgrind } from '@/lib/approvals/noise-gate'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 
 // ─────────────────────────────────────────────────────────────────
 // pickChecklistSuggestion — ren, facit-testbar kärna
@@ -140,7 +141,10 @@ export async function suggestChecklistForProject(input: SuggestChecklistInput): 
     const requiredCount = suggestion.items.filter(it => it.required).length
     const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
-    await supabase.from('pending_approvals').insert({
+    // Pass B, del 3: checklist_forslag är kortkanal-typad 'digest'
+    // (lib/approvals/kortkanal.ts) — skapaKort skriver då en
+    // automation_activity-rad i stället för ett kort, tyst.
+    await skapaKort(supabase, {
       id: approvalId,
       business_id: businessId,
       approval_type: 'checklist_forslag',

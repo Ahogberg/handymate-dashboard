@@ -39,14 +39,86 @@ export async function GET(request: NextRequest) {
       // scheduled_review_request ingår: ett obesvarat kort är ett nej,
       // aldrig ett samtycke (punkt 8, 2026-09-02 — se steg 3 nedan).
       .lt('expires_at', new Date().toISOString())
-      .select('id')
+      .select('id, business_id, approval_type, title')
 
     if (error) throw error
-    results.expired_approvals = data?.length || 0
+    const utgangna: Array<{ id: string; business_id: string; approval_type: string; title: string }> = data || []
+    results.expired_approvals = utgangna.length
     console.log(`[maintenance] Expired ${results.expired_approvals} approvals`)
+
+    // Pass B, del 1 (docs/audits/AUTOPILOT_REVISION_2026-09-04.md, avsnitt
+    // 2 — "Arbetet försvinner, korten går ut i tysthet"): ett kort som
+    // ingen såg blev tidigare detsamma som ett kort som aldrig fanns. Nu
+    // en rad per konto i automation_activity, så det syns i "Skött utan
+    // dig" (app/api/automations/activity/route.ts).
+    if (utgangna.length > 0) {
+      const perKonto = new Map<string, typeof utgangna>()
+      for (const rad of utgangna) {
+        const lista = perKonto.get(rad.business_id) || []
+        lista.push(rad)
+        perKonto.set(rad.business_id, lista)
+      }
+
+      const MAX_TITLAR = 3
+      for (const [businessId, rader] of Array.from(perKonto)) {
+        const titlar = rader.slice(0, MAX_TITLAR).map(r => r.title)
+        const rest = rader.length - titlar.length
+        const beskrivning = `${rader.length} förslag gick ut utan beslut: ${titlar.join(', ')}${rest > 0 ? `, och ${rest} till` : ''}`
+
+        const { error: actErr } = await supabase.from('automation_activity').insert({
+          business_id: businessId,
+          automation_type: 'kort_utgangna',
+          action: 'expired',
+          description: beskrivning,
+          metadata: {
+            approval_ids: rader.map(r => r.id),
+            approval_types: rader.map(r => r.approval_type),
+          },
+          // automation_activity.status har en CHECK-kolumn (sql/
+          // automation_center.sql) som bara tillåter 'success' | 'failed' |
+          // 'skipped' — inte 'auto'. 'success' matchar bäst: registreringen
+          // av utgången lyckades, inget misslyckades.
+          status: 'success',
+        })
+        if (actErr) {
+          console.error('[maintenance] kort_utgangna-loggning misslyckades:', actErr.message, { businessId })
+        }
+      }
+    }
   } catch (err: any) {
     console.error('[maintenance] expire-approvals error:', err.message)
     results.expired_approvals_error = err.message
+  }
+
+  // ── 1b. team_intro-kort som aldrig stängdes (Del 4, 2026-09-04) ────
+  //
+  // Startkorten (lib/onboarding/starter-cards.ts) presenterar teamet och
+  // väntar aldrig på ett riktigt beslut — "Jag har läst det" är enda
+  // handlingen. Utan den här regeln låg de som pending i CARD_LIFETIME_DAYS
+  // (14 dagar) innan steget ovan satte dem till 'expired'. Ett kort som
+  // aldrig går att stänga lär kunden att kort inte betyder något
+  // (docs/audits/AUTOPILOT_REVISION_2026-09-04.md, avsnitt 4). De var
+  // aldrig ett förslag att avvisa, så 'approved' — inte 'expired' — efter
+  // 7 dagar, med resolved_by 'system' (samma märkning som raddningsko
+  // använder för systemstängda ärenden).
+  try {
+    const sjuDagarSedan = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase
+      .from('pending_approvals')
+      .update({ status: 'approved', resolved_by: 'system', resolved_at: new Date().toISOString() })
+      .eq('approval_type', 'team_intro')
+      .eq('status', 'pending')
+      .lt('created_at', sjuDagarSedan)
+      .select('id')
+
+    if (error) throw error
+    results.team_intro_closed = data?.length || 0
+    if (results.team_intro_closed > 0) {
+      console.log(`[maintenance] team_intro stängda (auto-godkända efter 7 dagar): ${results.team_intro_closed}`)
+    }
+  } catch (err: any) {
+    console.error('[maintenance] team_intro-svepet failade:', err.message)
+    results.team_intro_closed_error = err.message
   }
 
   // ── 2. Sync 46elks phone webhooks ─────────────────────────

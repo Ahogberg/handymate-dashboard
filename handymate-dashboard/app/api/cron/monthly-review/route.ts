@@ -4,6 +4,7 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { generateMonthlyReview, buildMonthlyReviewSms } from '@/lib/matte/monthly-review'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -79,15 +80,18 @@ export async function GET(request: NextRequest) {
         if (!r.success) console.error('[cron/monthly-review] SMS misslyckades:', r.error)
       }
 
-      // Skapa pending_approval så rapporten dyker upp som notis
-      await supabase.from('pending_approvals').insert({
+      // Pass B, del 3: monthly_review är kortkanal-typad 'digest'
+      // (lib/approvals/kortkanal.ts) — hade 12/12 utgångsandel i
+      // produktionen (docs/audits/AUTOPILOT_REVISION_2026-09-04.md).
+      // Kortet var dubbelt; SMS:et ovan är rapporten och ska vara kvar.
+      // skapaKort skriver en automation_activity-rad i stället, tyst.
+      await skapaKort(supabase, {
         id: `mrev_${biz.business_id}_${report.data.month}`,
         business_id: biz.business_id,
         approval_type: 'monthly_review',
         title: `📊 Månadsrapport ${report.data.month_label}`,
         description: `${report.recommendations.length} rekommendation${report.recommendations.length === 1 ? '' : 'er'} väntar`,
         payload: { agent_id: 'matte', month: report.data.month, recommendations: report.recommendations.slice(0, 3) },
-        status: 'pending',
         risk_level: 'low',
       })
 

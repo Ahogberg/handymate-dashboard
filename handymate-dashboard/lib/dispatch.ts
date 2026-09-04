@@ -11,6 +11,7 @@ import { classifyCertStatus } from '@/lib/certifikat/status'
 import { svDateStr, svDateStrPlusDays } from '@/lib/dates'
 import { mondayOfWeek } from '@/lib/capacity/week-capacity'
 import { brusgrind } from '@/lib/approvals/noise-gate'
+import { skapaKort } from '@/lib/approvals/skapa-kort'
 
 interface TeamMember {
   id: string
@@ -289,7 +290,11 @@ export async function suggestDispatch(params: {
   const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`
   const enrichment = await buildDispatchCandidateEnrichment(supabase, params.businessId, best.member.id)
 
-  await supabase.from('pending_approvals').insert({
+  // Pass B, del 3: dispatch_suggestion är kortkanal-typad 'digest'
+  // (lib/approvals/kortkanal.ts) — skapaKort skriver då en
+  // automation_activity-rad i stället för ett kort, tyst. skapaKort gör
+  // insert + ev. push i EN sak (Pass A).
+  await skapaKort(supabase, {
     id: approvalId,
     business_id: params.businessId,
     approval_type: 'dispatch_suggestion',

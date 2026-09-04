@@ -179,6 +179,8 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // platsbanken — adminspärrad, läser ett öppet myndighets-API och SKRIVER
   // ingenting. Ingen tenant-kontext finns eller ska finnas: prospekt hör
   // till huset, inte till ett kundkonto → 144.
+  // 2026-09-04 (Pass B — kortutgång): cron/kort-gar-ut — cron-hemlighet,
+  // ingen tenant-kontext (svepet grupperar per business_id själv) → 145.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(144)
+  expect(utanStandard.length).toBeLessThanOrEqual(145)
 })

@@ -106,6 +106,7 @@ jobs:
             tests/platsbanken-kalla.spec.ts
             tests/autopilot-nba.spec.ts
             tests/autopilot-push.spec.ts
+            tests/autopilot-utgang.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
