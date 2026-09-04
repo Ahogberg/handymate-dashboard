@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getNextCustomerNumber } from '@/lib/numbering'
+import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 
 /**
  * GET - Lista alla kunder för ett företag
@@ -60,6 +61,30 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing name' }, { status: 400 })
     }
 
+    // Dubblettkontroll (2026-09-04): samma sanning som /api/actions
+    // create_customer. Ny deal-modalen gick tidigare förbi den helt, så
+    // samma kund kunde läggas upp två gånger med olika nummer. force_create
+    // är klientens uttryckliga "skapa ändå".
+    if (!body.force_create) {
+      const duplicates = await findCustomerDuplicates(supabase, {
+        business_id: business.business_id,
+        phone: phone_number,
+        email,
+        name,
+        address: address_line,
+      })
+      if (duplicates.length > 0) {
+        return NextResponse.json(
+          {
+            error: 'duplicate_customer',
+            message: 'En eller flera kunder matchar redan på telefon, e-post eller namn+adress.',
+            duplicates,
+          },
+          { status: 409 },
+        )
+      }
+    }
+
     const customerId = 'cust_' + Math.random().toString(36).substr(2, 9)
     const customerNumber = await getNextCustomerNumber(supabase, business.business_id)
 
@@ -91,7 +116,23 @@ export async function POST(request: NextRequest) {
       .select()
       .single()
 
-    if (error) throw error
+    if (error) {
+      // Sanning (2026-09-04): samma fix som /api/actions create_customer fick
+      // 2026-08-27, men den gjordes bara på den ena vägen. Ny deal-modalen
+      // går hit, och ett upptaget telefonnummer blev ett anonymt 500 —
+      // hantverkaren såg "Kunde inte skapa kund" utan att förstå varför,
+      // trots att svaret är enkelt: numret finns redan på en annan kund.
+      if ((error as { code?: string }).code === '23505' && error.message?.includes('unique_phone_per_business')) {
+        return NextResponse.json(
+          {
+            error: 'phone_taken',
+            message: 'Telefonnumret används redan av en annan kund — sök upp den befintliga kunden i stället.',
+          },
+          { status: 409 },
+        )
+      }
+      throw error
+    }
 
     // Fortnox-kundnummer vid SKAPANDET (2026-08-26) — se
     // lib/fortnox/sync.ts syncNewCustomerToFortnox. Non-blocking.
