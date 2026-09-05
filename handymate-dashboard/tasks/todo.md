@@ -1,3 +1,14 @@
+## Leverans 3: intäktskö (Codex 2026-09-05)
+
+- [x] Bygg intäktskö med sökning, prioritering och nästa steg.
+- [x] Behåll hemsidans tre kort och återanvänd befintligt behörighetsskydd och läsmodell.
+- [x] Verifiera fel, behörighet, filtrering, mobilvy, typkontroll och bygg.
+- [x] Dokumentera skarpa prov och lämna separat PR.
+
+Review: 31 riktade tester, typkontroll och produktionsbygg godkända.
+Mobil- och skrivbordsvy granskade. Skarpa prov återstår enligt
+[leveransplanen](revenue-work-queue.md). Inga nya databasfrågor eller migrationer.
+
 # Launch Truth & Operations (Codex 2026-09-03)
 
 - [x] Baslinjegranska den lokala Support & drift-leveransen mot befintliga
