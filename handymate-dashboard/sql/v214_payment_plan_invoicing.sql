@@ -141,7 +141,8 @@ BEGIN
  IF TG_OP IN ('INSERT','UPDATE') THEN
    -- Same lock order as activation: an in-flight ordinary invoice cannot
    -- slip between the no-invoices check and the committed plan.
-   PERFORM 1 FROM project WHERE project_id=NEW.project_id AND business_id=NEW.business_id FOR UPDATE;
+   PERFORM 1 FROM project WHERE business_id=NEW.business_id
+     AND (project_id=NEW.project_id OR quote_id=NEW.quote_id) ORDER BY project_id FOR UPDATE;
    SELECT quote_id INTO plan_id FROM invoice_payment_plan WHERE business_id=NEW.business_id AND quote_id=NEW.quote_id;
    IF plan_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM invoice_payment_stage WHERE invoice_id=NEW.invoice_id AND quote_id=plan_id) THEN RAISE EXCEPTION 'Använd projektets betalplan för denna offert'; END IF;
  END IF;
