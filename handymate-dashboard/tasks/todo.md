@@ -1,3 +1,8 @@
+## Kundförberedelse (Codex 2026-09-05)
+
+- [x] Implementera [byggplanens V1](customer-preparation-plan.md): kundunderlag och jobbstart. 56 tester, typkontroll och produktionsbygge gröna.
+- [ ] Driftsättningsprov: kör migration och verifiera riktig DB/storage samt autentiserat kundkort före aktivering.
+
 # Launch Truth & Operations (Codex 2026-09-03)
 
 - [x] Baslinjegranska den lokala Support & drift-leveransen mot befintliga

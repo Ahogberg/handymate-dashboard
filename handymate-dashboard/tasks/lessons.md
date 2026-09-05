@@ -560,3 +560,7 @@ och driftlarmet hade listat SMS-felen varje dag. Jag hade grep:at
 - Skriv aldrig "ingen fick veta" om systemet faktiskt sa något. Skriv
   "det sades som en gul varning och lästes inte", och rätta larmet.
 
+
+## 2026-09-05: Produktförslag ska följas av handling när användaren ber om bygge
+
+Kontrollera repot och bygg en granskningsbar leverans när användaren auktoriserar implementation. Stanna inte vid erbjudanden om fortsatt arbete.
