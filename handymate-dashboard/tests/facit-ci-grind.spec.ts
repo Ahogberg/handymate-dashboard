@@ -60,6 +60,7 @@ test.describe('Kontraktsgrinden (contracts.yml)', () => {
     // shellen fick "npx playwright test …" UTAN --no-deps på första raden,
     // startade inloggningssteget som kräver en browser, och 1314 test
     // "did not run". Felet doldes i två dygn av att tsc dog i OOM före det.
+    const yaml = read(file)
     const rader = yaml.split('\n')
     const start = rader.findIndex(l => l.includes('Browserlösa kontraktssviter'))
     const runI = rader.findIndex((l, i) => i > start && l.trim() === 'run: >-')
