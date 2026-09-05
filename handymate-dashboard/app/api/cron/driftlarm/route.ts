@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { sendEmail } from '@/lib/email'
+import { hamta46elksSaldo, bedomSaldo, type ElksSaldo } from '@/lib/sms/saldo'
 import { resolveCostCapUsd } from '@/lib/agents/shared/cost-guard'
 import { getAbsenceWindow, isAbsenceActive } from '@/lib/absence/absence-window'
 import { classifyAbsenceEvent } from '@/lib/absence/escalation'
@@ -327,6 +328,38 @@ async function runDriftlarm() {
     brokenSweeps.push('Användningssignal')
   }
 
+  // 5. 46elks-saldot (2026-09-05). SMS var dött 13 aug–5 sep: 85 utskick föll
+  //    på "Not enough credits" och raderna drunknade bland andra fel här i
+  //    digesten. Saldot läses nu rakt av och står ÖVERST i ämnesraden när det
+  //    inte räcker en vecka till. Fail-soft: kan saldot inte läsas står DET i
+  //    mejlet — tystnad är precis det som gjorde att ingen såg det förra gången.
+  let saldo: ElksSaldo = { ok: false, reason: 'inte läst' }
+  let saldoLarm: { granKr: number; veckoforbrukningKr: number; skickade7d: number } | null = null
+  let saldoFel = 0
+  try {
+    saldo = await hamta46elksSaldo()
+    const sjuDagar = new Date(Date.now() - 7 * 24 * 3600_000).toISOString()
+    const { count: skickade7d } = await supabase
+      .from('sms_log')
+      .select('sms_id', { count: 'exact', head: true })
+      .eq('status', 'sent')
+      .gte('created_at', sjuDagar)
+    const { count: pengarSlut } = await supabase
+      .from('sms_log')
+      .select('sms_id', { count: 'exact', head: true })
+      .eq('status', 'failed')
+      .ilike('error_message', '%Not enough credits%')
+      .gte('created_at', since)
+    saldoFel = pengarSlut ?? 0
+    if (saldo.ok) {
+      const bed = bedomSaldo(saldo.kr, skickade7d ?? 0)
+      if (!bed.racker) saldoLarm = { granKr: bed.granKr, veckoforbrukningKr: bed.veckoforbrukningKr, skickade7d: skickade7d ?? 0 }
+    }
+  } catch (err) {
+    console.error('[driftlarm] saldosvepet kraschade:', err)
+    brokenSweeps.push('46elks-saldo')
+  }
+
   const totals = {
     sms: sms.count,
     email: email.count,
@@ -342,15 +375,22 @@ async function runDriftlarm() {
   // användningssignalen ensam har träffar (en trasig kontroll är i sig en
   // driftrisk Andreas ska känna till — tystnad ska aldrig betyda "vi vet
   // inte" utan "vi kollade och det var rent").
-  if (totalErrors > 0 || brokenSweeps.length > 0 || usageSignal.count > 0) {
+  const saldoKritiskt = saldoLarm !== null || saldoFel > 0 || !saldo.ok
+  if (totalErrors > 0 || brokenSweeps.length > 0 || usageSignal.count > 0 || saldoKritiskt) {
     try {
-      const html = buildDriftlarmHtml({ sms, email, billing, automation, usageSignal, brokenSweeps })
+      const html = buildDriftlarmHtml({ sms, email, billing, automation, usageSignal, brokenSweeps, saldo, saldoLarm, saldoFel })
       // Om enbart signalen utlöser mailet (inga fel, inga trasiga svep) får
       // det en egen ämnesrad — signalen ska aldrig se ut som ett driftlarm.
-      const onlySignal = totalErrors === 0 && brokenSweeps.length === 0 && usageSignal.count > 0
-      const subject = onlySignal
-        ? `💡 Handymate användningssignal: ${usageSignal.count} kunder nära taket`
-        : `⚠️ Handymate driftlarm: ${totalErrors} fel senaste dygnet`
+      const onlySignal = totalErrors === 0 && brokenSweeps.length === 0 && usageSignal.count > 0 && !saldoKritiskt
+      // Saldot vinner ämnesraden. Ett tomt saldo är inte "ett fel bland
+      // andra" — det är orsaken till att inget SMS går ut alls.
+      const subject = saldoLarm || saldoFel > 0
+        ? `🔴 46elks-saldo ${saldo.ok ? `${saldo.kr} kr` : 'okänt'} — ${saldoFel > 0 ? `${saldoFel} SMS gick inte ut` : 'räcker inte en vecka'}`
+        : !saldo.ok
+          ? `⚠️ Handymate driftlarm: 46elks-saldot kunde inte läsas (${saldo.reason})`
+          : onlySignal
+            ? `💡 Handymate användningssignal: ${usageSignal.count} kunder nära taket`
+            : `⚠️ Handymate driftlarm: ${totalErrors} fel senaste dygnet`
       const result = await sendEmail({
         to: 'andreas@handymate.se',
         subject,
@@ -366,6 +406,26 @@ async function runDriftlarm() {
   }
 
   return NextResponse.json({ success: true, totals, usage_signal_count: usageSignal.count, mailed })
+}
+
+function saldoSection(
+  saldo: ElksSaldo,
+  larm: { granKr: number; veckoforbrukningKr: number; skickade7d: number } | null,
+  pengarSlut: number,
+): string {
+  const rad = (text: string, farg: string) =>
+    `<div style="margin: 0 0 18px; padding: 14px 16px; border-radius: 10px; background: ${farg}; font-size: 14px; line-height: 1.5;">${text}</div>`
+  if (!saldo.ok) {
+    return rad(`<strong>46elks-saldot kunde inte läsas</strong> (${escapeHtml(saldo.reason)}). Kontrollera nycklarna — utan saldo går inga SMS ut.`, '#FEF3C7')
+  }
+  const saldoText = `<strong>46elks-saldo: ${saldo.kr} ${escapeHtml(saldo.currency)}</strong> <span style="color:#6B7280">(råvärde ${saldo.raw})</span>`
+  if (pengarSlut > 0) {
+    return rad(`${saldoText}<br><strong style="color:#B91C1C">${pengarSlut} SMS gick inte ut senaste dygnet för att saldot var slut.</strong> Fyll på hos 46elks och slå på automatisk påfyllning. De utskicken är inte gjorda — kunderna fick ingenting.`, '#FEE2E2')
+  }
+  if (larm) {
+    return rad(`${saldoText}<br>Räcker inte en vecka till: ${larm.skickade7d} SMS senaste 7 dagarna ≈ ${larm.veckoforbrukningKr} kr, gräns ${larm.granKr} kr. Fyll på innan det tar slut.`, '#FEF3C7')
+  }
+  return rad(`${saldoText} — räcker.`, '#ECFDF5')
 }
 
 function categorySection(title: string, sweep: SweepOutcome, broken: boolean): string {
@@ -429,10 +489,14 @@ function buildDriftlarmHtml(params: {
   automation: SweepOutcome
   usageSignal: SweepOutcome
   brokenSweeps: string[]
+  saldo: ElksSaldo
+  saldoLarm: { granKr: number; veckoforbrukningKr: number; skickade7d: number } | null
+  saldoFel: number
 }): string {
-  const { sms, email, billing, automation, usageSignal, brokenSweeps } = params
+  const { sms, email, billing, automation, usageSignal, brokenSweeps, saldo, saldoLarm, saldoFel } = params
 
   const sections = [
+    saldoSection(saldo, saldoLarm, saldoFel),
     categorySection('SMS', sms, brokenSweeps.includes('SMS-loggen')),
     categorySection('E-post', email, brokenSweeps.includes('E-post/kommunikationsloggen')),
     categorySection('Betalningar', billing, brokenSweeps.includes('Betalningar')),
