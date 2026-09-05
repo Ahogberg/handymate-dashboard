@@ -1,3 +1,5 @@
+import { assertPlanFortnoxAmounts } from '@/lib/invoices/payment-plan/fortnox-credit'
+import { exportPlanCredit } from '@/lib/invoices/payment-plan/fortnox-credit'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { fortnoxRequest, isFortnoxConnected, syncCustomerToFortnox, updateFortnoxCustomer } from '@/lib/fortnox'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
@@ -110,6 +112,14 @@ export async function syncInvoiceToFortnox(
     )
   }
 
+  // Fortnox may act on a registered reduction after payment. An advance
+  // must not enter that path before its work completion is attested.
+  if (invoice.payment_plan_quote_id && invoice.invoice_type !== 'credit' && Number(invoice.rot_rut_deduction) > 0 && !invoice.payment_plan_work_completed_on) {
+    return { success: false, error: 'Bekräfta utfört arbete i betalplanen före Fortnox-export med ROT/RUT. Förskott med avdrag kräver avstämning innan export.' }
+  }
+
+  if (invoice.payment_plan_credit_pending) return { success: false, error: 'Fakturan har en kredit och ska inte exporteras på nytt' }
+
   let customerNumber = invoice.customer?.fortnox_customer_number as string | null
   if (!customerNumber && invoice.customer_id) {
     const sync = await syncCustomerToFortnox(businessId, invoice.customer_id)
@@ -174,6 +184,7 @@ export async function syncInvoiceToFortnox(
     : null
   const houseWorkType = fortnoxHouseWorkType(skvCategory)
   const rotType: RotRutType | null = taxReductionType === 'ROT' ? 'rot' : taxReductionType === 'RUT' ? 'rut' : null
+  if (invoice.payment_plan_quote_id && taxReductionType && !houseWorkType) return { success: false, error: 'Ange arbetskategori före export av betalplansfaktura med ROT/RUT' }
   if (taxReductionType && !houseWorkType) {
     await rapporteraTystFel(supabase, businessId, 'fortnox:housework-category-missing',
       `ROT/RUT-fakturan saknar arbetskategori (rot_work_category) — bokförs i Fortnox utan husarbete.`,
@@ -213,7 +224,7 @@ export async function syncInvoiceToFortnox(
   const invoicePayload: Record<string, unknown> = {
     CustomerNumber: customerNumber,
     Project: fortnoxProjectNumber || undefined,
-    InvoiceDate: today,
+    InvoiceDate: invoice.payment_plan_quote_id ? invoice.invoice_date : today,
     DueDate: dueDate,
     Currency: 'SEK',
     Language: 'SV',
@@ -235,6 +246,8 @@ export async function syncInvoiceToFortnox(
   const personalNumber: string | null = invoice.rot_personal_number || invoice.customer?.personal_number || null
   const propertyDesignation: string | null = invoice.rot_property_designation || invoice.customer?.property_designation || null
 
+  if (invoice.payment_plan_quote_id && withHouseWork && reductionAmount > 0 && !personalNumber) return { success: false, error: 'Personnummer krävs före Fortnox-export med avdrag' }
+
   await prepareInvoiceManifest(supabase, {
     businessId,
     invoiceId,
@@ -242,11 +255,12 @@ export async function syncInvoiceToFortnox(
   })
 
   const startedAt = new Date().toISOString()
-  await supabase
-    .from('invoice')
-    .update({ fortnox_sync_status: 'pending', fortnox_sync_attempted_at: startedAt })
-    .eq('invoice_id', invoiceId)
-    .eq('business_id', businessId)
+  if (invoice.payment_plan_quote_id) {
+    const { data: claimed, error: claimError } = await supabase.rpc('claim_payment_plan_fortnox', { p_business: businessId, p_invoice: invoiceId })
+    if (claimError || !claimed) return { success: false, error: 'Export pågår eller ett tidigare försök behöver stämmas av i Fortnox innan nytt försök.' }
+  } else {
+    await supabase.from('invoice').update({ fortnox_sync_status: 'pending', fortnox_sync_attempted_at: startedAt }).eq('invoice_id', invoiceId).eq('business_id', businessId)
+  }
 
   let fortnoxInvoiceNumber: string | null = null
   let fortnoxDocumentNumber: string | null = null
@@ -261,17 +275,81 @@ export async function syncInvoiceToFortnox(
     // ursprungliga koden, förväxlat med kundfaktura-resursen). Att läsa
     // InvoiceNumber här gav alltid undefined, vilket fick varje lyckad
     // bokning att tolkas som ett misslyckande.
-    const response = await fortnoxRequest<{ Invoice: { DocumentNumber: string } }>(
-      businessId,
-      'POST',
-      '/invoices',
-      { Invoice: invoicePayload },
-    )
-    fortnoxInvoiceNumber = response?.Invoice?.DocumentNumber ?? null
-    fortnoxDocumentNumber = response?.Invoice?.DocumentNumber ?? null
+    if (invoice.payment_plan_quote_id && invoice.fortnox_document_number) {
+      fortnoxDocumentNumber = invoice.fortnox_document_number
+      fortnoxInvoiceNumber = fortnoxDocumentNumber
+    } else if (invoice.payment_plan_quote_id && invoice.invoice_type === 'credit') {
+      const { data: original, error: originalError } = await supabase.from('invoice')
+        .select('fortnox_document_number').eq('business_id', businessId)
+        .eq('invoice_id', invoice.credit_for_invoice_id).single()
+      if (originalError || !original?.fortnox_document_number) throw new Error('Originalfakturan måste vara exporterad till Fortnox före kreditering')
+      fortnoxDocumentNumber = await exportPlanCredit((method, path) => fortnoxRequest(businessId, method, path), original.fortnox_document_number)
+      fortnoxInvoiceNumber = fortnoxDocumentNumber
+    } else {
+      const response = await fortnoxRequest<{ Invoice: { DocumentNumber: string } }>(businessId, 'POST', '/invoices', { Invoice: invoicePayload })
+      fortnoxInvoiceNumber = response?.Invoice?.DocumentNumber ?? null
+      fortnoxDocumentNumber = response?.Invoice?.DocumentNumber ?? null
+    }
+    if (invoice.payment_plan_quote_id && fortnoxDocumentNumber) {
+      const { error: referenceError } = await supabase.from('invoice').update({ fortnox_document_number: fortnoxDocumentNumber })
+        .eq('invoice_id', invoiceId).eq('business_id', businessId)
+      if (referenceError) throw new Error('Fortnox skapade fakturan men referensen kunde inte sparas. Stäm av innan nytt försök.')
+    }
+
   } catch (err: any) {
     fortnoxError = err?.message || 'Fortnox-fel'
     console.error('[sync-to-fortnox] Fortnox API failed:', fortnoxError)
+  }
+
+  if (invoice.payment_plan_quote_id && fortnoxError) return { success: false, error: fortnoxError }
+
+  async function registerReduction(): Promise<boolean> {
+    if (!fortnoxDocumentNumber) return false
+    if (invoice.payment_plan_quote_id && invoice.rot_application_status === 'submitted') return true
+    let taxReductionCreated = false
+    if (withHouseWork && !(invoice.payment_plan_quote_id && invoice.invoice_type === 'credit')) {
+      if (reductionAmount > 0 && personalNumber) {
+        try {
+          await fortnoxRequest(businessId, 'POST', '/taxreductions', {
+            TaxReduction: buildTaxReductionPayload({
+              documentNumber: fortnoxDocumentNumber,
+              askedAmountKr: reductionAmount,
+              customerName: invoice.customer?.name,
+              personalNumber,
+              propertyDesignation,
+              brfOrgNumber: invoice.rot_brf_org_number || null,
+              apartmentNumber: invoice.rot_apartment_number || null,
+            }),
+          })
+          taxReductionCreated = true
+        } catch (trErr: any) {
+          const message = trErr?.message || 'taxreductions failed'
+          console.error('[sync-to-fortnox] POST /taxreductions misslyckades (bokföringen kvarstår):', message)
+          await rapporteraTystFel(supabase, businessId, 'fortnox:taxreduction-failed', message, {
+            invoiceId, fortnoxDocumentNumber, askedAmountKr: reductionAmount,
+          })
+        }
+      } else {
+        await rapporteraTystFel(supabase, businessId, 'fortnox:taxreduction-skipped',
+          'ROT/RUT-fakturan bokfördes i Fortnox men ingen begäran skapades — personnummer eller avdragsbelopp saknas.',
+          { invoiceId, fortnoxDocumentNumber, hasPersonalNumber: !!personalNumber, askedAmountKr: reductionAmount })
+      }
+    }
+
+    if (invoice.payment_plan_quote_id && taxReductionCreated) {
+      const { error } = await supabase.from('invoice').update({ rot_application_status: 'submitted' }).eq('invoice_id', invoiceId).eq('business_id', businessId)
+      if (error) return false
+    }
+    return taxReductionCreated
+  }
+  let taxReductionCreated = false
+  if (invoice.payment_plan_quote_id) {
+    taxReductionCreated = await registerReduction()
+    if (withHouseWork && reductionAmount > 0 && !taxReductionCreated) return { success: false, error: 'Fakturan finns i Fortnox men avdraget kunde inte registreras. Stäm av före utskick.' }
+    try {
+      const remote = await fortnoxRequest<{ Invoice: { Total: number; TaxReduction: number } }>(businessId, 'GET', `/invoices/${fortnoxDocumentNumber}`)
+      assertPlanFortnoxAmounts(invoice, remote.Invoice)
+    } catch (error: any) { return { success: false, error: error.message || 'Fortnox-beloppen kunde inte stämmas av före utskick' } }
   }
 
   // Dubbelskydd (2026-08-20, verifierat mot Fortnox egen OpenAPI-spec —
@@ -339,35 +417,7 @@ export async function syncInvoiceToFortnox(
   // förblir null (INTE 'submitted' — det ordet ska betyda att Fortnox har
   // en begäran), och driftlarmet får veta. Andreas kan då skicka via vår
   // egen XML (/dashboard/invoices/rot-payment) eller registrera i Fortnox.
-  let taxReductionCreated = false
-  if (withHouseWork) {
-    if (reductionAmount > 0 && personalNumber) {
-      try {
-        await fortnoxRequest(businessId, 'POST', '/taxreductions', {
-          TaxReduction: buildTaxReductionPayload({
-            documentNumber: fortnoxDocumentNumber,
-            askedAmountKr: reductionAmount,
-            customerName: invoice.customer?.name,
-            personalNumber,
-            propertyDesignation,
-            brfOrgNumber: invoice.rot_brf_org_number || null,
-            apartmentNumber: invoice.rot_apartment_number || null,
-          }),
-        })
-        taxReductionCreated = true
-      } catch (trErr: any) {
-        const message = trErr?.message || 'taxreductions failed'
-        console.error('[sync-to-fortnox] POST /taxreductions misslyckades (bokföringen kvarstår):', message)
-        await rapporteraTystFel(supabase, businessId, 'fortnox:taxreduction-failed', message, {
-          invoiceId, fortnoxDocumentNumber, askedAmountKr: reductionAmount,
-        })
-      }
-    } else {
-      await rapporteraTystFel(supabase, businessId, 'fortnox:taxreduction-skipped',
-        'ROT/RUT-fakturan bokfördes i Fortnox men ingen begäran skapades — personnummer eller avdragsbelopp saknas.',
-        { invoiceId, fortnoxDocumentNumber, hasPersonalNumber: !!personalNumber, askedAmountKr: reductionAmount })
-    }
-  }
+  if (!invoice.payment_plan_quote_id) taxReductionCreated = await registerReduction()
 
   const now = new Date().toISOString()
   // Nummer-unifiering (2026-08-20): skriv över Handymates eget

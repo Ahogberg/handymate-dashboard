@@ -23,6 +23,9 @@ export interface InvoiceReminder {
 }
 
 export interface Invoice {
+  project_id?: string | null
+  payment_plan_quote_id?: string | null
+  payment_plan_work_completed_on?: string | null
   invoice_id: string
   invoice_number: string
   invoice_type?: string | null

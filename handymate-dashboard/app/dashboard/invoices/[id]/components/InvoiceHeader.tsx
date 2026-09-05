@@ -191,7 +191,7 @@ export function InvoiceHeader({
         )}
 
         {/* Sekundär */}
-        {invoice.status === 'draft' && (
+        {invoice.status === 'draft' && !invoice.payment_plan_quote_id && (
           <Link href={`/dashboard/invoices/${invoiceId}/edit`} className={GHOST_BTN}>
             <Pencil className="w-4 h-4" />
             Redigera

@@ -155,6 +155,10 @@ jobs:
           tests/facit-invoice-customer-paid.spec.ts
           tests/quote-ata-payment-plan.spec.ts
           tests/facit-material-double-count.spec.ts
+          tests/payment-plan-invoicing.spec.ts
+          tests/facit-sync-to-fortnox.spec.ts
+          tests/facit-fortnox-housework.spec.ts
+          tests/facit-fortnox-einvoice.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

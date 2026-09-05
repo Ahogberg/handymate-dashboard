@@ -857,3 +857,19 @@ Review: tasks/whole-job-journey-review.md. Åtta överlämningsfel rättade. Tre
 - [x] Testa befintlig faktura, företagsisolering, läsfel och exakt CI-kommando.
 - [ ] TypeScript/build, uppdatera PR och verifiera CI på nya huvudet.
 - [ ] Inloggat demoprov återstår; delbetalning/avdragsparitet efter lansering enligt granskningen.
+
+## 2026-09-05 — betalplansfakturering, separat från PR #11
+- [x] Kontrollera Skatteverkets a conto-/ROT-regler före implementation.
+- [x] Ny serverberäknad betalplansväg, låst underlag och atomiskt register.
+- [x] Delfakturor, slutavräkning, helkrediter och projektyta.
+- [x] ROT-grind och Fortnox kreditreferens/claim/beloppskontroll.
+- [x] Fakturakärna + faktisk PostgreSQL-migration i test; mobilprov.
+- [ ] Grön CI på publicerad separat draft-PR.
+- [ ] Inloggat demo-/Fortnoxprov och tillämpad/verifierad v214. Ingen sådan åtkomst i sessionen.
+- [ ] Lanseringsbeslut senast 10 september; avstängt om prov eller avgränsningar inte är godkända.
+Se tasks/payment-plan-invoicing.md för facit, blockerade fall och provningsordning.
+
+## PR #12 — avgränsa triggern efter granskning
+- [x] Begränsa projektlåset till INSERT; tidig retur för fristående fakturor och vanliga UPDATE.
+- [x] Verifiera vanliga uppdateringar och kvarvarande betalplansskydd med PGlite. 27 prov gröna, inklusive pg_locks och positiv låskontroll.
+- [x] Dokumentera rättningen och rekommendationen efter lansering för draft-PR. Kör inte v214.

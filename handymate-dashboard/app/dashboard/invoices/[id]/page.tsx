@@ -370,6 +370,11 @@ export default function InvoiceDetailPage() {
           onSendViaFortnox={handleSendViaFortnox}
         />
 
+        {invoice.payment_plan_quote_id && invoice.project_id && <div className="mb-6 rounded-xl border border-teal-200 bg-teal-50 p-4 text-teal-900">
+          <p>Beloppen följer den låsta betalplanen. Tidigare fakturor och utfärdade krediter avräknas vid sista steget.</p>
+          <Link className="mt-2 inline-block underline" href={`/dashboard/projects/${invoice.project_id}/payment-plan`}>Öppna betalplan och bekräfta utfört arbete</Link>
+        </div>}
+
         {/* Banderoller — bevarade oförändrade ur den gamla sidan, bara
             flyttade hit (ovanför dokumentet snarare än actions). Inte
             "åtgärder" i hierarkins mening, bara information som annars
@@ -461,6 +466,7 @@ export default function InvoiceDetailPage() {
       />
 
       <InvoiceCreditModal
+        fullOnly={!!invoice.payment_plan_quote_id}
         show={showCreditModal}
         invoiceNumber={invoice.invoice_number}
         invoiceTotal={invoice.total}

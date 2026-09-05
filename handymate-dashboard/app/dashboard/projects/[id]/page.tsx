@@ -2105,6 +2105,8 @@ export default function ProjectDetailPage() {
           <Plus className="w-4 h-4 text-slate-400" />
           Nytt tilläggsarbete
         </button>
+                        {process.env.NEXT_PUBLIC_PAYMENT_PLAN_INVOICING_ENABLED === 'true' && <Link href={`/dashboard/projects/${projectId}/payment-plan`} className="block px-4 py-2 text-sm text-teal-700 hover:bg-teal-50">Fakturera enligt betalplan</Link>}
+
         <button
           onClick={() => { setMoreMenuOpen(false); router.push(`/dashboard/projects/${project.project_id}/invoice-preview`) }}
           className="w-full flex items-center gap-2 px-4 py-2.5 text-sm text-slate-700 hover:bg-slate-50 transition-colors"

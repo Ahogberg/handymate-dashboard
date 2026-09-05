@@ -587,3 +587,6 @@ flagga), inte bara förbjuda det senaste felet.
 Codex rättelse: verifiera även det YAML-avkodade shellkommandots argument,
 inte bara att testfilnamnen matchar package.json. En grön lokal npm-körning
 är inte bevis för CI-kommandot om skalets argument kan skilja sig.
+
+## 2026-09-05 — En appflagga stänger inte av en databastrigger
+Granskningen av PR #12 hittade projektlås på alla faktura-UPDATE, även betalningar och cronjobb utan betalplan. Avgränsa varje triggergren efter operation och berörd rad innan uppslag/lås. Aktiveringskapplöpningen kräver lås vid INSERT; befintliga fakturor stoppar redan aktivering. Prova även det vanliga flödet utan den nya funktionen. Grön CI och avstängd appflagga bevisar inte att migrationen är isolerad från produktion.

@@ -194,6 +194,7 @@ export default function InvoicePreviewPage() {
         if (d.error) {
           setError(d.error + (d.stage ? ` (stage: ${d.stage})` : ''))
         } else {
+          if (d.paymentPlan) { router.replace(`/dashboard/projects/${projectId}/payment-plan`); return }
           setData(d as InvoicePreviewData)
         }
         setLoading(false)
