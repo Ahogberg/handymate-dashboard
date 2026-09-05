@@ -136,8 +136,26 @@ test('reviewed customer answers reach editable quote input without erasing prior
   const input = page.getByLabel('Offertunderlag')
   await expect(input).toContainText('Min tidigare text')
   await expect(input).toContainText('Okänd sträcka')
-  await expect(input).toContainText('Kundunderlag prep')
+  await expect(input).toContainText('Kundunderlag · Underlag för laddbox')
   await expect(page.getByRole('button',{name:'Tillagt i offertunderlaget'})).toBeDisabled()
   expect(await input.inputValue()).not.toContain('private/path')
   expect(errors).toEqual([])
+})
+
+
+test('recovery debounces typing instead of writing on every dependency cleanup', async ({page}) => {
+  await mount(page, 'recovery')
+  await page.clock.install()
+  await page.clock.pauseAt(new Date())
+  await page.evaluate(() => {
+    const original = Storage.prototype.setItem
+    ;(window as any).storageWrites = 0
+    Storage.prototype.setItem = function(key,value) { (window as any).storageWrites++; return original.call(this,key,value) }
+  })
+  for (const text of ['M','Mo','Mon','Montering']) await page.getByLabel('Arbete').fill(text)
+  expect(await page.evaluate(() => (window as any).storageWrites)).toBe(0)
+  await page.clock.runFor(499)
+  expect(await page.evaluate(() => (window as any).storageWrites)).toBe(0)
+  await page.clock.runFor(1)
+  expect(await page.evaluate(() => (window as any).storageWrites)).toBe(1)
 })

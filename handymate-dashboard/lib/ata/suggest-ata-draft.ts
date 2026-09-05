@@ -159,6 +159,9 @@ export interface SuggestAtaDraftParams {
   /** Default 'daniel' (säljansvarig — samma persona som create_quote_draft,
       etapp 2a). */
   routedAgent?: string
+  /** Internal customer-preparation source; never included in AI text. */
+  sourcePreparationId?: string
+  beforeInsert?: () => Promise<boolean>
 }
 
 export interface SuggestAtaDraftResult {
@@ -231,6 +234,14 @@ export async function suggestAtaDraft(
       return { created: false, reason: 'missing_project' }
     }
 
+    const preparationApprovalId = params.sourcePreparationId ? `prep_ata_${params.sourcePreparationId}` : null
+    if (preparationApprovalId) {
+      const {data:existing,error} = await supabase.from('pending_approvals').select('id')
+        .eq('business_id',params.businessId).eq('id',preparationApprovalId).maybeSingle()
+      if (error) return {created:false,reason:'dedup_lookup_failed'}
+      if (existing) return {created:true,approvalId:existing.id}
+    }
+
     let hasPendingAtaForProject = false
     try {
       hasPendingAtaForProject = await harPendingAtaForProjekt(supabase, params.businessId, params.projectId)
@@ -248,10 +259,11 @@ export async function suggestAtaDraft(
     if (gateReason) return { created: false, reason: gateReason }
 
     // ── Skapa förslags-kortet ──────────────────────────────────────
-    const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+    const approvalId = preparationApprovalId || `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
 
     const utkast = await byggAtaUtkast(supabase, params)
     if (!utkast) return { created: false, reason: 'unexpected_error' }
+    if (params.beforeInsert && !await params.beforeInsert()) return {created:false,reason:'unexpected_error'}
 
     const { error: insertErr } = await supabase.from('pending_approvals').insert({
       id: approvalId,
@@ -269,10 +281,15 @@ export async function suggestAtaDraft(
       // Inga pengar bundna, inget skickas till kund förrän hantverkaren
       // själv agerar — samma resonemang som create_quote_draft (etapp 2a).
       risk_level: 'low',
-      payload: utkast.payload,
+      payload: { ...utkast.payload, ...(params.sourcePreparationId ? { source_preparation_id: params.sourcePreparationId } : {}) },
     })
 
     if (insertErr) {
+      if (preparationApprovalId && insertErr.code === '23505') {
+        const {data:existing,error} = await supabase.from('pending_approvals').select('id')
+          .eq('business_id',params.businessId).eq('id',preparationApprovalId).maybeSingle()
+        if (!error && existing) return {created:true,approvalId:existing.id}
+      }
       console.error('[ata/suggest-ata-draft] kunde inte skapa förslag:', insertErr, {
         project_id: params.projectId,
       })

@@ -88,3 +88,6 @@ Två nya vägar utanför direkt standardgrind (148 totalt):
   statusövergång. Bilder lagras privat och signeras bara åt behörig ägare.
 
 Dessa kontrakt exekveras i `tests/customer-preparation/contract.test.mjs`.
+
+### Lars kundunderlagskontroll — 2026-09-05
+POST /api/customer-preparation/review: getAuthenticatedBusiness + aktiv owner/admin, ingen impersonation. Serverladdat underlag med business_id; projekt måste matcha både business_id och customer_id. Privata bilder hämtas endast under företagets och underlagets sökväg. V213 utökar den service-only-tabell som infördes i V212; ingen ny publik databasåtkomst. Driftprovet och migrationens utförande återstår enligt tasks/lars-preparation-review.md.

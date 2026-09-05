@@ -126,6 +126,10 @@ jobs:
           tests/quote-packages-day-close.spec.ts
           tests/revenue-work-queue.spec.ts
           tests/integration-gaps.spec.ts
+          tests/lars-preparation-review.spec.ts
+          tests/feature-test-parity.spec.ts
+          tests/facit-ai-kostnad-sanning.spec.ts
+          tests/bransle-matare.spec.ts
           tests/quote-edit-autosave.spec.ts
           tests/quote-new-context.spec.ts
           tests/quote-attachments.spec.ts

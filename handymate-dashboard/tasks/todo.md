@@ -834,3 +834,10 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - [x] Dokumentera vad som är bevisat respektive kräver autentiserad driftkontroll.
 
 Granskningsresultat och kvarvarande drift-/Lars-beroenden: tasks/integration-gap-review.md. Kodrättningarna är verifierade lokalt; hela driftkedjan är inte godkänd ännu.
+
+## Lars kundunderlagskontroll och korrigeringar
+- [x] Samma testspecar lokalt och CI, korrekt debounce/navigeringsflush, inga interna ID:n i AI-text.
+- [x] Beständig AI-granskning med källhänvisningar, bränslegrind, bildkontroll och serververifierad projektkoppling.
+- [x] Hantverkaren granskar och kan skapa idempotent ÄTA-förslag i befintliga godkännandekön.
+- [x] Regressionstester, TypeScript, build och granskningsbar SQL/PR.
+- [ ] Verifiera migration och inloggat flöde mot riktig AI/DB när åtkomst finns.

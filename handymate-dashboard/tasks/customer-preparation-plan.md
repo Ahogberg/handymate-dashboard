@@ -21,7 +21,9 @@
 - [x] Tester för obehörig åtkomst, felaktiga svar, dubbelsubmit och filgränser.
 - [x] Typkontroll, bygg och mobil rendering.
 
-## Avgränsningar
+## Avgränsningar för ursprunglig V1
+
+Senare utbyggnad med uttryckligen startad Lars-kontroll och projektkoppling dokumenteras i tasks/lars-preparation-review.md.
 
 Länken delas av hantverkaren; skapad betyder inte skickad. Inga automatiska
 SMS eller påminnelser i denna version. Kundens svar ändrar inte offert,

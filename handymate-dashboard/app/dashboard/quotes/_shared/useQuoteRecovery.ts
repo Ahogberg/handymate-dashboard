@@ -16,21 +16,30 @@ export function useQuoteRecovery<T>({userId,businessId,scope,enabled,value,hasCo
     catch {setStatus('Den tidigare återställningskopian kunde inte läsas. Spara det nya arbetet som utkast.'); try{sessionStorage.removeItem(key)}catch{}}
     setReady(true)
   },[key,enabled])
+  // One mutable snapshot per scope. Old cleanup must never read the new customer's value.
+  const scopeSnapshot = useRef({ key, value, hasContent })
+  if (scopeSnapshot.current.key !== key) scopeSnapshot.current = { key, value, hasContent }
+  const snapshot = scopeSnapshot.current
+  snapshot.value = value; snapshot.hasContent = hasContent
+  function persist(announce = true) {
+    if (!enabled || !key || !ready || pending || disabled.current) return
+    try {
+      if (!snapshot.hasContent) { sessionStorage.removeItem(key); return }
+      sessionStorage.setItem(key, JSON.stringify({version:1,savedAt:Date.now(),value:snapshot.value}))
+      if (announce) setStatus('Återställningskopia i den här fliken · spara utkast för att behålla på servern')
+    } catch { if (announce) setStatus('Återställningskopian kunde inte sparas. Spara utkast innan du lämnar sidan.') }
+  }
   const serialized=JSON.stringify(value)
-  useEffect(()=>{
-    if(!enabled || !key || !ready || pending || disabled.current)return
-    const snapshot = { value, hasContent }
-    function persist(announce = true){
-      if(disabled.current)return
-      if(!snapshot.hasContent){try{sessionStorage.removeItem(key!)}catch{};return}
-      try {sessionStorage.setItem(key!,JSON.stringify({version:1,savedAt:Date.now(),value:snapshot.value}));if(announce)setStatus('Återställningskopia i den här fliken · spara utkast för att behålla på servern')}
-      catch {if(announce)setStatus('Återställningskopian kunde inte sparas. Spara utkast innan du lämnar sidan.')}
-    }
-    const timer=setTimeout(persist,500)
+  useEffect(() => {
+    const timer = setTimeout(() => persist(), 500)
+    return () => clearTimeout(timer)
+  }, [serialized, hasContent, enabled, key, ready, pending])
+  useEffect(() => {
     const onHide = () => persist()
-    window.addEventListener('pagehide',onHide)
-    return ()=>{clearTimeout(timer);window.removeEventListener('pagehide',onHide);persist(false)}
-  },[serialized,hasContent,enabled,key,ready,pending])
+    window.addEventListener('pagehide', onHide)
+    return () => { window.removeEventListener('pagehide', onHide); persist(false) }
+    // Only lifecycle changes flush. Typing is handled by the debounce above.
+  }, [enabled, key, ready, pending])
   function clear(){disabled.current=true;if(key)try{sessionStorage.removeItem(key)}catch{};setPending(null);setStatus('')}
   function restore(){if(!pending)return;try{current.current.onRestore(pending.value);setPending(null);setStatus('Arbetet är återställt. Kontrollera offerten och spara utkast.')}catch{setStatus('Kopian kunde inte återställas. Börja om eller behåll fliken medan du kontaktar support.')}}
   function discard(){if(key)try{sessionStorage.removeItem(key)}catch{};setPending(null);setStatus('Tidigare återställningskopia borttagen.')}

@@ -1,3 +1,4 @@
+import type { SavedPreparationReview } from './review-contract'
 export const TEMPLATES = {
   charging: {
     label: 'Underlag för laddbox',
@@ -65,5 +66,8 @@ export interface Preparation {
   created_at: string
   submitted_at: string | null
   expires_at: string
+  project_id?: string | null
+  lars_review?: SavedPreparationReview | null
+  ata_approval_id?: string | null
   token?: string
 }

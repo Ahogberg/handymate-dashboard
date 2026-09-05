@@ -15,13 +15,17 @@ export async function GET(request: NextRequest) {
     const { data, error } = await db.from('customer_preparation').select('*')
       .eq('business_id', business.business_id).eq('customer_id', customerId).order('created_at', { ascending: false }).limit(50)
     if (error) return failure()
+    const approvalIds = (data || []).filter(row => row.lars_review).map(row => `prep_ata_${row.id}`)
+    const approvals = approvalIds.length ? await db.from('pending_approvals').select('id').eq('business_id',business.business_id).in('id',approvalIds) : {data:[],error:null}
+    if (approvals.error) return failure()
+    const existingApprovals = new Set((approvals.data || []).map(row => row.id))
     const rows = await Promise.all((data || []).map(async row => {
       const images = Array.isArray(row.images) ? row.images : []
       const paths = images.filter((path: unknown): path is string => typeof path === 'string' && path.startsWith(`${business.business_id}/${row.id}/`))
       const signed = paths.length ? await db.storage.from(BUCKET).createSignedUrls(paths, 300) : null
       if (signed?.error) throw signed.error
       if (signed?.data?.some(file => !file.signedUrl)) throw new Error('Bildlänk saknas')
-      return { ...row, image_urls: signed?.data?.map(file => file.signedUrl) || [] }
+      return { ...row, ata_approval_id: existingApprovals.has(`prep_ata_${row.id}`) ? `prep_ata_${row.id}` : null, image_urls: signed?.data?.map(file => file.signedUrl) || [] }
     }))
     return NextResponse.json({ preparations: rows }, { headers: { 'Cache-Control': 'private, no-store' } })
   } catch { return failure() }
@@ -58,11 +62,16 @@ export async function PATCH(request: NextRequest) {
     if (!business) return NextResponse.json({ error: 'Behörighet saknas' }, { status: 403 })
     const body = await request.json()
     if (typeof body.id !== 'string' || !['reviewed', 'cancelled'].includes(body.status)) return NextResponse.json({ error: 'Ogiltig ändring' }, { status: 400 })
-    const { data, error } = await getServerSupabase().from('customer_preparation')
+    const db = getServerSupabase()
+    const { data: current, error: readError } = await db.from('customer_preparation').select('*').eq('business_id', business.business_id).eq('id', body.id).maybeSingle()
+    if (readError) return failure()
+    if (!current || (current.review_run_id && Date.parse(current.review_started_at) > Date.now() - 180000)) return NextResponse.json({ error: 'Underlaget behandlas eller har ändrats. Läs in igen.' }, { status: 409 })
+    let update = db.from('customer_preparation')
       .update({ status: body.status, ...(body.status === 'reviewed' ? { reviewed_at: new Date().toISOString() } : {}) })
       .eq('business_id', business.business_id).eq('id', body.id)
       .in('status', body.status === 'reviewed' ? ['submitted'] : ['open', 'submitted', 'reviewed'])
-      .select('id').maybeSingle()
+    if (Object.prototype.hasOwnProperty.call(current, 'review_run_id')) update = update.or(`review_run_id.is.null,review_started_at.lt.${new Date(Date.now()-180000).toISOString()}`)
+    const { data, error } = await update.select('id').maybeSingle()
     if (error) return failure()
     if (!data) return NextResponse.json({ error: 'Underlaget har ändrats. Läs in igen.' }, { status: 409 })
     return NextResponse.json({ success: true })

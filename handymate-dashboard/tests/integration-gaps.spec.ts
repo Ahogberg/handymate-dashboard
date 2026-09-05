@@ -23,6 +23,7 @@ test('validated customer answers and package choices survive the canonical quote
   expect(payload.reservations_snapshot).toEqual(context.reservationsSnapshot)
   expect(sourceTranscript).toContain('Sträckan behöver mätas')
   expect(sourceTranscript).not.toContain('private/image')
+  expect(sourceTranscript).not.toContain(preparation.id)
   expect(() => preparationQuoteInput({...preparation,status:'submitted'})).toThrow('Granska')
   expect(() => preparationQuoteInput({...preparation,status:'cancelled'})).toThrow('Granska')
 })

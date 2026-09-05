@@ -17,9 +17,9 @@ Grenen samlar alla fyra PR:er och integrationsrättningarna. Basen inkluderar ma
 
 ## Avsiktliga gränser och kvarvarande bevis
 
-- Lars automatiska kontroll av svar och bilder är ännu inte implementerad. Manuell granskning och överföring till offert är nu sammankopplade, men de ska inte beskrivas som en Lars-bedömning.
-- customer_preparation saknar projekt-FK. En förfrågan inför första offert får inte automatiskt klassas som ÄTA. Automatisk kedja från Lars-bedömning till projektbundet förslag behöver en uttrycklig, verifierad projektkoppling och beständigt granskningsresultat.
-- Migrationens SQL är oförändrad, endast omdöpt till v212_customer_preparation.sql enligt Claudes PR #7-kommentar. Claude rapporterade att migrationen körts och kontrollerats i produktion. Ingen ny SQL har körts i denna session.
+- Uppdatering: Lars kontroll av svar och bilder är nu implementerad i granskningsgrenen. Aktivering kräver v213 och det inloggade provet; se tasks/lars-preparation-review.md.
+- Projektkoppling och beständigt granskningsresultat tillkommer genom v213. En förfrågan inför första offert klassas aldrig automatiskt som ÄTA: hantverkaren väljer projekt och granskar tilläggstexten innan ett internt förslag skapas.
+- Den ursprungliga migrationens SQL är oförändrad, endast omdöpt till v212_customer_preparation.sql enligt Claudes PR #7-kommentar. Claude rapporterade att migrationen körts och kontrollerats i produktion. Ingen ny SQL har körts i denna session.
 - Produktionsdatans mängd och behörigheter har inte verifierats direkt här. Claudes PR #9-granskning rapporterade avsaknad av aktiva intäktsärenden; grenen skapar inte testärenden i produktion för att fylla kön.
 - Autentiserad provning av verklig mikrofon/transkribering, AI-generering, DB-skrivningar och offertleverans återstår. Fixture-proven verifierar kopplingarna under kontrollerade förutsättningar, inte hela driftmiljön.
 
@@ -31,7 +31,7 @@ Grenen samlar alla fyra PR:er och integrationsrättningarna. Basen inkluderar ma
 4. Föreslå ett faktiskt projektbundet tillägg. Bekräfta förslagskortet, öppna godkännandekön, kontrollera intäktskön som ägare/admin och följ vidare till riktigt ÄTA-utkast.
 5. Upprepa läsning med annat företag och otillräcklig roll. Inga tidigare kundunderlag eller intäktsärenden får bli kvar synliga.
 
-## Verifierat i denna gren
+## Tidigare verifiering före Lars-utbyggnaden
 
 - 184 gemensamma Playwright-prov godkända: 162 kontrakts-/funktionsprov och 22 isolerade Chromium-prov.
 - 17 kundunderlagsprov godkända med verkliga route-handlers och simulerade databasanrop.
@@ -40,3 +40,7 @@ Grenen samlar alla fyra PR:er och integrationsrättningarna. Basen inkluderar ma
 - TypeScript med 6 GB heap: exit 0. Produktionsbygge: exit 0. Befintliga Next/Sentry-varningar finns kvar.
 - git diff --check: utan fel.
 - Inga live-AI-anrop, kundutskick eller databasändringar utfördes för verifieringen.
+
+## Senaste verifiering inklusive Lars-kontrollen
+
+1 139 kontraktsprov + 17 Node-kontrakt + 25 komponentprov + 2 publika formulärprov godkända (1 183 totalt). TypeScript och produktionsbygge passerar. De två npm-kommandona motsvarar CI:s testlistor. Detaljer och obligatoriskt driftprov för v213: tasks/lars-preparation-review.md.

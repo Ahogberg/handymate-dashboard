@@ -571,3 +571,6 @@ För varje yta: identifiera producent, sparad källa, behörighet, nästa handli
 kvitto och omläsning. Testa PR:erna tillsammans. Fixture-test är inte bevis
 på produktionsdata. En tom kö kräver en fungerande producent; en kundinsamling
 kräver ett praktiskt överlämnande. Dokumentera separat kvarvarande AI- och driftprov.
+
+## 2026-09-05 — Lokal testparitet och effektlivscykel
+En cleanup på en effekt som beror på inmatning körs vid varje tangenttryck, inte bara vid navigering. Separera debounce från avmontering; prova skrivfrekvens med en räknare. Håll package.json och CI i samma körväg. Interna databas-ID:n ska vara strukturerad metadata, inte AI-underlag. Slutför uttryckligt beställda integrationer; dokumentation av glapp ersätter inte implementation.

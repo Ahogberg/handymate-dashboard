@@ -4,7 +4,7 @@ import { TEMPLATES, type Preparation } from './contract'
 export function preparationQuoteInput(row: Preparation): string {
   if (row.status !== 'reviewed') throw new Error('Granska kundunderlaget först.')
   return [
-    `Kundunderlag ${row.id} · ${TEMPLATES[row.template].label}`,
+    `Kundunderlag · ${TEMPLATES[row.template].label}`,
     `Arbete: ${row.context}`,
     ...TEMPLATES[row.template].questions.map(question => `${question.label}\n${row.answers[question.id] || 'Inget svar'}`),
     'Kundens uppgifter är underlag, inte verifierade tekniska förutsättningar. Okända uppgifter behöver stämmas av.',

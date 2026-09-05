@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import LarsPreparationReview from './LarsPreparationReview'
 import { useBusiness } from '@/lib/BusinessContext'
 import { TEMPLATES, STATUS_LABELS, isExpired, type Preparation, type TemplateKey } from '@/lib/customer-preparation/contract'
 
@@ -64,8 +65,9 @@ function CustomerPreparationsSession({ customerId }: { customerId: string }) {
           <p className="text-xs text-slate-500">Kundens svar · {row.submitted_at ? new Date(row.submitted_at).toLocaleString('sv-SE') : ''}</p>
           {TEMPLATES[row.template].questions.map(question => <div key={question.id}><p className="text-sm font-medium">{question.label}</p><p className="whitespace-pre-wrap text-sm">{row.answers[question.id] || 'Inget svar'}</p></div>)}
           {(row.image_urls || []).map((url, index) => <a key={url} href={url} target="_blank" rel="noopener noreferrer" className="inline-block p-1"><img src={url} alt={`Kundens bild ${index + 1}`} className="h-24 w-24 rounded-lg object-cover" /></a>)}
+          <LarsPreparationReview row={row} customerId={customerId} onChanged={load} />
           {row.status === 'reviewed' && <a href={`/dashboard/quotes/new?customer_id=${encodeURIComponent(customerId)}&preparation_id=${encodeURIComponent(row.id)}`} className="inline-block min-h-[44px] rounded-lg bg-teal-700 px-3 py-3 text-sm text-white">Använd i ny offert</a>}
-          {row.status === 'submitted' && <button type="button" disabled={busy} onClick={() => void mutate('PATCH', { id: row.id, status: 'reviewed' })} className="min-h-[44px] rounded-lg bg-teal-700 px-3 text-sm text-white disabled:opacity-50">Markera som granskat</button>}
+          {row.status === 'submitted' && !row.lars_review && <button type="button" disabled={busy} onClick={() => void mutate('PATCH', { id: row.id, status: 'reviewed' })} className="min-h-[44px] rounded-lg bg-teal-700 px-3 text-sm text-white disabled:opacity-50">Markera som granskat</button>}
           <p className="text-xs text-slate-500">Granskning ändrar inte offert, bokning eller projektstatus. Bildlänkar varar fem minuter — läs in igen vid behov.</p>
         </div>}
         {row.status !== 'cancelled' && <button type="button" disabled={busy} onClick={() => void mutate('PATCH', { id: row.id, status: 'cancelled' })} className="mt-2 min-h-[44px] text-sm text-slate-500 underline">Återkalla kundlänk</button>}
