@@ -1,3 +1,11 @@
+## Offertupplevelse (Codex 2026-09-05)
+
+- [x] Skissa och bygg enligt [planen](../docs/design/quote-experience/PLAN.md).
+- [x] Verifiera återställning, prisval, reservationer, mobil och bygg.
+- [x] Lämna sida och PR för granskning.
+
+Review: 100 riktade tester godkända. Öppningsbar skiss och granskning finns i planen.
+
 # Launch Truth & Operations (Codex 2026-09-03)
 
 - [x] Baslinjegranska den lokala Support & drift-leveransen mot befintliga

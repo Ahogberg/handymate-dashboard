@@ -193,8 +193,8 @@ export function QuoteBuilderHeader({
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-primary-700 hover:bg-primary-600 text-white text-xs font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm whitespace-nowrap"
               >
                 {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
-                <span className="hidden sm:inline">{saving ? 'Sparar…' : 'Skicka offert'}</span>
-                <span className="sm:hidden">{saving ? 'Sparar…' : 'Skicka'}</span>
+                <span className="hidden sm:inline">{saving ? 'Sparar…' : 'Granska och skicka'}</span>
+                <span className="sm:hidden">{saving ? 'Sparar…' : 'Granska'}</span>
               </button>
               {/* ETAPP 1f: disabled Skicka-knapp får alltid en synlig orsak
                   istället för ett tyst lås. */}
