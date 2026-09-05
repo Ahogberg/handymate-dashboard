@@ -1,3 +1,4 @@
+import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -115,6 +116,7 @@ export async function GET(
     // ── 4. Quote + quote_items ──────────────────────────────────
     let quote: any = null
     let quoteItems: any[] = []
+    let hasQuoteSourceRows = false
     if (project.quote_id) {
       const { data: q, error: quoteError } = await supabase
         .from('quotes')
@@ -141,8 +143,9 @@ export async function GET(
         // Canonical: hämta items från quote_items-tabellen
         const { data: qi, error: itemsError } = await supabase
           .from('quote_items')
-          .select('id, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, labor_amount')
+          .select('id, option_selected, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, labor_amount')
           .eq('quote_id', project.quote_id)
+          .eq('business_id', business.business_id)
           .order('sort_order', { ascending: true })
 
         if (itemsError) {
@@ -159,28 +162,10 @@ export async function GET(
           )
         }
 
-        // Legacy-fallback: om quote_items är tom men quotes.items (JSONB) har data,
-        // mappa den till samma shape. Gamla offerter från före quote_overhaul.sql.
-        if ((qi || []).length === 0 && Array.isArray(q.items) && q.items.length > 0) {
-          quoteItems = q.items.map((item: any, i: number) => ({
-            id: item.id || `legacy_${i}`,
-            description: item.description || item.name || '',
-            quantity: item.quantity || 1,
-            unit: item.unit || 'st',
-            unit_price: item.unit_price || item.price || 0,
-            total: (item.quantity || 1) * (item.unit_price || item.price || 0),
-            is_rot_eligible: !!item.is_rot_eligible,
-            is_rut_eligible: !!item.is_rut_eligible,
-            item_type: item.item_type || 'item',
-            sort_order: item.sort_order ?? i,
-            group_name: item.group_name || null,
-            // ?? (inte ||): labor_amount 0 = ren material och skall bevaras
-            labor_amount: item.labor_amount ?? null,
-            _source: 'legacy_jsonb',
-          }))
-        } else {
-          quoteItems = qi || []
-        }
+        // Samma tillvals-, rabatt- och artikelregler som övriga fakturavägar.
+        const sourceItems = (qi || []).length > 0 ? qi! : (Array.isArray(q.items) ? q.items : [])
+        hasQuoteSourceRows = sourceItems.length > 0
+        quoteItems = mapQuoteItemsToInvoiceItems(sourceItems)
 
         // Plocka bort items från quote-objektet — vi exponerar dem
         // separat under quote.items för konsumenter.
@@ -291,11 +276,9 @@ export async function GET(
     // ── 6. Server-side totals ───────────────────────────────────
     // Quote-total: prioritera summa av quote_items, fall tillbaka på
     // quotes.total om items saknas (legacy quote utan rader).
-    const itemsSum = quoteItems.reduce(
-      (s, it) => s + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0),
-      0,
-    )
-    const quoteTotal = quoteItems.length > 0 ? itemsSum : Number(quote?.total) || 0
+    const itemsSum = quoteItems.filter(it => it.item_type === 'item').reduce((s, it) => s + Number(it.total || 0), 0)
+      - quoteItems.filter(it => it.item_type === 'discount').reduce((s, it) => s + Math.abs(Number(it.total || 0)), 0)
+    const quoteTotal = hasQuoteSourceRows ? itemsSum : Number(quote?.total) || 0
 
     // ÄTA-summor: additions positiva, removals negativa
     const sumAtas = (arr: { change_type: string; total: number }[]) =>
@@ -330,11 +313,11 @@ export async function GET(
       }, 0)
 
     const rotWorkCost = Math.max(0, quoteItems
-      .filter(it => it.is_rot_eligible)
+      .filter(it => it.item_type === 'item' && it.is_rot_eligible)
       .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
       + ataEligibleWork('rot'))
     const rutWorkCost = Math.max(0, quoteItems
-      .filter(it => it.is_rut_eligible)
+      .filter(it => it.item_type === 'item' && it.is_rut_eligible)
       .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
       + ataEligibleWork('rut'))
 

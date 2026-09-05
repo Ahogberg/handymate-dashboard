@@ -23,6 +23,7 @@ import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
+import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
 import { QuoteItemsSection } from './QuoteItemsSection'
 import { QuoteRotSection } from './QuoteRotSection'
 import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
@@ -312,6 +313,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               setDescription={setDescription}
             />
 
+            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
             <QuoteItemsSection
               items={items}
               recalculated={recalculated}

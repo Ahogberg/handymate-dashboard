@@ -57,6 +57,7 @@ export interface QuoteBudgetDerivation {
 
 interface QuoteItemTableRow {
   id: string
+  option_selected?: boolean | null
   item_type: string | null
   description: string | null
   quantity: number | null
@@ -71,6 +72,7 @@ interface QuoteItemTableRow {
 interface QuoteJsonbItem {
   id?: string
   type?: string  // legacy: 'labor' | 'material'
+  option_selected?: boolean
   item_type?: string
   description?: string
   name?: string
@@ -128,7 +130,7 @@ export async function getQuoteBudgetDerivation(
   const { data: tableData, error: tableError } = await supabase
     .from('quote_items')
     .select(
-      'id, item_type, description, quantity, unit, unit_price, total, ' +
+      'id, item_type, option_selected, description, quantity, unit, unit_price, total, ' +
         'is_rot_eligible, is_rut_eligible, sort_order',
     )
     .eq('quote_id', quoteId)
@@ -151,12 +153,13 @@ export async function getQuoteBudgetDerivation(
     for (const r of tableRows) {
       const qty = Number(r.quantity || 0)
       const total = Number(r.total || 0)
-      const itemType = r.item_type || 'item'
-
-      if (itemType !== 'item') continue  // hoppa rubriker/text/subtotal/discount
+      if (r.item_type === 'option' && r.option_selected !== true) continue
+      const itemType = r.item_type === 'option' ? 'item' : (r.item_type || 'item')
+      if (itemType === 'discount') { totalAmount -= Math.abs(total); continue }
+      if (itemType !== 'item') continue
 
       totalAmount += total
-      const isLabor = isLaborByTableRow(r)
+      const isLabor = isLaborByTableRow({ ...r, item_type: itemType })
 
       if (isLabor) {
         laborCount += 1
@@ -219,12 +222,13 @@ export async function getQuoteBudgetDerivation(
     for (const j of jsonbItems) {
       const qty = Number(j.quantity || 0)
       const total = Number(j.total ?? qty * Number(j.unit_price ?? j.price ?? 0))
-      const itemType = j.item_type || 'item'
-
+      if (j.item_type === 'option' && j.option_selected !== true) continue
+      const itemType = j.item_type === 'option' ? 'item' : (j.item_type || 'item')
+      if (itemType === 'discount') { totalAmount -= Math.abs(total); continue }
       if (itemType !== 'item') continue
 
       totalAmount += total
-      const isLabor = isLaborByJsonbItem(j)
+      const isLabor = isLaborByJsonbItem({ ...j, item_type: itemType })
 
       if (isLabor) {
         laborCount += 1
@@ -242,9 +246,8 @@ export async function getQuoteBudgetDerivation(
 
     return {
       budget_hours: laborHours > 0 ? laborHours : null,
-      // Behåll quote.total-fallback om radernas summa råkar bli 0 men
-      // offerten har en total satt direkt (edge-case)
-      budget_amount: totalAmount > 0 ? totalAmount : Number(quoteRow.total || 0) || null,
+      // Befintliga rader med noll valt belopp får inte återuppliva en gammal total.
+      budget_amount: totalAmount > 0 ? totalAmount : null,
       project_type: deriveProjectType(laborCount, materialCount),
       labor_items: laborItems,
       source: 'jsonb_legacy',

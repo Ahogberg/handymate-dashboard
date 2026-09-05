@@ -1,3 +1,28 @@
+## Offertupplevelse (Codex 2026-09-05)
+
+- [x] Skissa och bygg enligt [planen](../docs/design/quote-experience/PLAN.md).
+- [x] Verifiera återställning, prisval, reservationer, mobil och bygg.
+- [x] Lämna sida och PR för granskning.
+
+Review: 100 riktade tester godkända. Öppningsbar skiss och granskning finns i planen.
+## Kundförberedelse (Codex 2026-09-05)
+
+- [x] Implementera [byggplanens V1](customer-preparation-plan.md): kundunderlag och jobbstart. 56 tester, typkontroll och produktionsbygge gröna.
+- [ ] Driftsättningsprov: kör migration och verifiera riktig DB/storage samt autentiserat kundkort före aktivering.
+## Leverans 2 (Codex 2026-09-05)
+
+- [x] Bygg och verifiera [offertpaketering och dagsavslut](quote-packages-day-close-plan.md).
+## Leverans 3: intäktskö (Codex 2026-09-05)
+
+- [x] Bygg intäktskö med sökning, prioritering och nästa steg.
+- [x] Behåll hemsidans tre kort och återanvänd befintligt behörighetsskydd och läsmodell.
+- [x] Verifiera fel, behörighet, filtrering, mobilvy, typkontroll och bygg.
+- [x] Dokumentera skarpa prov och lämna separat PR.
+
+Review: 31 riktade tester, typkontroll och produktionsbygg godkända.
+Mobil- och skrivbordsvy granskade. Skarpa prov återstår enligt
+[leveransplanen](revenue-work-queue.md). Inga nya databasfrågor eller migrationer.
+
 # Launch Truth & Operations (Codex 2026-09-03)
 
 - [x] Baslinjegranska den lokala Support & drift-leveransen mot befintliga
@@ -799,3 +824,36 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - Riktigt DB-prov 2026-09-03: samtliga fem queries gröna; 1 SMS-fel,
   0 mejlfel, 0 betalningsfel, 8 automationsfel och 4 hälsokontroller.
 - Kontraktsgrind 350/350, `npx tsc --noEmit` rent, `npm run build` exit 0.
+
+## 2026-09-05 — Gemensam integrationskontroll, PR #7–#10
+- [x] Samla de fyra oförändrade leveranserna i en granskningsgren; ta med mains CI-rättningar.
+- [x] Kundunderlag: säkert överlämnande till offertens befintliga intag och beständig källtext.
+- [x] Dagsavslut: uppdatera projektet efter bekräftat sparande och visa nästa väg för ÄTA-förslag.
+- [x] Offert: stäng glapp mellan lokal återställning, autospar och explicit sparande.
+- [x] Kör gemensamma kontrakt, integrationsprov, TypeScript och produktionbygge.
+- [x] Dokumentera vad som är bevisat respektive kräver autentiserad driftkontroll.
+
+Granskningsresultat och kvarvarande drift-/Lars-beroenden: tasks/integration-gap-review.md. Kodrättningarna är verifierade lokalt; hela driftkedjan är inte godkänd ännu.
+
+## Lars kundunderlagskontroll och korrigeringar
+- [x] Samma testspecar lokalt och CI, korrekt debounce/navigeringsflush, inga interna ID:n i AI-text.
+- [x] Beständig AI-granskning med källhänvisningar, bränslegrind, bildkontroll och serververifierad projektkoppling.
+- [x] Hantverkaren granskar och kan skapa idempotent ÄTA-förslag i befintliga godkännandekön.
+- [x] Regressionstester, TypeScript, build och granskningsbar SQL/PR.
+- [ ] Verifiera migration och inloggat flöde mot riktig AI/DB när åtkomst finns.
+
+## 2026-09-05 — Hela uppdragsresan
+- [x] Kontrollera faktisk browser-/driftåtkomst och senaste PR-status.
+- [x] Följ godkänd offert → projekt → tid/material → ÄTA → fakturaunderlag och betalstatus.
+- [x] Reproducera och rätta överlämningsfel med verkliga produktionsfunktioner och isolerade beroenden.
+- [x] Kör relevanta regressioner, TypeScript/build och dokumentera bevisnivå per steg.
+- [x] Uppdatera gransknings-PR; skilj driftbevis från simulerade prov.
+
+Review: tasks/whole-job-journey-review.md. Åtta överlämningsfel rättade. Tre ytterligare risker öppet dokumenterade; inloggat driftprov inte genomfört eftersom session/DB-åtkomst saknas.
+
+## PR #11 — CI och befintlig slutfaktura efter granskning
+- [x] Ta in main e2b9740 och ta bort backslash i vikt YAML-block.
+- [x] Stoppa slutfakturaskapande när projektet redan har faktura; läsfel får inte öppna vägen.
+- [x] Testa befintlig faktura, företagsisolering, läsfel och exakt CI-kommando.
+- [ ] TypeScript/build, uppdatera PR och verifiera CI på nya huvudet.
+- [ ] Inloggat demoprov återstår; delbetalning/avdragsparitet efter lansering enligt granskningen.
