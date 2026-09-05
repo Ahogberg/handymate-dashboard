@@ -1,3 +1,4 @@
+import { createPlanInvoice } from '@/lib/invoices/payment-plan/service'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -45,6 +46,12 @@ export async function POST(request: NextRequest) {
 
     if (origError || !original) {
       return NextResponse.json({ error: 'Originalfaktura hittades inte' }, { status: 404 })
+    }
+
+    if (original.payment_plan_quote_id) {
+      if (credit_type !== 'full') return NextResponse.json({ error: 'Betalplansfakturor stöder full kreditering. Delkredit behöver först stämmas av separat.' }, { status: 409 })
+      const invoice = await createPlanInvoice(supabase, business_id, original.project_id, (original.partial_number || 1) - 1, original.invoice_id)
+      return NextResponse.json({ invoice })
     }
 
     if (original.status === 'credited' || original.status === 'draft' || original.status === 'cancelled') {

@@ -92,7 +92,10 @@ test.describe('Fortnox Invoice-resursen har inget InvoiceNumber-falt (verifierat
 test.describe('Fortnox-dubbelskydd — markera som skickad (verifierat mot fortnox-openapi.json)', () => {
   test('gor ett PUT-anrop mot externalprint-endpointen for att markera fakturan som skickad', () => {
     const idx = FILE.indexOf('fortnoxDocumentNumber = response')
-    const block = FILE.slice(idx, idx + 2000)
+    const printIdx = FILE.indexOf('`/invoices/${fortnoxDocumentNumber}/externalprint`')
+    expect(idx).toBeGreaterThan(-1)
+    expect(printIdx).toBeGreaterThan(idx)
+    const block = FILE.slice(FILE.lastIndexOf('await fortnoxRequest', printIdx), printIdx + 70)
     expect(block).toMatch(/fortnoxRequest[\s\S]*?'PUT'[\s\S]*?externalprint/)
   })
 

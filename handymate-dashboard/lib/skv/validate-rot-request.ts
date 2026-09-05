@@ -16,6 +16,9 @@ const ROT_MAX_PER_YEAR = 50000
 const RUT_MAX_PER_YEAR = 75000
 
 export interface SkvInvoiceLike {
+  payment_plan_credit_pending?: boolean
+  payment_plan_quote_id?: string | null
+  payment_plan_work_completed_on?: string | null
   invoice_id: string
   invoice_number?: string | null
   status?: string | null
@@ -112,6 +115,17 @@ export function validateInvoiceForSkv(input: SkvValidationInput): ValidationResu
     const paid = Number(inv.paid_amount)
     if (paid + 1 < share) {
       errors.push(`Kunden har betalat ${Math.round(paid)} kr men ska betala ${Math.round(share)} kr innan begäran kan skickas.`)
+    }
+  }
+
+  if (inv.payment_plan_credit_pending) errors.push('Fakturan har en kredit. Stäm av krediteringen före ROT/RUT-ansökan.')
+  if (inv.payment_plan_quote_id) {
+    const completed = inv.payment_plan_work_completed_on
+    const today = new Date().toISOString().slice(0, 10)
+    if (!completed || !Number.isFinite(Date.parse(completed)) || completed > today) errors.push('Bekräfta utfört arbete i projektets betalplan före ROT/RUT-ansökan.')
+    if (paidAt && !isNaN(paidAt.getTime())) {
+      const deadline = `${paidAt.getUTCFullYear() + 1}-01-31`
+      if (completed && completed > deadline || today > deadline) errors.push('Tidsgränsen 31 januari efter betalningsåret har passerats. Ansökan behöver granskas.')
     }
   }
 

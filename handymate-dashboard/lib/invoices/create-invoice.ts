@@ -87,6 +87,8 @@ export interface CreateInvoiceInput {
       partial_number, partial_total, ...). Skrivs rakt in i INSERT-raden. */
   extraFields?: CreateInvoiceExtraFields
   /** Supabase .select()-strängen för den returnerade raden. Default '*'. */
+  persist?: (row: Record<string, unknown>) => Promise<any>
+  requireAtomicNumber?: boolean
   selectClause?: string
 }
 
@@ -157,6 +159,7 @@ export async function createInvoice(
       invoiceNumber = formatInvoiceNumber(rpcRow.prefix || 'FV', year, rpcRow.num)
       ocrNumber = computeInvoiceOcr(rpcRow.num)
     } else {
+      if (input.requireAtomicNumber) throw new Error('Atomisk fakturanummerserie saknas — kontrollera migration v81')
       // Fallback: RPC:n (sql/v81_invoice_number_rpc.sql) är inte körd ännu,
       // eller businessen saknar en business_config-rad. Gamla read-then-
       // write-kedjan — samma dubblettrisk som INNAN denna etapp, men appen
@@ -220,6 +223,11 @@ export async function createInvoice(
   // annat default eller triggar ett schema-cache-fel på miljöer utan v74.
   if (input.bookingId !== undefined) row.booking_id = input.bookingId
   if (input.extraFields) Object.assign(row, input.extraFields)
+
+  if (input.persist) {
+    const invoice = await input.persist(row)
+    return { invoice, invoiceNumber: invoice.invoice_number, ocrNumber: invoice.ocr_number, usedNumberFallback }
+  }
 
   const { data: invoice, error } = await supabase
     .from('invoice')

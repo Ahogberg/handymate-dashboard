@@ -110,6 +110,9 @@ export const BEHALLS: string[] = [
   // .personnummer, .name, .phone_number, .address_line finns) — det är inte
   // en läcka, det är vad en svensk faktura juridiskt måste innehålla.
   'invoice',
+  // Låst fakturaunderlag och avräkningsspår för betalplansfakturor.
+  'invoice_payment_plan',
+  'invoice_payment_stage',
 
   // Leverantörsfakturor — samma bokföringsplikt som invoice, fast för
   // firmans INKÖP i stället för dess FÖRSÄLJNING.

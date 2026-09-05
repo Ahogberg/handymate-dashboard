@@ -1,3 +1,4 @@
+import { loadPlan, paymentPlanEnabled } from '@/lib/invoices/payment-plan/service'
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
@@ -65,6 +66,11 @@ export async function GET(
     }
     if (!project) {
       return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+    }
+
+    if (paymentPlanEnabled()) {
+      const plan = await loadPlan(supabase, business.business_id, params.id)
+      if (plan) return NextResponse.json({ paymentPlan: true })
     }
 
     // ── 2. Customer ──────────────────────────────────────────────

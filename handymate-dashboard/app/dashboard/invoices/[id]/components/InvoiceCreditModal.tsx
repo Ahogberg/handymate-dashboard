@@ -4,6 +4,7 @@ import { Loader2, RotateCcw, X } from 'lucide-react'
 import type { InvoiceItem } from '../types'
 
 interface InvoiceCreditModalProps {
+  fullOnly?: boolean
   show: boolean
   invoiceNumber: string
   invoiceTotal: number
@@ -30,6 +31,7 @@ interface InvoiceCreditModalProps {
  * och POST:ar mot /api/invoices/credit exakt som förut.
  */
 export function InvoiceCreditModal({
+  fullOnly = false,
   show,
   invoiceNumber,
   invoiceTotal,
@@ -72,6 +74,8 @@ export function InvoiceCreditModal({
             Hel kreditering
           </button>
           <button
+            disabled={fullOnly}
+            title={fullOnly ? 'Betalplansfakturor stöder hel kreditering. Delkredit kräver separat avstämning.' : undefined}
             onClick={() => setCreditType('partial')}
             className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all ${
               creditType === 'partial' ? 'bg-white text-gray-900' : 'text-gray-500'

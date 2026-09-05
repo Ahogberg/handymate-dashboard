@@ -1,3 +1,4 @@
+import { createPlanInvoice, loadPlan, paymentPlanEnabled } from '@/lib/invoices/payment-plan/service'
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { NextRequest, NextResponse } from 'next/server'
 import { markInvoiceSources } from '@/lib/invoices/mark-sources'
@@ -81,6 +82,14 @@ export async function POST(
         { error: 'Projektet saknar kopplad kund — kan inte skapa faktura' },
         { status: 400 },
       )
+    }
+
+    if (paymentPlanEnabled()) {
+      const plan = await loadPlan(supabase, business.business_id, projectId)
+      if (plan) {
+        const invoice = await createPlanInvoice(supabase, business.business_id, projectId, plan.snapshot.stages.length - 1)
+        return NextResponse.json({ invoice_id: invoice.invoice_id, invoice_number: invoice.invoice_number })
+      }
     }
 
     // Samma spärr som autofakturans underlag: återanvänd en befintlig

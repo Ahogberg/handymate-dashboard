@@ -117,6 +117,8 @@ export interface Invoice {
   credit_reason?: string | null
 
   // Partial
+  payment_plan_quote_id?: string | null
+  payment_plan_work_completed_on?: string | null
   partial_number?: number
   partial_total?: number
 
