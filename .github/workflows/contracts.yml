@@ -58,7 +58,13 @@ jobs:
           PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
 
       - name: TypeScript — noll fel
+        # 2026-09-05: tsc behöver mer än Nodes standardheap (4 GB) sedan
+        # 3 sep — varje körning på main dog i "JavaScript heap out of memory"
+        # och grinden var röd i två dygn utan att någon såg det. Runnern har
+        # 7 GB; 6 GB räcker (verifierat lokalt av Codex på PR #7).
         run: npx tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Browserlösa kontraktssviter
         # Inga browsers installeras — sviterna nedan får inte använda
