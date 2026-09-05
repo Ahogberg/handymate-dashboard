@@ -107,21 +107,21 @@ jobs:
           tests/launch-preflight.spec.ts
           tests/google-revoke.spec.ts
           tests/veckopuls.spec.ts
-            tests/launch-desk-kallkrav.spec.ts
-            tests/rekryteringssignal.spec.ts
-            tests/platsbanken-kalla.spec.ts
-            tests/autopilot-nba.spec.ts
-            tests/autopilot-push.spec.ts
-            tests/autopilot-utgang.spec.ts
-            tests/autopilot-rapport.spec.ts
-            tests/ata-utkast-sparas.spec.ts
-            tests/agent-tillstand.spec.ts
-            tests/kontoradering.spec.ts
-            tests/work-report.spec.ts
-            tests/lisa-fangar.spec.ts
-            tests/driftlarm-saldo.spec.ts
-            tests/starttid-loop.spec.ts
-            tests/kommunikation-installningar.spec.ts
+          tests/launch-desk-kallkrav.spec.ts
+          tests/rekryteringssignal.spec.ts
+          tests/platsbanken-kalla.spec.ts
+          tests/autopilot-nba.spec.ts
+          tests/autopilot-push.spec.ts
+          tests/autopilot-utgang.spec.ts
+          tests/autopilot-rapport.spec.ts
+          tests/ata-utkast-sparas.spec.ts
+          tests/agent-tillstand.spec.ts
+          tests/kontoradering.spec.ts
+          tests/work-report.spec.ts
+          tests/lisa-fangar.spec.ts
+          tests/driftlarm-saldo.spec.ts
+          tests/starttid-loop.spec.ts
+          tests/kommunikation-installningar.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

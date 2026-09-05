@@ -54,6 +54,29 @@ test.describe('Kontraktsgrinden (contracts.yml)', () => {
     expect(yaml).toContain('--no-deps')
   })
 
+  test('det vikta run-blocket har samma indrag på varje rad — annars blir raderna egna kommandon', () => {
+    // 2026-09-05: femton specrader låg med två extra mellanslag. I ett vikt
+    // YAML-block (>-) behåller mer indragna rader sina radbrytningar, så
+    // shellen fick "npx playwright test …" UTAN --no-deps på första raden,
+    // startade inloggningssteget som kräver en browser, och 1314 test
+    // "did not run". Felet doldes i två dygn av att tsc dog i OOM före det.
+    const rader = yaml.split('\n')
+    const start = rader.findIndex(l => l.includes('Browserlösa kontraktssviter'))
+    const runI = rader.findIndex((l, i) => i > start && l.trim() === 'run: >-')
+    const slut = rader.findIndex((l, i) => i > runI && l.trim() === '--reporter=line')
+    expect(runI).toBeGreaterThan(start)
+    expect(slut).toBeGreaterThan(runI)
+    const forsta = rader[runI + 1]
+    const indrag = forsta.slice(0, forsta.length - forsta.trimStart().length)
+    const avvikande = rader.slice(runI + 1, slut + 1)
+      .filter(l => l.trim() !== '')
+      .filter(l => l.slice(0, l.length - l.trimStart().length) !== indrag)
+      .map(l => l.trim())
+    expect(avvikande, 'rader med avvikande indrag i run-blocket').toEqual([])
+    expect(rader[slut - 2].trim()).toBe('--no-deps')
+    expect(rader[slut - 1].trim()).toBe('--project=chromium')
+  })
+
   test('varje listad testfil finns', () => {
     const yaml = read(file)
     const listade = Array.from(yaml.matchAll(/tests\/[a-z0-9-]+\.spec\.ts/g)).map(m => m[0])
