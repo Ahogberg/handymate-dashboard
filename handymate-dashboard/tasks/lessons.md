@@ -569,3 +569,12 @@ vikt block blev "\ --no-deps" ett ord med inledande mellanslag, flaggan
 försvann och 1153 test "did not run" — samma symptom, ny orsak. Ett facit
 för ett format ska kräva formatet positivt (varje rad är testfil eller
 flagga), inte bara förbjuda det senaste felet.
+
+## 2026-09-05 — Installera aldrig paket i ett delat node_modules medan tsc kör
+
+Granskningsarbetsträd länkar main:s node_modules. En `npm install` av ett
+enda paket i arbetsträdet skrev om det delade trädet mitt under en tsc-
+körning: 1268 "Cannot find module"-fel som såg ut som PR:ns. Regel: kör
+tsc och test först, installera saknade paket sen med `npm ci` på main,
+och kör om. Läs alltid de första felraderna innan ett tsc-fel skylls på
+grenen.
