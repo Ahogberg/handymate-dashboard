@@ -506,7 +506,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
               >
                 {number}
               </div>
-              <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Lisa fångar samtalen — dygnet runt</p>
+              <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Lisa fångar samtalen — under era öppettider</p>
               {isDemo && (
                 <p style={{ marginTop: 8, fontSize: 11, color: 'var(--ob-muted)' }}>
                   Simulerat i demoläget — inget nytt nummer köps.

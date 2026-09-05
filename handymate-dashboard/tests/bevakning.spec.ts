@@ -93,7 +93,7 @@ test.describe('Daniels dag-nummer följer inställningarna', () => {
 test.describe('Lisa, Lars och Matte', () => {
   test('Lisa: samtalsutfall när det finns, annars löftet', () => {
     expect(byggBevakning({ telefon: { aktiv: true, samtal: 6 } })[0].detalj).toBe('6 samtal senaste dygnet')
-    expect(byggBevakning({ telefon: { aktiv: true, samtal: 0 } })[0].detalj).toBe('svarar när du inte kan')
+    expect(byggBevakning({ telefon: { aktiv: true, samtal: 0 } })[0].detalj).toBe('fångar när du inte kan')
   })
 
   test('Lars: nästa bokning med kund och deterministisk etikett', () => {

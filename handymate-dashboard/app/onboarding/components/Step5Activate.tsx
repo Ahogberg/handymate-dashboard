@@ -50,7 +50,7 @@ const PLANS = [
     // konkurrent kan säga — moaten är svensk back-office, inte "AI-team".
     // Avatarraden visar redan de sex medarbetarna; texten upprepar det inte.
     features: [
-      'Missat samtal? Kunden får svar inom 30 sekunder — dygnet runt',
+      'Missat samtal? Kunden får svar inom 30 sekunder — under era öppettider',
       'Färdig offert på minuter — ROT-avdraget rätt räknat',
       'Jobbet klart → fakturan skapad. Inget glöms',
       'Tyst vecka? Teamet föreslår utskicket som fyller den',

@@ -105,7 +105,7 @@ export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[]
   if (profil.phoneNumber) {
     rows.push({
       key: 'profil_telefon',
-      text: `Lisa svarar på ${profil.phoneNumber} från dag ett`,
+      text: `Lisa fångar samtal på ${profil.phoneNumber} från dag ett`,
     })
   }
 
@@ -120,7 +120,7 @@ export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[]
 export function teamGorNarDuAktiverar(row: ScanRow): string | null {
   switch (row.key) {
     case 'kunder':
-      return 'Lisa svarar när de ringer och Hanna håller kontakten'
+      return 'Lisa fångar samtalet när de ringer och Hanna håller kontakten'
     case 'fakturor':
       return 'Karin bevakar dem och påminner när det behövs'
     case 'projekt':

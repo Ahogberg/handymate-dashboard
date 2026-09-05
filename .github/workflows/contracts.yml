@@ -112,6 +112,8 @@ jobs:
             tests/agent-tillstand.spec.ts
             tests/kontoradering.spec.ts
             tests/work-report.spec.ts
+            tests/lisa-fangar.spec.ts
+            tests/driftlarm-saldo.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

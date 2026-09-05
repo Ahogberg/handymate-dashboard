@@ -208,7 +208,7 @@ function fmt(n: number): string {
 function teamGorAtFyndet(key: string): string {
   switch (key) {
     case 'kunder':
-      return 'Lisa svarar när de ringer och Hanna håller kontakten'
+      return 'Lisa fångar samtalet när de ringer och Hanna håller kontakten'
     case 'utanTelefon':
       return 'Lisa kan inte nå dem'
     case 'utanEpost':

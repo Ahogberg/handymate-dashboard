@@ -157,13 +157,13 @@ export function byggBevakning(indata: BevakningsIndata): BevakningsRad[] {
       ? {
           agentId: 'lisa',
           rubrik: 'Bevakar telefonen',
-          detalj: indata.telefon.samtal > 0 ? `${indata.telefon.samtal} samtal senaste dygnet` : 'svarar när du inte kan',
+          detalj: indata.telefon.samtal > 0 ? `${indata.telefon.samtal} samtal senaste dygnet` : 'fångar när du inte kan',
           aktiv: true,
         }
       : {
           agentId: 'lisa',
           rubrik: 'Telefonen är inte kopplad ännu',
-          detalj: 'Lisa svarar så fort ett nummer finns',
+          detalj: 'Lisa fångar samtal så fort ett nummer finns',
           aktiv: false,
         })
   }
