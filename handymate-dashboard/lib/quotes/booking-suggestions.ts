@@ -135,3 +135,21 @@ export function formatSuggestion(suggestion: BookingSuggestion): string {
   const dayMonth = date.toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', timeZone: 'Europe/Stockholm' })
   return `vecka ${suggestion.week} (${weekday} ${dayMonth})`
 }
+
+/**
+ * "mån 22 sep" — kort etikett för ett YYYY-MM-DD-datum (kundens
+ * requested_date). Delad källa för approve-knappen (lib/jarvis/
+ * approval-view.ts), push-titeln (lib/notifications/approval-push.ts) och
+ * kvittot (lib/approvals/value-receipt.ts) i Starttiden-loopen
+ * (2026-09-05) — samma UTC-noon-ankring som isoWeek/addDays ovan, så
+ * veckodagen aldrig glider en dag av en tidszons skull.
+ */
+export function formatRequestedDateShort(dateStr: string): string {
+  const date = new Date(`${dateStr}T12:00:00Z`)
+  return date.toLocaleDateString('sv-SE', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    timeZone: 'Europe/Stockholm',
+  })
+}

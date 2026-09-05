@@ -333,7 +333,7 @@ export default function PortalQuoteSigningModal({
                     När vill du att vi börjar?
                   </div>
                   <div style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 12, lineHeight: 1.45 }}>
-                    Tiderna nedan har vi ledigt. Välj en så återkommer vi med bekräftelse — det är
+                    Veckor vi har utrymme att börja. Välj en så återkommer vi med bekräftelse — det är
                     ett önskemål, inte en bokad tid.
                   </div>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

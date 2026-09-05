@@ -43,6 +43,7 @@ export const PUSH_KLASS_PER_TYP: Record<string, PushKlass> = {
   review_request: 'beslut',
   publish_microsite: 'beslut',
   agent_observation: 'beslut',
+  new_booking_request: 'beslut',
   ata_signed_notification: 'hant',
   ata_declined_notification: 'hant',
   quote_signed: 'hant',

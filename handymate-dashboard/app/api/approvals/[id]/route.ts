@@ -722,6 +722,41 @@ async function hittaBefintligOffertForKort(
 }
 
 /**
+ * Idempotens för Starttiden-bokningen (new_booking_request/source:
+ * 'quote_signing', 2026-09-05) — samma märkningsmönster som
+ * hittaBefintligOffertForKort ovan, men i booking.notes (TEXT, verifierat
+ * mot produktionsschemat via Supabase MCP — booking saknar ett eget
+ * "payload"-fält). En omkörning (dubbelklick, nätverksretry) hittar sin
+ * egen tidigare bokning här och POSTar aldrig en andra.
+ *
+ * Kastar ALDRIG — en misslyckad uppslagning faller tillbaka till "ingen
+ * befintlig bokning hittad" och låter caset skapa som vanligt (fail-soft,
+ * samma princip som resten av filen).
+ */
+async function hittaBefintligBokningForKort(
+  supabase: SupabaseClient,
+  businessId: string,
+  approvalId: string,
+): Promise<{ booking_id: string; scheduled_start: string } | null> {
+  try {
+    const { data, error } = await supabase
+      .from('booking')
+      .select('booking_id, scheduled_start')
+      .eq('business_id', businessId)
+      .ilike('notes', `%${idempotensMarkorFor(approvalId)}%`)
+      .limit(1)
+    if (error) {
+      console.error('[new_booking_request] idempotens-uppslag misslyckades (fail-soft, skapar som vanligt):', error.message)
+      return null
+    }
+    return data?.[0] ?? null
+  } catch (err: any) {
+    console.error('[new_booking_request] idempotens-uppslag kastade (fail-soft):', err?.message || err)
+    return null
+  }
+}
+
+/**
  * Execute the payload action based on approval_type.
  * Returns result info (non-fatal — approval is already marked approved).
  *
@@ -923,6 +958,149 @@ async function executeApprovalPayload(
       error: result.error,
       sms_status: result.status,
     }
+  }
+
+  /**
+   * Etapp Starttiden (2026-09-05, docs/audits/WOW_GENOMLYSNING_2026-09-05.md
+   * "A. Starttiden") — new_booking_request/source:'quote_signing'.
+   *
+   * Kunden signerade offerten och valde en vecka ur riktiga kalenderluckor
+   * (idé 4, app/api/quotes/public/[token]/route.ts). Hantverkaren trycker
+   * EN gång på kortet: bokningen skapas via samma POST /api/bookings som
+   * dashboardens kalender använder (kalendersynk, dispatch-förslag,
+   * projekt-koppling — allt återanvänt, ingen egen genväg), och FÖRST när
+   * den svarat ok går bekräftelse-SMS:et ut.
+   *
+   * Bokningen är alltid huvudsaken. Ett uteblivet/misslyckat SMS (fel
+   * nummer, kvot, 46elks nere) får ALDRIG se ut som ett misslyckat
+   * godkännande — kunden är trots allt bokad. Resultatet bär därför ett
+   * explicit `ok:true` plus `sms_sent`/`sms_reason`, och
+   * lib/approvals/execution-outcome.ts har ett uttryckligt undantag för
+   * just den kombinationen (annars klassar den generiska `sms_sent===false`-
+   * regeln om hela kortet som "misslyckades").
+   *
+   * Idempotens: en omkörning (dubbelklick, nätverksretry efter att
+   * bokningen redan skapades) får ALDRIG POSTa en andra bokning. Uppslaget
+   * sker FÖRE POST, mot samma märkning som ÄTA/offert-idempotensen ovan
+   * (idempotensMarkorFor) — men i bokningens `notes`-fält (booking.notes är
+   * TEXT, verifierat mot produktionsschemat). SMS:et är dubbelt skyddat:
+   * sendSmsViaElks (via sendSms-closuren ovan) har sin egen approvalId-
+   * baserade idempotens och skickar aldrig samma kort två gånger.
+   */
+  async function executeQuoteSigningBooking(pl: Record<string, any>): Promise<Record<string, unknown>> {
+    const requestedDate = typeof pl.requested_date === 'string' ? pl.requested_date : ''
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || !pl.customer_id) {
+      return {
+        action: 'new_booking_request',
+        ok: false,
+        error: 'Ofullständigt bokningsönskemål — saknar kund eller datum',
+      }
+    }
+
+    const supabase = await getSupabase()
+    const { data: config } = await supabase
+      .from('business_config')
+      .select('working_hours, business_name, assigned_phone_number')
+      .eq('business_id', businessId)
+      .maybeSingle()
+
+    let bookingId: string
+    let scheduledStart: string
+
+    const befintlig = await hittaBefintligBokningForKort(supabase, businessId, approvalId)
+    if (befintlig) {
+      bookingId = befintlig.booking_id
+      scheduledStart = befintlig.scheduled_start
+    } else {
+      // Firmans egen starttid för veckodagen (business_config.working_hours,
+      // lib/bookings/availability.ts — samma källa som den publika
+      // självbokningen redan läser). Ingen satt arbetstid för dagen →
+      // 07:30, aldrig en gissning på ett klockslag ingen bett om.
+      const { workingDayFor, stockholmLocalToISO } = await import('@/lib/bookings/availability')
+      const workDay = workingDayFor(config?.working_hours as any, requestedDate)
+      const startTime = workDay?.start || '07:30'
+      scheduledStart = stockholmLocalToISO(requestedDate, startTime)
+
+      // Projektet finns redan — offertsignering skapar det via
+      // createProjectFromQuote (project.quote_id, sql/v103/v136). quotes
+      // saknar en egen project_id-kolumn, så uppslaget går via projektets
+      // quote_id. Fail-soft: hittas inget slår POST /api/bookings ändå in
+      // en koppling via applyBookingPipelineEffects/customer_id.
+      let projectId: string | null = null
+      if (pl.quote_id) {
+        const { data: project } = await supabase
+          .from('project')
+          .select('project_id')
+          .eq('business_id', businessId)
+          .eq('quote_id', pl.quote_id)
+          .maybeSingle()
+        projectId = project?.project_id || null
+      }
+
+      const notes = [
+        pl.quote_title ? `Bokat från offert: ${pl.quote_title}` : 'Bokat från signerad offert',
+        idempotensMarkorFor(approvalId),
+      ].join(' ')
+
+      const res = await fetch(`${appUrl}/api/bookings`, {
+        method: 'POST',
+        headers: forwardHeaders(),
+        body: JSON.stringify({
+          customer_id: pl.customer_id,
+          scheduled_start: scheduledStart,
+          notes,
+          project_id: projectId,
+        }),
+      })
+      const r = await classifyResponse(res)
+      if (!r.ok) {
+        return { action: 'new_booking_request', ok: false, error: r.error, reason: r.reason }
+      }
+      const createdBooking = (r.metadata as any)?.booking
+      if (!createdBooking?.booking_id) {
+        return { action: 'new_booking_request', ok: false, error: 'Bokningen skapades men gav inget booking_id tillbaka' }
+      }
+      bookingId = createdBooking.booking_id
+    }
+
+    // SMS — ENDAST efter att bokningen faktiskt finns (skapad nyss, eller
+    // redan skapad vid ett tidigare försök). Aldrig något ovisst i texten:
+    // datum/tid kommer från den faktiska bokningsraden, inte kundens önskan.
+    if (!pl.customer_phone) {
+      return {
+        action: 'new_booking_request',
+        ok: true,
+        booking_id: bookingId,
+        sms_sent: false,
+        sms_reason: 'Inget telefonnummer sparat på kunden',
+      }
+    }
+
+    const { buildBookingConfirmationSms } = await import('@/lib/bookings/confirmation-sms')
+    const message = buildBookingConfirmationSms({
+      customerName: pl.customer_name,
+      businessName: config?.business_name || 'Handymate',
+      assignedPhoneNumber: config?.assigned_phone_number,
+      scheduledStart,
+    })
+
+    const smsResult = await sendSms({
+      to: pl.customer_phone,
+      message,
+      customerId: pl.customer_id,
+      relatedId: bookingId,
+      messageType: 'booking_confirmation',
+      purpose: 'transactional',
+    })
+
+    const result: Record<string, unknown> = {
+      action: 'new_booking_request',
+      ok: true,
+      booking_id: bookingId,
+      sms_sent: smsResult.sms_sent,
+    }
+    if (!smsResult.sms_sent) result.sms_reason = smsResult.error || 'SMS kunde inte skickas'
+    return result
   }
   // appUrl används fortfarande av icke-SMS-cases (send_quote, create_booking,
   // etc.) — separat audit för deras silent-failure-risk (TD).
@@ -1780,6 +1958,24 @@ async function executeApprovalPayload(
       case 'reschedule_request':
       case 'new_booking_request': {
         const pl = payload as any
+
+        // ═══ Etapp Starttiden (2026-09-05) ═══
+        //
+        // new_booking_request från offertsignering (app/api/quotes/public/
+        // [token]/route.ts, action 'request_booking') bär en HELT ANNAN
+        // payload-form än Mattes SMS-förslagsgren nedan: ingen
+        // customer_reply_pending, ingen pl.entity.phone — bara
+        // { quote_id, customer_id, customer_name, customer_phone,
+        //   requested_date, source: 'quote_signing' }. Utan denna gren
+        // landade varje godkännande i `if (!message || !pl.entity?.phone)`
+        // nedan och returnerade tyst `{skipped:'no message or phone'}` —
+        // kortet sa "Bekräfta så läggs den i kalendern" men gjorde
+        // ingenting. Se docs/audits/WOW_GENOMLYSNING_2026-09-05.md, "A.
+        // Starttiden", och tests/starttid-loop.spec.ts (facit).
+        if (approval_type === 'new_booking_request' && pl.source === 'quote_signing') {
+          return await executeQuoteSigningBooking(pl)
+        }
+
         const message = pl.customer_reply_pending
           || (pl.available_slots?.length
             ? `Hej! Vi kan komma:\n${(pl.available_slots as any[]).map((s: any, i: number) => `${i + 1}. ${s.label}`).join('\n')}\nVilket passar bäst?`

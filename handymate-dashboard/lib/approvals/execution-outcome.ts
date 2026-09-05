@@ -126,10 +126,17 @@ export function classifyExecutionResult(
     reason === 'rate_limited' ||
     reason === 'four_eyes_required'
 
+  // Starttiden (2026-09-05): new_booking_request/quote_signing skickar en
+  // BÄSTA-FÖRSÖK-bekräftelse-SMS efter en redan lyckad bokning — misslyckas
+  // den ska kortet ALDRIG visas som "utförandet misslyckades" (kunden är
+  // trots allt bokad). Caset markerar det med ett explicit `ok:true`; bara
+  // då räknas ett `sms_sent:false` inte som fel. Alla andra cases (t.ex.
+  // send_sms, propose_booking_times) vars HELA syfte är SMS:et saknar ett
+  // sådant `ok`-fält och faller kvar på den gamla regeln.
   const failed =
     Boolean(result.error) ||
     result.ok === false ||
-    result.sms_sent === false ||
+    (result.sms_sent === false && result.ok !== true) ||
     isKnownFailReason
 
   if (failed) {

@@ -192,7 +192,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
     const body = await request.json()
-    const { customer_id, scheduled_start, scheduled_end, notes, service_type, assigned_user_id } = body
+    const { customer_id, scheduled_start, scheduled_end, notes, service_type, assigned_user_id, project_id } = body
 
     if (!scheduled_start) {
       return NextResponse.json({ error: 'Missing scheduled_start' }, { status: 400 })
@@ -219,6 +219,28 @@ export async function POST(request: NextRequest) {
       assignedToName = targetUser.name
     }
 
+    // Explicit projektkoppling (valfri) — Etapp Starttiden (2026-09-05):
+    // en offertsignering vet EXAKT vilket projekt bokningen hör till
+    // (project.quote_id) och behöver inte förlita sig på
+    // applyBookingPipelineEffects gissning via customer_id längre ner.
+    // Fail-soft: ett ogiltigt/främmande project_id ignoreras tyst i stället
+    // för att stoppa hela bokningen — pipeline-effekterna nedan ger ändå en
+    // fallback-koppling via kundens aktiva projekt.
+    let explicitProjectId: string | null = null
+    if (project_id) {
+      const { data: targetProject } = await supabase
+        .from('project')
+        .select('project_id')
+        .eq('project_id', project_id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      if (targetProject) {
+        explicitProjectId = targetProject.project_id
+      } else {
+        console.warn('[bookings] project_id skickades men hör inte till businessen — ignoreras:', project_id)
+      }
+    }
+
     const bookingId = 'book_' + Math.random().toString(36).substr(2, 9)
     const combinedNotes = [service_type, notes].filter(Boolean).join(' — ') || null
 
@@ -228,6 +250,7 @@ export async function POST(request: NextRequest) {
         booking_id: bookingId,
         business_id: business.business_id,
         customer_id: customer_id || null,
+        project_id: explicitProjectId,
         scheduled_start,
         scheduled_end: scheduled_end || null,
         status: 'confirmed',
@@ -307,13 +330,17 @@ export async function POST(request: NextRequest) {
     // (lib/bookings/apply-pipeline-effects.ts) sedan 2026-09-02, så de två
     // vägarna som skapar bokningar inte kan glida isär igen (se filens
     // egen kommentar för bakgrunden). Icke-blockerande i sig själv.
-    const { projectId } = await applyBookingPipelineEffects(supabase, business.business_id, {
+    const { projectId: autoCreatedProjectId } = await applyBookingPipelineEffects(supabase, business.business_id, {
       bookingId,
       customerId: customer_id || null,
       serviceType: service_type || null,
       scheduledStart: scheduled_start || null,
     })
-    if (projectId) booking.project_id = projectId
+    // explicitProjectId (redan skrivet på insert-raden) vinner alltid —
+    // pipeline-effekten skapar bara ETT NYTT projekt när kunden saknar ett
+    // aktivt sedan innan (guard i maybeCreateProjectFromBooking), så de två
+    // kan aldrig peka på olika projekt för samma bokning.
+    booking.project_id = explicitProjectId || autoCreatedProjectId || booking.project_id || null
 
     return NextResponse.json({ booking })
   } catch (error: any) {

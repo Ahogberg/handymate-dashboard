@@ -23,6 +23,7 @@ import { byggDedupeNyckel, klassificeraPush } from '@/lib/notifications/push-pol
 import { bokforPush, nyligenSkickad } from '@/lib/notifications/push-dispatch-log'
 import { skaHallasUnderTystTid } from '@/lib/notifications/tyst-tid'
 import { hallPush } from '@/lib/notifications/push-held'
+import { formatRequestedDateShort } from '@/lib/quotes/booking-suggestions'
 
 interface ApprovalLike {
   /** pending_approvals.id om anroparen har raden — blir dedupe-objektet. */
@@ -218,6 +219,25 @@ export function buildPushTemplate(
         title: 'Ditt måndagsmöte är redo',
         body: 'Ta del av veckans sammanfattning från teamet',
         url: '/dashboard',
+      }
+    }
+
+    case 'new_booking_request': {
+      // Etapp Starttiden (2026-09-05) — kunden signerade offerten och valde
+      // en vecka. buildPushTemplate saknade tidigare typen helt, så
+      // sendApprovalPush loggade "no template" och pushade aldrig —
+      // kortet fanns i kön men hantverkaren fick aldrig veta. Gäller BARA
+      // source:'quote_signing' i praktiken (Mattes SMS-förslagsgren
+      // använder samma approval_type men payloaden saknar requested_date/
+      // customer_name i samma form — de fälten saknas helt enkelt tyst här).
+      const name = typeof payload.customer_name === 'string' && payload.customer_name ? payload.customer_name : 'Kunden'
+      const datum = typeof payload.requested_date === 'string' && payload.requested_date
+        ? formatRequestedDateShort(payload.requested_date)
+        : 'snart'
+      return {
+        title: `${name} vill börja ${datum}`,
+        body: 'Bekräfta så får kunden Bokat i telefonen',
+        url: '/dashboard/approvals?filter=new_booking_request',
       }
     }
 

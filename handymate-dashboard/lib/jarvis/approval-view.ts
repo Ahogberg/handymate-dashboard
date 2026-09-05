@@ -9,6 +9,7 @@
  */
 
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
+import { formatRequestedDateShort } from '@/lib/quotes/booking-suggestions'
 
 interface ApprovalLike {
   approval_type: string
@@ -139,6 +140,18 @@ export function approveLabel(approvalType: string, payload?: Record<string, unkn
   if (approvalType === 'fakturera_projekt') {
     const varde = kr(p.amount_kr)
     return varde ? `Godkänn & skicka — ${varde}` : 'Godkänn & skicka'
+  }
+  // Starttiden (2026-09-05): kunden signerade offerten och valde en vecka —
+  // knappen säger vilken dag godkännandet faktiskt bokar in, precis som
+  // beloppsreglerna ovan säger vilket belopp en åtgärd gäller. Gäller bara
+  // source:'quote_signing' (executorn i approvals/[id]/route.ts), men
+  // etiketten här känner inte till source — den läser bara requested_date,
+  // vilket alltid finns när den finns.
+  if (approvalType === 'new_booking_request') {
+    const datum = typeof p.requested_date === 'string' && p.requested_date
+      ? formatRequestedDateShort(p.requested_date)
+      : null
+    return datum ? `Boka ${datum}` : 'Boka'
   }
   if (approvalType === 'send_quote') return 'Godkänn & skicka'
   if (approvalType === 'send_sms') return 'Skicka'

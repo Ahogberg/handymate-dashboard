@@ -1,5 +1,6 @@
 import { formatSEK } from '@/lib/format-price'
 import type { ExecutionOutcome } from '@/lib/approvals/execution-outcome'
+import { formatRequestedDateShort } from '@/lib/quotes/booking-suggestions'
 
 export interface ValueReceiptApproval {
   approval_type: string
@@ -24,6 +25,7 @@ export const RECEIPT_APPROVAL_TYPES = [
   'fakturera_projekt',
   'send_sms',
   'create_ata_draft',
+  'new_booking_request',
 ] as const
 
 const positiveAmount = (value: unknown): number | null =>
@@ -132,6 +134,38 @@ export function buildValueReceipt(
           : projectId
             ? { link: `/dashboard/projects/${projectId}`, linkLabel: 'Öppna projektet' }
             : {}),
+      }
+    }
+
+    case 'new_booking_request': {
+      // Starttiden (2026-09-05) — bara offertsignerings-grenen (source
+      // 'quote_signing', app/api/approvals/[id]/route.ts,
+      // executeQuoteSigningBooking) returnerar booking_id här; Mattes
+      // SMS-förslagsgren för samma approval_type gör det aldrig, så den
+      // grenen ger aldrig ett kvitto via detta case.
+      const bookingId = id(execution.booking_id)
+      if (execution.ok !== true || !bookingId) return null
+
+      const datum = typeof payload.requested_date === 'string' && payload.requested_date
+        ? formatRequestedDateShort(payload.requested_date)
+        : null
+      const bokadText = datum ? `Bokad ${datum}` : 'Bokad'
+
+      if (execution.sms_sent === false) {
+        const phone = id(payload.customer_phone)
+        return {
+          text: phone
+            ? `${bokadText}. Kunden kunde inte nås per SMS — ring ${phone}`
+            : `${bokadText}. Kunden kunde inte nås — inget telefonnummer sparat`,
+          link: `/dashboard/bookings/${bookingId}`,
+          linkLabel: 'Öppna bokningen',
+        }
+      }
+
+      return {
+        text: `${bokadText} — kunden fick en bekräftelse`,
+        link: `/dashboard/bookings/${bookingId}`,
+        linkLabel: 'Öppna bokningen',
       }
     }
 

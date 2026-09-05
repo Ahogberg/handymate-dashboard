@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
 import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
-import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
 import { sanitizeSenderId } from '@/lib/sms/sender-id'
 
@@ -404,19 +403,13 @@ case 'create_booking': {
 
   // Skicka bekräftelse-SMS
   if (customer?.phone_number && businessConfig?.business_name) {
-    const bookingDate = new Date(scheduledStart)
-    const dateStr = bookingDate.toLocaleDateString('sv-SE', { 
-      weekday: 'long', 
-      day: 'numeric', 
-      month: 'long' 
+    const { buildBookingConfirmationSms } = await import('@/lib/bookings/confirmation-sms')
+    const message = buildBookingConfirmationSms({
+      customerName: customer.name,
+      businessName: businessConfig.business_name,
+      assignedPhoneNumber: businessConfig.assigned_phone_number,
+      scheduledStart,
     })
-    const timeStr = bookingDate.toLocaleTimeString('sv-SE', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
-    })
-
-    const suffix = buildSmsSuffix(businessConfig.business_name, businessConfig.assigned_phone_number)
-    const message = `Hej${customer.name ? ' ' + customer.name.split(' ')[0] : ''}! Din tid hos ${businessConfig.business_name} är bokad: ${dateStr} kl ${timeStr}. Välkommen! Behöver du ändra tiden?\n${suffix}`
 
     try {
       // Genom strypunkten (etapp 0 batch 4). Bokningsbekräftelsen går till
