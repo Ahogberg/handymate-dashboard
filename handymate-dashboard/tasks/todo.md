@@ -841,3 +841,12 @@ Granskningsresultat och kvarvarande drift-/Lars-beroenden: tasks/integration-gap
 - [x] Hantverkaren granskar och kan skapa idempotent ÄTA-förslag i befintliga godkännandekön.
 - [x] Regressionstester, TypeScript, build och granskningsbar SQL/PR.
 - [ ] Verifiera migration och inloggat flöde mot riktig AI/DB när åtkomst finns.
+
+## 2026-09-05 — Hela uppdragsresan
+- [x] Kontrollera faktisk browser-/driftåtkomst och senaste PR-status.
+- [x] Följ godkänd offert → projekt → tid/material → ÄTA → fakturaunderlag och betalstatus.
+- [x] Reproducera och rätta överlämningsfel med verkliga produktionsfunktioner och isolerade beroenden.
+- [x] Kör relevanta regressioner, TypeScript/build och dokumentera bevisnivå per steg.
+- [x] Uppdatera gransknings-PR; skilj driftbevis från simulerade prov.
+
+Review: tasks/whole-job-journey-review.md. Åtta överlämningsfel rättade. Tre ytterligare risker öppet dokumenterade; inloggat driftprov inte genomfört eftersom session/DB-åtkomst saknas.

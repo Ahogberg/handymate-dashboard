@@ -1,3 +1,4 @@
+import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { NextRequest, NextResponse } from 'next/server'
 import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
@@ -152,8 +153,9 @@ export async function POST(
         quote = q
         const { data: qi, error: itemsError } = await supabase
           .from('quote_items')
-          .select('id, description, quantity, unit, unit_price, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, cost_price, article_number, labor_amount, linked_product_id')
+          .select('id, option_selected, total, description, quantity, unit, unit_price, is_rot_eligible, is_rut_eligible, item_type, sort_order, group_name, cost_price, article_number, labor_amount, linked_product_id')
           .eq('quote_id', project.quote_id)
+          .eq('business_id', business.business_id)
           .order('sort_order', { ascending: true })
 
         if (itemsError) {
@@ -170,28 +172,10 @@ export async function POST(
           )
         }
 
-        // Legacy-fallback: JSONB quotes.items om quote_items är tom
-        if ((qi || []).length === 0 && Array.isArray(q.items) && q.items.length > 0) {
-          quoteItems = q.items.map((item: any, i: number) => ({
-            id: item.id || `legacy_${i}`,
-            description: item.description || item.name || '',
-            quantity: Number(item.quantity) || 1,
-            unit: item.unit || 'st',
-            unit_price: Number(item.unit_price ?? item.price) || 0,
-            is_rot_eligible: !!item.is_rot_eligible,
-            is_rut_eligible: !!item.is_rut_eligible,
-            item_type: item.item_type || 'item',
-            sort_order: item.sort_order ?? i,
-            group_name: item.group_name || null,
-            cost_price: item.cost_price ?? null,
-            article_number: item.article_number ?? null,
-            // ?? (inte ||): labor_amount 0 = ren material och skall bevaras
-            labor_amount: item.labor_amount ?? null,
-            linked_product_id: item.linked_product_id ?? null,
-          }))
-        } else {
-          quoteItems = qi || []
-        }
+        // Samma tillvals-, rabatt- och artikelregler som övriga fakturavägar.
+        const sourceItems = (qi || []).length > 0 ? qi! : (Array.isArray(q.items) ? q.items : [])
+        quoteItems = mapQuoteItemsToInvoiceItems(sourceItems)
+
       }
     }
 
@@ -231,30 +215,9 @@ export async function POST(
     const items: any[] = []
     let sortOrder = 0
 
-    // Quote-rader först
+    // Behåll den gemensamma mapparens radtyp, belopp och produktkoppling.
     for (const qi of quoteItems) {
-      const qty = Number(qi.quantity) || 0
-      const price = Number(qi.unit_price) || 0
-      items.push({
-        id: `ii_${Math.random().toString(36).slice(2, 14)}`,
-        item_type: qi.item_type || 'item',
-        description: qi.description || '',
-        quantity: qty,
-        unit: qi.unit || 'st',
-        unit_price: price,
-        total: qty * price,
-        is_rot_eligible: !!qi.is_rot_eligible,
-        is_rut_eligible: !!qi.is_rut_eligible,
-        sort_order: sortOrder++,
-        group_name: qi.group_name || null,
-        cost_price: qi.cost_price ?? null,
-        article_number: qi.article_number ?? null,
-        // Arbetsandelen (v67) följer med till ROT-basen — ?? (inte ||), 0 är giltigt
-        labor_amount: qi.labor_amount ?? null,
-        // Produktkopplingen (A1): marginaluppföljning + Fortnox ArticleNumber
-        linked_product_id: qi.linked_product_id ?? null,
-        _source: 'quote',
-      })
+      items.push({ ...qi, sort_order: sortOrder++, _source: 'quote' })
     }
 
     // ÄTA-rader — gruppera per ÄTA via group_name + metadata
@@ -317,7 +280,8 @@ export async function POST(
 
     // ── 6. Subtotal, VAT, total ─────────────────────────────────
     const regularItems = items.filter(i => (i.item_type || 'item') === 'item')
-    const subtotal = regularItems.reduce((s, i) => s + (Number(i.quantity) * Number(i.unit_price)), 0)
+    const subtotal = regularItems.reduce((s, i) => s + Number(i.total || 0), 0)
+      - items.filter(i => i.item_type === 'discount').reduce((s, i) => s + Math.abs(Number(i.total || 0)), 0)
     const vatRate = 25
     const vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100
     const total = Math.round((subtotal + vatAmount) * 100) / 100

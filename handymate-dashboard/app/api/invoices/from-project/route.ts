@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
   }
 
   // Hämta ofakturerade tidposter
-  const { data: timeEntries } = await supabase
+  const { data: timeEntries, error: timeError } = await supabase
     .from('time_entry')
     .select('time_entry_id, description, work_date, duration_minutes, hourly_rate, is_billable, business_user_id, invoiced')
     .eq('business_id', business.business_id)
@@ -65,7 +65,7 @@ export async function GET(request: NextRequest) {
     .order('work_date', { ascending: true })
 
   // Hämta ofakturerat material
-  const { data: materials } = await supabase
+  const { data: materials, error: materialError } = await supabase
     .from('project_material')
     .select('material_id, name, unit, quantity, purchase_price, sell_price, markup_percent, total_sell, invoiced')
     .eq('business_id', business.business_id)
@@ -73,11 +73,15 @@ export async function GET(request: NextRequest) {
     .or('invoiced.is.null,invoiced.eq.false')
 
   // Hämta business-inställningar
-  const { data: config } = await supabase
+  const { data: config, error: configError } = await supabase
     .from('business_config')
     .select('default_hourly_rate, default_payment_days, invoice_prefix, next_invoice_number, bankgiro, plusgiro, swish_number, f_skatt_registered, org_number')
     .eq('business_id', business.business_id)
     .single()
+
+  if (timeError || materialError || configError) {
+    return NextResponse.json({ error: 'Fakturaunderlaget kunde inte läsas fullständigt. Försök igen innan du skapar faktura.' }, { status: 503 })
+  }
 
   // Formatera tidposter till fakturarader. Etapp T — KVITTOPRINCIPEN:
   // aldrig ett hårdkodat 895. Saknas BÅDE tidpostens eget timpris OCH
@@ -200,12 +204,18 @@ export async function POST(request: NextRequest) {
   // Slå upp project.quote_id för att härda mot orphan-fakturor. Tidigare
   // skapade rutten invoice utan vare sig project_id eller quote_id —
   // gjorde framtida marginal-analys + backfill omöjlig (TD-58, v52).
-  const { data: projectRow } = await supabase
+  const { data: projectRow, error: projectError } = await supabase
     .from('project')
-    .select('project_id, quote_id')
+    .select('project_id, quote_id, customer_id')
     .eq('project_id', project_id)
     .eq('business_id', business.business_id)
     .single()
+  if (projectError || !projectRow) {
+    return NextResponse.json({ error: 'Projekt hittades inte eller kunde inte läsas' }, { status: projectError ? 503 : 404 })
+  }
+  if (!projectRow.customer_id || customer_id !== projectRow.customer_id) {
+    return NextResponse.json({ error: 'Fakturans kund måste vara projektets kund' }, { status: 403 })
+  }
   const linkedQuoteId = projectRow?.quote_id || null
 
   // Betalkonton + betalningsvillkor (nummer/OCR sköts nu av createInvoice-kärnan)

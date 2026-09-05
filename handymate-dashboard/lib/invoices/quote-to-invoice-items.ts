@@ -73,8 +73,8 @@ export function mapQuoteItemsToInvoiceItems(
     .filter((item: any) => item.item_type !== 'option' || item.option_selected === true)
     .map((item: any, i: number) => {
       const itemType = item.item_type === 'option' ? 'item' : (item.item_type || 'item')
-      const quantity = item.quantity || 1
-      const unitPrice = item.unit_price || item.price || 0
+      const quantity = Number(item.quantity ?? 1)
+      const unitPrice = Number(item.unit_price ?? item.price ?? 0)
       return {
         id: radId(prefix),
         item_type: itemType,

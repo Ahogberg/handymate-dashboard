@@ -53,7 +53,7 @@ export interface ProjektFakturaUnderlag {
 
 export interface ProjektFakturaStopp {
   ok: false
-  reason: 'projekt_saknas' | 'kund_saknas' | 'faktura_finns' | 'inga_rader'
+  reason: 'projekt_saknas' | 'kund_saknas' | 'faktura_finns' | 'inga_rader' | 'underlag_otillgangligt'
   error: string
   existingInvoiceId?: string
 }
@@ -82,13 +82,15 @@ export async function byggProjektFakturaUnderlag(
   }
 
   // 2. Finns redan en faktura är underlaget inaktuellt per definition.
-  const { data: existingInvoice } = await supabase
+  const { data: existingInvoice, error: invoiceError } = await supabase
     .from('invoice')
     .select('invoice_id')
     .eq('business_id', businessId)
     .eq('project_id', projectId)
     .limit(1)
     .maybeSingle()
+
+  if (invoiceError) return { ok: false, reason: 'underlag_otillgangligt', error: 'Tidigare fakturor kunde inte kontrolleras' }
 
   if (existingInvoice) {
     return {
@@ -110,21 +112,26 @@ export async function byggProjektFakturaUnderlag(
   let vatRate = 25
 
   if (project.quote_id) {
-    const { data: quote } = await supabase
+    const { data: quote, error: quoteError } = await supabase
       .from('quotes')
       .select('items, rot_rut_type, rot_rut_deduction, customer_pays, personnummer, fastighetsbeteckning, vat_rate')
       .eq('quote_id', project.quote_id)
+      .eq('business_id', businessId)
       .single()
+
+    if (quoteError || !quote) return { ok: false, reason: 'underlag_otillgangligt', error: 'Projektets offert kunde inte läsas' }
 
     // A1: labor_amount/is_rut_eligible/cost_price/article_number/
     // linked_product_id/group_name följde tidigare INTE med här — RUT-rader
     // tappade sitt berättigande helt och ROT-basen föll tillbaka på radtotal.
-    const { data: strukturerade } = await supabase
+    const { data: strukturerade, error: itemsError } = await supabase
       .from('quote_items')
       .select('item_type, description, quantity, unit, unit_price, total, is_rot_eligible, is_rut_eligible, sort_order, is_hidden, option_selected, group_name, cost_price, article_number, labor_amount, linked_product_id')
       .eq('quote_id', project.quote_id)
       .eq('business_id', businessId)
       .order('sort_order')
+
+    if (itemsError) return { ok: false, reason: 'underlag_otillgangligt', error: 'Offertraderna kunde inte läsas' }
 
     if (strukturerade && strukturerade.length > 0) {
       // Delade mapparen (lib/invoices/quote-to-invoice-items.ts): tillvals-
@@ -138,20 +145,21 @@ export async function byggProjektFakturaUnderlag(
     if (quote && quoteItems.length > 0) {
       rotRutType = quote.rot_rut_type || null
       rotRutDeduction = quote.rot_rut_deduction || 0
-      customerPays = quote.customer_pays || null
       personnummer = quote.personnummer || null
       fastighetsbeteckning = quote.fastighetsbeteckning || null
-      vatRate = quote.vat_rate || 25
+      vatRate = quote.vat_rate ?? 25
     }
   }
 
   // 4. Godkända ÄTA
-  const { data: atas } = await supabase
+  const { data: atas, error: atasError } = await supabase
     .from('project_change')
     .select('change_id, description, items, total, change_type')
     .eq('project_id', projectId)
     .eq('business_id', businessId)
     .in('status', [...ATA_FAKTURERBARA_STATUSAR])
+
+  if (atasError) return { ok: false, reason: 'underlag_otillgangligt', error: 'Tilläggsarbetena kunde inte läsas' }
 
   const ataItems: any[] = []
   if (atas && atas.length > 0) {
@@ -216,8 +224,8 @@ export async function byggProjektFakturaUnderlag(
   const discountItems = allItems.filter(i => i.item_type === 'discount')
   const subtotal = regularItems.reduce((sum, i) => sum + (i.total || 0), 0)
     - discountItems.reduce((sum, i) => sum + Math.abs(i.total || 0), 0)
-  const vatAmount = Math.round(subtotal * (vatRate / 100))
-  const total = subtotal + vatAmount
+  const vatAmount = Math.round(subtotal * (vatRate / 100) * 100) / 100
+  const total = Math.round((subtotal + vatAmount) * 100) / 100
 
   if (rotRutType) {
     const rate = rotRutType === 'rut' ? 0.5 : 0.3
