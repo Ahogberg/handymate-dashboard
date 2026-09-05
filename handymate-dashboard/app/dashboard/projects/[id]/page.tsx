@@ -84,6 +84,7 @@ import Link from 'next/link'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
+import DayClose from '@/components/day-close/DayClose'
 import ProjectCloseoutModal from '@/components/projects/ProjectCloseoutModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
@@ -2396,6 +2397,7 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 items-start">
               <div className="min-w-0 space-y-3.5">
                 <JobPreparation projectId={projectId} />
+                <DayClose key={projectId} projectId={projectId} projectName={project.name} />
                 {/* Hantverkarens egna uppgifter överst — agenternas förslag under. */}
                 <ProjectTasksBlock
                   projectId={projectId}

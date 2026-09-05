@@ -42,6 +42,7 @@ import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/bus
 import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
+import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
@@ -2779,6 +2780,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                 />
               </div>
             )}
+
+            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
 
             {/* Huvudyta: dokument-canvas (default) eller listvy (radeditor) */}
             {mainView === 'list' ? (
