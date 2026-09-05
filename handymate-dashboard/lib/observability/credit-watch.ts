@@ -49,6 +49,8 @@ export const CREDIT_WATCH_PROBE_MODEL = 'claude-haiku-4-5-20251001'
  * detail så ett feltolkat antagande syns första körningen.
  */
 export const ELKS_BALANCE_DIVISOR = 10000
+/** Ett svenskt SMS kostar ~0,35 kr hos 46elks. Under det går ingenting ut. */
+export const ELKS_ETT_SMS_SEK = 0.35
 
 export function lasElksMinSek(env: Readonly<Record<string, string | undefined>> = process.env): number {
   const raw = Number(env.CREDIT_WATCH_ELKS_MIN_SEK)
@@ -71,12 +73,20 @@ export function bedomElksSaldo(body: unknown, minSek: number): KontrollResultat 
   }
   const balanceSek = balanceRaw / ELKS_BALANCE_DIVISOR
   const low = balanceSek < minSek
+  // Under ett SMS (0,35 kr) går inget ut alls. Det är inte en varning bland
+  // andra — det är orsaken till att kunder inte får sina bekräftelser och
+  // ägare inte får sina påminnelser. 2026-09-05: saldot hade stått på 0 kr
+  // som "🟡 1 varning" varje morgon sedan 2 sep, mejlen lästes aldrig, och
+  // 85 utskick föll under tiden. Rött + siffran i ämnesraden, alltid.
+  const tomt = balanceSek < ELKS_ETT_SMS_SEK
   return {
     key: 'elks_balance',
-    status: low ? 'warn' : 'ok',
-    summary: low
-      ? `46elks-saldo ${balanceSek.toFixed(0)} kr — under gränsen ${minSek} kr, fyll på`
-      : `46elks-saldo ${balanceSek.toFixed(0)} kr`,
+    status: tomt ? 'error' : low ? 'warn' : 'ok',
+    summary: tomt
+      ? `46elks-saldo ${balanceSek.toFixed(0)} kr — SMS går inte ut, fyll på nu`
+      : low
+        ? `46elks-saldo ${balanceSek.toFixed(0)} kr — under gränsen ${minSek} kr, fyll på`
+        : `46elks-saldo ${balanceSek.toFixed(0)} kr`,
     detail: { balance_raw: balanceRaw, balance_sek: balanceSek, min_sek: minSek, currency: currency ?? null },
   }
 }

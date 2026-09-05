@@ -536,32 +536,17 @@ export async function triggerEventCommunication(params: {
 export async function getCommunicationSettings(
   businessId: string
 ): Promise<CommunicationSettings> {
-  const supabase = getServerSupabase()
-
-  const { data } = await supabase
-    .from('communication_settings')
-    .select('*')
-    .eq('business_id', businessId)
-    .single()
-
-  if (data) return data as CommunicationSettings
-
-  // Return defaults if no settings exist
+  // 2026-09-05: communication_settings har aldrig funnits i produktionen.
+  // Läs sanningen (automation_settings) och presentera den i legacy-formen
+  // så resten av filen inte behöver ändras. `tone` har ingen kolumn och
+  // används inte av någon sändväg — konstant.
+  const { getAutomationSettings, syncCommunicationSettings } = await import('@/lib/automations')
+  const auto = await getAutomationSettings(businessId)
   return {
-    id: '',
+    id: auto.id || '',
     business_id: businessId,
-    auto_enabled: true,
     tone: 'friendly',
-    max_sms_per_customer_per_week: 3,
-    send_booking_confirmation: true,
-    send_day_before_reminder: true,
-    send_on_the_way: true,
-    send_quote_followup: true,
-    send_job_completed: true,
-    send_invoice_reminder: true,
-    send_review_request: true,
-    quiet_hours_start: '21:00',
-    quiet_hours_end: '07:00',
+    ...syncCommunicationSettings(auto),
   }
 }
 

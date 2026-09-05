@@ -115,6 +115,7 @@ jobs:
             tests/lisa-fangar.spec.ts
             tests/driftlarm-saldo.spec.ts
             tests/starttid-loop.spec.ts
+            tests/kommunikation-installningar.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

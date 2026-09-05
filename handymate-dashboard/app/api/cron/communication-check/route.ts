@@ -39,18 +39,23 @@ export async function GET(request: NextRequest) {
     // inställningen när tabellen väl finns. Saknas tabellen ⇒ FAIL-CLOSED:
     // ingen får utgående uppföljningar automatiskt. Tystnad är rätt default
     // för något som skickar SMS till hantverkarens kunder.
+    // 2026-09-05: av-listan läses ur automation_settings (sms_auto_enabled =
+    // false) — samma sanning som quote-follow-up och Kommunikation-sidan.
+    // communication_settings fanns aldrig; gårdagens fail-closed-spärr på den
+    // gjorde att den här cronen inte gjorde något alls. Fortsatt fail-closed:
+    // kan listan inte läsas körs inget utgående.
     const { data: disabledSettings, error: settingsError } = await supabase
-      .from('communication_settings')
+      .from('automation_settings')
       .select('business_id')
-      .eq('auto_enabled', false)
+      .eq('sms_auto_enabled', false)
 
     if (settingsError) {
-      console.warn('[cron/communication-check] communication_settings kunde inte läsas — hoppar över allt utgående:', settingsError.message)
+      console.warn('[cron/communication-check] automation_settings kunde inte läsas — hoppar över allt utgående:', settingsError.message)
       return NextResponse.json({
         success: true,
         businesses: 0,
         agent_triggered: 0,
-        skipped: 'communication_settings saknas — fail-closed',
+        skipped: 'automation_settings kunde inte läsas — fail-closed',
       })
     }
 

@@ -210,3 +210,18 @@ test.describe('korKreditbevakning — injicerad fetch', () => {
     expect(results.find(r => r.key === 'database')?.status).toBe('error')
   })
 })
+
+test.describe('bedomElksSaldo — tomt saldo är rött, inte gult (2026-09-05)', () => {
+  test('0 kr ger status error med "SMS går inte ut" — aldrig bara en varning', () => {
+    const r = bedomElksSaldo({ balance: 0, currency: 'SEK' }, 300)
+    expect(r.status).toBe('error')
+    expect(r.summary).toContain('SMS går inte ut')
+    expect(r.summary).toContain('0 kr')
+  })
+  test('under ett SMS (0,35 kr) är fortfarande error; över det men under gränsen är warn', () => {
+    expect(bedomElksSaldo({ balance: 3000 }, 300).status).toBe('error') // 0,30 kr
+    expect(bedomElksSaldo({ balance: 3500 }, 300).status).toBe('warn')  // 0,35 kr, under 300
+    expect(bedomElksSaldo({ balance: 5_000_000 }, 300).status).toBe('ok') // 500 kr
+  })
+})
+

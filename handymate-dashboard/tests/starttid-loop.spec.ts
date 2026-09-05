@@ -327,19 +327,17 @@ test.describe('kundtexten — "Veckor vi har utrymme att börja"', () => {
 })
 
 test.describe('facit-inkoppling', () => {
-  test('den här filen är kopplad SIST i test:contracts (package.json)', () => {
+  // Inte "sist i listan": den invarianten blev röd så fort nästa pass kopplade
+  // in sitt facit efter det här (driftlarm-saldo, kommunikation-installningar),
+  // precis som autopilot-rapport.spec.ts och autopilot-utgang.spec.ts en gång
+  // gjorde. Det som ska gälla är att specen körs i CI och lokalt — inte platsen.
+  test('den här filen är kopplad i test:contracts (package.json)', () => {
     const pkg = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8'))
-    const script = pkg.scripts['test:contracts'] as string
-    expect(script).toContain('tests/starttid-loop.spec.ts')
-    // "sist" tolkas som: efter alla andra tests/*.spec.ts-nämningar i strängen.
-    const allSpecs = Array.from(script.matchAll(/tests\/[a-z0-9-]+\.spec\.ts/g)).map(m => m[0])
-    expect(allSpecs[allSpecs.length - 1]).toBe('tests/starttid-loop.spec.ts')
+    expect(pkg.scripts['test:contracts'] as string).toContain('tests/starttid-loop.spec.ts')
   })
 
-  test('den här filen är kopplad SIST i .github/workflows/contracts.yml', () => {
-    const yamlPath = path.join(ROOT, '..', '.github', 'workflows', 'contracts.yml')
-    const yaml = fs.readFileSync(yamlPath, 'utf8')
-    const allSpecs = Array.from(yaml.matchAll(/tests\/[a-z0-9-]+\.spec\.ts/g)).map(m => m[0])
-    expect(allSpecs[allSpecs.length - 1]).toBe('tests/starttid-loop.spec.ts')
+  test('den här filen är kopplad i .github/workflows/contracts.yml', () => {
+    const yaml = fs.readFileSync(path.join(ROOT, '..', '.github', 'workflows', 'contracts.yml'), 'utf8')
+    expect(yaml).toContain('tests/starttid-loop.spec.ts')
   })
 })

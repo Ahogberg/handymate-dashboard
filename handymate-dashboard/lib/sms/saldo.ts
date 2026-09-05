@@ -13,6 +13,13 @@
  * uttrycklig här, och driftlarmet visar även råvärdet så ett fel i
  * antagandet syns i mejlet i stället för att dölja sig bakom en snygg siffra.
  *
+ * OBS: lib/observability/credit-watch.ts läser också saldot (05:05) och
+ * larmar rött när det är tomt. Den här läsningen finns för driftlarmet
+ * (05:15) som korrelerar saldot med FAKTISKT misslyckade utskick senaste
+ * dygnet — "0 kr" och "20 SMS gick inte ut" i samma mening. Två små anrop
+ * om dagen, medvetet, hellre än att driftlarmet lutar sig mot ett sparat
+ * utfall som kan vara inaktuellt.
+ *
  * Fail-soft: saknade nycklar eller ett nätverksfel ger `{ ok:false, reason }`
  * — aldrig ett kastat fel som stoppar resten av driftlarmet.
  */

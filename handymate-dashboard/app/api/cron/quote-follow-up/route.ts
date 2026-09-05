@@ -108,20 +108,9 @@ export async function GET(request: NextRequest) {
           console.warn('[quote-follow-up] automation_settings lookup failed (non-blocking):', bizId, err)
         }
 
-        // Fallback: kolla communication_settings
-        if (enabled) {
-          try {
-            const { data: commSettings } = await supabase
-              .from('communication_settings')
-              .select('auto_enabled')
-              .eq('business_id', bizId)
-              .single()
-            if (commSettings && commSettings.auto_enabled === false) enabled = false
-          } catch (err) {
-            console.warn('[quote-follow-up] communication_settings lookup failed (non-blocking):', bizId, err)
-          }
-        }
-
+        // (Den gamla fallbacken mot communication_settings är borttagen
+        // 2026-09-05 — tabellen har aldrig funnits; automation_settings ovan
+        // är enda sanningen och saknad rad betyder PÅ, precis som förut.)
         nudgeEnabledMap.set(bizId, enabled)
 
         // Autonomi bara relevant för icke-V3-företag (V3 hoppas ändå).

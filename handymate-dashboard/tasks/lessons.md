@@ -541,3 +541,22 @@ stod öppen på main i fyra timmar, tio dagar före lansering.
 - Commit-meddelanden som hävdar "66/66 gröna" utan att specarna faktiskt
   kördes mot den committade filen är värre än inget — de får nästa läsare
   att sluta leta.
+
+## 2026-09-05 — "Ingen fick veta" var fel: systemet sa till, ingen läste
+
+Jag skrev att SMS-kanalen dött "utan att någon fick veta" och byggde ett
+saldolarm. Andreas visade inkorgen: kreditbevakningen (`app/api/cron/
+credit-watch`) hade skrivit "46elks-saldo 0 kr" varje morgon sedan 2 sep,
+och driftlarmet hade listat SMS-felen varje dag. Jag hade grep:at
+`driftlarm/route.ts` efter "saldo" och dragit slutsatsen att inget larm fanns.
+
+**Regler:**
+- Innan påståendet "X finns inte": grep hela repot på BEGREPPET (saldo,
+  balance, credit, elks), inte på en fil. `grep -rn` kostar en sekund; ett
+  felaktigt "finns inte" kostar en dubblett och en falsk historia.
+- Ett larm som skickas men inte läses är ett designfel i larmet, inte i
+  läsaren. Tre mejl om dagen med "1 varning" och "8 fel" är tapet. Rött
+  och en siffra i ämnesraden bara när något är kritiskt; annars tystnad.
+- Skriv aldrig "ingen fick veta" om systemet faktiskt sa något. Skriv
+  "det sades som en gul varning och lästes inte", och rätta larmet.
+

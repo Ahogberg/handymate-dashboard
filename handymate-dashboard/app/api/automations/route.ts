@@ -141,26 +141,11 @@ export async function PATCH(request: NextRequest) {
     const body = await request.json()
     const settings = await updateAutomationSettings(business.business_id, body)
 
-    // Sync communication_settings table for backwards compatibility
+    // 2026-09-05: speglingen till communication_settings är borttagen —
+    // tabellen har aldrig funnits i produktionen och `throw` här gav 500 på
+    // VARJE sparning trots att automation_settings redan var skriven.
     const { getServerSupabase } = await import('@/lib/supabase')
     const supabase = getServerSupabase()
-
-    const { error: communicationSyncError } = await supabase.from('communication_settings').upsert({
-      business_id: business.business_id,
-      auto_enabled: settings.sms_auto_enabled,
-      send_booking_confirmation: settings.sms_booking_confirmation,
-      send_day_before_reminder: settings.sms_day_before_reminder,
-      send_on_the_way: settings.sms_on_the_way,
-      send_quote_followup: settings.sms_quote_followup,
-      send_job_completed: settings.sms_job_completed,
-      send_invoice_reminder: settings.sms_invoice_reminder,
-      send_review_request: settings.sms_review_request,
-      quiet_hours_start: settings.sms_quiet_hours_start,
-      quiet_hours_end: settings.sms_quiet_hours_end,
-      max_sms_per_customer_per_week: settings.sms_max_per_customer_week,
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'business_id' })
-    if (communicationSyncError) throw communicationSyncError
 
     // Sync pipeline_automation table for backwards compatibility
     const { error: pipelineSyncError } = await supabase.from('pipeline_automation').upsert({

@@ -10,7 +10,6 @@ import {
 
 interface CommunicationSettings {
   auto_enabled: boolean
-  tone: 'formal' | 'friendly' | 'personal'
   max_sms_per_customer_per_week: number
   send_booking_confirmation: boolean
   send_day_before_reminder: boolean
@@ -60,7 +59,6 @@ interface Stats {
 
 const defaultSettings: CommunicationSettings = {
   auto_enabled: true,
-  tone: 'friendly',
   max_sms_per_customer_per_week: 3,
   send_booking_confirmation: true,
   send_day_before_reminder: true,
@@ -84,11 +82,6 @@ const channelIcons: Record<string, typeof Phone> = {
   email: Mail,
 }
 
-const toneLabels: Record<string, string> = {
-  formal: 'Formell',
-  friendly: 'Vänlig',
-  personal: 'Personlig',
-}
 
 const settingsCheckboxes: Array<{ key: keyof CommunicationSettings; label: string }> = [
   { key: 'send_booking_confirmation', label: 'Bekräftelse vid bokning' },
@@ -590,26 +583,6 @@ export default function CommunicationPage() {
             </div>
 
             <div className="p-5 space-y-6">
-              {/* Tone */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 block mb-2">Ton i meddelanden</label>
-                <div className="flex gap-2">
-                  {(['formal', 'friendly', 'personal'] as const).map(tone => (
-                    <button
-                      key={tone}
-                      onClick={() => setSettings({ ...settings, tone })}
-                      className={`flex-1 py-2.5 px-3 rounded-xl text-sm font-medium border transition-all ${
-                        settings.tone === tone
-                          ? 'bg-primary-50 border-primary-300 text-primary-700'
-                          : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'
-                      }`}
-                    >
-                      {toneLabels[tone]}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
               {/* Max SMS */}
               <div>
                 <label className="text-sm font-medium text-gray-700 block mb-2">
