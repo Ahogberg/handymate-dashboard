@@ -36,7 +36,7 @@ De första nio nya regressionerna var röda före rättningen. Ett senare budget
 ## Kvarvarande risker — inte gröna bara för att kontrakten passerar
 
 - **Inloggat driftprov är fortfarande blockerat av åtkomst.** Kör v213 och verifiera SELECT/trigger enligt tasks/lars-preparation-review.md. Logga därefter in på ett avgränsat demokonto och kör hela kedjan med omläsningar.
-- **Upprepad slutfakturering saknar ett heltäckande skydd.** create-final-invoice saknar samma befintlig-faktura-kontroll som autofakturans underlag. Fakturanummer-RPC:n hindrar inte två olika fakturor för samma arbete. Källmarkering sker efter insert. Ett verkligt samtidighets-/återförsöksprov och samordnat skydd mellan manuell slut-, tim- och autofakturering återstår; detta är inte åtgärdat i denna leverans.
+- **Historiskt fynd, delvis rättat efter granskning:** create-final-invoice saknar samma befintlig-faktura-kontroll som autofakturans underlag. Fakturanummer-RPC:n hindrar inte två olika fakturor för samma arbete. Källmarkering sker efter insert. Ett verkligt samtidighets-/återförsöksprov och samordnat skydd mellan manuell slut-, tim- och autofakturering återstår; kontrollen för redan befintlig faktura är nu införd i slutfakturarutten enligt granskningen. Den returnerar befintligt kvitto och stoppar vid läsfel. Äkta samtidiga första skrivningar är fortfarande inte transaktionellt samordnade mellan fakturavägarna.
 - **Manuell delbetalning har begränsad semantik.** payment-decision och dess befintliga test anger uttryckligen att ett delbelopp utan ROT blir paid; även ROT-grenen jämför med totalen utan att först kräva hela kundandelen. Att dessa kontrakt passerar innebär inte att generell delbetalning är korrekt hanterad. Detta behöver ändras tillsammans med registreringsvyn, kvittot och påminnelserna och är inte ändrat här.
 - **Förhandsvisning och slutlig avdragsberäkning använder olika årstakskällor.** Preview använder den rena avdragsfunktionen, medan skapandet använder kundens återstående årsutrymme. Dagens rättningar bevisar rad-/tillvalssumman, inte full avdragsparitet för en kund med tidigare nyttjat utrymme.
 
@@ -54,3 +54,11 @@ Använd det befintliga demokontot och Reality Week-körboken. Skapa en ny testku
 - Inga browserkomponenter ändrades i denna rättning; tidigare mobilprov är inte omräknade som nya driftbevis.
 - TypeScript `--noEmit`: exit 0. Produktionsbygge: exit 0. Befintliga Next/Sentry-varningar kvarstår; ingen sådan varning räknas som driftbevis.
 - `git diff --check`: utan fel.
+
+## Rättning efter Claudes PR-granskning
+
+- Main e2b9740 tas in med dess facit för rena rader i vikt YAML-block och lärdomstext. Alla 21 avslutande backslash är borttagna.
+- Det verkliga YAML-avkodade kommandot kontrollerades med shlex: 89 separata argument, inklusive --no-deps, inga argument med omgivande blanksteg. Körningen gav 1 419 godkända och ett befintligt skip. Ett ytterligare prov av återförsök lades sedan till och kördes separat; utvecklingskörningar räknas inte dubbelt.
+- Slutfakturan kontrollerar nu befintlig faktura för samma företag/projekt före prisberäkning, nummeruttag och källmarkering. Samma princip som autofakturans underlag. Läsfel ger 503; befintlig faktura ger samma ID/nummer med deduplicated=true.
+- Regressioner täcker befintligt kvitto, återförsök efter sparande, annat företag/projekt och misslyckat uppslag.
+- Delbetalning och avdragsparitet skjuts enligt granskningen till efter lansering. Det inloggade demoprovet återstår och är inte ersatt av dessa tester.

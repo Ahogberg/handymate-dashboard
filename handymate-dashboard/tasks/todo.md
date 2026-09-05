@@ -850,3 +850,10 @@ Granskningsresultat och kvarvarande drift-/Lars-beroenden: tasks/integration-gap
 - [x] Uppdatera gransknings-PR; skilj driftbevis från simulerade prov.
 
 Review: tasks/whole-job-journey-review.md. Åtta överlämningsfel rättade. Tre ytterligare risker öppet dokumenterade; inloggat driftprov inte genomfört eftersom session/DB-åtkomst saknas.
+
+## PR #11 — CI och befintlig slutfaktura efter granskning
+- [x] Ta in main e2b9740 och ta bort backslash i vikt YAML-block.
+- [x] Stoppa slutfakturaskapande när projektet redan har faktura; läsfel får inte öppna vägen.
+- [x] Testa befintlig faktura, företagsisolering, läsfel och exakt CI-kommando.
+- [ ] TypeScript/build, uppdatera PR och verifiera CI på nya huvudet.
+- [ ] Inloggat demoprov återstår; delbetalning/avdragsparitet efter lansering enligt granskningen.

@@ -83,6 +83,31 @@ export async function POST(
       )
     }
 
+    // Samma spärr som autofakturans underlag: återanvänd en befintlig
+    // projektfaktura innan rader räknas om eller ett nytt nummer tas ut.
+    // Ett läsfel får aldrig tolkas som att projektet saknar faktura.
+    const { data: existingInvoice, error: existingInvoiceError } = await supabase
+      .from('invoice')
+      .select('invoice_id, invoice_number')
+      .eq('business_id', business.business_id)
+      .eq('project_id', projectId)
+      .limit(1)
+      .maybeSingle()
+
+    if (existingInvoiceError) {
+      return NextResponse.json(
+        { error: 'Tidigare fakturor kunde inte kontrolleras. Försök igen.', stage: 'existing_invoice' },
+        { status: 503 },
+      )
+    }
+    if (existingInvoice) {
+      return NextResponse.json({
+        invoice_id: existingInvoice.invoice_id,
+        invoice_number: existingInvoice.invoice_number,
+        deduplicated: true,
+      })
+    }
+
     // ── 2. Business config + pre-flight (TD-27) ─────────────────
     const { data: businessConfig, error: businessError } = await supabase
       .from('business_config')

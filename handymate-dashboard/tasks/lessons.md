@@ -574,3 +574,16 @@ kräver ett praktiskt överlämnande. Dokumentera separat kvarvarande AI- och dr
 
 ## 2026-09-05 — Lokal testparitet och effektlivscykel
 En cleanup på en effekt som beror på inmatning körs vid varje tangenttryck, inte bara vid navigering. Separera debounce från avmontering; prova skrivfrekvens med en räknare. Håll package.json och CI i samma körväg. Interna databas-ID:n ska vara strukturerad metadata, inte AI-underlag. Slutför uttryckligt beställda integrationer; dokumentation av glapp ersätter inte implementation.
+
+## 2026-09-05 — Grinden ska fånga varje sätt ett vikt YAML-block kan gå sönder
+
+Indragsfacit (samma dag) fångade extra mellanslag men inte avslutande
+backslash. Codex lade in 21 specrader med " \" som i ett shellskript; i ett
+vikt block blev "\ --no-deps" ett ord med inledande mellanslag, flaggan
+försvann och 1153 test "did not run" — samma symptom, ny orsak. Ett facit
+för ett format ska kräva formatet positivt (varje rad är testfil eller
+flagga), inte bara förbjuda det senaste felet.
+
+Codex rättelse: verifiera även det YAML-avkodade shellkommandots argument,
+inte bara att testfilnamnen matchar package.json. En grön lokal npm-körning
+är inte bevis för CI-kommandot om skalets argument kan skilja sig.

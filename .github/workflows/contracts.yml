@@ -134,27 +134,27 @@ jobs:
           tests/quote-new-context.spec.ts
           tests/quote-attachments.spec.ts
           tests/quote-document-parity.spec.ts
-          tests/project-invoice-journey.spec.ts \
-          tests/quote-to-invoice-mapper.spec.ts \
-          tests/fakturaunderlaget.spec.ts \
-          tests/fakturakallorna.spec.ts \
-          tests/quote-signing-atomic.spec.ts \
-          tests/project-quote-idempotency.spec.ts \
-          tests/won-project-assignment.spec.ts \
-          tests/reservations.spec.ts \
-          tests/product-reservations-route.spec.ts \
-          tests/time-entry-write-path.spec.ts \
-          tests/ata-livscykeln.spec.ts \
-          tests/ata-dokumentet.spec.ts \
-          tests/canonical-project-completion.spec.ts \
-          tests/create-invoice-core.spec.ts \
-          tests/send-invoice-core.spec.ts \
-          tests/invoice-delivery-truth.spec.ts \
-          tests/apply-payment-decision.spec.ts \
-          tests/fortnox-classify-payment.spec.ts \
-          tests/facit-invoice-customer-paid.spec.ts \
-          tests/quote-ata-payment-plan.spec.ts \
-          tests/facit-material-double-count.spec.ts \
+          tests/project-invoice-journey.spec.ts
+          tests/quote-to-invoice-mapper.spec.ts
+          tests/fakturaunderlaget.spec.ts
+          tests/fakturakallorna.spec.ts
+          tests/quote-signing-atomic.spec.ts
+          tests/project-quote-idempotency.spec.ts
+          tests/won-project-assignment.spec.ts
+          tests/reservations.spec.ts
+          tests/product-reservations-route.spec.ts
+          tests/time-entry-write-path.spec.ts
+          tests/ata-livscykeln.spec.ts
+          tests/ata-dokumentet.spec.ts
+          tests/canonical-project-completion.spec.ts
+          tests/create-invoice-core.spec.ts
+          tests/send-invoice-core.spec.ts
+          tests/invoice-delivery-truth.spec.ts
+          tests/apply-payment-decision.spec.ts
+          tests/fortnox-classify-payment.spec.ts
+          tests/facit-invoice-customer-paid.spec.ts
+          tests/quote-ata-payment-plan.spec.ts
+          tests/facit-material-double-count.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

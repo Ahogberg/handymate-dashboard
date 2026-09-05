@@ -30,7 +30,7 @@ function harness(){
  const rows=(tables[table]||[]).filter(r=>filters.every(f=>f(r))).map(r=>fields==='*'?{...r}:Object.fromEntries(fields.split(',').map(k=>[k.trim(),r[k.trim()]])))
  return {data:one?(rows[0]||null):rows,error:null}
  }).then(ok,bad)};return q}}
- const deps:any={'@/lib/observability/driftlarm':{rapporteraTystFel:async()=>{}},'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>({business_id:'b'})},'@/lib/permissions':{getCurrentUser:async()=>({}),hasPermission:()=>true},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/invoices/quote-to-invoice-items':mapper,'@/lib/ata/lifecycle':lifecycle,'@/lib/rot-rut':rot,'@/lib/rot-rut-limits':{calculateCappedDeduction:async()=>({deduction:0})},'@/lib/invoices/create-invoice':{createInvoice:async(_:any,input:any)=>{state.created.push(input);return {invoice:{invoice_id:'i',invoice_number:'TEST'}}}},'@/lib/invoices/mark-sources':{markInvoiceSources:async(_:any,input:any)=>{state.marks.push(input);return {ok:true}}}}
+ const deps:any={'@/lib/observability/driftlarm':{rapporteraTystFel:async()=>{}},'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>({business_id:'b'})},'@/lib/permissions':{getCurrentUser:async()=>({}),hasPermission:()=>true},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/invoices/quote-to-invoice-items':mapper,'@/lib/ata/lifecycle':lifecycle,'@/lib/rot-rut':rot,'@/lib/rot-rut-limits':{calculateCappedDeduction:async()=>({deduction:0})},'@/lib/invoices/create-invoice':{createInvoice:async(_:any,input:any)=>{state.created.push(input);tables.invoice.push({invoice_id:'i',invoice_number:'TEST',business_id:input.businessId,project_id:input.projectId});return {invoice:{invoice_id:'i',invoice_number:'TEST'}}}},'@/lib/invoices/mark-sources':{markInvoiceSources:async(_:any,input:any)=>{state.marks.push(input);return {ok:true}}}}
  const preview=compile('app/api/projects/[id]/invoice-preview/route.ts',deps)
  const final=compile('app/api/projects/[id]/create-final-invoice/route.ts',deps)
  const hourly=compile('app/api/invoices/from-project/route.ts',deps)
@@ -81,4 +81,25 @@ test('project budget keeps selected labor hours, discounts and excludes declined
   const h=harness();const rows=[{item_type:'option',option_selected:true,quantity:2,unit:'tim',unit_price:500,total:1000},{item_type:'option',option_selected:false,quantity:9,unit:'tim',unit_price:500,total:4500},{item_type:'discount',quantity:1,total:-100}].map(r=>({...r,business_id:'b',quote_id:'q'}));h.tables.quote_items=legacy?[]:rows;h.tables.quotes[0].items=legacy?rows:[]
   expect(await h.budget()).toMatchObject({budget_hours:2,budget_amount:900})
  }
+})
+
+test('final invoice returns existing project invoice before pricing, insert or source marking',async()=>{
+ const h=harness();h.tables.invoice=[{invoice_id:'existing',invoice_number:'TEST-1',business_id:'b',project_id:'p'}]
+ h.state.failTable='quotes' // The existing receipt must not depend on new source reads.
+ const response=await h.final();expect(response.status).toBe(200)
+ expect(await response.json()).toEqual({invoice_id:'existing',invoice_number:'TEST-1',deduplicated:true})
+ expect(h.state.created).toHaveLength(0);expect(h.state.marks).toHaveLength(0)
+})
+test('final invoice lookup is scoped by both business and project',async()=>{
+ const h=harness();h.tables.invoice=[{invoice_id:'other-business',business_id:'other',project_id:'p'},{invoice_id:'other-project',business_id:'b',project_id:'other'}]
+ expect((await h.final()).status).toBe(200);expect(h.state.created).toHaveLength(1)
+})
+test('final invoice fails closed when existing invoices cannot be read',async()=>{
+ const h=harness();h.state.failTable='invoice'
+ expect((await h.final()).status).toBe(503);expect(h.state.created).toHaveLength(0);expect(h.state.marks).toHaveLength(0)
+})
+
+test('retry after a saved final invoice returns the same receipt without a second invoice',async()=>{
+ const h=harness();const first=await (await h.final()).json();const retry=await (await h.final()).json()
+ expect(retry).toMatchObject({...first,deduplicated:true});expect(h.state.created).toHaveLength(1);expect(h.state.marks).toHaveLength(1)
 })

@@ -78,6 +78,28 @@ test.describe('Kontraktsgrinden (contracts.yml)', () => {
     expect(rader[slut - 1].trim()).toBe('--project=chromium')
   })
 
+  test('ingen rad i det vikta run-blocket slutar med backslash — den blir ett ord, inte en radbrytning', () => {
+    // 2026-09-05 (PR #11, cd06061): 21 specrader lades in med avslutande " \"
+    // som i ett shellskript. I ett vikt YAML-block (>-) är backslash ett
+    // vanligt tecken, så raden "…spec.ts \" följd av "--no-deps" blev
+    // "\ --no-deps" — shellen läser "\ " som ett skyddat mellanslag och
+    // flaggan blev ordet " --no-deps". Playwright kände inte igen den,
+    // startade inloggningssteget och 1153 test "did not run".
+    // Varje rad i blocket ska vara en ren testfil eller en flagga, inget annat.
+    const yaml = read(file)
+    const rader = yaml.split('\n')
+    const start = rader.findIndex(l => l.includes('Browserlösa kontraktssviter'))
+    const runI = rader.findIndex((l, i) => i > start && l.trim() === 'run: >-')
+    const slut = rader.findIndex((l, i) => i > runI && l.trim() === '--reporter=line')
+    const block = rader.slice(runI + 1, slut + 1).map(l => l.trim()).filter(Boolean)
+    const medBackslash = block.filter(l => l.endsWith('\\'))
+    expect(medBackslash, 'rader som slutar med backslash i run-blocket').toEqual([])
+    const ogiltiga = block
+      .slice(1) // första raden är "npx playwright test"
+      .filter(l => !/^tests\/[a-z0-9-]+\.spec\.ts$/.test(l) && !/^--[a-z-]+(=[a-z0-9-]+)?$/.test(l))
+    expect(ogiltiga, 'rader i run-blocket som varken är testfil eller flagga').toEqual([])
+  })
+
   test('varje listad testfil finns', () => {
     const yaml = read(file)
     const listade = Array.from(yaml.matchAll(/tests\/[a-z0-9-]+\.spec\.ts/g)).map(m => m[0])
