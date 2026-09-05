@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState, type Dispatch, type SetStateAction } from 'react'
+import { useCallback, useState, useRef, type Dispatch, type SetStateAction } from 'react'
 import type { useRouter } from 'next/navigation'
 import type { useToast } from '@/components/Toast'
 import type { QuoteItem } from '@/lib/types/quote'
@@ -29,6 +29,7 @@ export interface UseQuoteBuilderSaveParams {
   getContext: () => QuotePayloadContext
   /** Krävs när mode==='edit' — quote_id för PUT och navigering. */
   quoteId?: string
+  onSaved?: () => void
 }
 
 /**
@@ -67,12 +68,16 @@ export function useQuoteBuilderSave({
   router,
   getContext,
   quoteId,
+  onSaved,
 }: UseQuoteBuilderSaveParams) {
   const [saving, setSaving] = useState(false)
+  const inFlight = useRef(false)
+  const autoSaveFlight = useRef<Promise<void> | null>(null)
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   const save = useCallback(
     async (send: boolean = false, skipDescriptionConfirm: boolean = false) => {
+      if (inFlight.current) return
       const ctx = getContext()
 
       if (send && !ctx.selectedCustomer) {
@@ -91,17 +96,21 @@ export function useQuoteBuilderSave({
         return
       }
 
+      inFlight.current = true
       setSaving(true)
       try {
+        // An older background PUT must finish before this explicit save.
+        await autoSaveFlight.current
         // `workingItems` är en lokal kopia (inte `items`-state) eftersom
         // setState inte reflekteras synkront — linked_product_id måste
         // hinna sättas innan finalItems byggs.
         let workingItems = items
+        let registerFailed = false
 
         if (mode === 'create') {
           // P4 (UX-revision 2026-08-03): AI-rader som saknade pris, som
           // användaren fyllt i och lämnat ikryssade ("Spara i produktbanken",
-          // default PÅ — se ItemRow) — auto-POSTas till /api/products HÄR,
+          // aktivt val — se ItemRow) — auto-POSTas till /api/products HÄR,
           // före offerten sparas, så nästa AI-offert hittar priset.
 
           // UX1e (Prisslingan V2): LÄNKADE prislösa rader prissätter BANKEN.
@@ -113,7 +122,7 @@ export function useQuoteBuilderSave({
             i =>
               i.item_type === 'item' &&
               i.ai_price_missing &&
-              i.save_to_products !== false &&
+              i.save_to_products === true &&
               i.unit_price > 0 &&
               !!i.linked_product_id,
           )
@@ -125,7 +134,9 @@ export function useQuoteBuilderSave({
                 body: JSON.stringify({ id: row.linked_product_id, sales_price: row.unit_price }),
               })
               if (res.ok) setLocalPrice(row.linked_product_id as string, row.unit_price)
+              else registerFailed = true
             } catch (err) {
+              registerFailed = true
               console.error('[useQuoteBuilderSave] kunde inte prissätta bankartikeln:', err)
             }
           }
@@ -134,7 +145,7 @@ export function useQuoteBuilderSave({
             i =>
               i.item_type === 'item' &&
               i.ai_price_missing &&
-              i.save_to_products !== false &&
+              i.save_to_products === true &&
               i.unit_price > 0 &&
               !i.linked_product_id &&
               i.description.trim() !== '',
@@ -157,6 +168,7 @@ export function useQuoteBuilderSave({
                       body: JSON.stringify({ id: träff.id, sales_price: row.unit_price }),
                     })
                     if (res.ok) setLocalPrice(träff.id, row.unit_price)
+                    else registerFailed = true
                   }
                   workingItems = workingItems.map(i => (i.id === row.id ? { ...i, linked_product_id: träff.id } : i))
                   continue
@@ -178,9 +190,11 @@ export function useQuoteBuilderSave({
                     is_favorite: false,
                   }),
                 })
+                if (!res.ok) registerFailed = true
                 if (res.ok) {
                   const data = await res.json()
                   const newId = data.product?.id
+                  if (!newId) registerFailed = true
                   if (newId) {
                     workingItems = workingItems.map(i => (i.id === row.id ? { ...i, linked_product_id: newId } : i))
                     // C4 (Prisslingan V2 pass 3): servern kan ha ÅTERANVÄNT en
@@ -195,6 +209,7 @@ export function useQuoteBuilderSave({
               } catch (err) {
                 // Sväljs medvetet — en misslyckad produktbanks-auto-save får
                 // aldrig blockera offert-sparandet.
+                registerFailed = true
                 console.error('[useQuoteBuilderSave] auto-save till produktbanken misslyckades:', err)
               }
             }
@@ -224,6 +239,7 @@ export function useQuoteBuilderSave({
         if (!res.ok) {
           toast.error(data.error || 'Kunde inte spara offerten')
         } else if (mode === 'edit') {
+          onSaved?.()
           toast.success(send ? 'Offerten är sparad — välj hur den ska skickas' : 'Offert sparad')
           if (send) {
             router.push(`/dashboard/quotes/${quoteId}?send=true`)
@@ -232,6 +248,8 @@ export function useQuoteBuilderSave({
             setTimeout(() => setAutoSaveStatus('idle'), 3000)
           }
         } else {
+          if (typeof data.quote?.quote_id !== 'string' || !data.quote.quote_id) throw new Error('Quote save was not confirmed')
+          onSaved?.()
           toast.success(send ? 'Offert sparad — öppnar skicka-vy' : 'Offert sparad som utkast')
           router.push(
             send
@@ -239,13 +257,15 @@ export function useQuoteBuilderSave({
               : `/dashboard/quotes/${data.quote.quote_id}`,
           )
         }
+        if (res.ok && registerFailed) toast.warning('Alla valda priser kunde inte sparas i artikelregistret. Kontrollera dem där.')
       } catch (err) {
         console.error('Save failed:', err)
         toast.error('Kunde inte spara offerten')
       }
+      inFlight.current = false
       setSaving(false)
     },
-    [mode, items, setItems, products, setLocalPrice, setSendConfirmPending, toast, router, getContext, quoteId],
+    [mode, items, setItems, products, setLocalPrice, setSendConfirmPending, toast, router, getContext, quoteId, onSaved],
   )
 
   // EDIT-LÄGE ENDAST: tyst bakgrundsspar, ingen navigering/toast/validering
@@ -253,25 +273,27 @@ export function useQuoteBuilderSave({
   // debounce-useEffect i QuoteBuilder.tsx (samma 5s + samma bevakade fält
   // som förr), INTE härifrån — timern behöver leva där state:et lever.
   const performAutoSave = useCallback(async () => {
-    if (mode !== 'edit') return
-    setAutoSaveStatus('saving')
-    try {
-      const ctx = getContext()
-      const payload = buildQuotePayload({ ...ctx, items, mode, quoteId })
-      const res = await fetch('/api/quotes', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (res.ok) {
-        setAutoSaveStatus('saved')
-        setTimeout(() => setAutoSaveStatus('idle'), 3000)
-      } else {
-        setAutoSaveStatus('error')
-      }
-    } catch {
-      setAutoSaveStatus('error')
-    }
+    if (mode !== 'edit' || inFlight.current) return
+    // Serialize background writes, too. The newest invocation runs last.
+    const previous = autoSaveFlight.current
+    const write = (async () => {
+      await previous
+      if (inFlight.current) return
+      setAutoSaveStatus('saving')
+      try {
+        const ctx = getContext()
+        const payload = buildQuotePayload({ ...ctx, items, mode, quoteId })
+        const res = await fetch('/api/quotes', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+        setAutoSaveStatus(res.ok ? 'saved' : 'error')
+      } catch { setAutoSaveStatus('error') }
+    })()
+    autoSaveFlight.current = write
+    await write
+    if (autoSaveFlight.current === write) autoSaveFlight.current = null
   }, [mode, items, getContext, quoteId])
 
   return { saving, save, autoSaveStatus, performAutoSave }

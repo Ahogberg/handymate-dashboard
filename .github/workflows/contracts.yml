@@ -122,6 +122,17 @@ jobs:
           tests/driftlarm-saldo.spec.ts
           tests/starttid-loop.spec.ts
           tests/kommunikation-installningar.spec.ts
+          tests/quote-experience.spec.ts
+          tests/quote-packages-day-close.spec.ts
+          tests/revenue-work-queue.spec.ts
+          tests/integration-gaps.spec.ts
+          tests/quote-edit-autosave.spec.ts
+          tests/quote-new-context.spec.ts
+          tests/quote-attachments.spec.ts
+          tests/quote-document-parity.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
+
+      - name: Kundunderlag — API-kontrakt med isolerade beroenden
+        run: node --test tests/customer-preparation/contract.test.mjs

@@ -1,0 +1,41 @@
+name: Sammanhang mellan kundunderlag, offert och dagsavslut
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: feature-integration-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: handymate-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npx playwright install --with-deps chromium
+      # All requests are intercepted. No login, live AI call or customer message.
+      - name: Gemensamma gränssnittsprov
+        run: >-
+          npx playwright test
+          tests/quote-experience.ui.spec.ts
+          tests/quote-packages-day-close.ui.spec.ts
+          tests/revenue-work-queue.ui.spec.ts
+          --no-deps --project=chromium --workers=2 --reporter=line
+      - name: Kundens formulär mot lokal Next-server
+        run: npx playwright test --config=playwright.preparation.config.ts
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: integration-test-results
+          path: handymate-dashboard/test-results

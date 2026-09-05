@@ -158,7 +158,7 @@ export function mapGeneratedItemToQuoteItem(
         // före B1 — ingen arbetsandel, inget inköpspris, inga produkttriggers
         // för reservationsmotorn.
         ...(item.linkedProductId ? { linked_product_id: item.linkedProductId } : {}),
-        ...(priceMissing ? { ai_price_missing: true, save_to_products: true } : {}),
+        ...(priceMissing ? { ai_price_missing: true, save_to_products: false } : {}),
         ...(uncertain ? { ai_uncertain: true, ai_note: item.note || null } : {}),
         // Editor-interna fält, samma livscykel som ai_uncertain: de strippas
         // i buildQuotePayload innan quote_items POSTas och når aldrig basen.

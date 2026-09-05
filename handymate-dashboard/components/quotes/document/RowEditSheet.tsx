@@ -183,6 +183,11 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
                     Erbjudandet visas BARA när det finns något att spara: rad
                     kopplad till banken, pris ifyllt, och skilt från artikelns.
                     Se lib/products/pricing-state.ts för när vi tiger. */}
+                {item.ai_price_missing && item.unit_price > 0 && <label className="mt-2 flex min-h-[44px] items-center gap-2 text-sm text-slate-700">
+                  <input type="checkbox" checked={item.save_to_products === true} onChange={e => onUpdate(item.id, 'save_to_products', e.target.checked)} />
+                  Spara även som pris för framtida offerter
+                </label>}
+                <p className="mt-2 text-xs text-slate-500">Prisändringen gäller denna offert. Artikelns standardpris ändras bara när du väljer det.</p>
                 {standardOffer.show && onSaveAsStandard && (
                   <button
                     type="button"

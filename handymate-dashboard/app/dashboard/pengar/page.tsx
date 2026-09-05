@@ -11,6 +11,7 @@ import { LedgerHero } from '@/components/value/LedgerHero'
 import { LedgerFlode } from '@/components/value/LedgerFlode'
 import { LedgerRader } from '@/components/value/LedgerRader'
 import { LedgerHistorik, type LedgerHistorikRad } from '@/components/value/LedgerHistorik'
+import RevenueWorkQueue from '@/components/pengar/RevenueWorkQueue'
 
 /**
  * /dashboard/pengar — Value Ledger + "Pengar på bordet".
@@ -104,6 +105,8 @@ export default function PengarPaBordetPage() {
             <LedgerHistorik rader={historik} laddar={historikLaddar} />
           </>
         )}
+
+        <RevenueWorkQueue />
 
         {/* ═══ Potential-halvan — identifierat, inte bokfört ═══ */}
         <div>

@@ -560,3 +560,14 @@ och driftlarmet hade listat SMS-felen varje dag. Jag hade grep:at
 - Skriv aldrig "ingen fick veta" om systemet faktiskt sa något. Skriv
   "det sades som en gul varning och lästes inte", och rätta larmet.
 
+
+## 2026-09-05: Produktförslag ska följas av handling när användaren ber om bygge
+
+Kontrollera repot och bygg en granskningsbar leverans när användaren auktoriserar implementation. Stanna inte vid erbjudanden om fortsatt arbete.
+
+## 2026-09-05 — Kontrollera hela kedjan innan en ny yta räknas som levererad nytta
+Användarens rättelse: granska alla byggda ytor tillsammans och täpp till glapp.
+För varje yta: identifiera producent, sparad källa, behörighet, nästa handling,
+kvitto och omläsning. Testa PR:erna tillsammans. Fixture-test är inte bevis
+på produktionsdata. En tom kö kräver en fungerande producent; en kundinsamling
+kräver ett praktiskt överlämnande. Dokumentera separat kvarvarande AI- och driftprov.

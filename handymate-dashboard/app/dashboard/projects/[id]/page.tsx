@@ -84,6 +84,7 @@ import Link from 'next/link'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import dynamic from 'next/dynamic'
 import ProjectInvoiceModal from '@/components/invoices/ProjectInvoiceModal'
+import DayClose from '@/components/day-close/DayClose'
 import ProjectCloseoutModal from '@/components/projects/ProjectCloseoutModal'
 import TimeEntryModal from '@/components/time/TimeEntryModal'
 import { ProjectBookingsTable } from './components/ProjectBookingsTable'
@@ -849,7 +850,7 @@ export default function ProjectDetailPage() {
 
   // --- Data Fetching ---
 
-  const fetchProjectData = useCallback(async () => {
+  const fetchProjectData = useCallback(async (preserveOnError = false) => {
     try {
       const res = await fetch(`/api/projects/${projectId}`)
       if (!res.ok) throw new Error('Not found')
@@ -878,6 +879,7 @@ export default function ProjectDetailPage() {
         uninvoiced_sell: uninvoicedMats.reduce((s: number, m: any) => s + (m.total_sell || 0), 0)
       })
     } catch {
+      if (preserveOnError) throw new Error('Projektet kunde inte läsas om.')
       setProject(null)
     } finally {
       setLoading(false)
@@ -2396,6 +2398,7 @@ export default function ProjectDetailPage() {
             <div className="grid grid-cols-1 lg:grid-cols-[1fr_340px] gap-5 items-start">
               <div className="min-w-0 space-y-3.5">
                 <JobPreparation projectId={projectId} />
+                <DayClose key={projectId} projectId={projectId} projectName={project.name} onSaved={() => fetchProjectData(true)} />
                 {/* Hantverkarens egna uppgifter överst — agenternas förslag under. */}
                 <ProjectTasksBlock
                   projectId={projectId}
