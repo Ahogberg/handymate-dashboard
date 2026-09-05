@@ -540,6 +540,7 @@ export default function QuoteDetailPage() {
       </div>
 
       <QuoteSendModal
+        preview={<QuoteDocumentPanel data={templateData} style={templateStyle} payload={previewPayload} />}
         show={showSendModal}
         quote={quote}
         business={business}
