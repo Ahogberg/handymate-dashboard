@@ -37,3 +37,7 @@ befintliga löften sanna.
 - Kolla inkorgen efter "⚠️ Handymate driftlarm" från augusti — annars saknas Resend-nyckeln i Vercel.
 - Push-prenumeration som obligatoriskt steg i uppstartsmötet.
 - Stripe live, demokontot med riktig data, App Store-material, EAS-nycklar.
+
+## Villkorad punkt (beslut 2026-09-05)
+
+**Fakturera enligt betalplan** (delfakturor på fastpris med avräkning på slutfakturan) byggs av Codex i egen PR enligt `tasks/plan-betalplansfakturering.md`. Är den inte grön, inloggat provad och mergad senast 10 september flyttas den hit som punkt 2, direkt efter "jobbet går att utföra". Delbetalning av en utställd faktura är en annan sak och ligger redan i listan.
