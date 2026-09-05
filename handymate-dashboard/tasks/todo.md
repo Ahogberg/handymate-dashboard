@@ -868,3 +868,8 @@ Review: tasks/whole-job-journey-review.md. Åtta överlämningsfel rättade. Tre
 - [ ] Inloggat demo-/Fortnoxprov och tillämpad/verifierad v214. Ingen sådan åtkomst i sessionen.
 - [ ] Lanseringsbeslut senast 10 september; avstängt om prov eller avgränsningar inte är godkända.
 Se tasks/payment-plan-invoicing.md för facit, blockerade fall och provningsordning.
+
+## PR #12 — avgränsa triggern efter granskning
+- [x] Begränsa projektlåset till INSERT; tidig retur för fristående fakturor och vanliga UPDATE.
+- [x] Verifiera vanliga uppdateringar och kvarvarande betalplansskydd med PGlite. 27 prov gröna, inklusive pg_locks och positiv låskontroll.
+- [x] Dokumentera rättningen och rekommendationen efter lansering för draft-PR. Kör inte v214.

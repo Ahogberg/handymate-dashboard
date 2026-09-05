@@ -66,3 +66,11 @@ Detta är inte bevis för full driftfunktion. Båda flaggorna `PAYMENT_PLAN_INVO
 - `CI=true npm run test:contracts`: 1 485 Playwright-prov gröna, 1 befintligt överhoppat, samt 17 Node-prov gröna.
 - `payment-plan-invoicing.ui.spec.ts`: 2 gröna mobil-/gränssnittsprov med interceptat API.
 - Produktionsbygge och GitHub-CI redovisas på PR:n efter avslutad körning.
+
+## Rättning efter Claudes granskning av f3c0139
+- Projektlåset tas enbart vid INSERT. En vanlig UPDATE returnerar omedelbart när OLD.payment_plan_quote_id är null; status, betalning och cronuppdateringar gör då inga betalplansuppslag eller projektlås.
+- Fristående INSERT utan projekt, offert eller betalplansreferens returnerar också direkt. En angiven betalplansreferens kontrolleras fortfarande mot registret.
+- Skyddet för befintliga planfakturor och krediter behålls. Offertkopplad INSERT behåller låset även utan project_id, så att aktivering och samtidig vanlig fakturaskapning fortfarande serialiseras.
+- 27 betalplansprov gröna. Nya PGlite-prov läser pg_locks i samma transaktion: vanliga UPDATE och fristående INSERT saknar RowShareLock på project; offertkopplad INSERT har det. Positiv kontroll visar att provet faktiskt observerar låset. Källfacit låser också operationsgrenarna.
+- Rekommendation: aktivering efter lansering, med driftprov veckan efter den 14:e när åtkomst finns. INSERT på en kopplad vanlig faktura tar fortfarande ett lås efter migrationen; appflaggorna är inte en avstängning av SQL-triggern.
+- v214 är fortfarande INTE körd i demo eller produktion av Codex. Ingen retarget ännu: #11 är fortfarande öppen. PR #12 förblir draft och avstängd.

@@ -182,4 +182,45 @@ test.describe('Verklig PostgreSQL-transaktion (PGlite)',()=>{
    expect(await claim()).toBe(true)
  })
 
+ test('vanliga betalnings- och statusuppdateringar tar inget projektlås',async()=>{
+   await db.exec(`INSERT INTO project VALUES('ordinary-project','b','c',NULL);
+     INSERT INTO invoice(invoice_id,business_id,project_id,status,total) VALUES('ordinary','b','ordinary-project','sent',100);`)
+   await db.transaction(async tx=>{
+     await tx.exec(`UPDATE invoice SET status='overdue' WHERE invoice_id='ordinary';
+       UPDATE invoice SET status='paid',paid_at=now() WHERE invoice_id='ordinary';`)
+     const locks=await tx.query<{mode:string}>(`SELECT mode FROM pg_locks WHERE relation='public.project'::regclass AND pid=pg_backend_pid() AND mode='RowShareLock'`)
+     expect(locks.rows).toEqual([])
+     expect((await tx.query<{status:string}>(`SELECT status FROM invoice WHERE invoice_id='ordinary'`)).rows[0].status).toBe('paid')
+   })
+ })
+ test('fristående fakturainsert tar inget projektlås',async()=>{
+   await db.transaction(async tx=>{
+     await tx.exec(`INSERT INTO invoice(invoice_id,business_id,status) VALUES('standalone','b','draft')`)
+     expect((await tx.query(`SELECT mode FROM pg_locks WHERE relation='public.project'::regclass AND pid=pg_backend_pid() AND mode='RowShareLock'`)).rows).toEqual([])
+   })
+ })
+ test('projektlåset ligger endast i INSERT-grenen; vanliga UPDATE returnerar före uppslag',()=>{
+   const migration=fs.readFileSync('sql/v214_payment_plan_invoicing.sql','utf8')
+   const body=migration.split('FUNCTION public.protect_payment_plan_invoice()')[1].split('END $$;')[0]
+   const insert=body.indexOf("IF TG_OP='INSERT' THEN")
+   const update=body.indexOf("IF TG_OP='UPDATE' AND OLD.payment_plan_quote_id IS NOT NULL THEN")
+   const lock=body.indexOf('ORDER BY project_id FOR UPDATE')
+   expect(insert).toBeGreaterThan(-1)
+   expect(lock).toBeGreaterThan(insert)
+   expect(lock).toBeLessThan(update)
+   expect(body.match(/FOR UPDATE/g)).toHaveLength(1)
+   const early=body.indexOf("IF TG_OP='UPDATE' AND OLD.payment_plan_quote_id IS NULL THEN RETURN NEW; END IF;")
+   expect(early).toBeGreaterThan(-1)
+   expect(early).toBeLessThan(body.indexOf('SELECT 1 FROM invoice_payment_stage'))
+ })
+
+ test('offertkopplad INSERT behåller projektlåset som skyddar aktivering',async()=>{
+   await db.exec(`INSERT INTO project VALUES('new-project','b','c','new-quote')`)
+   await db.transaction(async tx=>{
+     await tx.exec(`INSERT INTO invoice(invoice_id,business_id,quote_id,status) VALUES('new-invoice','b','new-quote','draft')`)
+     const locks=await tx.query<{mode:string}>(`SELECT mode FROM pg_locks WHERE relation='public.project'::regclass AND pid=pg_backend_pid() AND mode='RowShareLock'`)
+     expect(locks.rows).toContainEqual({mode:'RowShareLock'})
+   })
+ })
+
 })

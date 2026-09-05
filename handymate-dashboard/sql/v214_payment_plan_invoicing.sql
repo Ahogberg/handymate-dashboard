@@ -137,8 +137,13 @@ BEGIN
    IF OLD.payment_plan_quote_id IS NOT NULL THEN RAISE EXCEPTION 'Betalplansfakturor ska krediteras, inte raderas'; END IF;
    RETURN OLD;
  END IF;
+ -- Existing ordinary invoices already prevent activation. Their status,
+ -- payment and cron updates must not consult or lock payment-plan projects.
+ IF TG_OP='UPDATE' AND OLD.payment_plan_quote_id IS NULL THEN RETURN NEW; END IF;
+ IF TG_OP='INSERT' AND NEW.project_id IS NULL AND NEW.quote_id IS NULL
+    AND NEW.payment_plan_quote_id IS NULL THEN RETURN NEW; END IF;
  IF NEW.payment_plan_quote_id IS NOT NULL AND NOT EXISTS (SELECT 1 FROM invoice_payment_stage WHERE invoice_id=NEW.invoice_id AND quote_id=NEW.payment_plan_quote_id) THEN RAISE EXCEPTION 'Betalplansreferensen saknar registerpost'; END IF;
- IF TG_OP IN ('INSERT','UPDATE') THEN
+ IF TG_OP='INSERT' THEN
    -- Same lock order as activation: an in-flight ordinary invoice cannot
    -- slip between the no-invoices check and the committed plan.
    PERFORM 1 FROM project WHERE business_id=NEW.business_id
