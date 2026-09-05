@@ -560,3 +560,12 @@ och driftlarmet hade listat SMS-felen varje dag. Jag hade grep:at
 - Skriv aldrig "ingen fick veta" om systemet faktiskt sa något. Skriv
   "det sades som en gul varning och lästes inte", och rätta larmet.
 
+
+## 2026-09-05 — Grinden ska fånga varje sätt ett vikt YAML-block kan gå sönder
+
+Indragsfacit (samma dag) fångade extra mellanslag men inte avslutande
+backslash. Codex lade in 21 specrader med " \" som i ett shellskript; i ett
+vikt block blev "\ --no-deps" ett ord med inledande mellanslag, flaggan
+försvann och 1153 test "did not run" — samma symptom, ny orsak. Ett facit
+för ett format ska kräva formatet positivt (varje rad är testfil eller
+flagga), inte bara förbjuda det senaste felet.
