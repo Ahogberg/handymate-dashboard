@@ -1,6 +1,6 @@
 # Liveprov inför lansering — 6 september 2026
 
-Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är inte godkänd för lansering genom detta protokoll: nio reproducerade fynd och återstående driftgrindar finns nedan. Alla knappar, roller och miljöer är inte uttömmande provade.
+Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är inte godkänd för lansering genom detta protokoll: elva reproducerade fynd och återstående driftgrindar finns nedan. Alla knappar, roller och miljöer är inte uttömmande provade.
 
 ## Miljö och metod
 
@@ -24,6 +24,8 @@ Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är 
 | F07 | Medel | Inställningar → Så ska teamet jobba → Så ska Handymate arbeta, beskrivet som Hur mycket teamet gör på egen hand, visar AI-röst, hälsningsfras och telefonassistent. | Etikett och destinationsinnehåll stämmer inte. Hjälpcentret beskriver samtidigt att ingen robot pratar med kunden. |
 | F08 | Hög | Resursplanering → Ny post → Andreas, P-1015, 2026-09-06, behåll formulärets 08:00–09:00, typ Internt, spara. Projektet visar 10:00–11:00. Återöppna samma post från månadsvyn: även redigeringsformuläret visar 10:00–11:00. | Klockslaget förändras över sparning/återläsning. Klienten skickar datumtid utan offset i `app/dashboard/schedule/page.tsx`. Exakt DB-/serverkonvertering inte verifierad med loggar. Spara inte på nytt som workaround: kan flytta tiden igen. |
 | F09 | Hög | Samma söndagspost saknas i veckovyn 31 aug–6 sep även efter omladdning, med Andreas markerad. Byt till september månad: posten finns på 6 september. Projektets planeringsflik visar den också. | Klienten skickar slutdatum `yyyy-MM-dd`; `app/api/schedule/route.ts` filtrerar `start_datetime <= endDate`, vilket exkluderar tider efter midnatt på sista dagen. Rätta intervallgränsen och lås både dag/vecka/månad samt tidszoner med facit. |
+| F10 | Hög | ÄTA-1 → PDF. Texten från formulärets ”Intern notering…” syns under ANTECKNINGAR i den kundvända PDF:en: ”Syntetiskt UI-prov. Ska inte skickas eller faktureras.” | Visuellt verifierat. `components/projects/ata/ChangeModal.tsx` använder `notes` för intern notering; `lib/ata/pdf.ts` skriver ut `ata.notes`. Ingen PDF skickad. Separera intern och kundsynlig text; lås även PDF-innehållet med test. |
+| F11 | Hög | Öppna befintligt oskickat utkast #FV-2026-003 från fakturalistan. Rubriken visar Utkast, historiken Skickad —. Dokumentet visar ändå Försenad, 12 kr ränta och Att betala 637 kr, medan fakturalistan visar 625 kr. | Läsprov utan fakturaändring. `deriveStatus` i `lib/invoice-templates/data-builder.ts` saknar utkastgren och klassar utifrån passerat förfallodatum; byggaren lägger sedan till ränta. Verifierat i dokumentvyn, inte skickad PDF eller bokföring. |
 
 ## Verifierade sammanhängande prov
 
@@ -34,7 +36,7 @@ Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är 
 | Uppgift → projekt → dashboard → slutför → global uppgiftsvy | Godkänt med F06 | TEST Codex – verifiera kopplad projektuppgift. Efter slutförande visar globala vyn 0 aktiva. |
 | Intern tid → veckovy → projekt → ekonomisk kostnad | Godkänt med F04 | 08:00–08:15, 2026-09-06, 0,25 tim, 125 kr intern kostnad, 0 debiterbara timmar. Finns inte som fakturerbar tid i Att fakturera. |
 | Dagsavslut med riktig AI → granskning → spara intern anteckning → byggdagbok | Godkänt för anteckningsvägen | Prompt begär endast anteckning, ingen tid/material/ÄTA. Bara anteckningen föreslås, sparningskvitto visas och texten finns i byggdagboken. Tidtagg 0,25 h pekar på tidigare tidrapport samma dag. |
-| ÄTA → spara utkast → projektets lista och budget | Godkänt för utkast | ÄTA-1, 500 kr, Utkast; projektets avtalade belopp är fortsatt 2 450 kr. PDF-knappen öppnar PDF-adress; innehållet ännu inte verifierat. |
+| ÄTA → spara utkast → projektets lista och budget | Godkänt för utkast | ÄTA-1, 500 kr, Utkast; projektets avtalade belopp är fortsatt 2 450 kr. PDF visuellt verifierad i fortsättningsprovet: korrekta belopp och utkastmarkering, men intern notering exponeras enligt F10. |
 | Ny jobbtyp → egen artikel → tre standardrader → ny affär → skapa offert → spara | Godkänt med F05 | Jobbtyp TEST Codex – artikelkoppling; artikel TEST-CODEX-0906 850 kr/st och 100 % arbete; offert #2026007 har 2×150, 1×450, 2×850. Kunden och beskrivningen följer affären. |
 | Delmoment → projektets fakturaberedskap | Godkänt för skapande | TEST Codex – dokumentationskontroll sparas; statuskortet uppdateras till 1 delmoment kvar. |
 | Kampanj → manuellt urval → text → granskning | Godkänt fram till utskick | Noll mottagare spärrar Fortsätt; bara Andreas vald ger en mottagare/ett SMS. Ingen kampanj skickad eller schemalagd. |
@@ -58,7 +60,7 @@ Dessutom lästa: Offertkategorier, Business Twin-data, Automationsbibliotek och 
 - Fortnox är inte anslutet. Bokföring, betalning, kredit och integrationernas verkliga leverans är inte provade.
 - Push är blockerad av webbläsaren; ingen leverans verifierad.
 - Kundunderlag/Lars-vägen blockerad av F02; automatisk egenkontroll blockerad av F01.
-- Uppladdning, exportinnehåll, fältrapport, rolltester som anställd och fel vid nätverksavbrott återstår.
+- Bild-/textuppladdning och ÄTA-PDF är nu provade enligt fortsättningen nedan. Övriga exporter, fältrapport, rolltester som anställd och fel vid nätverksavbrott återstår.
 - Vercel success på ovanstående head. Samtliga 10 hämtade Actions-körningar på samma head är gröna, fem workflows med två körningar vardera: Kontraktsgrind, Onboardingens tipskort, Första nyttan på mobil och desktop, Jobbtyper och offertstandarder, Sammanhang mellan kundunderlag/offert/dagsavslut. Detta ersätter inte liveprov och är inte ett nytt lokalt testresultat.
 
 ## Testdata för omprov
@@ -82,3 +84,29 @@ Dessutom lästa: Offertkategorier, Business Twin-data, Automationsbibliotek och 
 5. F03 och F07: alla ingångar följer lanseringssynligheten och varje inställningsetikett öppnar avsett innehåll.
 
 Inga av fynden har rättats eller lagts på main i denna audit. Orsak på main kontra integrationsgren är inte klassificerad för samtliga fynd. Genomför omprov på en ny, namngiven previewversion efter rättning och behåll ovanstående testdata tills dess.
+
+## Fortsättningsprov — samma previewversion
+
+Head kontrollerad på nytt: `421f9728587a7c186ff806cdd7d8f2e400216edd`, PR #16 öppen. Inga rättningar eller nya lokala testsuite-körningar påstås här.
+
+| Prov | Resultat och avgränsning |
+|---|---|
+| Projekt → ladda upp PNG → omladdning → förhandsvisning | Godkänt. Syntetisk bild 640×400 visas korrekt, filen ligger kvar. TXT ligger också kvar efter uppladdning. |
+| Projektfiler → kundportal | Båda uppladdade testfilerna blir synliga under Dokument/Filer utan separat delningssteg. Dokumentera detta tydligt i uppladdningsytan. Avsedd delningsmodell behöver bekräftas; detta klassas inte automatiskt som ett behörighetsfel. |
+| Kundportalens offert- och projektvyer | Accepterad #2026006 synlig, utkast #2026007 dolt. Intern dagsanteckning syns inte i den provade projektvyn. Begränsat till synligt gränssnitt, inte fullständigt API-/behörighetsprov. Projektetiketten visar ”Projekt #proj_1” i stället för P-1015; mindre presentationsobservation. |
+| ÄTA-PDF, visuell läsning | En sida, P-1015, 500 exkl. moms + 125 moms = 625, vattenstämpel UTKAST — ej skickad. Intern notering läcker enligt F10. |
+| Artikelpris → befintlig offert | TEST-CODEX-0906 ändrat från 850 till 900 i jobbtypsupplägget. Förhandsvisning för nästa offert visar 900; omladdad #2026007 behåller 850, antal 2, radbelopp 1 700. Återställt till 850 och verifierat efter omladdning. |
+| Projekt → Matte med riktig AI | Svaret använder projektets 2 450 budget, 125 kostnad, 2 325 marginal och cirka 95 %. Den formulering som likställer kostnadsandel 5 % med hur mycket kostnadsunderlag som rapporterats behöver nyanseras: budgetförbrukning bevisar inte datans fullständighet. Inga skrivåtgärder beställdes. |
+| Intern testtid → attest → omladdning → Att fakturera | Godkänt med tidigare veckofel F04. Endast testveckans enda 15-minuterspost godkänd. Försvinner från attestkön och förblir borta efter omladdning. Två äldre veckor kvar, orörda. Testtiden dyker inte upp under Att fakturera; veckosummeringen visar fortsatt 0 fakturerbara minuter. |
+| Fakturalista → befintligt utkast → dokument och historik | Sidan laddar men status och betalbelopp är inkonsekventa enligt F11. Ingen sändning, fakturaredigering, betalning eller Fortnox-synk utförd. |
+
+### Blockerade exportprov
+
+TXT-förhandsvisning visar ”This page has been blocked by Chromium”. Försök att fånga TXT-/byggdagboksnedladdning gav timeout, och direkt öppning av offertens observerade PDF-adress gav `net::ERR_BLOCKED_BY_CLIENT`. Detta är blockerade prov i webbläsarmiljön, inte bevis för att produktens export är trasig. ÄTA-PDF gick däremot att läsa visuellt. Övriga exportinnehåll är inte godkända.
+
+### Kvarlämnade testdata och prioritering
+
+- Två nya syntetiska projektfiler: `handymate-test-upload.txt` (`doc_1788709208027_cvgm0r5`) och `handymate-test-image.png` (`doc_1788709358040_v6ridb5`). Innehåller inga kunduppgifter.
+- Testtidens attest är nu godkänd; ingen löneexport gjord. Testartikelns pris återställt till 850.
+- Prioritera F10 före kundutskick av ÄTA och F11 före användning av fakturadokumentet som betalunderlag, tillsammans med tidigare höga fynd. Rättningar behöver sedan provas på en ny namngiven head.
+- Mobil live, ny onboarding, anställdroll och Fortnox-drift är fortsatt öppna. Rapporten är en utökad audit, inte ett intyg om att alla flöden fungerar.
