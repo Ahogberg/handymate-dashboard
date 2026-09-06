@@ -439,11 +439,12 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
           ) : phase === 'pending' ? (
             <div style={{ padding: '14px 0' }}>
               <p style={{ color: 'var(--ob-ink)', fontSize: 15, fontWeight: 600, marginBottom: 6 }}>
-                Ditt nummer är reserverat
+                Inget nummer har kunnat tilldelas ännu
               </p>
               <p style={{ color: 'var(--ob-muted)', fontSize: 13, lineHeight: 1.5, maxWidth: 300, margin: '0 auto' }}>
-                Du kan fortsätta direkt — numret aktiveras i bakgrunden och dyker
-                upp i appen under Inställningar → Telefoni.
+                Du kan fortsätta med resten av inställningarna. Telefon och SMS
+                fungerar först när ett nummer har tilldelats. Kontrollera status
+                under Inställningar → Telefoni.
               </p>
               <button
                 type="button"
@@ -461,7 +462,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
                   fontFamily: 'inherit',
                 }}
               >
-                Kolla igen
+                Försök tilldela nummer igen
               </button>
             </div>
           ) : (
