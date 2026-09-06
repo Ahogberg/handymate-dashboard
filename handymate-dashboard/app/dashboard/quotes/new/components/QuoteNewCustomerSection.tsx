@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { AlertTriangle, ClipboardList, User } from 'lucide-react'
 import { createDefaultItem } from '@/lib/quote-calculations'
 import type { QuoteItem } from '@/lib/types/quote'
@@ -27,6 +28,7 @@ interface CustomerPriceListInfo {
 interface QuoteNewCustomerSectionProps {
   customers: Customer[]
   selectedCustomer: string
+  onCustomerCreated?: (customer: Customer) => void
   setSelectedCustomer: (id: string) => void
   /** @deprecated Giltighetstiden sätts i dokumentet ("Giltig till"-datumet).
       Propparna finns kvar för anropskompatibilitet men används inte längre. */
@@ -53,6 +55,7 @@ const INPUT_CLS =
 export function QuoteNewCustomerSection({
   customers,
   selectedCustomer,
+  onCustomerCreated,
   setSelectedCustomer,
   title,
   setTitle,
@@ -63,6 +66,34 @@ export function QuoteNewCustomerSection({
   setItems,
   hasItems,
 }: QuoteNewCustomerSectionProps) {
+  const [creatingCustomer, setCreatingCustomer] = useState(false)
+  const [customerName, setCustomerName] = useState('')
+  const [customerPhone, setCustomerPhone] = useState('')
+  const [customerEmail, setCustomerEmail] = useState('')
+  const [customerSaving, setCustomerSaving] = useState(false)
+  const [customerError, setCustomerError] = useState('')
+
+  async function saveCustomer() {
+    if (customerSaving || !customerName.trim()) return
+    setCustomerSaving(true)
+    setCustomerError('')
+    try {
+      const response = await fetch('/api/customers', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: customerName.trim(), phone_number: customerPhone.trim(), email: customerEmail.trim() }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.message || result.error || 'Kunden kunde inte sparas')
+      if (!result.customer?.customer_id) throw new Error('Kunden kunde inte bekräftas. Kontrollera kundregistret innan du försöker igen.')
+      onCustomerCreated?.(result.customer)
+      setSelectedCustomer(result.customer.customer_id)
+      setCreatingCustomer(false)
+      setCustomerName(''); setCustomerPhone(''); setCustomerEmail('')
+    } catch (error) {
+      setCustomerError(error instanceof Error ? error.message : 'Kunden kunde inte sparas')
+    } finally { setCustomerSaving(false) }
+  }
+
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
       <div className="flex items-center gap-3 mb-5">
@@ -90,6 +121,26 @@ export function QuoteNewCustomerSection({
                 </option>
               ))}
             </select>
+            {onCustomerCreated && (
+              <div className="mt-2">
+                <button type="button" className="min-h-[44px] text-sm font-semibold text-primary-700" onClick={() => setCreatingCustomer(!creatingCustomer)} disabled={customerSaving}>
+                  {creatingCustomer ? 'Stäng kundformuläret' : '+ Skapa ny kund'}
+                </button>
+                {customers.length === 0 && <p className="text-sm text-gray-500">Skapa din första kund här. Offertens rader och priser ligger kvar.</p>}
+                {creatingCustomer && (
+                  <section aria-label="Skapa kund i offerten" className="mt-2 space-y-3 rounded-xl border border-slate-200 p-3">
+                    <label className="block text-sm">Namn *<input className={INPUT_CLS} value={customerName} onChange={e => setCustomerName(e.target.value)} disabled={customerSaving} /></label>
+                    <label className="block text-sm">Telefon<input type="tel" className={INPUT_CLS} value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} disabled={customerSaving} /></label>
+                    <label className="block text-sm">E-post<input type="email" className={INPUT_CLS} value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} disabled={customerSaving} /></label>
+                    <p className="text-xs text-gray-500">Adress och övriga kunduppgifter kan kompletteras i kundregistret.</p>
+                    {customerError && <p role="alert" className="text-sm text-red-700">{customerError}</p>}
+                    <button type="button" className="min-h-[44px] rounded-lg bg-primary-700 px-4 text-sm text-white disabled:opacity-50" onClick={saveCustomer} disabled={customerSaving || !customerName.trim()}>
+                      {customerSaving ? 'Sparar kunden…' : 'Spara och välj kunden'}
+                    </button>
+                  </section>
+                )}
+              </div>
+            )}
             {customerPriceListInfo && (
               <div className="mt-3 bg-primary-50 border border-primary-100 rounded-xl p-3 space-y-2">
                 <div className="flex items-start gap-2">

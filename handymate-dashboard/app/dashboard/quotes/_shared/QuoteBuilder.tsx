@@ -2647,6 +2647,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             <div data-first-quote-customer>
             <QuoteNewCustomerSection
               customers={customers}
+              onCustomerCreated={customer => setCustomers(previous => [...previous.filter(c => c.customer_id !== customer.customer_id), customer])}
               selectedCustomer={selectedCustomer}
               setSelectedCustomer={setSelectedCustomer}
               validDays={validDays}
