@@ -28,7 +28,12 @@ export async function recordLearningEvent(
   referenceId: string | null,
   referenceType: ReferenceType,
   agentSuggestion: Record<string, unknown>,
-  humanOverride: Record<string, unknown> | null
+  humanOverride: Record<string, unknown> | null,
+  /** Valfri tolkad preferens + kategori (v5-kolumnerna learned_preference/
+      preference_category). Anropare som redan vet vad valet betyder — t.ex.
+      Daniels agentrad — skriver in den direkt i stället för att vänta på
+      nattlig tolkning. */
+  learned?: { learnedPreference?: string; preferenceCategory?: string }
 ): Promise<{ success: boolean; error?: string }> {
   const supabase = getServerSupabase()
 
@@ -42,6 +47,8 @@ export async function recordLearningEvent(
         reference_type: referenceType,
         agent_suggestion: agentSuggestion,
         human_override: humanOverride,
+        ...(learned?.learnedPreference ? { learned_preference: learned.learnedPreference } : {}),
+        ...(learned?.preferenceCategory ? { preference_category: learned.preferenceCategory } : {}),
       })
 
     if (error) {

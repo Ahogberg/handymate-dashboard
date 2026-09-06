@@ -2,8 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { analyzeQuoteBeforeSend } from '@/lib/daniel-intelligence'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { getServerSupabase } from '@/lib/supabase'
+import { AGENTRAD_MIN_SAMPLE, type AgentradEvidence } from '@/lib/daniel-agentrad'
+import { getDanielAgentradEvidence } from '@/lib/daniel-agentrad-evidence'
 
-/** GET /api/quotes/intelligence?quoteId=xxx — Business Twin Reality Check. */
+// force-dynamic: läser auth via getAuthenticatedBusiness (cookies/headers) —
+// utan detta kan Next cachea svaret statiskt vid bygget.
+export const dynamic = 'force-dynamic'
+
+/**
+ * GET /api/quotes/intelligence?quoteId=xxx — Business Twin Reality Check.
+ *
+ * Svaret bär dessutom `agentrad` (Daniels agentrad på offertsidan,
+ * lib/daniel-agentrad.ts): bevisen bakom varningen — exempelprojekt,
+ * "N av M tog mer tid" och senaste debrief-lärdomen. Fältet är null när
+ * raden inte är motiverad (ingen varning, färre än tre jobb, offerten är
+ * inte längre ett utkast) så QuoteSendModal kan ignorera det helt.
+ */
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -31,7 +46,20 @@ export async function GET(request: NextRequest) {
           },
         }
       : analysis
-    return NextResponse.json(response, { status: analysis.status === 'unavailable' ? 503 : 200 })
+
+    // Agentradens bevis hämtas bara när verklighetskontrollen redan varnar
+    // på ett tillräckligt urval — samma grind som raden själv använder.
+    let agentrad: AgentradEvidence | null = null
+    if (
+      analysis.status === 'ready'
+      && analysis.show_warning
+      && analysis.analysis
+      && analysis.analysis.similar_jobs >= AGENTRAD_MIN_SAMPLE
+    ) {
+      agentrad = await getDanielAgentradEvidence(getServerSupabase(), business.business_id, quoteId)
+    }
+
+    return NextResponse.json({ ...response, agentrad }, { status: analysis.status === 'unavailable' ? 503 : 200 })
   } catch (error: any) {
     console.error('[quote-intelligence] Error:', error)
     return NextResponse.json({

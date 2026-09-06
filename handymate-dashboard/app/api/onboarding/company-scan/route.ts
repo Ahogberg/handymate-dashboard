@@ -3,6 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { computeInstantValue, type InstantHeadline } from '@/lib/onboarding/instant-value'
+import { buildScanSources, type ScanSource } from '@/lib/onboarding/company-scan-rows'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 
@@ -59,6 +60,25 @@ export interface CompanyScanResult {
     specialtyCount: number
     phoneNumber: string | null
   }
+  /**
+   * Företagsskanningen (2026-09-06, docs/design/skisser-2026-09-06/
+   * foretagsskanning.dc.html). Tre tillägg, alla valfria så äldre svar och
+   * testernas tomma resultat fortsätter typa:
+   *
+   * - overdueInvoicesCount: delmängden förfallna av de öppna fakturorna —
+   *   samma overdue_count som computeInstantValue redan räknar; ger Karins
+   *   rad sitt "… varav N förfallna".
+   * - oldestStaleQuoteDays: ålder i dagar på den ÄLDSTA offerten som borde
+   *   följas upp (null när ingen är gammal) — Daniels "…, äldsta N dagar".
+   * - sources: vad skanningen faktiskt gick igenom. Bara källor som finns
+   *   (kundregister/fakturor med n>0) eller är kopplade (Fortnox enligt
+   *   business_config.fortnox_connected). Aldrig Gmail — skannen läser ingen
+   *   post — och aldrig något som inte är kopplat: listan är en kvittens,
+   *   inte ett löfte.
+   */
+  overdueInvoicesCount?: number
+  oldestStaleQuoteDays?: number | null
+  sources?: ScanSource[]
 }
 
 const STALE_QUOTE_DAYS = 5 // samma cadence som pengar-sidan (app/api/dashboard/pengar/route.ts)
@@ -76,7 +96,7 @@ export async function GET(request: NextRequest) {
   const businessId = business.business_id
   const staleGrans = new Date(Date.now() - STALE_QUOTE_DAYS * 86_400_000).toISOString()
 
-  const [invoicesRes, customerRes, projectsRes, quotesRes, pendingRes, configRes] = await Promise.all([
+  const [invoicesRes, customerRes, projectsRes, quotesRes, pendingRes, configRes, fortnoxRes] = await Promise.all([
     // Öppna fakturor (sent/overdue) — samma konvention som cash-radarn och
     // instant-value. Radernas total+status matas rakt in i computeInstantValue
     // nedan, som ger både antal och Karins ev. krona-fynd på samma gång.
@@ -117,6 +137,14 @@ export async function GET(request: NextRequest) {
       .select('default_hourly_rate, employee_count, specialties, assigned_phone_number, pricing_settings')
       .eq('business_id', businessId)
       .maybeSingle(),
+    // Källistan: Fortnox räknas som genomgånget BARA när kopplingen finns
+    // (samma flagga som /api/integrations/fortnox/status). Egen query så
+    // profil-selecten ovan står orörd.
+    supabase
+      .from('business_config')
+      .select('fortnox_connected, fortnox_last_synced_at')
+      .eq('business_id', businessId)
+      .maybeSingle(),
   ])
 
   // Ren beräkning, delad med onboardingens payoff — inga deals/stages här
@@ -130,7 +158,16 @@ export async function GET(request: NextRequest) {
   })
 
   const quoteRows = quotesRes.data ?? []
-  const staleQuotesCount = quoteRows.filter(q => q.sent_at && q.sent_at < staleGrans).length
+  const staleQuotes = quoteRows.filter(q => q.sent_at && q.sent_at < staleGrans)
+  const staleQuotesCount = staleQuotes.length
+  // Äldsta offerten som borde följas upp, i hela dagar sedan sent_at.
+  const nu = Date.now()
+  const oldestStaleQuoteDays = staleQuotes.reduce<number | null>((max, q) => {
+    const t = new Date(q.sent_at as string).getTime()
+    if (Number.isNaN(t)) return max
+    const dagar = Math.floor((nu - t) / 86_400_000)
+    return max === null || dagar > max ? dagar : max
+  }, null)
 
   // Materialpåslaget bor i pricing_settings-JSONB:n (se PUT /api/onboarding).
   const cfg = configRes.data
@@ -148,6 +185,14 @@ export async function GET(request: NextRequest) {
     staleQuotesCount,
     pendingApprovalsCount: pendingRes.count ?? 0,
     karinHeadline: instant.headline.agent === 'Karin' ? instant.headline : null,
+    overdueInvoicesCount: instant.overdue_count,
+    oldestStaleQuoteDays,
+    sources: buildScanSources({
+      customerCount: instant.customer_count,
+      openInvoicesCount: instant.unpaid_count,
+      fortnoxConnected: Boolean(fortnoxRes.data?.fortnox_connected),
+      fortnoxLastSyncedAt: fortnoxRes.data?.fortnox_last_synced_at ?? null,
+    }),
     profil: {
       hourlyRate: Number(cfg?.default_hourly_rate) || null,
       employeeCount: Number(cfg?.employee_count) || null,

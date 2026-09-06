@@ -940,3 +940,26 @@ Slutkontroll 2026-09-06: 1 152 kontraktstester gröna (inklusive 12 nya PostgreS
 - [x] Reproducera och rätta samtidig manuell accept, återförsök och läsfel med 11 beteendeprov.
 - [x] Kontrakt 1 163 gröna, separat #11-fakturaprov 57 gröna, TypeScript rent. Bevisnivå och inloggad körordning dokumenterade. Build slutstatus i PR-leveransen.
 - [x] Publicerat PR #15 utan ändring av #14. Kodversionens CI och produktionsbygge gröna. Säker inloggning lyckades men öppnade Bee Service AB i äldre onboarding; kontots lämplighet och gemensam granskningsversion måste bekräftas före skrivande driftprov.
+
+# Skisser 2026-09-06 → ytor (beslut Andreas 2026-09-06 kväll)
+
+Tre Claude Design-skisser i docs/design/skisser-2026-09-06/. Kartläggning
+mot koden gjord (tre utforskningar). Beslut: två byggs före lansering,
+två skrivs som spec till efter lansering.
+
+- [x] A. Företagsskanningen (21fefd62) (components/tour/CompanyScan.tsx + API):
+      tvådelad desktopvy (teal Matte-panel + fyndlista med progress),
+      etikett per rad Importerat/Möjlighet/Uppskattat i ScanRow, nya fält
+      overdueCount + oldestStaleQuoteDays, sanna källor ("Går igenom",
+      aldrig Gmail/Fortnox som inte är kopplat), slutkort, smal mobilvy.
+      CTA heter aldrig "Command Center" (internt namn, capability-inventory).
+      Alla facit-låsta strängar i tests/company-scan.spec.ts behålls.
+- [x] B. Daniels agentrad (2fac2a03) på offertsidan (app/dashboard/quotes/[id]):
+      rad under åtgärderna när efterkalkylen har ≥3 liknande jobb och
+      varnar; "Visa varför" (exakt etikett, SYNLIG-INTELLIGENS) med de
+      enskilda projekten + debrief-citat ur project_lesson; "Lägg till N h"
+      / "Behåll N h" skriver learning_events (quote_price_adjusted);
+      snooza/avfärda per offert. Marginalnotisen (Karin) byggs INTE nu.
+- [x] C. Spec efter lansering (eb6a2703, punkt 13 och 14): Field Command (mobilappen, punkt 1 i
+      efter-lansering) och Karins marginalnotis (jämförelsemotor möte→rader,
+      stabila rad-id). Skisserna är underlaget.

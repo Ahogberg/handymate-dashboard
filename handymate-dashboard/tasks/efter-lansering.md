@@ -21,6 +21,8 @@ befintliga löften sanna.
 | 10 | **Avvikande fakturapris mot bekräftat inköpspris** | 3 | Den billiga delen av kostnadsbevakningen | `supplier_invoices`, `project_material.purchase_price`. Returer/kreditfakturor har inga tabeller alls — den delen kräver manuell registrering och väntar |
 | 11 | **Fyll en avbokning** — accepterat obokat jobb som passar person och plats | 5+ | Intäkt, men flest beroenden | `lib/agents/hanna/capacity-fill.ts` (riktar sig mot nya kunder). Saknas: accepterade obokade jobb, kompetens, restid |
 | 12 | **Förklarbar veckoplanering** | — | Först när restid och deadline finns i planeringsdatan | `lib/schedule/person-day.ts`, `DispatchReasoning` |
+| 13 | **Field Command** — säg det en gång i fält: tid, ÄTA, bokning ur ett yttrande, med fråga vid tvetydighet, samlat godkännande och kvitto | 5–7 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/field-command.dc.html`). Kartlagt samma kväll: rapportläget finns men fem byggstenar saknas, se avsnittet nedan. Placering i listan avgör Andreas | `lib/matte/work-report.ts` (fyra verktyg, projekt- och personlåst), `work-report-confirmation.ts` (ett kort per åtgärd), `time_checkins` (v17/v76), mobilappens `MatteSheet`/`ProjectReportCard`, `resolvePersonScheduleQuery` (namnmatchning, bara läsning) |
+| 14 | **Karins marginalnotis** — "kunden bad om X på platsbesöket, det finns inte i offerten", fäst vid raden | 4–6 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/agentnarvaro-offert.dc.html`, mönster 2). Kräver en jämförelsemotor och stabila rad-id som inte finns. Placering avgör Andreas | `customer_fact` (v122, `evidence_quote` ordagrant ur mötet), `assemble-transcript.ts` (tidsstämplad tidslinje), `lib/reservations/match.ts` (mönster för radmatchning), `learning_events` |
 
 ## Punkt 4 i detalj — Firmans kunskapsbas (beslut Andreas 2026-09-06)
 
@@ -49,6 +51,65 @@ Tre lager som bygger på varandra. Lager 1 och 2 byggs direkt efter lansering so
 - **Först villkorstexten:** kunden godkänner att firmans siffror bidrar till anonymiserade, aggregerade branschspann, med en flagga per firma för att säga nej. Inget samlas innan texten är ute och flaggan finns.
 - **Aldrig enskilda firmors priser.** Bara spann per jobbtyp och region, och bara när minst 20 firmor bidrar. Prisdelning mellan konkurrenter är känsligt konkurrensrättsligt; aggregat med tröskel är den säkra formen. Ta juridisk kontroll innan lansering av lagret.
 - **Volymen finns inte än:** 34 offerter i databasen 2026-09-05. Punkten är meningsfull först vid hundratals firmor per bransch.
+
+## Punkt 13 i detalj — Field Command (kartlagt 2026-09-06)
+
+Det som finns och behålls: röst → transkript → Lars i rapportläge, låst till
+det projekt klienten skickar och till den egna personen; fyra åtgärdstyper
+(`log_time`, `add_work_note`, `log_material`, `create_ata_draft`); signerade
+bekräftelsekort med idempotenta skrivningar; ÄTA-utkast utan pris som aldrig
+når kunden (exakt skissens bärnstensfärgade "inget pris satt, inget skickas").
+Mobilappen (`handymate-mobile`) har redan ytan: `ProjectReportCard` →
+`MatteSheet` med `workReport: true`. Bygg där, inte i desktop-Jobbkompisen.
+
+Saknas, i den ordning de bör byggas:
+1. **Samlat godkännande.** Idag ett kort per åtgärd, kedjat (`work-report-
+   confirmation.ts`, facit i `tests/work-report.spec.ts:337-348`). Skissen:
+   en lista med alla delar synliga och EN knapp "Godkänn N · ÄTA väntar på
+   pris". Ärlighetsregeln kvar: varje del listad, inget skrivs tyst, ÄTA
+   utan pris godkänns aldrig av knappen.
+2. **Tid på annan person.** Rapportläget avvisar det medvetet (`work-
+   report.ts:62`, 403 "bara din egen tid"). Kräver: `business_user_id` i
+   `log_time`-schemat, namnmatchning via samma princip som
+   `resolvePersonScheduleQuery` (aldrig gissa, fråga vid flera träffar), och
+   en attest-regel: tid som en annan person loggat på mig syns i min attest.
+3. **Fråga vid tvetydighet som chips.** Modellen får `ambiguous:true` med
+   alternativ idag; klienten renderar inget. Kort med knappar (två Johan,
+   vilket jobb) innan något skrivs.
+4. **Projekt från incheckning.** `time_checkins` (status active) matas aldrig
+   in i Matte. "Du är incheckad på Storgatan 12 sedan 07:52, jag antar det" —
+   som förslag, aldrig tyst.
+5. **Bokning i rapportläget.** `book_site_visit`/`create_booking` finns bara
+   i vanlig chatt. Lars bokar, med samma bekräftelse som övriga delar.
+6. **Kvitto och ångra.** Kvittolista per agent och mål (Tid, Kalender, Offert,
+   Kund) finns delvis i `DayClose` (`REPORT_LABELS`). "Ångra allt · 30 s"
+   saknas helt: kräver en ångra-väg per skrivning (radera tidrad, avboka,
+   ta bort utkast) inom fönstret. Mobilappen har 5-sekunders ångra för
+   godkännanden (`home.tsx UNDO_MS`), samma mönster.
+
+## Punkt 14 i detalj — Karins marginalnotis (kartlagt 2026-09-06)
+
+Ingen motor jämför idag ett möte eller kundunderlag mot offertrader. Lars
+kundunderlagskontroll är uttryckligen förbjuden att påstå vad som ingår i
+en offert (`review-contract.ts`), och det ska förbli så tills motorn finns.
+
+Bygg:
+1. **Koppling möte → offert.** `meeting_job` och `call_recording` saknar
+   `quote_id`. Lägg till, sätt när offerten skapas från ett möte eller när
+   kunden matchar och mötet är ≤30 dagar gammalt (som förslag).
+2. **Jämförelsemotorn** (`lib/quotes/saknade-rader.ts`): kundlöften och
+   önskemål ur `customer_fact` (`fact_type` commitment/preference med
+   `evidence_quote`) mot offertens rader. Utfall per önskemål: `finns`,
+   `saknas`, `oklart`. Aldrig pris — bara "Uppskattat" från prislistan om en
+   artikel matchar, annars "Sätt pris".
+3. **Stabila rad-id.** `quote_items.id` regenereras vid varje sparning
+   (`app/api/quotes/route.ts:783-789`). Notisen fästs vid `sort_order` +
+   beskrivning, eller så införs ett stabilt `rad_nyckel`.
+4. **Ytan.** Klientkomponent bredvid raden i redigeringsläget (mönster:
+   `ReservationSuggestionBox`), aldrig i det statiska dokumentet
+   (`tests/quote-document-parity.spec.ts`). Knappar: Lägg till rad, Visa
+   varför (citatet med tidsstämpel, offerten saknar raden, prislistans
+   uppskattning), Ingår redan. Beslut skrivs till `learning_events`.
 
 ## Beslutat men litet (halv dag var)
 - **Ett morgonmejl i stället för tre** (räddningskö, driftlarm, kreditbevakning). Rött i ämnesraden bara när något stoppar kunder, annars tystnad. Beslut Andreas 2026-09-05.

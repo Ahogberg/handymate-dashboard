@@ -13,10 +13,28 @@
 import type { CompanyScanResult } from '@/app/api/onboarding/company-scan/route'
 import { fmt } from '@/lib/onboarding/instant-value'
 
+/**
+ * Ärlighetsetiketten per rad (Företagsskanningen, 2026-09-06 —
+ * docs/design/skisser-2026-09-06/foretagsskanning.dc.html). Samma semantik
+ * som KÄNT/UPPSKATTAT i docs/design/SYNLIG-INTELLIGENS.md, men i skannens
+ * egna ord:
+ *
+ *   importerat  — ett antal läst rakt ur databasen (kunder, fakturor, …)
+ *   mojlighet   — en agents bedömning av vad talen betyder (Karins kronor,
+ *                 Daniels gamla offerter)
+ *   uppskattat  — en räknefråga på kundens egna uppgifter, ingen mätning
+ *                 (årsvärdet av en missad faktureringstimme)
+ *
+ * Etiketten sätts av buildScanRows, aldrig av vyn — så StepGenomgang och
+ * CompanyScan visar samma sanning om samma rad.
+ */
+export type ScanKalla = 'importerat' | 'mojlighet' | 'uppskattat'
+
 export interface ScanRow {
   key: string
   text: string
   agent?: 'karin' | 'daniel' | 'lars'
+  kalla: ScanKalla
 }
 
 /**
@@ -26,32 +44,39 @@ export interface ScanRow {
 export function buildScanRows(d: CompanyScanResult): ScanRow[] {
   const rows: ScanRow[] = []
   if (d.customerCount > 0) {
-    rows.push({ key: 'kunder', text: `${fmt(d.customerCount)} kund${d.customerCount > 1 ? 'er' : ''} hittade` })
+    rows.push({ key: 'kunder', kalla: 'importerat', text: `${fmt(d.customerCount)} kund${d.customerCount > 1 ? 'er' : ''} hittade` })
   }
   if (d.openInvoicesCount > 0) {
-    rows.push({ key: 'fakturor', text: `${fmt(d.openInvoicesCount)} öppna faktur${d.openInvoicesCount > 1 ? 'or' : 'a'} analyserade` })
+    rows.push({ key: 'fakturor', kalla: 'importerat', text: `${fmt(d.openInvoicesCount)} öppna faktur${d.openInvoicesCount > 1 ? 'or' : 'a'} analyserade` })
   }
   if (d.activeProjectsCount > 0) {
-    rows.push({ key: 'projekt', text: `${fmt(d.activeProjectsCount)} pågående projekt identifierade` })
+    rows.push({ key: 'projekt', kalla: 'importerat', text: `${fmt(d.activeProjectsCount)} pågående projekt identifierade` })
   }
   if (d.openQuotesCount > 0) {
-    rows.push({ key: 'offerter', text: `${fmt(d.openQuotesCount)} offert${d.openQuotesCount > 1 ? 'er' : ''} hittade` })
+    rows.push({ key: 'offerter', kalla: 'importerat', text: `${fmt(d.openQuotesCount)} offert${d.openQuotesCount > 1 ? 'er' : ''} hittade` })
   }
   // Karins rad är uttryckligen HENNES fynd — rutten sätter karinHeadline
   // bara när headline verkligen är Karins (förfallet/obetalt > 0), aldrig
   // Daniels/Hannas/Lisas generiska fallback under en Karin-etikett.
   if (d.karinHeadline?.amount_kr) {
-    rows.push({ key: 'karin', agent: 'karin', text: `Karin hittade ${fmt(d.karinHeadline.amount_kr)} kr i utestående kundfordringar` })
+    // Grundmeningen är pinnad i tests/company-scan.spec.ts; "varav N
+    // förfallna" hängs på BARA när rutten faktiskt räknat förfallna (>0).
+    const forfallna = d.overdueInvoicesCount ?? 0
+    const suffix = forfallna > 0 ? `, varav ${fmt(forfallna)} förfall${forfallna > 1 ? 'na' : 'en'}` : ''
+    rows.push({ key: 'karin', agent: 'karin', kalla: 'mojlighet', text: `Karin hittade ${fmt(d.karinHeadline.amount_kr)} kr i utestående kundfordringar${suffix}` })
   }
   if (d.staleQuotesCount > 0) {
-    rows.push({ key: 'daniel', agent: 'daniel', text: `Daniel hittade ${fmt(d.staleQuotesCount)} offert${d.staleQuotesCount > 1 ? 'er' : ''} som borde följas upp` })
+    // Ålder på den äldsta: bara när rutten vet den (null/saknas ⇒ inget tillägg).
+    const aldsta = d.oldestStaleQuoteDays
+    const suffix = typeof aldsta === 'number' && aldsta > 0 ? `, äldsta ${fmt(aldsta)} dag${aldsta > 1 ? 'ar' : ''}` : ''
+    rows.push({ key: 'daniel', agent: 'daniel', kalla: 'mojlighet', text: `Daniel hittade ${fmt(d.staleQuotesCount)} offert${d.staleQuotesCount > 1 ? 'er' : ''} som borde följas upp${suffix}` })
   }
   if (d.activeProjectsCount > 0) {
-    rows.push({ key: 'lars', agent: 'lars', text: `Lars bevakar ${fmt(d.activeProjectsCount)} aktiv${d.activeProjectsCount > 1 ? 'a' : 't'} projekt` })
+    rows.push({ key: 'lars', kalla: 'importerat', agent: 'lars', text: `Lars bevakar ${fmt(d.activeProjectsCount)} aktiv${d.activeProjectsCount > 1 ? 'a' : 't'} projekt` })
   }
   // Kön, sist — pekar framåt mot "Det här behöver dig idag".
   if (d.pendingApprovalsCount > 0) {
-    rows.push({ key: 'ko', text: `${fmt(d.pendingApprovalsCount)} sak${d.pendingApprovalsCount > 1 ? 'er' : ''} behöver din uppmärksamhet` })
+    rows.push({ key: 'ko', kalla: 'importerat', text: `${fmt(d.pendingApprovalsCount)} sak${d.pendingApprovalsCount > 1 ? 'er' : ''} behöver din uppmärksamhet` })
   }
   // Firmans egna uppgifter, sist: en ny firma utan import har inga rader ovan
   // och fick tidigare "Inget att gå igenom än" — exakt ICP:n mötte alltså en
@@ -78,6 +103,8 @@ export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[]
     rows.push({
       key: 'profil_timme',
       agent: 'lars',
+      // En räknefråga på kundens egna tal — aldrig en mätning.
+      kalla: 'uppskattat',
       text:
         personer > 1
           ? `Med ${fmt(timpris)} kr/h och ${personer} personer motsvarar en missad faktureringstimme i veckan ${fmt(perAr)} kr på ett år`
@@ -90,6 +117,7 @@ export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[]
     rows.push({
       key: 'profil_pastag',
       agent: 'daniel',
+      kalla: 'importerat',
       text: `Ditt materialpåslag på ${fmt(markup)} % räknas in i varje offert automatiskt`,
     })
   }
@@ -98,6 +126,7 @@ export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[]
   if (tjanster > 0) {
     rows.push({
       key: 'profil_tjanster',
+      kalla: 'importerat',
       text: `${fmt(tjanster)} tjänst${tjanster > 1 ? 'er' : ''} du valt styr vad teamet föreslår i offerter och svar`,
     })
   }
@@ -105,11 +134,65 @@ export function buildProfileRows(profil: CompanyScanResult['profil']): ScanRow[]
   if (profil.phoneNumber) {
     rows.push({
       key: 'profil_telefon',
+      kalla: 'importerat',
       text: `Lisa fångar samtal på ${profil.phoneNumber} från dag ett`,
     })
   }
 
   return rows
+}
+
+/**
+ * En källa skanningen faktiskt gick igenom (Företagsskanningen, 2026-09-06).
+ * Listan är en kvittens, inte ett löfte: bara källor som finns (kundregister/
+ * fakturor med n>0) eller är kopplade (Fortnox enligt
+ * business_config.fortnox_connected). Aldrig Gmail — skannen läser ingen
+ * post — och aldrig något som inte är kopplat.
+ */
+export interface ScanSource {
+  key: 'kundregister' | 'fakturor' | 'fortnox'
+  label: string
+  meta: string
+}
+
+/** Kort svensk datumstämpel för "kopplat · synkat 6 sep." — ingen tid, ingen sekund. */
+function kortDatum(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })
+}
+
+/**
+ * Ren och testbar (tests/foretagsskanning-vy.spec.ts): källistan byggs ur
+ * talen + Fortnox-flaggan, ingenting annat. Ordningen är systemet först,
+ * sedan det lästa — samma ordning som vänsterpanelen bockar av dem i.
+ */
+export function buildScanSources(input: {
+  customerCount: number
+  openInvoicesCount: number
+  fortnoxConnected: boolean
+  fortnoxLastSyncedAt?: string | null
+}): ScanSource[] {
+  const sources: ScanSource[] = []
+  if (input.fortnoxConnected) {
+    const synk = kortDatum(input.fortnoxLastSyncedAt)
+    sources.push({ key: 'fortnox', label: 'Fortnox', meta: synk ? `kopplat · synkat ${synk}` : 'kopplat' })
+  }
+  if (input.customerCount > 0) {
+    sources.push({ key: 'kundregister', label: 'Kundregister', meta: `${fmt(input.customerCount)} kund${input.customerCount > 1 ? 'er' : ''}` })
+  }
+  if (input.openInvoicesCount > 0) {
+    sources.push({ key: 'fakturor', label: 'Fakturor', meta: `${fmt(input.openInvoicesCount)} öppna` })
+  }
+  return sources
+}
+
+/** Etikettens ord i UI:t — en sanning, samma ord i skannen och genomgången. */
+export const KALLA_LABEL: Record<ScanKalla, string> = {
+  importerat: 'Importerat',
+  mojlighet: 'Möjlighet',
+  uppskattat: 'Uppskattat',
 }
 
 /**
