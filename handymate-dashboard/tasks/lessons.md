@@ -584,3 +584,7 @@ En React-skisstillverkning med tom root fungerar i Chromium men kan bli tom i fi
 
 ## 2026-09-06 — Guider ska provas i den riktiga mobilramen
 En fristående desktopskiss missar att onboardingramen saknar fast höjd på mobil. Montera verkliga ob-page → ob-stage → ob-card-wrap, prova alla tipssteg efter scroll vid 375×812 och kontrollera toast + överlagrade knappar samtidigt. Tipskort på en rörlig mobilram ska förankras i viewporten.
+
+
+## 2026-09-06 — Visat företagsnamn är inte bevis för vald inloggning
+När användaren uppger att demokontot valdes men sidan visar ett annat företagsnamn: skilj på inloggningsval, sessionens företagskoppling och återställda onboardingfält. Beskriv exakt vad UI visar; påstå inte att användaren valde fel konto. Verifiera i ny navigering och undvik företagsändringar tills avsett konto är tydligt.

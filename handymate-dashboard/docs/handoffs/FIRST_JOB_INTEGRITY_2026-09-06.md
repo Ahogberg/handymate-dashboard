@@ -58,3 +58,20 @@ Vid starten saknades session och lokala databasuppgifter. Säker browserAuth-inl
 8. Kontrollera mobil, omladdning och annan roll. Faktisk leverans och betalningsregistrering provas bara i överenskommen testmiljö/mot testmottagare.
 
 Kända begränsningar från #11 kvarstår: samtidig första fakturaskrivning är inte samordnad mellan alla fakturavägar; manuell delbetalning har begränsad semantik; ROT-årstaket kan skilja mellan preview och slutberäkning. De är inte rättade eller omklassade till gröna i denna leverans.
+
+
+## Fortsatt inloggat prov — eget testkonto
+
+Andreas förtydligade att den första inloggningen avsåg demokontot. Bee Service AB var det **visade företagsnamnet**, inte bevis för vilket konto han valde. Ny navigering till dashboard gav samma onboardingvy; orsaken är inte fastställd. Inga företagsuppgifter ändrades där.
+
+Andreas godkände sitt eget testkonto. En ny säker inloggning öppnade **Nordström El AB**, med Andreas som synlig användare. Där genomfördes:
+
+- Kundlistan och befintliga acceptanstestkunden öppnades. Ny kund-dialog inspekterades och avbröts utan sparning; telefon är obligatoriskt.
+- Ny offert från kundkortet behöll rätt kund.
+- Riktig AI-generering kördes för byte av två befintliga jordade vägguttag, med två timmars uppskattat arbete och uttrycklig text ”Ingen ROT eller RUT i detta prov”.
+- AI-förslaget gav fyra rader: arbete 1 700, uttag 440, framkörning 450 och småmaterial med saknat pris. Netto 2 590 kr.
+- ROT dök ändå upp i förslaget. Efter aktivt val Inget avdrag försvann avdraget, men summary klassade hela 2 590 kr som material (arbete 0). Arbetsraden hade enheten st. Detta är observerade avvikelser, inte rättade i PR #15. Det är ännu inte klarlagt om enheten kommer från AI-svaret eller produktkopplingen. Kodens summering använder avdragsflagga/timenhet för arbetsklassning, vilket förklarar omslaget i visningen.
+- Testtiteln återställdes efter AI-genereringen och utkastet sparades som **#2026003**, `quote_pq1nnsv4gqc`. En full omladdning återgav samma kund, fyra rader, nettobelopp och status Utkast.
+- Offertens händelselogg visade inget skickat/öppnat/signerat datum. Inga Skicka- eller signeringsåtgärder utfördes. Testutkastet lämnades kvar för granskning.
+
+**Bevisnivå:** riktig inloggning, AI-generering, offertskrivning och omläsning har nu genomförts. Detta gäller den driftsatta versionen på app.handymate.se, inte en verifierad sammanslagning av #11/#13/#14/#15. Kundkortet saknade den nya kundunderlagsytan. Hela accept→projekt→faktura-resan och de nya standardartikelytorna är fortfarande inte driftverifierade.
