@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet><meta name="design_doc_mode" content="canvas"><link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/colors_and_type.css"><link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/styles.css"><script src="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/_ds_bundle.js"></script><style>body{margin:0;background:#f8fafc}a{color:#0f766e}a:hover{color:#115e59}@keyframes hm-pulse{0%{box-shadow:0 0 0 0 rgba(13,148,136,.45)}70%{box-shadow:0 0 0 18px rgba(13,148,136,0)}100%{box-shadow:0 0 0 0 rgba(13,148,136,0)}}@keyframes hm-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}</style></helmet>
+<div style="padding:48px 56px 64px;font-family:var(--font-body);color:var(--slate-800);display:flex;flex-direction:column;gap:28px">
+<div style="max-width:900px"><span class="eyebrow">Mobil · Matte</span><h2 style="font-size:28px;margin-top:6px">Field Command — säg det en gång</h2><p style="color:var(--slate-500);font-size:15px;margin-top:4px">Hantverkaren beskriver vad som hänt. Matte delar upp det i tid, ÄTA och bokning, frågar när något är tvetydigt och kvitterar vad som gjordes. Pris och omfattning härleds aldrig utan bevis.</p></div>
+
+<div style="display:flex;gap:36px;align-items:flex-start;flex-wrap:wrap">
+
+<div data-screen-label="1 Tolkning" style="display:flex;flex-direction:column;gap:12px"><div style="font-size:13px;color:var(--slate-500)"><strong style="color:var(--slate-900)">1 · Tolkning</strong> — transkript → strukturerad lista</div>
+<div style="width:390px;height:844px;border-radius:44px;background:var(--slate-50);border:1px solid var(--slate-300);box-shadow:0 20px 40px rgba(15,23,42,.08);overflow:hidden;display:flex;flex-direction:column">
+<div style="height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;font:600 15px var(--font-body);color:var(--slate-900)"><span>15:41</span><span style="width:16px;height:10px;border:1.5px solid var(--slate-900);border-radius:3px;position:relative"><span style="position:absolute;inset:1.5px;right:4px;background:var(--slate-900);border-radius:1px"></span></span></div>
+<div style="padding:6px 16px 10px;display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid var(--slate-200);display:flex;align-items:center;justify-content:center;color:var(--slate-700)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m15 18-6-6 6-6"></path></svg></div><div style="flex:1;min-width:0"><div style="font:700 16px var(--font-heading);color:var(--slate-900)">Storgatan 12</div><div style="font-size:12.5px;color:var(--slate-500)">Incheckad 07:52 · Andreas, Johan</div></div><div style="width:36px;height:36px;border-radius:50%;background:var(--teal-50);border:2px solid rgba(94,234,212,.5);display:flex;align-items:center;justify-content:center;font:700 13px var(--font-heading);color:var(--teal-700)">M</div></div>
+<div style="flex:1;padding:4px 16px 0;overflow:hidden;display:flex;flex-direction:column;gap:10px">
+<div style="padding:14px 16px;border-radius:16px;background:#fff;border:1px solid var(--slate-200)"><div style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--slate-500);margin-bottom:6px">Du sa</div><div style="font-size:15px;line-height:1.5;color:var(--slate-800)">"Vi är klara här. Lägg två timmar på mig och Johan, kunden ville ha en extra list i hallen och boka återbesök nästa torsdag."</div></div>
+<div style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-700);margin:6px 0 -2px 2px">Matte tolkade det så här</div>
+<sc-for list="{{ actions }}" as="a" hint-placeholder-count="4">
+<div style="display:flex;align-items:flex-start;gap:12px;padding:12px 14px;border-radius:14px;background:#fff;border:1px solid {{ a.border }}">
+<span style="width:24px;height:24px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;background:{{ a.iconBg }};color:{{ a.iconFg }}"><sc-if value="{{ a.ok }}" hint-placeholder-val="{{ true }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></sc-if><sc-if value="{{ a.warn }}" hint-placeholder-val="{{ false }}"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path></svg></sc-if></span>
+<div style="flex:1;min-width:0"><div style="font-size:15px;font-weight:500;color:var(--slate-900);line-height:1.3">{{ a.title }}</div><div style="font-size:12.5px;color:{{ a.subFg }};margin-top:2px;line-height:1.4">{{ a.sub }}</div></div>
+<button style="font:500 13px var(--font-body);color:var(--slate-500);background:none;border:none;padding:2px 4px;cursor:pointer;flex:none">{{ a.action }}</button>
+</div>
+</sc-for>
+</div>
+<div style="padding:12px 16px 0"><button style="width:100%;height:52px;border-radius:14px;border:none;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font:600 16px var(--font-body);box-shadow:0 10px 25px -5px rgba(13,148,136,.25);cursor:pointer" style-hover="opacity:.92">Godkänn 3 · ÄTA väntar på pris</button></div>
+<div style="padding:14px 16px 26px;display:flex;flex-direction:column;align-items:center;gap:6px"><div style="width:64px;height:64px;border-radius:50%;background:var(--slate-900);color:#fff;display:flex;align-items:center;justify-content:center;animation:hm-pulse 2s infinite;cursor:pointer"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div><div style="font-size:12px;color:var(--slate-400)">Håll in för att lägga till</div></div>
+</div></div>
+
+<div style="align-self:center;color:var(--slate-300);padding-top:40px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div>
+
+<div data-screen-label="2 Fråga" style="display:flex;flex-direction:column;gap:12px"><div style="font-size:13px;color:var(--slate-500)"><strong style="color:var(--slate-900)">2 · Fråga</strong> — tvetydighet löses innan något skrivs</div>
+<div style="width:390px;height:844px;border-radius:44px;background:var(--slate-50);border:1px solid var(--slate-300);box-shadow:0 20px 40px rgba(15,23,42,.08);overflow:hidden;display:flex;flex-direction:column">
+<div style="height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;font:600 15px var(--font-body);color:var(--slate-900)"><span>15:41</span><span style="width:16px;height:10px;border:1.5px solid var(--slate-900);border-radius:3px;position:relative"><span style="position:absolute;inset:1.5px;right:4px;background:var(--slate-900);border-radius:1px"></span></span></div>
+<div style="padding:6px 20px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--slate-200)"><div style="width:40px;height:40px;border-radius:50%;background:var(--teal-50);border:2.5px solid rgba(94,234,212,.5);display:flex;align-items:center;justify-content:center;font:700 15px var(--font-heading);color:var(--teal-700);position:relative">M<span style="position:absolute;right:-1px;bottom:-1px;width:11px;height:11px;border-radius:50%;background:#4ade80;border:2px solid #fff"></span></div><div><div style="font:700 16px var(--font-heading);color:var(--slate-900)">Matte</div><div style="font-size:12.5px;color:var(--slate-500)">Storgatan 12 · incheckad</div></div></div>
+<div style="flex:1;padding:16px 16px 0;display:flex;flex-direction:column;gap:10px;overflow:hidden">
+<div style="align-self:flex-end;max-width:290px;padding:11px 14px;border-radius:18px 18px 4px 18px;background:var(--slate-200);font-size:14.5px;line-height:1.45;color:var(--slate-900)">Lägg två timmar på Johan också</div>
+<div style="max-width:300px;padding:11px 14px;border-radius:4px 18px 18px 18px;background:#fff;border:1px solid var(--slate-200);font-size:14.5px;line-height:1.45;color:var(--slate-800)">Ni har två Johan i teamet. Vilken menar du?</div>
+<div style="display:flex;gap:8px;padding-left:4px"><sc-for list="{{ johans }}" as="j" hint-placeholder-count="2"><button onClick="{{ j.pick }}" style="height:40px;padding:0 16px;border-radius:999px;font:500 14px var(--font-body);cursor:pointer;border:1.5px solid {{ j.border }};background:{{ j.bg }};color:{{ j.fg }};transition:all .15s">{{ j.name }}</button></sc-for></div>
+<sc-if value="{{ johanPicked }}" hint-placeholder-val="{{ true }}">
+<div style="max-width:300px;padding:11px 14px;border-radius:4px 18px 18px 18px;background:#fff;border:1px solid var(--slate-200);font-size:14.5px;line-height:1.45;color:var(--slate-800);animation:hm-rise .35s both">Och vilket jobb? Du är incheckad på <strong>Storgatan 12</strong> sedan 07:52, så jag antar det.</div>
+<div style="display:flex;gap:8px;padding-left:4px;animation:hm-rise .35s both"><button style="height:40px;padding:0 16px;border-radius:999px;font:500 14px var(--font-body);cursor:pointer;border:1.5px solid var(--teal-700);background:var(--teal-700);color:#fff">Storgatan 12</button><button style="height:40px;padding:0 16px;border-radius:999px;font:500 14px var(--font-body);cursor:pointer;border:1.5px solid var(--slate-200);background:#fff;color:var(--slate-700)">Annat jobb</button></div>
+<div style="max-width:300px;padding:11px 14px;border-radius:4px 18px 18px 18px;background:var(--teal-50);border:1px solid #ccfbf1;font-size:14.5px;line-height:1.45;color:var(--slate-800);animation:hm-rise .35s .15s both"><span style="display:flex;align-items:center;gap:6px;color:var(--teal-700);font-weight:600"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg>Klart</span>+2 h på {{ johanName }}, Storgatan 12. <a href="#" style="font-weight:500">Ångra</a></div>
+</sc-if>
+</div>
+<div style="padding:12px 16px 28px;display:flex;gap:8px;align-items:center"><div style="flex:1;height:48px;border-radius:24px;border:1px solid var(--slate-200);background:#fff;display:flex;align-items:center;padding:0 16px;font-size:14px;color:var(--slate-400)">Eller skriv…</div><div style="width:48px;height:48px;border-radius:50%;background:var(--slate-900);color:#fff;display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div></div>
+</div></div>
+
+<div style="align-self:center;color:var(--slate-300);padding-top:40px"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg></div>
+
+<div data-screen-label="3 Kvitto" style="display:flex;flex-direction:column;gap:12px"><div style="font-size:13px;color:var(--slate-500)"><strong style="color:var(--slate-900)">3 · Kvitto</strong> — vad hände, vart gick det, vad väntar</div>
+<div style="width:390px;height:844px;border-radius:44px;background:var(--slate-50);border:1px solid var(--slate-300);box-shadow:0 20px 40px rgba(15,23,42,.08);overflow:hidden;display:flex;flex-direction:column">
+<div style="height:54px;display:flex;align-items:flex-end;justify-content:space-between;padding:0 28px 6px;font:600 15px var(--font-body);color:var(--slate-900)"><span>15:42</span><span style="width:16px;height:10px;border:1.5px solid var(--slate-900);border-radius:3px;position:relative"><span style="position:absolute;inset:1.5px;right:4px;background:var(--slate-900);border-radius:1px"></span></span></div>
+<div style="padding:6px 16px 0;display:flex;align-items:center;justify-content:space-between"><div style="width:36px;height:36px;border-radius:50%;background:#fff;border:1px solid var(--slate-200);display:flex;align-items:center;justify-content:center;color:var(--slate-700)"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></div><button onClick="{{ undoAll }}" style="height:36px;padding:0 14px;border-radius:999px;border:1px solid var(--slate-200);background:#fff;color:var(--slate-700);font:500 13px var(--font-body);display:flex;align-items:center;gap:6px;cursor:pointer;opacity:{{ undoOpacity }}"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"></path><path d="M4 9h10.5a5.5 5.5 0 0 1 5.5 5.5v0a5.5 5.5 0 0 1-5.5 5.5H11"></path></svg>{{ undoLabel }}</button></div>
+<div style="flex:1;padding:22px 20px 0;overflow:hidden">
+<div style="display:flex;align-items:center;gap:10px"><span style="width:32px;height:32px;border-radius:50%;background:var(--teal-50);color:var(--teal-700);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"></path></svg></span><h2 style="font-size:24px">Matte tog det vidare</h2></div>
+<div style="font-size:13px;color:var(--slate-500);margin:6px 0 20px 42px">Storgatan 12 · sagt en gång 15:41</div>
+<div style="display:flex;flex-direction:column;gap:6px;background:#fff;border:1px solid var(--slate-200);border-radius:16px;padding:6px 8px">
+<sc-for list="{{ receipt }}" as="r" hint-placeholder-count="4"><div style="display:flex;align-items:center;gap:12px;padding:10px 8px;border-bottom:1px solid {{ r.divider }}"><span style="width:28px;height:28px;border-radius:50%;flex:none;background:var(--teal-50);color:var(--teal-700);display:flex;align-items:center;justify-content:center;font:700 11px var(--font-heading)">{{ r.who }}</span><div style="flex:1;min-width:0"><div style="font-size:14.5px;color:var(--slate-900);line-height:1.3">{{ r.text }}</div></div><span style="font-size:12px;color:var(--slate-400);white-space:nowrap">→ {{ r.dest }}</span></div></sc-for>
+</div>
+<div style="margin-top:14px;padding:14px 16px;border-radius:16px;background:#fffbeb;border:1px solid #fde68a"><div style="display:flex;align-items:center;gap:8px;color:#b45309;font-weight:600;font-size:14px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"></path><path d="M12 17h.01"></path><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"></path></svg>1 sak väntar på dig</div><div style="font-size:13.5px;color:var(--slate-700);margin-top:4px;line-height:1.45">Extra list i hallen ligger som ÄTA-utkast utan pris. Daniel skickar inget förrän du satt ett.</div><button style="margin-top:10px;height:40px;padding:0 16px;border-radius:12px;border:1px solid #fde68a;background:#fff;color:var(--slate-900);font:600 14px var(--font-body);cursor:pointer">Sätt pris på ÄTA</button></div>
+<div style="margin-top:16px;font-size:12px;color:var(--slate-400);line-height:1.5;padding:0 2px">Möjligt ÄTA är inte intäkt. Det blir det när kunden godkänt och Karin fakturerat.</div>
+</div>
+<div style="padding:12px 16px 28px"><button style="width:100%;height:52px;border-radius:14px;border:1px solid var(--slate-200);background:#fff;color:var(--slate-700);font:600 15px var(--font-body);cursor:pointer" style-hover="background:#f1f5f9">Klar</button></div>
+</div></div>
+
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ataPriced&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Scenario&quot;}}">
+class Component extends DCLogic {
+  state = { johan: 'Johan Ek', undoLeft: 30, undone: false };
+  componentDidMount() { this.timer = setInterval(() => this.setState(s => s.undoLeft > 0 && !s.undone ? { undoLeft: s.undoLeft - 1 } : null), 1000); }
+  componentWillUnmount() { clearInterval(this.timer); }
+  renderVals() {
+    const ataPriced = this.props.ataPriced === true;
+    const ok = (title, sub, action) => ({ title, sub, action, ok: true, warn: false, border: '#e2e8f0', iconBg: '#ccfbf1', iconFg: '#0f766e', subFg: '#64748b' });
+    const actions = [
+      ok('+2 h · Andreas', 'Storgatan 12 · arbetstid', 'Ändra'),
+      ok('+2 h · Johan Ek', 'Storgatan 12 · arbetstid', 'Ändra'),
+      ataPriced
+        ? ok('Extra list i hallen · ÄTA 1 850 kr', 'Prissatt från din prislista · skickas till kund vid godkännande', 'Ändra')
+        : { title: 'Extra list i hallen → möjligt ÄTA', sub: 'Utanför accepterad offert. Inget pris satt, inget skickas.', action: 'Sätt pris', ok: false, warn: true, border: '#fde68a', iconBg: '#fef3c7', iconFg: '#b45309', subFg: '#b45309' },
+      ok('Återbesök tors 10 sep · 08:00', 'Lars bokar in dig och Johan', 'Ändra'),
+    ];
+    const names = ['Johan Berg', 'Johan Ek'];
+    const johans = names.map(n => { const on = n === this.state.johan; return { name: n, pick: () => this.setState({ johan: n }), bg: on ? '#0f766e' : '#fff', fg: on ? '#fff' : '#334155', border: on ? '#0f766e' : '#e2e8f0' }; });
+    const receipt = [
+      { who: 'L', text: '4 h loggade på Storgatan 12', dest: 'Tid' },
+      { who: 'L', text: 'Återbesök bokat tors 08:00', dest: 'Kalender' },
+      { who: 'D', text: ataPriced ? 'ÄTA 1 850 kr skickat till kund' : 'ÄTA-utkast: extra list i hallen', dest: 'Offert' },
+      { who: 'M', text: 'Kundlöfte sparat: "extra list i hallen"', dest: 'Kund' },
+    ].map((r, i, a) => ({ ...r, divider: i === a.length - 1 ? 'transparent' : '#f1f5f9' }));
+    const u = this.state.undoLeft;
+    return {
+      actions, johans, johanPicked: true, johanName: this.state.johan, receipt,
+      undoLabel: this.state.undone ? 'Ångrat' : u > 0 ? 'Ångra allt · ' + u + ' s' : 'Ångra i historiken',
+      undoOpacity: u > 0 || this.state.undone ? 1 : 0.6,
+      undoAll: () => this.setState({ undone: true }),
+    };
+  }
+}
+</script>
+</body>
+</html>
