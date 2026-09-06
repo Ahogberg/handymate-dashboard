@@ -184,7 +184,9 @@ for (const [label, fixtureName, fixture, criticalStrings] of [
   ] as const,
   [
     'overdue (dröjsmålsränta + påminnelseavgift + försenad-notis)', 'overdue', fixtureOverdue,
-    ['12 dagar försenad', '+ 46 kr', '+ 60 kr', 'Fakturan är försenad', '14 046 kr'],
+    // F20 (2026-09-06): öre visas med två decimaler — 45,50 kr ränta och
+    // 14 045,50 kr att betala är det betalningsgrundande beloppet, inte avrundningen.
+    ['12 dagar försenad', '+ 45,50 kr', '+ 60 kr', 'Fakturan är försenad', '14 045,50 kr'],
   ] as const,
   [
     'credit (kreditfaktura, negativa belopp)', 'credit', fixtureCredit,

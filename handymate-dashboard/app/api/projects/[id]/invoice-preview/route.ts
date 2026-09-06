@@ -365,6 +365,18 @@ export async function GET(
     const year = new Date().getFullYear()
     const nextInvoiceNumber = `${prefix}-${year}-${String(nextNum).padStart(3, '0')}`
 
+    // ── 9b. Befintlig projektfaktura (samma spärr som create-final-invoice) ──
+    // Förhandsgranskningen visade "nästa nummer" och grundofferten trots att
+    // utkastet redan fanns (Codex liveprov 2026-09-07). Sidan visar då
+    // fakturan som finns i stället för en knapp som inte skapar något.
+    const { data: existingInvoice } = await supabase
+      .from('invoice')
+      .select('invoice_id, invoice_number, status')
+      .eq('business_id', business.business_id)
+      .eq('project_id', project.project_id)
+      .limit(1)
+      .maybeSingle()
+
     // ── 10. Response ────────────────────────────────────────────
     // _deployVersion: deploy-marker så vi kan verifiera VILKEN commit
     // som faktiskt körs i prod. Om responsen saknar fältet → stale
@@ -404,6 +416,7 @@ export async function GET(
       vatAmount,
       totalInclVat: Math.round(totalInclVat * 100) / 100,
       nextInvoiceNumber,
+      existingInvoice: existingInvoice || null,
     })
   } catch (error: any) {
     console.error('[invoice-preview] unexpected error:', error)

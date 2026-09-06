@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import { Loader2, Plus, Send, Trash2, X } from 'lucide-react'
 import { ATA_TYP_LABELS } from '@/lib/ata/labels'
 
@@ -304,7 +305,7 @@ export default function ChangeModal({ projectId, editing, customerId, onClose, o
             )}
             {total > 0 && (
               <div className="mt-2 text-right text-sm font-semibold text-gray-900">
-                Summa exkl. moms: {total.toLocaleString('sv-SE')} kr
+                Summa exkl. moms: {formatKronor(total)}
               </div>
             )}
           </div>

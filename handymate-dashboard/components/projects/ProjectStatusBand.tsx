@@ -106,7 +106,7 @@ function EconomyZone({ economics, loading, bucket }: { economics: ProjectEconomi
   }
   const offererat = economics.intakter.forvantad_intakt_kr
   const nedlagt = economics.kostnader.total_kr
-  const fakturerat = economics.intakter.fakturerat_kr
+  const fakturerat = economics.intakter.fakturerat_ex_moms_kr ?? economics.intakter.fakturerat_kr
   const ingetArbete = (nedlagt ?? 0) <= 0 && fakturerat <= 0 && economics.kostnader.arbete_timmar <= 0
 
   if (bucket === 'planering' && ingetArbete) {

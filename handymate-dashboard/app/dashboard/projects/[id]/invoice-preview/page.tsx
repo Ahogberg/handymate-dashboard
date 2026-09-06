@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -106,6 +107,8 @@ interface InvoicePreviewData {
   vatAmount: number
   totalInclVat: number
   nextInvoiceNumber: string
+  /** Befintlig projektfaktura — då skapas ingen ny, den öppnas i stället. */
+  existingInvoice?: { invoice_id: string; invoice_number: string; status: string } | null
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -113,7 +116,7 @@ interface InvoicePreviewData {
 // ─────────────────────────────────────────────────────────────────
 
 function formatCurrency(amount: number): string {
-  return amount.toLocaleString('sv-SE') + ' kr'
+  return formatKronor(amount)
 }
 
 function formatDate(date: string | null): string {
@@ -339,7 +342,7 @@ function InvoiceDocument({ data, today }: { data: InvoicePreviewData; today: str
             className="text-[28px] font-bold text-slate-900 tracking-tight leading-none mb-3 tabular-nums"
             style={{ fontFamily: "'Space Grotesk', system-ui, sans-serif" }}
           >
-            {data.nextInvoiceNumber}
+            {data.existingInvoice?.invoice_number ?? data.nextInvoiceNumber}
           </div>
           <div className="text-sm text-slate-500 truncate">
             {project.name} · slutfaktura · {today}
@@ -739,7 +742,24 @@ function InvoiceSidebar({
         </div>
       </div>
 
-      {/* CTA — Skicka faktura */}
+      {/* Befintlig projektfaktura: ingen ny skapas (samma spärr som routen) */}
+      {data.existingInvoice && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-slate-800">
+          <div className="font-semibold">Fakturan finns redan: {data.existingInvoice.invoice_number}</div>
+          <div className="mt-1 text-slate-600">
+            Projektet har redan en faktura{data.existingInvoice.status === 'draft' ? ' som utkast' : ''}. Siffrorna ovan är en förhandsgranskning av underlaget, ingen ny faktura skapas.
+          </div>
+          <Link
+            href={`/dashboard/invoices/${data.existingInvoice.invoice_id}`}
+            className="mt-3 inline-flex items-center gap-2 rounded-lg bg-primary-700 px-4 py-2 text-sm font-semibold text-white hover:bg-primary-800"
+          >
+            Öppna {data.existingInvoice.invoice_number}
+          </Link>
+        </div>
+      )}
+
+      {/* CTA — skapar fakturan som utkast och öppnar den; utskicket sker i fakturavyn (F23) */}
+      {!data.existingInvoice && (
       <button
         onClick={onSendInvoice}
         disabled={sending}
@@ -753,16 +773,20 @@ function InvoiceSidebar({
         ) : (
           <>
             <Send className="w-4 h-4" />
-            Skicka faktura till {customerName}
+            Skapa faktura till {customerName}
           </>
         )}
       </button>
+      )}
+      {!data.existingInvoice && (
+        <p className="text-xs text-slate-500 -mt-1">Fakturan skapas som utkast och öppnas. Du skickar den från fakturavyn.</p>
+      )}
 
       {/* Ghost — Redigera */}
       <button
         onClick={() =>
           onShowToast(
-            'Redigera direkt i invoice-vyn efter du klickat "Skicka faktura"',
+            'Redigera direkt i fakturavyn efter du klickat "Skapa faktura"',
             'info',
           )
         }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState, useCallback } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import Link from 'next/link'
 import { ArrowLeft, Download, AlertTriangle, Check, Info, FileUp } from 'lucide-react'
 import { validateInvoiceForSkv } from '@/lib/skv/validate-rot-request'
@@ -209,7 +210,7 @@ function Section({ type, rows, edits, setEdits, selected, setSelected, orgNumber
                         <span>Redan bokförd i Fortnox med skattereduktion — kontrollera i Fortnox om den redan skickats till Skatteverket innan du väljer den här, så du inte begär utbetalning dubbelt.</span>
                       </div>
                     )}
-                    <div className="text-xs text-gray-500 mt-0.5">Arbetskostnad {row.work_cost.toLocaleString('sv-SE')} kr · Begärt avdrag <strong>{row.deduction.toLocaleString('sv-SE')} kr</strong></div>
+                    <div className="text-xs text-gray-500 mt-0.5">Arbetskostnad {formatKronor(row.work_cost)} · Begärt avdrag <strong>{formatKronor(row.deduction)}</strong></div>
 
                     {/* Luckfält */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3">

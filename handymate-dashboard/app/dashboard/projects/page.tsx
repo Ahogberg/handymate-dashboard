@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import {
   FolderKanban,
   Plus,
@@ -448,7 +449,7 @@ export default function ProjectsPage() {
               className="inline-flex items-center gap-2 px-3.5 min-h-[36px] bg-amber-50 border border-amber-200 rounded-full text-sm font-semibold text-amber-700 hover:border-amber-300 transition-colors"
             >
               <DollarSign className="w-4 h-4" />
-              {Math.round(totalUninvoiced).toLocaleString('sv-SE')} kr ofakturerat
+              {formatKronor(Math.round(totalUninvoiced))} ofakturerat
             </Link>
           )}
           {overBudget === 0 && totalUninvoiced <= 0 && (
@@ -705,7 +706,7 @@ export default function ProjectsPage() {
                           <span className="block text-sm font-medium text-slate-500">Inte påbörjat</span>
                           {project.budget_amount ? (
                             <span className="block text-xs text-slate-400">
-                              offererat {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr <span className="text-[10px]">exkl. moms</span>
+                              offererat {formatKronor(Math.round(project.budget_amount))} <span className="text-[10px]">exkl. moms</span>
                             </span>
                           ) : project.budget_hours ? (
                             <span className="block text-xs text-slate-400">{project.budget_hours} tim budgeterat</span>
@@ -736,7 +737,7 @@ export default function ProjectsPage() {
                               <p className="mt-1.5 text-xs text-slate-500 tabular-nums">
                                 {project.budget_amount ? (
                                   <>
-                                    <b className="text-slate-700 font-semibold">{Math.round(project.actual_amount).toLocaleString('sv-SE')} kr</b> av {Math.round(project.budget_amount).toLocaleString('sv-SE')} kr
+                                    <b className="text-slate-700 font-semibold">{formatKronor(Math.round(project.actual_amount))}</b> av {formatKronor(Math.round(project.budget_amount))}
                                     <br />
                                   </>
                                 ) : null}
@@ -748,7 +749,7 @@ export default function ProjectsPage() {
                               <div className="flex items-center gap-1 justify-end mb-1">
                                 <DollarSign className="w-3 h-3 text-slate-400" />
                                 <span className={`text-sm font-medium ${getBudgetColor(project.actual_amount, project.budget_amount)}`}>
-                                  {Math.round(project.actual_amount).toLocaleString('sv-SE')}/{Math.round(project.budget_amount).toLocaleString('sv-SE')} kr
+                                  {Math.round(project.actual_amount).toLocaleString('sv-SE')}/{formatKronor(Math.round(project.budget_amount))}
                                 </span>
                               </div>
                               <div className="h-1.5 bg-slate-100 rounded-full w-full ml-auto">

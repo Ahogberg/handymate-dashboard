@@ -46,7 +46,7 @@ export interface ProjectEconomics {
     budget_amount: number  // från offert
     ata_signerat_kr: number  // signed/invoiced project_change-tillägg
     ata_pending_kr: number  // skickade men ej signerade ÄTAs
-    fakturerat_kr: number  // sum(invoice.total) för detta projekt
+    fakturerat_kr: number  // sum(invoice.total) för utfärdade fakturor (sent/overdue/customer_paid/paid) — aldrig utkast, makulerade eller krediterade
     /** Utfärdad fakturering exklusive moms. Null om någon relevant faktura
         saknar subtotal — används av lärloopen, aldrig total inkl. moms. */
     fakturerat_ex_moms_kr: number | null
@@ -313,7 +313,11 @@ export async function computeProjectEconomics(
   let realizedInvoiceCount = 0
   for (const inv of invoices) {
     const v = Number(inv.total || 0)
-    fakturerat += v
+    // Ett utkast är inte fakturerat (Codex liveprov 2026-09-07: projektet
+    // visade "Fakturerat 3 688 kr" direkt när utkastet skapades). Bara
+    // utfärdade fakturor räknas — samma mängd som realizedInvoiceCount.
+    const utfardad = ['sent', 'overdue', 'customer_paid', 'paid'].includes(inv.status || '')
+    if (utfardad) fakturerat += v
     // customer_paid räknas som betalt: kunden har gjort sitt, ROT-delen är
     // en fordran på Skatteverket — inte en risk hos kunden.
     if (isCustomerSettled(inv.status)) betalt += v

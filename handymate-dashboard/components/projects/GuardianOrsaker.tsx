@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { formatKronor } from '@/lib/format-price'
 import { ExternalLink, AlertTriangle } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
@@ -58,7 +59,7 @@ export function GuardianOrsaker({ varning, variant = 'rows', projectId }: Props)
           )}
           {typeof o.amount_kr === 'number' && o.amount_kr > 0 && (
             <span className="font-medium text-right shrink-0 whitespace-nowrap">
-              {o.amount_kr.toLocaleString('sv-SE')} kr
+              {formatKronor(o.amount_kr)}
             </span>
           )}
         </div>
@@ -123,7 +124,7 @@ export function GuardianOrsaker({ varning, variant = 'rows', projectId }: Props)
                 )}
                 {typeof o.amount_kr === 'number' && o.amount_kr > 0 && (
                   <span className="font-heading font-semibold tabular-nums text-right shrink-0 whitespace-nowrap">
-                    {o.amount_kr.toLocaleString('sv-SE')} kr
+                    {formatKronor(o.amount_kr)}
                   </span>
                 )}
               </div>

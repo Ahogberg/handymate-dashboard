@@ -1,6 +1,7 @@
 'use client'
 
 import { CheckCircle, Loader2, X } from 'lucide-react'
+import { formatKronor } from '@/lib/format-price'
 import { PAYMENT_METHODS } from '../helpers'
 
 export interface PaymentData {
@@ -101,7 +102,7 @@ export function InvoicePaymentModal({
               <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400">kr</span>
             </div>
             <p className="text-xs text-gray-400 mt-1">
-              {mode === 'settle' ? 'Återstår från Skatteverket' : 'Att betala'}: {amountDue?.toLocaleString('sv-SE')} kr
+              {mode === 'settle' ? 'Återstår från Skatteverket' : 'Att betala'}: {formatKronor(amountDue)}
             </p>
           </div>
         </div>

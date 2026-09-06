@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import {
   FileText,
   Plus,
@@ -339,7 +340,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="font-heading tabular-nums text-xl font-bold text-slate-900">{stats.unpaidCount}</p>
                 <p className="text-xs text-gray-500">Obetalda</p>
-                <p className="text-xs text-primary-700 font-medium tabular-nums">{stats.unpaidValue.toLocaleString('sv-SE')} kr</p>
+                <p className="text-xs text-primary-700 font-medium tabular-nums">{formatKronor(stats.unpaidValue)}</p>
               </div>
             </div>
           </div>
@@ -352,7 +353,7 @@ export default function InvoicesPage() {
                 <p className={`font-heading tabular-nums text-xl font-bold ${stats.overdue > 0 ? 'text-red-600' : 'text-slate-900'}`}>{stats.overdue}</p>
                 <p className="text-xs text-gray-500">Förfallna</p>
                 {stats.overdue > 0 && (
-                  <p className="text-xs text-red-500 font-medium tabular-nums">{stats.overdueValue.toLocaleString('sv-SE')} kr</p>
+                  <p className="text-xs text-red-500 font-medium tabular-nums">{formatKronor(stats.overdueValue)}</p>
                 )}
               </div>
             </div>
@@ -365,7 +366,7 @@ export default function InvoicesPage() {
               <div>
                 <p className="font-heading tabular-nums text-xl font-bold text-slate-900">{stats.paid}</p>
                 <p className="text-xs text-gray-500">Betalda totalt</p>
-                <p className="text-xs text-emerald-500 font-medium tabular-nums">{stats.paidValue.toLocaleString('sv-SE')} kr</p>
+                <p className="text-xs text-emerald-500 font-medium tabular-nums">{formatKronor(stats.paidValue)}</p>
               </div>
             </div>
           </div>
@@ -493,10 +494,10 @@ export default function InvoicesPage() {
                             </div>
                           </div>
                           <div className="text-right flex-shrink-0">
-                            <p className="font-bold text-gray-900">{invoice.total?.toLocaleString('sv-SE')} kr</p>
+                            <p className="font-bold text-gray-900">{formatKronor(invoice.total)}</p>
                             {invoice.rot_rut_type && (
                               <p className="text-xs text-emerald-600">
-                                {invoice.rot_rut_type.toUpperCase()}: {invoice.customer_pays?.toLocaleString('sv-SE')} kr
+                                {invoice.rot_rut_type.toUpperCase()}: {formatKronor(invoice.customer_pays)}
                               </p>
                             )}
                           </div>
@@ -607,10 +608,10 @@ export default function InvoicesPage() {
                             ) : null}
                           </td>
                           <td className="px-6 py-4">
-                            <p className="text-gray-900 font-medium text-sm tabular-nums">{invoice.total?.toLocaleString('sv-SE')} kr</p>
+                            <p className="text-gray-900 font-medium text-sm tabular-nums">{formatKronor(invoice.total)}</p>
                             {invoice.rot_rut_type && (
                               <p className="text-xs text-emerald-600">
-                                {invoice.rot_rut_type.toUpperCase()}: {invoice.customer_pays?.toLocaleString('sv-SE')} kr
+                                {invoice.rot_rut_type.toUpperCase()}: {formatKronor(invoice.customer_pays)}
                               </p>
                             )}
                           </td>

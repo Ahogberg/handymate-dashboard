@@ -1,6 +1,7 @@
 'use client'
 
 import { Check } from 'lucide-react'
+import { formatKronor } from '@/lib/format-price'
 import { formatSEK } from '@/lib/format-price'
 import { FLOW_SYSTEM_STAGES } from '@/components/pipeline/unified/flow-constants'
 import { deriveMarginalState } from '@/components/projects/economy/MarginalCard'
@@ -183,7 +184,9 @@ function EkonomiStaplar({ economics, state }: { economics: ProjectEconomics; sta
   const { intakter, kostnader, meta } = economics
   const offererat = intakter.forvantad_intakt_kr
   const nedlagt = kostnader.total_kr
-  const fakturerat = intakter.fakturerat_kr
+  // Netto mot netto: Offererat är exkl. moms, så Fakturerat jämförs exkl. moms
+  // när alla utfärdade fakturor bär subtotal (annars brutto som förr).
+  const fakturerat = intakter.fakturerat_ex_moms_kr ?? intakter.fakturerat_kr
 
   const nedlagtPct = offererat > 0 && nedlagt != null ? (nedlagt / offererat) * 100 : 0
   const nedlagtOver = nedlagtPct > 100
@@ -195,7 +198,7 @@ function EkonomiStaplar({ economics, state }: { economics: ProjectEconomics; sta
           kostnader.arbete_timmar > 0
             ? `${kostnader.arbete_timmar.toLocaleString('sv-SE', { maximumFractionDigits: 1 })} tim${
                 kostnader.arbete_kr != null && kostnader.arbete_timmar > 0
-                  ? ` à ${Math.round(kostnader.arbete_kr / kostnader.arbete_timmar).toLocaleString('sv-SE')} kr`
+                  ? ` à ${formatKronor(Math.round(kostnader.arbete_kr / kostnader.arbete_timmar))}`
                   : ''
               }`
             : null,

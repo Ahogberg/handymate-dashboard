@@ -990,3 +990,10 @@ två skrivs som spec till efter lansering.
 - [x] F04: attestvyn räknade veckor från 1 januari med söndag som veckostart
       (söndag 6 sep = "Vecka 37" mot V36 i veckovyn). Nu ISO-vecka via
       isoWeekInfo, måndag i UTC ur datumsträngen. Facit livegenomgang-f04.
+- [x] F23–F26 (produktionsprov 7 sep, #18-beskrivningen): "Skicka faktura"
+      heter "Skapa faktura" + förklaring att den skapas som utkast;
+      förhandsgranskningen visar befintlig faktura i stället för nästa
+      nummer; 41 kronbelopp via toLocaleString bytta till formatKronor;
+      Fakturerat räknar bara utfärdade fakturor (aldrig utkast) och korten
+      jämför netto mot netto; framdriftens nämnare = grundoffert + signerad
+      ÄTA. Paritetsbaselinen uppdaterad till öre-regeln (45,50 / 14 045,50).

@@ -1,6 +1,7 @@
 'use client'
 
 import { InvoiceTotals } from '@/lib/types/invoice'
+import { formatKronor } from '@/lib/format-price'
 
 interface InvoiceSummaryProps {
   totals: InvoiceTotals
@@ -30,33 +31,33 @@ export default function InvoiceSummary({
       <div className="space-y-1">
         <div className="flex justify-between py-[5px] text-[13px]">
           <span className="text-[#64748B]">Delsumma</span>
-          <span className="text-[#64748B]">{totals.subtotal.toLocaleString('sv-SE')} kr</span>
+          <span className="text-[#64748B]">{formatKronor(totals.subtotal)}</span>
         </div>
 
         {totals.discountAmount > 0 && (
           <div className="flex justify-between py-[5px] text-[13px]">
             <span className="text-[#64748B]">Rabatt</span>
-            <span className="text-[#64748B]">−{totals.discountAmount.toLocaleString('sv-SE')} kr</span>
+            <span className="text-[#64748B]">−{formatKronor(totals.discountAmount)}</span>
           </div>
         )}
 
         <div className="flex justify-between py-[5px] text-[13px]">
           <span className="text-[#64748B]">Moms {vatRate}%</span>
-          <span className="text-[#64748B]">{totals.vat.toLocaleString('sv-SE')} kr</span>
+          <span className="text-[#64748B]">{formatKronor(totals.vat)}</span>
         </div>
 
         {/* ROT/RUT line */}
         {hasRotRut && deduction > 0 && (
           <div className="flex justify-between py-[5px] text-[13px] text-[#0F766E]">
             <span>{rotRutType!.toUpperCase()}-avdrag ({rotRutType === 'rot' ? '30%' : '50%'})</span>
-            <span>−{deduction.toLocaleString('sv-SE')} kr</span>
+            <span>−{formatKronor(deduction)}</span>
           </div>
         )}
 
         {/* Total */}
         <div className="flex justify-between border-t border-thin border-[#E2E8F0] mt-2 pt-3 text-[15px] font-medium text-[#1E293B]">
           <span>Totalt</span>
-          <span>{totals.total.toLocaleString('sv-SE')} kr</span>
+          <span>{formatKronor(totals.total)}</span>
         </div>
       </div>
 
@@ -65,7 +66,7 @@ export default function InvoiceSummary({
         <div className="bg-[#CCFBF1] rounded-lg px-4 py-3.5 mt-3 flex justify-between items-center">
           <span className="text-[12px] text-[#0F766E]">Kund betalar</span>
           <span className="text-[20px] font-medium text-[#0F766E]">
-            {customerPays.toLocaleString('sv-SE')} kr
+            {formatKronor(customerPays)}
           </span>
         </div>
       )}

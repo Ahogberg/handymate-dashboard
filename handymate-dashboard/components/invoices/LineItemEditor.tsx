@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import { ChevronDown } from 'lucide-react'
 import { InvoiceItem, InvoiceItemType } from '@/lib/types/invoice'
 import {
@@ -171,7 +172,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
                       min={0}
                     />
                   ) : showTotal ? (
-                    <span className="text-[13px] text-[#1E293B] text-right">{Math.abs(item.total).toLocaleString('sv-SE')} kr</span>
+                    <span className="text-[13px] text-[#1E293B] text-right">{formatKronor(Math.abs(item.total))}</span>
                   ) : (
                     <span />
                   )}
@@ -227,7 +228,7 @@ export default function LineItemEditor({ items, onChange, rotRutType }: LineItem
                         min={0}
                       />
                       <span className="text-[13px] text-[#1E293B] font-medium flex-1 text-right whitespace-nowrap">
-                        {Math.abs(item.total).toLocaleString('sv-SE')} kr
+                        {formatKronor(Math.abs(item.total))}
                       </span>
                     </div>
                   )}

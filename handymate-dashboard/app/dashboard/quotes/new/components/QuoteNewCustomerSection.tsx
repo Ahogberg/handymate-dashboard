@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import { AlertTriangle, ClipboardList, User } from 'lucide-react'
 import { createDefaultItem } from '@/lib/quote-calculations'
 import type { QuoteItem } from '@/lib/types/quote'
@@ -152,9 +153,9 @@ export function QuoteNewCustomerSection({
                   </div>
                 </div>
                 <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-primary-700 pl-5">
-                  {customerPriceListInfo.hourlyRate ? <span>Timpris: {customerPriceListInfo.hourlyRate.toLocaleString('sv-SE')} kr</span> : null}
+                  {customerPriceListInfo.hourlyRate ? <span>Timpris: {formatKronor(customerPriceListInfo.hourlyRate)}</span> : null}
                   {customerPriceListInfo.materialMarkup ? <span>Materialpåslag: {customerPriceListInfo.materialMarkup}%</span> : null}
-                  {customerPriceListInfo.calloutFee ? <span>Utryckning: {customerPriceListInfo.calloutFee.toLocaleString('sv-SE')} kr</span> : null}
+                  {customerPriceListInfo.calloutFee ? <span>Utryckning: {formatKronor(customerPriceListInfo.calloutFee)}</span> : null}
                 </div>
                 {customerPriceListInfo.items && customerPriceListInfo.items.length > 0 && items.length === 0 && (
                   <button

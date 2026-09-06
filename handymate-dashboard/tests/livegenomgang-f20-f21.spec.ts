@@ -118,3 +118,44 @@ test.describe('F21 — 30 dagar netto är 30 kalenderdagar i svensk tid', () => 
     expect(detalj).toContain('paid_at: svDateStr(),')
   })
 })
+
+test.describe('F23–F26 — fakturans presentationsfel ur produktionsprovet 7 sep', () => {
+  test('F23: förhandsgranskningens knapp lovar inte utskick, och befintlig faktura visas i stället för en ny', () => {
+    const src = utanKommentarer(read('app/dashboard/projects/[id]/invoice-preview/page.tsx'))
+    expect(src).toContain('Skapa faktura till {customerName}')
+    expect(src).not.toContain('Skicka faktura till {customerName}')
+    expect(src).toContain('Fakturan skapas som utkast och öppnas.')
+    expect(src).toContain('Fakturan finns redan: {data.existingInvoice.invoice_number}')
+    expect(src).toContain('{data.existingInvoice?.invoice_number ?? data.nextInvoiceNumber}')
+    expect(src).not.toContain("toLocaleString('sv-SE')")
+    const route = utanKommentarer(read('app/api/projects/[id]/invoice-preview/route.ts'))
+    expect(route).toContain('existingInvoice: existingInvoice || null')
+    expect(route).toContain(".eq('project_id', project.project_id)")
+  })
+
+  test('F24: inga kronbelopp via toLocaleString kvar i faktura-, projekt-, offert- eller portalytorna', () => {
+    const walk = (d: string): string[] => fs.readdirSync(path.join(ROOT, d), { withFileTypes: true }).flatMap(e => e.isDirectory() ? walk(path.join(d, e.name)) : /\.tsx?$/.test(e.name) ? [path.join(d, e.name)] : [])
+    const traffar: string[] = []
+    for (const dir of ['app/dashboard/invoices', 'app/dashboard/projects', 'app/dashboard/quotes', 'app/portal', 'components/invoices', 'components/projects']) {
+      for (const f of walk(dir)) {
+        const src = utanKommentarer(read(f))
+        for (const m of Array.from(src.matchAll(/toLocaleString\('sv-SE'\)\}(?:&nbsp;| )kr|toLocaleString\('sv-SE'\) \+ ' kr'/g))) traffar.push(`${f}: ${m[0]}`)
+      }
+    }
+    expect(traffar).toEqual([])
+  })
+
+  test('F25: utkast räknas inte som fakturerat, och korten jämför netto mot netto', () => {
+    const econ = utanKommentarer(read('lib/projects/compute-economics.ts'))
+    expect(econ).toContain("const utfardad = ['sent', 'overdue', 'customer_paid', 'paid'].includes(inv.status || '')")
+    expect(econ).toContain('if (utfardad) fakturerat += v')
+    for (const f of ['components/projects/ProjectStatusCard.tsx', 'components/projects/ProjectStatusBand.tsx']) {
+      expect(utanKommentarer(read(f)), f).toMatch(/fakturerat_ex_moms_kr \?\? \w+\.?\w*\.?fakturerat_kr/)
+    }
+  })
+
+  test('F26: framdriftens belopp räknar grundoffert plus signerad ÄTA', () => {
+    const src = utanKommentarer(read('app/dashboard/projects/[id]/page.tsx'))
+    expect(src).toContain("project.budget_amount + changes.filter(c => ['signed', 'approved', 'invoiced'].includes(c.status))")
+  })
+})

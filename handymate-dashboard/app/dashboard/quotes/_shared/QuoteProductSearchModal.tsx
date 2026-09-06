@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import { Loader2, Search, X } from 'lucide-react'
 import type { ProductWithComponents } from './applyProductToItem'
 import { priceState } from '@/lib/products/pricing-state'
@@ -167,7 +168,7 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
                     ) : (
                       <>
                         <span className="text-sm font-semibold text-slate-900 tabular-nums">
-                          {Math.round(p.sales_price).toLocaleString('sv-SE')} kr
+                          {formatKronor(Math.round(p.sales_price))}
                         </span>
                         <span className="text-[11px] text-slate-400 ml-1">/{p.unit}</span>
                       </>

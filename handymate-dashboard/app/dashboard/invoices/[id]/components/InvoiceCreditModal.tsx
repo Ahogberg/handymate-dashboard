@@ -1,6 +1,7 @@
 'use client'
 
 import { Loader2, RotateCcw, X } from 'lucide-react'
+import { formatKronor } from '@/lib/format-price'
 import type { InvoiceItem } from '../types'
 
 interface InvoiceCreditModalProps {
@@ -83,7 +84,7 @@ export function InvoiceCreditModal({
 
         <p className="text-sm text-gray-500 mb-4">
           {creditType === 'full'
-            ? `Hela faktura #${invoiceNumber} (${invoiceTotal?.toLocaleString('sv-SE')} kr) krediteras. Originalfakturan markeras som krediterad.`
+            ? `Hela faktura #${invoiceNumber} (${formatKronor(invoiceTotal)}) krediteras. Originalfakturan markeras som krediterad.`
             : 'Välj vilka rader och antal som ska krediteras.'}
         </p>
 
@@ -115,7 +116,7 @@ export function InvoiceCreditModal({
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-900 truncate">{item.description}</p>
                     <p className="text-xs text-gray-400">
-                      {item.quantity} {item.unit} x {item.unit_price?.toLocaleString('sv-SE')} kr
+                      {item.quantity} {item.unit} x {formatKronor(item.unit_price)}
                     </p>
                   </div>
                   {creditItemChecked[index] && (
@@ -133,7 +134,7 @@ export function InvoiceCreditModal({
                     />
                   )}
                   <span className="text-sm font-medium text-gray-700 w-20 text-right">
-                    {item.total?.toLocaleString('sv-SE')} kr
+                    {formatKronor(item.total)}
                   </span>
                 </label>
               )

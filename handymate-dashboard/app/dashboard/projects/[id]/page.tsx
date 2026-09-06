@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { formatKronor } from '@/lib/format-price'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -398,7 +399,7 @@ const PROJECT_TYPE_LABELS: Record<string, string> = {
 
 function formatCurrency(amount: number | null | undefined): string {
   return typeof amount === 'number' && Number.isFinite(amount)
-    ? amount.toLocaleString('sv-SE') + ' kr'
+    ? formatKronor(amount)
     : '—'
 }
 
@@ -2459,7 +2460,9 @@ export default function ProjectDetailPage() {
                     progressPercent={project.progress_percent}
                     budgetHours={project.budget_hours ?? null}
                     actualHours={summary?.total_hours ?? 0}
-                    budgetAmount={project.budget_amount ?? null}
+                    // Nämnaren är hela det avtalade: grundoffert + signerad/fakturerad ÄTA
+                    // (Codex liveprov 2026-09-07: kortet stod kvar på 2 450 efter +500 ÄTA).
+                    budgetAmount={project.budget_amount != null ? project.budget_amount + changes.filter(c => ['signed', 'approved', 'invoiced'].includes(c.status)).reduce((s, c) => s + Number(c.total || 0), 0) : null}
                     actualRevenue={summary?.total_revenue ?? null}
                     formatHours={formatHours}
                     formatCurrency={formatCurrency}
@@ -5388,7 +5391,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
             <div>
               <label className="text-xs text-gray-400 uppercase tracking-wider mb-1.5 block">Totalt</label>
               <div className="px-3 py-2.5 bg-gray-100 border border-[#E2E8F0] rounded-lg text-sm font-medium text-gray-900">
-                {total.toLocaleString('sv-SE')} kr
+                {formatKronor(total)}
               </div>
             </div>
           </div>
@@ -5403,7 +5406,7 @@ function SupplierInvoiceModal({ projectId, editing, onClose, onSaved }: {
               </div>
               {total > 0 && markup > 0 && (
                 <p className="text-sm text-primary-700 font-medium">
-                  → {customerPrice.toLocaleString('sv-SE')} kr till kund
+                  → {formatKronor(customerPrice)} till kund
                 </p>
               )}
             </div>
