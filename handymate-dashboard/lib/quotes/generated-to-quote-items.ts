@@ -98,6 +98,23 @@ export function rotRutFranSanning(
   return legacyItemRotRutType(item.type, suggestedDeductionType)
 }
 
+/**
+ * Efter artikelkoppling (2026-09-06, driftfynd #2026004 på Nordström El):
+ * applyProductToItem sätter is_rot_eligible från artikelns standardflagga.
+ * Det är rätt när hantverkaren själv väljer en artikel — men ett BELAGT nej
+ * från generatorn (hantverkarens "inget avdrag" i underlaget, eller ett nej
+ * i lib/rot/tabell.ts) fick då tyst bli ROT igen, och offerten visade ett
+ * avdrag ingen bett om. Belagt nej vinner över artikelns standard. Okänt
+ * (flaggorna undefined) och belagt ja lämnar artikelns standard orörd:
+ * artikeln vet om en materialrad aldrig ger ROT.
+ */
+export function rotRutEfterArtikelkoppling(applied: QuoteItem, raw: GeneratedQuoteItemInput | undefined): QuoteItem {
+  if (raw && raw.is_rot_eligible === false && raw.is_rut_eligible === false) {
+    return { ...applied, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null }
+  }
+  return applied
+}
+
 /** Same unit map as the original client-side converter. */
 export function normalizeUnit(unit: string | null | undefined): string {
   const map: Record<string, string> = {

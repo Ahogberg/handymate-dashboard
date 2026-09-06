@@ -12,6 +12,7 @@ import * as fs from 'fs'
 import * as path from 'path'
 import { tolkaAvdragsinstruktion, INSTRUKTIONSMONSTER, AVDRAGS_KALLA_INSTRUKTION } from '../lib/rot/instruktion'
 import { getQuoteBudgetDerivation } from '../lib/quotes/get-quote-budget-derivation'
+import { rotRutEfterArtikelkoppling } from '../lib/quotes/generated-to-quote-items'
 
 const ROOT = path.join(__dirname, '..')
 const read = (f: string) => fs.readFileSync(path.join(ROOT, f), 'utf8')
@@ -95,5 +96,39 @@ test.describe('Arbete mot material — arbetsandelen går före avdragsflaggan',
     expect(res.labor_items.map(i => i.description)).toEqual(['Elinstallation – byte av två vägguttag'])
     // "2 st" är inte två timmar — tidsbudgeten lämnas tom.
     expect(res.budget_hours).toBeNull()
+  })
+})
+
+test.describe('Artikelkopplingen får inte återinföra ROT (driftfynd #2026004)', () => {
+  const kopplad: any = { id: 'r1', description: 'Byte av vägguttag – arbete', quantity: 2, unit: 'st', unit_price: 850, total: 1700,
+    is_rot_eligible: true, is_rut_eligible: false, rot_rut_type: 'rot', linked_product_id: 'prod_6', labor_amount: 1190 }
+
+  test('belagt nej från generatorn vinner över artikelns standardflagga', () => {
+    const raw: any = { type: 'labor', description: 'Byte av vägguttag', is_rot_eligible: false, is_rut_eligible: false }
+    const rad = rotRutEfterArtikelkoppling(kopplad, raw)
+    expect(rad.is_rot_eligible).toBe(false)
+    expect(rad.is_rut_eligible).toBe(false)
+    expect(rad.rot_rut_type).toBeNull()
+    // Allt annat från artikeln behålls: pris, koppling, arbetsandel.
+    expect(rad.linked_product_id).toBe('prod_6')
+    expect(rad.labor_amount).toBe(1190)
+  })
+
+  test('okänt (flaggorna undefined) ⇒ artikelns standard gäller', () => {
+    const raw: any = { type: 'labor', description: 'Byte av vägguttag' }
+    expect(rotRutEfterArtikelkoppling(kopplad, raw).is_rot_eligible).toBe(true)
+    expect(rotRutEfterArtikelkoppling(kopplad, undefined).is_rot_eligible).toBe(true)
+  })
+
+  test('belagt ja ändrar inte en materialartikel till ROT', () => {
+    const material: any = { ...kopplad, is_rot_eligible: false, rot_rut_type: null, labor_amount: 0 }
+    const raw: any = { type: 'material', is_rot_eligible: true, is_rut_eligible: false }
+    expect(rotRutEfterArtikelkoppling(material, raw).is_rot_eligible).toBe(false)
+  })
+
+  test('källskanning: QuoteBuilder lindar applyProductToItem i rotRutEfterArtikelkoppling vid AI-koppling', () => {
+    const src = utanKommentarer(read('app/dashboard/quotes/_shared/QuoteBuilder.tsx'))
+    const fn = src.split('function linkAiItemsToProducts')[1].split('function applyAiResult')[0]
+    expect(fn).toContain('rotRutEfterArtikelkoppling(applyProductToItem(row, product, row.quantity), rawRows[i])')
   })
 })
