@@ -14,6 +14,9 @@ import { Check, Loader2 } from 'lucide-react'
 
 export function QuickPriceInput({
   productId,
+  initialValue,
+  allowDecimals = false,
+  disabled = false,
   unit,
   onSaved,
   autoFocus,
@@ -21,6 +24,9 @@ export function QuickPriceInput({
   label = 'Artikelpris',
 }: {
   productId: string
+  initialValue?: number
+  allowDecimals?: boolean
+  disabled?: boolean
   unit: string
   /** Anropas efter lyckad sparning med det nya priset. */
   onSaved: (price: number) => void
@@ -28,13 +34,13 @@ export function QuickPriceInput({
   onSavingChange?: (saving: boolean) => void
   label?: string
 }) {
-  const [value, setValue] = useState('')
+  const [value, setValue] = useState(initialValue && initialValue > 0 ? String(initialValue) : '')
   const [saving, setSaving] = useState(false)
   const [fel, setFel] = useState(false)
 
   async function spara() {
-    const pris = Math.round(Number(value))
-    if (!(pris > 0) || !Number.isFinite(pris) || saving) return
+    const pris = allowDecimals ? Math.round(Number(value) * 100) / 100 : Math.round(Number(value))
+    if (!(pris > 0) || !Number.isFinite(pris) || saving || disabled) return
     setSaving(true)
     onSavingChange?.(true)
     setFel(false)
@@ -60,9 +66,10 @@ export function QuickPriceInput({
         type="number"
         aria-label={label}
         aria-invalid={fel}
-        disabled={saving}
-        inputMode="numeric"
-        min={1}
+        disabled={saving || disabled}
+        inputMode={allowDecimals ? "decimal" : "numeric"}
+        min={allowDecimals ? 0.01 : 1}
+        step={allowDecimals ? 0.01 : 1}
         value={value}
         autoFocus={autoFocus}
         onChange={e => setValue(e.target.value)}
@@ -81,7 +88,7 @@ export function QuickPriceInput({
       <button
         type="button"
         onClick={spara}
-        disabled={saving || !(Number(value) > 0)}
+        disabled={saving || disabled || !(Number(value) > 0)}
         title="Spara pris (Enter)"
         className="p-2 min-h-[44px] rounded-lg text-primary-700 hover:bg-primary-50 disabled:opacity-30"
       >

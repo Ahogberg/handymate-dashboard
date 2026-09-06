@@ -300,7 +300,7 @@ export default function ItemRow({
           <label className="flex items-center gap-1.5 min-h-[44px] w-fit cursor-pointer select-none pl-6">
             <input
               type="checkbox"
-              checked={item.save_to_products ?? true}
+              checked={item.save_to_products === true}
               onChange={(e) => onUpdate(item.id, 'save_to_products', e.target.checked)}
               className="w-4 h-4 rounded border-gray-300 accent-primary-700 cursor-pointer"
             />
@@ -459,7 +459,7 @@ export default function ItemRow({
           >
             <input
               type="checkbox"
-              checked={item.save_to_products ?? true}
+              checked={item.save_to_products === true}
               onChange={(e) => onUpdate(item.id, 'save_to_products', e.target.checked)}
               aria-label="Spara i produktbanken när offerten sparas"
               className="w-3.5 h-3.5 rounded border-gray-300 accent-primary-700 cursor-pointer"

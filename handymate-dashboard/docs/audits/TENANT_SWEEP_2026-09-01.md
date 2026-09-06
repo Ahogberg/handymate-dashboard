@@ -75,3 +75,19 @@ Sonden finns för att `evaluateLaunchEnvironment` bara kontrollerar att
 miljövariabler är satta. Mätt samma dag mot prod: `ELKS_API_USER: ✅ Set`
 samtidigt som 46elks svarade *"Not enough credits on your account"* — hela
 Grind B blockerad medan env-checken rapporterade grönt.
+
+## Tillägg 2026-09-05 — kundförberedelse
+
+Två nya vägar utanför direkt standardgrind (148 totalt):
+- `customer-preparation`: `preparationOwner` anropar getAuthenticatedBusiness
+  och getCurrentUser för exakt företag; endast aktiv owner/admin, ingen
+  impersonation. Alla läsningar/skrivningar business-scopas.
+- `preparation/[token]`: separat slump-UUID för en förfrågan, 30 dagars
+  giltighet och återkallelse. Publikt GET lämnar endast mall, kontext, datum
+  och status. POST har DB-rate-limit, strömmande storlekstak och villkorad
+  statusövergång. Bilder lagras privat och signeras bara åt behörig ägare.
+
+Dessa kontrakt exekveras i `tests/customer-preparation/contract.test.mjs`.
+
+### Lars kundunderlagskontroll — 2026-09-05
+POST /api/customer-preparation/review: getAuthenticatedBusiness + aktiv owner/admin, ingen impersonation. Serverladdat underlag med business_id; projekt måste matcha både business_id och customer_id. Privata bilder hämtas endast under företagets och underlagets sökväg. V213 utökar den service-only-tabell som infördes i V212; ingen ny publik databasåtkomst. Driftprovet och migrationens utförande återstår enligt tasks/lars-preparation-review.md.

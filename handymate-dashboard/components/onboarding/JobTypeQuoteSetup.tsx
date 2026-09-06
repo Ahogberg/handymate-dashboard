@@ -4,6 +4,8 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Check, FileText, Loader2, Plus } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
+import { JobStandardRowsEditor } from '@/components/onboarding/JobStandardRowsEditor'
+import { slugifyJobType } from '@/lib/job-types'
 import { JobTypeQuotePreview } from '@/components/onboarding/JobTypeQuotePreview'
 import type { ReservationWithTriggers } from '@/lib/reservations/match'
 import { coreArticleGuidance, inspectTemplate, relevantProducts, resolveFirstQuoteSelection, sameUnit, setupSummary, templatesForJobType,
@@ -11,6 +13,7 @@ import { coreArticleGuidance, inspectTemplate, relevantProducts, resolveFirstQuo
 import './job-type-setup.css'
 
 interface Props {
+  syncOnboarding?: boolean
   initialJobTypes?: string[]
   initialSelection?: FirstQuoteSelection | null
   refreshKey?: number
@@ -22,11 +25,11 @@ interface Props {
 type SetupResponse = QuoteSetupData & { canManage: boolean }
 
 /** Delad riktig uppsättningsyta — ingen offertpreview och inga AI-anrop. */
-export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onChange, onBusyChange, refreshKey = 0, allowCreateJobType = true }: Props) {
+export function JobTypeQuoteSetup({ syncOnboarding = false, initialJobTypes = [], initialSelection, onChange, onBusyChange, refreshKey = 0, allowCreateJobType = true }: Props) {
   const [data, setData] = useState<SetupResponse | null>(null)
   const [selected, setSelected] = useState<string[]>(() => Array.from(new Set([
     ...(initialSelection ? [initialSelection.jobTypeSlug] : []), ...initialJobTypes,
-  ])).slice(0, 3))
+  ])))
   const [focused, setFocused] = useState(initialSelection?.jobTypeSlug || initialJobTypes[0] || '')
   const [templateId, setTemplateId] = useState(initialSelection?.templateId || '')
   const [error, setError] = useState('')
@@ -37,6 +40,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
   const [showAll, setShowAll] = useState(false)
   const [editingPrice, setEditingPrice] = useState<string | null>(null)
   const [reservationLibrary, setReservationLibrary] = useState<ReservationWithTriggers[] | null>(null)
+  const syncedOnboarding = useRef(false)
   const revision = useRef(0)
   const mutationLock = useRef(false)
   const onChangeRef = useRef(onChange)
@@ -52,6 +56,12 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
     setLoading(true)
     setError('')
     try {
+      if (syncOnboarding && !syncedOnboarding.current) {
+        const response = await fetch('/api/job-types/quote-setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ operation: 'syncOnboarding' }) })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error || 'Kunde inte hämta dina valda jobb.')
+        syncedOnboarding.current = true
+      }
       const reservationRequest = fetch('/api/reservations?include=triggers', { cache: 'no-store' }).catch(() => null)
       const response = await fetch('/api/job-types/quote-setup', { cache: 'no-store' })
       const result = await response.json()
@@ -72,7 +82,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
         setError(err instanceof Error ? err.message : 'Kunde inte hämta underlaget.')
       }
     } finally { if (request === revision.current) setLoading(false) }
-  }, [])
+  }, [syncOnboarding])
 
   useEffect(() => { void load(); return () => { revision.current++ } }, [load, refreshKey])
 
@@ -107,12 +117,8 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
 
   function toggleJob(slug: string) {
     setTemplateId(''); setShowAll(false)
-    if (selected.includes(slug)) {
-      const next = selected.filter(s => s !== slug)
-      setSelected(next); setFocused(next[0] || '')
-    } else if (selected.length < 3) {
-      setSelected([...selected, slug]); setFocused(slug)
-    }
+    setSelected(old => Array.from(new Set([...old, slug])))
+    setFocused(slug)
   }
 
   const rows = chosen && data ? inspectTemplate(chosen, data.products) : []
@@ -125,57 +131,59 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
       <img src={matte?.avatar} alt="" width={56} height={56} />
       <div><span className="job-setup-eyebrow">Matte · din chefsagent</span>
         <h2>Vilket jobb börjar vi med?</h2>
-        <p>Välj upp till tre vanliga jobb. Koppla ett offertupplägg och sätt dina priser där de behövs.</p>
-        <p className="job-setup-caption">Börja gärna med 3–5 återkommande nyckelartiklar per jobbtyp, till exempel arbetstid, framkörning och vanligt material. Det är en genväg, inte ett krav.</p>
-        <p className="job-setup-caption">När affären har samma jobbtyp kan offerten börja med era förvalda artikelrader. Flera mallar? Då väljer du vilken. Artikelkopplade reservationer föreslås i offerten och du granskar dem innan de läggs till.</p>
+        <p>Vilket av dina jobb vill du kunna offerera först? Välj ett jobb och förbered dess standardrader.</p>
+        <p className="job-setup-caption">Dina val följer med till nya offerter för samma jobbtyp. Du granskar alltid offerten innan den skickas.</p>
       </div>
     </div>
     {error && <div className="job-setup-error" role="alert">{error} <button type="button" onClick={() => void load()} disabled={loading || busy}>Försök igen</button></div>}
     {loading && <p className="job-setup-loading" role="status"><Loader2 size={18} className="animate-spin" /> Hämtar dina jobb och artiklar…</p>}
-    {!loading && data && <>
+    {data && <>
       {!data.linkingAvailable && <p className="job-setup-note" role="status">Jobbtypskopplingen är inte aktiverad ännu. Du kan fortsätta och använda ditt artikelregister som vanligt.</p>}
       <div className="job-setup-jobs" role="group" aria-label="Dina vanligaste jobb">
-        {data.jobTypes.map(j => <button type="button" key={j.id} aria-pressed={selected.includes(j.slug)}
-          disabled={busy || (!selected.includes(j.slug) && selected.length >= 3)} onClick={() => toggleJob(j.slug)}>
-          <span>{j.name}</span>{selected.includes(j.slug) ? <Check size={17} /> : <Plus size={17} />}
+        {data.jobTypes.map(j => <button type="button" key={j.id} aria-pressed={focused === j.slug}
+          disabled={busy || priceSaving || loading} onClick={() => toggleJob(j.slug)}>
+          <span>{j.name}</span>{focused === j.slug ? <Check size={17} /> : <ArrowRight size={17} />}
         </button>)}
       </div>
       {!data.jobTypes.length && <p>Inga jobbtyper finns ännu. Lägg till ett jobb ni ofta gör, till exempel servicebesök.</p>}
       {data.canManage && allowCreateJobType && <details className="job-setup-details"><summary>Lägg till en jobbtyp</summary>
         <form className="job-setup-inline" onSubmit={async e => {
           e.preventDefault()
-          if (jobName.trim() && await mutate('/api/job-types', 'POST', { name: jobName.trim() })) setJobName('')
+          if (jobName.trim() && await mutate('/api/job-types', 'POST', { name: jobName.trim() })) {
+            const slug = slugifyJobType(jobName.trim()); setSelected(old => Array.from(new Set([...old, slug]))); setFocused(slug); setTemplateId(''); setJobName('')
+          }
         }}>
           <label className="sr-only" htmlFor="quote-setup-job-name">Namn på jobbtypen</label>
           <input id="quote-setup-job-name" value={jobName} maxLength={80} onChange={e => setJobName(e.target.value)} placeholder="Till exempel servicebesök" />
           <button type="submit" disabled={busy || !jobName.trim()}>Lägg till</button>
         </form>
       </details>}
-      {selected.length > 1 && <div className="job-setup-tabs" role="group" aria-label="Redigera valt jobb">
-        {data.jobTypes.filter(j => selected.includes(j.slug)).map(j => <button type="button" key={j.id} aria-pressed={focused === j.slug}
-          disabled={busy} onClick={() => { setFocused(j.slug); setTemplateId(''); setShowAll(false) }}>{j.name}</button>)}
-      </div>}
       {job && data.linkingAvailable && <div className="job-setup-workspace" key={job.slug}>
         <div className="job-setup-document-heading"><FileText size={23} /><div><span className="job-setup-eyebrow">Ditt upplägg för</span><h3>{job.name}</h3></div></div>
-        <label className="job-setup-label" htmlFor="quote-setup-template">Vilken offertmall vill du utgå från?</label>
-        <select id="quote-setup-template" value={chosen?.id || ''} disabled={busy} onChange={e => { setTemplateId(e.target.value); setShowAll(false) }}>
+        {!linked.length && data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => { setTemplateId(''); void mutate('/api/job-types/quote-setup', 'POST', { operation: 'create', jobTypeSlug: job.slug }) }}>Förbered standardrader för {job.name}</button>}
+        <details className="job-setup-details" open={linked.length > 1 || undefined}><summary>{linked.length > 1 ? 'Välj vilket offertupplägg du vill använda' : 'Utgå från en befintlig offertmall'}</summary>
+        <label className="job-setup-label" htmlFor="quote-setup-template">Offertupplägg</label>
+        <select id="quote-setup-template" value={chosen?.id || ''} disabled={busy || priceSaving || loading} onChange={e => { setTemplateId(e.target.value); setShowAll(false) }}>
           <option value="">Välj en mall</option>
           <optgroup label="Kopplade till jobbtypen">{linked.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
           <optgroup label="Mallar att koppla">{data.templates.filter(t => !t.jobTypeSlug).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
         </select>
         {!data.templates.length && <div className="job-setup-note"><p>Det finns inga offertmallar ännu.</p>
-          {data.canManage && <button type="button" disabled={busy} onClick={() => void mutate('/api/quote-templates/seed', 'POST')}>Hämta mallar för min bransch</button>}
+          {data.canManage && <button type="button" disabled={busy || priceSaving || loading} onClick={() => void mutate('/api/quote-templates/seed', 'POST')}>Hämta mallar för min bransch</button>}
         </div>}
+        </details>
         {chosen && <>
           {chosen.jobTypeSlug !== job.slug && <div className="job-setup-note"><p>Du granskar mallen. Den blir inte ert standardunderlag förrän du kopplar den.</p>
-            {data.canManage && <button type="button" className="job-setup-primary" disabled={busy} onClick={() => void mutate('/api/job-types/quote-setup', 'PUT',
+            {data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => void mutate('/api/job-types/quote-setup', 'PUT',
               { templateId: chosen.id, jobTypeSlug: job.slug, updatedAt: chosen.updatedAt })}>Koppla till {job.name} <ArrowRight size={16} /></button>}
           </div>}
+          {chosen.jobTypeSlug === job.slug && data.canManage && <JobStandardRowsEditor template={chosen} products={data.products} busy={busy || priceSaving || loading}
+            onWrite={body => mutate('/api/job-types/quote-setup', 'POST', body)} onRefresh={load} onBusyChange={setPriceSaving} />}
           <p className="job-setup-summary" role="status">{setupSummary(rows)}</p>
           <p className="job-setup-caption">{coreArticleGuidance(rows)}</p>
           <p className="job-setup-caption">Artikelpriser exkl. moms. Mängder, kundavtal och jobbets förutsättningar granskar du i offerten.</p>
           <JobTypeQuotePreview jobName={job.name} template={chosen} products={data.products} reservationLibrary={reservationLibrary} />
-          <div className="job-setup-products">
+          {(!data.canManage || chosen.jobTypeSlug !== job.slug) && <><div className="job-setup-products">
             {(showAll ? products : products.slice(0, 10)).map(p => <div className="job-setup-product" key={p.id}>
               <div><strong>{p.name}</strong><span>{p.unit}</span></div>
               {data.canManage && (!(p.salesPrice && p.salesPrice > 0) || editingPrice === p.id)
@@ -184,7 +192,7 @@ export function JobTypeQuoteSetup({ initialJobTypes = [], initialSelection, onCh
                   {data.canManage && <button type="button" onClick={() => setEditingPrice(p.id)}>Ändra pris</button>}</div>}
             </div>)}
           </div>
-          {products.length > 10 && <button type="button" className="job-setup-text-button" onClick={() => setShowAll(!showAll)}>{showAll ? 'Visa färre artiklar' : `Visa alla ${products.length} artiklar`}</button>}
+          {products.length > 10 && <button type="button" className="job-setup-text-button" onClick={() => setShowAll(!showAll)}>{showAll ? 'Visa färre artiklar' : `Visa alla ${products.length} artiklar`}</button>}</>}
           {unresolved.length > 0 && <details className="job-setup-details"><summary>{unresolved.length} {unresolved.length === 1 ? 'rad behöver' : 'rader behöver'} artikelkoppling</summary>
             <p className="job-setup-caption">Välj en befintlig artikel med samma enhet. Vi gissar inte vad en rad motsvarar.</p>
             {unresolved.map(({ item, status }) => <div className="job-setup-unlinked" key={item.index}>

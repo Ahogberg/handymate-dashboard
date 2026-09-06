@@ -245,6 +245,7 @@ const REF_TYPE_BUCKET: Record<string, FuelBucket> = {
   monthly_review_analysis: 'quotes_analysis',
   egenkontroll_foto: 'quotes_analysis',
   jobbuddy_photo: 'quotes_analysis',
+  preparation_review: 'quotes_analysis',
   ai_copilot: 'quotes_analysis',
   pipeline_call_analysis: 'quotes_analysis',
   matte_chat_turn: 'quotes_analysis',
@@ -267,6 +268,8 @@ const REF_TYPE_BUCKET: Record<string, FuelBucket> = {
 
   // ── Diagnostik (når aldrig hit i praktiken, se docstring) ──────────────
   probe: 'night_work',
+  probe_transcription_bench: 'night_work',
+  launch_desk_brief: 'night_work',
 }
 
 /** Aldrig en tyst odefinierad bucket: kända värden mappas explicit ovan,

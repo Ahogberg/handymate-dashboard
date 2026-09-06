@@ -1,29 +1,17 @@
 'use client'
 
-/**
- * KomIgangRail — "Teamet behöver detta för att hjälpa dig bättre"
- * (docs/design/FORSTA-30-MINUTERNA.md DEL 4; Lager 3 / B7, 2026-08-27).
- *
- * Förut tre identiska rader för alla konton. Nu uppgifter härledda ur
- * kontots RIKTIGA luckor (app/api/onboarding/kom-igang/route.ts →
- * lib/onboarding/kom-igang-tasks.ts): en primär med agent, värde och
- * tidsuppskattning, upp till två sekundära. Completion kommer alltid ur
- * signalen, aldrig ur ett kryss användaren sätter själv.
- *
- * Synlig bara för NYA konton (< 30 dagar, business.created_at) med minst en
- * öppen uppgift. Döljs för gott när allt är klart — localStorage-minnet gör
- * det permanent så kortet inte flimrar fram igen vid nästa hämtning.
- * Fail-safe: ett rutt-fel gör att railen inte renderas alls.
- */
+/** En primär uppgift utifrån kontots mål och verkliga signaler.
+ * Hämtas om vid fokus/återkomst. Ingen global "klar"-flagga kan gömma en
+ * annan firmas start. API-fel ger ett synligt återförsök. */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { Check } from 'lucide-react'
+import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { KOM_IGANG_HEADING, visibleKomIgangTasks, type KomIgangTask } from '@/lib/onboarding/kom-igang-tasks'
 
-const DONE_KEY = 'hm_kom_igang_klar'
 const KONTO_MAX_DAGAR = 30
 
 interface KomIgangData {
@@ -45,39 +33,51 @@ function fallbackTasks(d: KomIgangData): KomIgangTask[] {
 
 export function KomIgangRail() {
   const business = useBusiness()
+  // Remount per företag: gammal respons eller lokalt UI får inte följa med.
+  return <AccountStartRail key={business.business_id} />
+}
+
+function AccountStartRail() {
+  const business = useBusiness()
+  const { isOpen, setPendingPrompt, setActiveTab, setIsOpen } = useJobbuddy()
   const [data, setData] = useState<KomIgangData | null>(null)
   const [failed, setFailed] = useState(false)
-  const [dismissedForGood, setDismissedForGood] = useState(false)
+  const [retry, setRetry] = useState(0)
+  const wasOpen = useRef(false)
+  useEffect(() => {
+    if (wasOpen.current && !isOpen) setRetry(n => n + 1)
+    wasOpen.current = isOpen
+  }, [isOpen])
 
   useEffect(() => {
-    try {
-      if (localStorage.getItem(DONE_KEY)) setDismissedForGood(true)
-    } catch { /* trasig localStorage — railen får bara visas normalt */ }
-  }, [])
-
-  useEffect(() => {
-    if (dismissedForGood) return
-    let aktiv = true
-    fetch('/api/onboarding/kom-igang')
-      .then(r => (r.ok ? r.json() : Promise.reject(new Error('fel svar'))))
-      .then(d => { if (aktiv) setData(d) })
-      .catch(() => { if (aktiv) setFailed(true) })
-    return () => { aktiv = false }
-  }, [dismissedForGood])
+    let active = true
+    let latest = 0
+    const controller = new AbortController()
+    async function refresh() {
+      const request = ++latest
+      try {
+        const r = await fetch('/api/onboarding/kom-igang', { signal: controller.signal, cache: 'no-store' })
+        if (!r.ok) throw new Error('fel svar')
+        const d = await r.json()
+        if (active && request === latest) { setData(d); setFailed(false) }
+      } catch {
+        if (active && request === latest) { setFailed(true); setData(null) }
+      }
+    }
+    void refresh()
+    const onFocus = () => { void refresh() }
+    window.addEventListener('focus', onFocus)
+    return () => { active = false; controller.abort(); window.removeEventListener('focus', onFocus) }
+  }, [retry, business.business_id])
 
   const tasks = data ? (Array.isArray(data.tasks) ? data.tasks : fallbackTasks(data)) : []
   const allaKlara = data !== null && tasks.length > 0 && tasks.every(t => t.klar)
 
-  useEffect(() => {
-    if (allaKlara) {
-      try {
-        localStorage.setItem(DONE_KEY, '1')
-      } catch { /* kortet döljer sig ändå just den här sessionen (allaKlara nedan) */ }
-    }
-  }, [allaKlara])
-
-  if (failed || dismissedForGood || !data) return null
-  if (allaKlara || tasks.length === 0) return null
+  function openMission(task: KomIgangTask) {
+    setPendingPrompt(task.prompt || 'Vad är det viktigaste vi kan göra den här veckan?')
+    setActiveTab('chat')
+    setIsOpen(true)
+  }
 
   const kontotsAlderDagar = business.created_at
     ? (Date.now() - new Date(business.created_at).getTime()) / 86_400_000
@@ -86,6 +86,11 @@ export function KomIgangRail() {
   // än att tyst gömma railen för alla.
   const nyttKonto = kontotsAlderDagar === null || kontotsAlderDagar < KONTO_MAX_DAGAR
   if (!nyttKonto) return null
+  if (failed) return <section className="rounded-2xl border border-slate-200 bg-white p-4" aria-label="Kom igång">
+    <p role="alert" className="text-sm text-slate-700">Kunde inte hämta nästa steg för ditt företag.</p>
+    <button type="button" className="min-h-[44px] text-sm font-semibold text-teal-800" onClick={() => setRetry(n => n + 1)}>Försök igen</button>
+  </section>
+  if (!data || allaKlara || tasks.length === 0) return null
 
   const { primary, secondary } = visibleKomIgangTasks(tasks)
   if (!primary) return null
@@ -98,8 +103,9 @@ export function KomIgangRail() {
         <span className="text-[11px] text-slate-400 shrink-0">{klaraAntal}/{tasks.length} klart</span>
       </div>
 
+      <p className="text-xs text-slate-600 mb-3">Fånga förfrågningar, få iväg offerter och följ pengarna. Börja med en sak som hjälper dig nu.</p>
       {/* Primär — agenten som behöver den, värdet, tiden */}
-      <Link href={primary.href} className="block rounded-xl border border-primary-100 bg-primary-50/60 p-3 mb-2.5 group hover:border-primary-300 transition-colors">
+      <TaskAction task={primary} onMission={openMission} className="block rounded-xl border border-primary-100 bg-primary-50/60 p-3 mb-2.5 group hover:border-primary-300 transition-colors">
         <div className="flex items-start gap-2.5">
           <AgentAvatar agentKey={primary.agent} size="sm" />
           <div className="min-w-0">
@@ -108,24 +114,32 @@ export function KomIgangRail() {
             <p className="m-0 mt-1.5 text-[11px] text-slate-400">~{primary.minuter} min</p>
           </div>
         </div>
-      </Link>
+      </TaskAction>
 
       {secondary.length > 0 && (
         <div className="flex flex-col gap-2">
           {secondary.map(u => (
-            <Link key={u.key} href={u.href} className="flex items-start gap-2.5 min-h-[32px] group">
+            <TaskAction key={u.key} task={u} onMission={openMission} className="flex items-start gap-2.5 min-h-[44px] group">
               <span className="w-5 h-5 rounded-full flex items-center justify-center shrink-0 mt-0.5 border border-slate-300 text-transparent">
                 <Check className="w-3 h-3" strokeWidth={3} />
               </span>
               <span className="text-[13px] leading-snug text-slate-700 group-hover:text-primary-700">
                 {u.label} <span className="text-slate-400">· ~{u.minuter} min</span>
               </span>
-            </Link>
+            </TaskAction>
           ))}
         </div>
       )}
     </div>
   )
+}
+
+function TaskAction({ task, onMission, className, children }: {
+  task: KomIgangTask; onMission: (task: KomIgangTask) => void; className: string; children: React.ReactNode
+}) {
+  return task.key === 'matte_mission'
+    ? <button type="button" className={`${className} w-full text-left`} onClick={() => onMission(task)}>{children}</button>
+    : <Link href={task.href} className={className}>{children}</Link>
 }
 
 export default KomIgangRail

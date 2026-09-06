@@ -39,7 +39,7 @@ test('offerteditorn skapar aldrig en ny offert vid navigation', () => {
   // (performAutoSave).
   expect(save).toContain("method: mode === 'edit' ? 'PUT' : 'POST'")
   expect(save).toMatch(
-    /const performAutoSave = useCallback\(async \(\) => \{\s*if \(mode !== 'edit'\) return[\s\S]{0,400}method: 'PUT'/,
+    /const performAutoSave = useCallback\(async \(\) => \{\s*if \(mode !== 'edit' \|\| inFlight.current\) return[\s\S]{0,1000}method: 'PUT'/,
   )
 
   // Debounce-timern (5s, samma som förr) anropar den TYSTA performAutoSave()

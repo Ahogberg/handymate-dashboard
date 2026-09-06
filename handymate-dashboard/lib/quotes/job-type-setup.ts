@@ -11,6 +11,7 @@ export interface SetupJobType {
 
 export interface SetupItem {
   index: number
+  quantity?: number
   itemType: 'item' | 'option'
   description: string
   unit: string
@@ -117,7 +118,7 @@ export function coreArticleGuidance(rows: SetupRow[]): string {
   return `${count} återkommande artiklar är prissatta för jobbtypen.`
 }
 
-/** Smal DTO: mallens gamla pris, kvantitet och totalsumma följer INTE med. */
+/** Smal DTO: mallens gamla pris och totalsumma följer INTE med. Standardmängden är redigerbar. */
 export function toSetupTemplate(row: Record<string, unknown>): SetupTemplate {
   const rawItems = Array.isArray(row.default_items) ? row.default_items : []
   return {
@@ -129,7 +130,7 @@ export function toSetupTemplate(row: Record<string, unknown>): SetupTemplate {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return []
       const type = item.item_type || 'item'
       if (type !== 'item' && type !== 'option') return []
-      return [{ index, itemType: type, description: String(item.description || ''), unit: String(item.unit || ''),
+      return [{ index, quantity: typeof item.quantity === 'number' && Number.isFinite(item.quantity) ? item.quantity : 1, itemType: type, description: String(item.description || ''), unit: String(item.unit || ''),
         linkedProductId: typeof item.linked_product_id === 'string' ? item.linked_product_id : null }]
     }),
   }

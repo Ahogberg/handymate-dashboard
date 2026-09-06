@@ -1,3 +1,4 @@
+import { removePreparationImages } from '@/lib/customer-preparation/cleanup'
 /**
  * Kontoradering — persondata-listan (2026-09-04, tasks/plan-kontoradering.md).
  *
@@ -145,7 +146,7 @@ export const RADERAS: string[] = [
   // ── Samtal, sms, mejl, widget — konversationsinnehåll ──
   'call_recording', 'conversations', 'sms_conversation', 'sms_log',
   'sms_queue', 'email_conversations', 'communication_log',
-  'customer_message', 'widget_conversation', 'thread_message',
+  'customer_message', 'customer_preparation', 'widget_conversation', 'thread_message',
   'matte_conversations', 'matte_messages', 'agent_messages',
 
   // ── Agentens minne av en specifik kund/case ──
@@ -393,6 +394,9 @@ export async function raderaPersondata(
 ): Promise<RaderingsResultat> {
   const raderat: Record<string, number | null> = {}
   const fel: Record<string, string> = {}
+
+  // Behåll referenserna vid lagringsfel så raderingen kan återförsökas.
+  await removePreparationImages(supabase, businessId)
 
   const barn = await raderaBarntabellerUtanBusinessId(supabase, businessId)
   Object.assign(raderat, barn.raderat)

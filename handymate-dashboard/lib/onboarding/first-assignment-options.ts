@@ -32,7 +32,7 @@ export function deriveFirstAssignmentOptions(snapshot: FirstAssignmentSnapshot):
     options.push({
       id: 'first_quote',
       title: 'Få ut min första offert',
-      description: 'Daniel använder jobbtypen, dina artiklar och dina priser. Du granskar innan något skickas.',
+      description: 'Din valda jobbtyp, mall och dina artikelpriser följer med. Anpassa jobbet och granska offerten.',
       agentIds: ['matte', 'daniel'],
     })
   }
@@ -70,5 +70,11 @@ export function deriveFirstAssignmentOptions(snapshot: FirstAssignmentSnapshot):
     })
   }
 
-  return options.slice(0, 2)
+  // Kundens mål styr ordningen, men skapar aldrig saknade signaler.
+  const preferred: FirstAssignmentId = focus?.id === 'fler_jobb'
+    ? 'customer_inflow'
+    : hasPortfolioSignal && focus && focus.id !== 'mindre_admin'
+      ? 'portfolio_plan'
+      : snapshot.hasFirstQuoteSetup ? 'first_quote' : 'customer_inflow'
+  return [...options.filter(o => o.id === preferred), ...options.filter(o => o.id !== preferred)].slice(0, 2)
 }

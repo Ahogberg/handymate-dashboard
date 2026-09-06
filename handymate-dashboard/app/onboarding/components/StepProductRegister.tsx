@@ -1,5 +1,7 @@
 'use client'
 
+import { slugifyJobType } from '@/lib/job-types'
+
 /**
  * StepProductRegister — "Ditt produktregister" (onboarding-steg, efter
  * kundimporten StepImportData).
@@ -38,6 +40,7 @@ import type { ComponentPayload, ProductRow } from '@/app/dashboard/settings/prod
 import type { OnboardingFormData } from '../types-redesign'
 
 interface Props {
+  onFirstQuote?: () => Promise<void>
   onNext: () => void
   onBack: () => void
   data: OnboardingFormData
@@ -55,7 +58,8 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['arbete', 'material', 'hyra', 'övrigt']
 
-export default function StepProductRegister({ onNext, onBack, data, setData }: Props) {
+export default function StepProductRegister({ onFirstQuote, onNext, onBack, data, setData }: Props) {
+  const [openingQuote, setOpeningQuote] = useState(false)
   const [view, setView] = useState<View>('loading')
   const [products, setProducts] = useState<ProductRow[]>([])
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null)
@@ -147,7 +151,7 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
 
   return (
     <div className="ob-screen">
-      <OnboardingHeader step={OB_DOTS.productRegister} total={OB_DOT_TOTAL} onBack={setupBusy ? null : onBack} onSkip={setupBusy ? null : onNext} />
+      <OnboardingHeader step={OB_DOTS.productRegister} total={OB_DOT_TOTAL} onBack={setupBusy || openingQuote ? null : onBack} onSkip={setupBusy || openingQuote ? null : onNext} />
       <div className="ob-body">
         {view === 'loading' && (
           <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', minHeight: '100%' }}>
@@ -162,14 +166,14 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
           <>
             <h1 className="ob-headline">Ditt sätt att offerera.</h1>
             <p className="ob-sub">
-              Välj en vanlig jobbtyp, koppla en offertmall och sätt priser på dina artiklar.
+              Börja med ett av jobben du valt. Lägg till standardrader och sätt dina egna artikelpriser.
               Då kan Daniel förbereda nästa offert med ert eget underlag — i stället för att du börjar från noll.
               Börja gärna med 3–5 återkommande nyckelartiklar per vanlig jobbtyp. Det är en rekommendation, inte ett krav för att fortsätta.
             </p>
 
             {error && <FallbackNote text={error} />}
 
-            <JobTypeQuoteSetup initialJobTypes={data.quoteJobTypes} initialSelection={data.firstQuoteSelection}
+            <JobTypeQuoteSetup syncOnboarding initialJobTypes={data.quoteJobTypes?.length ? data.quoteJobTypes : (data.specialties || []).map(slugifyJobType)} initialSelection={data.firstQuoteSelection}
               refreshKey={setupRefresh} onBusyChange={setSetupBusy} onChange={(selection, jobTypes) => setData(d => ({ ...d, quoteJobTypes: jobTypes, firstQuoteSelection: selection }))} />
 
             <button type="button" className="obi-choice" onClick={() => setShowCatalog(true)} style={{ marginBottom: 12 }}>
@@ -255,7 +259,7 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
               <span className="obi-choice-arrow"><ArrowRight size={20} /></span>
             </button>
 
-            <button type="button" className="obi-skiplink" style={{ marginTop: 16 }} onClick={onNext} disabled={setupBusy}>
+            <button type="button" className="obi-skiplink" style={{ marginTop: 16 }} onClick={onNext} disabled={setupBusy || openingQuote}>
               Hoppa över — jag gör det senare
             </button>
           </>
@@ -263,11 +267,17 @@ export default function StepProductRegister({ onNext, onBack, data, setData }: P
       </div>
 
       <div className="ob-footer">
-        {view === 'ready' && (
-          <button type="button" className="ob-cta" onClick={onNext} disabled={setupBusy}>
-            Fortsätt <ArrowRight size={18} />
+        {view === 'ready' && <>
+          {data.firstQuoteSelection && onFirstQuote && <button type="button" className="ob-cta" disabled={setupBusy || openingQuote} onClick={async () => {
+            setOpeningQuote(true); setError('')
+            try { await onFirstQuote() }
+            catch (err) { setError(err instanceof Error ? err.message : 'Kunde inte öppna offerten. Försök igen.') }
+            finally { setOpeningQuote(false) }
+          }}>{openingQuote ? 'Öppnar offertvyn…' : 'Använd för min första offert'} <ArrowRight size={18} /></button>}
+          <button type="button" className={data.firstQuoteSelection && onFirstQuote ? 'obi-skiplink' : 'ob-cta'} onClick={onNext} disabled={setupBusy || openingQuote}>
+            {data.firstQuoteSelection && onFirstQuote ? 'Fortsätt till start i stället' : 'Fortsätt'} <ArrowRight size={18} />
           </button>
-        )}
+        </>}
       </div>
 
       {editingProduct && (

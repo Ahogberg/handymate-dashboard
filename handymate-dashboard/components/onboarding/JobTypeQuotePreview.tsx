@@ -27,7 +27,7 @@ export function JobTypeQuotePreview({ jobName, template, products, reservationLi
     <div className="job-setup-preview-top">
       <div className="job-setup-preview-title"><FileText size={20} aria-hidden="true" /><div>
         <span>Så här börjar nästa offert</span>
-        <h4>{jobName} · {template.name}</h4>
+        <h4>{template.id.startsWith('qstd_') ? jobName : `${jobName} · ${template.name}`}</h4>
       </div></div>
       <span className="job-setup-preview-badge">Förhandsvisning · Inget skickas</span>
     </div>
@@ -36,7 +36,7 @@ export function JobTypeQuotePreview({ jobName, template, products, reservationLi
       {visibleRows.map(row => <div className="job-setup-preview-row" key={row.index}>
         <div>
           <strong>{row.description}</strong>
-          <span>{row.itemType === 'option' ? 'Tillval · ' : ''}{row.productName && row.productName !== row.description ? `${row.productName} · ` : ''}{row.unit || 'enhet saknas'}</span>
+          <span>{row.itemType === 'option' ? 'Tillval · ' : ''}{row.productName && row.productName !== row.description ? `${row.productName} · ` : ''}{template.items.find(item => item.index === row.index)?.quantity ?? 1} {row.unit || 'enhet saknas'}</span>
         </div>
         {row.status === 'priced'
           ? <span className="job-setup-preview-price"><CheckCircle2 size={15} aria-hidden="true" />{kronor.format(row.unitPrice!)} kr/{row.unit}</span>

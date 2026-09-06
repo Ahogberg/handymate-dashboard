@@ -35,8 +35,8 @@ export function FirstQuoteLaunch({ companyName, jobName, templateName, onContinu
     <div className="first-quote-host">
       <img src={matte?.avatar} alt="" width={80} height={80} />
       <span>Matte · din chefsagent</span>
-      <h2>Snyggt! Låt oss skapa<br />din första offert.</h2>
-      <p>Ditt upplägg följer med. Välj kund och anpassa jobbet direkt i offertvyn.</p>
+      <h2>Ditt upplägg är valt.<br />Nu tar vi ditt första jobb.</h2>
+      <p>Jobbtypen och mallen följer med från onboardingen. Välj kund, anpassa mängder och priser och granska din egen offert.</p>
     </div>
     <div className="first-quote-paper">
       <div className="first-quote-paper-top"><strong>{companyName}</strong><FileText size={26} aria-hidden="true" /></div>

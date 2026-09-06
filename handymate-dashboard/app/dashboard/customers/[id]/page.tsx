@@ -46,6 +46,7 @@ import { useToast } from '@/components/Toast'
 import { sendSiteVisitSms } from '@/lib/sms/site-visit-confirm'
 import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
+import CustomerPreparations from '@/components/customer-preparation/CustomerPreparations'
 import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
@@ -1350,6 +1351,7 @@ export default function CustomerDetailPage() {
                     Ladda ner kommunikationsunderlag
                   </a>
                 </div>
+                {currentUser && ['owner', 'admin'].includes(currentUser.role) && <CustomerPreparations key={customerId} customerId={customerId} />}
                 <CustomerTimeline customerId={customerId} customerEmail={customer?.email} />
               </div>
             )}

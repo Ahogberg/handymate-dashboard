@@ -93,7 +93,7 @@ test.describe('Första uppdraget — signalstyrt och utan låtsasportfölj', () 
   test('finalen återanvänder handoff och offertstart — ingen ny missions-POST', () => {
     const final = source('app/onboarding/components/FirstAssignmentFinal.tsx')
     expect(final).toContain('writeFirstMissionPrompt')
-    expect(final).toContain('Låt Matte ta fram planen')
+    expect(final).toContain('Förbered mitt första uppdrag')
     expect(final).not.toMatch(/fetch\([^)]*mission/i)
   })
 })

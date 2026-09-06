@@ -96,6 +96,7 @@ export interface RevenueRecoveryAction {
 
 export interface RevenueRecoveryCase {
   case_id: string
+  title?: string
   approval_id: string
   approval_type: RevenueRecoveryApprovalType
   project_id: string | null
@@ -259,6 +260,7 @@ function buildCase(
 
   return Object.freeze({
     case_id: `recovery:${approval.id}`,
+    title: approval.title,
     approval_id: approval.id,
     approval_type: approval.approval_type as RevenueRecoveryApprovalType,
     project_id: values.projectId,

@@ -58,7 +58,7 @@ test('aktiveringsytan är read-only bevis, inte en ny offertskrivare eller grind
   const preview = read('components/onboarding/JobTypeQuotePreview.tsx')
   expect(setup).toContain("'/api/reservations?include=triggers'")
   expect(setup).toContain('<JobTypeQuotePreview')
-  expect(setup).toContain('3–5 återkommande nyckelartiklar')
+  expect(read('components/onboarding/JobStandardRowsEditor.tsx')).toContain('3–5 återkommande nyckelartiklar')
   expect(preview).toContain('Inget skickas')
   expect(preview).toContain('Mängder och villkor granskar du i offerten')
   expect(preview).not.toMatch(/fetch\s*\(|\/api\/quotes|router\.|reduce\s*\(|total/i)

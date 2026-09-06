@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -15,6 +16,7 @@ import {
 import type { Quote, QuoteIntelligence } from '../types'
 
 interface QuoteSendModalProps {
+  preview?: ReactNode
   show: boolean
   quote: Quote
   business: { business_name?: string; contact_email?: string; [key: string]: any }
@@ -33,6 +35,7 @@ interface QuoteSendModalProps {
 }
 
 export function QuoteSendModal({
+  preview,
   show,
   quote,
   business,
@@ -49,6 +52,7 @@ export function QuoteSendModal({
   onClose,
   onSend,
 }: QuoteSendModalProps) {
+  const [previewOpen, setPreviewOpen] = useState(false)
   if (!show) return null
 
   return (
@@ -57,14 +61,15 @@ export function QuoteSendModal({
       onClick={() => !sending && onClose()}
     >
       <div
-        className="bg-white rounded-xl border border-[#E2E8F0] w-full max-w-lg shadow-xl"
+        role="dialog" aria-modal="true" aria-label="Granska och skicka offert"
+        className={`bg-white rounded-xl border border-[#E2E8F0] w-full max-h-[90dvh] overflow-y-auto shadow-xl ${previewOpen ? 'max-w-4xl' : 'max-w-lg'}`}
         onClick={e => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center gap-3 px-6 py-4 border-b border-gray-100">
           <Mail className="w-5 h-5 text-primary-700" />
           <h2 className="text-lg font-semibold text-gray-900">
-            Skicka offert {quote.quote_number || ''}
+            Granska och skicka {quote.quote_number || ''}
           </h2>
           <button
             onClick={() => !sending && onClose()}
@@ -75,6 +80,13 @@ export function QuoteSendModal({
         </div>
 
         <div className="px-6 py-4 space-y-4">
+          <section className="rounded-xl border border-teal-200 bg-teal-50 p-4">
+            <p className="font-semibold text-slate-900">{quote.title || 'Din offert'}</p>
+            <p className="mt-1 text-sm text-slate-700">{quote.customer?.name || 'Kontrollera kunden'} · {Number.isFinite(quote.total) ? quote.total.toLocaleString('sv-SE') + ' kr inkl. moms före avdrag' : 'Belopp behöver kontrolleras'}</p>
+            <p className="mt-2 text-xs text-slate-600">Kontrollera dokumentet, mottagarna och sändsättet. Offerten skickas först med knappen längst ned.</p>
+            {preview && <button type="button" onClick={() => setPreviewOpen(!previewOpen)} aria-expanded={previewOpen} className="mt-2 min-h-[44px] text-sm font-semibold text-teal-800 underline">{previewOpen ? 'Stäng förhandsvisningen' : 'Visa kundens offert'}</button>}
+          </section>
+          {previewOpen && preview && <div className="min-w-0 overflow-auto rounded-xl border bg-slate-50">{preview}</div>}
           {/* Beskrivning saknas */}
           {!quote.description?.trim() && (
             <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-lg">

@@ -18,14 +18,14 @@ interface JobType {
 }
 
 const SUGGESTIONS = [
-  { name: 'Elarbete', color: '#D97706' },
-  { name: 'VVS', color: '#2563EB' },
-  { name: 'Bygg & Snickeri', color: '#64748B' },
-  { name: 'Måleri', color: '#DB2777' },
-  { name: 'Tak', color: '#7C3AED' },
-  { name: 'Plattsättning', color: '#0F766E' },
-  { name: 'Golv', color: '#16A34A' },
-  { name: 'Fönsterbyte', color: '#EA580C' },
+  { name: 'Installera laddbox', color: '#D97706' },
+  { name: 'Byta blandare', color: '#2563EB' },
+  { name: 'Bygga altan', color: '#64748B' },
+  { name: 'Måla väggar och tak', color: '#DB2777' },
+  { name: 'Lägga om tak', color: '#7C3AED' },
+  { name: 'Renovera badrum', color: '#0F766E' },
+  { name: 'Lägga golv', color: '#16A34A' },
+  { name: 'Byta fönster', color: '#EA580C' },
 ]
 
 export default function JobTypesPage() {
@@ -135,7 +135,7 @@ export default function JobTypesPage() {
           </Link>
           <div className="flex-1">
             <h1 className="text-xl font-bold text-gray-900">Jobbtyper</h1>
-            <p className="text-sm text-gray-500">Vilka typer av arbeten ni utför — styr delegering och statistik</p>
+            <p className="text-sm text-gray-500">Dina jobbtyper och standardrader till offert — samma val i affärer och projekt</p>
           </div>
           <button
             onClick={openCreate}

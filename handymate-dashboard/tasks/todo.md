@@ -1,3 +1,28 @@
+## Offertupplevelse (Codex 2026-09-05)
+
+- [x] Skissa och bygg enligt [planen](../docs/design/quote-experience/PLAN.md).
+- [x] Verifiera återställning, prisval, reservationer, mobil och bygg.
+- [x] Lämna sida och PR för granskning.
+
+Review: 100 riktade tester godkända. Öppningsbar skiss och granskning finns i planen.
+## Kundförberedelse (Codex 2026-09-05)
+
+- [x] Implementera [byggplanens V1](customer-preparation-plan.md): kundunderlag och jobbstart. 56 tester, typkontroll och produktionsbygge gröna.
+- [ ] Driftsättningsprov: kör migration och verifiera riktig DB/storage samt autentiserat kundkort före aktivering.
+## Leverans 2 (Codex 2026-09-05)
+
+- [x] Bygg och verifiera [offertpaketering och dagsavslut](quote-packages-day-close-plan.md).
+## Leverans 3: intäktskö (Codex 2026-09-05)
+
+- [x] Bygg intäktskö med sökning, prioritering och nästa steg.
+- [x] Behåll hemsidans tre kort och återanvänd befintligt behörighetsskydd och läsmodell.
+- [x] Verifiera fel, behörighet, filtrering, mobilvy, typkontroll och bygg.
+- [x] Dokumentera skarpa prov och lämna separat PR.
+
+Review: 31 riktade tester, typkontroll och produktionsbygg godkända.
+Mobil- och skrivbordsvy granskade. Skarpa prov återstår enligt
+[leveransplanen](revenue-work-queue.md). Inga nya databasfrågor eller migrationer.
+
 # Launch Truth & Operations (Codex 2026-09-03)
 
 - [x] Baslinjegranska den lokala Support & drift-leveransen mot befintliga
@@ -805,3 +830,67 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - [x] Arbetsrad med enheten "st" blev material när avdraget slogs av: `labor_amount > 0` är nu första signalen i `get-quote-budget-derivation` och `get-quote-context`, kolumnen hämtas i båda selectarna.
 - [x] Facit `tests/rot-instruktion.spec.ts` (24 prov: tolkningen, inkopplingen, klassningen med beteendeprov) inkopplat i package.json och CI.
 - [ ] Codex provar om på Nordström El efter deploy: samma instruktion ⇒ inga ROT-flaggor och "Inget avdrag" i offertbyggaren; arbetsraden kvar som arbete i projektvyn.
+## 2026-09-05 — Gemensam integrationskontroll, PR #7–#10
+- [x] Samla de fyra oförändrade leveranserna i en granskningsgren; ta med mains CI-rättningar.
+- [x] Kundunderlag: säkert överlämnande till offertens befintliga intag och beständig källtext.
+- [x] Dagsavslut: uppdatera projektet efter bekräftat sparande och visa nästa väg för ÄTA-förslag.
+- [x] Offert: stäng glapp mellan lokal återställning, autospar och explicit sparande.
+- [x] Kör gemensamma kontrakt, integrationsprov, TypeScript och produktionbygge.
+- [x] Dokumentera vad som är bevisat respektive kräver autentiserad driftkontroll.
+
+Granskningsresultat och kvarvarande drift-/Lars-beroenden: tasks/integration-gap-review.md. Kodrättningarna är verifierade lokalt; hela driftkedjan är inte godkänd ännu.
+
+## Lars kundunderlagskontroll och korrigeringar
+- [x] Samma testspecar lokalt och CI, korrekt debounce/navigeringsflush, inga interna ID:n i AI-text.
+- [x] Beständig AI-granskning med källhänvisningar, bränslegrind, bildkontroll och serververifierad projektkoppling.
+- [x] Hantverkaren granskar och kan skapa idempotent ÄTA-förslag i befintliga godkännandekön.
+- [x] Regressionstester, TypeScript, build och granskningsbar SQL/PR.
+- [ ] Verifiera migration och inloggat flöde mot riktig AI/DB när åtkomst finns.
+
+## 2026-09-05 — Hela uppdragsresan
+- [x] Kontrollera faktisk browser-/driftåtkomst och senaste PR-status.
+- [x] Följ godkänd offert → projekt → tid/material → ÄTA → fakturaunderlag och betalstatus.
+- [x] Reproducera och rätta överlämningsfel med verkliga produktionsfunktioner och isolerade beroenden.
+- [x] Kör relevanta regressioner, TypeScript/build och dokumentera bevisnivå per steg.
+- [x] Uppdatera gransknings-PR; skilj driftbevis från simulerade prov.
+
+Review: tasks/whole-job-journey-review.md. Åtta överlämningsfel rättade. Tre ytterligare risker öppet dokumenterade; inloggat driftprov inte genomfört eftersom session/DB-åtkomst saknas.
+
+## PR #11 — CI och befintlig slutfaktura efter granskning
+- [x] Ta in main e2b9740 och ta bort backslash i vikt YAML-block.
+- [x] Stoppa slutfakturaskapande när projektet redan har faktura; läsfel får inte öppna vägen.
+- [x] Testa befintlig faktura, företagsisolering, läsfel och exakt CI-kommando.
+- [ ] TypeScript/build, uppdatera PR och verifiera CI på nya huvudet.
+- [ ] Inloggat demoprov återstår; delbetalning/avdragsparitet efter lansering enligt granskningen.
+## 2026-09-06 — Första nyttan från onboarding
+- [x] Kartlägg befintlig första-uppdragsfinal, startlista, offertstart och turer.
+- [x] Skiss och avgränsning: docs/design/first-value/PLAN.md.
+- [x] Bygg målanknuten start, säker överlämning och frivillig offertguide.
+- [x] Verifiera mobil/desktop, kontobyte, fel och integrationskontrakt.
+- [ ] Leverera separat granskningsgren med ärligt provningsläge.
+
+Första nyttan: 1 104 kontrakt och fyra Chromiumprov gröna lokalt.
+Riktiga komponenter, avlyssnade API-svar. Inloggat AI-/DB-prov återstår.
+Skiss, screenshots och provningsordning: docs/design/first-value/PLAN.md.
+
+## 2026-09-06 — Sammanhängande jobbtyp → offertstandard (bygger på PR #13)
+- [x] Konkreta branschjobb, egen jobbtyp direkt, bevara äldre val.
+- [x] Spara onboardingval som riktiga jobbtyper idempotent; återanvänd i offertsteget.
+- [x] Standardrader direkt: välj/skapa artikel, mängd, pris, förhandsvisning i onboarding/inställningar.
+- [x] Återanvänd valda rader från offert som jobbstandard med explicit val och samtidighetsskydd.
+- [x] Behåll artikelreferenser, reservationsförslag, offertögonblicksbilder och affär/projektkoppling.
+- [x] Verifiera serverkontrakt, mobilflöde, tsc, build. Redovisa separat kvarstående driftprov.
+
+Design: samma job_types används genom resan. Föreslagna namn ändrar aldrig befintliga jobb. Inga automatiska priser eller reservationer. Standardrader använder befintliga quote_templates; inga nya databaskolumner. Befintliga mallar redigeras radvis med updated_at-konfliktskydd och övriga fält bevaras. Nyskapad standard får deterministiskt id per jobb så dubbla klick inte skapar två standarder. Flera redan kopplade mallar kräver uttryckligt val. Egen artikel använder befintligt artikel-API och dess dubbletthantering.
+
+Verifieringsresultat och kvarstående inloggat prov: `docs/handoffs/JOB_STANDARDS_2026-09-06.md`. PostgreSQL- och UI-proven är isolerade, inga produktionsskrivningar.
+
+Slutkontroll 2026-09-06: 1 152 kontraktstester gröna (inklusive 12 nya PostgreSQL-prov), två jobb-/artikelresor i Chromium gröna, tsc rent och produktionsbygge exit 0. Mobilfixarna för PR #13 har separat prov för samtliga fem tipssteg vid 375×812 och 1280×900; båda gröna.
+
+
+## 2026-09-06 — Första riktiga jobbet: integrationskontroll
+- [x] Kontrollera main och PR #11–#14 samt demoåtkomst. #11 är ännu inte integrerad; dess rättningar ska inte dupliceras. Webbläsaren står på inloggning och lokal DB/session saknas.
+- [x] Följ kodens övergångar onboarding → offert → accept → projekt → fakturering; driftresan är fortfarande blockerad av session och sammanslagen version.
+- [x] Reproducera och rätta samtidig manuell accept, återförsök och läsfel med 11 beteendeprov.
+- [x] Kontrakt 1 163 gröna, separat #11-fakturaprov 57 gröna, TypeScript rent. Bevisnivå och inloggad körordning dokumenterade. Build slutstatus i PR-leveransen.
+- [x] Publicerat PR #15 utan ändring av #14. Kodversionens CI och produktionsbygge gröna. Säker inloggning lyckades men öppnade Bee Service AB i äldre onboarding; kontots lämplighet och gemensam granskningsversion måste bekräftas före skrivande driftprov.

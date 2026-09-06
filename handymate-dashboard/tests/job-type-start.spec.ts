@@ -101,7 +101,9 @@ test('inkopplingen äger ingen ny offertskrivare, ingen ny pris-/reservationsmot
   expect(handler).not.toMatch(/setSelectedCustomer|setTitle|setDescription|\.insert\(/)
   expect(builder).toContain('resolveTemplateItemPrices(cloned, pricingProducts, pricingSettings?.hourly_rate)')
   expect(builder).toContain('useReservationSuggestions(items,')
-  expect(builder).toContain('jobTypeStart={jobTypeStart}')
+  const intakeStart = builder.match(/jobTypeStart=\{<>[\s\S]*?<\/>\}/)?.[0]
+  expect(intakeStart).toContain('{jobTypeStart}')
+  expect(intakeStart).toContain('{preparationInput}')
   const intake = read('app/dashboard/quotes/new/components/quick/QuickIntake.tsx')
   expect(intake.indexOf('{jobTypeStart}')).toBeGreaterThan(intake.indexOf('fixed inset-0'))
   const onboarding = read('app/onboarding/page.tsx')

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
-import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { OPEN_QUOTE_STATUSES, WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
 export async function POST(request: NextRequest) {
   try {
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { quoteId } = await request.json()
-    if (!quoteId) {
+    if (typeof quoteId !== 'string' || !quoteId.trim()) {
       return NextResponse.json({ error: 'Missing quoteId' }, { status: 400 })
     }
 
@@ -29,9 +29,13 @@ export async function POST(request: NextRequest) {
       .select('*')
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
-      .single()
+      .maybeSingle()
 
-    if (fetchErr || !quote) {
+    if (fetchErr) {
+      console.error('[quotes/accept] quote read failed:', fetchErr)
+      return NextResponse.json({ error: 'Offerten kunde inte läsas. Försök igen.' }, { status: 503 })
+    }
+    if (!quote) {
       return NextResponse.json({ error: 'Offert hittades inte' }, { status: 404 })
     }
 
@@ -44,6 +48,7 @@ export async function POST(request: NextRequest) {
         .from('customer')
         .select('*')
         .eq('customer_id', quote.customer_id)
+        .eq('business_id', business.business_id)
         .maybeSingle()
       if (customerErr) {
         console.error('[quotes/accept] customer fetch error (non-blocking):', customerErr)
@@ -55,12 +60,18 @@ export async function POST(request: NextRequest) {
       quote.customer = null
     }
 
+    // Ett återförsök kvitterar accepten, men kör inte utskick/automation igen.
+    // Detta kvitto intygar statusen, inte att allt efterarbete har lyckats.
+    if ((WON_QUOTE_STATUSES as readonly string[]).includes(quote.status)) {
+      return NextResponse.json({ success: true, deduplicated: true })
+    }
+
     if (!(OPEN_QUOTE_STATUSES as readonly string[]).includes(quote.status)) {
       return NextResponse.json({ error: 'Offerten kan inte accepteras i nuvarande status' }, { status: 400 })
     }
 
     // Uppdatera offert till accepted
-    let { error: updateErr } = await supabase
+    let { data: accepted, error: updateErr } = await supabase
       .from('quotes')
       .update({
         status: 'accepted',
@@ -68,19 +79,35 @@ export async function POST(request: NextRequest) {
         accepted_manually: true,
       })
       .eq('quote_id', quoteId)
+      .eq('business_id', business.business_id)
+      .eq('status', quote.status)
+      .select('quote_id')
+      .maybeSingle()
 
     // Fallback: om accepted_manually/accepted_at inte finns i DB ännu
-    if (updateErr && updateErr.message?.includes('column')) {
+    if (updateErr && ['42703', 'PGRST204'].includes(updateErr.code) &&
+        /accepted_manually|accepted_at/.test(updateErr.message || '')) {
       const fallback = await supabase
         .from('quotes')
         .update({ status: 'accepted' })
         .eq('quote_id', quoteId)
+        .eq('business_id', business.business_id)
+        .eq('status', quote.status)
+        .select('quote_id')
+        .maybeSingle()
+      accepted = fallback.data
       updateErr = fallback.error
     }
 
     if (updateErr) {
       console.error('Quote accept update error:', updateErr)
       return NextResponse.json({ error: `Databasfel: ${updateErr.message}` }, { status: 500 })
+    }
+
+    // Compare-and-set: endast anropet som faktiskt ändrade status får
+    // skapa projekt, skicka notiser och starta automationer.
+    if (!accepted) {
+      return NextResponse.json({ error: 'Offerten har ändrats. Läs in den igen innan du fortsätter.' }, { status: 409 })
     }
 
     // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).

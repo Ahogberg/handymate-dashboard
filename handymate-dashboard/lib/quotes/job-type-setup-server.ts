@@ -5,6 +5,12 @@ export class QuoteSetupError extends Error {
   constructor(public status: number, message: string) { super(message) }
 }
 
+/** A successful write must change the version even within the same millisecond. */
+export function nextTemplateVersion(previous: unknown): string {
+  const time = typeof previous === 'string' ? Date.parse(previous) : NaN
+  return new Date(Math.max(Date.now(), Number.isFinite(time) ? time + 1 : 0)).toISOString()
+}
+
 function missingLinkColumn(error: { code?: string; message?: string } | null): boolean {
   return !!error && ['42703', 'PGRST204'].includes(error.code || '') && /job_type_slug/.test(error.message || '')
 }
@@ -64,7 +70,7 @@ export async function linkTemplateToJobType(db: SupabaseClient, businessId: stri
     if (!job) throw new QuoteSetupError(404, 'Jobbtypen finns inte eller är arkiverad.')
   }
   if ((template.updated_at ?? null) !== body.updatedAt) throw new QuoteSetupError(409, 'Mallen har ändrats. Läs in den igen.')
-  let q = db.from('quote_templates').update({ job_type_slug: body.jobTypeSlug, updated_at: new Date().toISOString() })
+  let q = db.from('quote_templates').update({ job_type_slug: body.jobTypeSlug, updated_at: nextTemplateVersion(template.updated_at) })
     .eq('business_id', businessId).eq('id', body.templateId)
   q = body.updatedAt === null ? q.is('updated_at', null) : q.eq('updated_at', body.updatedAt)
   const { data, error } = await q.select('*').maybeSingle()
@@ -99,7 +105,7 @@ export async function linkTemplateItem(db: SupabaseClient, businessId: string, i
   if (!sameUnit(String(item.unit || ''), typeof product.unit === 'string' ? product.unit : '')) throw new QuoteSetupError(400, 'Enheterna skiljer sig. Ändra mängd och enhet i offertmallen först.')
   const updatedItems = items.map((row: unknown, index: number) => index === body.itemIndex
     ? { ...item, linked_product_id: product.id, article_number: product.sku ?? null } : row)
-  let q = db.from('quote_templates').update({ default_items: updatedItems, updated_at: new Date().toISOString() })
+  let q = db.from('quote_templates').update({ default_items: updatedItems, updated_at: nextTemplateVersion(template.updated_at) })
     .eq('business_id', businessId).eq('id', body.templateId)
   q = body.updatedAt === null ? q.is('updated_at', null) : q.eq('updated_at', body.updatedAt)
   const { data, error: writeError } = await q.select('*').maybeSingle()
