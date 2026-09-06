@@ -1,6 +1,8 @@
 'use client'
 
 import { logBusinessConfigError } from '@/lib/business/quote-surface-select'
+import { formatKronor } from '@/lib/format-price'
+import { svDateStr, svDatePlusDays } from '@/lib/dates'
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, X } from 'lucide-react'
@@ -26,9 +28,6 @@ interface TimeEntry {
   invoice_id: string | null
 }
 
-function toISODate(d: Date): string {
-  return d.toISOString().split('T')[0]
-}
 
 /**
  * ETAPP 6c (offert-masterplan.md, faktura-sprinten): tunn wrapper ovanpå
@@ -58,7 +57,7 @@ export default function NewInvoicePage() {
   const [rotRutType, setRotRutType] = useState('')
   const [personalNumber, setPersonalNumber] = useState('')
   const [propertyDesignation, setPropertyDesignation] = useState('')
-  const [invoiceDate, setInvoiceDate] = useState(toISODate(new Date()))
+  const [invoiceDate, setInvoiceDate] = useState(svDateStr())
   const [dueDate, setDueDate] = useState('')
   const [ourReference, setOurReference] = useState('')
   const [yourReference, setYourReference] = useState('')
@@ -118,9 +117,9 @@ export default function NewInvoicePage() {
     // dueDateInitialized-ref:en blockerar sedan omräkning med rätt värde.
     if (!dueDateInitialized.current) {
       dueDateInitialized.current = true
-      const d = new Date(invoiceDate + 'T00:00:00')
-      d.setDate(d.getDate() + paymentDays)
-      setDueDate(toISODate(d))
+      // Kalenderdagsaritmetik i svensk tid (F21: lokal midnatt + 30 dagar
+      // skrevs ut som UTC-datum ⇒ 29 dagar netto på dokumentet).
+      setDueDate(svDatePlusDays(invoiceDate, paymentDays))
     }
 
     if (fromQuoteId) await loadFromQuote(fromQuoteId)
@@ -329,7 +328,7 @@ export default function NewInvoicePage() {
                           </p>
                           <p className="text-xs text-slate-500">{entry.customer?.name || 'Ingen kund'} — {entry.description || 'Ingen beskrivning'}</p>
                         </div>
-                        <div className="text-sm font-medium text-slate-900">{totalCost.toLocaleString('sv-SE')} kr</div>
+                        <div className="text-sm font-medium text-slate-900">{formatKronor(totalCost)}</div>
                       </label>
                     )
                   })}

@@ -1,3 +1,4 @@
+import { formatKronor } from '@/lib/format-price'
 /**
  * Delad CSS och hjälpfunktioner för HTML-dokumentgenerering
  * (Offert, Faktura, Tidrapport)
@@ -41,17 +42,10 @@ export function stripPrintBar(html: string): string {
 }
 
 export function formatCurrency(amount: number | null | undefined): string {
-  if (amount == null) return '0 kr'
-  // Intl.NumberFormat('sv-SE') producerar NBSP ( ) eller narrow nbsp
-  // ( ) som thousand-separator. PDF-renderer + vissa fonter kan visa
-  // det som "10000" istället för "10 000". Pilot-feedback 2026-05-20:
-  // 'Siffror i offerten ska alltid särskrivas enligt 10 000'. Ersätter
-  // alla typer av no-break-spaces med vanlig space ( ).
-  return new Intl.NumberFormat('sv-SE', {
-    style: 'decimal',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount).replace(/[  ]/g, ' ') + ' kr'
+  // Tusentalsavgränsaren är vanlig space (pilot-feedback 2026-05-20: "10 000",
+  // aldrig NBSP som vissa PDF-fonter tappar). Öre visas med två decimaler,
+  // hela kronor utan — F20, samma regel som resten av appen (lib/format-price).
+  return formatKronor(amount)
 }
 
 const SV_MONTHS = [

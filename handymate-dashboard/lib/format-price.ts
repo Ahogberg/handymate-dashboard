@@ -34,3 +34,28 @@ export function calculateVat(exVat: number, vatRate: number = 25): number {
 export function priceExVat(inclVat: number, vatRate: number = 25): number {
   return Math.round(inclVat / (1 + vatRate / 100))
 }
+
+/**
+ * F20 (Codex liveprov 2026-09-06): samma belopp visades som 1 062,5 i
+ * portalens lista, 1 063 i dokumentet och 812,5 / 813 i fakturaskaparen
+ * respektive fakturadokumentet — sex formaterare med olika avrundning.
+ * Regeln nu: hela kronor visas utan decimaler, öre visas med exakt två.
+ * Det betalningsgrundande beloppet (invoice.total, Swish) är aldrig
+ * avrundat, så visningen får inte heller vara det.
+ */
+export function formatKronorTal(amount: number | null | undefined): string {
+  const n = Number(amount ?? 0)
+  if (!Number.isFinite(n)) return '0'
+  const avrundat = Math.round(n * 100) / 100
+  const decimaler = Number.isInteger(avrundat) ? 0 : 2
+  return new Intl.NumberFormat('sv-SE', {
+    style: 'decimal',
+    minimumFractionDigits: decimaler,
+    maximumFractionDigits: decimaler,
+  }).format(avrundat).replace(/[\u00a0\u202f]/g, ' ')
+}
+
+export function formatKronor(amount: number | null | undefined): string {
+  return `${formatKronorTal(amount)} kr`
+}
+

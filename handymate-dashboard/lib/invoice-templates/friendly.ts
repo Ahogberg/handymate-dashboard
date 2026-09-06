@@ -351,7 +351,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
 
 function formatNumber(n: number): string {
   if (Number.isInteger(n)) return String(n)
-  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 })
+  return n.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 }
 
 function formatOcr(ocr: string): string {

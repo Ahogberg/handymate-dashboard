@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { svDateStr } from '@/lib/dates'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, X } from 'lucide-react'
 import type { Session, AuthChangeEvent } from '@supabase/supabase-js'
@@ -714,7 +715,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         dealNumber: null,
         issuedDate: formatDate(new Date()),
         validUntilDate: formatDate(validUntil),
-        validUntilDateISO: validUntil.toISOString().split('T')[0],
+        validUntilDateISO: svDateStr(validUntil),
         title: title || 'Offert',
         description: description || null,
         items: recalculated.map((i): QuoteTemplateItem => {
@@ -817,7 +818,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         // Samma amountToPay som quoteTemplateData (var tidigare en egen,
         // ofullständig formel — se kommentar ovan).
         customer_pays: amountToPay,
-        valid_until: validUntil.toISOString().split('T')[0],
+        valid_until: svDateStr(validUntil),
         not_included: notIncluded || null,
         ata_terms: ataTerms || null,
         payment_terms_text: paymentTermsText || null,

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import { svDateStr } from '@/lib/dates'
 import { useParams, useRouter } from 'next/navigation'
 import { AlertCircle, AlertTriangle, Loader2, RotateCcw } from 'lucide-react'
 import Link from 'next/link'
@@ -41,7 +42,7 @@ export default function InvoiceDetailPage() {
   const [sendingReminder, setSendingReminder] = useState(false)
   const [showPaymentModal, setShowPaymentModal] = useState(false)
   const [paymentData, setPaymentData] = useState<PaymentData>({
-    paid_at: new Date().toISOString().split('T')[0],
+    paid_at: svDateStr(),
     paid_via: 'swish',
     paid_amount: 0,
   })

@@ -336,5 +336,5 @@ function formatNumber(n: number): string {
   if (Number.isInteger(n)) {
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
   }
-  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
+  return n.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
 }

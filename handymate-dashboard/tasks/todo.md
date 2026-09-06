@@ -963,3 +963,18 @@ två skrivs som spec till efter lansering.
 - [x] C. Spec efter lansering (eb6a2703, punkt 13 och 14): Field Command (mobilappen, punkt 1 i
       efter-lansering) och Karins marginalnotis (jämförelsemotor möte→rader,
       stabila rad-id). Skisserna är underlaget.
+
+# Liveprov onboarding → fakturaunderlag: F17, F20, F21 (Claude 2026-09-06 kväll)
+
+- [x] F17: kolumn-DEFAULT på business_config.pricing_settings seedade
+      hourly_rate 650 på varje nytt konto (v79 städade bara raderna). v218 KÖRD:
+      ny DEFAULT utan timpris + 7 rader städade. Testkontot: 850, inget skuggande.
+- [x] F20: en kronformatering (lib/format-price formatKronor/formatKronorTal):
+      hela kronor utan decimaler, öre med två. Dokumentmotorn, offertbyggarens
+      rader, portalen, fakturaskaparen och alla fyra mallarna använder den.
+- [x] F21: förfallodatum via svDatePlusDays (svensk kalenderdag), fakturadatum/
+      betaldatum/giltig-till via svDateStr. Ingen toISOString().split('T')[0]
+      kvar i faktura-/offertskaparna eller create-invoice.
+- [x] Facit tests/livegenomgang-f20-f21.spec.ts (9) i test:contracts + CI.
+      tsc rent, 1664/1664 (1 skipped), pglite 17/17.
+- Codex: F16, F18, F19, F03, F06, F07. Omprov i produktion, inte previewn.
