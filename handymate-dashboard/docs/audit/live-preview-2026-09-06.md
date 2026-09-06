@@ -1,6 +1,6 @@
 # Liveprov inför lansering — 6 september 2026
 
-Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är inte godkänd för lansering genom detta protokoll: fjorton reproducerade fynd och återstående driftgrindar finns nedan. Alla knappar, roller och miljöer är inte uttömmande provade.
+Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är inte godkänd för lansering genom detta protokoll: femton reproducerade fynd och återstående driftgrindar finns nedan. Alla knappar, roller och miljöer är inte uttömmande provade.
 
 ## Miljö och metod
 
@@ -146,3 +146,25 @@ Samma integrationshead `421f9728587a7c186ff806cdd7d8f2e400216edd`. Inloggad Nord
 | 6. Mobil och första onboarding | Kräver mobilprov och nytt konto med verifierbar e-post. Inte godkänt ännu. |
 
 Kvar i flik 3 finns en lokal, oskickad återställningskopia med 3 arbetsartiklar som testbevis; inte ett nytt numrerat serverutkast. Detta är ett delprotokoll, inte avslutad täckning av område 1–6.
+
+## Nyregistrering och onboarding — kvällsprov
+
+Användaren godkände ett nytt testkonto med plusadress till sin egen inkorg. Företaget är märkt **TEST Codex – onboarding El**. Befintlig Nordström-session loggades ut via UI. Registreringen gjordes genom /signup → /onboarding, utan DB-genväg. Ingen betalning eller aktivering av abonnemang gjordes.
+
+- Orgnummeruppslag och hemsida hoppades över med synliga knappar. Manuell företagsblankett kräver ändå organisationsnummer och betalmottagare före fortsatt onboarding.
+- Det tidigare testföretagets organisationsnummer nekades på kontrollsiffra. Formulärets eget exempelnummer användes för den syntetiska firman och passerade. Bankgiro återanvändes från tidigare testkonto, ingen bankkoppling eller betalning utfördes. Testuppgifterna ska inte användas till verkliga affärshandlingar.
+- Kontouppgifter angavs genom säker credential-ruta. Vid fortsatt registrering nåddes jobbtypssteget utan synligt verifieringssteg i det provade flödet; mottagen verifieringspost är inte kontrollerad.
+- El gav åtta synliga vanliga jobbtyper och Visa fler jobbtyper. Installera laddbox och Felsökning el valdes. Egen jobbtyp TEST Codex – belysningsservice lades till och syntes som tredje val.
+- Standardpris 850 kr/tim, materialpåslag 20 %, mål Minska administrationen. Sammanfattningen bar vidare tre jobbtyper och 850 kr/tim.
+- Telefonreservationen gjordes automatiskt av onboardingsteget. Tre loggade fel `46elks_purchase_failed` kl. 18:54:44, 18:54:49 och 18:54:55 UTC. Ingen lyckad nummerreservation verifierad.
+- Visa instruktioner senare gick att använda när vänteläget upphörde. Ingen vidarekoppling aktiverad. Import hoppades över genom avsedd knapp.
+- Sammanfattningen använde 850 × 52 = 44 200 kr som hypotetiskt årsbelopp för en missad faktureringstimme per vecka och återgav 20 % materialpåslag samt tre tjänster.
+- Nästa sida kräver Stripe-aktivering: årsvis Firman 59 950 kr/år förvalt, uttrycklig text att prenumerationen startar direkt. Aktivera Handymate klickades inte. Inget synligt kostnadsfritt testval eller hoppa över på detta steg.
+
+### F15 — missvisande besked efter misslyckad telefonreservation
+
+**Prioritet hög.** Efter de tre felanropen visar UI ”Ditt nummer är reserverat” och ”numret aktiveras i bakgrunden”. Inget telefonnummer visas. Fallbacken får användaren att tro att en reservation lyckats när det provade underlaget visar misslyckade köp. Rotorsaken hos 46elks är inte fastställd. Rätta fel-/väntetexten och verifiera separat om någon verklig återförsöksprocess finns i bakgrunden.
+
+### Täckningsgräns
+
+Jobbtypsvalen fungerar genom stegen men omladdningspersistens, efterföljande artikelregister, guidetur och första offert är inte verifierade på det nya kontot. De ligger efter betalgrinden i denna provade väg. Fortsätt på ett legitimt kostnadsfritt aktiverat testkonto eller en verifierad testbetalningsmiljö; ändra inte DB eller kringgå grinden för att kalla liveprovet grönt. Användarens problem att interagera med den delade webbläsaren gick inte att säkert hänföra till Handymate — agentens klick och scroll fungerade.
