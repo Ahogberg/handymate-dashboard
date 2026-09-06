@@ -1,3 +1,5 @@
+import { formatKronor } from '@/lib/format-price'
+
 /**
  * Delade formatterare och status-getters för kundportalen.
  * Extraherade från page.tsx vid komponent-splitten — INGEN logik-ändring.
@@ -9,8 +11,7 @@ export const formatDate = (date: string) =>
 export const formatDateTime = (date: string) =>
   new Date(date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })
 
-export const formatCurrency = (n: number) =>
-  new Intl.NumberFormat('sv-SE', { style: 'currency', currency: 'SEK', maximumFractionDigits: 0 }).format(n)
+export const formatCurrency = (n: number) => formatKronor(n)
 
 export const getQuoteStatusText = (s: string) => {
   switch (s) {

@@ -632,3 +632,13 @@ script-strängen mot BÅDA sidorna av konflikten, inte bara spec-listan.
 Och: ett facit som är rött "sedan tidigare" är ett fynd, aldrig ett
 antagande — kör det mot HEAD innan det avfärdas.
 
+
+## v79 städade raderna men inte kolumnstandarden (F17, 2026-09-06)
+
+`business_config.pricing_settings` hade ett kolumn-DEFAULT med `hourly_rate: 650`.
+v79 tog bort nyckeln ur alla rader och skrev "ingen levande kod skriver värdet
+längre" — men DEFAULT:en är levande kod i databasen, och varje nytt konto fick
+650 igen (7 konton på 30 dagar; Codex testkonto visade 650 i tidrapport och
+fakturaunderlag trots 850 i onboardingen). Regel: när ett seedat värde städas,
+kontrollera `information_schema.columns.column_default` och triggers på
+tabellen, inte bara raderna. v218 rättar båda.

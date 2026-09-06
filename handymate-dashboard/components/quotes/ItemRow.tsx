@@ -1,6 +1,7 @@
 'use client'
 
 import { Bookmark, BookmarkCheck, GripVertical, Trash2 } from 'lucide-react'
+import { formatKronor } from '@/lib/format-price'
 import { useSortable } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 import type { QuoteItem } from '@/lib/types/quote'
@@ -43,12 +44,7 @@ export const ITEM_TYPE_BADGE: Record<QuoteItem['item_type'], { label: string; cl
 }
 
 export function formatCurrency(amount: number) {
-  return new Intl.NumberFormat('sv-SE', {
-    style: 'currency',
-    currency: 'SEK',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount)
+  return formatKronor(amount)
 }
 
 // ---------------------------------------------------------------------------

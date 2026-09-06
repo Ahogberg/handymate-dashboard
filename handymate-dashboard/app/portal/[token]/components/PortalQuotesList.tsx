@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { formatKronorTal } from '@/lib/format-price'
 import { ArrowLeft, ChevronRight, FileText, Sparkles } from 'lucide-react'
 import { formatCurrency, formatDate, getQuoteStatusText, getQuoteStatusColor } from '../helpers'
 import type { Quote } from '../types'
@@ -110,7 +111,7 @@ export default function PortalQuotesList({
                           letterSpacing: '-0.02em',
                         }}
                       >
-                        {(q.customer_pays || q.total).toLocaleString('sv-SE')}
+                        {formatKronorTal(q.customer_pays || q.total)}
                       </span>
                       <span style={{ fontSize: 13, color: 'var(--muted)' }}>kr inkl. moms</span>
                     </div>

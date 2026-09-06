@@ -1,4 +1,5 @@
 import { generateOCR } from '@/lib/ocr'
+import { svDateStr } from '@/lib/dates'
 import type { InvoiceType, InvoiceStatus } from '@/lib/types/invoice'
 
 /**
@@ -125,7 +126,8 @@ export function computeDueDate(invoiceDate: Date, dueDays: number): Date {
 }
 
 function toDateOnly(d: Date): string {
-  return d.toISOString().split('T')[0]
+  // Svensk kalenderdag, aldrig UTC-dagen (F21).
+  return svDateStr(d)
 }
 
 /**

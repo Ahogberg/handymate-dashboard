@@ -360,7 +360,7 @@ function formatNumber(n: number): string {
     // kanske inte renderar). Vanlig space garanterat.
     return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ')
   }
-  return n.toLocaleString('sv-SE', { maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
+  return n.toLocaleString('sv-SE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[  ]/g, ' ')
 }
 
 function mixWithWhite(hex: string, whitePct: number): string {
