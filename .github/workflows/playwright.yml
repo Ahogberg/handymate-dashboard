@@ -71,7 +71,12 @@ jobs:
         run: npm install --no-audit --no-fund
 
       - name: TypeScript — noll fel
+        # Samma heap som contracts.yml (2026-09-05): nattsviten har dött här i
+        # "JavaScript heap out of memory" varje natt sedan 2 sep — 4 min röd
+        # utan att ett enda prov kördes.
         run: npx tsc --noEmit
+        env:
+          NODE_OPTIONS: --max-old-space-size=6144
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
