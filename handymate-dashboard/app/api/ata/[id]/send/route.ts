@@ -169,6 +169,44 @@ export async function POST(
       )
     }
 
+    // F22 (Codex ÄTA-prov 2026-09-06): "Kopiera signeringslänken i stället"
+    // var en ren urklippsåtgärd. ÄTA:n förblev utkast, syntes inte i
+    // kundportalen (som bara listar sent+) och pdf_url var låst — trots att
+    // kunden i praktiken hade länken. Att kopiera länken är ett utskick där
+    // hantverkaren själv står för leveransen: markera som skickad, utan SMS,
+    // utan telefonnummer. Samma statusövergång och samma händelse som SMS.
+    if (method === 'link') {
+      const sentAt = new Date().toISOString()
+      const { data: uppdaterad, error: updateErr } = await supabase
+        .from('project_change')
+        .update({ status: 'sent', sent_at: sentAt })
+        .eq('change_id', params.id)
+        .eq('business_id', business.business_id)
+        .select('*')
+        .maybeSingle()
+      if (updateErr) {
+        console.error('[ata/send] update (link) failed:', updateErr)
+        return NextResponse.json({ error: 'ÄTA:n kunde inte markeras som skickad' }, { status: 500 })
+      }
+      try {
+        const { fireEvent } = await import('@/lib/automation-engine')
+        await fireEvent(supabase, 'ata_sent', business.business_id, {
+          change_id: params.id,
+          project_id: ata.project_id,
+          ata_number: ata.ata_number,
+          total: ata.total,
+          customer_name: customer.name,
+          via: 'link',
+        })
+      } catch { /* non-blocking */ }
+      return NextResponse.json({
+        success: true,
+        via: 'link',
+        signUrl,
+        ata: uppdaterad || { ...ata, status: 'sent', sent_at: sentAt },
+      })
+    }
+
     const rawPhone = to || customer.phone_number
     if (!rawPhone) {
       return NextResponse.json({ error: 'Inget telefonnummer att skicka till' }, { status: 400 })

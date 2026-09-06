@@ -4455,9 +4455,9 @@ export default function ProjectDetailPage() {
           changeId={sendAtaId}
           ataNumber={changes.find(c => c.change_id === sendAtaId)?.ata_number ?? null}
           onClose={() => setSendAtaId(null)}
-          onSent={() => {
+          onSent={(via) => {
             setSendAtaId(null)
-            showToast('ÄTA skickad till kund', 'success')
+            showToast(via === 'link' ? 'Länk kopierad. ÄTA:n är markerad som skickad.' : 'ÄTA skickad till kund', 'success')
             fetchProjectData()
           }}
           onError={(msg) => showToast(msg, 'error')}
