@@ -14,6 +14,7 @@ import {
   Trash2,
   Unlock,
   Users,
+  ClipboardList,
 } from 'lucide-react'
 import { WEATHER_EMOJI, WEATHER_LABELS, isDiaryWeather } from '@/lib/diary/weather'
 import { useFilePreview } from '@/components/documents/FilePreviewProvider'
@@ -105,9 +106,17 @@ export default function DiaryEntryCard({
               tid {row.time_entry_hours} h
             </span>
           )}
-          {(fromVoice || fromCall) && (
+          {fromCall && (
             <span className={`${badge} bg-gray-100 text-gray-600`}>
-              <Mic className="w-3 h-3" /> {fromCall ? 'Samtal' : 'Röst'}
+              <Mic className="w-3 h-3" /> Samtal
+            </span>
+          )}
+          {fromVoice && !fromCall && (
+            // Rapportläget kan vara dikterat ELLER skrivet — raden bär inte
+            // inmatningssättet, så etiketten säger var den kom ifrån, inte hur
+            // (Codex liveprov 2026-09-06: en skriven anteckning visades som "Röst").
+            <span className={`${badge} bg-gray-100 text-gray-600`}>
+              <ClipboardList className="w-3 h-3" /> Rapport
             </span>
           )}
         </div>
