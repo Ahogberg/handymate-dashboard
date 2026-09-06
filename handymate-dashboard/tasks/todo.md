@@ -808,3 +808,12 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - [x] Driftprovat av Codex i #16 (offert #2026006 → projekt P-1015): arbetsraden under Arbete, inget avdrag.
 - [x] Två visningsfel därefter: "Arbete 0 kr" i offertsummeringen (calculateQuoteTotals läste bara avdragstyp och enhet; arbetsandelen avgör nu när avdrag saknas) och "Skapa projekt" trots befintligt projekt (quotes GET slår upp project.quote_id, headern visar Öppna projekt). Facit +5 prov.
 - [ ] Codex provar om på Nordström El efter deploy: samma instruktion ⇒ inga ROT-flaggor och "Inget avdrag" i offertbyggaren; arbetsraden kvar som arbete i projektvyn.
+
+## 2026-09-06 — Codex livegenomgång (nio fynd), Claudes del på main
+- [x] F02 kundunderlag nekas: `rate_limit_check` (sql/v25) fanns aldrig i produktion och den publika grinden är fail-closed ⇒ tolv publika rutter nekade sedan svepet 1 sep. v25 körd och verifierad.
+- [x] F01 godkänd checklista misslyckas: `project_checklist.order_id` NOT NULL i produktion. v215 körd: nullable + villkor projekt-eller-order.
+- [x] F08 08–09 blev 10–11: naiv lokaltid lagrades som UTC. `svNaiveToIso` stämplar Stockholm-offset i schemats POST/PUT.
+- [x] F09 söndag saknas i veckovyn: `end_date=YYYY-MM-DD` = midnatt. `svDayRange` ger halvöppet dygnsintervall i GET.
+- [x] F05 offertsummering: rättad tidigare i dag (0c1c3c9), saknades i previewn vid provet.
+- [x] Facit `tests/schema-tider.spec.ts`: offset/DST, normalisering, intervall, inkoppling, v215, och att varje `.rpc()` har CREATE FUNCTION i sql/ — två saknade (auto-approve-räknare, storefront-visningar) fick v216, körd.
+- [ ] Kvar för Codex/andra: F03 dölj lanseringsgrindade länkar, F04 veckonummer i attest, F06 fliken Uppgifter, F07 inställningsetikett.

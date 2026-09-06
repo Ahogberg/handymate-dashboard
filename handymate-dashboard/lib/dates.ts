@@ -104,3 +104,54 @@ export function svTimeStr(d: Date = new Date()): string {
   const { hour, minute } = svParts(d)
   return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
 }
+
+/**
+ * UTC-offset för Europe/Stockholm på ett kalenderdatum, som "+02:00"/"+01:00".
+ * DST-säker: läses av svStartOfDay (verklig Intl-formattering), aldrig antagen.
+ * Offsetet beror bara på dagen — bytet sker kl 02–03 lokal tid, aldrig vid midnatt.
+ */
+export function svOffsetForDate(dateStr: string): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const utcMidnight = Date.UTC(y, m - 1, d)
+  // Middag UTC ligger säkert inom samma svenska kalenderdag.
+  const localMidnight = svStartOfDay(new Date(utcMidnight + 12 * 3600_000)).getTime()
+  const offsetMin = Math.round((utcMidnight - localMidnight) / 60_000)
+  const sign = offsetMin >= 0 ? '+' : '-'
+  const abs = Math.abs(offsetMin)
+  return `${sign}${String(Math.floor(abs / 60)).padStart(2, '0')}:${String(abs % 60).padStart(2, '0')}`
+}
+
+const NAIV_LOKALTID = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})(:\d{2})?(\.\d+)?$/
+
+/**
+ * Naiv "YYYY-MM-DDTHH:MM[:SS]" från ett formulär betyder svensk lokaltid.
+ * Utan offset tolkar Postgres (timestamptz, session UTC) strängen som UTC och
+ * 08:00 blir 10:00 (driftfynd F08, PR #16). Här stämplas Stockholm-offsetet på.
+ * Strängar som redan bär Z eller offset returneras orörda; annat skräp också
+ * (valideringen längre ned avgör).
+ */
+export function svNaiveToIso(value: string): string {
+  const m = NAIV_LOKALTID.exec((value || '').trim())
+  if (!m) return value
+  return `${m[1]}T${m[2]}${m[3] ?? ':00'}${svOffsetForDate(m[1])}`
+}
+
+/** YYYY-MM-DD + N kalenderdagar, ren strängaritmetik utan klocka. */
+export function svDatePlusDays(dateStr: string, days: number): string {
+  const [y, m, d] = dateStr.split('-').map(Number)
+  const shifted = new Date(Date.UTC(y, m - 1, d) + days * 86400_000)
+  return `${shifted.getUTCFullYear()}-${String(shifted.getUTCMonth() + 1).padStart(2, '0')}-${String(shifted.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * Halvöppet intervall [from, toExclusive) i svensk tid för ett kalenderspann.
+ * "2026-08-31".."2026-09-06" ⇒ från måndag 00:00 till OCH MED söndag 23:59:59
+ * — jämfört mot datumsträngen "2026-09-06" (= midnatt) föll söndagens poster
+ * bort (driftfynd F09, PR #16).
+ */
+export function svDayRange(startDate: string, endDate: string): { from: string; toExclusive: string } {
+  return {
+    from: svNaiveToIso(`${startDate}T00:00:00`),
+    toExclusive: svNaiveToIso(`${svDatePlusDays(endDate, 1)}T00:00:00`),
+  }
+}

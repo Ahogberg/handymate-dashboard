@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { svNaiveToIso } from '@/lib/dates'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, type BusinessUser } from '@/lib/permissions'
@@ -77,6 +78,11 @@ export async function PATCH(
 
     if (Object.keys(updates).length === 0) {
       return NextResponse.json({ error: 'Inga fält att uppdatera' }, { status: 400 })
+    }
+
+    // Samma normalisering som vid skapande: naiv lokaltid ⇒ Stockholm-offset (F08).
+    for (const f of ['start_datetime', 'end_datetime'] as const) {
+      if (typeof updates[f] === 'string') updates[f] = svNaiveToIso(updates[f])
     }
 
     // Validate type if provided

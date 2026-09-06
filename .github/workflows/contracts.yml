@@ -123,6 +123,7 @@ jobs:
           tests/starttid-loop.spec.ts
           tests/kommunikation-installningar.spec.ts
           tests/rot-instruktion.spec.ts
+          tests/schema-tider.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

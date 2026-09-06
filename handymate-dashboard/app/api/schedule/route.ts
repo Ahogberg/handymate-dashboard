@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { svDayRange, svNaiveToIso } from '@/lib/dates'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
@@ -35,11 +36,18 @@ export async function GET(request: NextRequest) {
       .order('start_datetime', { ascending: true })
 
     // Filter by date range (overlap: entry starts before range ends AND entry ends after range starts)
+    // Datumparametrar är svenska kalenderdagar. Jämförs de som råa strängar
+    // blir "2026-09-06" midnatt UTC, och söndagens poster faller bort (F09).
+    // Halvöppet intervall i Stockholm-tid; ett fullständigt datetime-värde
+    // med offset används oförändrat.
+    const DATUM = /^\d{4}-\d{2}-\d{2}$/
     if (startDate) {
-      query = query.gte('end_datetime', startDate)
+      query = query.gte('end_datetime', DATUM.test(startDate) ? svDayRange(startDate, startDate).from : startDate)
     }
     if (endDate) {
-      query = query.lte('start_datetime', endDate)
+      query = DATUM.test(endDate)
+        ? query.lt('start_datetime', svDayRange(endDate, endDate).toExclusive)
+        : query.lte('start_datetime', endDate)
     }
 
     // Filter by user IDs
@@ -150,12 +158,14 @@ export async function POST(request: NextRequest) {
       project_id,
       title,
       description,
-      start_datetime,
-      end_datetime,
       all_day,
       type,
       color,
     } = body
+    // Formuläret skickar naiv lokaltid ("2026-09-06T08:00:00"). Utan offset
+    // lagras den som UTC och visas som 10:00 (F08). Stämpla Stockholm-offset.
+    const start_datetime = typeof body.start_datetime === 'string' ? svNaiveToIso(body.start_datetime) : body.start_datetime
+    const end_datetime = typeof body.end_datetime === 'string' ? svNaiveToIso(body.end_datetime) : body.end_datetime
 
     // Validate required fields
     if (!business_user_id || !title || !start_datetime || !end_datetime || !type) {

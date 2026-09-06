@@ -578,3 +578,16 @@ körning: 1268 "Cannot find module"-fel som såg ut som PR:ns. Regel: kör
 tsc och test först, installera saknade paket sen med `npm ci` på main,
 och kör om. Läs alltid de första felraderna innan ett tsc-fel skylls på
 grenen.
+
+## 2026-09-06 — En RPC som aldrig migrerats är osynlig tills en grind stängs
+
+`rate_limit_check` skrevs i sql/v25 men kördes aldrig i produktion. Så länge
+grinden var fail-open märktes inget. Tenant-svepet 1 sep gjorde den publika
+grinden fail-closed — rätt beslut — och tolv publika rutter började neka utan
+larm, i fem dagar, tills Codex livegenomgång fann det som "kundunderlaget
+går inte att lämna in". Kolumnvakten skyddar kolumner men inte funktioner.
+Regler: (1) varje `.rpc('x')` kräver `CREATE FUNCTION x` i sql/ (facit
+schema-tider), (2) verifiera funktioner mot pg_proc i produktion på samma
+sätt som kolumner mot information_schema innan en fail-closed-grind slås på,
+(3) ett fail-closed-beslut ska följas av ett driftlarm när räknaren nekar
+på grund av fel, inte kvot.
