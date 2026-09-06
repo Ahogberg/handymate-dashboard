@@ -13,7 +13,7 @@
  * aktuell — samma callback i alla tre fallen).
  *
  * LAYOUT: på desktop (≥1024 px) två paneler — vänster en teal panel med
- * Matte, "Ge mig 40 sekunder." och listan över vad skanningen går igenom
+ * Matte, "Ge mig några sekunder." och listan över vad skanningen går igenom
  * (bockas av i takt med raderna); höger själva raderna med en ärlighets-
  * etikett per rad (Importerat / Möjlighet / Uppskattat, satt av
  * buildScanRows — aldrig av vyn), en förloppsstapel, legend och slutkortet
@@ -273,7 +273,7 @@ export default function CompanyScan({ onClose }: { onClose: (r?: CompanyScanClos
             </div>
           </div>
           <div className="mt-7">
-            <h2 className="m-0 text-2xl font-bold tracking-tight text-white">Ge mig 40 sekunder.</h2>
+            <h2 className="m-0 text-2xl font-bold tracking-tight text-white">Ge mig några sekunder.</h2>
             <p className="mt-2 mb-0 text-sm leading-relaxed text-white/85">
               Jag läser igenom det du kopplat och lämnar över till rätt person i teamet. Du behöver inte göra något.
             </p>

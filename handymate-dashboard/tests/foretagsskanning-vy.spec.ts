@@ -180,9 +180,9 @@ test.describe('vyn — skissens tre chip, legend, slutkortet och förbjudna ord'
     expect(s).toContain('aria-label="Etiketternas betydelse"')
   })
 
-  test('vänsterpanelen: Matte, "Ge mig 40 sekunder.", källistan och ärlighetsnoten ur skissen', () => {
+  test('vänsterpanelen: Matte, "Ge mig några sekunder." (skanningen tar ~6 s, aldrig ett påhittat tal), källistan och ärlighetsnoten ur skissen', () => {
     expect(s).toContain('Chefsassistent')
-    expect(s).toContain('Ge mig 40 sekunder.')
+    expect(s).toContain('Ge mig några sekunder.')
     expect(s).toContain('>Går igenom<')
     expect(s).toContain('Fakta från dina system märks Importerat. Sådant teamet bedömer märks Möjlighet eller Uppskattat. Vi hittar aldrig på för att det ska se bra ut.')
     // Källorna bockas av i takt med raderna, inte på en egen klocka
