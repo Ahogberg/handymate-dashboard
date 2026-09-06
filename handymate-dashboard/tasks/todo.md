@@ -997,3 +997,6 @@ två skrivs som spec till efter lansering.
       Fakturerat räknar bara utfärdade fakturor (aldrig utkast) och korten
       jämför netto mot netto; framdriftens nämnare = grundoffert + signerad
       ÄTA. Paritetsbaselinen uppdaterad till öre-regeln (45,50 / 14 045,50).
+- [x] Mobilprov utan telefon: nio ui-specar körda headless i 375 px och
+      1280 px, 37 prov gröna (se lessons om headless-shell-symlinken).
+      Kvar: inloggade flöden på riktig telefon (Andreas i morgon).

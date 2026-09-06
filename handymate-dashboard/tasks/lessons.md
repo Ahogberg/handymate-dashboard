@@ -642,3 +642,14 @@ längre" — men DEFAULT:en är levande kod i databasen, och varje nytt konto fi
 fakturaunderlag trots 850 i onboardingen). Regel: när ett seedat värde städas,
 kontrollera `information_schema.columns.column_default` och triggers på
 tabellen, inte bara raderna. v218 rättar båda.
+
+## UI-specarna (tests/*.ui.spec.ts) i den här miljön (2026-09-07)
+
+Playwrights pinnade version letar efter chromium_headless_shell-1234 som inte
+finns i /opt/pw-browsers. Symlinka i stället för att installera:
+`mkdir -p /opt/pw-browsers/chromium_headless_shell-1234/chrome-headless-shell-linux64 &&
+ln -sf /opt/pw-browsers/chromium-1194/chrome-linux/chrome …/chrome-headless-shell`.
+Då kör alla nio ui-specar (375 px + 1280 px) headless utan inloggning — det
+är det mobilprov som går att göra utan telefon: onboardingturen, första
+uppdraget, jobbstandarder, dagsavslutet, offertupplevelsen, intäktskön,
+Lars kundunderlagskontroll, jobbförberedelsen och Daniels agentrad.
