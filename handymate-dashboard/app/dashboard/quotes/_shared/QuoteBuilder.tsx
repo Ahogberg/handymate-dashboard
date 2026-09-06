@@ -15,7 +15,7 @@ import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import {
   generateItemId, recalculateItems, getItemRotRutType,
 } from '@/lib/quote-calculations'
-import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
+import { generatedQuoteToQuoteItems, rotRutEfterArtikelkoppling } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
@@ -1397,7 +1397,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       const product = byId.get(productId)
       if (!product) return row
       linked++
-      const applied = applyProductToItem(row, product, row.quantity)
+      // Ett belagt nej från generatorn överlever artikelkopplingen — se
+      // rotRutEfterArtikelkoppling (driftfynd 2026-09-06).
+      const applied = rotRutEfterArtikelkoppling(applyProductToItem(row, product, row.quantity), rawRows[i])
       return { ...applied, description: row.description || applied.description }
     })
     if (linked > 0) {
