@@ -839,3 +839,15 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
   är 0 — pushen kan inte driftprovas förrän en telefon prenumererar.
   Provsteg: installera PWA på Nordström El, ring numret, låt det gå till
   missat → push + rad i push_dispatch_log (eller push_held 21–07).
+
+# Livegenomgången F10/F11 (Claude 2026-09-06)
+
+- [x] F10: `project_change.notes` ("Intern notering" i ÄTA-formuläret) ritades
+      i ÄTA-PDF:en under ANTECKNINGAR — samma PDF som kunden får via
+      /api/ata/sign/[token]/pdf. Blocket och fältet borttagna ur lib/ata/pdf.ts.
+      Sign-API:t (JSON) plockade redan fält uttryckligen utan notes.
+- [x] F11: deriveStatus räknade förfallodagar utan att se statusen; utkastet
+      FV-2026-003 (due_date 2026-06-10, aldrig skickat) fick 88 dagars ränta
+      (625 → 637 kr). draft/cancelled/credited ⇒ unpaid, 0 dagar, ingen ränta.
+- [x] Facit tests/livegenomgang-f10-f11.spec.ts i test:contracts + CI.
+      tsc rent, 1103/1103 gröna.

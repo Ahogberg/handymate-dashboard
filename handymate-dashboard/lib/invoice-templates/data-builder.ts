@@ -52,6 +52,15 @@ export function deriveStatus(invoice: any): { status: InvoiceStatus; daysOverdue
   // kundens skuld är reglerad, resten begärs från Skatteverket.
   if (invoice.status === 'paid' || invoice.status === 'customer_paid' || invoice.paid_at) return { status: 'paid', daysOverdue: 0 }
 
+  // Ett utkast har aldrig lämnat firman och kan inte vara sent — förfallo-
+  // datumet är bara ett förslag tills fakturan skickas. Samma för makulerad
+  // och krediterad: ingen skuld, ingen ränta. Driftfynd F11 (Nordström El
+  // 2026-09-06): FV-2026-003, utkast med due_date i maj, visade 637 kr med
+  // dröjsmålsränta i dokumentvyn medan listan sa 625 kr.
+  if (invoice.status === 'draft' || invoice.status === 'cancelled' || invoice.status === 'credited') {
+    return { status: 'unpaid', daysOverdue: 0 }
+  }
+
   const due = invoice.due_date ? new Date(invoice.due_date) : null
   const daysOverdue = due && due.getTime() < Date.now()
     ? Math.ceil((Date.now() - due.getTime()) / (1000 * 60 * 60 * 24))

@@ -125,6 +125,7 @@ jobs:
           tests/rot-instruktion.spec.ts
           tests/schema-tider.spec.ts
           tests/lisa-fangat-samtal.spec.ts
+          tests/livegenomgang-f10-f11.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

@@ -34,7 +34,13 @@ export interface AtaPdfAta {
   ata_number: number | null
   change_type: string | null
   description: string | null
-  notes?: string | null
+  /**
+   * project_change.notes finns MEDVETET inte här. Formuläret kallar fältet
+   * "Intern notering" (components/projects/ata/ChangeModal.tsx) och Pass F
+   * lägger dessutom kortets id där som idempotensmarkör. Dokumentet är det
+   * kunden signerar — samma PDF serveras via /api/ata/sign/[token]/pdf.
+   * Driftfynd F10, Nordström El 2026-09-06: noteringen hamnade i kundens PDF.
+   */
   items: unknown
   total?: number | null
   vat_rate?: number | null
@@ -238,19 +244,6 @@ export async function generateAtaPDF(input: GenerateAtaPdfInput): Promise<Buffer
   ensureSpace(beskrivning.length * 4.5)
   doc.text(beskrivning, margin, y)
   y += beskrivning.length * 4.5 + 3
-
-  if (ata.notes) {
-    doc.setFontSize(8)
-    doc.setTextColor(...ACCENT_RGB)
-    doc.text('ANTECKNINGAR', margin, y)
-    y += 5
-    doc.setFontSize(9)
-    doc.setTextColor(...TEXT_MUTED)
-    const noter = doc.splitTextToSize(ata.notes, contentWidth) as string[]
-    ensureSpace(noter.length * 4)
-    doc.text(noter, margin, y)
-    y += noter.length * 4 + 3
-  }
 
   if (arAvgaende) {
     doc.setFontSize(9)
