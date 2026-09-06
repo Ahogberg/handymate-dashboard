@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isoWeekInfo } from '@/lib/jarvis/monday-brief'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -67,22 +68,23 @@ export async function GET(request: NextRequest) {
       const userColor = (entry.business_user as any)?.color || '#94a3b8'
       const userEmail = (entry.business_user as any)?.email || ''
 
-      // Beräkna veckonummer
-      const d = new Date(entry.work_date)
-      const dayOfWeek = d.getDay()
-      const monday = new Date(d)
-      monday.setDate(d.getDate() - ((dayOfWeek + 6) % 7))
-      const weekKey = `${userId}_${monday.toISOString().split('T')[0]}`
-
-      const yearStart = new Date(d.getFullYear(), 0, 1)
-      const weekNum = Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + yearStart.getDay() + 1) / 7)
+      // ISO-vecka (måndag–söndag), samma hjälpare som veckovyn och
+      // måndagskortet. F04 (Codex liveprov 2026-09-06): den gamla formeln
+      // räknade veckor från 1 januari med söndag som veckostart, så söndagen
+      // 6 september hamnade i "Vecka 37" här men V36 i veckovyn.
+      const [yy, mm, dd] = String(entry.work_date).slice(0, 10).split('-').map(Number)
+      const d = new Date(Date.UTC(yy, mm - 1, dd))
+      const monday = new Date(d.getTime() - ((d.getUTCDay() + 6) % 7) * 86400000)
+      const mondayStr = monday.toISOString().slice(0, 10)
+      const weekKey = `${userId}_${mondayStr}`
+      const { isoYear, isoWeek: weekNum } = isoWeekInfo(mondayStr)
 
       if (!grouped[weekKey]) {
         grouped[weekKey] = {
           user: { id: userId, name: userName, color: userColor, email: userEmail },
           weekKey,
           weekNumber: weekNum,
-          year: d.getFullYear(),
+          year: isoYear,
           entries: [],
           totalMinutes: 0,
           billableMinutes: 0,

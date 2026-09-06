@@ -987,3 +987,6 @@ två skrivs som spec till efter lansering.
       Facit: kapplöpningsprov i tests/project-invoice-journey.spec.ts.
       Guarden i routen är medvetet bred (alla projektfakturor, inte bara
       final) — den skyddar mot dubbelfakturering efter en delfaktura.
+- [x] F04: attestvyn räknade veckor från 1 januari med söndag som veckostart
+      (söndag 6 sep = "Vecka 37" mot V36 i veckovyn). Nu ISO-vecka via
+      isoWeekInfo, måndag i UTC ur datumsträngen. Facit livegenomgang-f04.

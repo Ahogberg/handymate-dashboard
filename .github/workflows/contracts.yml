@@ -178,6 +178,7 @@ jobs:
           tests/livegenomgang-f22.spec.ts
           tests/onboarding-phone-truth.spec.ts
           tests/live-project-navigation-refresh.spec.ts
+          tests/livegenomgang-f04.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
