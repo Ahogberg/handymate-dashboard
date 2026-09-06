@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { persistOnboardingProgress } from '@/lib/onboarding/save-progress'
 import { useRouter } from 'next/navigation'
 import Step1MeetTheTeam from './components/Step1MeetTheTeam'
 import Step2Business from './components/Step2Business'
@@ -107,6 +108,9 @@ export default function OnboardingPage() {
   const [studioMode, setStudioMode] = useState(
     process.env.NEXT_PUBLIC_SETUP_STUDIO_ENABLED === 'true',
   )
+  const jobStepLock = useRef(false)
+  const [savingJobs, setSavingJobs] = useState(false)
+  const [jobSaveError, setJobSaveError] = useState('')
   const finalizeLock = useRef(false)
   // Företagsskannern-handoff (2026-09-02, tasks/plan-foretagsskannern.md):
   // varianten i tratten (lib/onboarding/funnel.ts) ska bli 'skanner' när
@@ -272,29 +276,17 @@ export default function OnboardingPage() {
   // Server-side via /api/onboarding PUT (service-role bypassar RLS).
   // `config`-objektet skriver whitelisted business_config-kolumner direkt.
   const saveProgress = useCallback(
-    async (
-      s: number,
-      extraData?: Record<string, unknown>,
-      config?: Record<string, unknown>,
-    ) => {
-      if (!data.businessId) return
+    async (s: number, extraData?: Record<string, unknown>, config?: Record<string, unknown>, strict = false) => {
+      if (!data.businessId) {
+        if (strict) throw new Error('Företagskontot saknas. Gå tillbaka till företagssteget.')
+        return
+      }
       try {
-        await fetch('/api/onboarding', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          // variant: vilken guide kunden faktiskt såg — servern stämplar
-          // tratten (lib/onboarding/funnel.ts) så A/B-testet går att läsa av.
-          // 'skanner' vinner över studio/classic — det säger VARIFRÅN kunden
-          // kom, inte vilken guide-UI som visades.
-          body: JSON.stringify({
-            step: s,
-            data: extraData || {},
-            config: config || {},
-            variant: viaSkanner ? 'skanner' : (studioMode ? 'studio' : 'classic'),
-          }),
-        })
-      } catch {
-        // Silent — onboarding fortsätter ändå, kan resume senare
+        await persistOnboardingProgress({ step: s, data: extraData || {}, config: config || {},
+          variant: viaSkanner ? 'skanner' : (studioMode ? 'studio' : 'classic') })
+      } catch (error) {
+        if (strict) throw error
+        // Older background checkpoints keep their existing best-effort behaviour.
       }
     },
     [data.businessId, studioMode, viaSkanner],
@@ -302,9 +294,13 @@ export default function OnboardingPage() {
 
   const next = useCallback(async () => {
     const newStep = Math.min(step + 1, TOTAL_STEPS - 1)
-    setStep(newStep)
+    if (step === 2) {
+      if (jobStepLock.current) return
+      jobStepLock.current = true; setSavingJobs(true); setJobSaveError('')
+    } else setStep(newStep)
+    try {
 
-    if (data.businessId && newStep > 0) {
+    if ((data.businessId || step === 2) && newStep > 0) {
       // Bygg config-payload baserat på vilket steg vi LÄMNAR
       const config: Record<string, unknown> = {}
 
@@ -339,8 +335,12 @@ export default function OnboardingPage() {
         config.phone_setup_type = data.phoneMode === 'forward' ? 'keep_existing' : 'new_number'
       }
 
-      await saveProgress(newStep, sanitizeForSave(data), config)
+      await saveProgress(newStep, sanitizeForSave(data), config, step === 2)
     }
+      if (step === 2) setStep(newStep)
+    } catch (error) {
+      setJobSaveError(error instanceof Error ? error.message : 'Kunde inte spara dina jobbval. Försök igen.')
+    } finally { if (step === 2) { jobStepLock.current = false; setSavingJobs(false) } }
   }, [step, data, saveProgress])
 
   const back = useCallback(() => {
@@ -427,7 +427,7 @@ export default function OnboardingPage() {
         <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 2 && (
-        <Step3HowYouWork onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        <Step3HowYouWork busy={savingJobs} error={jobSaveError} onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 3 && (
         <Step4PhoneNumber onNext={next} onBack={back} data={data} setData={setDataUpdater} />
@@ -442,7 +442,7 @@ export default function OnboardingPage() {
         <Step5Activate onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 7 && (
-        <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
+        <StepProductRegister onFirstQuote={launchFirstQuote} onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 8 && !launchRequested && <Step6LiveTour onFinish={finish} data={data} busy={finishing}
         onFirstQuote={data.firstQuoteSelection ? () => setLaunchRequested(true) : undefined} />}

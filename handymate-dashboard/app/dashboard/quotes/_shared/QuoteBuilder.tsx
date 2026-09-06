@@ -2039,7 +2039,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     if (!templateName.trim()) return
     setSavingTemplate(true)
     try {
-      await fetch('/api/quote-templates', {
+      const response = await fetch('/api/quote-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2058,12 +2058,16 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           rut_enabled: hasRutItems,
         }),
       })
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        throw new Error(result.error || 'Kunde inte spara mallen')
+      }
       toast.success('Mall sparad!')
       setShowSaveTemplateModal(false)
       setTemplateName('')
     } catch (err) {
       console.error('Failed to save template:', err)
-      toast.error('Kunde inte spara mallen')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara mallen')
     }
     setSavingTemplate(false)
   }
@@ -2933,6 +2937,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       )}
 
       <QuoteSaveTemplateModal
+        jobType={quoteJobType}
+        items={items}
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
         templateName={templateName}

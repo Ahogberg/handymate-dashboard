@@ -102,3 +102,33 @@ export async function findMatchingAssignees(
 
   return data || []
 }
+
+export class JobTypeSyncError extends Error {
+  constructor(public status: number, message: string) { super(message) }
+}
+
+/** Idempotent onboarding write. Never renames, unarchives or deletes existing jobs. */
+export async function ensureOnboardingJobTypes(db: SupabaseClient, businessId: string, input: unknown) {
+  if (!Array.isArray(input) || input.length > 100 || input.some(n => typeof n !== 'string' || !n.trim() || n.trim().length > 80 || !slugifyJobType(n))) {
+    throw new JobTypeSyncError(400, 'Välj giltiga jobbtyper med namn på högst 80 tecken.')
+  }
+  const names = new Map<string, string>()
+  for (const value of input as string[]) {
+    const name = value.trim(), slug = slugifyJobType(name)
+    const previous = names.get(slug)
+    if (previous && previous.toLocaleLowerCase('sv') !== name.toLocaleLowerCase('sv')) throw new JobTypeSyncError(400, 'Två jobbtyper får samma kortnamn. Ge dem tydligare olika namn.')
+    names.set(slug, name)
+  }
+  if (!names.size) return []
+  const { data: existing, error: readError } = await db.from('job_types').select('id, slug, name, is_active')
+    .eq('business_id', businessId).in('slug', Array.from(names.keys()))
+  if (readError) throw new JobTypeSyncError(503, 'Kunde inte läsa jobbtyperna. Försök igen.')
+  for (const job of existing || []) {
+    if (!job.is_active) throw new JobTypeSyncError(409, `Jobbtypen ${job.name} är arkiverad. Återställ den i Inställningar eller välj ett annat namn.`)
+    if (job.name.trim().toLocaleLowerCase('sv') !== names.get(job.slug)?.toLocaleLowerCase('sv')) throw new JobTypeSyncError(409, `Namnet liknar den befintliga jobbtypen ${job.name}. Välj det namnet eller ett tydligare eget namn.`)
+  }
+  const rows = Array.from(names).map(([slug, name]) => ({ business_id: businessId, slug, name }))
+  const { error } = await db.from('job_types').upsert(rows, { onConflict: 'business_id,slug', ignoreDuplicates: true })
+  if (error) throw new JobTypeSyncError(503, 'Kunde inte spara jobbtyperna. Försök igen.')
+  return Array.from(names.keys())
+}

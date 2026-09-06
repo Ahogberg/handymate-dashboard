@@ -25,8 +25,9 @@ test('mallens seedbelopp följer aldrig med till uppsättningsvyn', () => {
     null,
     { item_type: 'option', description: 'Tillval', unit: 'st' },
   ] })
+  expect(dto.items[0].quantity).toBe(10)
   expect(dto.items.map(r => r.index)).toEqual([0, 3])
-  expect(JSON.stringify(dto)).not.toMatch(/650|total|quantity|unit_price/)
+  expect(JSON.stringify(dto)).not.toMatch(/650|total|unit_price/)
 })
 
 for (const price of [0, null, NaN, Infinity, -1]) {

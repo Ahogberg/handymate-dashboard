@@ -1,3 +1,4 @@
+import { hydrateStandardProducts } from '@/lib/quotes/hydrate-standard-products'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
     const { data, error } = await query
     if (error) throw error
 
-    return NextResponse.json({ templates: data || [] })
+    return NextResponse.json({ templates: await hydrateStandardProducts(supabase, business.business_id, data || []) })
   } catch (error: any) {
     console.error('Get templates error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

@@ -69,16 +69,7 @@ export const TRADES: Trade[] = [
  * Justera direkt här — komponenterna importerar konstanten, ingen inline-
  * hårdkodning.
  */
-export const SPECIALTIES_BY_TRADE: Record<string, string[]> = {
-  electrician:        ['Installation', 'Felsökning', 'Belysning', 'Laddbox', 'Laddstolpar', 'Solceller', 'Smart hem', 'Service', 'Industri'],
-  plumber:            ['Badrum', 'Kök', 'Värmepump', 'Avlopp', 'Service', 'Vattenskador', 'Renovering', 'Nybygge'],
-  construction:       ['Badrum', 'Kök', 'Tak', 'Fasad', 'Tillbyggnad', 'Altan', 'Garage', 'Stommar', 'Energirenovering', 'Renovering'],
-  painter:            ['Inomhus', 'Utomhus', 'Tapetsering', 'Fönsterputs', 'Fasad', 'Trapphus', 'Kontor', 'Detaljmåleri'],
-  roofing:            ['Takomläggning', 'Plåttak', 'Tegeltak', 'Takfönster', 'Hängrännor', 'Skorsten', 'Snöskottning', 'Inspektion'],
-  groundworks:        ['Schaktning', 'Dränering', 'Asfaltering', 'Stenläggning', 'Grävning', 'Markarbeten', 'Husgrund', 'VA-grävning'],
-  general_contractor: ['Projektledning', 'Samordning', 'Upphandling', 'Beställarstöd', 'Byggherre-funktion', 'Tidplanering', 'Kvalitetskontroll', 'Slutbesiktning'],
-  other:              ['Badrum', 'Kök', 'Måleri', 'Trädgård', 'Mindre el', 'Mindre VVS', 'Snickeri', 'Reparationer'],
-}
+export { JOB_TYPES_BY_TRADE as SPECIALTIES_BY_TRADE } from '@/lib/job-type-catalog'
 
 /** Hjälp-lookup: bransch-label från ID (returnerar ID om miss, undvik undefined). */
 export function getTradeLabel(tradeId: string | null | undefined): string {

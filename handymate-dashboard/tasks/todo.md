@@ -810,3 +810,17 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 Första nyttan: 1 104 kontrakt och fyra Chromiumprov gröna lokalt.
 Riktiga komponenter, avlyssnade API-svar. Inloggat AI-/DB-prov återstår.
 Skiss, screenshots och provningsordning: docs/design/first-value/PLAN.md.
+
+## 2026-09-06 — Sammanhängande jobbtyp → offertstandard (bygger på PR #13)
+- [x] Konkreta branschjobb, egen jobbtyp direkt, bevara äldre val.
+- [x] Spara onboardingval som riktiga jobbtyper idempotent; återanvänd i offertsteget.
+- [x] Standardrader direkt: välj/skapa artikel, mängd, pris, förhandsvisning i onboarding/inställningar.
+- [x] Återanvänd valda rader från offert som jobbstandard med explicit val och samtidighetsskydd.
+- [x] Behåll artikelreferenser, reservationsförslag, offertögonblicksbilder och affär/projektkoppling.
+- [x] Verifiera serverkontrakt, mobilflöde, tsc, build. Redovisa separat kvarstående driftprov.
+
+Design: samma job_types används genom resan. Föreslagna namn ändrar aldrig befintliga jobb. Inga automatiska priser eller reservationer. Standardrader använder befintliga quote_templates; inga nya databaskolumner. Befintliga mallar redigeras radvis med updated_at-konfliktskydd och övriga fält bevaras. Nyskapad standard får deterministiskt id per jobb så dubbla klick inte skapar två standarder. Flera redan kopplade mallar kräver uttryckligt val. Egen artikel använder befintligt artikel-API och dess dubbletthantering.
+
+Verifieringsresultat och kvarstående inloggat prov: `docs/handoffs/JOB_STANDARDS_2026-09-06.md`. PostgreSQL- och UI-proven är isolerade, inga produktionsskrivningar.
+
+Slutkontroll 2026-09-06: 1 152 kontraktstester gröna (inklusive 12 nya PostgreSQL-prov), två jobb-/artikelresor i Chromium gröna, tsc rent och produktionsbygge exit 0. Mobilfixarna för PR #13 har separat prov för samtliga fem tipssteg vid 375×812 och 1280×900; båda gröna.

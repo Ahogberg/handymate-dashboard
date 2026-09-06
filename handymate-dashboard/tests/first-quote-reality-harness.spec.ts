@@ -83,7 +83,7 @@ test('nytt företag → jobbtyp → verkliga priser → reservation → sparning
 test('3–5 nyckelartiklar är rekommendation och sann status, aldrig onboardinggrind', () => {
   const rows = setup.templates[0].items.map((item, index) => ({ item, product: setup.products[index], status: 'priced' as const }))
   expect(coreArticleGuidance(rows)).toContain('3 nyckelartiklar')
-  const component = read('components/onboarding/JobTypeQuoteSetup.tsx')
+  const component = read('components/onboarding/JobTypeQuoteSetup.tsx') + read('components/onboarding/JobStandardRowsEditor.tsx')
   expect(component).toContain('3–5 återkommande nyckelartiklar')
   expect(component).toContain('Det är en genväg, inte ett krav')
   expect(component).not.toMatch(/disabled=\{[^}]*coreArticle|throw[^\n]*nyckelartik/i)

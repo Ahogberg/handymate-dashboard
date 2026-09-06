@@ -1,3 +1,4 @@
+import { ensureOnboardingJobTypes, JobTypeSyncError } from '@/lib/job-types'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { FUNNEL_KEY, markFinalized, markStepReached, normaliseraVariant, readFunnel, stripFunnelFromClientData } from '@/lib/onboarding/funnel'
@@ -231,11 +232,16 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
+    // Retrying a partial onboarding save must not duplicate or overwrite jobs.
+    if (config && Object.prototype.hasOwnProperty.call(config, 'specialties')) {
+      await ensureOnboardingJobTypes(supabase, business.business_id, config.specialties)
+    }
+
     return NextResponse.json({ success: true })
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : 'Okänt fel'
     console.error('PUT /api/onboarding error:', msg)
-    return NextResponse.json({ error: msg }, { status: 500 })
+    return NextResponse.json({ error: msg }, { status: error instanceof JobTypeSyncError ? error.status : 500 })
   }
 }
 

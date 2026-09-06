@@ -129,6 +129,9 @@ jobs:
           tests/onboarding-wow.spec.ts
           tests/first-quote-reality-harness.spec.ts
           tests/job-type-start.spec.ts
+          tests/job-standards.spec.ts
+          tests/job-type-setup.spec.ts
+          tests/job-type-activation-preview.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

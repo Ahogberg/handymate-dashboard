@@ -1,8 +1,12 @@
 'use client'
 
+import type { QuoteItem } from '@/lib/types/quote'
+import { SaveJobStandardFromQuote } from '@/components/onboarding/SaveJobStandardFromQuote'
 import { Loader2 } from 'lucide-react'
 
 interface QuoteSaveTemplateModalProps {
+  jobType?: string | null
+  items?: QuoteItem[]
   show: boolean
   onClose: () => void
   templateName: string
@@ -12,6 +16,7 @@ interface QuoteSaveTemplateModalProps {
 }
 
 export function QuoteSaveTemplateModal({
+  jobType, items,
   show,
   onClose,
   templateName,
@@ -27,7 +32,7 @@ export function QuoteSaveTemplateModal({
       onClick={onClose}
     >
       <div
-        className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-xl"
+        className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90dvh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
         <h3 className="font-heading text-lg font-bold text-slate-900 mb-4 tracking-tight">Spara som mall</h3>
@@ -60,6 +65,7 @@ export function QuoteSaveTemplateModal({
             {saving ? 'Sparar…' : 'Spara'}
           </button>
         </div>
+        {jobType && items && <SaveJobStandardFromQuote jobType={jobType} items={items} />}
       </div>
     </div>
   )
