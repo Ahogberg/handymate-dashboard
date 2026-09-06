@@ -29,3 +29,21 @@ Hantverkarvy: den befintliga integrationspreviewn (codex-3bda24). Kundportal: pr
 - PR #17 uppdaterad mot fdb9f7e8 med mergecommit 56743617. 12 riktade kontroller gröna lokalt efter synken.
 - Kodrättningar i den här grenen gäller F03/F06/F07/F16/F18/F19. De har ännu inte provats inloggat i produktion.
 - Kvar: ÄTA-utskick/accept, påverkan på faktura, material och slutfakturering. Varken full resa eller produktionsdrift är godkänd av denna rapport.
+
+## PR18 omprov och main-synk (7 september svensk tid)
+
+Main 0c6fd25 är intagen i 8e14282. F22:s projektkvitto följer med. Listorna har livegenomgang-f22 före live-project-navigation-refresh. 16 riktade kontroller gröna efter synk.
+
+Inloggat previewprov, Nordström El AB, projekt P-1015 (eget TEST Codex-projekt):
+- F03: Underentreprenörer saknas nu i den öppna Jobb-menyn. Grossistprislista saknas i inställningarnas fristående länkar; widgetkortet saknas under röstinställningen.
+- F06: Uppgifter öppnar uppgiftslistan och visar befintlig klar testuppgift.
+- F07: Kundkontakt → Telefonassistentens röst öppnar hälsningsfras och Lisa-röst. Ingen inställning sparad.
+- F18: en timme 11–12 den 6 september med beskrivningen TEST F18 – omprov, inget verkligt arbete sparad. Utan omladdning syns 1,00 tim à 500 kr, totalt 1,25 tim inklusive tidigare intern kvart. Nedlagt uppdateras 125 → 625 kr, fakturerbart underlag 500 kr. Nordströms timpris är här 500, inte onboardingtestföretagets 850. Detta är previewbevis; produktionsomprov krävs efter merge.
+- F19: både Fakturera och Förbered faktura öppnar befintligt Fakturaunderlag. Den nya timmen finns som arbete 500 kr, moms 125 kr, totalt 625 kr, inget avdrag. Den interna kvarten inkluderas inte. Avbrutet utan fakturaskapande.
+- F16: formuläret visas i editorn, inte i de inledande offertstegen. Tomt namn blockerar knappen. Eget befintligt telefonnummer avvisas av dubblettskyddet, offertens titel kvar. Positivt skapande ännu inte verifierat.
+
+Två upptäckter under klickprovet rättade i uppföljande commit:
+1. F16 tillät tom telefon, men databasen kräver phone_number. Live gav rått NOT NULL-fel. Formuläret kräver nu namn och telefon och använder native formvalidering för e-post; serverfel 500 visas utan databasdetaljer. Exekverande regression provar att blank telefon inte skickas och att serverfelet inte läcker.
+2. Mattes flytande knappar överlappar Fakturera längst ned i projektöversikten (1357×932). Klickets centrum öppnade röstpanelen. Klick på knappens fria vänsterdel öppnade rätt modal. Extra bottenutrymme införs så raden kan scrollas fri; visuell omkontroll på den nya deployen återstår.
+
+Inget fynd stängs genom kontraktstester enbart. F22:s kundaccept, PR17 mobil och PR18:s nya validering/placering återstår att liveprova. Ingen merge till main utförd.

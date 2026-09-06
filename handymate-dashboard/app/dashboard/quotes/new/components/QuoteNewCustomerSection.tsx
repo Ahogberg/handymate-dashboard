@@ -74,7 +74,7 @@ export function QuoteNewCustomerSection({
   const [customerError, setCustomerError] = useState('')
 
   async function saveCustomer() {
-    if (customerSaving || !customerName.trim()) return
+    if (customerSaving || !customerName.trim() || !customerPhone.trim()) return
     setCustomerSaving(true)
     setCustomerError('')
     try {
@@ -83,7 +83,7 @@ export function QuoteNewCustomerSection({
         body: JSON.stringify({ name: customerName.trim(), phone_number: customerPhone.trim(), email: customerEmail.trim() }),
       })
       const result = await response.json()
-      if (!response.ok) throw new Error(result.message || result.error || 'Kunden kunde inte sparas')
+      if (!response.ok) throw new Error(response.status >= 500 ? 'Kunden kunde inte sparas. Försök igen om en stund.' : result.message || result.error || 'Kunden kunde inte sparas')
       if (!result.customer?.customer_id) throw new Error('Kunden kunde inte bekräftas. Kontrollera kundregistret innan du försöker igen.')
       onCustomerCreated?.(result.customer)
       setSelectedCustomer(result.customer.customer_id)
@@ -128,16 +128,16 @@ export function QuoteNewCustomerSection({
                 </button>
                 {customers.length === 0 && <p className="text-sm text-gray-500">Skapa din första kund här. Offertens rader och priser ligger kvar.</p>}
                 {creatingCustomer && (
-                  <section aria-label="Skapa kund i offerten" className="mt-2 space-y-3 rounded-xl border border-slate-200 p-3">
-                    <label className="block text-sm">Namn *<input className={INPUT_CLS} value={customerName} onChange={e => setCustomerName(e.target.value)} disabled={customerSaving} /></label>
-                    <label className="block text-sm">Telefon<input type="tel" className={INPUT_CLS} value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} disabled={customerSaving} /></label>
+                  <form onSubmit={e => { e.preventDefault(); void saveCustomer() }} aria-label="Skapa kund i offerten" className="mt-2 space-y-3 rounded-xl border border-slate-200 p-3">
+                    <label className="block text-sm">Namn *<input required className={INPUT_CLS} value={customerName} onChange={e => setCustomerName(e.target.value)} disabled={customerSaving} /></label>
+                    <label className="block text-sm">Telefon *<input required type="tel" className={INPUT_CLS} value={customerPhone} onChange={e => setCustomerPhone(e.target.value)} disabled={customerSaving} /></label>
                     <label className="block text-sm">E-post<input type="email" className={INPUT_CLS} value={customerEmail} onChange={e => setCustomerEmail(e.target.value)} disabled={customerSaving} /></label>
-                    <p className="text-xs text-gray-500">Adress och övriga kunduppgifter kan kompletteras i kundregistret.</p>
+                    <p className="text-xs text-gray-500">Namn och telefonnummer krävs. Adress och övriga kunduppgifter kan kompletteras i kundregistret.</p>
                     {customerError && <p role="alert" className="text-sm text-red-700">{customerError}</p>}
-                    <button type="button" className="min-h-[44px] rounded-lg bg-primary-700 px-4 text-sm text-white disabled:opacity-50" onClick={saveCustomer} disabled={customerSaving || !customerName.trim()}>
+                    <button type="submit" className="min-h-[44px] rounded-lg bg-primary-700 px-4 text-sm text-white disabled:opacity-50" disabled={customerSaving || !customerName.trim() || !customerPhone.trim()}>
                       {customerSaving ? 'Sparar kunden…' : 'Spara och välj kunden'}
                     </button>
-                  </section>
+                  </form>
                 )}
               </div>
             )}

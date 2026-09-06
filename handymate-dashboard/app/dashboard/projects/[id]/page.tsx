@@ -2153,7 +2153,7 @@ export default function ProjectDetailPage() {
   // --- Render ---
 
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
+    <div className="p-4 pb-28 sm:p-8 sm:pb-28 bg-[#F8FAFC] min-h-screen">
       {/* Background blurs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>

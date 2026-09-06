@@ -32,3 +32,23 @@ test('an older project read cannot overwrite a refresh after saved work', async 
   expect(failure).toBe('Projektet kunde inte läsas om.')
   expect(projects).toEqual([{ id: 'new', hours: 1 }])
 })
+
+test('inline customer save stops missing phone and does not expose server errors', async () => {
+  const customerSource = fs.readFileSync('app/dashboard/quotes/new/components/QuoteNewCustomerSection.tsx', 'utf8')
+  const start = customerSource.indexOf('  async function saveCustomer() {')
+  const end = customerSource.indexOf('\n  return (', start)
+  let requests = 0
+  const errors: string[] = []
+  const context = {
+    customerSaving: false, customerName: 'Test', customerPhone: '   ', customerEmail: '',
+    setCustomerSaving: () => {}, setCustomerError: (value: string) => errors.push(value),
+    fetch: async () => { requests++; return { ok: false, status: 500, json: async () => ({ error: 'private database detail' }) } },
+  }
+  const save = vm.runInNewContext(ts.transpileModule('(' + customerSource.slice(start, end).trim() + ')', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
+  await save()
+  expect(requests).toBe(0)
+  context.customerPhone = '0700000000'
+  await save()
+  expect(requests).toBe(1)
+  expect(errors.at(-1)).toBe('Kunden kunde inte sparas. Försök igen om en stund.')
+})
