@@ -6,7 +6,7 @@ import { purchaseAndAssignNumber } from '@/lib/phone/purchase-number'
 /**
  * POST /api/onboarding/phone/reserve — köper + kopplar numret i STEG 3
  * (aha-testet kräver ett RIKTIGT, aktivt nummer före betalningen).
- * Komponentens fallback-platshållare kvarstår om env saknas (dev).
+ * Om köp misslyckas returneras en felkod, aldrig ett tilldelat nummer.
  */
 export async function POST(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
 
   const result = await purchaseAndAssignNumber(getServerSupabase(), business.business_id)
   if (!result.ok) {
-    // 200 med tom kropp → komponenten faller till platshållare (befintligt beteende)
+    // Behåll svarskontraktet: felkod utan nummer leder till misslyckat/väntande UI.
     return NextResponse.json({ error: result.error })
   }
   return NextResponse.json({ phone_number: result.phone_number })
