@@ -280,7 +280,7 @@ const GROUP_OF_TAB: Record<TabKey, GroupKey | null> = {
   leverantorer: 'economy_offert',
   changes: 'changes',
   milestones: 'planning',
-  tasks: 'planning',
+  tasks: 'tasks',
   schedule: 'planning',
   arbetsorder: 'planning',
   time: 'time_team',
@@ -822,7 +822,12 @@ export default function ProjectDetailPage() {
       if (!response.ok) throw new Error(result.error || 'Kunde inte registrera tiden')
       showToast('Tid registrerad!', 'success')
       setShowTimeModal(false)
-      fetchProjectData()
+      try {
+        await fetchProjectData(true)
+        setEconomicsRefreshKey(k => k + 1)
+      } catch {
+        showToast('Tiden är sparad, men projektvyn kunde inte uppdateras. Ladda om sidan.', 'error')
+      }
     } catch (error: any) {
       showToast(error.message || 'Något gick fel', 'error')
     } finally {
@@ -850,11 +855,14 @@ export default function ProjectDetailPage() {
 
   // --- Data Fetching ---
 
+  const projectReadVersion = useRef(0)
   const fetchProjectData = useCallback(async (preserveOnError = false) => {
+    const version = ++projectReadVersion.current
     try {
-      const res = await fetch(`/api/projects/${projectId}`)
+      const res = await fetch(`/api/projects/${projectId}`, { cache: 'no-store' })
       if (!res.ok) throw new Error('Not found')
       const data = await res.json()
+      if (version !== projectReadVersion.current) return
       setProject(data.project)
       setQuote(data.quote)
       setMilestones(data.milestones)
@@ -879,10 +887,11 @@ export default function ProjectDetailPage() {
         uninvoiced_sell: uninvoicedMats.reduce((s: number, m: any) => s + (m.total_sell || 0), 0)
       })
     } catch {
+      if (version !== projectReadVersion.current) return
       if (preserveOnError) throw new Error('Projektet kunde inte läsas om.')
       setProject(null)
     } finally {
-      setLoading(false)
+      if (version === projectReadVersion.current) setLoading(false)
     }
   }, [projectId])
 
@@ -1931,8 +1940,8 @@ export default function ProjectDetailPage() {
       id: 'ofakturerat',
       dotClass: 'bg-amber-500',
       text: `Ofakturerat: ${formatSEK(uninvoicedRevenue)}`,
-      actionLabel: 'Förbered delfaktura',
-      onAction: () => setActiveTab('economy'),
+      actionLabel: 'Förbered faktura',
+      onAction: () => setShowInvoiceModal(true),
     })
   }
   // Egenkontroll (Etapp 1c, tasks/easoft-gap-plan.md, copy.projektvy.sv.json
@@ -2144,7 +2153,7 @@ export default function ProjectDetailPage() {
   // --- Render ---
 
   return (
-    <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
+    <div className="p-4 pb-28 sm:p-8 sm:pb-28 bg-[#F8FAFC] min-h-screen">
       {/* Background blurs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden hidden sm:block">
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
@@ -2542,7 +2551,7 @@ export default function ProjectDetailPage() {
                 Ny ÄTA
               </button>
               <button
-                onClick={() => setActiveTab('economy')}
+                onClick={() => setShowInvoiceModal(true)}
                 className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
                 Fakturera

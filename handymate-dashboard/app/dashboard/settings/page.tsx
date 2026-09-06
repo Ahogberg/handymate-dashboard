@@ -1911,6 +1911,7 @@ export default function SettingsPage() {
             })()}
 
             {/* Länk till prislista */}
+            {!isLaunchHidden('wholesaler') && (
             <Link
               href="/dashboard/settings/pricelist"
               className="flex items-center justify-between p-4 bg-gray-50 hover:bg-gray-100 rounded-xl border border-gray-300 hover:border-primary-300 transition-all group"
@@ -1926,6 +1927,7 @@ export default function SettingsPage() {
               </div>
               <ChevronRight className="w-5 h-5 text-gray-400 group-hover:text-secondary-700 transition-colors" />
             </Link>
+            )}
 
             {/* Länk till produktregister */}
             <Link
@@ -3643,6 +3645,7 @@ export default function SettingsPage() {
             </div>
 
             {/* AI på hemsidan — en enda installationsyta. */}
+            {!isLaunchHidden('website_widget') && (
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">
               <div className="flex items-center gap-3 mb-4">
                 <div className="p-2 rounded-lg bg-primary-100">
@@ -3664,6 +3667,7 @@ export default function SettingsPage() {
                 Konfigurera och installera
               </Link>
             </div>
+            )}
 
             {/* Grossist-kopplingar */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-6">

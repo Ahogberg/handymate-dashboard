@@ -35,7 +35,7 @@ import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusiness } from '@/lib/BusinessContext'
 import { hasFeature, PlanType, getPlanLabel } from '@/lib/feature-gates'
-import { isLaunchHidden, isComingSoon, COMING_SOON_LABEL } from '@/lib/launch-visibility'
+import { isLaunchHidden, launchGateForPath, isComingSoon, COMING_SOON_LABEL } from '@/lib/launch-visibility'
 import { FuelSidebarBadge } from '@/components/fuel/FuelSidebarBadge'
 
 interface SidebarProps {
@@ -651,10 +651,10 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
    */
   function filterLaunchGates(items: NavItem[]): NavItem[] {
     return items
-      .filter(item => !(item.type === 'link' && isLaunchHidden(item.launchGate)))
+      .filter(item => !(item.type === 'link' && isLaunchHidden(item.launchGate || launchGateForPath(item.href))))
       .map(item => {
         if (item.type !== 'group') return item
-        const kvar = item.children.filter(c => !isLaunchHidden(c.launchGate))
+        const kvar = item.children.filter(c => !isLaunchHidden(c.launchGate || launchGateForPath(c.href)))
         if (kvar.length === 0) return null
         return { ...item, children: kvar }
       })

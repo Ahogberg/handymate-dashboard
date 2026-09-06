@@ -102,6 +102,7 @@ export const SETTINGS_AREAS: SettingsArea[] = [
       {
         label: 'Telefon',
         entries: [
+          { id: 'ai', label: 'Telefonassistentens röst', desc: 'Hälsningsfras och röst för samtal', icon: 'bot' },
           { id: '_link_phone', label: 'Telefoni', desc: 'Nummer, vidarekoppling och installationen', icon: 'phone', href: '/dashboard/settings/phone' },
           { id: 'phone', label: 'Samtalsinställningar', desc: 'Hur samtal hanteras i vardagen', icon: 'phone-call', supersededBy: '/dashboard/settings/phone' },
         ],
@@ -199,7 +200,6 @@ export const SETTINGS_AREAS: SettingsArea[] = [
       {
         label: 'Arbetssätt',
         entries: [
-          { id: 'ai', label: 'Så ska Handymate arbeta', desc: 'Hur mycket teamet gör på egen hand', icon: 'bot' },
           { id: 'autopilot', label: 'Godkännanden', desc: 'Vad som kräver ditt ja innan det går ut', icon: 'clipboard-check' },
           { id: '_link_knowledge', label: 'Kunskap & jobbstil', desc: 'Det teamet lärt sig om ditt företag', icon: 'book-open', href: '/dashboard/settings/knowledge' },
         ],
