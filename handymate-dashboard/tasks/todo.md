@@ -981,3 +981,9 @@ två skrivs som spec till efter lansering.
 - [x] F22 (ur Codex ÄTA-prov): "Kopiera signeringslänken i stället" markerar
       nu ÄTA:n som skickad (method=link, utan SMS) så den syns i kundportalen
       och PDF:en låses upp. Facit tests/livegenomgang-f22.spec.ts.
+- [x] Samtidiga slutfaktura-anrop (Codex dubblettprov täckte bara upprepade):
+      v219 KÖRD — partiellt unikt index, högst en levande slutfaktura per
+      projekt; create-final-invoice fångar 23505 och återanvänder vinnaren.
+      Facit: kapplöpningsprov i tests/project-invoice-journey.spec.ts.
+      Guarden i routen är medvetet bred (alla projektfakturor, inte bara
+      final) — den skyddar mot dubbelfakturering efter en delfaktura.

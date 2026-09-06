@@ -409,6 +409,29 @@ export async function POST(
       })
       invoice = created.invoice
     } catch (insertError: any) {
+      // v219: högst en levande slutfaktura per projekt (partiellt unikt
+      // index). Läsningen ovan är inte ett lås — två samtidiga POST kan
+      // båda passera den. Den som förlorar kapplöpningen får 23505 här och
+      // återanvänder vinnaren, exakt som den vanliga dedupe-vägen. Ett
+      // fakturanummer kan ha reserverats i onödan; det är det mindre felet.
+      if (insertError?.code === '23505') {
+        const { data: vinnare } = await supabase
+          .from('invoice')
+          .select('invoice_id, invoice_number')
+          .eq('business_id', business.business_id)
+          .eq('project_id', projectId)
+          .eq('invoice_type', 'final')
+          .limit(1)
+          .maybeSingle()
+        if (vinnare) {
+          return NextResponse.json({
+            invoice_id: vinnare.invoice_id,
+            invoice_number: vinnare.invoice_number,
+            deduplicated: true,
+            concurrent: true,
+          })
+        }
+      }
       console.error('[create-final-invoice] insert error:', insertError)
       return NextResponse.json(
         {

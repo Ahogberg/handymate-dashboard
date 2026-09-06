@@ -30,7 +30,7 @@ function harness(){
  const rows=(tables[table]||[]).filter(r=>filters.every(f=>f(r))).map(r=>fields==='*'?{...r}:Object.fromEntries(fields.split(',').map(k=>[k.trim(),r[k.trim()]])))
  return {data:one?(rows[0]||null):rows,error:null}
  }).then(ok,bad)};return q}}
- const deps:any={'@/lib/observability/driftlarm':{rapporteraTystFel:async()=>{}},'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>({business_id:'b'})},'@/lib/permissions':{getCurrentUser:async()=>({}),hasPermission:()=>true},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/invoices/quote-to-invoice-items':mapper,'@/lib/ata/lifecycle':lifecycle,'@/lib/rot-rut':rot,'@/lib/rot-rut-limits':{calculateCappedDeduction:async()=>({deduction:0})},'@/lib/invoices/create-invoice':{createInvoice:async(_:any,input:any)=>{state.created.push(input);tables.invoice.push({invoice_id:'i',invoice_number:'TEST',business_id:input.businessId,project_id:input.projectId});return {invoice:{invoice_id:'i',invoice_number:'TEST'}}}},'@/lib/invoices/mark-sources':{markInvoiceSources:async(_:any,input:any)=>{state.marks.push(input);return {ok:true}}}}
+ const deps:any={'@/lib/observability/driftlarm':{rapporteraTystFel:async()=>{}},'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>({business_id:'b'})},'@/lib/permissions':{getCurrentUser:async()=>({}),hasPermission:()=>true},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/invoices/quote-to-invoice-items':mapper,'@/lib/ata/lifecycle':lifecycle,'@/lib/rot-rut':rot,'@/lib/rot-rut-limits':{calculateCappedDeduction:async()=>({deduction:0})},'@/lib/invoices/create-invoice':{createInvoice:async(_:any,input:any)=>{if(input.invoiceType==='final'&&tables.invoice.some(i=>i.business_id===input.businessId&&i.project_id===input.projectId&&i.invoice_type==='final'))throw Object.assign(new Error('duplicate key value violates unique constraint "invoice_en_slutfaktura_per_projekt"'),{code:'23505'}) /* v219 */;state.created.push(input);tables.invoice.push({invoice_id:'i'+state.created.length,invoice_number:'TEST',business_id:input.businessId,project_id:input.projectId,invoice_type:input.invoiceType});return {invoice:{invoice_id:'i'+state.created.length,invoice_number:'TEST'}}}},'@/lib/invoices/mark-sources':{markInvoiceSources:async(_:any,input:any)=>{state.marks.push(input);return {ok:true}}}}
  const preview=compile('app/api/projects/[id]/invoice-preview/route.ts',deps)
  const final=compile('app/api/projects/[id]/create-final-invoice/route.ts',deps)
  const hourly=compile('app/api/invoices/from-project/route.ts',deps)
@@ -103,3 +103,13 @@ test('retry after a saved final invoice returns the same receipt without a secon
  const h=harness();const first=await (await h.final()).json();const retry=await (await h.final()).json()
  expect(retry).toMatchObject({...first,deduplicated:true});expect(h.state.created).toHaveLength(1);expect(h.state.marks).toHaveLength(1)
 })
+
+test('two concurrent final-invoice calls yield one invoice: the loser of the race returns the winner (v219 unique index)',async()=>{
+ const h=harness();const [a,b]=await Promise.all([h.final(),h.final()])
+ expect(a.status).toBe(200);expect(b.status).toBe(200)
+ const ja=await a.json(),jb=await b.json()
+ expect(h.state.created).toHaveLength(1);expect(ja.invoice_id).toBe(jb.invoice_id)
+ expect([ja,jb].filter(r=>r.concurrent===true)).toHaveLength(1)
+ expect(fs.readFileSync('sql/v219_en_slutfaktura_per_projekt.sql','utf8')).toContain("WHERE invoice_type = 'final'")
+})
+
