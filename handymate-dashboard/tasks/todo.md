@@ -978,3 +978,6 @@ två skrivs som spec till efter lansering.
 - [x] Facit tests/livegenomgang-f20-f21.spec.ts (9) i test:contracts + CI.
       tsc rent, 1664/1664 (1 skipped), pglite 17/17.
 - Codex: F16, F18, F19, F03, F06, F07. Omprov i produktion, inte previewn.
+- [x] F22 (ur Codex ÄTA-prov): "Kopiera signeringslänken i stället" markerar
+      nu ÄTA:n som skickad (method=link, utan SMS) så den syns i kundportalen
+      och PDF:en låses upp. Facit tests/livegenomgang-f22.spec.ts.
