@@ -192,7 +192,13 @@ export function QuoteHeader({
             Skicka påminnelse
           </button>
         )}
-        {quote.status === 'accepted' && (
+        {quote.status === 'accepted' && quote.linked_project && (
+          <Link href={`/dashboard/projects/${quote.linked_project.project_id}`} className={PRIMARY_BTN}>
+            <FolderKanban className="w-4 h-4" />
+            Öppna projekt
+          </Link>
+        )}
+        {quote.status === 'accepted' && !quote.linked_project && (
           <button onClick={onCreateProject} disabled={creatingProject} className={PRIMARY_BTN}>
             <FolderKanban className="w-4 h-4" />
             {creatingProject ? 'Skapar projekt…' : 'Skapa projekt'}

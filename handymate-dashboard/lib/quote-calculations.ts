@@ -218,6 +218,14 @@ export function calculateQuoteTotals(
       }
       gronBase += lineTotal
       gronDeductionRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
+    } else if (item.labor_amount != null && Number.isFinite(Number(item.labor_amount))) {
+      // Utan avdragstyp avgör arbetsandelen (v67), inte enheten: en arbetsrad
+      // med enheten "st" visade "Arbete 0 kr" så fort ROT var av (driftfynd
+      // 2026-09-06, #2026006). 0 är giltigt = ren material. Raderna MED
+      // avdrag ovan behåller hela radtotalen som arbete (tests/rot-split).
+      const labor = Math.min(Math.max(Number(item.labor_amount), 0), Math.max(lineTotal, 0))
+      laborTotal += labor
+      materialTotal += lineTotal - labor
     } else if (item.unit === 'tim' || item.unit === 'hour' || item.unit === 'h') {
       laborTotal += lineTotal
     } else {

@@ -13,6 +13,7 @@ import * as path from 'path'
 import { tolkaAvdragsinstruktion, INSTRUKTIONSMONSTER, AVDRAGS_KALLA_INSTRUKTION } from '../lib/rot/instruktion'
 import { getQuoteBudgetDerivation } from '../lib/quotes/get-quote-budget-derivation'
 import { rotRutEfterArtikelkoppling } from '../lib/quotes/generated-to-quote-items'
+import { calculateQuoteTotals } from '../lib/quote-calculations'
 
 const ROOT = path.join(__dirname, '..')
 const read = (f: string) => fs.readFileSync(path.join(ROOT, f), 'utf8')
@@ -130,5 +131,46 @@ test.describe('Artikelkopplingen får inte återinföra ROT (driftfynd #2026004)
     const src = utanKommentarer(read('app/dashboard/quotes/_shared/QuoteBuilder.tsx'))
     const fn = src.split('function linkAiItemsToProducts')[1].split('function applyAiResult')[0]
     expect(fn).toContain('rotRutEfterArtikelkoppling(applyProductToItem(row, product, row.quantity), rawRows[i])')
+  })
+})
+
+test.describe('Offertsummeringen: "Arbete" utan avdrag (driftfynd #2026006)', () => {
+  const rad = (extra: Record<string, unknown>) => ({ id: 'x', item_type: 'item', description: 'rad', quantity: 2, unit: 'st', unit_price: 850, total: 1700, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null, ...extra }) as any
+
+  test('arbetsandelen räknas som arbete och resten som material när avdrag saknas', () => {
+    const t = calculateQuoteTotals([rad({ labor_amount: 1190 }), rad({ id: 'm', quantity: 2, unit_price: 150, total: 300, labor_amount: 0 })])
+    expect(t.laborTotal).toBe(1190)
+    expect(t.materialTotal).toBe(510 + 300)
+    expect(t.subtotal).toBe(2000)
+  })
+
+  test('utan arbetsandel gäller enheten som förr', () => {
+    const t = calculateQuoteTotals([rad({ labor_amount: null }), rad({ id: 'h', unit: 'tim', quantity: 1, unit_price: 900, total: 900, labor_amount: undefined })])
+    expect(t.laborTotal).toBe(900)
+    expect(t.materialTotal).toBe(1700)
+  })
+
+  test('en ROT-rad behåller hela radtotalen som arbete (tests/rot-split oförändrat)', () => {
+    const t = calculateQuoteTotals([rad({ is_rot_eligible: true, rot_rut_type: 'rot', labor_amount: 1190 })])
+    expect(t.laborTotal).toBe(1700)
+    expect(t.rotWorkCost).toBe(1190)
+  })
+})
+
+test.describe('"Skapa projekt" visas inte när projektet redan finns (driftfynd #2026006)', () => {
+  test('quotes GET slår upp projektet via project.quote_id, företagsavgränsat', () => {
+    const src = utanKommentarer(read('app/api/quotes/route.ts'))
+    const i = src.indexOf("quote.linked_project = linkedProject")
+    expect(i).toBeGreaterThan(-1)
+    const block = src.slice(src.lastIndexOf(".from('project')", i), i)
+    expect(block).toContain(".eq('quote_id', quoteId)")
+    expect(block).toContain(".eq('business_id', businessId)")
+  })
+
+  test('QuoteHeader visar Öppna projekt i stället för Skapa projekt när kopplingen finns', () => {
+    const src = utanKommentarer(read('app/dashboard/quotes/[id]/components/QuoteHeader.tsx'))
+    expect(src).toContain("quote.status === 'accepted' && quote.linked_project && (")
+    expect(src).toContain("quote.status === 'accepted' && !quote.linked_project && (")
+    expect(src).toContain('Öppna projekt')
   })
 })

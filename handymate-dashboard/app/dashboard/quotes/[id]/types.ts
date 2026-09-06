@@ -93,6 +93,8 @@ export interface Quote {
   reference_person?: string
   customer_reference?: string
   project_address?: string
+  /** Projekt skapat från offerten (project.quote_id). null = inget ännu. */
+  linked_project?: { project_id: string; name: string | null; status: string | null } | null
   detail_level?: string
   show_unit_prices?: boolean
   show_quantities?: boolean

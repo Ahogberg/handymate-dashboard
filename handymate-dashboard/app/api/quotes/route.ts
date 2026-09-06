@@ -71,6 +71,18 @@ export async function GET(request: NextRequest) {
         customer = data
       }
 
+      // Kopplat projekt (driftfynd 2026-09-06, #2026006): en accepterad offert
+      // med automatiskt skapat projekt visade fortfarande "Skapa projekt".
+      // project.quote_id är sanningen (unik per offert), företagsavgränsad.
+      const { data: linkedProject } = await supabase
+        .from('project')
+        .select('project_id, name, status')
+        .eq('quote_id', quoteId)
+        .eq('business_id', businessId)
+        .limit(1)
+        .maybeSingle()
+      quote.linked_project = linkedProject || null
+
       // Fetch sibling versions if this quote is part of a version family
       let versions: any[] = []
       const parentId = quote.parent_quote_id || quote.quote_id

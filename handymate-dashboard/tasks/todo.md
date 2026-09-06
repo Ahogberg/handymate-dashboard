@@ -805,4 +805,6 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - [x] Arbetsrad med enheten "st" blev material när avdraget slogs av: `labor_amount > 0` är nu första signalen i `get-quote-budget-derivation` och `get-quote-context`, kolumnen hämtas i båda selectarna.
 - [x] Tredje fyndet (#2026004): artikelkopplingen skrev över det belagda nejet med artikelns standardflagga. `rotRutEfterArtikelkoppling` i `generated-to-quote-items.ts`, använd i `linkAiItemsToProducts`. Belagt nej vinner; okänt och belagt ja lämnar artikeln orörd.
 - [x] Facit `tests/rot-instruktion.spec.ts` (28 prov: tolkningen, inkopplingen, klassningen med beteendeprov) inkopplat i package.json och CI.
+- [x] Driftprovat av Codex i #16 (offert #2026006 → projekt P-1015): arbetsraden under Arbete, inget avdrag.
+- [x] Två visningsfel därefter: "Arbete 0 kr" i offertsummeringen (calculateQuoteTotals läste bara avdragstyp och enhet; arbetsandelen avgör nu när avdrag saknas) och "Skapa projekt" trots befintligt projekt (quotes GET slår upp project.quote_id, headern visar Öppna projekt). Facit +5 prov.
 - [ ] Codex provar om på Nordström El efter deploy: samma instruktion ⇒ inga ROT-flaggor och "Inget avdrag" i offertbyggaren; arbetsraden kvar som arbete i projektvyn.
