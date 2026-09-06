@@ -799,3 +799,9 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - Riktigt DB-prov 2026-09-03: samtliga fem queries gröna; 1 SMS-fel,
   0 mejlfel, 0 betalningsfel, 8 automationsfel och 4 hälsokontroller.
 - Kontraktsgrind 350/350, `npx tsc --noEmit` rent, `npm run build` exit 0.
+
+## 2026-09-06 — Två ROT-fynd från Codex driftprov (main, Claude)
+- [x] "Ingen ROT eller RUT" i underlaget gav ändå ROT: `lib/rot/instruktion.ts` tolkar hantverkarens uttryckliga nej och går före `bedomAvdrag`; slår även modellens `suggestedDeductionType`; skälet syns i reasoning.
+- [x] Arbetsrad med enheten "st" blev material när avdraget slogs av: `labor_amount > 0` är nu första signalen i `get-quote-budget-derivation` och `get-quote-context`, kolumnen hämtas i båda selectarna.
+- [x] Facit `tests/rot-instruktion.spec.ts` (24 prov: tolkningen, inkopplingen, klassningen med beteendeprov) inkopplat i package.json och CI.
+- [ ] Codex provar om på Nordström El efter deploy: samma instruktion ⇒ inga ROT-flaggor och "Inget avdrag" i offertbyggaren; arbetsraden kvar som arbete i projektvyn.

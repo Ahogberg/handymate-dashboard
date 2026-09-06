@@ -37,6 +37,8 @@ export interface QuoteLineRow {
   total: number
   is_rot_eligible: boolean
   is_rut_eligible: boolean
+  /** Arbetsandel i kr ur artikelsnapshot/AI (v67). null = okänd. */
+  labor_amount: number | null
   article_number: string | null
   /** Endast satt för rubriker/text/subtotal/discount (ej för 'item') */
   item_type: 'item' | 'heading' | 'text' | 'subtotal' | 'discount'
@@ -98,6 +100,7 @@ interface QuoteItemTableRow {
   total: number | null
   is_rot_eligible: boolean | null
   is_rut_eligible: boolean | null
+  labor_amount: number | null
   article_number: string | null
   sort_order: number | null
 }
@@ -115,6 +118,7 @@ interface QuoteJsonbItem {
   total?: number
   is_rot_eligible?: boolean
   is_rut_eligible?: boolean
+  labor_amount?: number | null
   article_number?: string
   sort_order?: number
 }
@@ -152,6 +156,10 @@ function normalizeItemType(raw: string | null | undefined): QuoteLineRow['item_t
 }
 
 function isLaborByHeuristic(row: QuoteLineRow): boolean {
+  // Arbetsandelen (labor_amount) är den starkaste signalen och oberoende av
+  // avdrag: en arbetsrad med enheten "st" blev material så fort ROT slogs av
+  // (fynd vid driftprov 2026-09-06). 0 = ren material, null = okänd.
+  if (Number(row.labor_amount ?? 0) > 0) return true
   // Best-effort. ROT/RUT-eligible är vanligtvis arbete (skattereduktion
   // gäller arbetskostnad). Plus unit som indikerar timme/h/timmar.
   if (row.is_rot_eligible || row.is_rut_eligible) return true
@@ -170,6 +178,7 @@ function fromQuoteItemTable(r: QuoteItemTableRow): QuoteLineRow {
     total: Number(r.total || 0),
     is_rot_eligible: !!r.is_rot_eligible,
     is_rut_eligible: !!r.is_rut_eligible,
+    labor_amount: r.labor_amount ?? null,
     article_number: r.article_number,
     item_type: normalizeItemType(r.item_type),
   }
@@ -187,6 +196,7 @@ function fromJsonbItem(j: QuoteJsonbItem, idx: number): QuoteLineRow {
     total: Number(j.total ?? qty * price),
     is_rot_eligible: !!j.is_rot_eligible,
     is_rut_eligible: !!j.is_rut_eligible,
+    labor_amount: j.labor_amount ?? null,
     article_number: j.article_number || null,
     item_type: normalizeItemType(j.item_type),
   }
@@ -269,7 +279,7 @@ export async function getProjectQuoteContext(
     .from('quote_items')
     .select(
       'id, item_type, description, quantity, unit, unit_price, total, ' +
-        'is_rot_eligible, is_rut_eligible, article_number, sort_order',
+        'is_rot_eligible, is_rut_eligible, labor_amount, article_number, sort_order',
     )
     .eq('quote_id', quoteId)
     .order('sort_order', { ascending: true })

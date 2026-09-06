@@ -9,6 +9,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildJobTypePrompt, type JobTypeGenerationContext } from '@/lib/quotes/job-type-generation'
 import { applyGeneratedPriceTruth } from '@/lib/quotes/generated-price-truth'
 import { bedomAvdrag, arArbeteUtanAvdrag, type Boendeform } from '@/lib/rot/ratt'
+import { tolkaAvdragsinstruktion } from '@/lib/rot/instruktion'
 
 export interface PriceListItem {
   name: string
@@ -1109,7 +1110,15 @@ Svara ENDAST med JSON (ingen markdown):
   // tasks/plan-rot-ratt.md Del 3.1 — så den är 'okand' tills en anropare
   // faktiskt börjar skicka den med.
   const boendeform: Boendeform = 'okand'
-  const rotBesked = bedomAvdrag(input.jobType || '', boendeform)
+  // Hantverkarens egen instruktion går före tabellen (2026-09-06, fynd vid
+  // driftprov: "Ingen ROT eller RUT i detta prov" gav ändå ROT). Ett
+  // uttryckligt "inget avdrag" i underlaget är ett belagt nej — se
+  // lib/rot/instruktion.ts. Bara nej tolkas; ett ja går fortfarande via
+  // bedomAvdrag eller hantverkarens eget kryss.
+  const avdragsinstruktion = tolkaAvdragsinstruktion(
+    [input.textDescription, input.voiceTranscript].filter(Boolean).join('\n'),
+  )
+  const rotBesked = avdragsinstruktion ?? bedomAvdrag(input.jobType || '', boendeform)
   const avdragsfragor = rotBesked.utfall === 'okant' ? [rotBesked.fraga] : []
   const utanAvdrag = arArbeteUtanAvdrag(input.jobType || '')
   // 'okant' får ALDRIG bli ett tyst nej. Ett belagt ja sätter flaggan, ett
@@ -1148,9 +1157,14 @@ Svara ENDAST med JSON (ingen markdown):
     laborCost,
     materialCost,
     totalBeforeVat: laborCost + materialCost,
-    suggestedDeductionType: parsed.suggestedDeductionType || 'none',
+    // Instruktionen slår även modellens förslag på offertnivå — annars hade
+    // rotRutFranSanning:s nej-gren visserligen hållit raderna rena, men
+    // offertbyggaren kunnat visa "ROT föreslaget" ur suggestedDeductionType.
+    suggestedDeductionType: avdragsinstruktion ? 'none' : (parsed.suggestedDeductionType || 'none'),
     confidence: parsed.confidence || 50,
-    reasoning: input.jobTypeContext
+    reasoning: [
+      avdragsinstruktion ? `Inget ROT-/RUT-avdrag: ${avdragsinstruktion.grund}` : '',
+      input.jobTypeContext
       ? [input.jobTypeContext.status === 'selected'
         ? `Underlag: ${input.jobTypeContext.templateName}. Artikelpriser kontrollerade mot produktbank och eventuellt kundavtal.`
         : input.jobTypeContext.status === 'unavailable' ? 'Jobbtypskopplingen kunde inte läsas. Ingen jobbtypsmall har använts.'
@@ -1158,6 +1172,7 @@ Svara ENDAST med JSON (ingen markdown):
         'Mängderna är förslag att granska mot jobbet, inte bekräftade mått. Saknade priser behöver fyllas i.',
         parsed.reasoning || ''].filter(Boolean).join('\n\n')
       : parsed.reasoning || '',
+    ].filter(Boolean).join('\n\n'),
     similarHistoricalQuotes: similarQuotes.map(q => ({
       id: q.quote_id,
       title: q.title,

@@ -20,7 +20,7 @@
  *
  * Heuristik labor vs material (samma som getProjectQuoteContext):
  * - JSONB-rader: type='labor' är källan
- * - quote_items: is_rot_eligible || is_rut_eligible || unit∈{tim/h/timmar/hour}
+ * - quote_items: labor_amount > 0 || is_rot_eligible || is_rut_eligible || unit∈{tim/h/timmar/hour}
  *
  * project_type-härledning:
  * - laborItems > 0 OCH materialItems > 0 → 'mixed'
@@ -65,6 +65,7 @@ interface QuoteItemTableRow {
   total: number | null
   is_rot_eligible: boolean | null
   is_rut_eligible: boolean | null
+  labor_amount?: number | null
   sort_order: number | null
 }
 
@@ -81,6 +82,7 @@ interface QuoteJsonbItem {
   total?: number
   is_rot_eligible?: boolean
   is_rut_eligible?: boolean
+  labor_amount?: number | null
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -89,8 +91,14 @@ interface QuoteJsonbItem {
 
 const LABOR_UNITS = new Set(['tim', 'h', 'timmar', 'hour'])
 
+// Arbetsandelen (labor_amount, v67) är den starkaste signalen: den sätts av
+// artikelsnapshoten och AI-generatorn oberoende av avdrag och enhet. Utan
+// den blev en arbetsrad med enheten "st" material så fort ROT slogs av
+// (fynd vid driftprov 2026-09-06). 0 är ett giltigt värde (ren material)
+// och ska INTE räknas som arbete; null betyder okänt och faller vidare.
 function isLaborByTableRow(r: QuoteItemTableRow): boolean {
   if (r.item_type && r.item_type !== 'item') return false
+  if (Number(r.labor_amount ?? 0) > 0) return true
   if (r.is_rot_eligible || r.is_rut_eligible) return true
   return LABOR_UNITS.has((r.unit || '').toLowerCase().trim())
 }
@@ -98,6 +106,7 @@ function isLaborByTableRow(r: QuoteItemTableRow): boolean {
 function isLaborByJsonbItem(j: QuoteJsonbItem): boolean {
   if (j.item_type && j.item_type !== 'item') return false
   if (j.type === 'labor') return true
+  if (Number(j.labor_amount ?? 0) > 0) return true
   if (j.is_rot_eligible || j.is_rut_eligible) return true
   return LABOR_UNITS.has((j.unit || '').toLowerCase().trim())
 }
@@ -129,7 +138,7 @@ export async function getQuoteBudgetDerivation(
     .from('quote_items')
     .select(
       'id, item_type, description, quantity, unit, unit_price, total, ' +
-        'is_rot_eligible, is_rut_eligible, sort_order',
+        'is_rot_eligible, is_rut_eligible, labor_amount, sort_order',
     )
     .eq('quote_id', quoteId)
     .eq('business_id', businessId)

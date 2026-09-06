@@ -122,6 +122,7 @@ jobs:
           tests/driftlarm-saldo.spec.ts
           tests/starttid-loop.spec.ts
           tests/kommunikation-installningar.spec.ts
+          tests/rot-instruktion.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
