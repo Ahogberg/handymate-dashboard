@@ -97,10 +97,14 @@ test.describe('steg 4 — numret: synligt, ärligt, begripligt', () => {
     expect(kort).not.toContain("overflow: 'hidden'")
   })
 
-  test('väntetexten säger reserverat — inte tilldelas-snurr', () => {
+  test('misslyckad reservation lovar inte ett nummer eller bakgrundsaktivering (F15)', () => {
     const s = read(STEG4)
-    expect(s).toContain('Ditt nummer är reserverat')
-    expect(s).not.toContain('tilldelas just nu')
+    const pending = s.slice(s.indexOf("phase === 'pending' ? ("), s.indexOf("animation: 'ob-pop-in", s.indexOf("phase === 'pending' ? (")))
+    expect(pending).toContain('Inget nummer har kunnat tilldelas ännu')
+    expect(pending).toContain('fungerar först när ett nummer har tilldelats')
+    expect(pending).toContain('Försök tilldela nummer igen')
+    expect(pending).not.toContain('Ditt nummer är reserverat')
+    expect(pending).not.toContain('aktiveras i bakgrunden')
   })
 
   test('valen förklarar vad som händer med kundens nummer', () => {

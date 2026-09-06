@@ -172,6 +172,7 @@ jobs:
           tests/schema-tider.spec.ts
           tests/lisa-fangat-samtal.spec.ts
           tests/livegenomgang-f10-f11.spec.ts
+          tests/onboarding-phone-truth.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
