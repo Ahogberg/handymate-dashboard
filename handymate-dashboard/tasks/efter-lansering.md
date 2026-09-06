@@ -12,7 +12,7 @@ befintliga löften sanna.
 | 1 | **Jobbet går att utföra** — tillträde, kundval, leverans bekräftade innan bilen åker | 3–4 | Värde varje arbetsdag, wow för den anställde, färre bomkörningar | `lib/job-preparation/load.ts` (laddar omfattning + checklistor, kontrollerar inget), utgående SMS-grind, godkännandekort. Saknas: tillstånd för de tre bekräftelserna; obesvarat = okänt, aldrig klart |
 | 2 | **Fakturera enligt betalplan** — delfakturor per steg, slutavräkning, helkredit | 2–3 kvar | Byggt av Codex i PR #12 (avstängt bakom flagga). Beslut 5 sep, efter granskning: efter lansering — triggern på fakturatabellen och förskottsflödet ska inte in fyra dagar före lansering. Kvar: retarget till main när #11 landat, härdning av UPDATE-grenen i triggern, ROT-förskott med Fortnox, ångra-väg för fel utkast, inloggat prov, Fortnox-driftprov, sedan v214 | `lib/invoices/payment-plan/*`, `sql/v214_payment_plan_invoicing.sql`, `tests/payment-plan-invoicing.spec.ts` (27 prov i PGlite), `tasks/plan-betalplansfakturering.md`, `tasks/payment-plan-invoicing.md` |
 | 3 | **Överens om vad som ingår** — genomgång till kunden direkt efter signering | 2 | Billigast, hakar i bokningsloopen som lagades 5 sep, skyddar marginalen | `quote_items`, bortvalda tillval (`lib/quotes/margin.ts`), portalen, signeringsflödet. Invändningar blir kort, aldrig ändrade villkor |
-| 4 | **Kundkortsmallar** — insikter som fyller i sig själva, med bevis | 3–4 | Ägaren styr vad teamet VET om varje kund, inte bara vad det prioriterar. Attio-mönstret (AI-attribut) anpassat till vår ärlighetsregel: varje värde pekar på raderna bakom | Motorerna finns spridda (Karin påminnelser, kassaradar, `lib/rot/*`, installationer, `customer_fact`). Saknas: mallregister, beräkning per kund, bevis-länk, UI på kundkortet. Beslut Andreas 2026-09-05: bygg lättillgängligt — färdiga mallar att slå på ("Betalningsvana", "ROT-kandidat", "Kräver förskott", "Tyst kund med installation"), egen regel på svenska via Matte med förhandsvisning på tre kunder innan den slås på, beviset alltid ett tryck bort |
+| 4 | **Firmans kunskapsbas** — allt teamet vet om firman, synligt för ägaren, läst av agenterna, med bevis | 5–7 (lager 1+2) | Skälet att stanna: värdet växer för varje vecka. Ersätter "Kundkortsmallar" som nu är en del av lager 1. Beslut Andreas 2026-09-06, se avsnittet under tabellen | Råvaran finns: `customer_fact` (v122, godkännandekort), `project_outcome` (v73, fryst efterkalkyl per avslutat jobb, `lib/efterkalkyl/*`), `getEfterkalkylInsight` per jobbtyp, `lib/profitability.ts`, `lib/installation/*`, `agent_memories` (v149, mönster kräver bekräftelse), `company-scan-rows.ts`. Saknas: en samlad yta, mallarna, export av själva kunskapsbasen |
 | 5 | **Nästa jobb** — framtida affär fångad på plats | 2–3 | Enda genuint saknade primitiven | `lib/voice/analysis-scope.ts` (+ `future_job`), `lib/matte/intent-agent.ts`, `createLeadAndDeal` i `lib/leads/golden-path.ts`. Saknas: intent, `create_deal`-verktyg, `project_id` på deal |
 | 6 | **Fortnox-integrationen bevisad mot ett riktigt bolag** | 1–2 | Ingen kund är kopplad, löftesmatrisen säger "dolt tills bevisat". Utan bevis är kopplingen ett löfte utan täckning | `lib/fortnox.ts` (20 funktioner), `lib/fortnox/*`, `tests/facit-fortnox-*.spec.ts`. Kräver Andreas egen Fortnox-licens: kund, artikel, faktura, betalning, återkörning, felväg. Beslut Andreas 2026-09-05 |
 | 7 | **SIE4-export** — bokföringsunderlag till vilken byrå som helst | 2–3 | Byrån väljer bokföringssystem, inte hantverkaren. Med SIE4 fungerar vi med Visma, Bokio och alla andra utan egna API:er. Saknas helt idag | Fakturor, betalningar, leverantörsfakturor, ROT finns. Saknas: kontering mot BAS, #VER/#TRANS-generering, export per period. Beslut Andreas 2026-09-05. Långsiktigt: äg vardagen, leverera underlaget — ersätt inte byråns system |
@@ -21,6 +21,34 @@ befintliga löften sanna.
 | 10 | **Avvikande fakturapris mot bekräftat inköpspris** | 3 | Den billiga delen av kostnadsbevakningen | `supplier_invoices`, `project_material.purchase_price`. Returer/kreditfakturor har inga tabeller alls — den delen kräver manuell registrering och väntar |
 | 11 | **Fyll en avbokning** — accepterat obokat jobb som passar person och plats | 5+ | Intäkt, men flest beroenden | `lib/agents/hanna/capacity-fill.ts` (riktar sig mot nya kunder). Saknas: accepterade obokade jobb, kompetens, restid |
 | 12 | **Förklarbar veckoplanering** | — | Först när restid och deadline finns i planeringsdatan | `lib/schedule/person-day.ts`, `DispatchReasoning` |
+
+## Punkt 4 i detalj — Firmans kunskapsbas (beslut Andreas 2026-09-06)
+
+Tre lager som bygger på varandra. Lager 1 och 2 byggs direkt efter lansering som en punkt. Lager 3 är en egen punkt med villkorstexten som första steg. Ärlighetsregeln gäller överallt: varje påstående i kunskapsbasen pekar på raderna bakom, obekräftade mönster visas som "väntar på ditt ja", aldrig som sanning.
+
+### Lager 1 — synlig för firman: sidan "Din kunskapsbas"
+- **Var:** egen sida `/dashboard/kunskap`, grindad till **ägare och admin** via `getCurrentUser` + roll (samma grind som `app/api/customer-preparation/route.ts`). Ett kort på Översikt visar räkningarna och länkar dit: "Teamet vet: 48 kundfakta · 12 efterkalkyler · 6 installationer · 3 bekräftade mönster". Anställda ser inte sidan.
+- **Sektioner, var och en med antal, "nytt sedan förra veckan" och bevis-länk per rad:**
+  1. *Kunder* — bekräftade `customer_fact` per kund (källa: samtal, mejl, möte). Obekräftade i egen grå rad med länk till kortet.
+  2. *Jobb* — `project_outcome` per avslutat projekt: offererat mot utfall i timmar och kronor, ÄTA-antal, marginal. Aggregat per jobbtyp från `getEfterkalkylInsight`. Här ligger det Brickanta kallar Knowledge Base, och det finns redan som data.
+  3. *Installationer* — `installation` med nästa service, redan synligt i portalen.
+  4. *Betalningsvana* — dagar till betalning per kund ur `invoice` (Karins underlag i `lib/agents/shared/business-aggregate.ts`).
+  5. *Mönster teamet bekräftat* — `agent_memories` med `confirmed_at` satt; de obekräftade i väntande kort.
+  6. *Mallar* — kundkortsmallarna (tidigare egen punkt): färdiga att slå på ("Betalningsvana", "ROT-kandidat", "Kräver förskott", "Tyst kund med installation"), egen regel på svenska via Matte med förhandsvisning på tre kunder innan den slås på.
+- **Export:** en knapp som ger hela kunskapsbasen som CSV via `/api/export` (nya moduler `customer_facts`, `project_outcomes`, `agent_memories`). Kunskapsbasen är skälet att stanna, aldrig ett gisslan. Att kunna ta med sig allt är en del av löftet.
+- **Tomt läge:** ny firma ser sex tomma sektioner med en rad var om vad som fyller dem ("Fylls när Lisa fångat ett samtal", "Fylls när ett jobb avslutats"). Aldrig exempeldata.
+
+### Lager 2 — agenterna läser den
+- Daniel prissätter mot firmans egna efterkalkyler (finns delvis: `QuoteMarginCard`, `efterkalkyl-insikt`); rätt form är "Liknande jobb hos dig tog 14 timmar, du offererade 10", aldrig "AI:n rekommenderar".
+- Lars varnar vid jobbstart när ett jobb liknar ett som gick över budget (`getProjectOutcome` vid `job_completed` finns, saknas vid *start*).
+- Karin läser betalningsvanan (finns) och mallarna (saknas).
+- Matte får kunskapsbasen i `lib/context/kundkontext.ts` (agentminnet finns där, efterkalkyl och installationer saknas).
+- Facit: varje agentpåstående ur kunskapsbasen bär `source_type`/`source_id` och en länk som öppnar raden.
+
+### Lager 3 — branschen i aggregat (egen punkt, senare)
+- **Först villkorstexten:** kunden godkänner att firmans siffror bidrar till anonymiserade, aggregerade branschspann, med en flagga per firma för att säga nej. Inget samlas innan texten är ute och flaggan finns.
+- **Aldrig enskilda firmors priser.** Bara spann per jobbtyp och region, och bara när minst 20 firmor bidrar. Prisdelning mellan konkurrenter är känsligt konkurrensrättsligt; aggregat med tröskel är den säkra formen. Ta juridisk kontroll innan lansering av lagret.
+- **Volymen finns inte än:** 34 offerter i databasen 2026-09-05. Punkten är meningsfull först vid hundratals firmor per bransch.
 
 ## Beslutat men litet (halv dag var)
 - **Ett morgonmejl i stället för tre** (räddningskö, driftlarm, kreditbevakning). Rött i ämnesraden bara när något stoppar kunder, annars tystnad. Beslut Andreas 2026-09-05.
