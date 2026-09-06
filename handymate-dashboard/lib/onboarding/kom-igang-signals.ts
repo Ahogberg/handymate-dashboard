@@ -30,10 +30,16 @@ export async function hamtaKomIgangSignals(
       supabase.from('pending_approvals').select('*', { count: 'exact', head: true }).eq('business_id', businessId).eq('status', 'pending').neq('approval_type', 'team_intro'),
     ])
 
+  // Ett läsfel är okänt, inte en tom portfölj eller en avklarad uppgift.
+  if ([configRes, callRecRes, quoteRes, pushRes, invoiceRes, missionRes, customerRes, segmentedRes, pendingRes].some(r => r.error)) {
+    throw new Error('Kunde inte läsa startunderlaget.')
+  }
   const testCall = (configRes.data?.onboarding_data as Record<string, unknown> | null | undefined)
     ?.test_call as { called_at?: string | null } | undefined
 
+  const onboarding = configRes.data?.onboarding_data as Record<string, unknown> | null
   return {
+    firstFocus: onboarding?.firstFocus ?? onboarding?.first_focus,
     ring_test: Boolean(testCall?.called_at) || (callRecRes.count ?? 0) > 0,
     karin_has_invoice_data: Boolean(configRes.data?.fortnox_connected) || (invoiceRes.count ?? 0) > 0,
     has_quote: (quoteRes.count ?? 0) > 0,

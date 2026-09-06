@@ -799,3 +799,14 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - Riktigt DB-prov 2026-09-03: samtliga fem queries gröna; 1 SMS-fel,
   0 mejlfel, 0 betalningsfel, 8 automationsfel och 4 hälsokontroller.
 - Kontraktsgrind 350/350, `npx tsc --noEmit` rent, `npm run build` exit 0.
+
+## 2026-09-06 — Första nyttan från onboarding
+- [x] Kartlägg befintlig första-uppdragsfinal, startlista, offertstart och turer.
+- [x] Skiss och avgränsning: docs/design/first-value/PLAN.md.
+- [x] Bygg målanknuten start, säker överlämning och frivillig offertguide.
+- [x] Verifiera mobil/desktop, kontobyte, fel och integrationskontrakt.
+- [ ] Leverera separat granskningsgren med ärligt provningsläge.
+
+Första nyttan: 1 104 kontrakt och fyra Chromiumprov gröna lokalt.
+Riktiga komponenter, avlyssnade API-svar. Inloggat AI-/DB-prov återstår.
+Skiss, screenshots och provningsordning: docs/design/first-value/PLAN.md.

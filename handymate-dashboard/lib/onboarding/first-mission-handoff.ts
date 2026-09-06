@@ -44,24 +44,29 @@ export function buildFirstMissionPrompt(revenueTargetAnnualSek?: number, firstFo
   return 'Vad är det viktigaste vi kan göra den här veckan?'
 }
 
-/** Best-effort — beaten degraderar tyst om storage saknas/är blockerad (privat läge). */
-export function writeFirstMissionPrompt(prompt: string): void {
+/** En prompt tillhör ETT företag och gäller i högst en timme. Gamla globala
+ * strängar konsumeras aldrig: de kan komma från ett annat konto. */
+const MAX_AGE_MS = 60 * 60 * 1000
+export function writeFirstMissionPrompt(prompt: string, businessId: string): boolean {
+  if (!businessId || !prompt.trim()) return false
   try {
-    sessionStorage.setItem(FIRST_MISSION_PROMPT_KEY, prompt)
-  } catch {
-    // Onboardingen ska aldrig fastna på en trasig sessionStorage — kunden
-    // hamnar bara på dashboarden utan förifylld prompt.
-  }
+    sessionStorage.setItem(FIRST_MISSION_PROMPT_KEY, JSON.stringify({ businessId, prompt, createdAt: Date.now() }))
+    return true
+  } catch { return false }
 }
 
-/** Läser OCH nollar i samma anrop — konsumeras exakt en gång. */
-export function readAndClearFirstMissionPrompt(): string | null {
+export function clearFirstMissionPrompt(): void {
+  try { sessionStorage.removeItem(FIRST_MISSION_PROMPT_KEY) } catch { /* best effort */ }
+}
+
+export function readAndClearFirstMissionPrompt(businessId: string): string | null {
   try {
     const value = sessionStorage.getItem(FIRST_MISSION_PROMPT_KEY)
     if (!value) return null
     sessionStorage.removeItem(FIRST_MISSION_PROMPT_KEY)
-    return value
-  } catch {
-    return null
-  }
+    const saved = JSON.parse(value)
+    const age = Date.now() - saved.createdAt
+    if (saved.businessId !== businessId || !Number.isFinite(age) || age < 0 || age > MAX_AGE_MS) return null
+    return typeof saved.prompt === 'string' && saved.prompt.trim() ? saved.prompt : null
+  } catch { return null }
 }

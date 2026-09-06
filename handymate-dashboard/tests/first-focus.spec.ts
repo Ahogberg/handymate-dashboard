@@ -44,7 +44,7 @@ test('första uppdraget bär fokuset (LiveTour → FirstAssignmentFinal → alte
   expect(kod('app/onboarding/components/Step6LiveTour.tsx')).toContain('<FirstAssignmentFinal')
   const final = kod('app/onboarding/components/FirstAssignmentFinal.tsx')
   expect(final).toContain('firstFocus: data.firstFocus')
-  expect(final).toContain('writeFirstMissionPrompt(selected.prompt)')
+  expect(final).toContain("writeFirstMissionPrompt(selected.prompt, data.businessId")
   expect(kod('lib/onboarding/first-assignment-options.ts')).toContain('firstFocusOption(snapshot.firstFocus)')
   const nba = kod('lib/jarvis/next-best-action-goals.ts')
   expect(nba).toContain("select('revenue_target_annual_sek, onboarding_data')")

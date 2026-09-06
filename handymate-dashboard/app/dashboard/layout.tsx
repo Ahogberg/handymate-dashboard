@@ -9,7 +9,6 @@ const Jobbkompisen = dynamic(() => import('@/components/Jobbkompisen'), {
   ssr: false,
   loading: () => <div className="fixed bottom-6 right-6 w-14 h-14 bg-primary-100 rounded-xl animate-pulse z-40" />,
 })
-import WelcomeModal from '@/components/WelcomeModal'
 import FeedbackWidget from '@/components/FeedbackWidget'
 import PWAInstallBanner from '@/components/PWAInstallBanner'
 import BillingStatusBanner from '@/components/BillingStatusBanner'
@@ -132,7 +131,7 @@ export default function DashboardLayout({
                           panelOpen ur useMission() själv — renderar inget
                           när panelen är stängd eller inget uppdrag är aktivt. */}
                       <MissionPanel />
-                      <WelcomeModal />
+                      {/* Välkomnandet bor i startlistan; inget extra lager avbryter uppdrag/offert. */}
                       <FeedbackWidget />
                       <PWAInstallBanner />
                     </div>

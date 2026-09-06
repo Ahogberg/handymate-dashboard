@@ -60,7 +60,7 @@ test.describe('Step6LiveTour.tsx — Första-uppdraget-beaten', () => {
 
   test('är skippbar — "Utforska själv" finns och kör samma onFinish', () => {
     expect(firstAssignment).toContain('Utforska själv')
-    expect(firstAssignment).toContain('onClick={onFinish}')
+    expect(firstAssignment).toContain('clearFirstMissionPrompt(); onFinish()')
   })
 
   test('ärlighetsregeln: planen kontrolleras och inget skickas utan godkännande', () => {
@@ -76,7 +76,7 @@ test.describe('Step6LiveTour.tsx — Första-uppdraget-beaten', () => {
     expect(step6).not.toContain('useJobbuddy')
     expect(firstAssignment).not.toContain('setPendingPrompt')
     expect(firstAssignment).not.toContain('useJobbuddy')
-    expect(firstAssignment).toContain('writeFirstMissionPrompt(selected.prompt)')
+    expect(firstAssignment).toContain("writeFirstMissionPrompt(selected.prompt, data.businessId")
   })
 
   test('inga send-/execute-mönster i filen (bara läsande instant-value-fetchen och den befintliga finalize-POST:en)', () => {

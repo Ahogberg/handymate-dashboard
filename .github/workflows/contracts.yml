@@ -122,6 +122,13 @@ jobs:
           tests/driftlarm-saldo.spec.ts
           tests/starttid-loop.spec.ts
           tests/kommunikation-installningar.spec.ts
+          tests/first-value-journey.spec.ts
+          tests/first-focus.spec.ts
+          tests/kom-igang-tasks.spec.ts
+          tests/onboarding-first-mission.spec.ts
+          tests/onboarding-wow.spec.ts
+          tests/first-quote-reality-harness.spec.ts
+          tests/job-type-start.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

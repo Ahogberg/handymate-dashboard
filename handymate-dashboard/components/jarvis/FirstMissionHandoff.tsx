@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { useBusiness } from '@/lib/BusinessContext'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { readAndClearFirstMissionPrompt } from '@/lib/onboarding/first-mission-handoff'
 
@@ -15,10 +16,11 @@ import { readAndClearFirstMissionPrompt } from '@/lib/onboarding/first-mission-h
  * Monteras i app/dashboard/layout.tsx, INUTI JobbuddyProvider.
  */
 export default function FirstMissionHandoff() {
+  const business = useBusiness()
   const { setPendingPrompt, setActiveTab, setIsOpen } = useJobbuddy()
 
   useEffect(() => {
-    const prompt = readAndClearFirstMissionPrompt()
+    const prompt = readAndClearFirstMissionPrompt(business.business_id)
     if (!prompt) return
     // Exakt ReaktiveringsInsikt-mekaniken: förifyll och öppna — skicka ALDRIG
     // automatiskt. Hantverkaren ser och kan redigera frågan innan den går iväg.
@@ -27,7 +29,7 @@ export default function FirstMissionHandoff() {
     setIsOpen(true)
     // Ska bara köras vid montering — nyckeln är redan konsumerad/nollad.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [business.business_id])
 
   return null
 }

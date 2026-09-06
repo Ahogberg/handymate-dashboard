@@ -64,8 +64,9 @@ test('varje uppgift förklarar agent, värde, tid och href', () => {
 
 test('rutten läser signalerna ur riktiga tabeller och behåller de tre booleanerna; railen och LiveTouren läser lib:en', () => {
   const route = kod('app/api/onboarding/kom-igang/route.ts')
+  const signals = kod('lib/onboarding/kom-igang-signals.ts')
   for (const t of ["from('invoice')", "from('mission')", "from('customer')", ".not('segment_id', 'is', null)", ".neq('approval_type', 'team_intro')", 'fortnox_connected']) {
-    expect(route, `${t} saknas`).toContain(t)
+    expect(signals, `${t} saknas`).toContain(t)
   }
   expect(route).toContain('return NextResponse.json({ ring_test, forsta_artefakten, pwa, tasks })')
   const rail = kod('components/jarvis/KomIgangRail.tsx')
@@ -74,5 +75,5 @@ test('rutten läser signalerna ur riktiga tabeller och behåller de tre booleane
   expect(rail).toContain("tasks.every(t => t.klar)")
   expect(rail).toContain('fallbackTasks(data)')
   expect(kod('app/onboarding/components/Step6LiveTour.tsx')).toContain('KOM_IGANG_DEFAULT_LABELS.map')
-  expect(KOM_IGANG_HEADING).toBe('Teamet behöver detta för att hjälpa dig bättre')
+  expect(KOM_IGANG_HEADING).toBe('Nästa steg för ditt företag')
 })

@@ -18,6 +18,8 @@ import {
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
+import { useQuoteSectionNavigation } from './useQuoteSectionNavigation'
+import { FirstQuoteGuide } from '@/components/onboarding/FirstQuoteGuide'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
 import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
@@ -420,7 +422,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   }
   /** Vilket ämne chip-raden senast bads scrolla till — se scrollToSection
       och effekten som konsumerar den, längre ner. */
-  const [pendingScrollSection, setPendingScrollSection] = useState<QuoteSection | null>(null)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
@@ -588,21 +589,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
    * `quickSection`. Byter till dokumentvyn först om listvyn är aktiv,
    * eftersom `data-section` bara finns i canvas-renderingen.
    */
-  const scrollToSection = useCallback((section: QuoteSection) => {
-    setMainView('document')
-    setPendingScrollSection(section)
-  }, [])
-
-  useEffect(() => {
-    if (!pendingScrollSection) return
-    const section = pendingScrollSection
-    const frame = requestAnimationFrame(() => {
-      const target = document.querySelector(`[data-section="${section}"]`)
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    setPendingScrollSection(null)
-    return () => cancelAnimationFrame(frame)
-  }, [pendingScrollSection])
+  const showDocument = useCallback(() => setMainView('document'), [])
+  const scrollToSection = useQuoteSectionNavigation(showDocument)
 
   const selectedCustomerObj = useMemo(
     () => customers.find(c => c.customer_id === selectedCustomer) || null,
@@ -2453,6 +2441,13 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             Grindvillkoret bor kvar på jobTypeStart-variabeln högre upp —
             orört. */}
         {jobTypeStart}
+        {firstQuoteIntent && jobStartApplied && <FirstQuoteGuide key={business.business_id}
+          companyName={business.business_name} hasCustomer={!!selectedCustomer}
+          onCustomer={() => {
+            const target = document.querySelector<HTMLElement>('[data-first-quote-customer]')
+            target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            target?.querySelector<HTMLElement>('input, button, select')?.focus({ preventScroll: true })
+          }} onSection={scrollToSection} />}
         {jobStartApplied && <p className="text-sm text-teal-800 mb-4" role="status">
           Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
         </p>}
@@ -2556,6 +2551,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
                 minst en rad har ett känt inköpspris. */}
             <QuoteMarginCard items={recalculated} />
 
+            <div data-first-quote-customer>
             <QuoteNewCustomerSection
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -2571,6 +2567,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
               setItems={setItems}
               hasItems={items.length > 0}
             />
+            </div>
           </div>
 
           {/* ── Assistentkolumnen, del 2: verktyg och avslut ───────

@@ -369,6 +369,11 @@ export default function OnboardingPage() {
       // Server-side finalize via /api/onboarding POST (befintlig endpoint
       // sätter onboarding_step + onboarding_completed_at + seedar defaults).
       // Kritiskt anrop — måste lyckas innan vi navigerar.
+      const saved = await fetch('/api/onboarding', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ step: 8, data: sanitizeForSave(data) }),
+      })
+      if (!saved.ok) throw new Error('Kunde inte spara dina onboardingval')
       const res = await fetch('/api/onboarding', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -389,7 +394,7 @@ export default function OnboardingPage() {
     } finally {
       finalizeLock.current = false
     }
-  }, [data.businessId, router])
+  }, [data, router])
 
   async function launchFirstQuote() {
     if (finalizeLock.current) return
@@ -439,7 +444,7 @@ export default function OnboardingPage() {
       {step === 7 && (
         <StepProductRegister onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
-      {step === 8 && !launchRequested && <Step6LiveTour onFinish={finish} data={data}
+      {step === 8 && !launchRequested && <Step6LiveTour onFinish={finish} data={data} busy={finishing}
         onFirstQuote={data.firstQuoteSelection ? () => setLaunchRequested(true) : undefined} />}
       {step === 8 && launchRequested && (launchJob && launchTemplate ?
         <FirstQuoteLaunch companyName={data.companyName || 'Ditt företag'} jobName={launchJob.name} templateName={launchTemplate.name}

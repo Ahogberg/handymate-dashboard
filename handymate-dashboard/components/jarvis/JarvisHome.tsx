@@ -257,7 +257,7 @@ export default function JarvisHome({
   const business = useBusiness()
   const { level: fuelLevel } = useFuel()
   const fuelCritical = fuelLevel?.state === 'critical'
-  const { setIsOpen: openJobbkompisen, setPendingPrompt, setPendingVoice } = useJobbuddy()
+  const { isOpen: jobbkompisenOpen, setIsOpen: openJobbkompisen, setPendingPrompt, setPendingVoice } = useJobbuddy()
 
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [queueLoaded, setQueueLoaded] = useState(false)
@@ -727,7 +727,7 @@ export default function JarvisHome({
     if (!queueLoaded || !mandagskortApproval) return
     if (mandagsmoteAutoOpenTried.current) return
     let hemturSeenLocally = false
-    try { hemturSeenLocally = localStorage.getItem(HEMTUR_SEEN_KEY) === '1' } catch { /* fail-closed nedan */ }
+    try { hemturSeenLocally = localStorage.getItem(`${HEMTUR_SEEN_KEY}:${business.business_id}`) === '1' } catch { /* fail-closed nedan */ }
     const onboardingResolved = onboardingGatesResolved({
       welcomeTourSeen: Boolean(business.welcome_tour_seen),
       hemturSeenLocally,
@@ -1649,7 +1649,7 @@ export default function JarvisHome({
           allra första ögonblick, INNAN Hemturen. Äger sin egen gate
           (welcome_tour_seen + hm_scan_klar) och anropar onClose när den
           stängs oavsett anledning; Hemturen renderas inte förrän dess. */}
-      <CompanyScan onClose={r => {
+      {!jobbkompisenOpen && <CompanyScan onClose={r => {
         setScanKlar(true)
         // Första verifierade handlingen: kortet skapades efter köns första
         // hämtning — hämta om så det syns, och håll Hemturen tills beslutet.
@@ -1658,13 +1658,13 @@ export default function JarvisHome({
           setForstaAtgardHamtad(false)
           void fetchQueue().finally(() => setForstaAtgardHamtad(true))
         }
-      }} />
+      }} />}
 
       {/* Hemturen (docs/design/FORSTA-30-MINUTERNA.md) — spotlightar de fem
           data-tour-target-noderna ovan. Gatead på welcome_tour_seen +
           localStorage; renderar ingenting förrän gaten öppnar OCH skannen
           har stängts (scanKlar) OCH ett ev. första kort är beslutat. */}
-      {scanKlar && !forstaAtgardId && <HemTur />}
+      {scanKlar && !forstaAtgardId && !jobbkompisenOpen && <HemTur />}
 
       {/* Måndagsmötet — egen, oberoende gate (se useEffect ovan). Kan öppna
           sig SAMTIDIGT som CompanyScan/HemTur teoretiskt existerar i DOM:en,

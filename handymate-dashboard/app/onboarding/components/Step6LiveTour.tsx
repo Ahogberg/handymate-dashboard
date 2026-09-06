@@ -28,6 +28,7 @@ import { FirstAssignmentFinal } from './FirstAssignmentFinal'
 interface Step6Props {
   onFinish: () => void
   onFirstQuote?: () => void
+  busy?: boolean
   data: OnboardingFormData
 }
 
@@ -100,7 +101,8 @@ const TOUR_STEPS: TourStep[] = [
   },
 ]
 
-export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Props) {
+export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: Step6Props) {
+  const [showAssignment, setShowAssignment] = useState(true)
   const [tourStep, setTourStep] = useState(-1)
   const [showToast, setShowToast] = useState(true)
   // Payoff-data: null = laddar (neutral placeholder), sedan värden eller fallback.
@@ -114,7 +116,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Pro
     // hit tills onboardingen är slutförd. Evighetsloop. Efter 5 s tvingas
     // touren till avslutat läge så Kör igång alltid går att nå.
     const t3 = setTimeout(() => setTourStep(s => (s === -1 ? -2 : s)), 5000)
-    return () => {
+      return () => {
       clearTimeout(t1)
       clearTimeout(t2)
       clearTimeout(t3)
@@ -148,6 +150,14 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Pro
     tourStep >= 0 && tourStep < TOUR_STEPS.length
       ? TOUR_STEPS[tourStep].id
       : null
+
+  // Uppdraget först; rundturen är ett frivilligt sidospår. Normal dokumenthöjd
+  // gör hela finalen nåbar även på små mobiler och med stor text.
+  if (showAssignment || finished) return <div className="ob-screen" style={{ padding: 20, height: 'auto', minHeight: 0, flex: 1, overflowY: 'auto' }}>
+    <FirstAssignmentFinal data={data} unpaidCount={instant?.unpaid_count ?? 0}
+      openDealsCount={instant?.open_deals_count ?? 0} onFinish={onFinish} onFirstQuote={onFirstQuote} busy={busy} />
+    <button type="button" className="ob-cta ghost" disabled={busy} onClick={() => { setShowAssignment(false); setTourStep(0) }}>Visa mig runt först</button>
+  </div>
 
   return (
     <div className="ob-screen" style={{ background: 'var(--ob-bg)' }}>
@@ -231,29 +241,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data }: Step6Pro
         </button>
       )}
 
-      {/* Final CTA — samma befintliga handoff/offertväg, men alternativen
-          härleds ur verkliga signaler. Ingen mission skrivs från onboarding. */}
-      {finished && (
-        <div
-          style={{
-            position: 'absolute',
-            left: 0,
-            right: 0,
-            bottom: 0,
-            padding: 20,
-            background: 'linear-gradient(180deg, transparent, var(--ob-bg) 30%)',
-            animation: 'ob-fade-in 400ms',
-          }}
-        >
-          <FirstAssignmentFinal
-            data={data}
-            unpaidCount={instant?.unpaid_count ?? 0}
-            openDealsCount={instant?.open_deals_count ?? 0}
-            onFinish={onFinish}
-            onFirstQuote={onFirstQuote}
-          />
-        </div>
-      )}
+
     </div>
   )
 }
