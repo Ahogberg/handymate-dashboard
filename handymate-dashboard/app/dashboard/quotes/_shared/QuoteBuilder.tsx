@@ -99,6 +99,8 @@ import {
 import { QuickStartPreferenceBanner } from '../new/components/quick/QuickStartPreferenceBanner'
 import { QuoteNewPriceWarningsBanner } from '../new/components/QuoteNewPriceWarningsBanner'
 import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from '../new/components/QuoteNewEfterkalkylBanner'
+import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { formatHours as formatAgentradHours } from '@/lib/daniel-agentrad'
 
 // ─── Types ───────────────────────────────────────────────────────────
 
@@ -216,6 +218,15 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const isEditMode = props.mode === 'edit'
   const quoteId = props.quoteId || ''
   const firstQuoteIntent = searchParams ? readFirstQuoteIntent(searchParams) : null
+  // Daniels agentrad (offertsidan) skickar hit ?buffert=N när hantverkaren
+  // valde "Lägg till N h". Timmarna läggs ALDRIG på automatiskt — notisen
+  // pekar bara på arbetsraden. Orimliga värden ignoreras tyst.
+  const daniel_buffert_h = (() => {
+    const raw = isEditMode ? searchParams?.get('buffert') : null
+    if (!raw) return null
+    const n = Number(raw.replace(',', '.'))
+    return Number.isFinite(n) && n > 0 && n <= 1000 ? n : null
+  })()
   const [dealContextReady, setDealContextReady] = useState(!searchParams?.get('deal_id'))
   const [inheritedJobType, setInheritedJobType] = useState<string | null>(null)
   const [jobStartApplied, setJobStartApplied] = useState(false)
@@ -2599,6 +2610,14 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}
             <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
             <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
+            {daniel_buffert_h != null && (
+              <div className="rounded-2xl border border-primary-100 bg-primary-50 p-4 flex items-start gap-3">
+                <AgentAvatar agentKey="daniel" size="sm" />
+                <p className="text-xs leading-relaxed text-slate-700 min-w-0">
+                  <span className="font-semibold text-slate-900">Daniel</span> föreslog +{formatAgentradHours(daniel_buffert_h)} h. Lägg dem på arbetsraden.
+                </p>
+              </div>
+            )}
 
             {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
                 fristående "N reservationer matchar"-bannern som satt här

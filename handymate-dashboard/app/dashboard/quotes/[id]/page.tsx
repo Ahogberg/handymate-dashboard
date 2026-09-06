@@ -19,6 +19,7 @@ import { QuoteStatusTimeline } from './components/QuoteStatusTimeline'
 import { QuoteSendModal } from './components/QuoteSendModal'
 import { QuoteDeleteConfirmModal } from './components/QuoteDeleteConfirmModal'
 import { QuoteNewVersionModal } from './components/QuoteNewVersionModal'
+import { DanielAgentrad } from './components/DanielAgentrad'
 import type { Quote, QuoteVersion, QuoteIntelligence, QuoteTrackingEvent } from './types'
 
 interface BusinessConfig {
@@ -514,6 +515,12 @@ export default function QuoteDetailPage() {
           onRequestNewVersion={requestNewVersion}
           onRequestDelete={requestDelete}
         />
+
+        {/* Daniels agentrad (docs/design/skisser-2026-09-06/agentnarvaro-
+            offert.dc.html): under åtgärderna, ovanför dokumentet — samma
+            plats på varje sida. Renderar null tills verklighetskontrollen
+            säger att en rad är motiverad (utkast, ≥3 liknande jobb, varning). */}
+        <DanielAgentrad quoteId={quoteId} quoteStatus={quote.status} />
 
         {/* ETAPP 4, punkt 1: dokumentet i centrum — bred vänsterkolumn för
             A4-dokumentet (samma motor/iframe som skaparen/PDF:en), smal
