@@ -266,16 +266,9 @@ export async function POST(request: NextRequest) {
       // Inget personal_phone eller agent_always: agent tar meddelande
       console.log('[Voice] No transfer phone or agent_always mode — agent handles call')
 
-      try {
-        const { notifyMissedCall } = await import('@/lib/notifications')
-        await notifyMissedCall({
-          businessId: business.business_id,
-          phoneNumber: from,
-        })
-      } catch (err) {
-        console.error('[Voice] notifyMissedCall failed (non-blocking):', business.business_id, from, err)
-      }
-
+      // Tidsstämpel FÖRE regeln körs — pushen får bara säga "SMS skickat"
+      // om en sms_log-rad är yngre än den här.
+      const sedanIso = new Date(Date.now() - 5_000).toISOString()
       try {
         const { fireEvent } = await import('@/lib/automation-engine')
         await fireEvent(supabase, 'call_missed', business.business_id, {
@@ -283,6 +276,15 @@ export async function POST(request: NextRequest) {
         })
       } catch (err) {
         console.error('[Voice] fireEvent call_missed failed (non-blocking):', business.business_id, callId, err)
+      }
+
+      // In-app-notis + push till ägaren (tidigare bara notisen, och bara i
+      // den här grenen). Samma helper som voice/missed. Fail-soft.
+      try {
+        const { meddelaFangatSamtal } = await import('@/lib/voice/fangat-samtal')
+        await meddelaFangatSamtal({ supabase, businessId: business.business_id, phone: from, callId, sedanIso })
+      } catch (err) {
+        console.error('[Voice] meddelaFangatSamtal failed (non-blocking):', business.business_id, callId, err)
       }
 
       // 46elks: spela meddelande och lägg på (agenten hanterar via webhook)

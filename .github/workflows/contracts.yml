@@ -124,6 +124,7 @@ jobs:
           tests/kommunikation-installningar.spec.ts
           tests/rot-instruktion.spec.ts
           tests/schema-tider.spec.ts
+          tests/lisa-fangat-samtal.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

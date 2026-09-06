@@ -251,6 +251,24 @@ export function buildPushTemplate(
       }
     }
 
+    case 'missed_call_captured': {
+      // Lisa fångar ett missat samtal (lib/voice/fangat-samtal.ts). Rubriken
+      // påstår bara det som bevisats: "Lisa fångade" kräver sms_sent === true
+      // (en sms_log-rad med status 'sent'); annars är det ett missat samtal
+      // som ägaren själv får ringa upp.
+      const namn = typeof payload.customer_name === 'string' && payload.customer_name.trim()
+        ? payload.customer_name.trim()
+        : typeof payload.phone_display === 'string' && payload.phone_display ? payload.phone_display : 'okänt nummer'
+      const smsSkickat = payload.sms_sent === true
+      return {
+        title: smsSkickat ? `Lisa fångade ett samtal från ${namn}` : `Missat samtal från ${namn}`,
+        body: smsSkickat
+          ? 'Svar-SMS är skickat. Kunden kan svara med vad den behöver — du ser tråden i appen.'
+          : 'Inget svar-SMS gick ut. Ring upp när du kan.',
+        url: '/dashboard/calls',
+      }
+    }
+
     default:
       return null
   }

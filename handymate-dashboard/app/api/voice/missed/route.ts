@@ -103,11 +103,19 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       const { getServerSupabase } = await import('@/lib/supabase')
       const { fireEvent } = await import('@/lib/automation-engine')
       const supabase = getServerSupabase()
+      // Tidsstämpel FÖRE regeln körs: pushen nedan får bara säga "SMS
+      // skickat" om en sms_log-rad är yngre än den här.
+      const sedanIso = new Date(Date.now() - 5_000).toISOString()
       await fireEvent(supabase, 'call_missed', businessId, {
         phone: from,
         call_id: callId,
       })
       console.log('[voice/missed] missat samtal → call_missed fyrat (catch-SMS)')
+
+      // In-app-notis + push till ägaren — samma helper som röstbrevlådegrenen
+      // i voice/incoming. Fail-soft, kastar aldrig.
+      const { meddelaFangatSamtal } = await import('@/lib/voice/fangat-samtal')
+      await meddelaFangatSamtal({ supabase, businessId, phone: from, callId, sedanIso })
 
       // Touchpoint 3 (onboarding-följeskrift): första-händelse-SMS till ägaren.
       // Icke-blockerande — fångar aldrig upp huvudflödet om det failar.

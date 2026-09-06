@@ -817,3 +817,25 @@ Kvar för Andreas: skarptest enligt planen (offert → fot → `/via` → `landi
 - [x] F05 offertsummering: rättad tidigare i dag (0c1c3c9), saknades i previewn vid provet.
 - [x] Facit `tests/schema-tider.spec.ts`: offset/DST, normalisering, intervall, inkoppling, v215, och att varje `.rpc()` har CREATE FUNCTION i sql/ — två saknade (auto-approve-räknare, storefront-visningar) fick v216, körd.
 - [ ] Kvar för Codex/andra: F03 dölj lanseringsgrindade länkar, F04 veckonummer i attest, F06 fliken Uppgifter, F07 inställningsetikett.
+
+# Push när Lisa fångar ett missat samtal (Claude 2026-09-06, lanseringsplanen)
+
+- [x] Fynd: vanligaste vägen (vidarekoppling som ingen svarade på →
+      app/api/voice/missed) gav ägaren INGEN signal — bara catch-SMS till
+      uppringaren + engångs-SMS:et vid första händelsen. Röstbrevlådegrenen
+      (voice/incoming) skrev in-app-notis men pushade inte. Analyserade
+      inspelningar pushade redan (meeting_summary/phone_call).
+- [x] lib/voice/fangat-samtal.ts: meddelaFangatSamtal() = in-app-notis +
+      push via sendApprovalPush (typ missed_call_captured, klass hant, dedupe
+      per call_id). "Lisa fångade ett samtal" bara när en sms_log-rad med
+      status 'sent' (automation_rule, till uppringaren, yngre än webhook-
+      starten) finns — annars "Missat samtal … ring upp". Fail-soft.
+- [x] Båda vägarna inkopplade: voice/missed (ny) och voice/incoming
+      (ersätter direktanropet till notifyMissedCall). url /dashboard/calls.
+- [x] Facit tests/lisa-fangat-samtal.spec.ts (13 prov) i test:contracts +
+      contracts.yml. tsc rent, 1097/1097 kontraktsprov gröna.
+- Läge i produktion: push_subscriptions har NOLL rader (ingen har
+  installerat PWA/app-push ännu) och call_recording inbound senaste 30 d
+  är 0 — pushen kan inte driftprovas förrän en telefon prenumererar.
+  Provsteg: installera PWA på Nordström El, ring numret, låt det gå till
+  missat → push + rad i push_dispatch_log (eller push_held 21–07).
