@@ -105,6 +105,13 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
   const [showAssignment, setShowAssignment] = useState(true)
   const [tourStep, setTourStep] = useState(-1)
   const [showToast, setShowToast] = useState(true)
+  const [smallViewport, setSmallViewport] = useState(false)
+  useEffect(() => {
+    const query = window.matchMedia('(max-width: 767px)')
+    const update = () => setSmallViewport(query.matches)
+    update(); query.addEventListener('change', update)
+    return () => query.removeEventListener('change', update)
+  }, [])
   // Payoff-data: null = laddar (neutral placeholder), sedan värden eller fallback.
   const [instant, setInstant] = useState<InstantValue | null>(null)
 
@@ -175,7 +182,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
             position: 'absolute',
             top: 20,
             left: '50%',
-            transform: 'translateX(-50%)',
+            translate: '-50% 0',
             padding: '12px 16px',
             background: 'var(--ob-ink)',
             color: '#fff',
@@ -188,7 +195,9 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
             boxShadow: 'var(--ob-sh-lg)',
             animation: 'ob-pop-in 400ms cubic-bezier(0.34, 1.56, 0.64, 1)',
             zIndex: 50,
-            whiteSpace: 'nowrap',
+            whiteSpace: 'normal',
+            maxWidth: 'calc(100% - 24px)',
+            textAlign: 'center',
           }}
         >
           <span
@@ -207,6 +216,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
       {/* Spotlight overlay tooltip */}
       {tourStep >= 0 && tourStep < TOUR_STEPS.length && (
         <SpotlightOverlay
+          position={smallViewport ? 'fixed' : 'absolute'}
           step={TOUR_STEPS[tourStep]}
           index={tourStep}
           total={TOUR_STEPS.length}
@@ -217,7 +227,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
 
       {/* Ständig utväg — touren ska aldrig kunna hålla någon fången. Diskret
           uppe till höger under hela turen; försvinner när stora CTA:n tar över. */}
-      {!finished && (
+      {!finished && !showToast && (
         <button
           type="button"
           onClick={skip}

@@ -581,3 +581,6 @@ grenen.
 
 ## 2026-09-06 — HTML-skisser ska fungera utan JavaScript
 En React-skisstillverkning med tom root fungerar i Chromium men kan bli tom i filförhandsvisaren. Exportera synligt statiskt reservinnehåll och kontrollera filen med JavaScript avstängt. Visa även en direkt bild i leveransen.
+
+## 2026-09-06 — Guider ska provas i den riktiga mobilramen
+En fristående desktopskiss missar att onboardingramen saknar fast höjd på mobil. Montera verkliga ob-page → ob-stage → ob-card-wrap, prova alla tipssteg efter scroll vid 375×812 och kontrollera toast + överlagrade knappar samtidigt. Tipskort på en rörlig mobilram ska förankras i viewporten.
