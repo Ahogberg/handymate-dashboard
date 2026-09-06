@@ -144,7 +144,7 @@ test.describe('teamGorNarDuAktiverar — rena meningar, aldrig ett löfte', () =
 
   test('varje känd nyckel ger en icke-tom mening', () => {
     for (const key of KANDA_NYCKLAR) {
-      const row: ScanRow = { key, text: 'x' }
+      const row: ScanRow = { key, text: 'x', kalla: 'importerat' }
       const mening = teamGorNarDuAktiverar(row)
       expect(mening, `${key} saknar mening`).not.toBeNull()
       expect(mening!.length).toBeGreaterThan(0)
@@ -152,12 +152,12 @@ test.describe('teamGorNarDuAktiverar — rena meningar, aldrig ett löfte', () =
   })
 
   test('okänd nyckel ger null', () => {
-    expect(teamGorNarDuAktiverar({ key: 'pahittad', text: 'x' })).toBeNull()
+    expect(teamGorNarDuAktiverar({ key: 'pahittad', text: 'x', kalla: 'importerat' })).toBeNull()
   })
 
   test('ingen mening innehåller ett belopp eller ett garantilöfte', () => {
     for (const key of KANDA_NYCKLAR) {
-      const mening = teamGorNarDuAktiverar({ key, text: 'x' })!
+      const mening = teamGorNarDuAktiverar({ key, text: 'x', kalla: 'importerat' })!
       // Ordgräns runt "kr" — annars matchar den t.ex. "godKänner" felaktigt.
       expect(mening.toLowerCase()).not.toMatch(/\bkr\b/)
       expect(mening.toLowerCase()).not.toContain('garanti')

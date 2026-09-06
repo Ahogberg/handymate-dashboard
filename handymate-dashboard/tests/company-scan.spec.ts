@@ -243,12 +243,12 @@ test.describe('kedjningen i JarvisHome — CompanyScan före Hemturen', () => {
 
   test('HemTur renderas villkorat på skannens onClose-flagga, inte ovillkorat längre', () => {
     expect(hem).toContain('const [scanKlar, setScanKlar] = useState(false)')
-    expect(hem).toContain('{scanKlar && !forstaAtgardId && <HemTur />}')
+    expect(hem).toContain('{scanKlar && !forstaAtgardId && !jobbkompisenOpen && <HemTur />}')
   })
 
   test('CompanyScan står FÖRE HemTur i JSX-trädet', () => {
     const scanIdx = hem.indexOf('<CompanyScan onClose=')
-    const hemturIdx = hem.indexOf('{scanKlar && !forstaAtgardId && <HemTur />}')
+    const hemturIdx = hem.indexOf('{scanKlar && !forstaAtgardId && !jobbkompisenOpen && <HemTur />}')
     expect(scanIdx).toBeGreaterThan(-1)
     expect(hemturIdx).toBeGreaterThan(-1)
     expect(scanIdx).toBeLessThan(hemturIdx)

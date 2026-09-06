@@ -618,3 +618,17 @@ En fristående desktopskiss missar att onboardingramen saknar fast höjd på mob
 
 ## 2026-09-06 — Visat företagsnamn är inte bevis för vald inloggning
 När användaren uppger att demokontot valdes men sidan visar ett annat företagsnamn: skilj på inloggningsval, sessionens företagskoppling och återställda onboardingfält. Beskriv exakt vad UI visar; påstå inte att användaren valde fel konto. Verifiera i ny navigering och undvik företagsändringar tills avsett konto är tydligt.
+
+## Merge 2026-09-06: kontraktslistan återbyggd ur CI-listan tappade svansen
+
+När package.json `test:contracts` krockar och byggs om ur CI-yamlens
+`run: >-`-block: yamlen innehåller BARA playwright-kommandot. Grenen (#11)
+hade dessutom ` && node --test tests/customer-preparation/contract.test.mjs`
+efter `--reporter=line`, och `tests/feature-test-parity.spec.ts` kräver
+den svansen. Min återbyggnad släppte den ⇒ paritetsfacit rött på main utan
+att någon märkte det förrän två byggagenter rapporterade det som
+"pre-existing". Regel: efter en återbyggnad av listan, diffa hela
+script-strängen mot BÅDA sidorna av konflikten, inte bara spec-listan.
+Och: ett facit som är rött "sedan tidigare" är ett fynd, aldrig ett
+antagande — kör det mot HEAD innan det avfärdas.
+

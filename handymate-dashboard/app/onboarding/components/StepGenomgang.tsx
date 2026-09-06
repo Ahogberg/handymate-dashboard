@@ -17,12 +17,12 @@
  * redan en fortsättning även när listan är tom.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { ArrowRight, Check } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
-import { buildScanRows, teamGorNarDuAktiverar, type ScanRow } from '@/lib/onboarding/company-scan-rows'
+import { buildScanRows, teamGorNarDuAktiverar, KALLA_LABEL, type ScanKalla, type ScanRow } from '@/lib/onboarding/company-scan-rows'
 import type { CompanyScanResult } from '@/app/api/onboarding/company-scan/route'
 import type { OnboardingFormData } from '../types-redesign'
 
@@ -39,6 +39,17 @@ interface Props {
  * i "Matte går igenom firman …".
  */
 const HANG_TIMEOUT_MS = 5000
+
+/**
+ * Ärlighetsetiketten per rad (samma tre som Företagsskanningen på
+ * dashboarden, 2026-09-06): Importerat i slate, Möjlighet i primary,
+ * Uppskattat vitt med slate-ram — teal är chrome, färgen bor i avataren.
+ */
+const KALLA_CHIP: Record<ScanKalla, CSSProperties> = {
+  importerat: { background: 'var(--ob-surface-2, #f1f5f9)', color: 'var(--ob-muted)', borderColor: 'var(--ob-border)' },
+  mojlighet: { background: 'var(--ob-primary-50)', color: 'var(--ob-primary-700)', borderColor: 'var(--ob-primary-100, #ccfbf1)' },
+  uppskattat: { background: '#fff', color: 'var(--ob-muted)', borderColor: 'var(--ob-border-strong)' },
+}
 
 export default function StepGenomgang({ onNext, onBack, data, setData }: Props) {
   const [rows, setRows] = useState<ScanRow[] | null>(null)
@@ -118,10 +129,19 @@ export default function StepGenomgang({ onNext, onBack, data, setData }: Props) 
                         <Check size={15} strokeWidth={2.6} />
                       </span>
                     )}
-                    <div style={{ minWidth: 0 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
                       <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: 'var(--ob-ink)' }}>
                         {row.text}
                       </p>
+                      <span
+                        data-kalla={row.kalla}
+                        style={{
+                          display: 'inline-block', marginTop: 6, fontSize: 11, fontWeight: 600,
+                          padding: '2px 8px', borderRadius: 999, border: '1px solid', ...KALLA_CHIP[row.kalla],
+                        }}
+                      >
+                        {KALLA_LABEL[row.kalla]}
+                      </span>
                       {uppfoljning && (
                         <p style={{ margin: '2px 0 0', fontSize: 12.5, color: 'var(--ob-muted)', lineHeight: 1.4 }}>
                           {uppfoljning}
