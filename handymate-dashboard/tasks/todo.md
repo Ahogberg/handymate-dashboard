@@ -824,3 +824,11 @@ Design: samma job_types används genom resan. Föreslagna namn ändrar aldrig be
 Verifieringsresultat och kvarstående inloggat prov: `docs/handoffs/JOB_STANDARDS_2026-09-06.md`. PostgreSQL- och UI-proven är isolerade, inga produktionsskrivningar.
 
 Slutkontroll 2026-09-06: 1 152 kontraktstester gröna (inklusive 12 nya PostgreSQL-prov), två jobb-/artikelresor i Chromium gröna, tsc rent och produktionsbygge exit 0. Mobilfixarna för PR #13 har separat prov för samtliga fem tipssteg vid 375×812 och 1280×900; båda gröna.
+
+
+## 2026-09-06 — Första riktiga jobbet: integrationskontroll
+- [x] Kontrollera main och PR #11–#14 samt demoåtkomst. #11 är ännu inte integrerad; dess rättningar ska inte dupliceras. Webbläsaren står på inloggning och lokal DB/session saknas.
+- [x] Följ kodens övergångar onboarding → offert → accept → projekt → fakturering; driftresan är fortfarande blockerad av session och sammanslagen version.
+- [x] Reproducera och rätta samtidig manuell accept, återförsök och läsfel med 11 beteendeprov.
+- [x] Kontrakt 1 163 gröna, separat #11-fakturaprov 57 gröna, TypeScript rent. Bevisnivå och inloggad körordning dokumenterade. Build slutstatus i PR-leveransen.
+- [ ] Publicera separat gransknings-PR utan att ändra #14 under Claudes granskning.
