@@ -42,11 +42,11 @@ De 57 proven täcker valda/bortvalda tillval, rabatt, godkänd ÄTA, gamla JSONB
 
 `tests/first-job-acceptance.spec.ts`: 11 beteendeprov. Kör den faktiska route-filen, SQL via befintlig PGlite-adapter och en minimal projektion av offerttabellen. Kommunikation och externa efterföljande system ersätts av explicita testdubblar. Provet intygar SQL-villkor och route-beteende, inte produktionsschema, RLS, verkliga utskick eller slutlig projektskapning.
 
-Samma spec ingår i package.json och CI:s kontraktskommando. Lokalt: **1 163 kontraktstester gröna**, inklusive de 11 nya. **57 befintliga projekt-/fakturaprov gröna** i den separata testkopian. **TypeScript exit 0**. Produktionsbyggets slutstatus anges i PR-leveransen.
+Samma spec ingår i package.json och CI:s kontraktskommando. Lokalt: **1 163 kontraktstester gröna**, inklusive de 11 nya. **57 befintliga projekt-/fakturaprov gröna** i den separata testkopian. **TypeScript exit 0**. **Produktionsbygge exit 0**. Kodversionen `9d5fa99ab6b079a203f9ec695469a69af86e5136` har grön GitHub CI.
 
 ## Återstående driftprov — konkret körordning
 
-Webbläsaren visar inloggningssidan för app.handymate.se. Ingen inloggad session eller lokal Supabase/testbehörighet finns. Det är ett åtkomsthinder, inte ett godkänt prov.
+Vid starten saknades session och lokala databasuppgifter. Säker browserAuth-inloggning lyckades därefter: app.handymate.se öppnade `/onboarding` för **Bee Service AB**, med äldre jobbtypsval (rubriken ”Hur jobbar du?”, inte #14:s nya vy). Inga företagsuppgifter eller testdata ändrades. Det återstår att bekräfta att detta är det avsedda testkontot och att en sammanslagen granskningsversion används. Inloggningen är verifierad; själva driftresan är inte genomförd.
 
 1. Driftsätt en granskningsversion som innehåller #11, #13, #14 och denna rättning; verifiera den exakta versionen. Bekräfta nödvändiga befintliga migrationer, särskilt v213. Kör inte #12/v214 som en del av detta prov.
 2. Logga in på ett avgränsat demokonto. Använd testdata och verifierade testmottagare. Ingen riktig kundkontakt ska skapas av provet.

@@ -831,4 +831,4 @@ Slutkontroll 2026-09-06: 1 152 kontraktstester gröna (inklusive 12 nya PostgreS
 - [x] Följ kodens övergångar onboarding → offert → accept → projekt → fakturering; driftresan är fortfarande blockerad av session och sammanslagen version.
 - [x] Reproducera och rätta samtidig manuell accept, återförsök och läsfel med 11 beteendeprov.
 - [x] Kontrakt 1 163 gröna, separat #11-fakturaprov 57 gröna, TypeScript rent. Bevisnivå och inloggad körordning dokumenterade. Build slutstatus i PR-leveransen.
-- [ ] Publicera separat gransknings-PR utan att ändra #14 under Claudes granskning.
+- [x] Publicerat PR #15 utan ändring av #14. Kodversionens CI och produktionsbygge gröna. Säker inloggning lyckades men öppnade Bee Service AB i äldre onboarding; kontots lämplighet och gemensam granskningsversion måste bekräftas före skrivande driftprov.
