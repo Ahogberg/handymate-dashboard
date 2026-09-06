@@ -73,6 +73,12 @@ export async function firstValuePreview() {
     }
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Host));
   `
+  // Förhandsvisare kan blockera JavaScript/eval. Visa alltid skissen i HTML
+  // innan React startar; createRoot ersätter reservinnehållet när JS fungerar.
+  const fallback = '<section aria-label="Statisk förhandsvisning"><h1>Handymate – första nyttan</h1><p>Här ser du skissen även utan JavaScript. Öppna HTML-filen i en vanlig webbläsare för den klickbara versionen.</p>' +
+    [['start-mobile.png', 'Första uppdraget'], ['quote-mobile.png', 'Guiden i offertskaparen']].map(([file, title]) =>
+      `<figure style="margin:24px 0"><h2>${title}</h2><img alt="${title}" width="375" style="display:block;max-width:100%;height:auto;border:1px solid #dbe4e7;border-radius:16px" src="data:image/png;base64,${readFileSync('docs/design/first-value/' + file).toString('base64')}"></figure>`
+    ).join('') + '</section>'
   const safeScript = (text: string) => text.replace(/<\/script/gi, '<\\/script')
-  return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Handymate – första nyttan</title><style>${css}\n${readFileSync('app/onboarding/onboarding.css','utf8')}\nbody{background:#f8fafc;font-family:Arial,sans-serif}main{max-width:760px;margin:24px auto;padding:0 16px}</style></head><body><main><p style="color:#64748b;font-size:12px">Granskningsskiss · exempeldata · inga utskick</p><div id="root"></div></main><script>${safeScript(readFileSync('node_modules/react/umd/react.production.min.js','utf8'))}</script><script>${safeScript(readFileSync('node_modules/react-dom/umd/react-dom.production.min.js','utf8'))}</script><script>${safeScript(script)}</script></body></html>`
+  return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Handymate – första nyttan</title><style>${css}\n${readFileSync('app/onboarding/onboarding.css','utf8')}\nbody{background:#f8fafc;font-family:Arial,sans-serif}main{max-width:760px;margin:24px auto;padding:0 16px}</style></head><body><main><p style="color:#64748b;font-size:12px">Granskningsskiss · exempeldata · inga utskick</p><div id="root">${fallback}</div></main><script>${safeScript(readFileSync('node_modules/react/umd/react.production.min.js','utf8'))}</script><script>${safeScript(readFileSync('node_modules/react-dom/umd/react-dom.production.min.js','utf8'))}</script><script>${safeScript(script)}</script></body></html>`
 }

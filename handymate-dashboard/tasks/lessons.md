@@ -578,3 +578,6 @@ körning: 1268 "Cannot find module"-fel som såg ut som PR:ns. Regel: kör
 tsc och test först, installera saknade paket sen med `npm ci` på main,
 och kör om. Läs alltid de första felraderna innan ett tsc-fel skylls på
 grenen.
+
+## 2026-09-06 — HTML-skisser ska fungera utan JavaScript
+En React-skisstillverkning med tom root fungerar i Chromium men kan bli tom i filförhandsvisaren. Exportera synligt statiskt reservinnehåll och kontrollera filen med JavaScript avstängt. Visa även en direkt bild i leveransen.
