@@ -1,6 +1,6 @@
 # Liveprov inför lansering — 6 september 2026
 
-Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är inte godkänd för lansering genom detta protokoll: elva reproducerade fynd och återstående driftgrindar finns nedan. Alla knappar, roller och miljöer är inte uttömmande provade.
+Genomförd bred skrivbordsgenomgång med avgränsade liveflöden. Produkten är inte godkänd för lansering genom detta protokoll: fjorton reproducerade fynd och återstående driftgrindar finns nedan. Alla knappar, roller och miljöer är inte uttömmande provade.
 
 ## Miljö och metod
 
@@ -110,3 +110,39 @@ TXT-förhandsvisning visar ”This page has been blocked by Chromium”. Försö
 - Testtidens attest är nu godkänd; ingen löneexport gjord. Testartikelns pris återställt till 850.
 - Prioritera F10 före kundutskick av ÄTA och F11 före användning av fakturadokumentet som betalunderlag, tillsammans med tidigare höga fynd. Rättningar behöver sedan provas på en ny namngiven head.
 - Mobil live, ny onboarding, anställdroll och Fortnox-drift är fortsatt öppna. Rapporten är en utökad audit, inte ett intyg om att alla flöden fungerar.
+
+## Kvällsprov — sparning och samband, 6 september
+
+Samma integrationshead `421f9728587a7c186ff806cdd7d8f2e400216edd`. Inloggad Nordström El, nya browserflikar men fungerande kontosession. Inga kodändringar, utskick, accepteranden eller nya serverofferter i denna del.
+
+### Nya reproducerade fynd
+
+| ID | Prioritet | Reproduktion | Utfall / avgränsning |
+|---|---|---|---|
+| F12 | Hög | Öppna #2026007 → Redigera. Ändra bara titel till TEST Codex – OSparat navigeringsprov 0906. Klicka sidomenyn Offerter utan att spara. Gå tillbaka med webbläsarens bakåt. | Navigering sker utan varning. Ursprunglig titel återkommer, ingen återställningsdialog erbjuds. Gäller edit-rutten för befintlig offert. Ny-offert-rutten klarade däremot separat återställningsprov nedan. |
+| F13 | Hög | Öppna #2026007/edit i A och B innan någon ändring. A ändrar titel till TEST Codex – flik A sparad 0906 och klickar Spara utkast; Sparad visas. B ändrar enbart beskrivning och sparar; även där Sparad. Ladda om A. | A:s sparade titel har ersatts av ursprungstiteln från B, samtidigt som B:s beskrivning består. Ingen konfliktvarning. Tyst förlust av nyare sparad ändring. Ursprunglig titel och beskrivning återställda och verifierade efter omladdning. |
+| F14 | Medel | Verksamhetsöversikt → affär #1016 → Allmänt. Jämför Värde (exkl. moms), 3 062,5 kr exkl., med dess länkade offert #2026007. | Offertens netto är 2 450 och inklusive moms 3 062,50. Affären betecknar alltså bruttobeloppet som netto. Fel i etikett eller värdemappning behöver avgränsas i kod; inget belopp ändrat i affären i detta prov. |
+
+### Verifierade delprov
+
+| Prov | Bevis |
+|---|---|
+| Ny offert från jobbtyp med ändrad standardmängd | TEST-jobbtypens arbetsartikel ändras från 2 till 3 och sparas. Ny-offert-start → välj TEST Codex – artikelkoppling → Standardrader. Editorn får 3 × 850 = 2 550 på arbetsraden, netto 3 300 och totalt 4 125. Inget serverutkast skapas. |
+| Befintlig offert behåller sin standardmängd | #2026007 omladdad efter standardändring har fortfarande 2 × 850 = 1 700. |
+| Förbehåll följer med till nya standardrader | Nya offerten erbjuder Daniels förslag TEST Codex – kontroll före utförande kopplat till testartikeln. |
+| Ny-offert-editorns återställning | Ny osparad offert får titeln TEST Codex – nytt återhämtningsprov 0906. Omladdning → Du har en påbörjad offert → Återställ arbetet. Titel, 3 × 850 och förbehållsförslag kommer tillbaka. Kopian presenteras uttryckligen som lokal återställning, inte serverutkast. |
+| Jobbuppläggets konfliktskydd | Ett återställningsförsök nekas med Upplägget har ändrats. Läs in det igen innan du sparar. Efter omladdning och nytt val går sparning igenom. Detta visar en synlig konfliktgrind, men orsaken till att just den versionen blev inaktuell är inte isolerad. |
+| Återställning av testdata | Testjobbtypens mängd tillbaka på 2 och förhandsvisningen bekräftar 2. Artikelpris kvar 850. #2026007:s ursprungliga titel och beskrivning återställda och omladdningsverifierade. |
+
+### Kvällens fortsatta täckning
+
+| Område | Status |
+|---|---|
+| 1. Sparning/återhämtning | Befintlig och ny offert samt två flikar provade; F12/F13. Dubbelklick och nätverksavbrott ännu inte verifierade. |
+| 2. Ändringar genom projektresan | Standardmängd till ny/befintlig offert och förbehållsförslag verifierade. F14 i affärsvärde. Byte av jobbtyp/kunduppgifter efter skapande och retroaktiv påverkan på accepterat dokument återstår. |
+| 3. Kundresa | Tidigare egen testsignering verifierad. Mobil, tillval och gamla länkar kvar. |
+| 4. Behörighet/företagsgränser | Behöver separata godkända testidentiteter. Ingen rollväxling eller användning av Bee Service. |
+| 5. Ekonomisk konsekvens | Tidigare budget-/offertprov finns; full matris med rabatt/tillval/ÄTA/faktura återstår. |
+| 6. Mobil och första onboarding | Kräver mobilprov och nytt konto med verifierbar e-post. Inte godkänt ännu. |
+
+Kvar i flik 3 finns en lokal, oskickad återställningskopia med 3 arbetsartiklar som testbevis; inte ett nytt numrerat serverutkast. Detta är ett delprotokoll, inte avslutad täckning av område 1–6.
