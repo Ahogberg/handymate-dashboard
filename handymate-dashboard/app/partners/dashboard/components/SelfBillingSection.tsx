@@ -37,7 +37,12 @@ export default function SelfBillingSection({ batches, onChanged }: { batches: Se
     <section className="bg-white border border-gray-200 rounded-xl overflow-hidden">
       <div className="px-5 py-4 border-b border-gray-100">
         <h2 className="font-semibold text-gray-900">Självfakturor</h2>
-        <p className="text-sm text-gray-500 mt-1">Handymate utfärdar underlaget i ditt namn. Granska, godkänn eller invänd här.</p>
+        <p className="text-sm text-gray-500 mt-1">
+          Handymate utfärdar underlaget i ditt namn. Granska, godkänn eller invänd här.
+          {/* Fristen kommer ur v193: mark_paid kräver delivered_at + 10 dagar
+              innan en ogranskad batch får räknas som godkänd (deemed_approved). */}
+          {' '}Utan invändning kan utbetalningen ske 10 dagar efter att fakturan gjorts tillgänglig.
+        </p>
       </div>
       {batches.length === 0 ? (
         <div className="px-5 py-10 text-center"><ReceiptText className="w-10 h-10 text-gray-300 mx-auto mb-3" /><p className="text-gray-500">Ingen självfaktura skapad ännu</p></div>

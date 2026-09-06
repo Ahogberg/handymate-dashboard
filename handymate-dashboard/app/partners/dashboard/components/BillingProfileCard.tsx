@@ -72,6 +72,9 @@ export default function BillingProfileCard({ profile, complete, onSaved }: Props
           </div>
         </div>
         {complete && <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-50 px-2 py-1 rounded-full"><CheckCircle2 className="w-3.5 h-3.5" /> Komplett</span>}
+        {!complete && !(profile.payout_bankgiro || profile.payout_plusgiro || profile.payout_account) && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-1 rounded-full whitespace-nowrap">Utbetalningsväg saknas</span>
+        )}
       </div>
 
       <div className="grid sm:grid-cols-2 gap-3">

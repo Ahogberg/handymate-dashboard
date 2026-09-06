@@ -27,6 +27,8 @@ export interface PartnerData {
   agreement_version: string | null
   agreement_required: boolean
   current_agreement_version: string
+  created_at: string | null
+  agreement_accepted_at: string | null
   billing_profile: PartnerBillingProfile
   billing_profile_complete: boolean
 }

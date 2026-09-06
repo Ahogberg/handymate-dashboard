@@ -6,10 +6,10 @@ Det avtalsmässiga standardbeslutet i `partneravtal-v1.md` är **20 % av faktisk
 
 ## P0 — avtal och produkt måste säga samma sak
 
-- [ ] Ändra `handymate.se/partners`: sidan säger i dag 20 % i 12 månader.
+- [x] Ändra `handymate.se/partners`: KLART (verifierat 2026-09-07) — sidan säger nu 20 % i 36 månader på samtliga fyra ställen (hero, steg, tabellrubrik, FAQ).
 - [x] Ändra standardkonfigurationen för nya partners till fast 20 % i 36 månader och 0 % därefter (`sql/v189_partner_flat_commission_and_agreement.sql`, `lib/partners/commission.ts`).
 - [x] Browserlöst facit mot provisionsmotorn: månadsvis kund, årsplan, upp-/nedgradering, obetald månad, återbetalning, chargeback, churn, återkomst inom period och månad 37 (`tests/partner-launch-gate.spec.ts` samt befintliga partnerfacit).
-- [ ] Kör det riktiga databasbeviset efter att v204/v205/v206 körts manuellt (`npm run proof:partner`). v204–v205 är körda; v206 återstår efter att första beviset fann en verklig schemaavvikelse.
+- [x] Kör det riktiga databasbeviset: KLART 2026-09-07 — v206 verifierad körd i prod (business_name, inget company_name) och `npm run proof:partner` grönt mot riktig databas (claim → konflikt → 180 dagar → självfaktura → betald; städning verifierad).
 - [x] Migrera de två befintliga partnerkonfigurationerna från den gamla standardtrappan till 20 % i 36 månader via v189; individuellt konfigurerade avvikelser lämnas orörda.
 - [ ] Besluta och dokumentera hur de två migrerade partnerna informeras om den nya kommersiella modellen och den nya avtalsversionen. Migrationen ersätter inte kommunikation eller ny acceptans.
 

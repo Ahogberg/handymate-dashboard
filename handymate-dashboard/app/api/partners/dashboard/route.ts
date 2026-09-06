@@ -41,7 +41,7 @@ export async function GET(request: NextRequest) {
 
   const { data: fullPartner } = await supabase
     .from('partners')
-    .select('id, name, company, email, referral_code, referral_url, commission_rate, commission_tiers, base_rate_after, tier_mode, ladder_months, total_earned_sek, total_pending_sek, api_key, webhook_url, webhook_secret, webhook_events, self_billing_legal_name, self_billing_org_number, self_billing_registered_address, self_billing_vat_number, self_billing_vat_registered, self_billing_vat_rate, self_billing_f_tax_approved, self_billing_email, payout_bankgiro, payout_plusgiro, payout_account')
+    .select('id, name, company, email, referral_code, referral_url, commission_rate, commission_tiers, base_rate_after, tier_mode, ladder_months, total_earned_sek, total_pending_sek, api_key, webhook_url, webhook_secret, webhook_events, self_billing_legal_name, self_billing_org_number, self_billing_registered_address, self_billing_vat_number, self_billing_vat_registered, self_billing_vat_rate, self_billing_f_tax_approved, self_billing_email, payout_bankgiro, payout_plusgiro, payout_account, created_at, agreement_accepted_at')
     .eq('id', partner.id)
     .single()
 
@@ -247,6 +247,10 @@ export async function GET(request: NextRequest) {
       agreement_version: partner.agreement_version,
       agreement_required: !hasAcceptedCurrentAgreement(partner),
       current_agreement_version: AGREEMENT_VERSION,
+      // Portalens sidhuvud (omdesign 2026-09-07): "partner sedan {månad år}"
+      // och "Avtal {version} godkänt {datum}" — datadrivet, aldrig hårdkodat.
+      created_at: fullPartner?.created_at || null,
+      agreement_accepted_at: fullPartner?.agreement_accepted_at || null,
       billing_profile: billingProfile,
       billing_profile_complete: billingProfileComplete,
     },
