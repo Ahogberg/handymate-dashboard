@@ -18,11 +18,20 @@ test.describe('Lisa: inkommande samtal → affärsrad → snabb återkoppling', 
     expect(s).not.toContain(".eq('business_id', params.get('business_id'))")
   })
 
-  test('en ny uppringare går genom samma kund/lead/deal-kärna som övriga leads', () => {
-    const s = read('app/api/voice/incoming/route.ts')
-    expect(s).toContain('createLeadAndDeal')
-    expect(s).toContain("source: 'vapi_call'")
-    expect(s).toContain('customerId = gp.customerId')
+  test('en ny uppringare blir lead/deal först efter transkriptet — genom samma kärna som övriga leads', () => {
+    // Sanningsgränsen (Golden Path Fas 2, 2026-08-13): ett nummer som ringer är
+    // inte ett lead. Bara ringtest-grenen i voice/incoming materialiserar
+    // (leadet är hantverkaren själv); riktiga uppringare går via
+    // processCallForPipeline efter transkriptet, med samma createLeadAndDeal.
+    const incoming = read('app/api/voice/incoming/route.ts')
+    expect(incoming).toContain('VIKTIG SANNINGSGRÄNS')
+    const utanRingtest = incoming.slice(incoming.indexOf('VIKTIG SANNINGSGRÄNS'))
+    expect(utanRingtest).not.toContain('createLeadAndDeal')
+    const pipeline = read('lib/pipeline-ai.ts')
+    expect(pipeline).toContain("import { createLeadAndDeal } from '@/lib/leads/golden-path'")
+    expect(pipeline).toContain("source: 'vapi_call'")
+    const analyze = read('app/api/voice/analyze/route.ts')
+    expect(analyze).toContain('processCallForPipeline')
   })
 
   test('onboardingens verkliga ringtest kräver ett riktigt tilldelat nummer', () => {
@@ -74,6 +83,7 @@ test.describe('marknadsföringsgränsen är uttrycklig', () => {
   test('produktspråket lovar inte en komplett live-röstagent före den finns', () => {
     const s = read('docs/marketing/product-language.md')
     expect(s).toContain('Säg inte att Lisa för en fri AI-konversation')
-    expect(s).toContain('fortsätter dialogen via SMS')
+    expect(s).toContain('Missade samtal kan följas upp via SMS')
+    expect(s).toContain('Ett samtal betyder inte automatiskt en ny kund eller affär')
   })
 })
