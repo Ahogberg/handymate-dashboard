@@ -3,7 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { loadRevenueRecoveryCases } from '@/lib/value/load-revenue-recovery-cases'
-import { selectRevenueRecoveryCasesForDashboard } from '@/lib/value/revenue-recovery-case'
+import { recoveryResponseCases } from '@/lib/value/revenue-work-queue'
 
 export const dynamic = 'force-dynamic'
 
@@ -30,7 +30,7 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({
-      cases: selectRevenueRecoveryCasesForDashboard(cases, Date.now()),
+      cases: recoveryResponseCases(cases, request.nextUrl.searchParams.get('view'), Date.now()),
     })
   } catch (error: any) {
     console.error('GET /api/revenue-recovery-cases error:', error)

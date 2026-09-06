@@ -1,3 +1,5 @@
+import { firstFocusOption } from './first-focus'
+import { buildFirstMissionPrompt } from './first-mission-handoff'
 /**
  * "Teamet behöver detta för att hjälpa dig bättre" (Lager 3 / B7, 2026-08-27).
  *
@@ -15,6 +17,7 @@
  * app/api/onboarding/kom-igang/route.ts.
  */
 export interface KomIgangSignals {
+  firstFocus?: unknown
   /** Testsamtal genomfört eller minst en inspelning. */
   ring_test: boolean
   /** Fortnox kopplat ELLER minst en faktura. */
@@ -62,6 +65,7 @@ export interface KomIgangTask {
   minuter: number
   href: string
   klar: boolean
+  prompt?: string
 }
 
 export const KOM_IGANG_MAX_VISIBLE = 3
@@ -74,10 +78,10 @@ export const KOM_IGANG_MAX_VISIBLE = 3
 export const KOM_IGANG_DEFAULT_LABELS: ReadonlyArray<string> = [
   'Ring ditt nummer — hör Lisa fånga samtalet',
   'Koppla Fortnox eller skicka din första faktura så Karin kan bevaka betalningarna',
-  'Skapa din första offert så Daniel följer upp den',
+  'Gör klart din första offert',
 ]
 
-export const KOM_IGANG_HEADING = 'Teamet behöver detta för att hjälpa dig bättre'
+export const KOM_IGANG_HEADING = 'Nästa steg för ditt företag'
 
 export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
   // Kundinflödet: en uppgift som aldrig säger "fungerar" förrän en riktig
@@ -110,14 +114,17 @@ export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
     },
     {
       key: 'daniel_quote', agent: 'daniel',
-      label: 'Skapa din första offert så Daniel följer upp den',
+      label: 'Gör klart din första offert',
       varde: 'Daniel påminner kunden när offerten legat obesvarad — du godkänner innan något skickas.',
       minuter: 5, href: '/dashboard/quotes/new', klar: s.has_quote,
     },
     {
       key: 'matte_mission', agent: 'matte',
-      label: 'Ge Matte ditt första uppdrag',
-      varde: 'Ett mål ("Frigör 50 000 kr före fredag") ger teamet en plan att arbeta efter.',
+      label: 'Förbered ditt första uppdrag med Matte',
+      varde: firstFocusOption(s.firstFocus)
+        ? `Du valde: ${firstFocusOption(s.firstFocus)!.label}. Granska frågan och skicka den till Matte.`
+        : 'Utgå från ditt mål. Granska frågan och skicka den till Matte för att få hjälp med nästa steg.',
+      prompt: buildFirstMissionPrompt(undefined, s.firstFocus),
       minuter: 3, href: '/dashboard', klar: s.has_mission,
     },
     {
@@ -136,10 +143,21 @@ export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
   ]
   // Hanna är bara relevant när det finns kunder att sortera; pushen bara
   // när ett riktigt kort väntar — annars finns inget att få notis om.
-  return alla.filter(t => {
+  const eligible = alla.filter(t => {
     if (t.key === 'hanna_segment') return s.customer_count > 0
     if (t.key === 'pwa') return s.pending_real_cards > 0
     return true
+  })
+  const focus = firstFocusOption(s.firstFocus)
+  if (!focus) return eligible
+  const order: KomIgangTask['key'][] = focus.id === 'fler_jobb'
+    ? ['kundinflode', 'matte_mission', 'ring', 'daniel_quote', 'karin_data']
+    : focus.id === 'mindre_admin'
+      ? ['matte_mission', 'daniel_quote', 'ring', 'karin_data', 'kundinflode']
+      : ['matte_mission', 'karin_data', 'daniel_quote', 'ring', 'kundinflode']
+  return eligible.sort((a, b) => {
+    const rank = (key: KomIgangTask['key']) => order.includes(key) ? order.indexOf(key) : order.length
+    return rank(a.key) - rank(b.key)
   })
 }
 

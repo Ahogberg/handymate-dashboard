@@ -87,6 +87,11 @@ function markSeenOnServer() {
 
 export default function HemTur() {
   const business = useBusiness()
+  return <AccountHemTur key={business.business_id} />
+}
+
+function AccountHemTur() {
+  const business = useBusiness()
   const [active, setActive] = useState(false)
   const [stepIndex, setStepIndex] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
@@ -99,7 +104,7 @@ export default function HemTur() {
     if (finishedRef.current) return
     if (business.welcome_tour_seen) return
     try {
-      if (localStorage.getItem(SEEN_KEY)) return
+      if (localStorage.getItem(`${SEEN_KEY}:${business.business_id}`)) return
     } catch {
       // Trasig/blockerad localStorage — fail-safe: ingen tur snarare än en
       // som inte kan komma ihåg att den visats.
@@ -128,7 +133,7 @@ export default function HemTur() {
     finishedRef.current = true
     setActive(false)
     try {
-      localStorage.setItem(SEEN_KEY, '1')
+      localStorage.setItem(`${SEEN_KEY}:${business.business_id}`, '1')
     } catch { /* best effort — se kommentaren vid markSeenOnServer */ }
     markSeenOnServer()
   }

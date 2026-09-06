@@ -285,7 +285,8 @@ test.describe('Bränsle-webhooken', () => {
     expect(efterGren).toContain("event_type: 'fuel_topup_completed'")
     // Måste ligga FÖRE prenumerationslogiken (planId/subscription_status) —
     // annars skriver ett fuel-köp av misstag över kundens riktiga plan.
-    const planUppdatering = s.indexOf('subscription_plan: planId')
+    const planUppdatering = s.indexOf('await byggAbonnemangsfalt(stripe, session)')
+    expect(s.slice(grenStart, planUppdatering)).toContain('return\n  }')
     expect(planUppdatering).toBeGreaterThan(grenStart)
   })
 
@@ -369,6 +370,7 @@ test.describe('Bränslet är ett serverauktoritativt stopp, inte bara en mätare
         s.indexOf("fetch('https://api.openai.com"),
         s.lastIndexOf('anthropic.messages.create'),
         s.lastIndexOf("fetch('https://api.openai.com"),
+        s.indexOf('await transcribe('),
       ].filter(index => index > gate)
       expect(gate, `${route} saknar checkFuelGate`).toBeGreaterThan(-1)
       expect(externalCalls.length, `${route} saknar förväntad extern AI-kostnad`).toBeGreaterThan(0)

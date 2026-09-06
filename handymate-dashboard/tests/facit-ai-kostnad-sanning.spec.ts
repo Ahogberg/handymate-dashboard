@@ -96,6 +96,13 @@ const INGEN_KUND_ATT_BELASTA: Record<string, string> = {
  * kundens Bränsle.
  */
 const GRINDAS_I: Record<string, string[]> = {
+  // The shared transcription engine replaced inline calls. Each customer entrypoint
+  // still gates before invoking it. The admin benchmark explicitly uses
+  // hoppaOverKostnad:true under isAdmin and does not spend customer fuel.
+  'lib/transcription/transcribe.ts': [
+    'app/api/voice/transcribe/route.ts', 'lib/meetings/process-job.ts',
+    'app/api/jobbuddy/voice/route.ts', 'app/api/matte/transcribe/route.ts',
+  ],
   'lib/agent/agents/shared.ts': ['lib/agent/orchestrator.ts'],
   'lib/agents/shared/thinking-call.ts': [
     'app/api/cron/agent-observations/[agent]/route.ts',
@@ -215,7 +222,10 @@ test.describe('2. Bränsletaket gäller varje AI-yta', () => {
     const s = kod('lib/meetings/process-job.ts')
     const gate = s.indexOf("fuelAllows(supabase, job.business_id, 'meeting_transcribe')")
     expect(gate).toBeGreaterThan(-1)
-    const efter = s.slice(gate, gate + 700)
+    // Mät på Bränslestoppets EGEN gren (fram till dess return) — inte ett
+    // fast teckenfönster som råkar nå in i nästa felgren (segError markerar
+    // med rätta failed) när koden ovanför krymper.
+    const efter = s.slice(gate, s.indexOf('return {', gate))
     expect(efter).toContain("update({ status: 'finalized', claimed_at: null")
     expect(efter).not.toContain("status: 'failed'")
   })

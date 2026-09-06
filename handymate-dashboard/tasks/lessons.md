@@ -561,6 +561,20 @@ och driftlarmet hade listat SMS-felen varje dag. Jag hade grep:at
   "det sades som en gul varning och lästes inte", och rätta larmet.
 
 
+## 2026-09-05: Produktförslag ska följas av handling när användaren ber om bygge
+
+Kontrollera repot och bygg en granskningsbar leverans när användaren auktoriserar implementation. Stanna inte vid erbjudanden om fortsatt arbete.
+
+## 2026-09-05 — Kontrollera hela kedjan innan en ny yta räknas som levererad nytta
+Användarens rättelse: granska alla byggda ytor tillsammans och täpp till glapp.
+För varje yta: identifiera producent, sparad källa, behörighet, nästa handling,
+kvitto och omläsning. Testa PR:erna tillsammans. Fixture-test är inte bevis
+på produktionsdata. En tom kö kräver en fungerande producent; en kundinsamling
+kräver ett praktiskt överlämnande. Dokumentera separat kvarvarande AI- och driftprov.
+
+## 2026-09-05 — Lokal testparitet och effektlivscykel
+En cleanup på en effekt som beror på inmatning körs vid varje tangenttryck, inte bara vid navigering. Separera debounce från avmontering; prova skrivfrekvens med en räknare. Håll package.json och CI i samma körväg. Interna databas-ID:n ska vara strukturerad metadata, inte AI-underlag. Slutför uttryckligt beställda integrationer; dokumentation av glapp ersätter inte implementation.
+
 ## 2026-09-05 — Grinden ska fånga varje sätt ett vikt YAML-block kan gå sönder
 
 Indragsfacit (samma dag) fångade extra mellanslag men inte avslutande
@@ -591,3 +605,16 @@ schema-tider), (2) verifiera funktioner mot pg_proc i produktion på samma
 sätt som kolumner mot information_schema innan en fail-closed-grind slås på,
 (3) ett fail-closed-beslut ska följas av ett driftlarm när räknaren nekar
 på grund av fel, inte kvot.
+Codex rättelse: verifiera även det YAML-avkodade shellkommandots argument,
+inte bara att testfilnamnen matchar package.json. En grön lokal npm-körning
+är inte bevis för CI-kommandot om skalets argument kan skilja sig.
+
+## 2026-09-06 — HTML-skisser ska fungera utan JavaScript
+En React-skisstillverkning med tom root fungerar i Chromium men kan bli tom i filförhandsvisaren. Exportera synligt statiskt reservinnehåll och kontrollera filen med JavaScript avstängt. Visa även en direkt bild i leveransen.
+
+## 2026-09-06 — Guider ska provas i den riktiga mobilramen
+En fristående desktopskiss missar att onboardingramen saknar fast höjd på mobil. Montera verkliga ob-page → ob-stage → ob-card-wrap, prova alla tipssteg efter scroll vid 375×812 och kontrollera toast + överlagrade knappar samtidigt. Tipskort på en rörlig mobilram ska förankras i viewporten.
+
+
+## 2026-09-06 — Visat företagsnamn är inte bevis för vald inloggning
+När användaren uppger att demokontot valdes men sidan visar ett annat företagsnamn: skilj på inloggningsval, sessionens företagskoppling och återställda onboardingfält. Beskriv exakt vad UI visar; påstå inte att användaren valde fel konto. Verifiera i ny navigering och undvik företagsändringar tills avsett konto är tydligt.

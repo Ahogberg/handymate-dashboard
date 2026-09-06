@@ -1,63 +1,15 @@
 'use client'
-
-import {
-  SECTION_ORDER,
-  SECTION_LABELS,
-  type QuoteSection,
-  type SectionSummary,
-} from '@/lib/quotes/quote-completeness'
-
-interface QuoteCompletenessStripProps {
-  summaries: Record<QuoteSection, SectionSummary>
-  onSelect: (section: QuoteSection) => void
-}
-
-/**
- * Offertens fullständighet som en alltid synlig, icke-blockerande chip-rad
- * (Fas 1, offert-omtaget 2026-08-31) — ersätter den borttagna
- * steg-för-steg-granskningen (QuickReviewBar/QuickReceipt) som gatade
- * dokumentets fält en sektion i taget.
- *
- * Varje chip visar `sectionSummary()`s text ("8 rader · 46 500 kr") eller,
- * om något behöver ögon, `attention` i stället (amber, samma tvåläges-
- * mönster som "Mer"-radens statusprickar). Ett klick scrollar till
- * ämnet i dokumentet — se `onSelect`/QuoteBuilder.tsx:s `scrollToSection`,
- * som använder QuoteDocuments `data-section`-attribut. Chippen filtrerar
- * ALDRIG bort handlers och blockerar ALDRIG något — det är precis
- * skillnaden mot det borttagna kvittot.
- */
-export function QuoteCompletenessStrip({ summaries, onSelect }: QuoteCompletenessStripProps) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
-      <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-        Läget just nu
-      </span>
-      {SECTION_ORDER.map(section => {
-        const summary = summaries[section]
-        const hasAttention = !!summary.attention
-        return (
-          <button
-            key={section}
-            type="button"
-            onClick={() => onSelect(section)}
-            title={`${SECTION_LABELS[section]} — klicka för att hoppa dit`}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-colors inline-flex items-center gap-1.5 ${
-              hasAttention
-                ? 'bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-200'
-                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-            }`}
-          >
-            <span
-              aria-hidden
-              className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasAttention ? 'bg-amber-500' : 'bg-primary-600'}`}
-            />
-            {SECTION_LABELS[section]}
-            <span className={hasAttention ? 'text-amber-700' : 'text-slate-400'}>
-              {summary.attention || summary.text}
-            </span>
-          </button>
-        )
-      })}
+import { SECTION_ORDER,SECTION_LABELS,type QuoteSection,type SectionSummary } from '@/lib/quotes/quote-completeness'
+interface QuoteCompletenessStripProps {summaries:Record<QuoteSection,SectionSummary>;onSelect:(section:QuoteSection)=>void}
+/** One next question, with all sections available on demand. Never gates editing. */
+export function QuoteCompletenessStrip({summaries,onSelect}:QuoteCompletenessStripProps){
+  const attention=SECTION_ORDER.filter(section=>summaries[section].attention)
+  const next=attention[0]
+  return <div className="rounded-xl border border-slate-200 bg-white p-3">
+    <div className="flex flex-wrap items-center justify-between gap-2">
+      <div><p className="text-xs font-medium text-slate-500">{next?'Nästa sak att kontrollera':'Din offertöversikt'}</p><p className="text-sm font-semibold text-slate-900">{next?summaries[next].attention:'Inga automatiska uppmärksamhetspunkter — granska kundens offert före utskick.'}</p></div>
+      {next && <button type="button" onClick={()=>onSelect(next)} className="min-h-[44px] rounded-lg bg-teal-700 px-3 text-sm font-medium text-white">Kontrollera {SECTION_LABELS[next].toLowerCase()} →</button>}
     </div>
-  )
+    <details className="mt-1"><summary className="min-h-[44px] cursor-pointer py-3 text-xs font-medium text-slate-600">Visa alla delar{attention.length>1?` · ${attention.length} behöver ses över`:''}</summary><div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{SECTION_ORDER.map(section=><button type="button" key={section} onClick={()=>onSelect(section)} className={`min-h-[44px] rounded-lg border p-3 text-left text-sm ${summaries[section].attention?'border-amber-200 bg-amber-50 text-amber-900':'border-slate-200 text-slate-700'}`}><span className="block font-medium">{SECTION_LABELS[section]}</span>{summaries[section].attention || summaries[section].text}</button>)}</div></details>
+  </div>
 }

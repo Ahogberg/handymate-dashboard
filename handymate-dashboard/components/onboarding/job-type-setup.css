@@ -73,3 +73,27 @@
 @media (max-width: 520px) { .job-setup-preview-top, .job-setup-preview-row { align-items: flex-start; flex-direction: column; } .job-setup-preview-badge { align-self: flex-start; } .job-setup-preview-price, .job-setup-preview-gap { justify-content: flex-start; text-align: left; } }
 @media (max-width: 420px) { .job-setup-jobs { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .job-setup *, .job-setup-workspace { animation: none !important; transition: none !important; scroll-behavior: auto !important; } }
+
+.job-standard-editor { margin: 16px 0; padding: 16px; border: 1px solid #cce6df; border-radius: 16px; background: #f7fcfa; }
+.job-standard-editor h4 { margin: 0 0 6px; font-size: 17px; }
+.job-standard-editor input, .job-standard-editor select { width: 100%; min-width: 0; padding: 10px; border: 1px solid #cbd5e1; border-radius: 8px; background: white; color: #0f172a; }
+.job-standard-editor label { font-size: 12px; color: #475569; }
+.job-standard-row { display: grid; grid-template-columns: minmax(100px, 1fr) 100px auto auto; align-items: center; gap: 10px; padding: 12px 0; border-bottom: 1px solid #dceae5; }
+.job-standard-row strong { overflow-wrap: anywhere; font-size: 14px; }
+.job-standard-row button { min-height: 44px; font-size: 13px; }
+.job-standard-row button:disabled { opacity: .45; }
+.job-standard-add { display: grid; grid-template-columns: minmax(120px, 1fr) 90px auto; gap: 10px; align-items: end; margin: 10px 0; }
+@media (max-width: 600px) {
+  .job-standard-row { grid-template-columns: 1fr 90px; }
+  .job-standard-add { grid-template-columns: 1fr 80px; }
+  .job-standard-add button { grid-column: 1 / -1; }
+}
+.job-standard-row { grid-template-columns: minmax(100px, 1fr) 85px minmax(150px, 1fr) auto; }
+.job-standard-price > span:first-child { display: block; font-size: 11px; color: #64748b; }
+.job-standard-price button { color: #0f766e; text-align: left; }
+.job-standard-price .inline-flex input { max-width: 95px; }
+@media (max-width: 600px) {
+  .job-standard-row { grid-template-columns: 80px 1fr; }
+  .job-standard-row > strong { grid-column: 1 / -1; }
+  .job-standard-price { min-width: 0; }
+}

@@ -34,6 +34,8 @@ const rel = (f: string) => path.relative(API, f).replace(/\\/g, '/').replace(/\/
 
 /** Kända grindar — namnet är dokumentationen. */
 const KANDA_GRINDAR: Record<string, RegExp> = {
+  // Aktiv owner/admin via getAuthenticatedBusiness + getCurrentUser; beteendet testas i customer-preparation/contract.test.mjs.
+  kundforberedelse_agare: /preparationOwner\(/,
   standardgrind: /getAuthenticatedBusiness\(/,
   cron_hemlighet: /verifyCronSecret\(/,
   plattformsadmin: /\bisAdmin\(request\)/,
@@ -59,6 +61,7 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
  * varför den räcker. Rate limit-kravet står separat nedan.
  */
 const PUBLIC_BY_DESIGN: Record<string, string> = {
+  'preparation/[token]': 'Unik randomUUID för exakt en förfrågan, expires_at + återkallelse, begränsat GET och rate-limitad atomisk POST',
   'health': 'Ingen — visar bara booleans/SHA/sparat kreditläge, gör inga leverantörsanrop',
   'ata/sign/[token]': 'sign_token (randomUUID, unik) i path — atomisk statusövergång sedan 2026-09-01',
   'ata/sign/[token]/pdf': 'sign_token i path — samma credential som signeringssidan, läsning av dokumentet',
@@ -105,6 +108,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
 
 /** Publika rutter som SKRIVER något dyrt (SMS/LLM/kort/rad) måste ha fail-closed tak. */
 const KRAVER_PUBLIKT_TAK = [
+  'preparation/[token]',
   'portal/[token]/messages',
   'lead-portal/[code]',
   'public/book/[slug]',
@@ -184,6 +188,7 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // 2026-09-04 (Pass C — veckorapporten): cron/veckorapport —
   // cron-hemlighet, ingen tenant-kontext (svepet grupperar per
   // business_id själv, exakt samma motivering som kort-gar-ut) → 146.
+  // 2026-09-05 kundförberedelse: ägar-helper + avgränsad publik kundlänk → 148.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(146)
+  expect(utanStandard.length).toBeLessThanOrEqual(148)
 })

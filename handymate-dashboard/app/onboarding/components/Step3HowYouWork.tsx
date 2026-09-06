@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { slugifyJobType } from '@/lib/job-types'
 import { ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import InfoSheet from './InfoSheet'
@@ -11,6 +12,8 @@ import type { WorkPricingModel } from '@/lib/onboarding/pricing-start'
 import { OB_DOTS, OB_DOT_TOTAL, SPECIALTIES_BY_TRADE, TRADES, getTradeLabel } from '../constants'
 
 interface Step3Props {
+  busy?: boolean
+  error?: string
   onNext: () => void
   onBack: () => void
   data: OnboardingFormData
@@ -22,7 +25,7 @@ const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 const DEFAULT_DAYS = [true, true, true, true, true, false, false]
 
-export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3Props) {
+export default function Step3HowYouWork({ busy = false, error, onNext, onBack, data, setData }: Step3Props) {
   const trade = data.trade || 'other'
   const specs = SPECIALTIES_BY_TRADE[trade] || SPECIALTIES_BY_TRADE.other
   const selected = data.specialties || []
@@ -36,6 +39,8 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
   const materialMarkup = data.materialMarkup ?? 20
   const firstFocus = data.firstFocus
 
+  const [customJob, setCustomJob] = useState('')
+  const [showMoreJobs, setShowMoreJobs] = useState(false)
   const [extraSheetOpen, setExtraSheetOpen] = useState(false)
   const [expandedTrade, setExpandedTrade] = useState<string | null>(null)
   const [priceInfoOpen, setPriceInfoOpen] = useState(false)
@@ -47,7 +52,9 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
     const next = selected.includes(s)
       ? selected.filter(x => x !== s)
       : [...selected, s]
-    update({ specialties: next })
+    const slugs = next.map(slugifyJobType)
+    update({ specialties: next, quoteJobTypes: slugs,
+      firstQuoteSelection: data.firstQuoteSelection && slugs.includes(data.firstQuoteSelection.jobTypeSlug) ? data.firstQuoteSelection : null })
   }
 
   /**
@@ -81,13 +88,14 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
 
   return (
     <div className="ob-screen">
+      <fieldset disabled={busy} style={{ display: 'contents' }}>
       <OnboardingHeader step={OB_DOTS.howYouWork} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
         <h1 className="ob-headline">Hur jobbar du?</h1>
         {/* "svara rätt i telefonen" är FÖRBJUDEN copy (låter som talande
             röst-AI, vilket produkten inte har) — samma regel som i teamintrot.
             Lisa fångar missade samtal och svarar kunder via SMS. */}
-        <p className="ob-sub">Lisa behöver veta det här för att svara kunderna rätt</p>
+        <p className="ob-sub">Dina jobbtyper följer med till nya affärer och hjälper oss att förbereda rätt offertunderlag.</p>
 
         {/* Specialties */}
         <section style={{ marginBottom: 28 }}>
@@ -100,14 +108,14 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
             }}
           >
             <label className="ob-label" style={{ margin: 0 }}>
-              Specialiteter
+              Vilka jobb gör ni oftast?
             </label>
             <span style={{ fontSize: 12, color: 'var(--ob-muted)' }}>
               {selected.length} valda
             </span>
           </div>
           <div className="ob-chip-grid">
-            {specs.map(s => (
+            {(showMoreJobs ? specs : specs.slice(0, 8)).map(s => (
               <button
                 type="button"
                 key={s}
@@ -120,11 +128,25 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
             ))}
           </div>
 
+          {specs.length > 8 && <button type="button" className="ob-chip" onClick={() => setShowMoreJobs(v => !v)}>{showMoreJobs ? 'Visa färre' : 'Visa fler jobbtyper'}</button>}
+          <form onSubmit={e => {
+            e.preventDefault()
+            const name = customJob.trim()
+            if (!name || !/[a-zåäö0-9]/i.test(name)) return
+            if (!selected.some(s => s.toLocaleLowerCase('sv') === name.toLocaleLowerCase('sv'))) toggleSpec(name)
+            setCustomJob('')
+          }} style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            <label className="sr-only" htmlFor="custom-onboarding-job">Egen jobbtyp</label>
+            <input id="custom-onboarding-job" value={customJob} maxLength={80} onChange={e => setCustomJob(e.target.value)} placeholder="Saknas något? Skriv egen jobbtyp" style={{ minWidth: 0, flex: 1, padding: 10, border: '1px solid var(--ob-border)', borderRadius: 10 }} />
+            <button type="submit" className="ob-chip" disabled={!/[a-zåäö0-9]/i.test(customJob)}>Lägg till</button>
+          </form>
+          <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Börja med dina vanligaste jobb. Du kan lägga till fler och ändra dem i Inställningar senare.</p>
+
           {/* Extra-specialiteter från andra branscher */}
           {extraSpecs.length > 0 && (
             <div style={{ marginTop: 12 }}>
               <div style={{ fontSize: 11, color: 'var(--ob-muted)', marginBottom: 6, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                Från andra branscher
+                Fler valda jobb
               </div>
               <div className="ob-chip-grid">
                 {extraSpecs.map(s => {
@@ -400,6 +422,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
       </div>
 
       <div className="ob-footer">
+        {error && <p role="alert" className="ob-sub" style={{ color: '#b91c1c' }}>{error}</p>}
         {/* En död knapp utan besked lämnar användaren att gissa (B7-fyndet:
             org.nr-knappen). Samma mönster som Step2: knappen är klickbar,
             och ett klick i ogiltigt läge SÄGER vad som saknas. */}
@@ -418,7 +441,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           >
             <strong>Innan du fortsätter:</strong>{' '}
             {[
-              selected.length === 0 ? 'välj minst en specialitet' : null,
+              selected.length === 0 ? 'välj minst en jobbtyp' : null,
               !days.some(Boolean) ? 'markera minst en arbetsdag' : null,
               !pricingModel ? 'välj hur ni brukar prissätta arbetet' : null,
               rateRequired && !(Number(standardHourlyRate) > 0) ? 'ange ert standardpris för arbete' : null,
@@ -432,7 +455,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           style={!valid ? { opacity: 0.6, cursor: 'pointer' } : undefined}
           onClick={() => (valid ? onNext() : setVisaSaknas(true))}
         >
-          Fortsätt <ArrowRight size={18} />
+          {busy ? 'Sparar dina jobb…' : 'Fortsätt'} <ArrowRight size={18} />
         </button>
       </div>
 
@@ -468,7 +491,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
         title="Lägg till från annan bransch"
       >
         <p style={{ marginTop: 0, marginBottom: 16, color: 'var(--ob-muted)' }}>
-          Plocka specialiteter från andra branscher du också tar jobb inom.
+          Välj jobb från andra branscher du också arbetar inom.
           Din huvudbransch är <strong>{getTradeLabel(trade)}</strong>.
         </p>
         {TRADES.filter(t => t.id !== trade).map(t => {
@@ -536,6 +559,7 @@ export default function Step3HowYouWork({ onNext, onBack, data, setData }: Step3
           )
         })}
       </InfoSheet>
+      </fieldset>
     </div>
   )
 }

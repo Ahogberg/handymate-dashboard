@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { Loader2, Send } from 'lucide-react'
 import {
   SECTION_LABELS,
@@ -64,6 +65,7 @@ export function QuoteBuilderBottomBar({
   onSendQuote,
   onSaveDraft,
 }: QuoteBuilderBottomBarProps) {
+  const [showAllSections, setShowAllSections] = useState(false)
   const orderedSections = sortSectionsByAttention(summaries)
 
   return (
@@ -83,7 +85,7 @@ export function QuoteBuilderBottomBar({
           nedan förblir OVILLKORLIGT monterade — bara chip-raden gates. */}
       {hasQuoteContent && (
         <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5">
-          {orderedSections.map(section => {
+          {(showAllSections ? orderedSections : orderedSections.slice(0, 1)).map(section => {
             const summary = summaries[section]
             const hasAttention = !!summary.attention
             return (
@@ -109,6 +111,7 @@ export function QuoteBuilderBottomBar({
               </button>
             )
           })}
+          <button type="button" aria-expanded={showAllSections} onClick={() => setShowAllSections(!showAllSections)} className="min-h-[44px] shrink-0 px-2 text-xs font-medium text-teal-800 underline">{showAllSections ? 'Visa nästa' : 'Alla delar'}</button>
         </div>
       )}
 
@@ -140,7 +143,7 @@ export function QuoteBuilderBottomBar({
           className="flex-[1.4] min-h-[52px] inline-flex items-center justify-center gap-1.5 px-4 bg-primary-700 active:bg-primary-800 text-white text-sm font-semibold rounded-xl transition-colors disabled:opacity-50 shadow-sm"
         >
           {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-          {saving ? 'Sparar…' : 'Skicka offert'}
+          {saving ? 'Sparar…' : 'Granska och skicka'}
         </button>
 
         {sendConfirmPending && (

@@ -59,8 +59,8 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}))
-  if (!body.name || !body.name.trim()) {
-    return NextResponse.json({ error: 'Namn krävs' }, { status: 400 })
+  if (typeof body.name !== 'string' || !body.name.trim() || body.name.trim().length > 80 || !slugifyJobType(body.name)) {
+    return NextResponse.json({ error: 'Ange ett namn på högst 80 tecken med bokstäver eller siffror.' }, { status: 400 })
   }
 
   const supabase = getServerSupabase()
@@ -81,6 +81,7 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (error) {
+    if (error.code === '23505') return NextResponse.json({ error: 'Jobbtypen finns redan. Välj den befintliga eller ge den nya ett annat namn.' }, { status: 409 })
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 

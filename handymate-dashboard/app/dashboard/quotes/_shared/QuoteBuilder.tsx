@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, X } from 'lucide-react'
+import type { Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
@@ -18,6 +19,8 @@ import {
 import { generatedQuoteToQuoteItems, rotRutEfterArtikelkoppling } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
+import { useQuoteSectionNavigation } from './useQuoteSectionNavigation'
+import { FirstQuoteGuide } from '@/components/onboarding/FirstQuoteGuide'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
 import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
@@ -42,6 +45,8 @@ import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/bus
 import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
+import QuotePreparationInput from '@/components/customer-preparation/QuotePreparationInput'
+import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
@@ -56,6 +61,8 @@ import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
+import { useQuoteRecovery } from './useQuoteRecovery'
+import { QuotePriceMemory } from './QuotePriceMemory'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
 import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditView } from './QuoteEditView'
@@ -187,6 +194,21 @@ export interface QuoteBuilderProps {
 }
 
 export default function QuoteBuilder(props: QuoteBuilderProps) {
+  const query = useSearchParams()
+  const business = useBusiness()
+  const [userId, setUserId] = useState<string | null>(null)
+  useEffect(() => {
+    let active = true
+    let authChanged = false
+    void supabase.auth.getSession().then(({ data }: { data: { session: Session | null } }) => { if (active && !authChanged) setUserId(data.session?.user.id || '') }).catch(() => { if (active && !authChanged) setUserId('') })
+    const { data } = supabase.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => { authChanged = true; if (active) setUserId(session?.user.id || '') })
+    return () => { active = false; data.subscription.unsubscribe() }
+  }, [])
+  if (userId === null) return <div className="p-6 text-sm text-slate-600">Öppnar offertskaparen…</div>
+  return <QuoteBuilderSession key={`${business.business_id}:${userId}:${props.mode}:${props.quoteId || ''}:${query?.toString() || ''}`} {...props} recoveryUserId={userId} />
+}
+
+function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string }) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const business = useBusiness()
@@ -420,7 +442,6 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   }
   /** Vilket ämne chip-raden senast bads scrolla till — se scrollToSection
       och effekten som konsumerar den, längre ner. */
-  const [pendingScrollSection, setPendingScrollSection] = useState<QuoteSection | null>(null)
 
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
@@ -588,21 +609,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
    * `quickSection`. Byter till dokumentvyn först om listvyn är aktiv,
    * eftersom `data-section` bara finns i canvas-renderingen.
    */
-  const scrollToSection = useCallback((section: QuoteSection) => {
-    setMainView('document')
-    setPendingScrollSection(section)
-  }, [])
-
-  useEffect(() => {
-    if (!pendingScrollSection) return
-    const section = pendingScrollSection
-    const frame = requestAnimationFrame(() => {
-      const target = document.querySelector(`[data-section="${section}"]`)
-      target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    })
-    setPendingScrollSection(null)
-    return () => cancelAnimationFrame(frame)
-  }, [pendingScrollSection])
+  const showDocument = useCallback(() => setMainView('document'), [])
+  const scrollToSection = useQuoteSectionNavigation(showDocument)
 
   const selectedCustomerObj = useMemo(
     () => customers.find(c => c.customer_id === selectedCustomer) || null,
@@ -1964,17 +1972,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
   // useQuoteBuilderSave-hooken (app/dashboard/quotes/_shared/) — se den
   // filens docblock. `getContext` läses FÄRSKT vid varje `saveQuote()`-
   // anrop (inte memo:ad) så den alltid speglar senaste state.
-  const { saving, save: saveQuote, autoSaveStatus, performAutoSave } = useQuoteBuilderSave({
-    mode: props.mode,
-    quoteId,
-    items,
-    setItems,
-    products,
-    setLocalPrice,
-    setSendConfirmPending,
-    toast,
-    router,
-    getContext: (): QuotePayloadContext => ({
+  const getQuoteContext = (): QuotePayloadContext => ({
       selectedCustomer,
       title,
       description,
@@ -2020,7 +2018,36 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             dealId: dealIdFromQuery,
             leadId: leadIdFromQuery,
           }),
-    }),
+  })
+  const recovery = useQuoteRecovery({
+    userId: props.recoveryUserId,
+    businessId: business.business_id,
+    scope: searchParams?.toString() || 'blank',
+    enabled: !isEditMode && !loading && dealContextReady,
+    value: { context: getQuoteContext(), items, quickInput, photos, aiTextInput, aiBedomning },
+    hasContent: items.length > 0 || photos.length > 0 || attachments.length > 0 || [title, description, quickInput, aiTextInput, notIncluded, projectAddress].some(value => !!value.trim()),
+    onRestore: saved => {
+      const c = saved.context
+      if (!c || !Array.isArray(saved.items) || !Array.isArray(saved.photos) || !Array.isArray(c.reservationsSnapshot) || !Array.isArray(c.paymentPlan) || !Array.isArray(c.attachments)
+        || [c.title,c.description,c.selectedCustomer,c.notIncluded,c.ataTerms,c.paymentTermsText,c.termsText,c.referencePerson,c.customerReference,c.projectAddress,c.personnummer,c.fastighetsbeteckning,saved.quickInput,saved.aiTextInput].some(value => typeof value !== 'string')
+        || [c.vatRate,c.discountPercent,c.validDays].some(value => !Number.isFinite(value))) throw new Error('Invalid recovery')
+      setItems(saved.items); setSelectedCustomer(c.selectedCustomer); setTitle(c.title); setDescription(c.description)
+      setPricingSettings(previous => previous ? { ...previous, vat_rate: c.vatRate } : previous); setDiscountPercent(c.discountPercent); setNotIncluded(c.notIncluded)
+      setAtaTerms(c.ataTerms); setPaymentTermsText(c.paymentTermsText); setTermsText(c.termsText)
+      reservations.setSnapshot(c.reservationsSnapshot); setPaymentPlan(c.paymentPlan)
+      setReferencePerson(c.referencePerson); setCustomerReference(c.customerReference); setProjectAddress(c.projectAddress)
+      setDetailLevel(c.detailLevel); setShowUnitPrices(c.showUnitPrices); setShowQuantities(c.showQuantities)
+      setPersonnummer(c.personnummer); setFastighetsbeteckning(c.fastighetsbeteckning); setValidDays(c.validDays)
+      setTemplateStyle(c.templateStyle); setAttachments(c.attachments); setTemplateId(c.templateId)
+      setAiGenerated(!!c.aiGenerated); setAiConfidence(c.aiConfidence ?? null); setSourceTranscript(c.sourceTranscript ?? null)
+      setQuoteJobType(c.quoteJobType ?? null); setQuickInput(saved.quickInput); setPhotos(saved.photos)
+      setAiTextInput(saved.aiTextInput); setAiBedomning(saved.aiBedomning)
+      setQuickMode(saved.items.length ? null : 'intake')
+    },
+  })
+  const { saving, save: saveQuote, autoSaveStatus, performAutoSave } = useQuoteBuilderSave({
+    mode: props.mode, quoteId, items, setItems, products, setLocalPrice,
+    setSendConfirmPending, toast, router, getContext: getQuoteContext, onSaved: recovery.clear,
   })
 
   // EDIT-LÄGE ENDAST (Fas 2, offert-omtaget 2026-08-31): 5s-debounce-
@@ -2053,7 +2080,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
     if (!templateName.trim()) return
     setSavingTemplate(true)
     try {
-      await fetch('/api/quote-templates', {
+      const response = await fetch('/api/quote-templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2072,12 +2099,16 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
           rut_enabled: hasRutItems,
         }),
       })
+      if (!response.ok) {
+        const result = await response.json().catch(() => ({}))
+        throw new Error(result.error || 'Kunde inte spara mallen')
+      }
       toast.success('Mall sparad!')
       setShowSaveTemplateModal(false)
       setTemplateName('')
     } catch (err) {
       console.error('Failed to save template:', err)
-      toast.error('Kunde inte spara mallen')
+      toast.error(err instanceof Error ? err.message : 'Kunde inte spara mallen')
     }
     setSavingTemplate(false)
   }
@@ -2181,6 +2212,21 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       </div>
     )
   }
+
+  if (!isEditMode && recovery.pending) return (
+    <main className="mx-auto max-w-xl p-6 pt-12">
+      <div className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
+        <p className="text-sm font-medium text-teal-700">Fortsätt där du slutade</p>
+        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Du har en påbörjad offert</h1>
+        <p className="mt-3 text-sm text-slate-600">En återställningskopia finns i den här fliken från {new Date(recovery.pending.savedAt).toLocaleTimeString('sv-SE')}. Den är inte ett bekräftat serverutkast.</p>
+        {recovery.status && <p role="status" className="mt-3 text-sm text-amber-800">{recovery.status}</p>}
+        <div className="mt-6 flex flex-wrap gap-3">
+          <button type="button" onClick={recovery.restore} className="min-h-[48px] rounded-xl bg-teal-700 px-4 font-medium text-white">Återställ arbetet</button>
+          <button type="button" onClick={recovery.discard} className="min-h-[48px] rounded-xl border px-4 text-slate-600">Börja om och ta bort kopian</button>
+        </div>
+      </div>
+    </main>
+  )
 
   // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): egen layout, egen fil
   // (QuoteEditView.tsx) — se den filens docblock för varför den INTE ligger
@@ -2318,6 +2364,16 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart} />
   ) : null
 
+  const preparationInput = !isEditMode && selectedCustomer ? <QuotePreparationInput
+    key={selectedCustomer} customerId={selectedCustomer} preparationId={searchParams?.get('preparation_id')}
+    onApply={text => {
+      setQuickInput(previous => [previous, text].filter(Boolean).join('\n\n'))
+      setAiTextInput(previous => [previous, text].filter(Boolean).join('\n\n'))
+      setSourceTranscript(previous => [previous, text].filter(Boolean).join('\n\n'))
+      if (items.length === 0) setQuickMode('intake')
+      else setShowAiHelper(true)
+    }} /> : null
+
   // ═══ SNABBOFFERTEN: intag och byggkänsla är fullskärmslägen ══════════
   if (quickMode === 'intake') {
     return (
@@ -2332,7 +2388,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
         onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
       />
       <QuickIntake
-        jobTypeStart={jobTypeStart}
+        jobTypeStart={<>{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}{jobTypeStart}{preparationInput}</>}
         customers={customers}
         selectedCustomer={selectedCustomer}
         onSelectCustomer={setSelectedCustomer}
@@ -2454,7 +2510,16 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             OAVSETT skärmstorlek utan att kundkortets mobilordning rörs.
             Grindvillkoret bor kvar på jobTypeStart-variabeln högre upp —
             orört. */}
+        {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
         {jobTypeStart}
+        {preparationInput}
+        {firstQuoteIntent && jobStartApplied && <FirstQuoteGuide key={business.business_id}
+          companyName={business.business_name} hasCustomer={!!selectedCustomer}
+          onCustomer={() => {
+            const target = document.querySelector<HTMLElement>('[data-first-quote-customer]')
+            target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
+            target?.querySelector<HTMLElement>('input, button, select')?.focus({ preventScroll: true })
+          }} onSection={scrollToSection} />}
         {jobStartApplied && <p className="text-sm text-teal-800 mb-4" role="status">
           Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
         </p>}
@@ -2557,7 +2622,9 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
             {/* Marginalen medan priset sätts — självgardande, syns bara när
                 minst en rad har ett känt inköpspris. */}
             <QuoteMarginCard items={recalculated} />
+            <QuotePriceMemory items={items} onChange={setItems} />
 
+            <div data-first-quote-customer>
             <QuoteNewCustomerSection
               customers={customers}
               selectedCustomer={selectedCustomer}
@@ -2573,6 +2640,7 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
               setItems={setItems}
               hasItems={items.length > 0}
             />
+            </div>
           </div>
 
           {/* ── Assistentkolumnen, del 2: verktyg och avslut ───────
@@ -2782,6 +2850,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
               </div>
             )}
 
+            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
+
             {/* Huvudyta: dokument-canvas (default) eller listvy (radeditor) */}
             {mainView === 'list' ? (
               <QuoteItemsSection
@@ -2938,6 +3008,8 @@ export default function QuoteBuilder(props: QuoteBuilderProps) {
       )}
 
       <QuoteSaveTemplateModal
+        jobType={quoteJobType}
+        items={items}
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
         templateName={templateName}
