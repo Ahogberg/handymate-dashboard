@@ -25,7 +25,8 @@ export default function SendAtaDialog({ changeId, ataNumber, onClose, onSent, on
   changeId: string
   ataNumber?: number | null
   onClose: () => void
-  onSent: () => void
+  /** 'sms' = SMS:et gick ut; 'link' = länken kopierad och ÄTA:n markerad som skickad. */
+  onSent: (via?: 'sms' | 'link') => void
   onError: (msg: string) => void
 }) {
   const [preview, setPreview] = useState<Forhandsvisning | null>(null)
@@ -67,21 +68,38 @@ export default function SendAtaDialog({ changeId, ataNumber, onClose, onSent, on
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Kunde inte skicka ÄTA')
-      onSent()
+      onSent('sms')
     } catch (err: any) {
       onError(err.message || 'Kunde inte skicka ÄTA')
       setSending(false)
     }
   }
 
+  // F22: kopiering är ett utskick där hantverkaren själv levererar länken.
+  // Urklippet först (kräver användargesten), sedan markeras ÄTA:n som skickad
+  // så den syns i kundportalen och PDF:en låses upp för kunden.
   const kopieraLank = async () => {
-    if (!preview?.signUrl) return
+    if (!preview?.signUrl || sending) return
     try {
       await navigator.clipboard.writeText(preview.signUrl)
-      setCopied(true)
-      setTimeout(() => setCopied(false), 2000)
     } catch {
       onError('Kunde inte kopiera länken')
+      return
+    }
+    setCopied(true)
+    setSending(true)
+    try {
+      const res = await fetch(`/api/ata/${changeId}/send`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ method: 'link' }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'ÄTA:n kunde inte markeras som skickad')
+      onSent('link')
+    } catch (err: any) {
+      setSending(false)
+      onError(`${err.message || 'ÄTA:n kunde inte markeras som skickad'}. Länken är kopierad, men ÄTA:n är kvar som utkast.`)
     }
   }
 
@@ -139,6 +157,9 @@ export default function SendAtaDialog({ changeId, ataNumber, onClose, onSent, on
               <Copy className="w-3.5 h-3.5" />
               {copied ? 'Länk kopierad' : 'Kopiera signeringslänken i stället'}
             </button>
+            <p className="text-xs text-gray-500 mt-1">
+              Kopierar du länken markeras ÄTA:n som skickad och blir synlig i kundportalen. Du ansvarar för att länken når kunden.
+            </p>
           </div>
         )}
 

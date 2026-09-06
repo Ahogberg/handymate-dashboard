@@ -175,6 +175,7 @@ jobs:
           tests/foretagsskanning-vy.spec.ts
           tests/daniel-agentrad.spec.ts
           tests/livegenomgang-f20-f21.spec.ts
+          tests/livegenomgang-f22.spec.ts
           tests/onboarding-phone-truth.spec.ts
           --no-deps
           --project=chromium
