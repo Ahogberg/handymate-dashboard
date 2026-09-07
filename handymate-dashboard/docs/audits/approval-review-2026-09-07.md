@@ -120,12 +120,13 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 ## Verifiering
 
 - 61 riktade Playwright-kontraktstest passerade för granskningsbevis, samtliga registrerade typers säkra behandling, exakta meddelandefält, databasfel, kampanjköning, befintligt handlingskontrakt och visning/redigering. Dessa använder inte en riktig kund eller en produktionssession.
+- Ytterligare 143 regressionsprov passerade efter anpassning av de avsiktligt ändrade knapptexterna. Ett befintligt test i starttid-loop om texten på den offentliga offertsidan fallerar; varken den sidan eller den testförväntningen ändras här.
 - Separat test kör den faktiska POST-routen med minnesdatabas: äldre klient, edit och retry utan granskningsbevis skriver inget; behörighetskontrollen sker före preview; den bekräftade ändrade texten och mottagaren är exakt de som köas; upprepat klick skapar ingen andra kampanj; projektavslut utan komplett granskning stoppas.
 - 10 mobilprov med faktisk granskningskomponent och nätverksadapter: full text/mottagare, avbryt utan exekvering, ändring, dubbelklick, gammal server, nätverksfel utan automatisk omkörning, fel trots HTTP 200, bakgrundsläge, kontobyte och avmontering. React Native-primitiver och nätverk är mockade.
 - Mobilens sju ändrade TS/TSX-filer passerade syntaxkontroll. Detta ersätter inte full typkontroll/build av Expo-projektet.
 - Webbens visuella dialogprov kunde inte köras: nedladdningen av lokal Chromium misslyckades.
 - Full backend-typkontroll stöter på tre befintliga fel kring den saknade `lib/portal/review` och dess användning. Inga fel i de nya granskningsfilerna rapporterades i den körningen.
-- Ingen verklig kampanj, e-post, SMS, faktura, bokning eller publicering utfördes. Ingen merge eller driftsättning har gjorts. TestFlight och webbens fulla användarresor återstår.
+- Ingen verklig kampanj, e-post, SMS, faktura, bokning eller publicering utfördes. Ingen merge eller produktionsdriftsättning har gjorts. TestFlight och webbens fulla användarresor återstår.
 
 ## Manuella slutprov efter färdigställande och ny build
 

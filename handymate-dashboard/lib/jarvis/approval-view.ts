@@ -102,7 +102,7 @@ export function needsAttention(approval: ApprovalLike): boolean {
  * server-bound review. Informational cards only acknowledge reading. */
 export function approveLabel(approvalType: string, _payload?: Record<string, unknown> | null): string {
   const klass = classify(approvalType)
-  return klass === 'INFORMATIONAL' || klass === 'ACKNOWLEDGEMENT' ? 'Jag har läst' : 'Granska'
+  return klass === 'INFORMATIONAL' || klass === 'ACKNOWLEDGEMENT' ? 'Jag har läst det' : 'Granska'
 }
 
 /**

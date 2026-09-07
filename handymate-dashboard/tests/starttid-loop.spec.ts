@@ -181,16 +181,16 @@ test.describe('pushmall för new_booking_request', () => {
   })
 })
 
-test.describe('approveLabel — "Boka {datum}"', () => {
+test.describe('approveLabel — granska bokning och följdutskick', () => {
   test('med requested_date i payloaden', () => {
     const label = approveLabel('new_booking_request', { requested_date: '2026-09-22' })
-    expect(label.startsWith('Boka ')).toBe(true)
+    expect(label).toBe('Granska')
     expect(label).not.toBe('Godkänn')
   })
 
   test('utan requested_date faller tillbaka snyggt, kraschar aldrig', () => {
     const label = approveLabel('new_booking_request', {})
-    expect(label).toBe('Boka')
+    expect(label).toBe('Granska')
   })
 })
 

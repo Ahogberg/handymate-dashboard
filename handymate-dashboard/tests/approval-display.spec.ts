@@ -48,7 +48,7 @@ test('approvalDisplay = typeLabel + agentForApproval + approveLabel', () => {
   }
   expect(approvalDisplay(ata).type_label).toBe('ÄTA-förslag')
   expect(approvalDisplay(dagbok).type_label).toBe('Dagboksanteckning')
-  expect(approvalDisplay(dagbok).approve_label).toBe('Spara i dagboken')
+  expect(approvalDisplay(dagbok).approve_label).toBe('Granska')
   // Explicit routing i payloaden vinner alltid.
   expect(approvalDisplay({ approval_type: 'create_ata_draft', payload: { routed_agent: 'karin' } }).agent).toBe('karin')
 })
