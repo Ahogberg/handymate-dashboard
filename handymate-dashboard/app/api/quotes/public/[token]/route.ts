@@ -525,8 +525,12 @@ export async function POST(
       return NextResponse.json({ error: 'Offerten har gått ut. Kontakta oss för en uppdaterad offert.' }, { status: 400 })
     }
 
-    if (!name || !signature_data) {
-      return NextResponse.json({ error: 'Namn och signatur krävs' }, { status: 400 })
+    // Namn + kryss (kundvy-omdesignen 2026-09-07): den ritade signaturen är
+    // inte längre obligatorisk — namn, villkorskryss (klienten grindar) och
+    // IP räcker som avtalsspår. signature_data tas fortfarande emot och
+    // sparas när den skickas (portalens signeringsmodal ritar fortfarande).
+    if (!name) {
+      return NextResponse.json({ error: 'Namn krävs' }, { status: 400 })
     }
 
     const ip =
@@ -620,7 +624,7 @@ export async function POST(
         p_signed_at: signedAt,
         p_signed_by_name: name,
         p_signed_by_ip: ip,
-        p_signature_data: signature_data,
+        p_signature_data: signature_data || null,
         p_totals: signedTotals,
         p_signed_options: signedOptions,
       })
@@ -636,6 +640,54 @@ export async function POST(
         return NextResponse.json({ error: 'Offerten har gått ut. Kontakta oss för en uppdaterad offert.' }, { status: 400 })
       }
       throw updateError
+    }
+
+    // ── ROT-uppgifter från kunden (kundvy-omdesignen 2026-09-07) ─────────────
+    // Kunden kan fylla i personnummer + fastighetsbeteckning i godkännande-
+    // flödet — de uppgifter Skatteverkets ansökan kräver och som hantverkaren
+    // annars jagar vid faktureringen. Valfria: utelämnade = "hoppa över".
+    // Non-blocking: signeringen är redan skriven; ett fel här får aldrig
+    // presentera godkännandet som misslyckat. Skrivs på offerten (visas i
+    // dokumentmotorn) och speglas till kundkortet när fälten där är tomma —
+    // det är kundkortet faktureringens validate-rot-request läser.
+    try {
+      const rotPnr = typeof body.rot_personnummer === 'string'
+        ? body.rot_personnummer.replace(/\D/g, '')
+        : ''
+      const rotFastighet = typeof body.rot_fastighet === 'string' ? body.rot_fastighet.trim() : ''
+      const pnrOk = rotPnr.length >= 10 && rotPnr.length <= 12
+      const fastighetOk = rotFastighet.length >= 3 && rotFastighet.length <= 200
+      if (pnrOk || fastighetOk) {
+        const quoteRotUpdate: Record<string, string> = {}
+        if (pnrOk) quoteRotUpdate.personnummer = rotPnr
+        if (fastighetOk) quoteRotUpdate.fastighetsbeteckning = rotFastighet
+        await supabase
+          .from('quotes')
+          .update(quoteRotUpdate)
+          .eq('quote_id', quote.quote_id)
+          .eq('business_id', quote.business_id)
+
+        if (quote.customer_id) {
+          const { data: cust } = await supabase
+            .from('customer')
+            .select('personal_number, property_designation')
+            .eq('customer_id', quote.customer_id)
+            .eq('business_id', quote.business_id)
+            .maybeSingle()
+          const custUpdate: Record<string, string> = {}
+          if (pnrOk && !cust?.personal_number) custUpdate.personal_number = rotPnr
+          if (fastighetOk && !cust?.property_designation) custUpdate.property_designation = rotFastighet
+          if (Object.keys(custUpdate).length > 0) {
+            await supabase
+              .from('customer')
+              .update(custUpdate)
+              .eq('customer_id', quote.customer_id)
+              .eq('business_id', quote.business_id)
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[quotes/public] ROT-uppgifter kunde inte sparas (non-blocking):', quote.quote_id, err)
     }
 
     // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
