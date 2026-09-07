@@ -19,6 +19,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateOCR } from '@/lib/ocr'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import type { ReminderDeliveryInput } from '@/lib/invoice-reminder-send'
+import {
+  emailHeading, emailParagraph, statusBand, summaryTable, infoBlock, detailRows, signature,
+  type StatusTone, type SummaryRow,
+} from '@/lib/email-templates'
 
 export const DEFAULT_SCHEDULE = [
   { level: 'friendly', emailToo: false },
@@ -117,19 +121,21 @@ export function getReminderMessage(level: ReminderLevel, vars: {
   }
 }
 
+/**
+ * Varumärkeslagret 2026-09-07: emailBody är nu ett INNEHÅLLSFRAGMENT
+ * (byggstenar ur lib/email-templates.ts), inte ett komplett dokument.
+ * Leveranspunkten (lib/invoice-reminder-send.ts) lägger på företagets
+ * masterlayout — logotyp, accentfärg, sidfot med stämpel — via emailLayout().
+ * Fragmentet lagras i godkännandekortets payload (delivery.messages) och
+ * förhandsvisas där; kort skapade före detta datum bär det gamla hela
+ * dokumentet, se arRedanHeltMejl i invoice-reminder-send.
+ */
 export function generateEmailContent(level: ReminderLevel, vars: {
   invoiceNumber: string; amount: string; dueDate: string; ocr: string
   businessName: string; daysOverdue: number; bankgiro: string
   reminderFee: number; interestAmount: number; swishNumber?: string | null
 }): { emailSubject: string; emailBody: string } {
   const { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount } = vars
-
-  const feeRow = reminderFee > 0 && level !== 'friendly'
-    ? `<tr><td style="padding:4px 0;color:#64748b">Påminnelseavgift</td><td style="text-align:right;padding:4px 0">${reminderFee} kr</td></tr>`
-    : ''
-  const interestRow = interestAmount > 0 && (level === 'formal' || level === 'final')
-    ? `<tr><td style="padding:4px 0;color:#64748b">Dröjsmålsränta</td><td style="text-align:right;padding:4px 0">${Math.round(interestAmount)} kr</td></tr>`
-    : ''
 
   const subjectMap: Record<ReminderLevel, string> = {
     friendly: `Påminnelse: Faktura ${invoiceNumber}`,
@@ -139,35 +145,39 @@ export function generateEmailContent(level: ReminderLevel, vars: {
   }
 
   const introMap: Record<ReminderLevel, string> = {
-    friendly: `<p>Vi vill vänligen påminna om att faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> förföll den ${dueDate}.</p><p>Om betalningen redan är skickad, bortse från detta meddelande.</p>`,
-    firm: `<p>Vi har ännu inte fått betalning för faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> som förföll den ${dueDate} (${daysOverdue} dagar sedan).</p><p>Vänligen betala snarast möjligt.</p>`,
-    formal: `<p>Trots tidigare påminnelser har vi inte fått betalning för faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong>.</p><p>Fakturan förföll den ${dueDate}, vilket innebär att betalningen nu är <strong>${daysOverdue} dagar försenad</strong>.</p><p>Dröjsmålsränta enligt räntelagen debiteras.</p>`,
-    final: `<p>Detta är en sista påminnelse gällande faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> som förföll den ${dueDate}.</p><p>Betalningen är nu <strong>${daysOverdue} dagar försenad</strong>. Om betalning inte sker inom 10 dagar kan ärendet komma att överlämnas till inkassobolag.</p>`,
+    friendly: `${emailParagraph(`Vi vill vänligen påminna om att faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> förföll den ${dueDate}.`)}${emailParagraph('Om betalningen redan är skickad, bortse från detta meddelande.')}`,
+    firm: `${emailParagraph(`Vi har ännu inte fått betalning för faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> som förföll den ${dueDate} (${daysOverdue} dagar sedan).`)}${emailParagraph('Vänligen betala snarast möjligt.')}`,
+    formal: `${emailParagraph(`Trots tidigare påminnelser har vi inte fått betalning för faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong>.`)}${emailParagraph(`Fakturan förföll den ${dueDate}, vilket innebär att betalningen nu är <strong>${daysOverdue} dagar försenad</strong>.`)}${emailParagraph('Dröjsmålsränta enligt räntelagen debiteras.')}`,
+    final: `${emailParagraph(`Detta är en sista påminnelse gällande faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> som förföll den ${dueDate}.`)}${emailParagraph(`Betalningen är nu <strong>${daysOverdue} dagar försenad</strong>. Om betalning inte sker inom 10 dagar kan ärendet komma att överlämnas till inkassobolag.`)}`,
+  }
+
+  // Tonen följer nivån: vänlig = neutral, andra = info, tredje = varning, sista = allvar.
+  const toneMap: Record<ReminderLevel, StatusTone> = {
+    friendly: 'neutral', firm: 'info', formal: 'warning', final: 'danger',
+  }
+
+  const harAvgift = reminderFee > 0 && level !== 'friendly'
+  const harRanta = interestAmount > 0 && (level === 'formal' || level === 'final')
+  const rows: SummaryRow[] = []
+  if (harAvgift || harRanta) {
+    rows.push({ label: 'Fakturabelopp', value: `${amount} kr` })
+    if (harAvgift) rows.push({ label: 'Påminnelseavgift', value: `${reminderFee} kr` })
+    if (harRanta) rows.push({ label: 'Dröjsmålsränta', value: `${Math.round(interestAmount)} kr` })
   }
 
   return {
     emailSubject: subjectMap[level],
     emailBody: `
-      <div style="font-family:'Segoe UI',system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
-        <div style="background:#0F766E;color:white;padding:16px 24px;border-radius:12px 12px 0 0;">
-          <h2 style="margin:0;font-size:18px;">${subjectMap[level]}</h2>
-        </div>
-        <div style="padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-          <p>Hej,</p>
-          ${introMap[level]}
-          ${(feeRow || interestRow) ? `
-          <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
-            <tr style="border-bottom:1px solid #e2e8f0"><td style="padding:4px 0;color:#64748b">Fakturabelopp</td><td style="text-align:right;padding:4px 0">${amount} kr</td></tr>
-            ${feeRow}
-            ${interestRow}
-          </table>` : ''}
-          <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:16px 0;">
-            <p style="margin:0 0 4px;font-weight:600;font-size:14px;">Betalningsinformation</p>
-            <p style="margin:0;font-size:14px;color:#64748b;">${bankgiro ? `Bankgiro: ${bankgiro}<br>` : ''}OCR: ${ocr}${vars.swishNumber ? `<br><strong>Swish:</strong> ${vars.swishNumber}` : ''}</p>
-          </div>
-          <p>Med vänlig hälsning,<br><strong>${businessName}</strong></p>
-        </div>
-      </div>
+      ${statusBand(subjectMap[level], toneMap[level])}
+      ${emailHeading('Hej,')}
+      ${introMap[level]}
+      ${rows.length ? summaryTable(rows) : ''}
+      ${infoBlock('Betalningsinformation', detailRows([
+        { label: 'Bankgiro', value: bankgiro },
+        { label: 'OCR', value: ocr },
+        { label: 'Swish', value: vars.swishNumber ?? '' },
+      ]))}
+      ${signature(businessName)}
     `,
   }
 }

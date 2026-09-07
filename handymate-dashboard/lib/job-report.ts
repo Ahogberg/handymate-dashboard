@@ -415,16 +415,23 @@ export async function approveJobReport(
     if (reportData.customerEmail) {
       try {
         const { sendEmail } = await import('@/lib/email')
+        // Varumärkeslagret 2026-09-07: masterlayouten (logotyp/accent/stämpel)
+        // i stället för nakna <p> med hårdkodad teal.
+        const { loadBranding } = await import('@/lib/branding/get-branding')
+        const { emailLayout, emailHeading, emailParagraph, actionBlock, signature } = await import('@/lib/email-templates')
+        const { escapeHtml } = await import('@/lib/document-html')
+        const branding = await loadBranding(supabase, businessId)
+        const content = `
+          ${emailHeading(`Hej ${escapeHtml(reportData.customerName.split(' ')[0])}!`, `Här kommer jobbrapporten för <strong>${escapeHtml(reportData.projectName)}</strong>.`)}
+          ${emailParagraph('Rapporten innehåller utfört arbete, material och garantiinformation.')}
+          ${actionBlock({ text: 'Öppna jobbrapport (PDF)', url: pdfUrl }, branding.accentColor)}
+          ${signature(escapeHtml(reportData.businessName), reportData.contactName ? escapeHtml(reportData.contactName) : undefined)}
+        `
         await sendEmail({
+          businessId,
           to: reportData.customerEmail,
           subject: `Jobbrapport — ${reportData.projectName} från ${reportData.businessName}`,
-          html: `
-            <p>Hej ${reportData.customerName.split(' ')[0]}!</p>
-            <p>Här kommer jobbrapporten för <strong>${reportData.projectName}</strong>.</p>
-            <p>Rapporten innehåller utfört arbete, material och garantiinformation.</p>
-            <p><a href="${pdfUrl}" style="display:inline-block;padding:12px 24px;background:#0F766E;color:white;text-decoration:none;border-radius:8px;font-weight:600;">Öppna jobbrapport (PDF)</a></p>
-            <p>Med vänliga hälsningar,<br/>${reportData.contactName}<br/>${reportData.businessName}</p>
-          `,
+          html: emailLayout(branding, content),
           fromName: reportData.businessName,
         })
       } catch { /* non-blocking */ }

@@ -5,7 +5,7 @@ import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
-import { loadAttribution } from '@/lib/branding/attribution'
+import { loadBranding, brandingFromConfig } from '@/lib/branding/get-branding'
 
 /**
  * POST - Auto-generera fakturor från ofakturerade tidrapporter.
@@ -96,8 +96,9 @@ async function generateInvoicesForBusiness(params: {
     return { ...result, success: false, errors: ['Business not found'] }
   }
 
-  // Stämpeln i auto-sända mejl — laddas EN gång före kundloopen, aldrig i den.
-  const attribution = params.autoSend ? await loadAttribution(supabase, params.businessId) : null
+  // Varumärke + stämpel i auto-sända mejl — laddas EN gång före kundloopen,
+  // aldrig i den (varumärkeslagret 2026-09-07: ersätter loadAttribution).
+  const branding = params.autoSend ? await loadBranding(supabase, params.businessId) : null
 
   // Get all unbilled, billable time entries
   let query = supabase
@@ -313,12 +314,7 @@ async function generateInvoicesForBusiness(params: {
           const { invoiceEmail } = await import('@/lib/email-templates')
 
           const { subject, html } = invoiceEmail({
-            branding: {
-              businessName: business.business_name || 'Handymate',
-              contactEmail: business.contact_email,
-              orgNumber: business.org_number,
-              attribution: attribution ?? undefined,
-            },
+            branding: branding ?? brandingFromConfig(business),
             customerName,
             invoiceNumber,
             totalAmount: total.toLocaleString('sv-SE'),

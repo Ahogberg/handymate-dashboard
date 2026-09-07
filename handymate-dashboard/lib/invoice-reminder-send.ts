@@ -1,6 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { loadAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
+import { loadBranding } from '@/lib/branding/get-branding'
+import { emailLayout } from '@/lib/email-templates'
+
+/**
+ * Övergång (varumärkeslagret 2026-09-07): kort skapade före bytet bär ett
+ * komplett mejl-dokument i payload.delivery.messages.emailBody (gammal
+ * teal-header). Dem lindar vi inte in en gång till — de får stämpeln som
+ * förut. Kan tas bort när inga pending-kort från före 2026-09-07 finns kvar.
+ */
+export function arRedanHeltMejl(emailBody: string): boolean {
+  return emailBody.includes('border-radius:12px 12px 0 0') || /<html|<body/i.test(emailBody)
+}
 
 /**
  * Delad leverans-logik för fakturapåminnelser.
@@ -137,14 +149,23 @@ export async function deliverInvoiceReminder(
     try {
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
-      // Stämpeln läggs på vid leveransen (inte i invoice-reminder-card, som
-      // bara komponerar texten) — en query per utskick, aldrig blockerande.
-      const attribution = await loadAttribution(supabase, businessId)
+      // Varumärke + stämpel läggs på vid leveransen (inte i
+      // invoice-reminder-card, som bara komponerar innehållet) — en query
+      // per utskick, aldrig blockerande. Legacy-kort med helt dokument får
+      // bara stämpeln, som förut.
+      let html: string
+      if (arRedanHeltMejl(messages.emailBody)) {
+        const attribution = await loadAttribution(supabase, businessId)
+        html = `${messages.emailBody}${attributionEmailHtml(attribution)}`
+      } else {
+        const branding = await loadBranding(supabase, businessId)
+        html = emailLayout(branding, messages.emailBody)
+      }
       await resend.emails.send({
         from: `${businessName} <faktura@${process.env.RESEND_DOMAIN ?? 'handymate.se'}>`,
         to: customerEmail,
         subject: messages.emailSubject,
-        html: `${messages.emailBody}${attributionEmailHtml(attribution)}`,
+        html,
       })
       emailSent = true
     } catch (err) {

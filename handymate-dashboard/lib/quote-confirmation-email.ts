@@ -1,9 +1,17 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { sendEmail } from '@/lib/email'
+import { loadBranding, type Branding } from '@/lib/branding/get-branding'
+import { escapeHtml } from '@/lib/document-html'
+import {
+  emailLayout, emailHeading, emailParagraph, infoBlock, detailRows, actionBlock, signature,
+} from '@/lib/email-templates'
 
 /**
  * Skicka bekräftelsemail efter att offert signerats.
  * Inkluderar ROT-uppgifter om offerten har ROT-avdrag.
+ *
+ * Varumärkeslagret 2026-09-07: renderas genom emailLayout() med företagets
+ * logotyp/accent/stämpel (tidigare hårdkodad teal utan stämpel).
  */
 export async function sendQuoteSignedConfirmation(
   businessId: string,
@@ -47,14 +55,8 @@ export async function sendQuoteSignedConfirmation(
     return { success: false, error: 'Customer has no email' }
   }
 
-  // Fetch business
-  const { data: business } = await supabase
-    .from('business_config')
-    .select('business_name, contact_name, contact_email')
-    .eq('business_id', businessId)
-    .single()
-
-  if (!business) return { success: false, error: 'Business not found' }
+  // Varumärke + stämpel (kastar aldrig; neutralt fallback vid fel).
+  const branding = await loadBranding(supabase, businessId)
 
   const hasRot = !!(quote.rot_work_cost && quote.rot_work_cost > 0)
   const quoteNumber = quote.quote_number || quote.quote_id.slice(0, 8)
@@ -73,12 +75,11 @@ export async function sendQuoteSignedConfirmation(
     : ''
 
   const html = buildConfirmationHtml({
+    branding,
     firstName,
     customerName,
     customerAddress: customer.address_line || '',
     quoteNumber,
-    businessName: business.business_name || '',
-    contactName: business.contact_name || '',
     hasRot,
     personnummer,
     fastighet,
@@ -91,8 +92,8 @@ export async function sendQuoteSignedConfirmation(
     to: customer.email,
     subject,
     html,
-    fromName: business.business_name || 'Handymate',
-    replyTo: business.contact_email || undefined,
+    fromName: branding.businessName,
+    replyTo: branding.contactEmail,
   })
 
   // Log
@@ -133,79 +134,48 @@ export async function sendQuoteSignedConfirmation(
 }
 
 function buildConfirmationHtml(opts: {
+  branding: Branding
   firstName: string
   customerName: string
   customerAddress: string
   quoteNumber: string
-  businessName: string
-  contactName: string
   hasRot: boolean
   personnummer: string
   fastighet: string
   portalUrl: string
 }): string {
-  const rotSection = opts.hasRot ? `
-    <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px; font-weight: 600; color: #166534;">🏠 ROT-uppgifter</p>
-      <p style="margin: 4px 0; color: #374151;">Fastighetsbeteckning/lägenhetsnummer: <strong>${opts.fastighet || 'Saknas — vänligen meddela oss'}</strong></p>
-      <p style="margin: 4px 0; color: #374151;">Personnummer: <strong>${opts.personnummer ? opts.personnummer.slice(0, 6) + '-XXXX' : 'Saknas — behövs för ROT-ansökan'}</strong></p>
-    </div>
-  ` : ''
+  const b = opts.branding
 
-  return `
-<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; color: #1F2937;">
-  <div style="background: #0F766E; padding: 20px; border-radius: 12px 12px 0 0; text-align: center;">
-    <h1 style="color: white; margin: 0; font-size: 20px;">${opts.businessName}</h1>
-  </div>
+  // ROT-uppgifterna: personnumret maskeras — mailet ska bekräfta att vi HAR
+  // uppgiften, inte transportera den.
+  const rotSection = opts.hasRot
+    ? infoBlock(
+        'ROT-uppgifter',
+        detailRows([
+          { label: 'Fastighetsbeteckning/lägenhetsnummer', value: escapeHtml(opts.fastighet) || 'Saknas — vänligen meddela oss' },
+          { label: 'Personnummer', value: opts.personnummer ? escapeHtml(opts.personnummer.slice(0, 6)) + '-XXXX' : 'Saknas — behövs för ROT-ansökan' },
+        ]) + `<p style="margin:8px 0 0;font-size:13px;color:#64748b;">Avdraget är preliminärt — Skatteverket fastställer det slutgiltiga beloppet.</p>`,
+        'success',
+      )
+    : ''
 
-  <div style="background: white; padding: 24px; border: 1px solid #E5E7EB; border-top: none; border-radius: 0 0 12px 12px;">
-    <h2 style="color: #111827; font-size: 18px; margin: 0 0 16px;">
-      Tack ${opts.firstName}!
-    </h2>
-
-    <p style="color: #374151; line-height: 1.6;">
-      Tack för att du godkände offert <strong>${opts.quoteNumber}</strong>.
-      ${opts.hasRot ? 'För att vi ska kunna ansöka om ditt ROT-avdrag behöver vi verifiera följande uppgifter.' : ''}
-    </p>
-
-    <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; margin: 16px 0;">
-      <p style="margin: 0 0 8px; font-weight: 600; color: #111827;">📋 Fakturauppgifter</p>
-      <p style="margin: 4px 0; color: #374151;">Namn: <strong>${opts.customerName}</strong></p>
-      <p style="margin: 4px 0; color: #374151;">Adress: <strong>${opts.customerAddress || 'Ej angiven'}</strong></p>
-    </div>
-
+  const content = `
+    ${emailHeading(
+      `Tack ${escapeHtml(opts.firstName)}!`,
+      `Tack för att du godkände offert <strong>${escapeHtml(opts.quoteNumber)}</strong>.${opts.hasRot ? ' För att vi ska kunna ansöka om ditt ROT-avdrag behöver vi verifiera följande uppgifter.' : ''}`,
+    )}
+    ${infoBlock('Fakturauppgifter', detailRows([
+      { label: 'Namn', value: escapeHtml(opts.customerName) },
+      { label: 'Adress', value: escapeHtml(opts.customerAddress) || 'Ej angiven' },
+    ]))}
     ${rotSection}
-
-    <p style="color: #374151; line-height: 1.6;">
-      Stämmer uppgifterna? Svara på detta mail om något behöver korrigeras.
-    </p>
-
-    <p style="color: #374151; line-height: 1.6;">
-      Vi hör av oss inom kort för att boka in arbetets start.
-    </p>
-
-    ${opts.portalUrl ? `
-    <div style="text-align: center; margin: 24px 0;">
-      <a href="${opts.portalUrl}" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
-        Gå till din kundportal
-      </a>
-      <p style="color: #6B7280; font-size: 13px; margin: 8px 0 0;">
-        Här kan du följa ditt projekt, se fakturor och skicka meddelanden.
-      </p>
-    </div>
-    ` : ''}
-
-    <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
-
-    <p style="color: #6B7280; font-size: 14px; margin: 0;">
-      Med vänliga hälsningar,<br/>
-      <strong>${opts.contactName}</strong><br/>
-      ${opts.businessName}
-    </p>
-  </div>
-</body>
-</html>`
+    ${emailParagraph('Stämmer uppgifterna? Svara på detta mail om något behöver korrigeras.')}
+    ${emailParagraph('Vi hör av oss inom kort för att boka in arbetets start.')}
+    ${opts.portalUrl
+      ? `${actionBlock({ text: 'Gå till din kundportal', url: opts.portalUrl }, b.accentColor)}
+         ${emailParagraph('Här kan du följa ditt projekt, se fakturor och skicka meddelanden.', { muted: true })}`
+      : ''}
+    ${signature(escapeHtml(b.businessName), b.contactName ? escapeHtml(b.contactName) : undefined)}
+  `
+  return emailLayout(b, content)
 }

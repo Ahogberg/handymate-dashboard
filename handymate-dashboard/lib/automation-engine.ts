@@ -342,16 +342,17 @@ async function handleSendEmail(
     // aldrig funnits — varje V3 send_email-regel failade med 404. Går nu
     // direkt via e-postkärnan (Resend) och läser dess resultat.
     const { sendEmail, logEmail } = await import('@/lib/email')
-    const { data: biz } = await supabase
-      .from('business_config')
-      .select('business_name')
-      .eq('business_id', businessId)
-      .maybeSingle()
-    const html = body
+    // Varumärkeslagret 2026-09-07: fritexten (escapad) i företagets
+    // masterlayout — logotyp/accent/stämpel — i stället för nakna <br>-rader.
+    const { loadBranding } = await import('@/lib/branding/get-branding')
+    const { emailLayout, emailParagraph } = await import('@/lib/email-templates')
+    const branding = await loadBranding(supabase, businessId)
+    const text = body
       .split(/\r?\n/)
       .map(line => line.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'))
       .join('<br>')
-    const result = await sendEmail({ to, subject, html, fromName: biz?.business_name || undefined })
+    const html = emailLayout(branding, emailParagraph(text))
+    const result = await sendEmail({ businessId, to, subject, html, fromName: branding.businessName })
     await logEmail({
       businessId,
       customerId: (context.customer_id as string) || undefined,

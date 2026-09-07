@@ -10,7 +10,10 @@ import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { extractFirstName, halsning } from '@/lib/customers/namn'
-import { buildAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
+import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
+import {
+  emailLayout, emailHeading, emailParagraph, amountHero, infoBlock, rotRutNotice, actionBlock, formatKr,
+} from '@/lib/email-templates'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -104,7 +107,12 @@ async function sendEmail(
 }
 
 /**
- * Generera email HTML
+ * Offertmailet — företagets varumärke via masterlayouten (lib/email-templates.ts).
+ *
+ * Varumärkeslagret 2026-09-07: skalet, sidhuvudet, sidfoten och stämpeln
+ * kommer från emailLayout(); den här funktionen komponerar bara innehållet.
+ * "Du betalar"-logiken speglar offertsidan: beloppet efter preliminärt
+ * ROT/RUT är huvudsiffran, totalsumman står ärligt bredvid.
  */
 function generateEmailHTML(
   quote: any,
@@ -114,143 +122,67 @@ function generateEmailHTML(
   creator?: { name?: string | null; phone?: string | null; email?: string | null } | null,
   pdfUrl?: string
 ): string {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
+  // business är hela business_config-raden (select('*')) → varumärke +
+  // stämpel utan extra query. Kontaktuppgifter = offertens SKAPARE när den
+  // finns (samma identitet som kunddokumentet visar), annars företagets.
+  // `??` — en skapare med tomt telefonfält faller ändå tillbaka på företagets.
+  const base = brandingFromConfig(business)
+  const branding: Branding = {
+    ...base,
+    businessName: escapeHtml(base.businessName),
+    contactPhone: escapeHtml(creator?.phone ?? base.contactPhone) || undefined,
+    contactEmail: escapeHtml(creator?.email ?? base.contactEmail) || undefined,
+    logoUrl: base.logoUrl ? escapeHtml(base.logoUrl) : undefined,
+    orgNumber: base.orgNumber ? escapeHtml(base.orgNumber) : undefined,
   }
-
-  // On-brand: företagets accent_color som header/CTA-färg. Validera som 6-siffrig
-  // hex — annars fallback till Handymate-teal. Undviker att osäkert värde
-  // interpoleras i inline-style.
-  const accent = /^#[0-9a-fA-F]{6}$/.test(business.accent_color || '')
-    ? business.accent_color
-    : '#0F766E'
 
   // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
   // beskrivning och namn kan innehålla tecken som annars tolkas som markup.
-  const businessName = escapeHtml(business.business_name)
   // R1: hälsningen använder kundens FÖRNAMN, aldrig rått fullnamn.
   const customerGreeting = escapeHtml(halsning(quote.customer?.name))
   const quoteTitle = escapeHtml(quote.title || 'Offert')
   const quoteDescription = escapeHtml(quote.description)
-  // Kontaktuppgifter = offertens SKAPARE när den finns (samma identitet som
-  // kunddokumentet visar), annars företagets/ägarens uppgifter. `??` — en
-  // skapare med tomt telefonfält faller ändå tillbaka på företagets.
-  const businessPhone = escapeHtml(creator?.phone ?? business.phone_number)
-  const businessEmail = escapeHtml(creator?.email ?? business.contact_email)
   const contactName = creator?.name ? escapeHtml(creator.name) : ''
-  const businessOrgNumber = escapeHtml(business.org_number)
-  const businessLogoUrl = escapeHtml(business.logo_url)
 
-  const formatDate = (date: string) => {
-    return new Date(date).toLocaleDateString('sv-SE', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    })
-  }
+  const formatDate = (date: string) =>
+    new Date(date).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
 
-  const customerPays = quote.rot_rut_type ? quote.customer_pays : quote.total
-  const rotText = quote.rot_rut_type
-    ? `<p style="color: #059669; font-weight: 600;">Med ${quote.rot_rut_type.toUpperCase()}-avdrag betalar du endast: ${formatCurrency(customerPays)} kr</p>`
-    : ''
+  const harRot = Boolean(quote.rot_rut_type && quote.customer_pays != null)
+  const hero = harRot
+    ? amountHero(
+        'Du betalar',
+        formatKr(quote.customer_pays),
+        `efter preliminärt ${String(quote.rot_rut_type).toUpperCase()}-avdrag · totalt ${formatKr(quote.total)} inkl. moms`,
+      )
+    : amountHero('Totalt', formatKr(quote.total), 'inkl. moms')
 
-  const signBlock = signUrl
-    ? `
-      <!-- Sign CTA -->
-      <div style="text-align: center; margin: 30px 0; padding: 24px; background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 12px;">
-        <p style="color: #166534; font-weight: 600; margin: 0 0 12px 0; font-size: 15px;">Redo att godkänna offerten?</p>
-        <p style="color: #4b5563; font-size: 13px; margin: 0 0 16px 0;">I din kundportal kan du granska offerten, signera digitalt och följa ditt projekt.</p>
-        <a href="${signUrl}" style="display: inline-block; background: ${accent}; color: white; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-weight: 700; font-size: 16px;">
-          Öppna din kundportal →
-        </a>
-        <p style="color: #9ca3af; font-size: 11px; margin: 12px 0 0 0;">Eller kopiera länken: ${signUrl}</p>
-      </div>`
-    : `
-      <!-- CTA -->
-      <div style="text-align: center; margin: 30px 0;">
-        <p style="color: #444; margin-bottom: 15px;">Har du frågor eller vill boka? Kontakta oss:</p>
-        <a href="tel:${businessPhone}" style="display: inline-block; background: ${accent}; color: white; text-decoration: none; padding: 14px 30px; border-radius: 8px; font-weight: 600; font-size: 16px;">
-          Ring ${businessPhone}
-        </a>
-      </div>`
+  const handling = signUrl
+    ? `${infoBlock(
+        'Redo att godkänna offerten?',
+        'I din kundportal kan du granska offerten, godkänna den och följa ditt projekt.',
+        'success',
+      )}
+      ${actionBlock({ text: 'Öppna din kundportal', url: signUrl }, branding.accentColor, pdfUrl ? { text: 'Ladda ner offert (PDF)', url: pdfUrl } : undefined)}
+      ${emailParagraph(`Eller kopiera länken: ${signUrl}`, { muted: true })}`
+    : `${emailParagraph('Har du frågor eller vill boka? Kontakta oss:')}
+      ${actionBlock({ text: `Ring ${branding.contactPhone || ''}`, url: `tel:${branding.contactPhone || ''}` }, branding.accentColor, pdfUrl ? { text: 'Ladda ner offert (PDF)', url: pdfUrl } : undefined)}`
 
-  return `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f4f4f5; margin: 0; padding: 20px;">
-  <div style="max-width: 600px; margin: 0 auto;">
-    <!-- Header -->
-    <div style="background: ${accent}; padding: 30px; border-radius: 12px 12px 0 0; text-align: center;">
-      ${business.logo_url ? `<img src="${businessLogoUrl}" alt="${businessName}" style="max-height: 48px; margin-bottom: 12px;" />` : ''}
-      <h1 style="color: white; margin: 0; font-size: 28px;">${businessName}</h1>
-      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0;">Offert</p>
-    </div>
-
-    <!-- Content -->
-    <div style="background: white; padding: 30px; border-radius: 0 0 12px 12px;">
-      <p style="font-size: 16px; color: #1a1a1a; margin: 0 0 20px 0;">
-        ${customerGreeting}
-      </p>
-
-      <p style="color: #444; line-height: 1.6;">
-        Tack för att du kontaktade oss. Här kommer din offert för:
-      </p>
-
-      <!-- Quote Box -->
-      <div style="background: #f0fdfa; border-left: 4px solid ${accent}; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-        <h2 style="margin: 0 0 10px 0; font-size: 18px; color: #1a1a1a;">
-          ${quoteTitle}
-        </h2>
-        ${quote.description ? `<p style="color: #666; margin: 0; font-size: 14px; white-space: pre-line;">${quoteDescription}</p>` : ''}
-      </div>
-
-      <!-- Price -->
-      <div style="background: #fafafa; padding: 20px; border-radius: 8px; margin: 20px 0;">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="color: #666; font-size: 14px;">Totalt (inkl. moms)</span>
-          <span style="font-size: 24px; font-weight: 700; color: #1a1a1a;">${formatCurrency(quote.total)} kr</span>
-        </div>
-        ${rotText}
-      </div>
-
-      <!-- Valid Until -->
-      <p style="color: #666; font-size: 14px; text-align: center; margin: 20px 0;">
-        ${quote.valid_until ? `Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>` : ''}
-      </p>
-
-      ${signBlock}
-
-      ${pdfUrl ? `
-      <!-- PDF-nedladdning (sekundär) -->
-      <div style="text-align: center; margin: 0 0 10px 0;">
-        <a href="${pdfUrl}" style="display: inline-block; color: ${accent}; text-decoration: underline; font-size: 14px; font-weight: 600;">
-          Ladda ner offert (PDF)
-        </a>
-      </div>` : ''}
-
-      <!-- Footer -->
-      <div style="border-top: 1px solid #eee; padding-top: 20px; margin-top: 30px; text-align: center; color: #888; font-size: 12px;">
-        <p style="margin: 0 0 5px 0;"><strong>${businessName}</strong></p>
-        ${contactName ? `<p style="margin: 0 0 5px 0;">Din kontakt: ${contactName}</p>` : ''}
-        <p style="margin: 0;">${businessPhone} | ${businessEmail}</p>
-        ${business.org_number ? `<p style="margin: 5px 0 0 0;">Org.nr: ${businessOrgNumber}</p>` : ''}
-      </div>
-    </div>
-
-    <!-- Stämpeln (lib/branding/attribution.ts) — samma HTML går via Gmail och Resend -->
-    <p style="text-align: center; color: #999; font-size: 11px; margin-top: 20px;">
-      Detta email skickades från ${businessName}.
-    </p>
-    ${attributionEmailHtml(buildAttribution(business))}
-  </div>
-${trackingPixelUrl ? `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" />` : ''}
-</body>
-</html>
+  const content = `
+    ${emailHeading(customerGreeting, 'Tack för att du kontaktade oss. Här kommer din offert för:')}
+    ${infoBlock(quoteTitle, quote.description ? `<span style="white-space:pre-line;">${quoteDescription}</span>` : '')}
+    ${hero}
+    ${harRot ? rotRutNotice(String(quote.rot_rut_type), Number(quote.total) - Number(quote.customer_pays)) : ''}
+    ${quote.valid_until ? emailParagraph(`Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>.`) : ''}
+    ${handling}
+    ${contactName ? emailParagraph(`Din kontakt: <strong>${contactName}</strong>`, { muted: true }) : ''}
   `
+
+  // Spårningspixeln ligger sist i dokumentet — efter </html> duger för
+  // mailklienter, men vi lägger den inne i body för säkerhets skull.
+  const html = emailLayout(branding, content)
+  return trackingPixelUrl
+    ? html.replace('</body>', `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" /></body>`)
+    : html
 }
 
 export async function POST(request: NextRequest) {
