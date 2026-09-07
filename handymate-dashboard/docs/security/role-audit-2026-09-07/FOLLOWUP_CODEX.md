@@ -23,6 +23,9 @@ owner/admin-only och nekar även verifierad impersonering.
   återkallad medlemsidentitet mellan anrop samt dynamisk route.
 - Samma test mot basens route misslyckades med 200 i stället för 403.
 - `tests/rollgranser-r1-r4.spec.ts`: 17 gröna projektions-/källkodskontrakt.
+- Behörighets-/tenantkontrakten: 61 gröna. `tsc --noEmit`: exit 0.
+- Första Next-bygget kompilerade men föll på Nodes heap-minnesgräns;
+  detta är inte ett godkänt fullständigt bygge.
 
 Detta är INTE liveverifiering av autentisering, RLS, ekonomidata eller återkallelse.
 Serverns impersoneringsverifiering är inte injektionsprovad av GET-testet;
@@ -33,6 +36,9 @@ testet skiljer bara på request-headers och kontexten från auth-helpern.
 Testidentiteternas lösenord finns enligt överlämningen i privat kanal. De finns
 inte tillgängliga här. Webbläsarens befintliga session tillhör Nordström El,
 inte Rollprov A/B. Säker inloggning behövs för att fortsätta med faktiska roller.
+Ett säkert inloggningsförsök gjordes; webbplatsen svarade "Fel e-post eller
+lösenord". Ingen testidentitet blev därmed verifierad. Inga lösenord lästes
+eller sparades i repo eller testloggar.
 
 1. Verifiera A/B, samtliga medlemsflaggor, P1–P4 och tilldelningar live.
 2. Kör tillåtna/nekade projektanrop och granska hela ekonomisvaren.
