@@ -1,6 +1,6 @@
 # Efter lansering — den enda ordnade listan
 
-Uppdaterad 2026-09-05. Ersätter ordningarna i tasks/plan-sann-agentstatus.md,
+Uppdaterad 2026-09-07. Ersätter ordningarna i tasks/plan-sann-agentstatus.md,
 docs/audits/WOW_GENOMLYSNING_2026-09-05.md och Codex granskningar. När den
 här och en annan lista säger olika gäller den här.
 
@@ -23,6 +23,7 @@ befintliga löften sanna.
 | 12 | **Förklarbar veckoplanering** | — | Först när restid och deadline finns i planeringsdatan | `lib/schedule/person-day.ts`, `DispatchReasoning` |
 | 13 | **Field Command** — säg det en gång i fält: tid, ÄTA, bokning ur ett yttrande, med fråga vid tvetydighet, samlat godkännande och kvitto | 5–7 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/field-command.dc.html`). Kartlagt samma kväll: rapportläget finns men fem byggstenar saknas, se avsnittet nedan. Placering i listan avgör Andreas | `lib/matte/work-report.ts` (fyra verktyg, projekt- och personlåst), `work-report-confirmation.ts` (ett kort per åtgärd), `time_checkins` (v17/v76), mobilappens `MatteSheet`/`ProjectReportCard`, `resolvePersonScheduleQuery` (namnmatchning, bara läsning) |
 | 14 | **Karins marginalnotis** — "kunden bad om X på platsbesöket, det finns inte i offerten", fäst vid raden | 4–6 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/agentnarvaro-offert.dc.html`, mönster 2). Kräver en jämförelsemotor och stabila rad-id som inte finns. Placering avgör Andreas | `customer_fact` (v122, `evidence_quote` ordagrant ur mötet), `assemble-transcript.ts` (tidsstämplad tidslinje), `lib/reservations/match.ts` (mönster för radmatchning), `learning_events` |
+| 15 | **Kundstart som hänger ihop** — kundens mål → första verkliga resultat → gemensam uppföljning | 4–6 | Codex genomlysning 2026-09-07 mot main ce00347: byggstenarna finns men bildar ingen kedja. Startkvitto knutet till valt mål ("ÄTA-utkastet är sparat på jobbet Solvägen, kundens godkännande återstår"), olika första uppdrag per mål (idag får fyra mål samma offertstart utan importerad data), en kort kundstartssammanfattning som support, partner och mejl läser (mål, valt första jobb, bekräftat resultat, öppet hinder, ansvarig, nästa kontakt), partnerns "Aktiv kund" på uppnådd nytta i stället för betalning. Prövas med tre nya kundtyper: utan historik, med import, via partner | `lib/onboarding/kom-igang-tasks.ts` (klar = något finns, inte att kunden lyckats), `app/api/onboarding/company-scan`, `app/api/cron/onboarding-followup/route.ts`, `lib/partners/activity.ts`, supportens ärendevy, `lib/weekly-value.ts`. De tre små rättningarna före lansering (läsfel ≠ tom firma i genomgången, "uppskattningsvis" i dag 2/7-mejlen, samma prioritering i mejl och startsida) bygger Codex 2026-09-07 |
 
 ## Punkt 4 i detalj — Firmans kunskapsbas (beslut Andreas 2026-09-06)
 
@@ -110,6 +111,24 @@ Bygg:
    (`tests/quote-document-parity.spec.ts`). Knappar: Lägg till rad, Visa
    varför (citatet med tidsstämpel, offerten saknar raden, prislistans
    uppskattning), Ingår redan. Beslut skrivs till `learning_events`.
+
+## Codex tre förslag 2026-09-07 — delpunkter, inte egna satsningar
+
+Codex föreslog tre produktsteg ovanpå intäktskön, löftesbevakningen och
+experimentmotorn. Ingen av dem är en ny satsning; de är nästa lager på
+punkter som redan står i tabellen.
+
+- **Frågan som låser upp jobbet** (Codex förstaval) → delpunkt under **1**.
+  Lars väljer en konkret kompletteringsfråga som för jobbet mot
+  fakturering, med rätt mottagare och sparningskvitto. Samma
+  bekräftelsemodell som tillträde/kundval/leverans: obesvarat = okänt.
+- **Jobbets beviskedja** → delpunkt under **9**. Varje avtalad offert-/ÄTA-rad
+  kopplad till utfört arbete och dokumentation, så firman ser vad som
+  återstår att styrka. Kräver momentmodellen som punkt 9 bygger.
+- **Firmans nästa standard** → delpunkt under **4**, lager 2. Prova en exakt
+  ändring i en offertstandard på utvalda kommande jobb, följ utfallet i
+  `learning_events`, ägaren beslutar om den blir permanent. Samma
+  bevisregel som kunskapsbasen: mönster kräver bekräftelse.
 
 ## Beslutat men litet (halv dag var)
 - **Ett morgonmejl i stället för tre** (räddningskö, driftlarm, kreditbevakning). Rött i ämnesraden bara när något stoppar kunder, annars tystnad. Beslut Andreas 2026-09-05.
