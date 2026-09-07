@@ -14,7 +14,7 @@
     "proof:partner": "playwright test --config=playwright.partner-proof.config.ts",
     "test:tenant-isolation": "playwright test --config=playwright.integration.config.ts",
     "evidence:new": "node scripts/launch-evidence.mjs",
-    "test:feature-integration": "playwright test tests/quote-experience.ui.spec.ts tests/quote-packages-day-close.ui.spec.ts tests/revenue-work-queue.ui.spec.ts tests/lars-preparation-review.ui.spec.ts tests/portal-invoice-recovery.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line && playwright test --config=playwright.preparation.config.ts",
+    "test:feature-integration": "playwright test tests/quote-experience.ui.spec.ts tests/quote-packages-day-close.ui.spec.ts tests/revenue-work-queue.ui.spec.ts tests/lars-preparation-review.ui.spec.ts tests/portal-invoice-recovery.ui.spec.ts tests/onboarding-truth.ui.spec.ts tests/onboarding-truth.spec.ts --no-deps --project=chromium --workers=2 --reporter=line && playwright test --config=playwright.preparation.config.ts",
     "test:first-value-ui": "playwright test tests/first-value-journey.ui.spec.ts --no-deps --project=chromium --reporter=line",
     "test:job-standards-ui": "playwright test tests/job-standards.ui.spec.ts --no-deps --project=chromium --reporter=line",
     "test:onboarding-tour-ui": "playwright test tests/onboarding-tour-mobile.ui.spec.ts --no-deps --project=chromium --reporter=line"

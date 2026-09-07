@@ -653,3 +653,6 @@ Då kör alla nio ui-specar (375 px + 1280 px) headless utan inloggning — det
 är det mobilprov som går att göra utan telefon: onboardingturen, första
 uppdraget, jobbstandarder, dagsavslutet, offertupplevelsen, intäktskön,
 Lars kundunderlagskontroll, jobbförberedelsen och Daniels agentrad.
+
+## 2026-09-07 — Avgränsa leveransen utan att överskatta kundupplevelsen
+Skilj små lanseringsfixar från belägg för en sammanhängande kundresa. Samma härledningsfunktion räcker inte om kanalerna matar in olika bevis. Läsfel är inte tom data, och uppskattad tid måste förbli märkt även när den återges i mejl.

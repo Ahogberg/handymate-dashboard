@@ -47,12 +47,12 @@ test('signalläsningen behåller fokus och stoppar vid databasfel', async () => 
   const tenants: string[] = []
   const db: any = { from: (table: string) => {
     const q: any = {
-      select: () => q, eq: (key: string, value: string) => { if (key === 'business_id') tenants.push(value); return q }, not: () => q, neq: () => q, maybeSingle: () => q,
+      select: () => q, eq: (key: string, value: string) => { if (key === 'business_id') tenants.push(value); return q }, in: () => q, order: () => q, limit: () => q, not: () => q, neq: () => q, maybeSingle: () => q,
       then: (resolve: (x: any) => void) => resolve({ data: table === 'business_config' ? { onboarding_data: { first_focus: 'mindre_admin' } } : null, count: 0, error: fail && table === 'mission' ? { message: 'unreadable' } : null }),
     }; return q
   } }
   expect((await hamtaKomIgangSignals(db, 'firm-a')).firstFocus).toBe('mindre_admin')
-  expect(tenants).toHaveLength(9)
+  expect(tenants).toHaveLength(17)
   expect(tenants.every(t => t === 'firm-a')).toBe(true)
   fail = true
   await expect(hamtaKomIgangSignals(db, 'firm-a')).rejects.toThrow('Kunde inte läsa startunderlaget')

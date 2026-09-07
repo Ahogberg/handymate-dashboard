@@ -11,13 +11,13 @@
  * kunden betalar för något den redan sett i sina egna siffror. Ingen AI,
  * ingen prova-på: bara räknefrågor mot GET /api/onboarding/company-scan.
  *
- * Tom lista (ny firma, misslyckad läsning, en ägargrindad 403) visar en
- * ärlig "Inget att gå igenom än" — ALDRIG påhittade rader. Ingen skip-länk:
+ * En lyckad tom läsning för en ny firma visar en
+ * ärlig "Inget att gå igenom än". Läsfel visas separat med återförsök. Ingen skip-länk:
  * genomgången är kort nog att alltid visas, och "Vidare till aktivering" är
  * redan en fortsättning även när listan är tom.
  */
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useState, type CSSProperties } from 'react'
 import { ArrowRight, Check } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
 import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
@@ -35,7 +35,7 @@ interface Props {
 
 /**
  * Säkerhetsnät (B7-mönstret, samma som Company Scan/instant-value):
- * hämtningen får max 5 s innan vi visar tom-läget i stället för att fastna
+ * hämtningen får max 5 s innan vi visar läsfelet i stället för att fastna
  * i "Matte går igenom firman …".
  */
 const HANG_TIMEOUT_MS = 5000
@@ -53,37 +53,44 @@ const KALLA_CHIP: Record<ScanKalla, CSSProperties> = {
 
 export default function StepGenomgang({ onNext, onBack, data, setData }: Props) {
   const [rows, setRows] = useState<ScanRow[] | null>(null)
-  const startedRef = useRef(false)
+  const [failed, setFailed] = useState(false)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
-    if (startedRef.current) return
-    startedRef.current = true
+    let active = true
+    setFailed(false)
+    setRows(null)
     const controller = new AbortController()
     const watchdog = setTimeout(() => controller.abort(), HANG_TIMEOUT_MS)
     fetch('/api/onboarding/company-scan', { signal: controller.signal })
-      .then(r => (r.ok ? r.json() : null))
+      .then(r => { if (!r.ok) throw new Error('Kunde inte läsa genomgången'); return r.json() })
       .then((json: CompanyScanResult | null) => {
         clearTimeout(watchdog)
-        const found = json ? buildScanRows(json) : []
+        if (!active) return
+        if (!json) throw new Error('Genomgång saknas')
+        const found = buildScanRows(json)
         setRows(found)
         setData(d => ({ ...d, genomgang: found }))
       })
       .catch(() => {
-        // Nätverksfel, avbrutet av vakthunden, eller ett fel svar — samma
-        // ärliga tom-läge som en 403/ny firma. Aldrig en påhittad rad.
         clearTimeout(watchdog)
-        setRows([])
-        setData(d => ({ ...d, genomgang: [] }))
+        if (active) setFailed(true)
       })
-    return () => { clearTimeout(watchdog); controller.abort() }
+    return () => { active = false; clearTimeout(watchdog); controller.abort() }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+  }, [attempt])
 
   return (
     <div className="ob-screen">
       <OnboardingHeader step={OB_DOTS.genomgang} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body">
-        {rows === null ? (
+        {failed ? (
+          <div role="alert">
+            <h1 className="ob-headline">Vi kunde inte hämta dina uppgifter just nu</h1>
+            <p className="ob-sub">Försök igen för att se genomgången av din firma. Du kan också gå vidare till aktivering.</p>
+            <button type="button" className="ob-cta" onClick={() => setAttempt(n => n + 1)}>Försök igen</button>
+          </div>
+        ) : rows === null ? (
           <div
             style={{
               display: 'flex', flexDirection: 'column', alignItems: 'center',
