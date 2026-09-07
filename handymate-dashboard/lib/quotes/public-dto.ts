@@ -45,6 +45,15 @@ export function buildPublicQuoteDto({
     rot_rut_type: quote.rot_rut_type ?? null,
     rot_rut_deduction: quote.rot_rut_deduction ?? 0,
     customer_pays: quote.customer_pays ?? quote.total ?? 0,
+    // Endast en FLAGGA — själva uppgifterna (integritetskänsliga) släpps
+    // aldrig i den publika payloaden, se allowlist-facit (quote-public-dto).
+    // Styr ROT-uppgiftssteget i godkännandeflödet: visas bara när avdrag
+    // finns och någon av uppgifterna saknas på offerten.
+    rot_uppgifter_saknas: Boolean(
+      quote.rot_rut_type
+      && Number(quote.rot_rut_deduction ?? 0) > 0
+      && (!quote.personnummer || !quote.fastighetsbeteckning),
+    ),
     attachments: Array.isArray(quote.attachments) ? quote.attachments : [],
     customer: customer
       ? {

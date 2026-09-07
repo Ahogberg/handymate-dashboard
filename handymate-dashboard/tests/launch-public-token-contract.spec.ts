@@ -5,7 +5,10 @@ import path from 'path'
 const ROOT = path.resolve(__dirname, '..')
 
 function source(relativePath: string): string {
-  return fs.readFileSync(path.join(ROOT, relativePath), 'utf8')
+  // Radslutsnormalisering (2026-09-07): på en Windows-checkout (CRLF) hittade
+  // \n-ankarsträngarna aldrig sina träffar och facitet blev falskt rött —
+  // samma .replace som repots övriga källfacit använder.
+  return fs.readFileSync(path.join(ROOT, relativePath), 'utf8').replace(/\r\n/g, '\n')
 }
 
 const MUTABLE_PUBLIC_GET_ROUTES = [

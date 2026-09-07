@@ -1,6 +1,21 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+// Kundens offertsida — omdesignad 2026-09-07 efter Claude Design-utforskningen
+// ("Kundens offert", varianterna 1a/1d/1e), med sanningsjusteringarna:
+//  - "Du betalar" (efter preliminärt ROT) som huvudsiffra, totalen alltid synlig
+//  - Signering = namn + kryss (ingen ritad signatur; servern kräver namn,
+//    portalens signeringsmodal ritar fortfarande och är orörd)
+//  - ROT-uppgiftssteget visas BARA när avdrag finns och uppgifter saknas
+//    (quote.rot_uppgifter_saknas — en flagga; själva uppgifterna släpps
+//    aldrig i den publika payloaden, se quote-public-dto-facitet)
+//  - Bekräftelsen: godkänd-kort + "Vad händer nu" + starttidsförslagen
+//    (booking_suggestions kommer från den riktiga kapacitetsmotorn)
+//  - Ingen "kopia är på väg till din mejl"-rad — inget sådant mejl skickas
+// Bevarat oförändrat: portal-redirect, öppningsspårningen (facit-låst),
+// tillvalskortet med live-total, kundens fråga, referensfoton, avböj-flödet,
+// dokumentmotorn (PublicQuoteDocument) och attributionsstämpeln.
+
+import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
 import { DECLINE_REASONS as DECLINE_REASON_OPTIONS } from '@/lib/quotes/decline-reasons'
 import {
@@ -10,10 +25,7 @@ import {
   AlertTriangle,
   Zap,
   FileText,
-  Eraser,
-  PenTool,
   Calendar,
-  User,
   Package,
   XCircle,
   Clock,
@@ -61,8 +73,8 @@ interface QuoteData {
   rot_rut_type?: 'rot' | 'rut' | null
   rot_rut_deduction?: number
   customer_pays?: number
-  personnummer?: string
-  fastighetsbeteckning?: string
+  /** Flagga ur DTO:n — uppgifterna själva exponeras aldrig publikt. */
+  rot_uppgifter_saknas?: boolean
   valid_until?: string
   status: string
   signed_at?: string
@@ -92,10 +104,7 @@ const formatSEK = (amount: number) =>
   }).format(amount)
 
 // Taxonomin ägs av lib/quotes/decline-reasons.ts så kundvyn, portalen och
-// förlustanalysen räknar på exakt samma kategorier. Den lokala listan hade
-// bland annat 'no_longer_needed', som analysen inte kände igen — de svaren
-// hamnade i "skäl saknas". 'not_now' ersätter den och är dessutom mer värd:
-// en uppskjuten affär är en återaktiveringskandidat, inte en förlust.
+// förlustanalysen räknar på exakt samma kategorier.
 const DECLINE_REASONS = DECLINE_REASON_OPTIONS.map(r => ({ value: r.code, label: r.label }))
 
 // ── Component ──────────────────────────────────────────────────────────────────
@@ -147,8 +156,11 @@ export default function QuoteSignPage() {
   const [attribution, setAttribution] = useState<Attribution | null>(null)
   const [errorMessage, setErrorMessage] = useState('')
   const [name, setName] = useState('')
-  const [hasDrawn, setHasDrawn] = useState(false)
   const [termsAccepted, setTermsAccepted] = useState(false)
+  // ROT-uppgifterna (1e): valfria, skickas med i signeringen när ifyllda.
+  const [rotPnr, setRotPnr] = useState('')
+  const [rotFastighet, setRotFastighet] = useState('')
+  const [rotBoende, setRotBoende] = useState<'smahus' | 'bostadsratt'>('smahus')
   const [showDeclineForm, setShowDeclineForm] = useState(false)
   const [declineReason, setDeclineReason] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -156,11 +168,6 @@ export default function QuoteSignPage() {
   // Kundens tillvalsval (id:n för ikryssade option-rader). Endast visning —
   // servern validerar id:na och räknar om totalen själv vid signering.
   const [selectedOptions, setSelectedOptions] = useState<Set<string>>(new Set())
-
-  // Canvas refs and drawing state
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const isDrawingRef = useRef(false)
-  const lastPointRef = useRef<{ x: number; y: number } | null>(null)
 
   // ── Fetch quote on mount ───────────────────────────────────────────────────
 
@@ -266,107 +273,6 @@ export default function QuoteSignPage() {
     return () => window.removeEventListener('beforeunload', handleUnload)
   }, [quote, state])
 
-  // ── Canvas setup ───────────────────────────────────────────────────────────
-
-  const initCanvas = useCallback(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-
-    const dpr = window.devicePixelRatio || 1
-    const rect = canvas.getBoundingClientRect()
-
-    canvas.width = rect.width * dpr
-    canvas.height = rect.height * dpr
-
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    ctx.scale(dpr, dpr)
-    ctx.fillStyle = '#f8fafc'
-    ctx.fillRect(0, 0, rect.width, rect.height)
-    ctx.strokeStyle = '#1e293b'
-    ctx.lineWidth = 2.5
-    ctx.lineCap = 'round'
-    ctx.lineJoin = 'round'
-  }, [])
-
-  useEffect(() => {
-    if (state === 'viewing') {
-      const timer = setTimeout(initCanvas, 50)
-      return () => clearTimeout(timer)
-    }
-  }, [state, initCanvas])
-
-  useEffect(() => {
-    if (state !== 'viewing') return
-
-    const handleResize = () => {
-      initCanvas()
-      setHasDrawn(false)
-    }
-
-    window.addEventListener('resize', handleResize)
-    return () => window.removeEventListener('resize', handleResize)
-  }, [state, initCanvas])
-
-  // ── Canvas drawing helpers ─────────────────────────────────────────────────
-
-  function getCanvasPoint(e: React.MouseEvent | React.TouchEvent) {
-    const canvas = canvasRef.current
-    if (!canvas) return null
-
-    const rect = canvas.getBoundingClientRect()
-    let clientX: number, clientY: number
-
-    if ('touches' in e) {
-      if (e.touches.length === 0) return null
-      clientX = e.touches[0].clientX
-      clientY = e.touches[0].clientY
-    } else {
-      clientX = e.clientX
-      clientY = e.clientY
-    }
-
-    return { x: clientX - rect.left, y: clientY - rect.top }
-  }
-
-  function startDrawing(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    isDrawingRef.current = true
-    const point = getCanvasPoint(e)
-    if (point) lastPointRef.current = point
-  }
-
-  function draw(e: React.MouseEvent | React.TouchEvent) {
-    e.preventDefault()
-    if (!isDrawingRef.current) return
-
-    const canvas = canvasRef.current
-    const ctx = canvas?.getContext('2d')
-    if (!ctx || !canvas) return
-
-    const point = getCanvasPoint(e)
-    if (!point || !lastPointRef.current) return
-
-    ctx.beginPath()
-    ctx.moveTo(lastPointRef.current.x, lastPointRef.current.y)
-    ctx.lineTo(point.x, point.y)
-    ctx.stroke()
-
-    lastPointRef.current = point
-    setHasDrawn(true)
-  }
-
-  function stopDrawing() {
-    isDrawingRef.current = false
-    lastPointRef.current = null
-  }
-
-  function clearCanvas() {
-    initCanvas()
-    setHasDrawn(false)
-  }
-
   // ── Tillval ────────────────────────────────────────────────────────────────
 
   function toggleOption(id: string) {
@@ -378,40 +284,36 @@ export default function QuoteSignPage() {
     })
   }
 
-  // ── Submit signature ───────────────────────────────────────────────────────
+  // ── Submit approval (namn + kryss) ─────────────────────────────────────────
 
   async function handleSubmit() {
-    if (!name.trim() || !hasDrawn || !termsAccepted || submitting) return
-
-    const canvas = canvasRef.current
-    if (!canvas) return
+    if (!name.trim() || !termsAccepted || submitting) return
 
     setSubmitting(true)
     setErrorMessage('')
 
     try {
-      const signatureData = canvas.toDataURL('image/png')
-
       const res = await fetch(`/api/quotes/public/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'sign',
           name: name.trim(),
-          signature_data: signatureData,
           selected_option_ids: Array.from(selectedOptions),
+          // ROT-uppgifterna: valfria — tomma fält är "hoppa över", då frågar
+          // hantverkaren i stället innan fakturan.
+          rot_personnummer: rotPnr.trim() || undefined,
+          rot_fastighet: rotFastighet.trim() || undefined,
         }),
       })
 
       const data = await res.json()
 
       if (!res.ok) {
-        setErrorMessage(data.error || 'Kunde inte spara signaturen')
+        setErrorMessage(data.error || 'Kunde inte spara godkännandet')
       } else {
-        // ETAPP 5 (offert-masterplan.md), punkt 4: dokumentet (visas kvar på
-        // 'success'-skärmen) ska speglas som signerat direkt, utan att vänta
-        // på en ny GET-runda — servern är fortfarande den auktoritativa
-        // sanningen (redan skriven ovan), detta är bara den lokala vyn.
+        // Dokumentet (visas kvar på 'success'-skärmen) speglas som signerat
+        // direkt — servern är fortfarande den auktoritativa sanningen.
         const signedDate = new Date().toLocaleDateString('sv-SE', {
           day: 'numeric',
           month: 'long',
@@ -434,6 +336,7 @@ export default function QuoteSignPage() {
         // kapacitet. Tom lista → inget bokningserbjudande visas.
         setBookingSuggestions(data.booking_suggestions || [])
         setState('success')
+        window.scrollTo({ top: 0, behavior: 'smooth' })
       }
     } catch {
       setErrorMessage('Något gick fel. Försök igen.')
@@ -443,8 +346,6 @@ export default function QuoteSignPage() {
   }
 
   // ── Kundens fråga (idé 5) ──────────────────────────────────────────────────
-  // En kund som undrar något hör oftast inte av sig alls — hen tackar nej i
-  // tysthet. Frågan landar direkt i hantverkarens godkännande-kö.
 
   async function handleAskQuestion() {
     const text = questionText.trim()
@@ -480,8 +381,6 @@ export default function QuoteSignPage() {
       const res = await fetch(`/api/quotes/public/${token}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // reason_code är det som gör förlusten räknebar; reason lämnas kvar
-        // för bakåtkompatibilitet med äldre klienter.
         body: JSON.stringify({ action: 'decline', reason_code: declineReason, reason: declineReason }),
       })
 
@@ -522,6 +421,30 @@ export default function QuoteSignPage() {
     )
   }
 
+  // ── Företagsfoten — hantverkarens varumärke + avstängbar stämpel ──────────
+
+  function BusinessFooter() {
+    return (
+      <div className="pt-6 border-t border-slate-200 text-center text-xs leading-relaxed text-slate-500">
+        {business && (
+          <p>
+            <strong className="text-slate-700">{business.name}</strong>
+            {business.org_number && <> · Org.nr {business.org_number}</>}
+            {business.f_skatt && <> · Godkänd för F-skatt</>}
+            {(business.phone || business.email) && (
+              <>
+                <br />
+                {[business.phone, business.email].filter(Boolean).join(' · ')}
+              </>
+            )}
+          </p>
+        )}
+        {/* Footer — stämpeln, lib/branding/attribution.ts */}
+        <AttributionStamp attribution={attribution} className="mt-3 text-center text-xs text-gray-400 pb-8" linkClassName="font-medium" />
+      </div>
+    )
+  }
+
   // ── Render: Loading ────────────────────────────────────────────────────────
 
   if (state === 'loading') {
@@ -557,25 +480,9 @@ export default function QuoteSignPage() {
     )
   }
 
-  // ── Render: Already declined ───────────────────────────────────────────────
+  // ── Render: Already declined / declined ────────────────────────────────────
 
-  if (state === 'already_declined') {
-    return (
-      <CenteredLayout>
-        <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
-          <div className="w-14 h-14 bg-gray-500/10 rounded-full flex items-center justify-center mx-auto mb-4">
-            <XCircle className="w-7 h-7 text-gray-400" />
-          </div>
-          <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten har avböjts</h2>
-          <p className="text-gray-500 text-sm">Denna offert har redan avböjts.</p>
-        </div>
-      </CenteredLayout>
-    )
-  }
-
-  // ── Render: Declined (just now) ────────────────────────────────────────────
-
-  if (state === 'declined') {
+  if (state === 'already_declined' || state === 'declined') {
     return (
       <CenteredLayout>
         <div className="bg-white shadow-sm rounded-3xl border border-gray-200 p-8 text-center">
@@ -584,28 +491,22 @@ export default function QuoteSignPage() {
           </div>
           <h2 className="text-xl font-bold text-gray-900 mb-2">Offerten har avböjts</h2>
           <p className="text-gray-500 text-sm">
-            Vi har registrerat att du avböjer offerten.{' '}
-            {business?.name || 'Företaget'} kommer att informeras.
+            {state === 'declined'
+              ? `Vi har registrerat att du avböjer offerten. ${business?.name || 'Företaget'} kommer att informeras.`
+              : 'Denna offert har redan avböjts.'}
           </p>
         </div>
       </CenteredLayout>
     )
   }
 
-  // ── Gemensamt: 'viewing' / 'already_signed' / 'success' ────────────────────
-  // Alla tre visar SAMMA dokument (mallmotorn) — ETAPP 5, "dokumentet ÄR
-  // gränssnittet". 'viewing' lägger till det interaktiva lagret (tillval,
-  // signaturkort, avböj); de andra två är read-only bekräftelser.
-
   if (!quote) return null
 
   const structuredItems = quote.structured_items || []
   const templateStyle = quote.template_style || 'modern'
-  const canSubmit = !!(name.trim() && hasDrawn && termsAccepted && !submitting)
+  const canSubmit = !!(name.trim() && termsAccepted && !submitting)
 
   // ── Tillval: live-total på klienten via SAMMA motor som servern ────────────
-  // Endast visning — servern räknar alltid om själv vid signering.
-  // Låst läge (signerad offert): visa lagrat option_selected, ingen toggling.
   const optionsLocked = !!quote.signed_at
   const optionRows = structuredItems.filter((i) => i.item_type === 'option')
   const hasOptionRows = optionRows.length > 0
@@ -633,34 +534,27 @@ export default function QuoteSignPage() {
     ? liveTotals.customerPaysAfterDeductions
     : quote.customer_pays ?? quote.total - (quote.rot_rut_deduction || 0)
 
-  // ETAPP 5, punkt 3: kundens tillvalsval uppdaterar HELA Modern-dokumentet
-  // (rader + summering) live — Premium/Friendly (iframe mot serverns
-  // färdig-renderade HTML) förblir statiska tills E2a:s motor täcker fler
-  // stilar, se PublicQuoteDocument-kommentaren och not-texten i tillvalskortet.
   const liveTemplateData =
     quote.template_data && liveTotals
       ? applyLiveSelectionToTemplateData(quote.template_data, selectedOptions, liveTotals)
       : quote.template_data ?? null
 
-  // ROT-boxen: dokumentet visar redan avdragsbeloppet + personnummer i sin
-  // egen summering/mottagarblock (se QuoteDocument.tsx / premium.ts/
-  // friendly.ts) — bara fastighetsbeteckning saknas där, så den separata
-  // boxen visas bara när den faktiskt tillför information.
-  const showRotBox = !!quote.rot_rut_type && dispRotRutDeduction > 0 && !!quote.fastighetsbeteckning
+  const harAvdrag = !!quote.rot_rut_type && dispRotRutDeduction > 0
+  const avdragEtikett = quote.rot_rut_type === 'rut' ? 'RUT-avdrag' : 'ROT-avdrag'
+  const visaRotSteg = state === 'viewing' && harAvdrag && quote.rot_uppgifter_saknas === true
 
   return (
     <div className="min-h-screen bg-slate-50 relative overflow-hidden">
-      {/* Background blobs */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute -top-40 -right-40 w-80 h-80 bg-primary-50 rounded-full blur-3xl" />
         <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-primary-50 rounded-full blur-3xl" />
       </div>
 
       <div className="relative max-w-3xl mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="text-center mb-8">
+        {/* ── Sidhuvud: hantverkarens varumärke ── */}
+        <div className="flex items-center gap-3.5 mb-6">
           <div
-            className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden text-white font-bold text-2xl"
+            className="w-11 h-11 rounded-xl flex items-center justify-center shadow-md overflow-hidden text-white font-bold text-xl flex-none"
             style={{ background: business?.accent_color || '#0F766E' }}
           >
             {business?.logo_url ? (
@@ -679,43 +573,51 @@ export default function QuoteSignPage() {
             ) : business?.name ? (
               <span>{business.name.charAt(0).toUpperCase()}</span>
             ) : (
-              <Zap className="w-8 h-8 text-white" />
+              <Zap className="w-6 h-6 text-white" />
             )}
           </div>
-          <h1 className="text-3xl font-bold">
-            <span className="text-primary-700">{business?.name || 'Offert'}</span>
-          </h1>
-          <p className="text-gray-500 mt-1 text-sm">
-            {state === 'success'
-              ? 'Offerten är godkänd'
-              : state === 'already_signed'
-                ? 'Offerten är signerad'
-                : 'Offert'}
-          </p>
+          <div className="min-w-0">
+            <h1 className="text-lg font-bold text-gray-900 leading-tight">{business?.name || 'Offert'}</h1>
+            <p className="text-[13px] text-gray-500">
+              Offert
+              {quote.valid_until && state === 'viewing' && (
+                <> · gäller till {new Date(quote.valid_until).toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' })}</>
+              )}
+            </p>
+          </div>
         </div>
 
-        {/* Confirmation banner (success / already signed) */}
+        {/* ── Bekräftelsen (success / redan signerad) ── */}
         {(state === 'success' || state === 'already_signed') && (
-          <div className="mb-6 p-5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-start gap-3">
-            <div className="w-10 h-10 bg-emerald-500/10 rounded-xl flex items-center justify-center shrink-0">
-              <CheckCircle className="w-5 h-5 text-emerald-600" />
+          <div className="mb-6 bg-teal-950 text-white rounded-2xl p-6">
+            <div className="w-10 h-10 rounded-full bg-teal-300/20 flex items-center justify-center text-teal-300">
+              <CheckCircle className="w-5 h-5" />
             </div>
-            <div>
-              <p className="text-sm font-semibold text-emerald-800">
-                {state === 'success' ? 'Tack! Din signatur har sparats.' : 'Offerten är redan signerad.'}
-              </p>
-              <p className="text-xs text-emerald-700 mt-0.5">
-                {quote.signed_by_name && `Signerad av ${quote.signed_by_name}. `}
-                {business?.name || 'Företaget'} kommer att kontakta dig med nästa steg.
-              </p>
+            <h2 className="text-2xl font-bold tracking-tight mt-4 leading-snug">
+              {state === 'success'
+                ? `Tack${quote.signed_by_name ? ` ${quote.signed_by_name.split(' ')[0]}` : ''}. Offerten är godkänd.`
+                : 'Offerten är redan godkänd.'}
+            </h2>
+            <p className="text-sm text-white/70 mt-2 leading-relaxed">
+              {quote.signed_by_name && <>Godkänd av {quote.signed_by_name}</>}
+              {quote.signed_at && (
+                <>
+                  {quote.signed_by_name ? ', ' : 'Godkänd '}
+                  {new Date(quote.signed_at).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' })}
+                </>
+              )}
+              {(quote.signed_by_name || quote.signed_at) && '.'}
+            </p>
+            <div className="flex justify-between items-baseline mt-4 pt-4 border-t border-white/10">
+              <span className="text-[13px] text-white/70">
+                {harAvdrag ? `Att betala efter preliminärt ${avdragEtikett.replace('-avdrag', '')}` : 'Att betala'}
+              </span>
+              <span className="text-xl font-bold tabular-nums">{formatSEK(dispCustomerPays || dispTotal)}</span>
             </div>
           </div>
         )}
 
-        {/* Boka direkt efter signering (idé 4). Signeringen är det enda
-            ögonblick då kunden är maximalt engagerad — går hen därifrån utan
-            datum blir bokningen ett telefonsamtal som ska jagas. Visas bara
-            när kapacitetsmotorn hittat dagar med verkligt utrymme. */}
+        {/* ── Starttidsförslagen (kapacitetsmotorn) ── */}
         {state === 'success' && bookingSuggestions.length > 0 && (
           <div className="mb-6 bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
             {bookingState === 'sent' ? (
@@ -735,7 +637,7 @@ export default function QuoteSignPage() {
                   <h3 className="text-base font-semibold text-gray-900">När vill du att vi börjar?</h3>
                 </div>
                 <p className="text-gray-400 text-xs mb-4 sm:pl-8">
-                  Veckor vi har utrymme att börja. Välj en så återkommer vi med bekräftelse.
+                  Tiderna nedan har vi ledigt. Välj en så återkommer vi med bekräftelse.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:pl-8">
                   {bookingSuggestions.map((s) => {
@@ -748,7 +650,7 @@ export default function QuoteSignPage() {
                         type="button"
                         onClick={() => handleRequestBooking(s.date)}
                         disabled={bookingState === 'sending'}
-                        className="min-h-[44px] px-4 py-3 text-left border border-gray-200 rounded-xl hover:border-gray-400 hover:bg-gray-50 disabled:opacity-50 transition-colors"
+                        className="min-h-[44px] px-4 py-3 text-left border border-gray-200 rounded-xl hover:border-primary-400 hover:bg-primary-50/40 disabled:opacity-50 transition-colors"
                       >
                         <span className="block text-sm font-semibold text-gray-900">Vecka {s.week}</span>
                         <span className="block text-xs text-gray-500 mt-0.5 capitalize">
@@ -768,6 +670,73 @@ export default function QuoteSignPage() {
           </div>
         )}
 
+        {/* ── Vad händer nu ── */}
+        {(state === 'success' || state === 'already_signed') && (
+          <div className="mb-6 bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <p className="text-[11px] font-semibold tracking-widest text-gray-500 uppercase">Vad händer nu</p>
+            <div className="flex flex-col gap-3.5 mt-3.5 text-sm leading-relaxed">
+              <div className="flex gap-3">
+                <span className="w-6 h-6 rounded-full flex-none bg-teal-50 text-primary-700 flex items-center justify-center text-xs font-bold">1</span>
+                <span className="text-gray-700">
+                  <strong className="text-gray-900">{business?.contact_name || business?.name || 'Hantverkaren'} hör av sig</strong>{' '}
+                  och stämmer av starttid och detaljer.
+                </span>
+              </div>
+              {harAvdrag && (
+                <div className="flex gap-3">
+                  <span className="w-6 h-6 rounded-full flex-none bg-teal-50 text-primary-700 flex items-center justify-center text-xs font-bold">2</span>
+                  <span className="text-gray-700">
+                    <strong className="text-gray-900">{avdragEtikett}et dras på fakturan.</strong>{' '}
+                    {business?.name || 'Företaget'} ansöker hos Skatteverket när du betalat. Beloppet är
+                    preliminärt tills Skatteverket godkänt det.
+                  </span>
+                </div>
+              )}
+              <div className="flex gap-3">
+                <span className="w-6 h-6 rounded-full flex-none bg-teal-50 text-primary-700 flex items-center justify-center text-xs font-bold">{harAvdrag ? 3 : 2}</span>
+                <span className="text-gray-700">
+                  <strong className="text-gray-900">Den godkända offerten finns kvar här.</strong>{' '}
+                  Länken fungerar även i efterhand, och du kan ladda ner den som PDF nedan.
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── "Du betalar"-kortet (1a) ── */}
+        {state === 'viewing' && (
+          <div className="mb-5 bg-white shadow-sm rounded-2xl border border-gray-200 p-6">
+            <p className="text-[11px] font-semibold tracking-widest text-gray-500 uppercase">
+              {harAvdrag ? 'Du betalar' : 'Totalt inkl. moms'}
+            </p>
+            <p className="text-4xl font-bold tracking-tight text-gray-900 mt-1.5 tabular-nums">
+              {formatSEK(dispCustomerPays || dispTotal)}
+            </p>
+            {harAvdrag && (
+              <>
+                <div className="flex flex-col gap-1.5 mt-3.5 text-sm">
+                  <div className="flex justify-between text-gray-600">
+                    <span>Offertens totalsumma inkl. moms</span>
+                    <span className="tabular-nums text-gray-900">{formatSEK(dispTotal)}</span>
+                  </div>
+                  <div className="flex justify-between items-center text-emerald-700">
+                    <span className="flex items-center gap-2">
+                      {avdragEtikett}
+                      <span className="text-[10px] font-semibold tracking-wide uppercase px-1.5 py-0.5 rounded-full border border-emerald-200 bg-emerald-50">
+                        preliminärt
+                      </span>
+                    </span>
+                    <span className="tabular-nums font-semibold">−{formatSEK(dispRotRutDeduction)}</span>
+                  </div>
+                </div>
+                <p className="text-xs text-gray-500 leading-relaxed mt-3">
+                  Avdraget dras direkt på fakturan. Skatteverket fastställer det slutgiltiga beloppet.
+                </p>
+              </>
+            )}
+          </div>
+        )}
+
         {/* Validity countdown banner */}
         {state === 'viewing' && daysLeft !== null && daysLeft <= 7 && (
           <div
@@ -779,13 +748,12 @@ export default function QuoteSignPage() {
           >
             <Clock className="w-4 h-4 shrink-0" />
             {daysLeft === 0
-              ? 'Sista dagen att signera!'
+              ? 'Sista dagen att godkänna!'
               : `Offerten går ut om ${daysLeft} dag${daysLeft === 1 ? '' : 'ar'}`}
           </div>
         )}
 
-        {/* Dokumentet — ETAPP 5: samma mall hantverkaren valde (Modern/Premium/
-            Friendly), inte en egen tolkning. */}
+        {/* Dokumentet — ETAPP 5: samma mall hantverkaren valde. */}
         <div className="mb-6">
           <PublicQuoteDocument
             style={templateStyle}
@@ -874,19 +842,6 @@ export default function QuoteSignPage() {
               </div>
             )}
 
-            {/* ROT/RUT — endast när dokumentet inte redan täcker informationen */}
-            {showRotBox && (
-              <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
-                <h4 className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">
-                  {quote.rot_rut_type === 'rot' ? 'ROT-avdrag' : 'RUT-avdrag'}
-                </h4>
-                <div className="flex justify-between text-sm">
-                  <span className="text-gray-400">Fastighetsbeteckning</span>
-                  <span className="text-gray-500">{quote.fastighetsbeteckning}</span>
-                </div>
-              </div>
-            )}
-
             {/* Attachments */}
             {quote.attachments && quote.attachments.length > 0 && (
               <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-6">
@@ -913,85 +868,107 @@ export default function QuoteSignPage() {
               </div>
             )}
 
-            {/* Signature Card — ankarpunkt för dokumentets "Godkänn offerten
-                digitalt"-yta (SignatureCta.tsx, id="signature-card"). */}
+            {/* ── Godkänn offerten — namn + kryss (+ ROT-uppgifter vid behov) ──
+                Ankarpunkt för dokumentets "Godkänn offerten digitalt"-yta
+                (SignatureCta.tsx, id="signature-card"). */}
             <div id="signature-card" className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 sm:p-8 mb-4 scroll-mt-4">
-              <div className="flex items-center gap-3 mb-6">
-                <div className="w-10 h-10 bg-primary-50 rounded-xl flex items-center justify-center">
-                  <PenTool className="w-5 h-5 text-primary-700" />
+              <h3 className="text-lg font-bold text-gray-900 mb-1">Godkänn offerten</h3>
+              <p className="text-gray-400 text-xs mb-5">Skriv ditt namn och bekräfta — ingen signatur behövs.</p>
+
+              {/* ROT-uppgiftssteget (1e) — bara när avdrag finns och uppgifter saknas */}
+              {visaRotSteg && (
+                <div className="mb-6 p-4 rounded-xl border border-emerald-200 bg-emerald-50/40">
+                  <p className="text-[11px] font-semibold tracking-widest text-emerald-700 uppercase">
+                    {avdragEtikett} · preliminärt −{formatSEK(dispRotRutDeduction)}
+                  </p>
+                  <p className="text-sm font-semibold text-gray-900 mt-1.5">
+                    Två uppgifter för att avdraget ska kunna sökas
+                  </p>
+                  <p className="text-xs text-gray-600 leading-relaxed mt-1">
+                    Skatteverket kräver personnummer på den som får avdraget
+                    {quote.rot_rut_type === 'rot' && ' och uppgifter om bostaden'}.
+                    Du kan hoppa över — då frågar {business?.contact_name || business?.name || 'hantverkaren'} innan fakturan.
+                  </p>
+
+                  {quote.rot_rut_type === 'rot' && (
+                    <div className="flex gap-2 mt-3">
+                      {([['smahus', 'Hus / småhus'], ['bostadsratt', 'Bostadsrätt']] as const).map(([val, label]) => (
+                        <button
+                          key={val}
+                          type="button"
+                          onClick={() => setRotBoende(val)}
+                          className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                            rotBoende === val
+                              ? 'bg-primary-700 border-primary-700 text-white'
+                              : 'bg-white border-gray-200 text-gray-600 hover:border-primary-300'
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  <label className="flex flex-col gap-1.5 mt-3.5 text-xs text-gray-500">
+                    Personnummer
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      value={rotPnr}
+                      onChange={(e) => setRotPnr(e.target.value)}
+                      placeholder="ÅÅÅÅMMDD-XXXX"
+                      className="h-12 px-3.5 border border-gray-300 rounded-xl font-mono text-[15px] text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/40"
+                    />
+                    <span className="text-[11px] text-gray-400">Den som äger bostaden och betalar fakturan.</span>
+                  </label>
+
+                  {quote.rot_rut_type === 'rot' && (
+                    <label className="flex flex-col gap-1.5 mt-3 text-xs text-gray-500">
+                      {rotBoende === 'bostadsratt' ? 'Föreningens org.nr + lägenhetsnummer' : 'Fastighetsbeteckning'}
+                      <input
+                        type="text"
+                        value={rotFastighet}
+                        onChange={(e) => setRotFastighet(e.target.value)}
+                        placeholder={rotBoende === 'bostadsratt' ? 't.ex. 769600-1234, lgh 1102' : 't.ex. Bromma Ekbacken 4:12'}
+                        className="h-12 px-3.5 border border-gray-300 rounded-xl text-[15px] text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-primary-600/40"
+                      />
+                      <span className="text-[11px] text-gray-400">
+                        {rotBoende === 'bostadsratt'
+                          ? 'Föreningens organisationsnummer och ditt lägenhetsnummer (står på avgiftsavin).'
+                          : 'Står på lagfarten eller i Lantmäteriets Min fastighet.'}
+                      </span>
+                    </label>
+                  )}
+
+                  <p className="mt-3 text-[11px] text-gray-500 leading-relaxed">
+                    Uppgifterna används bara för {avdragEtikett.replace('-avdrag', '')}-ansökan.
+                  </p>
                 </div>
-                <div>
-                  <h3 className="text-lg font-bold text-gray-900">Signera offerten</h3>
-                  <p className="text-gray-400 text-xs">Skriv ditt namn och rita din signatur nedan</p>
-                </div>
-              </div>
+              )}
 
               {/* Name input */}
-              <div className="mb-5">
-                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                  <User className="w-4 h-4" />
-                  Namn
-                </label>
+              <div className="mb-4">
+                <label className="block text-xs text-gray-500 mb-1.5">Ditt namn</label>
                 <input
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Ditt fullständiga namn"
+                  placeholder="Förnamn Efternamn"
                   required
-                  className="w-full px-4 py-3 bg-gray-100 border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/50 transition-all"
+                  className="w-full h-12 px-4 bg-white border border-gray-300 rounded-xl text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-primary-600/40 transition-all"
                 />
               </div>
 
-              {/* Signature canvas */}
-              <div className="mb-3">
-                <label className="flex items-center gap-2 text-sm text-gray-500 mb-2">
-                  <PenTool className="w-4 h-4" />
-                  Signatur
-                </label>
-                <div className="relative">
-                  <canvas
-                    ref={canvasRef}
-                    className="w-full bg-gray-100 border border-gray-300 rounded-xl cursor-crosshair touch-none"
-                    style={{ height: '150px' }}
-                    onMouseDown={startDrawing}
-                    onMouseMove={draw}
-                    onMouseUp={stopDrawing}
-                    onMouseLeave={stopDrawing}
-                    onTouchStart={startDrawing}
-                    onTouchMove={draw}
-                    onTouchEnd={stopDrawing}
-                    onTouchCancel={stopDrawing}
-                  />
-                  {!hasDrawn && (
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                      <p className="text-gray-400 text-sm">Rita din signatur här</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Clear button */}
-              <div className="flex justify-end mb-5">
-                <button
-                  type="button"
-                  onClick={clearCanvas}
-                  className="flex items-center gap-2 px-4 py-2 text-sm text-gray-500 hover:text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-300 rounded-lg transition-all"
-                >
-                  <Eraser className="w-4 h-4" />
-                  Rensa
-                </button>
-              </div>
-
-              {/* Terms checkbox */}
+              {/* Terms checkbox — ersätter signaturen */}
               <label className="flex items-start gap-3 mb-5 cursor-pointer">
                 <input
                   type="checkbox"
                   checked={termsAccepted}
                   onChange={(e) => setTermsAccepted(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-primary-700"
+                  className="mt-0.5 h-5 w-5 rounded border-gray-300 accent-primary-700"
                 />
-                <span className="text-sm text-gray-500 leading-relaxed">
-                  Jag har läst och godkänner offerten och förstår att min digitala signatur är bindande.
+                <span className="text-sm text-gray-600 leading-relaxed">
+                  Jag godkänner offerten och förstår att godkännandet är bindande. Det ersätter en signatur.
                 </span>
               </label>
 
@@ -1012,12 +989,12 @@ export default function QuoteSignPage() {
                 {submitting && !showDeclineForm ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Signerar...
+                    Godkänner...
                   </>
                 ) : (
                   <>
                     <CheckCircle className="w-5 h-5" />
-                    Godkänn offert
+                    Godkänn offert · {formatSEK(dispCustomerPays || dispTotal)}
                   </>
                 )}
               </button>
@@ -1035,18 +1012,12 @@ export default function QuoteSignPage() {
               {/* Validation hint */}
               {!canSubmit && !submitting && (
                 <p className="mt-3 text-center text-gray-400 text-xs">
-                  {!name.trim()
-                    ? 'Fyll i ditt namn'
-                    : !hasDrawn
-                      ? 'Rita din signatur'
-                      : 'Bekräfta att du godkänner villkoren'}{' '}
-                  för att fortsätta
+                  {!name.trim() ? 'Fyll i ditt namn' : 'Bekräfta att du godkänner offerten'} för att fortsätta
                 </p>
               )}
             </div>
 
-            {/* Referensfoton (idé 6) — bevis utan arbete. Kunden jämför
-                två-tre offerter; vår är den enda som visar hur det blev. */}
+            {/* Referensfoton (idé 6) */}
             {referencePhotos && referencePhotos.photos.length > 0 && (
               <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
                 <h3 className="text-base font-semibold text-gray-900 mb-1">{referencePhotos.heading}</h3>
@@ -1070,8 +1041,7 @@ export default function QuoteSignPage() {
               </div>
             )}
 
-            {/* Kundens fråga (idé 5) — offerten blir en kanal, inte ett
-                dokument. Frågan landar direkt i hantverkarens kö. */}
+            {/* Kundens fråga (idé 5) */}
             <div className="bg-white shadow-sm rounded-2xl border border-gray-200 p-6 mb-8">
               <h3 className="text-base font-semibold text-gray-900 mb-1">Undrar du något?</h3>
               <p className="text-gray-400 text-xs mb-4">
@@ -1194,13 +1164,12 @@ export default function QuoteSignPage() {
               className="inline-flex items-center gap-2 px-5 py-3 border border-gray-200 rounded-xl text-sm font-medium text-gray-600 hover:bg-white transition-colors bg-white/60"
             >
               <FileText className="w-4 h-4" />
-              Ladda ner offert som PDF
+              Ladda ner godkänd offert (PDF)
             </a>
           </div>
         )}
 
-        {/* Footer — stämpeln, lib/branding/attribution.ts */}
-        <AttributionStamp attribution={attribution} className="text-center text-xs text-gray-400 pb-8" linkClassName="font-medium" />
+        <BusinessFooter />
       </div>
     </div>
   )

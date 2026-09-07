@@ -713,40 +713,19 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         await customerPage!.getByPlaceholder('Ditt fullständiga namn').fill(CUSTOMER_NAME)
       })
 
-      await test.step('Rita en riktig signatur på canvas (mouse move/down/move/up — ingen fejkad data-URL)', async () => {
-        const canvas = customerPage!.locator('#signature-card canvas')
-        // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13):
-        // canvasen ligger under vikningen (boundingBox() gav y≈782 i ett
-        // ≈720px viewport) — utan explicit scroll landar page.mouse-
-        // koordinaterna utanför den synliga ytan och onMouseDown/onMouseMove
-        // (app/quote/[token]/page.tsx) triggas aldrig, så hasDrawn förblir
-        // false och "Godkänn offert" stannar disabled i evighet. Detta är
-        // INTE samma sak som .click()/.fill(), som auto-scrollar internt —
-        // rå page.mouse gör det aldrig.
-        await canvas.scrollIntoViewIfNeeded()
-        const box = await canvas.boundingBox()
-        if (!box) throw new Error('Signatur-canvasen hittades inte / saknar boundingBox')
-        const startX = box.x + box.width * 0.2
-        const startY = box.y + box.height * 0.5
-        await customerPage!.mouse.move(startX, startY)
-        await customerPage!.mouse.down()
-        for (let i = 1; i <= 6; i++) {
-          await customerPage!.mouse.move(startX + i * (box.width * 0.1), startY + Math.sin(i) * 15, { steps: 5 })
-        }
-        await customerPage!.mouse.up()
-      })
-
-      await test.step('Kryssa i villkoren', async () => {
-        await customerPage!.locator('#signature-card input[type="checkbox"]').check()
+      await test.step('Kryssa i bindande-godkännandet (namn + kryss — canvasen togs bort i kundvy-omdesignen 2026-09-07)', async () => {
+        // Godkännandekortet kan ha flera checkboxar när ROT-uppgiftssteget
+        // visas — villkorskryssen är den sista i kortet.
+        await customerPage!.locator('#signature-card input[type="checkbox"]').last().check()
       })
 
       await test.step('Klicka "Godkänn offert" — den RIKTIGA vägen (RPC sign_quote_with_options), inte /api/quotes/accept', async () => {
         const signBtn = customerPage!.getByRole('button', { name: 'Godkänn offert' })
-        await expect(signBtn, 'knappen ska vara aktiv (namn+signatur+villkor ifyllda)').toBeEnabled({
+        await expect(signBtn, 'knappen ska vara aktiv (namn+villkor ifyllda)').toBeEnabled({
           timeout: 5000,
         })
         await signBtn.click()
-        await customerPage!.getByText('Tack! Din signatur har sparats.').waitFor({
+        await customerPage!.getByText(`Godkänd av ${CUSTOMER_NAME}`).waitFor({
           state: 'visible',
           timeout: 15_000,
         })

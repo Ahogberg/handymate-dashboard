@@ -54,4 +54,31 @@ test.describe('publik offert-DTO', () => {
       expect(serialized).not.toContain(forbidden)
     }
   })
+
+  test('rot_uppgifter_saknas är en flagga — aldrig själva uppgifterna', () => {
+    const bygg = (quote: Record<string, unknown>) =>
+      buildPublicQuoteDto({
+        quote: { quote_id: 'q1', status: 'sent', total: 1000, ...quote },
+        customer: null,
+        structuredItems: [],
+        displayLevel: 'full',
+        displayGroups: undefined,
+        baseTotals: undefined,
+        templateData: null,
+        templateStyle: 'modern',
+        documentHtml: null,
+      }) as Record<string, unknown>
+
+    // ROT-avdrag + uppgifter saknas → true (kunden erbjuds fylla i dem).
+    expect(bygg({ rot_rut_type: 'rot', rot_rut_deduction: 500 }).rot_uppgifter_saknas).toBe(true)
+    // Uppgifterna redan ifyllda → false, och de LÄCKS fortfarande inte.
+    const komplett = bygg({
+      rot_rut_type: 'rot', rot_rut_deduction: 500,
+      personnummer: '198001011234', fastighetsbeteckning: 'HEMLIG 1:2',
+    })
+    expect(komplett.rot_uppgifter_saknas).toBe(false)
+    expect(JSON.stringify(komplett)).not.toContain('198001011234')
+    // Inget avdrag → aldrig true, oavsett tomma fält.
+    expect(bygg({}).rot_uppgifter_saknas).toBe(false)
+  })
 })
