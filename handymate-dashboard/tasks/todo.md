@@ -1,3 +1,12 @@
+## Projektlistans rollgräns (Codex 2026-09-07)
+
+- [x] Regressioner i riktiga GET-handlern: null-identitet, impersonering, roller och ekonomifält.
+- [x] Neka saknad medlem utan serververifierad impersonering, scopea medlemsuppslag och maskera samtliga projektkostnader.
+- [x] Typkontroll, riktade testfall och produktionsbygge; dokumentera kvarvarande live-/UI-prov.
+- [x] Separat branch och granskbar PR, ingen direkt push till main.
+
+Review: 9 röda regressioner före fix; 60/60 riktade handler-/behörighetsprov gröna efter fix. `npx tsc --noEmit` exit 0. `npm run build` exit 0 (varningar och Supabase-konfigurationsfel loggas av andra rutter under statisk generering; ingen produktionskonfiguration användes). Lint saknar konfiguration och öppnar setup, därför ej verifierad. Liveprov av driftsatt rättning, aktiv inbjudningstoken och webb-/mobilvyer återstår.
+
 ## ÄTA-belopp utan rader (Codex 2026-09-07)
 
 - [x] Läs senaste kod, PR:er, CI och producent/konsument för dagsrapport → ÄTA → faktura.
