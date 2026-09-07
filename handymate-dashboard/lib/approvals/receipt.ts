@@ -30,6 +30,14 @@ export function rejectionEffect(type: string): string {
 export function approvalReceipt(type: string, action: string, result: Record<string, any> | null, outcome?: string | null): ApprovalReceipt {
   if (action === 'reject') return result?.error ? { state: 'partial', text: `Kortet är avvisat, men en följdändring misslyckades: ${result.error}` } : { state: 'rejected', text: 'Förslaget är avvisat.' }
   const r = result || {}
+  if (type === 'autopilot_package' && Array.isArray(r.results)) {
+    const selected = r.results.filter((item: any) => !item.skipped && !item.info)
+    const failed = selected.filter((item: any) => item.ok !== true)
+    const completed = selected.length - failed.length
+    const labels: Record<string, string> = { sms: 'SMS', materials: 'Material', booking: 'Bokning' }
+    const lines = r.results.map((item: any) => `${labels[item.type] || 'Information'}: ${item.skipped ? 'valdes bort' : item.info ? 'läst, ingen ändring' : item.ok === true ? (item.type === 'sms' ? 'accepterat av SMS-tjänsten' : item.type === 'materials' ? `${item.count} rader sparade` : 'sparad') : `${item.partial ? 'delvis utfört — ' : ''}${item.error || 'kunde inte slutföras'}`}`)
+    return { state: !selected.length ? 'acknowledged' : failed.length ? (completed > 0 || failed.some((item: any) => item.partial) ? 'partial' : 'failed') : 'saved', text: `${completed} av ${selected.length} valda handlingar slutfördes.\n${lines.join('\n')}` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true
@@ -42,12 +50,6 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     return { state: 'acknowledged', text: type === 'karin_deadline' ? 'Påminnelsen är noterad. Detta bekräftar inte någon inlämning.' : r.note || 'Informationen är noterad.' }
   }
   if (r.executed === false || r.skipped || outcome === 'skipped') return { state: 'needs_action', text: r.note || 'Ingen handling utfördes. Ärendet behöver hanteras vidare.' }
-  if (r.action === 'autopilot_package') {
-    const results = Array.isArray(r.results) ? r.results : []
-    const failed = results.filter((item: any) => item.ok === false).length
-    if (failed) return { state: failed < results.length ? 'partial' : 'failed', text: `${results.length - failed} av ${results.length} delåtgärder slutfördes.` }
-    return results.length ? { state: 'saved', text: `${results.length} delåtgärder slutfördes. Se utfallet för varje delåtgärd.` } : { state: 'needs_action', text: 'Inga delåtgärder valdes.' }
-  }
   if (type === 'new_booking_request' && r.ok === true && r.booking_id) return { state: r.sms_sent === true ? 'saved' : 'partial', text: r.sms_sent === true ? 'Bokningen är sparad och bekräftelsen har accepterats av SMS-tjänsten.' : 'Bokningen är sparad, men ingen SMS-bekräftelse har skickats.' }
   if (type === 'project_debrief' && r.ok === true && r.saved === 0) return { state: 'acknowledged', text: 'Frågorna är avslutade utan nya projektlärdomar.' }
   if (saved[type] && (r.ok === true || Object.keys(r).some(k => /_id$/.test(k)) || r.assigned || typeof r.minutes === 'number')) return { state: 'saved', text: saved[type] }

@@ -10,7 +10,7 @@ function canonical(value: any): string {
   return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${canonical(value[k])}`).join(',')}}`
 }
 export function requireApprovalReview(input: {
-  approval: { id: string; approval_type: string; title?: string; payload?: any }
+  approval: { id: string; approval_type: string; title?: string; payload?: any; package_data?: any }
   businessId: string; actorId: string; body: Record<string, any>; prepared?: PreparedApprovalReview
 }, secret: string, now = Date.now()) {
   const { approval, body } = input
@@ -24,7 +24,7 @@ export function requireApprovalReview(input: {
   if (!review.confirmLabel) return { status: 422, data: { error: review.blockedReason, code: 'approval_review_unavailable', review } }
   if (!secret) return { status: 503, data: { error: 'Granskningen kunde inte verifieras. Försök igen senare.' } }
   const binding = canonical({ id: approval.id, businessId: input.businessId, actorId: input.actorId,
-    type: approval.approval_type, payload, action: body.action, overrides: body.action_overrides ?? null, snapshot: input.prepared?.snapshot ?? null, review })
+    type: approval.approval_type, payload, packageData: approval.package_data ?? null, action: body.action, overrides: body.action_overrides ?? null, snapshot: input.prepared?.snapshot ?? null, review })
   const sign = (expires: number) => createHmac('sha256', secret).update(`approval-review-v1\n${expires}\n${binding}`).digest('hex')
   const [expiry, signature] = typeof body.review_token === 'string' ? body.review_token.split('.') : []
   const expires = Number(expiry)

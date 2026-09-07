@@ -201,6 +201,13 @@ function timeUntilExpiry(expiresAt: string): string {
   return `${Math.floor(hours / 24)} dag kvar`
 }
 
+function ApprovalHistoryReceipt({ approval }: { approval: Approval }) {
+  const receipt = (approval.payload?.execution_result as { receipt?: { state: string; text: string } } | undefined)?.receipt
+  if (approval.status === 'pending' || !receipt?.text) return null
+  const needsAttention = ['partial', 'failed', 'needs_action'].includes(receipt.state)
+  return <p className={`mt-2 text-sm whitespace-pre-wrap ${needsAttention ? 'text-amber-800' : 'text-slate-700'}`}>{receipt.text}</p>
+}
+
 function getRecipient(payload: Record<string, unknown>): string {
   if (payload.customer_name) return payload.customer_name as string
   if (payload.to) return payload.to as string
@@ -447,6 +454,7 @@ export default function ApprovalsPage() {
         setApprovals(prev => prev.filter(a => a.id !== id))
         setEditingId(null)
 
+        if (action === 'reject' && result?.receipt?.text) setFeedbackMsg(result.receipt.text)
         // Visa feedback baserat på vad som hände
         if (action === 'approve') {
           setFeedbackLink(null)
@@ -870,6 +878,7 @@ export default function ApprovalsPage() {
                             <span className="font-semibold text-gray-900">{approval.title}</span>
                           </div>
                           <p className="text-sm text-gray-500">{approval.package_data.customer_name} · {approval.description}</p>
+                          <ApprovalHistoryReceipt approval={approval} />
                         </div>
                         {approval.status === 'pending' && (
                           <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">
@@ -1045,7 +1054,7 @@ export default function ApprovalsPage() {
                             }`}>
                               {approval.status === 'approved' ? 'Godkänd' :
                                approval.status === 'rejected' ? 'Avvisad' :
-                               approval.status === 'auto_approved' ? 'Auto-utförd' :
+                               approval.status === 'auto_approved' ? 'Automatiskt godkänd' :
                                'Utgången'}
                             </span>
                           )}
@@ -1063,6 +1072,7 @@ export default function ApprovalsPage() {
                         {approval.description && (
                           <p className="text-sm text-slate-500 mt-1">{approval.description}</p>
                         )}
+                        <ApprovalHistoryReceipt approval={approval} />
                         {/* Visa offert-länk för quote-relaterade approvals */}
                         {QUOTE_RELATED_TYPES.includes(approval.approval_type) && (() => {
                           const quoteId = getQuoteId(approval)

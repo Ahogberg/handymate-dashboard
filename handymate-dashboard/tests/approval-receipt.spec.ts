@@ -70,3 +70,20 @@ test('automation SMS previews literal replacement values including dollar signs'
  a.payload.rule_action_config.template='Hej {{missing}}'
  expect((await prepareApprovalReview(db as any,'b',a,{action:'approve'}))?.review.confirmLabel).toBeNull()
 })
+test('package review binds all selected parts, not just the outer payload',async()=>{
+ const db={from(){throw Error('Unexpected lookup')}} as any
+ const approval={id:'a',approval_type:'autopilot_package',payload:{},package_data:{actions:[{id:'sms',type:'customer_sms',data:{to:'+46701234567',message:'Reviewed'}},{id:'book',type:'booking_suggestion',title:'Bokning',data:{}}]}}
+ const body={action:'approve',action_overrides:{book:'rejected'}}
+ const prepared=await prepareApprovalReview(db,'b',approval,body)
+ expect(prepared?.review.confirmLabel).toBeTruthy();expect(prepared?.review.messages[0].text).toBe('Reviewed')
+ const input={approval,businessId:'b',actorId:'u',body,prepared}
+ const token=requireApprovalReview(input,'test',1000)!.data.review_token
+ expect(requireApprovalReview({...input,body:{...body,review_token:token}},'test',1000)).toBeNull()
+ approval.package_data.actions[0].data.message='Changed'
+ expect(requireApprovalReview({...input,body:{...body,review_token:token}},'test',1000)?.status).toBe(428)
+ expect((await prepareApprovalReview(db,'b',approval,{action:'approve'}))?.review.confirmLabel).toBeNull()
+})
+test('package receipts count actual writes, not informational or rejected parts',()=>{
+ const r=approvalReceipt('autopilot_package','approve',{action:'autopilot_package',ok:false,error:'failed',results:[{type:'project_info',ok:true,info:true},{type:'sms',ok:true},{type:'materials',ok:false,partial:true,count:1,error:'one row failed'},{type:'booking',skipped:'rejected'}]})
+ expect(r.state).toBe('partial');expect(r.text).toContain('1 av 2');expect(r.text).toContain('SMS: accepterat');expect(r.text).toContain('Material: delvis utfört');expect(r.text).toContain('Bokning: valdes bort')
+})

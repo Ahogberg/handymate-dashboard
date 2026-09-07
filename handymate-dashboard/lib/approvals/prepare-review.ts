@@ -11,7 +11,7 @@ export interface PreparedApprovalReview { review: ApprovalReview; snapshot: Reco
  * Live values are part of the signed review, never silently substituted later.
  */
 export async function prepareApprovalReview(db: SupabaseClient, businessId: string,
-  approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any },
+  approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any },
   body: Record<string, any>,
 ): Promise<PreparedApprovalReview | undefined> {
   const type = approval.approval_type
@@ -98,6 +98,33 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       if (![d.reminderFee, d.interestAmount].every(v => typeof v === 'number' && Number.isFinite(v) && v >= 0)) throw new Error('Avgift och ränta måste vara giltiga belopp.')
       detail('Nästa påminnelsetid', d.nextReminderAt || 'Ingen nästa påminnelse planerad')
       return complete('Skickar påminnelsen via kanalerna ovan. När minst en kanal accepterar utskicket uppdateras fakturans avgift, ränta och nästa påminnelsetid.', 'Skicka påminnelsen')
+    }
+    if (type === 'autopilot_package') {
+      const actions = approval.package_data?.actions
+      if (!Array.isArray(actions) || !actions.length || new Set(actions.map(a => a.id)).size !== actions.length) throw new Error('Paketet saknar ett entydigt åtgärdsurval.')
+      for (const item of actions) {
+        if (body.action_overrides?.[item.id] === 'rejected') { detail('Vald bort', item.title || item.type); continue }
+        const data = item.data || {}
+        if (item.type === 'project_info') { detail('Projektinformation (ingen ändring)', item.title); detail('Underlag', JSON.stringify(data, null, 2)); continue }
+        if (item.type === 'customer_sms') {
+          if (typeof data.message !== 'string' || !data.message.trim() || typeof data.to !== 'string' || !/^\+?[0-9 ()-]{7,20}$/.test(data.to)) throw new Error('En SMS-del saknar text eller mottagare.')
+          if (data.customer_id) await row('customer', 'customer_id', data.customer_id, 'SMS-mottagaren')
+          r.messages.push({ channel: 'SMS', recipients: [data.to], text: data.message })
+          continue
+        }
+        if (item.type === 'material_list') {
+          const project = await row('project', 'project_id', data.project_id, 'Materialens projekt')
+          detail('Registrera material på', project.name)
+          if (!Array.isArray(data.materials) || !data.materials.length) throw new Error('Materialdelen saknar rader.')
+          for (const material of data.materials) {
+            if (!material.name || !Number.isFinite(material.quantity) || material.quantity <= 0 || !Number.isFinite(material.unit_price ?? 0)) throw new Error('Materialraden saknar ett giltigt namn, antal eller pris.')
+            detail(material.name, `${material.quantity} ${material.unit || 'st'} · inköpspris ${material.unit_price || 0} kr per enhet`)
+          }
+          continue
+        }
+        throw new Error(`Delåtgärden ${item.title || item.type} behöver ett fullständigt underlag innan paketet kan bekräftas. Välj bort den för att hantera övriga delar separat.`)
+      }
+      return complete('Utför endast de granskade delarna. SMS skickas till mottagarna ovan och material registreras på angivet projekt. Varje dels utfall redovisas i kvittensen.', 'Utför de valda delarna')
     }
     switch (type) {
       case 'customer_fact': {

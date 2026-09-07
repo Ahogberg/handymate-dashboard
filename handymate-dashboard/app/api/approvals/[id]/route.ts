@@ -346,14 +346,15 @@ export async function POST(
     // 'pending', passerar båda, och exekverar payloaden två gånger (dubbla
     // SMS/fakturor). Guarden gör att bara den request som faktiskt flippar
     // går vidare till executeApprovalPayload.
-    const { data: flippedApproval, error: updateError } = await supabase
+    let approvalUpdate = supabase
       .from('pending_approvals')
       .update(updateData)
       .eq('id', params.id)
       .eq('status', 'pending')
       .eq('business_id', business.business_id)
       .eq('payload', JSON.stringify(approval.payload))
-      .select('id')
+    if (approval.package_data) approvalUpdate = approvalUpdate.eq('package_data', JSON.stringify(approval.package_data))
+    const { data: flippedApproval, error: updateError } = await approvalUpdate.select('id')
 
     if (updateError) throw updateError
     if (!flippedApproval || flippedApproval.length === 0) {
@@ -570,6 +571,7 @@ export async function POST(
               outcome,
               error_text,
               receipt,
+              ...(Array.isArray(executionResult?.results) ? { results: executionResult.results } : {}),
               executed_at: new Date().toISOString(),
               ...(artifacts ? { artifacts } : {}),
             },
@@ -1470,20 +1472,20 @@ async function executeApprovalPayload(
 
             case 'material_list': {
               const materials = act.data.materials as any[]
-              if (materials?.length > 0 && act.data.project_id) {
-                for (const mat of materials) {
-                  await supabase.from('project_material').insert({
-                    material_id: 'mat_' + Math.random().toString(36).substr(2, 9),
-                    project_id: act.data.project_id,
-                    business_id: businessId,
-                    name: mat.name,
-                    quantity: mat.quantity,
-                    unit: mat.unit,
-                    purchase_price: mat.unit_price || 0,
-                  })
-                }
+              if (!Array.isArray(materials) || !materials.length || !act.data.project_id) {
+                results.push({ id: act.id, type: 'materials', ok: false, error: 'Material eller projekt saknas.' }); break
               }
-              results.push({ id: act.id, type: 'materials', ok: true, count: materials?.length || 0 })
+              let count = 0
+              let materialError: string | undefined
+              for (let index = 0; index < materials.length; index++) {
+                const mat = materials[index]
+                const saved = await insertApprovalArtifact(supabase, 'project_material', 'material_id', businessId, approvalId, `material:${act.id}:${index}`, {
+                  project_id: act.data.project_id, name: mat.name, quantity: mat.quantity, unit: mat.unit, purchase_price: mat.unit_price || 0,
+                })
+                if (saved.error || !saved.data) { materialError = saved.error?.message || 'Materialraden kunde inte verifieras.'; break }
+                count++
+              }
+              results.push({ id: act.id, type: 'materials', ok: !materialError, count, partial: !!materialError && count > 0, error: materialError })
               break
             }
 
@@ -1500,6 +1502,7 @@ async function executeApprovalPayload(
         return {
           action: 'autopilot_package',
           results,
+          partial: anyFailed && results.some(r => r.partial || (r.ok === true && !r.info)),
           ok: !anyFailed,
           error: anyFailed ? 'En eller flera delåtgärder i paketet misslyckades' : undefined,
         }
@@ -1535,9 +1538,7 @@ async function executeApprovalPayload(
           pl.source_text ? `Ur mötet: "${pl.source_text}"` : null,
         ].filter(Boolean).join('\n\n')
 
-        const { data: task, error: taskErr } = await supabaseMF
-          .from('task')
-          .insert({
+        const { data: task, error: taskErr } = await insertApprovalArtifact(supabaseMF, 'task', 'id', businessId, approvalId, 'meeting_followup', {
             business_id: businessId,
             title: pl.title,
             description: beskrivning || null,
@@ -1550,8 +1551,6 @@ async function executeApprovalPayload(
             created_by: null,
             visibility: 'team',
           })
-          .select('id, title')
-          .single()
 
         if (taskErr || !task) {
           return { action: 'meeting_followup', ok: false, error: taskErr?.message || 'Kunde inte skapa uppgiften.' }
@@ -2348,7 +2347,8 @@ async function executeApprovalPayload(
               url: `/dashboard/quotes/${pl.quote_id}`,
             }),
           })
-          if (!response.ok) return { action: 'four_eyes_quote', ok: false, partial: true, quote_id: pl.quote_id, error: 'Offerten är granskad, men den interna notisen misslyckades.' }
+          const notification = await response.json().catch(() => null)
+          if (!response.ok || notification?.delivered !== true) return { action: 'four_eyes_quote', ok: false, partial: true, quote_id: pl.quote_id, error: 'Offerten är granskad, men den interna notisen kunde inte bekräftas hos någon mottagare.' }
         } catch {
           return { action: 'four_eyes_quote', ok: false, partial: true, quote_id: pl.quote_id, error: 'Offerten är granskad, men den interna notisen kunde inte bekräftas.' }
         }
@@ -2975,22 +2975,14 @@ async function executeApprovalPayload(
         }
 
         const supabasePD = await getSupabase()
-        const { error: lessonErr } = await supabasePD.from('project_lesson').insert(
-          ifyllda.map(s => ({
-            business_id: businessId,
-            project_id: pl.project_id,
-            quote_id: pl.quote_id ?? null,
-            job_type: pl.job_type ?? null,
-            lesson_text: s.text,
-            impact_hint: s.fraga,
-            source: 'debrief',
-            confirmed_by: resolvedByUserId ?? null,
-          })),
-        )
-
-        if (lessonErr) {
-          console.error('[approvals/project_debrief] kunde inte spara lärdomar:', lessonErr.message)
-          return { action: 'project_debrief', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
+        let savedLessons = 0
+        for (const answer of ifyllda) {
+          const saved = await insertApprovalArtifact(supabasePD, 'project_lesson', 'id', businessId, approvalId, `debrief:${answer.fraga}`, {
+            project_id: pl.project_id, quote_id: pl.quote_id ?? null, job_type: pl.job_type ?? null,
+            lesson_text: answer.text, impact_hint: answer.fraga, source: 'debrief', confirmed_by: resolvedByUserId ?? null,
+          })
+          if (saved.error || !saved.data) return { action: 'project_debrief', ok: false, partial: savedLessons > 0, saved: savedLessons, error: `${savedLessons} svar sparades; övriga svar kunde inte sparas.` }
+          savedLessons++
         }
 
         return { action: 'project_debrief', ok: true, saved: ifyllda.length }
@@ -3010,9 +3002,7 @@ async function executeApprovalPayload(
           return { action: 'playbook_pattern_confirmation', ok: false, error: 'Kortet saknar jobbtyp eller mönstertext.' }
         }
         const supabasePP = await getSupabase()
-        const { data: knowledge, error: knowledgeErr } = await supabasePP
-          .from('business_knowledge')
-          .insert({
+        const { data: knowledge, error: knowledgeErr } = await insertApprovalArtifact(supabasePP, 'business_knowledge', 'id', businessId, approvalId, 'pattern', {
             business_id: businessId,
             agent_id: 'daniel',
             knowledge_type: 'pattern',
@@ -3027,8 +3017,7 @@ async function executeApprovalPayload(
             status: 'active',
             related_approval_id: approvalId,
           })
-          .select('id')
-          .single()
+
 
         if (knowledgeErr || !knowledge) {
           console.error('[approvals/playbook_pattern_confirmation] kunde inte spara mönstret:', knowledgeErr?.message)
@@ -3119,11 +3108,9 @@ async function executeApprovalPayload(
         }
 
         const supabaseExp = await getSupabase()
-        const experimentId = `exp_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
         const nowIsoExp = new Date().toISOString()
 
-        const { error: expInsertErr } = await supabaseExp.from('operating_experiment').insert({
-          id: experimentId,
+        const { data: createdExperiment, error: expInsertErr } = await insertApprovalArtifact(supabaseExp, 'operating_experiment', 'id', businessId, approvalId, 'experiment', {
           business_id: businessId,
           hypothesis: plExp.hypothesis,
           agent_key: plExp.agent_id || 'lars',
@@ -3139,15 +3126,15 @@ async function executeApprovalPayload(
           confirmed_at: nowIsoExp,
         })
 
-        if (expInsertErr) {
+        if (expInsertErr || !createdExperiment) {
           if (arSchemaSaknas(expInsertErr)) {
             return { action: 'operating_experiment_proposal', ok: false, error: 'Försöket kan inte startas ännu.' }
           }
-          console.error('[approvals/operating_experiment_proposal] kunde inte starta försöket:', expInsertErr.message)
+          console.error('[approvals/operating_experiment_proposal] kunde inte starta försöket:', expInsertErr?.message)
           return { action: 'operating_experiment_proposal', ok: false, error: 'Kunde inte starta försöket — försök igen om en stund' }
         }
 
-        return { action: 'operating_experiment_proposal', ok: true, experiment_id: experimentId }
+        return { action: 'operating_experiment_proposal', ok: true, experiment_id: createdExperiment.id }
       }
 
       case 'operating_experiment_readout': {
@@ -3175,9 +3162,7 @@ async function executeApprovalPayload(
         if (decisionRo === 'made_standard') {
           // Samma form som case 'playbook_pattern_confirmation' ovan — en
           // bekräftad regel formar Daniels offertmotor.
-          const { data: knowledgeRo, error: knowledgeErrRo } = await supabaseRo
-            .from('business_knowledge')
-            .insert({
+          const { data: knowledgeRo, error: knowledgeErrRo } = await insertApprovalArtifact(supabaseRo, 'business_knowledge', 'id', businessId, approvalId, 'experiment_standard', {
               business_id: businessId,
               agent_id: 'lars',
               knowledge_type: 'pattern',
@@ -3192,8 +3177,7 @@ async function executeApprovalPayload(
               status: 'active',
               related_approval_id: approvalId,
             })
-            .select('id')
-            .single()
+
 
           if (knowledgeErrRo || !knowledgeRo) {
             console.error('[approvals/operating_experiment_readout] kunde inte spara regeln:', knowledgeErrRo?.message)
@@ -3206,12 +3190,7 @@ async function executeApprovalPayload(
             .eq('id', experimentIdRo)
             .eq('business_id', businessId)
 
-          if (expUpdateErrRo) {
-            if (arSchemaSaknas(expUpdateErrRo)) {
-              return { action: 'operating_experiment_readout', ok: false, error: 'Försöket kan inte startas ännu.' }
-            }
-            console.error('[approvals/operating_experiment_readout] regeln sparades men försöket kunde inte uppdateras:', expUpdateErrRo.message)
-          }
+          if (expUpdateErrRo) return { action: 'operating_experiment_readout', ok: false, partial: true, resulting_rule_id: knowledgeRo.id, error: 'Arbetssättet är sparat, men försökets beslut kunde inte uppdateras.' }
 
           return { action: 'operating_experiment_readout', ok: true, decision: decisionRo, resulting_rule_id: knowledgeRo.id }
         }
@@ -3237,7 +3216,7 @@ async function executeApprovalPayload(
           const inheritedMeasures = Array.isArray(plRo.measurement?.measures)
             ? (plRo.measurement.measures as Array<{ measure: string }>).map(m => m.measure as any)
             : undefined
-          await proposeExperiment(
+          const nextProposal = await proposeExperiment(
             supabaseRo, businessId,
             {
               jobType: plRo.job_type,
@@ -3247,8 +3226,10 @@ async function executeApprovalPayload(
             },
             { allowDuplicate: true },
           )
+          if (nextProposal !== 'created') return { action: 'operating_experiment_readout', ok: false, partial: true, error: 'Beslutet är sparat, men inget nytt försöksförslag kunde bekräftas.' }
         } catch (continueErr) {
           console.error('[approvals/operating_experiment_readout] nytt förslag misslyckades (fail-safe):', continueErr)
+          return { action: 'operating_experiment_readout', ok: false, partial: true, error: 'Beslutet är sparat, men det nya försöksförslaget misslyckades.' }
         }
 
         return { action: 'operating_experiment_readout', ok: true, decision: decisionRo }
