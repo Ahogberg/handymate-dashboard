@@ -197,12 +197,21 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
       starter|professional|enterprise — 'business' avvisades, 'professional'
       insatt. Verifierat: is_demo_tenant/agents_globally_paused true,
       automation av, 0 business_users, cleanup('biz_finns_inte') kastar.
-- [ ] Yta 9 kvar: landningssidan (handymate-landing: #demo-offert-blocket,
-      save-lead allowlist 'demo-offert' + e-post-kravet); 46elks-saldo
-      0,20 kr → fyll på före skarptest; NEXT_PUBLIC_LANDING_URL i Vercel
-      (default https://handymate.se); skarptest med eget nummer: SMS 1 →
-      portal → godkänn → SMS 2 → efteråt-vyn; kör
-      demo_quote_cleanup('biz_demo_ekstrom', 0) efteråt.
+- [x] Yta 9 landningsblocket BYGGT 2026-09-08 (handymate-landing:
+      #demo-offert i index.html före #bevis, egen CSS `.demo-*`, IIFE sist
+      i body; api/save-lead.js: 'demo-offert' i allowlisten, e-post valfri
+      BARA för KALLOR_UTAN_EPOST + mobil ≥9 siffror, name persisteras;
+      tests/demo-offert.test.mjs 35 gröna, npm test grönt). Leaden sparas
+      bara med kryssrutan i, efter kvittot, fire-and-forget.
+- [ ] v224_landing_leads_email_valfri.sql — KÖRS på "kör": landing_leads.email
+      är NOT NULL i prod → demo-leads faller tyst (23502) tills den körts.
+- [ ] Yta 9 kvar: 46elks-saldo 0,20 kr → fyll på före skarptest;
+      NEXT_PUBLIC_LANDING_URL i Vercel (default https://handymate.se);
+      skarptest med eget nummer: SMS 1 → portal → godkänn → SMS 2 →
+      efteråt-vyn (?demo=TOKEN); kryssa i → rad i landing_leads med
+      source demo-offert; kör demo_quote_cleanup('biz_demo_ekstrom', 0)
+      efteråt. Känt: Vercel-preview-URL:er fälls av CORS (bara
+      handymate.se), firmanamnet ändrar inte avsändaren (alltid Ekström).
 - [ ] Design-ytorna 6, 8, 10 (ej påbörjade)
 
 # Partnergrinden GRÖN 2026-09-07 (Claude)
