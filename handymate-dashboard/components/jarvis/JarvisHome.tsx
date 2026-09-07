@@ -821,7 +821,9 @@ export default function JarvisHome({
       // visade hemmet ingenting alls i det fallet.
       const utfall = (svar?.execution_outcome?.outcome ?? null) as 'success' | 'failed' | 'skipped' | null
       const kvitto = action === 'approve' ? buildValueReceipt(approval, utforande, utfall) : null
-      if (action === 'approve' && utfall === 'failed') {
+      if (svar?.receipt?.text) {
+        flash(svar.receipt.text, ['partial', 'failed', 'needs_action'].includes(svar.receipt.state), svar.receipt.next_url)
+      } else if (action === 'approve' && utfall === 'failed') {
         const orsakRaw = typeof svar?.execution_outcome?.error_text === 'string' ? svar.execution_outcome.error_text.trim() : ''
         // Serverns orsak slutar ofta redan med punkt — ingen ".." i bannern.
         const orsak = orsakRaw.replace(/[.\s]+$/, '')
@@ -837,7 +839,7 @@ export default function JarvisHome({
         key: `fresh-${approval.id}`,
         time: formatClock(new Date().toISOString()),
         agent: agentForApproval(approval),
-        text: utforande?.receipt ?? kvitto?.text ?? doneRowText({
+        text: svar?.receipt?.text ?? utforande?.receipt ?? kvitto?.text ?? doneRowText({
           action,
           title: approval.title,
           executed: utforande?.executed,

@@ -373,7 +373,7 @@ export default function ApprovalsPage() {
         const receipt = buildValueReceipt(retriedItem, result?.execution, result.execution_outcome.outcome)
         setFailedFeedback(null)
         setFailedExecutions(prev => prev.filter(a => a.id !== id))
-        setFeedbackMsg(receipt?.text || 'Utfört!')
+        setFeedbackMsg(result?.receipt?.text || receipt?.text || 'Beslutet är registrerat.')
         setFeedbackLink(receipt?.link || null)
         setFeedbackLinkLabel(receipt?.linkLabel || 'Öppna utkastet')
         setTimeout(() => {
@@ -466,15 +466,18 @@ export default function ApprovalsPage() {
           // Ärlighets-grenen FÖRST (Fas 0-härdningen): säg aldrig "Godkänt"
           // när utförandet misslyckades. Server-klassningen
           // (classifyExecutionResult) är facit — inte klientens fälttolkning.
-          if (result?.execution_outcome?.outcome === 'failed') {
+          if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed'].includes(result?.receipt?.state)) {
             setFailedFeedback({
               id,
-              text: `Godkänt — men utförandet misslyckades: ${result.execution_outcome.error_text || 'okänt fel'}`,
+              text: result?.receipt?.text || `Utförandet misslyckades: ${result.execution_outcome?.error_text || 'okänt fel'}`,
             })
             fetchApprovals()
             return
           }
-          if (result?.execution_outcome?.outcome === 'skipped') {
+          if (result?.receipt?.text) {
+            setFeedbackMsg(result.receipt.text)
+            if (result.receipt.next_url) setFeedbackLink(result.receipt.next_url)
+          } else if (result?.execution_outcome?.outcome === 'skipped') {
             setFeedbackMsg(result?.execution?.note || 'Noterat — ingen handling utfördes')
           } else if (approvedItem?.approval_type === 'quote_nudge') {
             setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
@@ -565,10 +568,10 @@ export default function ApprovalsPage() {
       if (res.ok) {
         setApprovals(prev => prev.filter(a => a.id !== id))
         setDebriefModal(null)
-        if (result?.execution_outcome?.outcome === 'failed') {
+        if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed'].includes(result?.receipt?.state)) {
           setFailedFeedback({
             id,
-            text: `Godkänt — men utförandet misslyckades: ${result.execution_outcome.error_text || 'okänt fel'}`,
+            text: result?.receipt?.text || `Utförandet misslyckades: ${result.execution_outcome?.error_text || 'okänt fel'}`,
           })
           fetchApprovals()
           return
@@ -779,15 +782,15 @@ export default function ApprovalsPage() {
           <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
             <div className="px-4 py-3 bg-red-50 border-b border-red-200">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                Godkända men ej utförda ({failedExecutions.length})
+                Åtgärder som behöver följas upp ({failedExecutions.length})
               </p>
               <p className="text-xs text-red-600 mt-0.5">
-                Du godkände dessa, men handlingen gick inte igenom — inget har skickats till kunden.
+                Dessa åtgärder slutfördes inte helt. Läs kvittensen innan du försöker igen; delar kan redan ha utförts.
               </p>
             </div>
             <div className="divide-y divide-red-100">
               {failedExecutions.map(item => {
-                const execResult = item.payload?.execution_result as { error_text?: string | null; outcome?: string } | undefined
+                const execResult = item.payload?.execution_result as { error_text?: string | null; outcome?: string; receipt?: { text: string; state: string } } | undefined
                 return (
                   <div key={item.id} className="px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -795,7 +798,7 @@ export default function ApprovalsPage() {
                       <p className="text-xs text-red-600 truncate">
                         {execResult?.outcome === 'retrying'
                           ? 'Omkörning avbröts — försök igen'
-                          : execResult?.error_text || 'Handlingen kunde inte utföras'}
+                          : execResult?.receipt?.text || execResult?.error_text || 'Handlingen kunde inte utföras'}
                       </p>
                     </div>
                     <button

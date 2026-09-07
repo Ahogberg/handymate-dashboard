@@ -318,6 +318,7 @@ export default function IdagCore({
       }
 
       const result = await res.json().catch(() => null) as {
+        receipt?: { state: string; text: string }
         execution?: {
           receipt?: string
           action?: string
@@ -335,6 +336,11 @@ export default function IdagCore({
       // Ärendet är avgjort i DB — plocka bort från kö-listan på riktigt.
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
 
+      if (result?.receipt?.text) {
+        showFeedback(result.receipt.text, ['partial', 'failed', 'needs_action'].includes(result.receipt.state), 7000)
+        setDoneRows(prev => [{ key: `local-${approval.id}`, time: 'nyss', agent: agentKey, text: result.receipt!.text, auto: false, fresh: true }, ...prev])
+        return
+      }
       if (action === 'reject') {
         if (approval.approval_type !== 'autonomy_offer') {
           setDoneRows(prev => [{

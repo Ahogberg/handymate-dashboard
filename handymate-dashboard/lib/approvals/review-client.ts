@@ -2,7 +2,7 @@
 import type { ApprovalReview } from './review-contract'
 
 let reviewing = false
-export function showApprovalReview(review: ApprovalReview): Promise<boolean> {
+export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit): Promise<boolean> {
   if (reviewing || typeof document === 'undefined') return Promise.resolve(false)
   reviewing = true
   return new Promise(resolve => {
@@ -22,23 +22,57 @@ export function showApprovalReview(review: ApprovalReview): Promise<boolean> {
       add('h3', `${message.channel} · ${message.recipients.length} mottagare`)
       for (const recipient of message.recipients) add('p', recipient)
       if (message.subject) add('h3', `Ämne: ${message.subject}`)
-      add('p', message.text)
+      if (message.html) {
+        const frame = document.createElement('iframe'); frame.title = message.subject || 'E-postens innehåll'
+        frame.setAttribute('sandbox', '')
+        frame.srcdoc = `<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; img-src data:">${message.html}`
+        frame.style.width = '100%'; frame.style.height = '55vh'; dialog.append(frame)
+      } else add('p', message.text)
     }
     if (review.blockedReason) add('p', review.blockedReason)
+    const objectUrls: string[] = []
+    const attachmentChecks: HTMLInputElement[] = []
+    let confirmButton: HTMLButtonElement | undefined
     let settled = false
     const finish = (confirmed: boolean) => {
       if (settled) return
       settled = true; reviewing = false
       window.removeEventListener('pagehide', cancel); window.removeEventListener('popstate', cancel)
+      objectUrls.forEach(url => URL.revokeObjectURL(url))
       dialog.remove(); previous?.focus(); resolve(confirmed)
     }
     const cancel = () => finish(false)
     const back = add('button', 'Tillbaka') as HTMLButtonElement
     back.type = 'button'; back.onclick = cancel
     back.style.padding = '12px 20px'
+    if (review.open && /^\/dashboard\//.test(review.open.path)) {
+      const open = add('button', review.open.label) as HTMLButtonElement
+      open.type = 'button'; open.onclick = () => { finish(false); window.location.assign(review.open!.path) }
+    }
+    for (const attachment of review.attachments || []) {
+      const status = add('p', `Laddar: ${attachment.label}`)
+      const checkLabel = document.createElement('label')
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.disabled = true
+      attachmentChecks.push(checkbox)
+      checkLabel.append(checkbox, document.createTextNode(` Jag har granskat: ${attachment.label}`)); dialog.append(checkLabel)
+      checkbox.onchange = () => { if (confirmButton) confirmButton.disabled = !attachmentChecks.every(check => check.checked && !check.disabled) }
+      if (!attachment.url.startsWith('/api/')) { status.textContent = 'Underlaget har en ogiltig adress.'; continue }
+      void fetch(attachment.url, { headers }).then(async response => {
+        if (!response.ok) throw new Error('Kunde inte läsa underlaget')
+        const mime = response.headers.get('content-type') || ''
+        if (!mime.startsWith('image/') && !mime.includes('application/pdf') && !mime.includes('text/html')) throw new Error('Underlaget har fel format')
+        const blob = await response.blob()
+        if (settled) return
+        const url = URL.createObjectURL(blob); objectUrls.push(url)
+        const frame = document.createElement('iframe'); frame.title = attachment.label
+        frame.setAttribute('sandbox', ''); frame.src = url; frame.style.width = '100%'; frame.style.height = '65vh'
+        status.replaceWith(frame); checkbox.disabled = false
+      }).catch(() => { if (!settled) status.textContent = 'Underlaget kunde inte laddas. Beslutet kan inte bekräftas.' })
+    }
     if (review.confirmLabel) {
       const confirm = add('button', review.confirmLabel) as HTMLButtonElement
-      confirm.type = 'button'
+      confirmButton = confirm
+      confirm.type = 'button'; confirm.disabled = attachmentChecks.length > 0
       Object.assign(confirm.style, { padding: '12px 20px', marginLeft: '12px', background: '#0F766E', color: 'white', borderRadius: '12px' })
       confirm.onclick = () => { confirm.disabled = true; finish(true) }
     }
@@ -51,13 +85,13 @@ export function showApprovalReview(review: ApprovalReview): Promise<boolean> {
 /** Explicit read-only preflight: an old server rejects `preview`, never sends. */
 export async function reviewedApprovalFetch(url: string, init: RequestInit): Promise<Response> {
   const body = JSON.parse(String(init.body || '{}'))
-  if (!['approve', 'edit', 'retry'].includes(body.action)) return fetch(url, init)
+  if (!['approve', 'edit', 'retry', 'reject'].includes(body.action)) return fetch(url, init)
   const preview = await fetch(url, { ...init, keepalive: false,
     body: JSON.stringify({ ...body, action: 'preview', decision_action: body.action }) })
   const data = await preview.clone().json().catch(() => null)
   if (preview.ok && data?.review_not_required === true) return fetch(url, init)
   if (!data?.review) return preview
-  const confirmed = await showApprovalReview(data.review)
+  const confirmed = await showApprovalReview(data.review, init.headers)
   if (!confirmed || !data.review_token || !data.review.confirmLabel) {
     return Response.json({ cancelled: true, error: 'Avbrutet. Ärendet ligger kvar.' }, { status: 499 })
   }

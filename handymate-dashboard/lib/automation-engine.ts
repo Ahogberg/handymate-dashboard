@@ -1,3 +1,4 @@
+import { automationSmsText, interpolateApprovalTemplate } from '@/lib/approvals/automation-message'
 /**
  * V3 Automation Engine
  *
@@ -198,13 +199,7 @@ function deriveAgentId(ruleName: string, actionType: string, triggerType: string
  * saknas i kontext, lämnas orörda i stället för att krascha eller radera dem.
  */
 export function interpolateTemplate(template: string, context: ExecutionContext): string {
-  let result = template
-  for (const [key, value] of Object.entries(context)) {
-    if (typeof value === 'string' || typeof value === 'number') {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
-    }
-  }
-  return result
+  return interpolateApprovalTemplate(template, context)
 }
 
 /**
@@ -255,8 +250,6 @@ async function handleSendSms(
   config: Record<string, unknown>,
   context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
-  const template = config.template as string || ''
-  let message = interpolateTemplate(template, context)
 
   // Get business name for template
   const { data: business } = await supabase
@@ -265,7 +258,7 @@ async function handleSendSms(
     .eq('business_id', businessId)
     .single()
 
-  message = message.replace(/\{\{business_name\}\}/g, business?.business_name || 'Handymate')
+  const message = automationSmsText(config, context, business?.business_name || 'Handymate')
 
   let to = (context.phone as string) || (context.customer_phone as string)
   // Många event (lead_received, threshold-regler m.fl.) bär bara customer_id,
@@ -542,7 +535,7 @@ async function handleUpdateStatus(
 
   const tableMap: Record<string, { table: string; idCol: string; statusCol: string }> = {
     lead: { table: 'leads', idCol: 'lead_id', statusCol: 'status' },
-    quote: { table: 'quote', idCol: 'quote_id', statusCol: 'status' },
+    quote: { table: 'quotes', idCol: 'quote_id', statusCol: 'status' },
     invoice: { table: 'invoice', idCol: 'invoice_id', statusCol: 'status' },
     booking: { table: 'booking', idCol: 'booking_id', statusCol: 'status' },
     customer: { table: 'customer', idCol: 'customer_id', statusCol: 'job_status' },
@@ -668,7 +661,7 @@ async function handleScheduleFollowup(
     related_id: (context.entity_id as string) || (context.lead_id as string) || (context.quote_id as string) || null,
     created_at: new Date().toISOString(),
   })
-  if (insertErr) console.error('[automation-engine] Failed to create followup:', insertErr.message)
+  if (insertErr) return { success: false, error: `Uppföljningen kunde inte sparas: ${insertErr.message}` }
 
   return { success: true, data: { followup_date: followupDate.toISOString(), description } }
 }

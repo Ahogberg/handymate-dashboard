@@ -179,7 +179,7 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         return
       }
       const result = await res.json().catch(() => null)
-      if (result?.execution_outcome?.outcome === 'failed') { setError(result.execution_outcome.error_text || 'Handlingen misslyckades'); return }
+      if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed', 'needs_action'].includes(result?.receipt?.state)) { setError(result?.receipt?.text || result.execution_outcome?.error_text || 'Handlingen misslyckades'); return }
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
       setEditingId(null)
     } catch {

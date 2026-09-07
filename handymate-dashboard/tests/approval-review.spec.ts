@@ -52,7 +52,8 @@ test('every registered type is covered: information is a receipt, mutations need
   }
   const i = input(); i.approval.approval_type = 'future_unknown_send'
   expect(gate(i)?.status).toBe(422)
-  for (const action of ['reject', 'snooze']) expect(gate(input({ action }))).toBeNull()
+  expect(gate(input({ action: 'snooze' }))).toBeNull()
+  expect(gate(input({ action: 'reject' }))?.status).toBe(428)
 })
 test('all supported outgoing types expose the same fields consumed by their executors', () => {
   for (const type of REVIEWABLE_MESSAGE_TYPES) {

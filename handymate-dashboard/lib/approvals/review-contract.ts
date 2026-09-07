@@ -3,8 +3,10 @@ export interface ApprovalReview {
   title: string
   effect: string
   confirmLabel: string | null
-  messages: { channel: 'SMS' | 'E-post'; recipients: string[]; subject?: string; text: string }[]
+  messages: { channel: 'SMS' | 'E-post'; recipients: string[]; subject?: string; text: string; html?: string }[]
   details?: { label: string; text: string }[]
+  attachments?: { label: string; url: string; kind: 'image' | 'document' }[]
+  open?: { label: string; path: string }
   blockedReason?: string
 }
 

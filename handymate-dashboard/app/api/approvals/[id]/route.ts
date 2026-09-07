@@ -1,3 +1,7 @@
+import { insertApprovalArtifact } from '@/lib/approvals/artifact-write'
+import { bookingProposalMessage } from '@/lib/approvals/booking-message'
+import { prepareApprovalReview } from '@/lib/approvals/prepare-review'
+import { approvalReceipt } from '@/lib/approvals/receipt'
 import { requireApprovalReview } from '@/lib/approvals/review-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
@@ -167,10 +171,11 @@ export async function POST(
 
     // Must run before BOTH pending→approved and the retry CAS. Older clients,
     // edits and direct API calls cannot bypass review. Rejection/snooze are exempt.
-    if (action === 'preview' && !['approve', 'edit', 'retry'].includes(body.decision_action)) {
+    if (action === 'preview' && !['approve', 'edit', 'retry', 'reject'].includes(body.decision_action)) {
       return NextResponse.json({ error: 'Ogiltig granskningshandling' }, { status: 400 })
     }
-    const reviewGate = requireApprovalReview({ approval,
+    const prepared = await prepareApprovalReview(supabase, business.business_id, approval, body)
+    const reviewGate = requireApprovalReview({ approval, prepared,
       body: action === 'preview' ? { ...body, action: body.decision_action, review_token: undefined } : body,
       businessId: business.business_id, actorId: currentUser.id,
     }, process.env.SUPABASE_SERVICE_ROLE_KEY || '')
@@ -262,6 +267,7 @@ export async function POST(
       }
 
       const retryClassified = classifyExecutionResult(retryResult)
+      let retryReceipt = approvalReceipt(approval.approval_type, action, retryResult, retryClassified.outcome)
       // Värdeattribution (2026-08-12): en lyckad omkörning skapar precis
       // samma sortens artefakter som förstaförsöket (fakturan, ÄTA:n, osv)
       // — utan detta försvann artefakt-ID:na för alla kort som gick igenom
@@ -277,6 +283,7 @@ export async function POST(
               error_text: retryClassified.error_text,
               executed_at: new Date().toISOString(),
               retried: true,
+              receipt: retryReceipt,
               ...(retryArtifacts ? { artifacts: retryArtifacts } : {}),
             },
           },
@@ -284,6 +291,7 @@ export async function POST(
         .eq('id', params.id)
         .eq('business_id', business.business_id)
       if (retryPersistError) {
+        retryReceipt = { ...retryReceipt, state: 'partial', text: `${retryReceipt.text} Kvittensen kunde inte sparas i historiken. Upprepa inte handlingen utan att kontrollera resultatet.` }
         console.error(`[approvals/${params.id}] retry: kunde inte spara execution_result:`, retryPersistError)
       }
 
@@ -304,6 +312,7 @@ export async function POST(
         success: true,
         action,
         execution: retryResult,
+        receipt: retryReceipt,
         execution_outcome: { outcome: retryClassified.outcome, error_text: retryClassified.error_text },
       })
     }
@@ -351,6 +360,8 @@ export async function POST(
       // En parallell request hann före oss mellan fetch och update.
       return NextResponse.json({ error: `Approval already resolved` }, { status: 409 })
     }
+
+    const rejectionErrors: string[] = []
 
     // Record learning event (non-blocking)
     try {
@@ -410,6 +421,7 @@ export async function POST(
         }
       }
     } catch (autonomyErr) {
+      if (action === 'reject') rejectionErrors.push('Automatisk hantering kunde inte återkallas.')
       console.error('[approvals] earned-autonomy hook error (non-blocking):', autonomyErr)
     }
 
@@ -421,12 +433,13 @@ export async function POST(
     if (action === 'reject' && approval.approval_type === 'four_eyes_quote') {
       const rejectedQuoteId = (approval.payload as Record<string, unknown>)?.quote_id as string | undefined
       if (rejectedQuoteId) {
-        const { error: resetErr } = await supabase
+        const { data: resetRows, error: resetErr } = await supabase
           .from('quotes')
           .update({ status: 'draft' })
           .eq('quote_id', rejectedQuoteId)
           .eq('business_id', business.business_id)
-          .eq('status', 'pending_approval')
+          .eq('status', 'pending_approval').select('quote_id')
+        if (!resetRows?.length) rejectionErrors.push('Offerten återställdes inte till utkast. Kontrollera dess aktuella status.')
         if (resetErr) {
           console.error('[approvals/four_eyes_quote] kunde inte återställa offerten till utkast:', resetErr.message)
         }
@@ -441,11 +454,12 @@ export async function POST(
         // (new/contacted/qualified/quote_sent/won/lost) → updaten failade
         // tyst och leaden låg kvar som aktiv. 'lost' är det kanoniska
         // avvisad-värdet. Supabase kastar inte — läs error explicit.
-        const { error: leadErr } = await supabase
+        const { data: leadRows, error: leadErr } = await supabase
           .from('leads')
           .update({ status: 'lost', updated_at: new Date().toISOString() })
           .eq('lead_id', leadId)
-          .eq('business_id', business.business_id)
+          .eq('business_id', business.business_id).select('lead_id')
+        if (leadErr || leadRows?.length !== 1) rejectionErrors.push('Kundförfrågan kunde inte markeras som förlorad.')
         if (leadErr) {
           console.error('[approvals/lead_review] Failed to mark lead lost:', leadErr.message)
         }
@@ -461,11 +475,12 @@ export async function POST(
     if (action === 'reject' && approval.approval_type === 'operating_experiment_readout') {
       const experimentId = (approval.payload as Record<string, unknown>)?.experiment_id as string | undefined
       if (experimentId) {
-        const { error: expRejectErr } = await supabase
+        const { data: rejectedExperiments, error: expRejectErr } = await supabase
           .from('operating_experiment')
           .update({ owner_decision: 'rejected', decided_at: new Date().toISOString() })
           .eq('id', experimentId)
-          .eq('business_id', business.business_id)
+          .eq('business_id', business.business_id).select('id')
+        if (expRejectErr || rejectedExperiments?.length !== 1) rejectionErrors.push('Försökets beslut kunde inte sparas.')
         if (expRejectErr && !arSchemaSaknas(expRejectErr)) {
           console.error('[approvals/operating_experiment_readout] kunde inte avvisa försöket:', expRejectErr.message)
         }
@@ -478,6 +493,11 @@ export async function POST(
     // klienterna slipper tolka execution-objektets fältvarianter själva —
     // approvals/page.tsx sa tidigare "Godkänt" även när utförandet misslyckats.
     let executionOutcome: { outcome: string; error_text: string | null } | null = null
+    let receipt = approvalReceipt(approval.approval_type, action, rejectionErrors.length ? { error: rejectionErrors.join(' ') } : null)
+    if (action === 'reject') {
+      const { error: rejectionPersistError } = await supabase.from('pending_approvals').update({ payload: { ...finalPayload, execution_result: { receipt, outcome: rejectionErrors.length ? 'failed' : 'skipped', error_text: rejectionErrors.join(' ') || null, executed_at: new Date().toISOString() } } }).eq('id', params.id).eq('business_id', business.business_id)
+      if (rejectionPersistError) receipt = { state: 'partial', text: `${receipt.text} Kvittensen kunde inte sparas i historiken.` }
+    }
     if (action === 'approve' || action === 'edit') {
       // Defense-in-depth: approval hämtades redan med .eq('business_id', business.business_id)
       // så detta ska aldrig kunna trigga, men explicit check förebygger framtida regressioner
@@ -531,6 +551,7 @@ export async function POST(
       const classified = classifyExecutionResult(executionResult)
       const { outcome, error_text } = classified
       executionOutcome = classified
+      receipt = approvalReceipt(approval.approval_type, action, executionResult, outcome)
       // Värdeattributionens första brott (verifierat 2026-08-12): executor-
       // cases returnerar artefakt-ID:n (ata_id, invoice_id, quote_id, ...) i
       // HTTP-svaret, men bara outcome/error_text/executed_at persisterades
@@ -548,6 +569,7 @@ export async function POST(
             execution_result: {
               outcome,
               error_text,
+              receipt,
               executed_at: new Date().toISOString(),
               ...(artifacts ? { artifacts } : {}),
             },
@@ -557,6 +579,7 @@ export async function POST(
         .eq('business_id', business.business_id)
 
       if (persistError) {
+        receipt = { ...receipt, state: 'partial', text: `${receipt.text} Kvittensen kunde inte sparas i historiken. Upprepa inte handlingen utan att kontrollera resultatet.` }
         // Non-blocking — exekveringen har redan skett och svaret nedan
         // innehåller ändå det faktiska utfallet. Men loggas synligt så vi
         // upptäcker om persisteringen systematiskt failar.
@@ -574,6 +597,7 @@ export async function POST(
       success: true,
       action,
       execution: executionResult,
+      receipt,
       execution_outcome: executionOutcome,
     })
   } catch (error: any) {
@@ -1482,95 +1506,12 @@ async function executeApprovalPayload(
       }
 
       case 'dispatch_suggestion': {
-        const supabaseDispatch = (await import('@/lib/supabase')).getServerSupabase()
-        const plDispatch = payload as any
-        const memberId = plDispatch.member_id
-        const memberName = plDispatch.member_name
-        const ctxType = plDispatch.context_type
-        const ctxId = plDispatch.context_id
-
-        // "Visa varför"-utrullning, Fall 4 (docs/design/SYNLIG-INTELLIGENS.md,
-        // 2026-08-13): sparar ÖGONBLICKSBESLUTET — vem som var bäst lämpad
-        // NÄR tilldelningen gjordes. Kan inte räknas om senare (poäng/
-        // tillgänglighet ändras), måste alltså sparas här, inte härledas
-        // live som Guardian gör. v130_dispatch_reasoning.sql.
-        const dispatchReasoning = {
-          reasons: plDispatch.reasons,
-          score: plDispatch.score,
-          alternatives: plDispatch.alternatives,
-          week_utilization_pct: plDispatch.week_utilization_pct,
-          certificates: plDispatch.certificates,
-        }
-
-        if (ctxType === 'booking' && ctxId) {
-          await supabaseDispatch.from('booking').update({
-            assigned_to: memberName,
-            assigned_user_id: memberId,
-            dispatch_reasoning: dispatchReasoning,
-          }).eq('booking_id', ctxId)
-        } else if (ctxType === 'work_order' && ctxId) {
-          await supabaseDispatch.from('work_orders').update({
-            assigned_to: memberName,
-            dispatch_reasoning: dispatchReasoning,
-          }).eq('id', ctxId)
-        }
-
-        return { action: 'dispatch_suggestion', assigned: memberName, context_type: ctxType }
+        const { assignApprovalWork } = await import('@/lib/approvals/internal-writes')
+        return assignApprovalWork(await getSupabase(), businessId, payload)
       }
-
       case 'time_attestation': {
-        const supabaseTime = (await import('@/lib/supabase')).getServerSupabase()
-        const plTime = payload as any
-        if (!plTime.checkin_id) return { action: 'time_attestation', skipped: 'no checkin_id' }
-
-        // Approve the checkin via the approve API logic
-        const minutes = plTime.duration_minutes || 0
-        await supabaseTime.from('time_checkins').update({
-          status: 'approved',
-          approved_by: 'via godkännanden',
-          approved_at: new Date().toISOString(),
-          duration_minutes: minutes,
-        }).eq('id', plTime.checkin_id)
-
-        // Etapp 1 Tier A (multi-employee-parity-plan.md): payload.user_id är
-        // checkin.user_id, dvs auth-UUID:n för den anställda vars tid det
-        // gäller (INTE nödvändigtvis den som klickar Godkänn här) — matcha
-        // mot business_users.user_id, samma mönster som checkin/approve.
-        let timeAttestationBusinessUserId: string | null = null
-        if (plTime.user_id) {
-          const { data: attestedBusinessUser } = await supabaseTime
-            .from('business_users')
-            .select('id')
-            .eq('user_id', plTime.user_id)
-            .eq('business_id', businessId)
-            .maybeSingle()
-          timeAttestationBusinessUserId = attestedBusinessUser?.id ?? null
-        }
-
-        // Create time_entry. approval_status sätts explicit till 'approved'
-        // — hantverkaren klickade just Godkänn på DET HÄR kortet, så raden
-        // ska inte falla på DB-defaulten 'pending' och landa i "Att
-        // attestera" igen (samma bugg och samma fix som app/api/checkin/
-        // approve/route.ts redan gör, och som blockerade BillableView.tsx
-        // från att räkna dessa timmar som fakturerbara). Funktionen har
-        // ingen currentUser i scope — businessId som approved_by speglar
-        // checkin/approve-mönstret.
-        const entryId = 'te_' + Math.random().toString(36).substr(2, 9)
-        await supabaseTime.from('time_entry').insert({
-          time_entry_id: entryId,
-          business_id: businessId,
-          business_user_id: timeAttestationBusinessUserId,
-          project_id: plTime.project_id || null,
-          description: `Incheckning ${plTime.checked_in_at ? new Date(plTime.checked_in_at).toLocaleDateString('sv-SE') : ''}${plTime.project_name ? ' · ' + plTime.project_name : ''}`,
-          duration_minutes: minutes,
-          work_date: plTime.checked_in_at?.split('T')[0] || new Date().toISOString().split('T')[0],
-          is_billable: true,
-          approval_status: 'approved',
-          approved_by: businessId,
-          approved_at: new Date().toISOString(),
-        })
-
-        return { action: 'time_attestation', time_entry_id: entryId, minutes }
+        const { attestApprovalTime } = await import('@/lib/approvals/internal-writes')
+        return attestApprovalTime(await getSupabase(), businessId, resolvedByUserId || null, payload)
       }
 
       case 'seasonal_campaign': {
@@ -1723,27 +1664,8 @@ async function executeApprovalPayload(
           factInsert.promise_status = 'open'
         }
 
-        let { data: fact, error: factErr } = await supabaseCF
-          .from('customer_fact')
-          .insert(factInsert)
-          .select('id')
-          .single()
-
-        // Fail-soft: v147-kolumnerna (due_at/promise_status) saknas ännu i
-        // den här miljön — kör om UTAN dem i stället för att fälla hela
-        // bekräftelsen. Ett kundfaktum måste gå att spara även om
-        // löftesbevakningen inte är påkopplad än.
-        if (
-          factErr &&
-          promiseDueAt &&
-          (factErr.code === '42703' || /column .* does not exist|schema cache/i.test(factErr.message || ''))
-        ) {
-          delete factInsert.due_at
-          delete factInsert.promise_status
-          const retry = await supabaseCF.from('customer_fact').insert(factInsert).select('id').single()
-          fact = retry.data
-          factErr = retry.error
-        }
+        const { data: fact, error: factErr } = await insertApprovalArtifact(supabaseCF, 'customer_fact', 'id', businessId, approvalId, 'customer_fact', factInsert)
+        const factFollowupErrors: string[] = []
 
         if (factErr || !fact) {
           console.error('[approvals/customer_fact] kunde inte spara faktumet:', factErr?.message)
@@ -1770,6 +1692,7 @@ async function executeApprovalPayload(
               .is('superseded_by', null)
               .neq('id', fact.id)
             if (supersedeErr) {
+              factFollowupErrors.push('Tidigare kunduppgifter kunde inte markeras som ersatta.')
               console.error('[approvals/customer_fact] supersede misslyckades (icke-blockerande):', supersedeErr.message)
               await rapporteraTystFel(supabaseCF, businessId, 'approvals/customer_fact:supersede', supersedeErr.message, {
                 factId: fact.id,
@@ -1778,6 +1701,7 @@ async function executeApprovalPayload(
               })
             }
           } catch (supersedeCatchErr: any) {
+            factFollowupErrors.push('Tidigare kunduppgifter kunde inte markeras som ersatta.')
             console.error(
               '[approvals/customer_fact] supersede kastade (icke-blockerande):',
               supersedeCatchErr?.message || supersedeCatchErr,
@@ -1792,7 +1716,7 @@ async function executeApprovalPayload(
           }
         }
 
-        return { action: 'customer_fact', ok: true, fact_id: fact.id }
+        return { action: 'customer_fact', ok: factFollowupErrors.length === 0, partial: factFollowupErrors.length > 0, error: factFollowupErrors.join(' ') || undefined, fact_id: fact.id }
       }
 
       case 'agent_memory_confirmation': {
@@ -1953,13 +1877,10 @@ async function executeApprovalPayload(
           return await executeQuoteSigningBooking(pl)
         }
 
-        const message = pl.customer_reply_pending
-          || (pl.available_slots?.length
-            ? `Hej! Vi kan komma:\n${(pl.available_slots as any[]).map((s: any, i: number) => `${i + 1}. ${s.label}`).join('\n')}\nVilket passar bäst?`
-            : null)
+        const message = bookingProposalMessage(pl)
 
         if (!message || !pl.entity?.phone) {
-          return { action: 'propose_booking_times', skipped: 'no message or phone' }
+          return { action: approval_type, skipped: 'no message or phone' }
         }
 
         // Audit-3 Fix A (2026-06-01)
@@ -1971,7 +1892,7 @@ async function executeApprovalPayload(
           purpose: 'conversational',
         })
         return {
-          action: 'propose_booking_times',
+          action: approval_type,
           sms_sent: r.sms_sent,
           error: r.error,
           slots_count: pl.available_slots?.length || 0,
@@ -2412,66 +2333,25 @@ async function executeApprovalPayload(
 
         const supabase4e = (await import('@/lib/supabase')).getServerSupabase()
 
-        // Återställ till draft — skaparen kan nu skicka
-        await supabase4e
-          .from('quotes')
-          .update({ status: 'draft' })
-          .eq('quote_id', pl.quote_id)
-
-        // Etapp 4 (multi-employee-parity-plan.md): denna push är riktad
-        // till SKAPAREN specifikt ("Offert godkänd" — du kan nu skicka den),
-        // inte en generell businessnotis. pl.requested_by_user_id är
-        // business_users.id (satt av app/api/quotes/send/route.ts, se
-        // lib/approvals/routing.ts) — INTE en auth-uuid, så vi måste slå
-        // upp business_users.user_id innan vi skickar target_user_id till
-        // /api/push/send (som förväntar sig auth-uuid, matchande
-        // push_subscriptions.user_id). ALDRIG business.user_id/
-        // getAuthenticatedBusiness().user_id här — det är alltid ägarens
-        // uuid, inte skaparens, se lib/auth.ts. Om uppslaget saknas eller
-        // missar faller vi tillbaka till oförändrat businessblast (som
-        // innan denna etapp).
-        let targetUserId: string | null = null
-        if (pl.requested_by_user_id) {
-          const { data: requester, error: requesterErr } = await supabase4e
-            .from('business_users')
-            .select('user_id')
-            .eq('id', pl.requested_by_user_id)
-            .maybeSingle()
-
-          if (requesterErr) {
-            console.error('[four_eyes_quote/push] business_users-uppslag misslyckades:', requesterErr)
-          } else if (requester?.user_id) {
-            targetUserId = requester.user_id
-          }
+        const { data: quoteRows, error: quoteResetError } = await supabase4e
+          .from('quotes').update({ status: 'draft' }).eq('quote_id', pl.quote_id)
+          .eq('business_id', businessId).eq('status', 'pending_approval').select('quote_id, total')
+        if (quoteResetError || quoteRows?.length !== 1) return { action: 'four_eyes_quote', ok: false, error: 'Offerten kunde inte återföras till utkast. Kontrollera dess aktuella status.' }
+        const { data: requester, error: requesterError } = await supabase4e.from('business_users')
+          .select('user_id').eq('id', pl.requested_by_user_id || '').eq('business_id', businessId).maybeSingle()
+        if (requesterError || !requester?.user_id) return { action: 'four_eyes_quote', ok: false, partial: true, quote_id: pl.quote_id, error: 'Offerten är granskad, men skaparen kunde inte nås med den interna notisen.' }
+        try {
+          const response = await fetch(`${appUrl}/api/push/send`, {
+            method: 'POST', headers: internalPushHeaders(), body: JSON.stringify({
+              business_id: businessId, target_user_id: requester.user_id, title: 'Offert godkänd',
+              body: `Din offert på ${(quoteRows[0].total || 0).toLocaleString('sv-SE')} kr har godkänts — du kan nu skicka den`,
+              url: `/dashboard/quotes/${pl.quote_id}`,
+            }),
+          })
+          if (!response.ok) return { action: 'four_eyes_quote', ok: false, partial: true, quote_id: pl.quote_id, error: 'Offerten är granskad, men den interna notisen misslyckades.' }
+        } catch {
+          return { action: 'four_eyes_quote', ok: false, partial: true, quote_id: pl.quote_id, error: 'Offerten är granskad, men den interna notisen kunde inte bekräftas.' }
         }
-
-        // Push-notis till skaparen. Fire-and-forget — fördröjer inte
-        // approval-response, men loggar fel så vi kan upptäcka push-issues
-        // (TD: bygg push-fail-monitoring-cron eller Sentry-integration).
-        // Audit-4 Fix H (2026-06-02): ersatte `.catch(() => {})` med loggat
-        // catch. /api/push/send har ingen auth-check, så cookie-forwarding
-        // behövs ej här.
-        fetch(`${appUrl}/api/push/send`, {
-          method: 'POST',
-          headers: internalPushHeaders(),
-          body: JSON.stringify({
-            business_id: businessId,
-            title: 'Offert godkänd',
-            body: `Din offert på ${(pl.quote_total || 0).toLocaleString('sv-SE')} kr har godkänts — du kan nu skicka den`,
-            url: `/dashboard/quotes/${pl.quote_id}`,
-            ...(targetUserId ? { target_user_id: targetUserId } : {}),
-          }),
-        })
-          .then(async (r) => {
-            if (!r.ok) {
-              const errText = await r.text().catch(() => '<unparsable>')
-              console.error(`[four_eyes_quote/push] HTTP ${r.status} from /api/push/send:`, errText)
-            }
-          })
-          .catch((err) => {
-            console.error('[four_eyes_quote/push] fetch failed:', err)
-          })
-
         return { action: 'four_eyes_quote', ok: true, quote_id: pl.quote_id }
       }
 
@@ -2790,7 +2670,7 @@ async function executeApprovalPayload(
         // cron-vägen — avgift/ränta muteras BARA här, aldrig vid skapandet.
         const pl = payload as any
         const delivery = pl.delivery
-        if (!delivery?.invoiceId) {
+        if (!delivery?.invoiceId || delivery.businessId !== businessId) {
           return { action: 'invoice_reminder', error: 'payload saknar delivery-data' }
         }
         const { deliverInvoiceReminder } = await import('@/lib/invoice-reminder-send')
@@ -2818,6 +2698,8 @@ async function executeApprovalPayload(
           action: 'invoice_reminder',
           sent: true,
           executed: true,
+          partial: !!r.errors?.length,
+          error: r.errors?.length ? r.errors.join(' ') : undefined,
           sms_sent: r.smsSent,
           email_sent: r.emailSent,
           fee_added: r.feeAdded,
@@ -2939,11 +2821,9 @@ async function executeApprovalPayload(
         }
 
         const supabaseCf = getServerSupabase()
-        const checklistId = `cl_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
         const items = templateItems.map((it: any) => ({ ...it, checked: false }))
 
-        const { error: insertCfErr } = await supabaseCf.from('project_checklist').insert({
-          id: checklistId,
+        const { data: createdChecklist, error: insertCfErr } = await insertApprovalArtifact(supabaseCf, 'project_checklist', 'id', businessId, approvalId, 'checklist', {
           project_id: projectId,
           business_id: businessId,
           name: pl.template_name || 'Checklista',
@@ -2951,11 +2831,11 @@ async function executeApprovalPayload(
           status: 'in_progress',
         })
 
-        if (insertCfErr) {
-          return { action: 'checklist_forslag', ok: false, error: insertCfErr.message }
+        if (insertCfErr || !createdChecklist) {
+          return { action: 'checklist_forslag', ok: false, error: insertCfErr?.message || 'Checklistan kunde inte verifieras.' }
         }
 
-        return { action: 'checklist_forslag', ok: true, checklist_id: checklistId, project_id: projectId }
+        return { action: 'checklist_forslag', ok: true, checklist_id: createdChecklist.id, project_id: projectId }
       }
 
       case 'tidrapport_forslag': {
@@ -2998,9 +2878,7 @@ async function executeApprovalPayload(
         // och räknas inte som fakturerbar i BillableView.tsx trots att
         // hantverkaren just godkänt kortet.
         const supabaseTe = getServerSupabase()
-        const entryIdTe = 'te_' + Math.random().toString(36).substr(2, 9)
-        const { error: insertTeErr } = await supabaseTe.from('time_entry').insert({
-          time_entry_id: entryIdTe,
+        const { data: createdTimeEntry, error: insertTeErr } = await insertApprovalArtifact(supabaseTe, 'time_entry', 'time_entry_id', businessId, approvalId, 'time_proposal', {
           business_id: businessId,
           business_user_id: assignedUserIdTe,
           project_id: projectIdTe,
@@ -3011,18 +2889,18 @@ async function executeApprovalPayload(
             : 'Tidrapport-förslag',
           is_billable: true,
           approval_status: 'approved',
-          approved_by: businessId,
+          approved_by: resolvedByUserId ?? null,
           approved_at: new Date().toISOString(),
         })
 
-        if (insertTeErr) {
-          return { action: 'tidrapport_forslag', ok: false, error: insertTeErr.message }
+        if (insertTeErr || !createdTimeEntry) {
+          return { action: 'tidrapport_forslag', ok: false, error: insertTeErr?.message || 'Tidraden kunde inte verifieras.' }
         }
 
         return {
           action: 'tidrapport_forslag',
           ok: true,
-          time_entry_id: entryIdTe,
+          time_entry_id: createdTimeEntry.time_entry_id,
           project_id: projectIdTe,
           minutes: suggestedMinutes,
         }
@@ -3070,7 +2948,7 @@ async function executeApprovalPayload(
         const res = await runApprovedAutomationAction(
           supabaseAuto, businessId, actionType, (pl.rule_action_config || {}) as Record<string, unknown>, pl,
         )
-        return { action: 'automation', action_type: actionType, ...res }
+        return { action: 'automation', action_type: actionType, ...res, ok: res.success, ...(actionType === 'send_sms' ? { sms_sent: res.success } : actionType === 'send_email' ? { email_sent: res.success } : {}) }
       }
 
       case 'project_debrief': {
