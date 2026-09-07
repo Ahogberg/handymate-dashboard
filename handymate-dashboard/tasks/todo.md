@@ -1,3 +1,138 @@
+# Varumärkeslagret för kundmail — I PROD 2026-09-07 (Claude, abb215fa)
+
+Andreas: "vi hjälper dom också att se mer professionella ut" → Design-
+briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
+"Ja kör det" på förarbetet: en sanning för varumärket + en masterlayout.
+
+- [x] `lib/branding/get-branding.ts` — loadBranding/brandingFromConfig,
+      accent valideras (#rrggbb annars teal), kastar aldrig, fallback-select
+      utan attribution_link_enabled (v202-fällan), stämpeln ur samma rad
+- [x] `emailLayout()` + byggstenar i lib/email-templates.ts — Claude Designs
+      master byts i EN fil, anroparna märker inget
+- [x] Åtta kundvägar genom layouten: offert, faktura, påminnelse, portal-
+      notiser, signeringsbekräftelse, jobbrapport, V3 send_email, nurture,
+      legacy auto-generate. orders/send (B2B) medvetet kvar på direkt stämpel
+- [x] Påminnelsekortets emailBody = FRAGMENT nu; leveransen lägger layouten.
+      Kort skapade före 2026-09-07 bär hela dokument → arRedanHeltMejl()
+      känner igen dem och stämplar bara. Ta bort grenen när kön är tömd.
+- [x] Facit: tests/brand-layer.spec.ts (runtime) + facit-attribution-email
+      (källskanning). 17 specar: 270 gröna, 1 skipped. tsc 0.
+- [x] Claude Designs master INTAGEN 2026-09-07 (f2c751cc): emailLayout med
+      meta-etikett/compact, amountBlock, paymentBlock (Swish primär +
+      bankgiro/OCR-kort), statusBand, summaryTable/summaryCard, rotRutNotice,
+      steps, dateCard, personRow, receiptCard, signature, formatDag.
+      Åtta ytor omskrivna med designens copy (offert, bekräftelse med/utan
+      ROT-uppgifter, faktura, fyra påminnelsenivåer, portalnotis kompakt,
+      jobbrapport, auto-faktura). Visuellt granskat mot design-1.html.
+- [x] emoji-fältet i EVENT_COPY rensat (samma commit)
+- Beslut att nämna för Andreas: påminnelsen visar avgift/ränta som
+  "tillkommer"-rader när de är konfigurerade (designen visade inga);
+  Swish-länken bär fakturabeloppet. Bokning/Kvitto/Omdöme har block men
+  ingen egen sändväg än (nurture/jobCompletedEmail är de som finns).
+- Facit-fälla: invoice-reminder-send måste innehålla EXAKT
+  `html = emailLayout(branding, messages.emailBody)` — ingen meta där.
+- [x] Yta 7 "Så ser dina kunder dig" — I PROD 2026-09-07 (a1a45571):
+      /dashboard/settings/kundvy (ägare/admin), länkad från Företag →
+      Uppgifter. Logotyp, accent (sex förval + hex, kontrastvarning < 4,5:1),
+      offertmall, härledd SMS-signatur, Färdig att skicka x/7, sju kort +
+      stor vy (mail i iframe på 375 px skalad, SMS-bubbla, sidmockuper),
+      testmail till egen adress. Offertmailets byggare utbruten till
+      lib/quotes/quote-email.ts (send-routen + preview använder SAMMA).
+      Visuellt granskat desktop 1380 + mobil 390 mot dev-servern.
+- Beslut/lärdomar yta 7: bokning + omdöme visas som SMS (så går de på
+  riktigt, designen visade mail); bara exempeldata (Anna Lindqvist), inte
+  senaste offerten; SMS-signaturen härleds ur firmanamnet — ingen kolumn
+  (följdpunkt om Andreas vill kunna ändra den); firmanamn = business_name
+  före display_name, samma som brandingFromConfig (testkontot har olika).
+- Lokala arbetsträdet ligger LÅNGT bakom origin (merge-base 1a345735) —
+  verifiering gjordes mot origin/main-export + mina 18 filer i scratchpad
+  (junction till node_modules). 40 röda i gaten där = identiska på ren
+  origin/main i samma miljö (.github saknas i exporten, ESM-laddning,
+  @electric-sql/pglite ej installerad lokalt). Inte mina.
+- [x] Yta 3 fältrapportens signeringssida — I PROD 2026-09-07 (dcc6e4d3):
+      /sign/report/{token} är syskon till offertsidan (logotyp, accent,
+      sektioner, foton Före/Efter, Utförare + F-skatt, Godkänn arbetet med
+      namn + kryss, invändning som kräver text). Publika routen bär
+      loadBranding + stämpel. Sign-routen ORÖRD. Facit
+      tests/faltrapport-signering.spec.ts. Fyra lägen granskade visuellt
+      (visning, invändning, godkänd, avvisad) desktop 1380 + mobil 390.
+- Lärdomar yta 3: gamla sidan ignorerade res.ok (ett 400 blev "Signerat!")
+  och saknade avvisat-läge. field_reports har 0 rader i prod — funktionen
+  har aldrig använts. Länken skickas ALDRIG automatiskt till kund; hant-
+  verkaren kopierar den från projektsidan (gap att besluta om). Cookie-
+  bannern ligger över de publika sidorna (global, inte min). QA-raden
+  (fr-qa-claude-visual-check-2026-09-07) raderad efter skärmdumparna.
+- [ ] Yta 4 portalens beslutskort — Design-brief skriven 2026-09-07
+      (docs/design/briefs/04-portalens-beslutskort.md), väntar på Design
+- [ ] Design-ytorna 2, 5, 6, 8–10 från listan 2026-09-07 (ej påbörjade)
+
+# Partnergrinden GRÖN 2026-09-07 (Claude)
+
+- [x] sql/v206 var REDAN KÖRD (verifierat i prod: funktionen
+      create_partner_self_billing_batch läser business_name, fantomfältet
+      company_name är borta). Todo-raden var föråldrad — v208:s efterskrift
+      dokumenterade körningen.
+- [x] `npm run proof:partner` GRÖNT mot riktig databas: hela kedjan
+      claim → konflikt → 180 dagar → självfaktura → betald, 1 passed.
+- [x] Städningen verifierad efteråt: 0 kvarvarande testpartners, 0 provisions-
+      rader, 0 attributionsbeslut, 0 referral kvar på testkontona.
+- Förutsättning som saknades: `.env.integration` fanns inte (gitignorerad).
+  Skapad lokalt från .env.local + PARTNER_TEST_ALLOW_DB_WRITES-spärren.
+- FÄLLA för nästa körning: testet skapar en partner med testföretagets EGEN
+  contact_email (för att pröva självhänvisningsspärren). Konton med
+  andreashogberg93@gmail.com krockar därför med den riktiga partner-raden
+  från mars. Använd konton med unik mejl — nu satta till biz_lc0g3raeu4
+  (test@test.com) och biz_5is3beewoe9 (asads@asd.com).
+- KVAR för partner-GO enligt Codex: publicerad 12-månaderstext ersatt,
+  juridik/redovisning stängd, de två migrerade partnernas acceptans.
+  Notera: 0 av 2 partners har accepterat avtalet ännu.
+
+# P1-fynd 2026-09-04: kundskapande gick inte via Ny deal (Andreas hittade)
+
+Rotorsak: kundskapande går via TVÅ API:er och bara den ena hade fixats.
+Kunder-sidan → /api/actions create_customer (fixad 2026-08-27).
+Ny deal-modalen → /api/customers POST (aldrig fixad) = anonymt 500 vid
+upptaget telefonnummer, och modalen läste inte ens serverns felkropp.
+
+- [x] 87dd34fa: 23505/unique_phone_per_business → 409 phone_taken med
+      förklaring; NewDealModal visar serverns meddelande i båda vägarna
+- [x] 521d1da2: dubblettkontrollen likriktad (findCustomerDuplicates +
+      force_create). I deal-flödet väljer ett klick den BEFINTLIGA kunden
+      till affären — Kunder-sidan navigerar bort, vilket skulle tappa dealen
+- [x] tsc 0; 69 kontrakt gröna
+- [ ] Efter GO: bryt ut kundskapandet till en delad helper så nästa fix inte
+      kan hamna på bara ena vägen
+- [ ] Efter GO: död kod bort i NewDealModal — inline-snabbkundformen ligger
+      kvar wrappad i `{false && ...}` sedan CustomerModal tog över (~40 rader)
+
+# Lanseringsprogrammet — testkörning (Andreas + Claude, startar 2026-09-04)
+
+Codex program (mål GO 14 sept), sanningskälla docs/launch/GO_NO_GO.md.
+Claudes förmätning 2026-09-03, allt verifierat lokalt/via MCP:
+
+- [ ] BESLUT (Andreas): fixa kodgrinden — `npm install` (lokalt) ELLER
+      npx-prefix i de fyra package.json-skripten (Codex fil, robustare).
+      node_modules/.bin/ är TOMT ⇒ test:contracts/test:partner-launch-gate/
+      proof:partner/test:tenant-isolation är okörbara som de står.
+- [x] Testinnehållet friskt: samma grind via npx = 344/344 gröna 2026-09-03
+      (Codex två röda i genomgang-fore-betalning + kundminne-kanaler åtgärdade)
+- [ ] Kör sql/v206 manuellt (business_config.company_name saknas i prod —
+      MCP-verifierat) → sedan `npm run proof:partner` grönt före push/GO
+- [ ] Grind A: build + contracts + partner-gate + launch:smoke + admin-JSON
+      (READY_FOR_MANUAL_PROOF, blocked=0) — spara JSON+SHA+tid i docs/launch/
+- [ ] Stripe-skarpbeviset ALDRIG kört: enda fuel_topup_completed är
+      evt_test_... (14 aug), fuel_ledger har 1 rad. Live-priser finns (5 st).
+      100 kr riktigt kort → exakt 10000 öre; Claude verifierar via MCP+Stripe-MCP
+- [ ] 46elks: saldo var 0 kr — påfyllning + nummer har LEDTID, förkrav för
+      Lisa-stationen (LISA_SHARP_PROOF.md), ordna FÖRE 8-10 sept
+- [ ] Färskkontoprovet (4 konton bygg/el/måleri/VVS): granska branschlistorna
+      i docs/bransch/ FÖRST — annars mäter provet ett system utan branschdata
+      (2/27 konton har jobbtyper idag)
+- [ ] Märk upp vilka av de 27 kontona (5 aktiva prenumerationer) som är
+      riktiga vs testkonton före 10-kundersprogrammet
+- Regel under programmet: inga nya features, bara P0/P1 mot låst release-SHA;
+  varje bevis bokförs i docs/launch/ med SHA + tidpunkt; BLOCKERAD ≠ PASS
+
 ## ÄTA-belopp utan rader (Codex 2026-09-07)
 
 - [x] Läs senaste kod, PR:er, CI och producent/konsument för dagsrapport → ÄTA → faktura.
