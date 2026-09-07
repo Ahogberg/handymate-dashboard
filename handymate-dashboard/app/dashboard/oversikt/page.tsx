@@ -18,6 +18,7 @@ import Link from 'next/link'
 import OnboardingChecklist from '@/components/OnboardingChecklist'
 import IdagCore from '@/components/dashboard/IdagCore'
 import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
+import { TIME_ESTIMATE_ANCHOR, TIME_ESTIMATE_EXPLANATION } from '@/lib/value/time-estimate-copy'
 import CashRadarCard from '@/components/dashboard/CashRadarCard'
 import IdentityPill from '@/components/IdentityPill'
 import { AgentReadinessCard } from '@/components/dashboard/AgentReadinessCard'
@@ -429,6 +430,9 @@ export default function DashboardOversiktPage() {
         {/* Värdebevis — Pengar in-radarn + veckovärdet (lanseringsytor) */}
         <CashRadarCard />
         <WeeklyValueDigest />
+        <p id={TIME_ESTIMATE_ANCHOR} className="mb-6 scroll-mt-24 text-xs text-gray-500">
+          <strong>Så uppskattas tiden: </strong>{TIME_ESTIMATE_EXPLANATION}
+        </p>
 
         {/* Onboarding Checklist */}
         {showOnboarding && onboardingData && (

@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { KomIgangSignals } from './kom-igang-tasks'
+import { loadChannelHealth } from './channel-health-data'
 
 /**
  * Signalerna bakom Kom igång-uppgifterna, läst för ETT företag.
@@ -8,16 +9,14 @@ import type { KomIgangSignals } from './kom-igang-tasks'
  * livscykelmailen kan tala om samma luckor som startsidan visar — annars blir
  * mailen generisk drip i stället för det kunden faktiskt saknar.
  *
- * Kundinflödet ingår INTE här: den signalen kommer från channel-health som
- * behöver användarens request (session + tenant). Fältet är valfritt i
- * KomIgangSignals; rutten lägger på det, cronen utelämnar det. Utelämnat
- * betyder "vet inte" och ger ingen uppgift — aldrig ett gissat läge.
+ * Även kundinflödesbevisen delas med mejlen. Behörighet kontrolleras av
+ * HTTP-/cron-anroparen; läsfel stoppar prioriteringen på båda ytorna.
  */
 export async function hamtaKomIgangSignals(
   supabase: SupabaseClient,
   businessId: string,
 ): Promise<KomIgangSignals> {
-  const [configRes, callRecRes, quoteRes, pushRes, invoiceRes, missionRes, customerRes, segmentedRes, pendingRes] =
+  const [configRes, callRecRes, quoteRes, pushRes, invoiceRes, missionRes, customerRes, segmentedRes, pendingRes, channelHealth] =
     await Promise.all([
       supabase.from('business_config').select('onboarding_data, fortnox_connected').eq('business_id', businessId).maybeSingle(),
       supabase.from('call_recording').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
@@ -28,6 +27,7 @@ export async function hamtaKomIgangSignals(
       supabase.from('customer').select('*', { count: 'exact', head: true }).eq('business_id', businessId),
       supabase.from('customer').select('*', { count: 'exact', head: true }).eq('business_id', businessId).not('segment_id', 'is', null),
       supabase.from('pending_approvals').select('*', { count: 'exact', head: true }).eq('business_id', businessId).eq('status', 'pending').neq('approval_type', 'team_intro'),
+      loadChannelHealth(supabase, businessId),
     ])
 
   // Ett läsfel är okänt, inte en tom portfölj eller en avklarad uppgift.
@@ -38,7 +38,15 @@ export async function hamtaKomIgangSignals(
     ?.test_call as { called_at?: string | null } | undefined
 
   const onboarding = configRes.data?.onboarding_data as Record<string, unknown> | null
+  const firstFocus = onboarding?.firstFocus ?? onboarding?.first_focus
+  const names: Record<string, string> = { phone: 'Telefon', email: 'E-post', web: 'Webb' }
   return {
+    kundinflode: {
+      any_lead_verified: channelHealth.any_lead_verified,
+      any_channel_verified: channelHealth.any_channel_verified,
+      fler_jobb: firstFocus === 'fler_jobb',
+      kanaler: channelHealth.channels.map(c => `${names[c.channel]}: ${c.label.toLowerCase()}`).join(' · '),
+    },
     firstFocus: onboarding?.firstFocus ?? onboarding?.first_focus,
     ring_test: Boolean(testCall?.called_at) || (callRecRes.count ?? 0) > 0,
     karin_has_invoice_data: Boolean(configRes.data?.fortnox_connected) || (invoiceRes.count ?? 0) > 0,

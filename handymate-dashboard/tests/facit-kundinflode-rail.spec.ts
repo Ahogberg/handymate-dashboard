@@ -45,11 +45,14 @@ test('"fungerar/bevisat" bara vid lead + affär; nådd kanal ändrar bara formul
   expect(ingen.varde).toBe(kanaler)
 })
 
-test('rutten hämtar sanningen från Codex kanalhälsa (samma request), läser firstFocus och utelämnar vid fel', () => {
+test('startsidan och mejlet delar alla bevis; ingen HTTP-route anropas från cron', () => {
   const r = kod('app/api/onboarding/kom-igang/route.ts')
-  expect(r).toContain("import { GET as channelHealthGET } from '@/app/api/onboarding/channel-health/route'")
-  expect(r).toContain('await channelHealthGET(request)')
-  expect(r).toContain("fler_jobb: firstFocus === 'fler_jobb'")
-  expect(r).toContain('...(kundinflode ? { kundinflode } : {})')
-  expect(r).not.toMatch(/any_lead_verified: true/)
+  const signals = kod('lib/onboarding/kom-igang-signals.ts')
+  const cron = kod('app/api/cron/onboarding-followup/route.ts')
+  expect(r).toContain('hamtaKomIgangSignals(supabase, businessId)')
+  expect(cron).toContain('hamtaKomIgangSignals(supabase, businessId)')
+  expect(signals).toContain('loadChannelHealth(supabase, businessId)')
+  expect(signals).toContain("fler_jobb: firstFocus === 'fler_jobb'")
+  expect(signals).toContain('any_lead_verified: channelHealth.any_lead_verified')
+  expect(r).not.toContain('channelHealthGET')
 })

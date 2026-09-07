@@ -133,7 +133,7 @@ test.describe('StepGenomgang — räknefrågor, ingen AI, ingen skip', () => {
     expect(src).not.toMatch(/anthropic|openai|generateText|messages\.create/i)
   })
 
-  test('laddningen har ett eget säkerhetsnät (max ~5 s) innan tom-läget', () => {
+  test('laddningen har ett eget säkerhetsnät (max ~5 s) innan läsfelet', () => {
     expect(src).toContain('HANG_TIMEOUT_MS = 5000')
     expect(src).toContain('Matte går igenom firman')
   })

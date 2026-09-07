@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { TIME_ESTIMATE_HREF, TIME_ESTIMATE_EXPLANATION } from '@/lib/value/time-estimate-copy'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
 import { getWeeklyValue, type WeeklyValue } from '@/lib/weekly-value'
@@ -300,7 +301,7 @@ function buildDay2EmailHtml(
   const gjort: string[] = []
   if (value) {
     if (value.calls_captured > 0) gjort.push(`<li style="margin-bottom: 8px;"><b>${value.calls_captured} kundsamtal</b> fångade</li>`)
-    if (value.time_hours > 0) gjort.push(`<li style="margin-bottom: 8px;"><b>${value.time_hours} timmar</b> administration du slapp</li>`)
+    if (value.time_hours > 0) gjort.push(`<li style="margin-bottom: 8px;">Uppskattningsvis <b>${kr(value.time_hours)} timmar</b> mindre administration. <a href="${appUrl()}${TIME_ESTIMATE_HREF}" title="${escapeHtml(TIME_ESTIMATE_EXPLANATION)}">Så uppskattas tiden</a></li>`)
     if (value.confirmed_kr > 0) gjort.push(`<li style="margin-bottom: 8px;"><b>${kr(value.confirmed_kr)} kr</b> i accepterade offerter och betalda fakturor teamet bidragit till</li>`)
   }
 
@@ -368,7 +369,7 @@ function buildDay7EmailHtml(firstName: string, value: WeeklyValue, nextAction: D
   }
   if (value.time_hours > 0) {
     bullets.push(
-      `<li style="margin-bottom: 8px;"><b>${value.time_hours} timmar</b> administration du slapp</li>`
+      `<li style="margin-bottom: 8px;">Uppskattningsvis <b>${kr(value.time_hours)} timmar</b> mindre administration. <a href="${appUrl()}${TIME_ESTIMATE_HREF}" title="${escapeHtml(TIME_ESTIMATE_EXPLANATION)}">Så uppskattas tiden</a></li>`
     )
   }
   if (value.confirmed_kr > 0) {

@@ -84,6 +84,8 @@ test('API:t är autentiserat, dynamiskt och filtrerar varje service-role-läsnin
   expect(route).toContain('getAuthenticatedBusiness(request)')
   expect(route).toContain("{ error: 'Inte inloggad' }, { status: 401 }")
 
+  const reads = kod('lib/onboarding/channel-health-data.ts')
+  expect(route).toContain('loadChannelHealth(getServerSupabase(), business.business_id)')
   for (const table of [
     'business_config',
     'email_inbound_route',
@@ -94,18 +96,18 @@ test('API:t är autentiserat, dynamiskt och filtrerar varje service-role-läsnin
     'deal',
     'leads',
   ]) {
-    const calls = Array.from(route.matchAll(new RegExp(`\\.from\\('${table}'\\)`, 'g')))
+    const calls = Array.from(reads.matchAll(new RegExp(`\\.from\\('${table}'\\)`, 'g')))
     expect(calls.length, `${table} läses inte`).toBeGreaterThan(0)
   }
 
-  const tenantFilters = Array.from(route.matchAll(/\.eq\('business_id', businessId\)/g))
-  const serviceRoleReads = Array.from(route.matchAll(/\.from\('/g))
+  const tenantFilters = Array.from(reads.matchAll(/\.eq\('business_id', businessId\)/g))
+  const serviceRoleReads = Array.from(reads.matchAll(/\.from\('/g))
   expect(tenantFilters.length, 'varje service-role-fråga måste tenantfiltreras')
     .toBe(serviceRoleReads.length)
 })
 
 test('telefonbeviset validerar testflödets exakta lead- och deal-id; inga andra rader får räcka', () => {
-  const route = kod('app/api/onboarding/channel-health/route.ts')
+  const route = kod('lib/onboarding/channel-health-data.ts')
   expect(route).toContain(".eq('id', testCall.deal_id)")
   expect(route).toContain(".eq('lead_id', testCall.lead_id)")
   expect(route).toContain(".in('lead_id', leadIds)")
@@ -114,7 +116,7 @@ test('telefonbeviset validerar testflödets exakta lead- och deal-id; inga andra
 })
 
 test('e-post och webb skiljer aktivering, kanalbevis och full Golden Path', () => {
-  const route = kod('app/api/onboarding/channel-health/route.ts')
+  const route = kod('lib/onboarding/channel-health-data.ts')
   expect(route).toContain(".from('email_inbound_route')")
   expect(route).toContain('last_received_at')
   expect(route).toContain(".from('gmail_imported_message')")

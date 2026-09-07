@@ -1044,3 +1044,15 @@ två skrivs som spec till efter lansering.
 Levererat: dashboard draft-PR #20 och landing draft-PR #2.
 
 Review: se [kundupplevelserapporten](../docs/handoffs/CUSTOMER_EXPERIENCE_2026-09-07.md) för leverans, verifiering och återstående skarpa prov.
+
+# Tre små kundstartsfixar (Codex 2026-09-07)
+
+- [x] Skilj läsfel från tom firma i genomgången, med återförsök och skydd mot sena svar.
+- [x] Märk mejlens tidsvärde som uppskattning och länka till förklaringen på Översikt.
+- [x] Dela kanalbevis och prioriteringsunderlag mellan startsidan och livscykelmejlen, med bevarad auth och tenantfiltrering.
+- [x] Kör riktade fel-/återhämtningsprov, tidsfacit, kanal-/prioriteringsprov, typkontroll och bygge.
+- [x] Lämna separat draft-PR och dokumentera miljöbegränsningar.
+
+Om kanalunderlaget inte kan läsas får mejlet ingen gissad prioritet; startsidan visar läsfel med återförsök. Inga nya tabeller, utskick eller skarpa kundprov. Större kundstartsfunktioner ligger efter lansering.
+
+Review: 9 röda / 2 gröna nya prov före rättning. Efteråt 94 riktade kod-/kontraktskontroller + 4 browserprov gröna, tsc och Next-produktionsbygge exit 0. Lint öppnar konfigurationsdialog och är inte verifierad. Rapport: [tre kundstartsfixar](../docs/handoffs/ONBOARDING_TRUTH_FIXES_2026-09-07.md). Ingen produktion eller kundkontakt.
