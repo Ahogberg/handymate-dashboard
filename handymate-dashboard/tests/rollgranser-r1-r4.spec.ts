@@ -177,6 +177,17 @@ test.describe('R1/R2 — rutterna grindar innan de läser eller raderar', () => 
     expect(block).toMatch(/if \(assignmentError\) throw assignmentError/)
   })
 
+  test('saknad medlemsidentitet nekas om inte servern bevisat impersonering (beslut Andreas 2026-09-07)', () => {
+    const src = read('app/api/projects/[id]/route.ts')
+    const nullGrind = src.indexOf('!currentUser && !business._impersonation')
+    expect(nullGrind).toBeGreaterThan(0)
+    expect(src.slice(nullGrind, nullGrind + 300)).toMatch(/status: 404/)
+    // Grinden ligger före tilldelningsuppslaget — inte efter.
+    expect(nullGrind).toBeLessThan(src.indexOf(".from('project_assignment')"))
+    // Inget "!currentUser ||"-degraderande mönster får smyga in i detaljen.
+    expect(src).not.toMatch(/!currentUser \|\| hasPermission/)
+  })
+
   test('projektdetaljens svar går genom ekonomiprojektionen med redacted-flaggan', () => {
     const src = read('app/api/projects/[id]/route.ts')
     expect(src).toMatch(/NextResponse\.json\(projiceraProjektdetalj\(\{/)
@@ -186,9 +197,9 @@ test.describe('R1/R2 — rutterna grindar innan de läser eller raderar', () => 
   test('projekt-DELETE kräver owner/admin före första raderingen', () => {
     const src = read('app/api/projects/route.ts')
     const del = src.slice(src.indexOf('export async function DELETE'))
-    const grind = del.indexOf('!isOwnerOrAdmin(actor)')
+    const grind = del.indexOf('!actor || !isOwnerOrAdmin(actor) || business._impersonation')
     const forstaRadering = del.indexOf('.delete()')
-    expect(grind).toBeGreaterThan(0)
+    expect(grind, 'null-aktör och impersonering nekas, inte bara fel roll').toBeGreaterThan(0)
     expect(forstaRadering).toBeGreaterThan(grind)
     expect(del.slice(grind, grind + 200)).toMatch(/status: 403/)
   })

@@ -23,9 +23,11 @@ export const dynamic = 'force-dynamic'
  *  - Tilldelning: en anställd utan see_all_projects kunde läsa vilket
  *    projekt som helst i firman via id, trots att listan bara visar
  *    tilldelade. Nu samma grind som listan: utan tilldelning → 404,
- *    innan en enda barnfråga körs. Okänd betraktare (null) faller öppet
- *    av samma dokumenterade skäl som listan (superadmin-impersonation,
- *    se app/api/projects/route.ts) — aldrig mer begränsad än listan.
+ *    innan en enda barnfråga körs. Saknad medlemsidentitet (null) är
+ *    INTE ett bevis på impersonering (beslut Andreas 2026-09-07): bara
+ *    `business._impersonation`, som getAuthenticatedBusiness sätter
+ *    efter serververifierad superadmin + cookie + känt målföretag,
+ *    släpper igenom en betraktare utan medlemsrad. Annars 404.
  *  - Ekonomi: summeringen nollades men quote.total, materialpriser,
  *    tidposternas timpris och milstolpsintäkt gick ut råa. Hela svaret
  *    går nu genom lib/projects/ekonomiprojektion.ts när prices_redacted.
@@ -57,6 +59,11 @@ export async function GET(
 
     // Tilldelningsgrind (R1) — före kund- och barnfrågorna.
     const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser && !business._impersonation) {
+      // Ingen medlemsrad och inget serververifierat impersoneringsbevis:
+      // vi vet inte vem som frågar, och då finns projektet inte.
+      return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
     if (currentUser && !hasPermission(currentUser, 'see_all_projects')) {
       const { data: assignment, error: assignmentError } = await supabase
         .from('project_assignment')

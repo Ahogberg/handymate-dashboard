@@ -839,7 +839,9 @@ export async function PUT(request: NextRequest) {
  * räckte medlemskap i firman — en anställd utan en enda tilldelning kunde
  * radera vilket projekt som helst utan tidrapporter. Beslut 2026-09-07:
  * radering är ägare/admin, en PM får inte den rätten via see_all_projects.
- * Okänd betraktare (null) faller öppet av samma skäl som GET ovan.
+ * Saknad medlemsidentitet (null) nekas — den är inte ett bevis på
+ * impersonering (beslut Andreas 2026-09-07). Impersonering nekas också:
+ * den är läs-only (lib/auth.ts, samma mönster som recordings och voice).
  */
 export async function DELETE(request: NextRequest) {
   try {
@@ -849,7 +851,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const actor = await getCurrentUser(request, business.business_id)
-    if (actor && !isOwnerOrAdmin(actor)) {
+    if (!actor || !isOwnerOrAdmin(actor) || business._impersonation) {
       return NextResponse.json({ error: 'Bara ägare eller admin kan ta bort projekt' }, { status: 403 })
     }
 
