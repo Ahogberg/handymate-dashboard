@@ -1039,6 +1039,8 @@ två skrivs som spec till efter lansering.
 - [x] Jämför offentliga löften, partnertexter och köpflöde med aktuell kod och launch-underlag.
 - [x] Genomför avgränsade förbättringar och skapa färdiga kundstarts-/partnermallar.
 - [x] Kör relevanta lokala kontroller, typkontroll och bygge; redovisa gränsen mot skarpa prov.
-- [ ] Leverera draft-PR och samlad rapport, utan merge/deployment/utskick.
+- [x] Leverera draft-PR och samlad rapport, utan merge/deployment/utskick.
+
+Levererat: dashboard draft-PR #20 och landing draft-PR #2.
 
 Review: se [kundupplevelserapporten](../docs/handoffs/CUSTOMER_EXPERIENCE_2026-09-07.md) för leverans, verifiering och återstående skarpa prov.
