@@ -64,7 +64,28 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
   (fr-qa-claude-visual-check-2026-09-07) raderad efter skärmdumparna.
 - [ ] Yta 4 portalens beslutskort — Design-brief skriven 2026-09-07
       (docs/design/briefs/04-portalens-beslutskort.md), väntar på Design
-- [ ] Design-ytorna 2, 5, 6, 8–10 från listan 2026-09-07 (ej påbörjade)
+- [x] Yta 2 dokumentfamiljen (PDF) — pushad 2026-09-07: EN helper
+      lib/branding/pdf.ts (loadPdfBranding/pdfBrandingFrom/loadPdfLogo,
+      drawBrandHeader → content-y, drawBrandFooter med "Sida i av n";
+      stämpeln ritar renderaren själv — facit-attribution-pdf kräver
+      literalen). Sex renderare går genom den: byggdagbok, egenkontroll/
+      formulärsvar, arbetsorder, ÄTA (pdf-data laddar brand, pdf.ts tar
+      `brand`), jobbrapporten (brand laddas FÄRSKT vid approve, payloaden
+      kan vara dagar gammal; margin-option 15 mm) och faktura-jsPDF-
+      fallbacken (accent + logga via logo_base64/logo_format; HTML→Chromium-
+      vägen är primär och orörd). AuthenticatedBusiness typad med
+      logo_url/accent_color/f_skatt_registered (raden är select('*')).
+      Facit tests/pdf-varumarke.spec.ts (31: källskanning + riktig jsPDF-
+      rendering). tsc 0 (körs från handymate-dashboard/handymate-dashboard —
+      från repo-roten sväljer tsc syskonprojekt och OOM:ar).
+- Fälla yta 2: lokala lib/ata/pdf.ts låg FÖRE Codex F10-fix (d79fb2ac,
+  notes ur kund-PDF:en) — hade återinfört ANTECKNINGAR-blocket. Fångat i
+  baskontrollen mot origin, rättat, livegenomgang-f10 grönt. Rött lokalt
+  utan koppling: work-report.spec (matte/chat äldre lokalt + CRLF) och
+  F11 (data-builder äldre lokalt).
+- [ ] Yta 2 kvar: skarptest — öppna en byggdagbok-, ÄTA- och arbetsorder-
+      PDF på ett konto MED logga (Bee) och ett UTAN; jobbrapport vid approve.
+- [ ] Design-ytorna 5, 6, 8–10 från listan 2026-09-07 (ej påbörjade)
 
 # Partnergrinden GRÖN 2026-09-07 (Claude)
 

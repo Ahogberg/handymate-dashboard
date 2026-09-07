@@ -2,18 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import jsPDF from 'jspdf'
+import { brandingFromConfig } from '@/lib/branding/get-branding'
+import { stampAttributionOnPdf } from '@/lib/branding/attribution'
+import {
+  drawBrandHeader,
+  drawBrandFooter,
+  loadPdfLogo,
+  pdfBrandingFrom,
+  PDF_TEXT_PRIMARY as TEXT_PRIMARY,
+  PDF_TEXT_MUTED as TEXT_MUTED,
+} from '@/lib/branding/pdf'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
 export const dynamic = 'force-dynamic'
 
-
-const ACCENT_RGB = [15, 118, 110] as const
-const TEXT_PRIMARY = [30, 41, 59] as const
-const TEXT_MUTED = [100, 116, 139] as const
+/** Dokumenttypen i sidhuvudet, efter mallens kategori (sql/v11_forms.sql). */
+const KATEGORI_LABEL: Record<string, string> = {
+  egenkontroll: 'Egenkontroll',
+  safety: 'Skyddsrond',
+  inspection: 'Besiktningsprotokoll',
+}
 
 /**
- * GET /api/form-submissions/[id]/pdf — Generera PDF av formulär
+ * GET /api/form-submissions/[id]/pdf — Generera PDF av formulär.
+ *
+ * Egenkontrollen är kvalitetsbeviset kunden får i handen — sedan yta 2
+ * (2026-09-07) bär den firmans logotyp, accentfärg och företagsfot ur
+ * brand-lagret (lib/branding/pdf.ts), som offert och faktura.
  */
 export async function GET(
   request: NextRequest,
@@ -57,6 +73,11 @@ export async function GET(
       submission.project = null
     }
 
+    // Varumärket: business är hela business_config-raden (select('*')) —
+    // ingen extra query, bara loggan hämtas.
+    const brand = pdfBrandingFrom(brandingFromConfig(business), await loadPdfLogo(business.logo_url, 'form-submissions/pdf'))
+    const ACCENT_RGB = brand.accent
+
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
     const pageWidth = doc.internal.pageSize.getWidth()
     const margin = 20
@@ -70,37 +91,21 @@ export async function GET(
       }
     }
 
-    // Header
-    doc.setFontSize(18)
-    doc.setTextColor(...ACCENT_RGB)
-    doc.text(submission.name, margin, y)
-    y += 8
-
-    // Business name
-    doc.setFontSize(10)
-    doc.setTextColor(...TEXT_MUTED)
-    doc.text(business.business_name || '', margin, y)
-    y += 5
-
-    // Project name
+    // Sidhuvud ur brand-lagret — dokumenttyp efter mallens kategori.
     const project = submission.project as any
-    if (project?.name) {
-      doc.text(`Projekt: ${project.name}`, margin, y)
-      y += 5
-    }
-
-    // Status + date
     const statusLabel = submission.status === 'signed' ? 'Signerat' : submission.status === 'completed' ? 'Ifyllt' : 'Utkast'
     const dateStr = submission.signed_at
       ? new Date(submission.signed_at).toLocaleDateString('sv-SE')
       : new Date(submission.created_at).toLocaleDateString('sv-SE')
-    doc.text(`Status: ${statusLabel} · ${dateStr}`, margin, y)
-    y += 10
-
-    // Separator line
-    doc.setDrawColor(226, 232, 240)
-    doc.line(margin, y, pageWidth - margin, y)
-    y += 8
+    const kategori = (submission.template as { category?: string | null } | null)?.category
+    const meta: string[] = []
+    if (project?.name) meta.push(`Projekt: ${project.name}`)
+    meta.push(`${statusLabel} · ${dateStr}`)
+    y = drawBrandHeader(doc, brand, {
+      docType: (kategori && KATEGORI_LABEL[kategori]) || 'Protokoll',
+      title: submission.name,
+      meta,
+    })
 
     // Fields
     const fields = submission.fields || []
@@ -228,6 +233,10 @@ export async function GET(
         } catch { /* ignore */ }
       }
     }
+
+    // Sidfot (firma · org.nr · F-skatt · kontakt + sidnummer) + stämpeln sist.
+    drawBrandFooter(doc, brand)
+    stampAttributionOnPdf(doc, brand.branding.attribution)
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     const filename = `${submission.name.replace(/[^a-zA-Z0-9åäöÅÄÖ\s-]/g, '').trim()}.pdf`

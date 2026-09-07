@@ -31,6 +31,10 @@ export interface Branding {
   contactEmail?: string
   contactPhone?: string
   orgNumber?: string
+  /** Postadress — dokumentens sidhuvud (yta 2), aldrig i mail. */
+  address?: string
+  /** Godkänd för F-skatt — dokumentfoten. false/okänt skrivs aldrig ut. */
+  fSkattRegistered: boolean
   swishNumber?: string
   bankgiro?: string
   attribution: Attribution
@@ -45,6 +49,8 @@ export type BrandingSource = {
   phone_number?: string | null
   public_phone?: string | null
   org_number?: string | null
+  address?: string | null
+  f_skatt_registered?: boolean | null
   logo_url?: string | null
   accent_color?: string | null
   swish_number?: string | null
@@ -55,7 +61,7 @@ export type BrandingSource = {
 
 /** Kolumnlistan för loadBranding — utan attribution_link_enabled (sql/v202), se fallback. */
 export const BRANDING_COLUMNS =
-  'business_name, display_name, contact_name, contact_email, phone_number, public_phone, org_number, logo_url, accent_color, swish_number, bankgiro, referral_code'
+  'business_name, display_name, contact_name, contact_email, phone_number, public_phone, org_number, address, f_skatt_registered, logo_url, accent_color, swish_number, bankgiro, referral_code'
 
 export function normalizeAccentColor(value: string | null | undefined): string {
   const v = (value ?? '').trim()
@@ -80,6 +86,8 @@ export function brandingFromConfig(row: BrandingSource | null | undefined): Bran
     contactEmail: clean(row?.contact_email),
     contactPhone: clean(row?.public_phone) ?? clean(row?.phone_number),
     orgNumber: clean(row?.org_number),
+    address: clean(row?.address),
+    fSkattRegistered: row?.f_skatt_registered === true,
     swishNumber: clean(row?.swish_number),
     bankgiro: clean(row?.bankgiro),
     attribution: buildAttribution(row),

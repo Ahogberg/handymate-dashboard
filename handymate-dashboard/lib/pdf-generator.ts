@@ -67,6 +67,10 @@ interface BusinessData {
   accent_color?: string
   invoice_footer_text?: string
   penalty_interest?: number
+  /** Base64 data-URI, förhämtad av anroparen (lib/branding/pdf.ts loadPdfLogo). */
+  logo_base64?: string
+  /** jsPDF addImage kräver PNG eller JPEG. */
+  logo_format?: 'PNG' | 'JPEG'
 }
 
 function formatSEK(amount: number | null | undefined): string {
@@ -97,11 +101,43 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
   else if (invoiceType === 'reminder') title = 'PÅMINNELSE'
   else if (invoiceType === 'partial') title = 'DELFAKTURA'
 
+  // Firmans accentfärg (yta 2, 2026-09-07) — fallbacken ska se ut som
+  // Fortnox-fakturan och offerten, inte som Handymate.
+  const accent = hexToRgb(business.accent_color)
+
   // ── Header ──
+  // Logga (PNG/JPEG, förhämtad) till vänster; texten flyttas åt höger om
+  // den. Misslyckas addImage faller vi tyst tillbaka till text-only —
+  // fakturan får ALDRIG fallera på loggan.
+  let textX = margin
+  if (business.logo_base64 && business.logo_format) {
+    try {
+      const maxW = 35
+      const maxH = 14
+      let logoW = maxW
+      let logoH = maxH
+      const props = doc.getImageProperties(business.logo_base64)
+      if (props?.width && props?.height) {
+        const ratio = props.width / props.height
+        logoH = maxH
+        logoW = logoH * ratio
+        if (logoW > maxW) {
+          logoW = maxW
+          logoH = logoW / ratio
+        }
+      }
+      doc.addImage(business.logo_base64, business.logo_format, margin, y, logoW, logoH)
+      textX = margin + logoW + 4
+    } catch (err) {
+      console.error('[generateInvoicePDF] Kunde inte rita logga i PDF-header:', err)
+      textX = margin
+    }
+  }
+
   // Company name (left) — weight 500 equivalent
   doc.setFontSize(16)
   doc.setTextColor(...TEXT_PRIMARY)
-  doc.text(business.business_name || 'Företag', margin, y + 6)
+  doc.text(business.business_name || 'Företag', textX, y + 6)
 
   // Contact info below company name
   doc.setFontSize(9)
@@ -111,12 +147,12 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
     business.address || '',
   ].filter(Boolean)
   companyLines.forEach((line, i) => {
-    doc.text(line, margin, y + 12 + i * 4)
+    doc.text(line, textX, y + 12 + i * 4)
   })
 
-  // Document type label (right, uppercase, teal)
+  // Document type label (right, uppercase, accent)
   doc.setFontSize(8)
-  doc.setTextColor(...ACCENT_RGB)
+  doc.setTextColor(...accent)
   doc.text(title, pageWidth - margin, y + 3, { align: 'right' })
 
   // Document number (right, larger)
@@ -130,9 +166,9 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
     doc.text(`Anledning: ${invoice.credit_reason}`, pageWidth - margin, y + 17, { align: 'right' })
   }
 
-  // ── Teal line ──
+  // ── Accentlinje ──
   y += 24
-  doc.setDrawColor(...ACCENT_RGB)
+  doc.setDrawColor(...accent)
   doc.setLineWidth(0.15)
   doc.line(margin, y, pageWidth - margin, y)
   y += 10
@@ -165,7 +201,7 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
   doc.setTextColor(...LABEL_COLOR)
   doc.text('FÖRFALLODATUM', dateX, y + 13)
   doc.setFontSize(10)
-  doc.setTextColor(...ACCENT_RGB) // Teal highlight
+  doc.setTextColor(...accent) // Accent highlight
   doc.text(new Date(invoice.due_date).toLocaleDateString('sv-SE', { day: 'numeric', month: 'long', year: 'numeric' }), dateX, y + 18)
 
   // Column 3: References
@@ -192,7 +228,7 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
   // ── ROT/RUT notice (subtle) ──
   if (invoice.rot_rut_type) {
     doc.setFontSize(9)
-    doc.setTextColor(...ACCENT_RGB)
+    doc.setTextColor(...accent)
     doc.text(
       `${invoice.rot_rut_type.toUpperCase()}-avdrag: ${formatSEK(invoice.rot_rut_deduction)} begärs hos Skatteverket. Att betala: ${formatSEK(invoice.customer_pays)}.`,
       margin, y,
@@ -232,11 +268,11 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
       ])
     } else if (itemType === 'discount') {
       tableBody.push([
-        { content: item.description, styles: { textColor: [...ACCENT_RGB] } },
-        { content: String(item.quantity), styles: { textColor: [...ACCENT_RGB] } },
-        { content: item.unit, styles: { textColor: [...ACCENT_RGB] } },
-        { content: formatSEK(Math.abs(item.unit_price)), styles: { textColor: [...ACCENT_RGB] } },
-        { content: `-${formatSEK(Math.abs(item.total))}`, styles: { textColor: [...ACCENT_RGB], halign: 'right' as const } },
+        { content: item.description, styles: { textColor: [...accent] } },
+        { content: String(item.quantity), styles: { textColor: [...accent] } },
+        { content: item.unit, styles: { textColor: [...accent] } },
+        { content: formatSEK(Math.abs(item.unit_price)), styles: { textColor: [...accent] } },
+        { content: `-${formatSEK(Math.abs(item.total))}`, styles: { textColor: [...accent], halign: 'right' as const } },
       ])
     } else {
       tableBody.push([
@@ -298,7 +334,7 @@ export function generateInvoicePDF(invoice: InvoiceData, business: BusinessData,
       y += 3
     }
     doc.setFontSize(options?.bold ? 11 : 9)
-    const color = options?.teal ? ACCENT_RGB : options?.bold ? TEXT_PRIMARY : TEXT_MUTED
+    const color = options?.teal ? accent : options?.bold ? TEXT_PRIMARY : TEXT_MUTED
     doc.setTextColor(color[0], color[1], color[2])
     doc.text(label, totalsX, y)
     doc.text(value, totalsX + totalsW, y, { align: 'right' })

@@ -9,13 +9,15 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { signStorageUrl } from '@/lib/storage-signing'
-import type { AtaPdfBilaga, AtaPdfBusiness, AtaPdfCustomer, AtaPdfProject } from './pdf'
+import { loadPdfBranding, type PdfBranding } from '@/lib/branding/pdf'
+import type { AtaPdfBilaga, AtaPdfCustomer, AtaPdfProject } from './pdf'
 
 /** Bucketen ÄTA-bilagor ligger i (privat, se sql/v151_private_buckets.sql). */
 export const ATA_BILAGE_BUCKET = 'project-files'
 
 export interface AtaPdfKontext {
-  business: AtaPdfBusiness | null
+  /** Varumärket (logga, accent, org.nr, F-skatt) — EN query via loadBranding. */
+  brand: PdfBranding
   customer: AtaPdfCustomer | null
   project: AtaPdfProject | null
   attachments: AtaPdfBilaga[]
@@ -25,12 +27,8 @@ export async function laddaAtaPdfKontext(
   supabase: SupabaseClient,
   ata: { change_id: string; business_id: string; project_id: string | null; customer_id?: string | null },
 ): Promise<AtaPdfKontext> {
-  const [{ data: business }, { data: project }, { data: bilagor }] = await Promise.all([
-    supabase
-      .from('business_config')
-      .select('business_name, org_number, address, phone_number, contact_email, logo_url')
-      .eq('business_id', ata.business_id)
-      .maybeSingle(),
+  const [brand, { data: project }, { data: bilagor }] = await Promise.all([
+    loadPdfBranding(supabase, ata.business_id, 'ata/pdf'),
     ata.project_id
       ? supabase
           .from('project')
@@ -67,7 +65,7 @@ export async function laddaAtaPdfKontext(
   }
 
   return {
-    business: business ?? null,
+    brand,
     customer,
     project: project ? { name: project.name, project_number: project.project_number } : null,
     attachments,

@@ -42,6 +42,7 @@ import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evi
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
 import { buildAttribution } from '@/lib/branding/attribution'
+import { loadPdfLogo } from '@/lib/branding/pdf'
 import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
 import { halsning } from '@/lib/customers/namn'
 import {
@@ -226,11 +227,15 @@ export async function sendInvoice(
       } catch (htmlPdfErr) {
         console.error('[invoices/send] HTML→PDF-vägen misslyckades — faller tillbaka till jsPDF:', htmlPdfErr)
         console.error('[invoices/send] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, mejlbilagan skickas med den äldre jsPDF-renderaren')
-        const swishQR = await generateSwishQR(
-          businessConfig?.swish_number,
-          amountToPay || invoice.total,
-          invoice.invoice_number,
-        )
+        const [swishQR, logo] = await Promise.all([
+          generateSwishQR(
+            businessConfig?.swish_number,
+            amountToPay || invoice.total,
+            invoice.invoice_number,
+          ),
+          // Firmans logga + accent även i fallbacken (yta 2, 2026-09-07).
+          loadPdfLogo(businessConfig?.logo_url, 'invoices/send'),
+        ])
         pdfBuffer = generateInvoicePDF(
           {
             invoice_number: invoice.invoice_number,
@@ -267,6 +272,9 @@ export async function sendInvoice(
             swish_number: businessConfig?.swish_number,
             swish_qr: swishQR || undefined,
             f_skatt_registered: businessConfig?.f_skatt_registered,
+            accent_color: businessConfig?.accent_color || undefined,
+            logo_base64: logo?.data,
+            logo_format: logo?.format,
           },
           // businessConfig är hela raden (select('*')) — stämpeln byggs direkt.
           { attribution: buildAttribution(businessConfig) },

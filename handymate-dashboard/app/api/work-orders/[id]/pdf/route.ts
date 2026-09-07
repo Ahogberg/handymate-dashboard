@@ -2,18 +2,27 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import jsPDF from 'jspdf'
+import { brandingFromConfig } from '@/lib/branding/get-branding'
+import { stampAttributionOnPdf } from '@/lib/branding/attribution'
+import {
+  drawBrandHeader,
+  drawBrandFooter,
+  loadPdfLogo,
+  pdfBrandingFrom,
+  PDF_TEXT_PRIMARY as TEXT_PRIMARY,
+  PDF_TEXT_MUTED as TEXT_MUTED,
+} from '@/lib/branding/pdf'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
 export const dynamic = 'force-dynamic'
 
-
-const ACCENT = [15, 118, 110] as const
-const TEXT_PRIMARY = [30, 41, 59] as const
-const TEXT_MUTED = [100, 116, 139] as const
-
 /**
- * GET /api/work-orders/[id]/pdf — Exportera arbetsorder som PDF
+ * GET /api/work-orders/[id]/pdf — Exportera arbetsorder som PDF.
+ *
+ * Sidhuvud/sidfot ur brand-lagret (lib/branding/pdf.ts, yta 2 2026-09-07):
+ * arbetsordern följer ofta med till kunden på plats och ska se ut som
+ * resten av firmans dokument.
  */
 export async function GET(
   request: NextRequest,
@@ -44,37 +53,21 @@ export async function GET(
       .eq('project_id', wo.project_id)
       .single()
 
+    // Varumärket: business är hela business_config-raden (select('*')) —
+    // ingen extra query, bara loggan hämtas.
+    const brand = pdfBrandingFrom(brandingFromConfig(business), await loadPdfLogo(business.logo_url, 'work-orders/pdf'))
+    const ACCENT = brand.accent
+
     const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' })
-    const pageWidth = doc.internal.pageSize.getWidth()
+    const contentWidth = doc.internal.pageSize.getWidth() - 40
     const margin = 20
-    const contentWidth = pageWidth - margin * 2
     let y = margin
 
-    // ── Header ──
-    doc.setFontSize(8)
-    doc.setTextColor(...ACCENT)
-    doc.text('ARBETSORDER', margin, y + 3)
-
-    doc.setFontSize(10)
-    doc.setTextColor(...TEXT_MUTED)
-    doc.text(wo.order_number, margin, y + 9)
-
-    doc.setFontSize(14)
-    doc.setTextColor(...TEXT_PRIMARY)
-    doc.text(business.business_name || '', pageWidth - margin, y + 6, { align: 'right' })
-
-    doc.setFontSize(9)
-    doc.setTextColor(...TEXT_MUTED)
-    const contactLine = [business.contact_phone, business.contact_email].filter(Boolean).join(' · ')
-    if (contactLine) doc.text(contactLine, pageWidth - margin, y + 12, { align: 'right' })
-
-    y += 20
-
-    // Separator
-    doc.setDrawColor(226, 232, 240)
-    doc.setLineWidth(0.3)
-    doc.line(margin, y, pageWidth - margin, y)
-    y += 8
+    // ── Sidhuvud ur brand-lagret ──
+    y = drawBrandHeader(doc, brand, {
+      docType: 'Arbetsorder',
+      title: String(wo.order_number ?? ''),
+    })
 
     // ── Title ──
     doc.setFontSize(16)
@@ -144,19 +137,9 @@ export async function GET(
       addSection('Tilldelad', assignStr)
     }
 
-    // Footer
-    const pageCount = doc.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
-      doc.setFontSize(7)
-      doc.setTextColor(...TEXT_MUTED)
-      doc.text(
-        `${business.business_name} — Arbetsorder ${wo.order_number} — Sida ${i} av ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      )
-    }
+    // Sidfot (firma · org.nr · F-skatt · kontakt + sidnummer) + stämpeln sist.
+    drawBrandFooter(doc, brand)
+    stampAttributionOnPdf(doc, brand.branding.attribution)
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
 
