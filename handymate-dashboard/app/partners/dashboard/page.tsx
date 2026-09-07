@@ -20,7 +20,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Zap, Copy, Check, Users, LogOut, Loader2, Eye, EyeOff, Settings, X,
-  Mail, MessageCircle, Smartphone,
+  Mail, MessageCircle, Smartphone, ChevronRight,
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
 import AgreementGate from '../components/AgreementGate'
@@ -508,6 +508,38 @@ export default function PartnerDashboardPage() {
             <span className="ml-auto text-[13px] text-slate-500">
               Kod <strong className="font-mono text-slate-900">{partner.referral_code}</strong>
             </span>
+          </div>
+        </section>
+
+        {/* ─── Säljmaterial ─── */}
+        <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col gap-3.5">
+          <div>
+            <h2 className="text-[17px] font-semibold text-slate-900">Säljmaterial</h2>
+            <p className="text-[13px] text-slate-500 mt-0.5">
+              Förifyllt med ditt namn och din länk — visa, skriv ut eller skicka vidare.
+            </p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            {[
+              { href: '/partners/material/partnerdeck', titel: 'Partnerdeck för mobilen', detalj: '11 slides att visa i kundmötet' },
+              { href: '/partners/material/leave-behind', titel: 'Leave-behind (A4)', detalj: 'Skriv ut med din kontakt förifylld' },
+              { href: '/partners/material/demo-manus', titel: 'Demo-manus, 20 minuter', detalj: 'Talarstöd och vanliga invändningar' },
+            ].map(m => (
+              <Link
+                key={m.href}
+                href={m.href}
+                className="flex items-center gap-3.5 px-3.5 py-3 rounded-xl border border-transparent hover:bg-slate-50 hover:border-slate-200 transition-colors"
+              >
+                <span className="w-9 h-9 rounded-lg bg-teal-50 text-primary-700 flex items-center justify-center flex-none">
+                  <Smartphone className="w-4 h-4" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium text-slate-900">{m.titel}</span>
+                  <span className="block text-xs text-slate-500">{m.detalj}</span>
+                </span>
+                <ChevronRight className="w-4 h-4 text-slate-400 flex-none" />
+              </Link>
+            ))}
           </div>
         </section>
 
