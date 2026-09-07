@@ -20,6 +20,7 @@ import { completeFirstQuoteOnboarding } from '@/lib/onboarding/first-quote-hando
 import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
 import { resolveFirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
 import { normalizeStandardHourlyRate } from '@/lib/onboarding/pricing-start'
+import { normalizeOnboardingServiceArea } from '@/lib/onboarding/service-area'
 import { MatteSetupGuide } from '@/components/onboarding/MatteSetupGuide'
 import { isDemoBusinessId } from '@/lib/demo/is-demo-client'
 import { SetupStudioShell } from '@/components/onboarding/SetupStudioShell'
@@ -220,12 +221,14 @@ export default function OnboardingPage() {
           companyName: d.business_name,
           trade: d.branch,
           orgNumber: d.org_number,
-          area: d.service_area,
           contactName: d.contact_name,
           email: d.contact_email,
           phone: d.phone_number,
           fSkatt: true,
           ...(d.onboarding_data || {}),
+          // JSONB may contain the legacy { type, values } area shape.
+          // Normalize after the draft spread so persisted drafts are safe too.
+          area: normalizeOnboardingServiceArea(d.onboarding_data?.area ?? d.service_area),
           // Server-härlett (aldrig från onboarding_data — se GET /api/onboarding).
           // Placerad EFTER spreadet så den aldrig kan skuggas av ett gammalt
           // cachat värde i onboarding_data.

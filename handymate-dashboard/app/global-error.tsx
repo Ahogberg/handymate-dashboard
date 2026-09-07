@@ -66,6 +66,9 @@ export default function GlobalError({
             >
               Försök igen
             </button>
+            <a href="/" style={{ display: 'block', marginTop: 16, padding: 12, color: '#0F766E' }}>
+              Till startsidan
+            </a>
           </div>
         </main>
       </body>

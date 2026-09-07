@@ -53,6 +53,31 @@
 }
 
 /* ========== Screen shell ========== */
+.ob-exit-nav {
+  position: sticky;
+  top: 0;
+  z-index: 110;
+  display: flex;
+  justify-content: flex-end;
+  padding: 8px 16px;
+  padding-top: max(8px, env(safe-area-inset-top));
+  background: var(--ob-bg);
+  border-bottom: 1px solid var(--ob-border);
+}
+.ob-exit-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 8px 12px;
+  color: var(--ob-primary-700);
+  font-weight: 600;
+  border-radius: 8px;
+}
+.ob-exit-link:focus-visible {
+  outline: 3px solid var(--ob-primary-600);
+  outline-offset: 2px;
+}
+.ob-layout .ob-page { min-height: calc(100dvh - 61px); }
 .ob-page {
   min-height: 100vh;
   background: var(--ob-bg);
