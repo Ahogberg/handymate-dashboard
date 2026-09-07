@@ -91,3 +91,19 @@ Dessa kontrakt exekveras i `tests/customer-preparation/contract.test.mjs`.
 
 ### Lars kundunderlagskontroll — 2026-09-05
 POST /api/customer-preparation/review: getAuthenticatedBusiness + aktiv owner/admin, ingen impersonation. Serverladdat underlag med business_id; projekt måste matcha både business_id och customer_id. Privata bilder hämtas endast under företagets och underlagets sökväg. V213 utökar den service-only-tabell som infördes i V212; ingen ny publik databasåtkomst. Driftprovet och migrationens utförande återstår enligt tasks/lars-preparation-review.md.
+
+## Tillägg 2026-09-07 — varumärkeslagret (yta 4 + yta 5)
+
+Tre nya vägar utanför direkt standardgrind (151 totalt):
+- `portal/[token]/decisions`: portal_token via getCustomerFromPortalToken;
+  läser bara kundens egna öppna beslut (ÄTA, faktura, omdöme). Ingen skrivning.
+- `portal/[token]/review`: portal_token; POST sparar högst ett omdöme per kund
+  (409 vid upprepning) och lägger texten i kundens tråd. Ingen SMS, inget LLM
+  — därför inget separat IP-tak. PATCH markerar bara Google-klick.
+- `public/booking-page/[slug]`: storefront-slug + is_published, samma grind som
+  `public/availability/[slug]`. Svarar med varumärke ur brand-lagret (som
+  storefronten redan visar publikt) och beräknade lediga tider. Ingen skrivning;
+  själva bokningen går fortfarande via `public/book/[slug]` med sitt IP-tak.
+
+De två portalrutterna pushades 2026-09-07 (35fe3db7) utan att inventeringen
+höjdes — rättat samma dag.

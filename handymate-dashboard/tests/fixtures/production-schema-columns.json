@@ -1,6 +1,6 @@
 {
-  "verified_at": "2026-09-04",
-  "source": "Supabase PostgREST OpenAPI, service_role, read-only. business_config uppdaterad 2026-09-04 efter migration v211 (deleted_at, deleted_by).",
+  "verified_at": "2026-09-07",
+  "source": "Supabase PostgREST OpenAPI, service_role, read-only. business_config uppdaterad 2026-09-04 efter migration v211 (deleted_at, deleted_by) och 2026-09-07 efter v222 (booking_visit_free).",
   "tables": {
     "business_config": [
       "accent_color",
@@ -32,6 +32,7 @@
       "benchmark_consent_version",
       "billing_period_end",
       "billing_period_start",
+      "booking_visit_free",
       "branch",
       "break_after_hours",
       "business_id",

@@ -77,6 +77,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'portal/[token]': 'portal_token (randomUUID) + portal_enabled via getCustomerFromPortalToken',
   'portal/[token]/activity': 'portal_token',
   'portal/[token]/agreements': 'portal_token',
+  'portal/[token]/decisions': 'portal_token — bara läsning av kundens egna öppna beslut (yta 4, 2026-09-07)',
   'portal/[token]/documents': 'portal_token, signerade storage-URL:er',
   'portal/[token]/installations': 'portal_token',
   'portal/[token]/invoices': 'portal_token',
@@ -87,7 +88,9 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'portal/[token]/projects': 'portal_token',
   'portal/[token]/quotes': 'portal_token',
   'portal/[token]/reports': 'portal_token',
+  'portal/[token]/review': 'portal_token — högst ett omdöme per kund (409 vid upprepning), skriver en rad + tråden, ingen SMS',
   'public/availability/[slug]': 'storefront-slug + is_published — bara beräknade slots',
+  'public/booking-page/[slug]': 'storefront-slug + is_published — varumärke ur brand-lagret (redan publikt via storefronten) + samma beräknade slots som availability, ingen skrivning',
   'public/book/[slug]': 'storefront-slug + is_published — fail-closed IP-tak, datumvalidering',
   'quotes/public/[token]': 'sign_token (randomUUID) — atomisk signering (v97), tak på fråga/bokning',
   'quotes/track': 'quote_id + sign_token (t=) krävs för varje skrivning sedan 2026-09-01',
@@ -189,6 +192,10 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // cron-hemlighet, ingen tenant-kontext (svepet grupperar per
   // business_id själv, exakt samma motivering som kort-gar-ut) → 146.
   // 2026-09-05 kundförberedelse: ägar-helper + avgränsad publik kundlänk → 148.
+  // 2026-09-07 varumärkeslagret: yta 4 gav portal/[token]/decisions +
+  // portal/[token]/review (portal_token, pushade utan att höja taket — rättat
+  // här), yta 5 gav public/booking-page/[slug] (storefront-slug, samma grind
+  // som availability). RÄKNAT på origin/main + bokningsrutten → 151.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(148)
+  expect(utanStandard.length).toBeLessThanOrEqual(151)
 })

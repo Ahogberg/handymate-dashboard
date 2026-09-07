@@ -39,6 +39,7 @@ import ReadyMeter from '@/components/settings/kundvy/ReadyMeter'
 import TouchpointCards from '@/components/settings/kundvy/TouchpointCards'
 import PreviewModal from '@/components/settings/kundvy/PreviewModal'
 import { StampNote, DemoBanner } from '@/components/settings/kundvy/Notes'
+import BookingLinkCard from '@/components/settings/kundvy/BookingLinkCard'
 
 type ConfigRow = Record<string, unknown> & {
   business_name?: string | null
@@ -47,6 +48,8 @@ type ConfigRow = Record<string, unknown> & {
   accent_color?: string | null
   quote_template_style?: string | null
   google_review_url?: string | null
+  /** sql/v222 — saknas kolumnen (migration ej körd) är fältet undefined → AV. */
+  booking_visit_free?: boolean | null
 }
 
 const DEMO_HIDE_KEY = 'kundvy_demo_banner_hidden'
@@ -278,6 +281,13 @@ export default function KundvyPage() {
               registerLogoPicker={registerLogoPicker}
             />
             <ReadyMeter rows={rows} onLocalAction={(id) => { if (id === 'logo') logoPickerRef.current() }} />
+            {business?.business_id && (
+              <BookingLinkCard
+                businessId={business.business_id}
+                visitFree={cfg ? cfg.booking_visit_free === true : null}
+                onVisitFreeChange={(v) => setCfg((c) => (c ? { ...c, booking_visit_free: v } : c))}
+              />
+            )}
           </div>
 
           {/* Kundresan */}

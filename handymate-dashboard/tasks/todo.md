@@ -122,16 +122,49 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
       PDF på ett konto MED logga (Bee) och ett UTAN; jobbrapport vid approve.
 - [x] v221 KÖRD i prod 2026-09-07 (verifierad: 10 kolumner, RLS, två
       policyer, anon utan rättigheter, default name_checkbox) → yta 4 pushad.
-- [ ] Yta 5 BOKNINGSFLÖDET — nästa bygge (Andreas "kör" 2026-09-07). Beslut:
-      hemsidan (/site/[slug]) designas INTE om — ICP 5–20 anställda har egen
-      hemsida; bokningslänken är det de saknar. Brief docs/design/briefs/05-
-      bokningsflodet-och-hemsidan.md (trimmad), Design "Bokning.dc.html".
-      Bygge: app/site/[slug]/boka i brand-lagret (loadBranding, accent-ramp,
-      stämpel), WeekPicker/SlotGrid/BookingSummary/ContactForm/Confirmation,
-      ICS "Lägg i kalendern" (klient), "Din bokningslänk" + kopiera i
-      /dashboard/settings/kundvy. Sanningsrättningar mot designen: "kostar
-      inget" bakom inställning (default av), inget "fast pris", vem som
-      kommer = contact_name annars firmanamnet. Lisa/Matte skickar länken =
+- [x] Yta 5 BOKNINGSFLÖDET — BYGGD 2026-09-07 (Design "Bokning.dc.html").
+      Beslut: hemsidan (/site/[slug]) designas INTE om — ICP 5–20 anställda
+      har egen hemsida; bokningslänken är det de saknar. Bygge:
+      app/site/[slug]/boka omskriven i brand-lagret (BrandMark + accent-ramp,
+      mobil: kort med veckopil/dagchips/tidsluckor → summering "Ändra" →
+      formulär; desktop: två kolumner med löftet "Vi kommer ut och tittar.
+      Sedan får du en offert." + tre steg, kortet till höger), bekräftelse
+      "Tack {förnamn}. Besöket är bokat." med "Lägg i kalendern" (ICS byggs
+      i klienten, buildVisitIcs) + "Vad händer nu" + "ändra via telefon";
+      409 → listan laddas om + lugn ruta, 429 → hänvisning till telefon,
+      inga alert(). EN publik route GET /api/public/booking-page/[slug]
+      (force-dynamic, is_published-grind som availability, loadBranding,
+      14 dagars slots med samma computeAvailableSlots, telefon formaterad).
+      Ren logik i lib/bookings/booking-page.ts (veckor, svenska datum,
+      ISO-vecka, hoursSummary, ICS). Kundvyn: "Din bokningslänk" (kopiera/
+      öppna; utan slug → Hemsida; opublicerad → amber) + reglaget "Besöket
+      kostar inget" (business_config.booking_visit_free, sql/v222, default
+      false — sidan säger "kostar inget" BARA då). Facit
+      tests/bokningsflodet.spec.ts (21). tsc 0, build grön (NODE_OPTIONS=
+      --max-old-space-size=8192 krävs, annars OOM vid typkollen). Visuellt
+      granskat mot dev-server + prod-data (slug test) 390 + 1280: val,
+      formulär, bekräftelse, 409, 429, 400, 404.
+- Fynd yta 5: fyra seed/testkonton (biz_rollprov_a/b, elexperten_sthlm,
+  biz_al7pjuu5smi) har working_hours i legacyform {start,end} utan
+  `active` → gamla availability-routen gav 0 tider varje dag. Rättat i
+  lib/bookings/availability.ts (isWorkingDayActive: saknat active = aktiv
+  när tider finns; kanoniska rader opåverkade). Riktiga konton (onboarding/
+  settings) skriver alltid {active,start,end}.
+- Beslut/lärdomar yta 5: is_published-grinden BEHÅLLS (bokningslänken
+  kräver publicerad hemsida — följdfråga om länken ska funka utan);
+  "vem som kommer" = contact_name annars firmanamnet; footnoten
+  "mån–fre 08–17" härleds ur firmans working_hours, inte påhittad; cookie-
+  bannern (global, teal) ligger över bokningssidan liksom över portalen.
+  Facit-inventeringen: yta 4:s decisions + review pushades UTAN post i
+  PUBLIC_BY_DESIGN och utan höjt tak — rättat nu (151, räknat på origin),
+  docs/audits/TENANT_SWEEP uppdaterad; production-schema-columns.json får
+  booking_visit_free (kolumnkontraktet). Playwright-skript måste ligga i
+  projektkatalogen (scratchpad hittar inte modulen) — kopiera in, kör, radera.
+- [ ] Yta 5 kvar: v222 KÖRA i prod (koden pushad före — sidan läser
+      kolumnen tolerant, reglaget i kundvyn toastar fel tills den finns).
+      Skarptest: boka på /site/test/boka med eget nummer →
+      SMS + lead hos Nordström El AB (radera efteråt), kundvyns kort +
+      reglage, mobil Safari (ICS-nedladdning). Lisa/Matte skickar länken =
       ny feature, EFTER lansering.
 - [ ] Yta 9 demo-offert till dig själv — brief skriven 2026-09-07
       (docs/design/briefs/09-demo-offert-till-dig-sjalv.md), väntar på Design

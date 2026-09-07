@@ -27,11 +27,21 @@ export function stockholmLocalToISO(dateStr: string, timeStr: string): string {
   return new Date(epoch).toISOString()
 }
 
+/**
+ * Är dagen aktiv? Kanonisk form har `active`; äldre/seedade rader
+ * (t.ex. testkontona) har bara `{start,end}` eller null för lediga dagar —
+ * de ska läsas som aktiva när tider finns, inte som "stängt varje dag".
+ */
+export function isWorkingDayActive(wd: Partial<WorkingDay> | null | undefined): wd is WorkingDay {
+  if (!wd || !wd.start || !wd.end) return false
+  return wd.active === undefined ? true : !!wd.active
+}
+
 export function workingDayFor(hours: WorkingHours | null | undefined, dateStr: string): WorkingDay | null {
   if (!hours) return null
   const day = WEEKDAY_KEYS[new Date(`${dateStr}T12:00:00Z`).getUTCDay()]
   const wd = hours[day]
-  return wd && wd.active ? wd : null
+  return isWorkingDayActive(wd) ? wd : null
 }
 
 export interface Slot { time: string; startISO: string; endISO: string }
