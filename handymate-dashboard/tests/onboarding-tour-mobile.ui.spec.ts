@@ -42,7 +42,7 @@ for(const width of [375,1280])test(`alla fem tipskort inom viewport och toast fr
   await page.clock.pauseAt(new Date('2026-09-06T00:00:01Z'))
   await page.goto('http://tour.test/')
   await page.getByRole('button',{name:'Visa mig runt först'}).click()
-  const toast=page.getByText('Lisa är på linjen. Karin har koll. Du är live.',{exact:true})
+  const toast=page.getByText('Här ser du hur startsidan fungerar.',{exact:true})
   await expect(toast).toBeVisible()
   await expect(page.getByRole('button',{name:'Hoppa till start →'})).toHaveCount(0)
   const toastBox=await toast.boundingBox()

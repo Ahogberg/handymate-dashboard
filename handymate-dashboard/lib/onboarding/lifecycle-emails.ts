@@ -38,7 +38,7 @@ export function amneFor(dag: LivscykelDag): string {
     case 7:
       return 'Din första vecka med Handymate'
     case 14:
-      return 'Tre saker som tar fem minuter'
+      return 'Ditt nästa steg med Handymate'
   }
 }
 

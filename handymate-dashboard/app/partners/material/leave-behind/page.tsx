@@ -93,25 +93,25 @@ export default function LeaveBehindPage() {
               <div>
                 <p className="text-[10px] text-slate-400">Dag ett</p>
                 <p className="text-[12px] text-slate-900 leading-relaxed mt-1">
-                  <span className="font-semibold">Ge Handymate 15 minuter</span> så börjar teamet jobba med det som redan finns i Fortnox.
+                  <span className="font-semibold">Börja med ett riktigt jobb.</span> Vi väljer ett första arbetsflöde och kontrollerar vad som behövs för att komma igång.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="mt-auto bg-[#0f2e2a] rounded-2xl p-6 flex justify-between items-center gap-6 text-white">
-            <div>
-              <p className="text-[10px] font-semibold tracking-[.14em] text-teal-300 uppercase">Ett pris. Allt ingår.</p>
+          <div className="mt-auto bg-[#0f2e2a] rounded-2xl p-6 flex flex-col sm:flex-row print:flex-row justify-between items-start gap-6 text-white">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-semibold tracking-[.14em] text-teal-300 uppercase">Hela teamet. Tydliga villkor.</p>
               <p className="mt-1.5">
                 <span className="text-[28px] font-bold tracking-tight leading-none">5 995 kr</span>
                 <span className="text-[13px] text-white/60"> /mån</span>
               </p>
               <p className="text-[11px] text-white/65 leading-relaxed mt-1.5">
-                Hela teamet. Ingen bindningstid. 30 dagars pengarna-tillbaka.<br />
-                Storfirman 11 995 kr/mån för större team.
+                Månadsbetalning exkl. moms, utan bindningstid. 30 dagars pengarna-tillbaka.<br />
+                Storfirman 11 995 kr/mån exkl. moms för större volym. Bränsle ingår upp till planens gräns; extra påfyllning köps separat.
               </p>
             </div>
-            <div className="text-right">
+            <div className="min-w-0 flex-1 text-left sm:text-right print:text-right">
               <p className="text-[10px] tracking-widest text-white/50">NÄSTA STEG</p>
               <p className="text-[14px] font-semibold mt-1">Kör Företagskollen gratis — 2 minuter</p>
               <p className="text-[11px] text-teal-300 mt-0.5">handymate.se/foretagskollen</p>

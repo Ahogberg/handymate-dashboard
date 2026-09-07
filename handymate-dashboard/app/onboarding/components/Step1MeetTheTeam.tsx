@@ -44,13 +44,13 @@ const AGENT_DISPLAY: Record<string, AgentDisplay> = {
     bg: '#E0F2FE',
     ring: '#0EA5E9',
     examples: [
-      'Missat samtal 14:02 → kunden får ett svars-SMS inom 30 sekunder',
+      'När telefonkanalen är aktiverad kan Lisa följa upp missade samtal via SMS',
       'Ny förfrågan sparas med anteckningar — redo att ringa upp',
     ],
   },
   karin: {
     id: 'karin',
-    activity: 'Skickar fakturor',
+    activity: 'Förbereder fakturor',
     icon: FileText,
     bg: '#DBEAFE',
     ring: '#2563EB',
@@ -72,18 +72,18 @@ const AGENT_DISPLAY: Record<string, AgentDisplay> = {
   },
   lars: {
     id: 'lars',
-    activity: 'Bekräftar bokningar',
+    activity: 'Förbereder bokningsbekräftelser',
     icon: Calendar,
     bg: '#D1FAE5',
     ring: '#059669',
     examples: [
-      'Bokning imorgon 07:00 → bekräftelse-SMS till kunden ikväll',
+      'Bokning imorgon → bekräftelse redo att granska före utskick',
       'Flaggar när ett projekt börjar dra över tid',
     ],
   },
   hanna: {
     id: 'hanna',
-    activity: 'Skickar SMS-kampanj',
+    activity: 'Föreslår SMS-kampanjer',
     icon: Megaphone,
     bg: '#EDE9FE',
     ring: '#9333EA',
@@ -208,11 +208,11 @@ export default function Step1MeetTheTeam({ onNext }: Step1Props) {
           onClick={onNext}
           disabled={!done}
         >
-          {done ? 'Sätt upp mig på 5 minuter' : 'Möter teamet…'}
+          {done ? 'Börja med mitt företag' : 'Möter teamet…'}
           {done && <ArrowRight size={18} />}
         </button>
         <p style={{ textAlign: 'center', fontSize: 12, color: 'var(--ob-muted)' }}>
-          Aldrig mer en missad kundkontakt.
+          Vi börjar med din firma. Du granskar innan något skickas.
         </p>
       </div>
     </div>
@@ -342,7 +342,7 @@ function AgentRow({ name, role, avatar, activity, examples, Icon, bg, ring, reve
           borderRadius: 'var(--ob-r-pill)',
         }}
       >
-        Online
+        I teamet
       </span>
     </div>
   )
