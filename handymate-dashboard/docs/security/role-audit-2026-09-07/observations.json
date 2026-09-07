@@ -1,0 +1,97 @@
+{
+  "meaning": "Reproduced current handler behavior; security gaps remain. Synthetic DB/auth; not integration or production proof.",
+  "results": [
+    {
+      "case": "unassigned-project-detail",
+      "role": "employee",
+      "status": 200,
+      "quoteTotal": 12000,
+      "materialCost": 500,
+      "pricesRedacted": true
+    },
+    {
+      "case": "unassigned-project-delete",
+      "role": "employee",
+      "status": 200,
+      "simulatedDeleteIntents": 8
+    },
+    {
+      "case": "unassigned-project-detail",
+      "role": "project_manager",
+      "status": 200,
+      "quoteTotal": 12000,
+      "materialCost": 500,
+      "pricesRedacted": true
+    },
+    {
+      "case": "unassigned-project-delete",
+      "role": "project_manager",
+      "status": 200,
+      "simulatedDeleteIntents": 8
+    },
+    {
+      "case": "unassigned-project-detail",
+      "role": "admin",
+      "status": 200,
+      "quoteTotal": 12000,
+      "materialCost": 500,
+      "pricesRedacted": false
+    },
+    {
+      "case": "unassigned-project-delete",
+      "role": "admin",
+      "status": 200,
+      "simulatedDeleteIntents": 8
+    },
+    {
+      "case": "unassigned-project-detail",
+      "role": "owner",
+      "status": 200,
+      "quoteTotal": 12000,
+      "materialCost": 500,
+      "pricesRedacted": false
+    },
+    {
+      "case": "unassigned-project-delete",
+      "role": "owner",
+      "status": 200,
+      "simulatedDeleteIntents": 8
+    },
+    {
+      "case": "other-company-blocked",
+      "role": "employee",
+      "status": 404,
+      "simulatedDeleteIntents": 0
+    },
+    {
+      "case": "team-list",
+      "role": "employee",
+      "internalCost": null,
+      "inviteTokenExposed": true
+    },
+    {
+      "case": "self-profile-update-response",
+      "role": "employee",
+      "status": 200,
+      "internalCost": 350
+    },
+    {
+      "case": "other-company-blocked",
+      "role": "project_manager",
+      "status": 404,
+      "simulatedDeleteIntents": 0
+    },
+    {
+      "case": "team-list",
+      "role": "project_manager",
+      "internalCost": null,
+      "inviteTokenExposed": true
+    },
+    {
+      "case": "self-profile-update-response",
+      "role": "project_manager",
+      "status": 200,
+      "internalCost": 350
+    }
+  ]
+}

@@ -1056,3 +1056,14 @@ Review: se [kundupplevelserapporten](../docs/handoffs/CUSTOMER_EXPERIENCE_2026-0
 Om kanalunderlaget inte kan läsas får mejlet ingen gissad prioritet; startsidan visar läsfel med återförsök. Inga nya tabeller, utskick eller skarpa kundprov. Större kundstartsfunktioner ligger efter lansering.
 
 Review: 9 röda / 2 gröna nya prov före rättning. Efteråt 94 riktade kod-/kontraktskontroller + 4 browserprov gröna, tsc och Next-produktionsbygge exit 0. Lint öppnar konfigurationsdialog och är inte verifierad. Rapport: [tre kundstartsfixar](../docs/handoffs/ONBOARDING_TRUTH_FIXES_2026-09-07.md). Ingen produktion eller kundkontakt.
+
+# Rollgränser admin/projektledare/anställd (Codex 2026-09-07)
+
+- [x] Kartlägg befintlig rollpolicy och inventera API-metoder, UI och agentvägar.
+- [x] Prova kritiska läs-/skrivgränser isolerat med olika roller och projekttilldelningar.
+- [x] Dokumentera bekräftade luckor, avsedda rättigheter och ej verifierade områden.
+- [x] Lämna granskningsbart underlag med reproduktioner och nästa avgränsade åtgärd.
+
+Företagsmedlemskap är inte rollbehörighet. Ingen produktionsdata, riktiga inbjudningar, SMS, betalningar eller användarändringar används i granskningen.
+
+Underlag: docs/security/role-audit-2026-09-07/README.md. Fyra reproducerade luckor; 14 syntetiska observationer; 60 befintliga källkodskontrakt passerar. Ingen produktfix eller fullständig plattformscertifiering.
