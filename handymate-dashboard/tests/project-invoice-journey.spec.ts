@@ -50,6 +50,52 @@ test('accepted options and discount survive project preview → final invoice, w
 test('automatic project draft recalculates customer pays after adding ATA',async()=>{
  const h=harness(),result=await h.draft();expect(result.ok).toBe(true);expect(result.subtotal).toBe(1400);expect(result.customerPays).toBe(1750)
 })
+
+for (const status of ['signed', 'approved']) {
+ for (const changeType of ['addition', 'removal']) {
+  for (const emptyItems of [[], null]) {
+   test(`automatic draft preserves total-only ${status} ${changeType} ATA with ${emptyItems === null ? 'null' : 'empty'} items`, async () => {
+    const h = harness()
+    const ata = h.tables.project_change[0]
+    Object.assign(ata, { status, change_type: changeType, items: emptyItems, total: 300.50 })
+    const expectedSubtotal = changeType === 'removal' ? 799.50 : 1400.50
+    const draft = await h.draft()
+    expect(draft.ok).toBe(true)
+    expect(draft.subtotal).toBe(expectedSubtotal)
+    expect(draft.ataChangeIds).toEqual(['a'])
+    const ataRows = draft.items.filter((item: any) => item.id.startsWith('ii_ata_') && item.item_type !== 'heading')
+    expect(ataRows).toHaveLength(1)
+    expect(ataRows[0].is_rot_eligible).toBe(false)
+    expect(ataRows[0].description).toBe(ata.description)
+    const preview = await (await h.preview()).json()
+    expect(preview.totalExclVat).toBe(expectedSubtotal)
+    expect((await h.final()).status).toBe(200)
+    expect(h.state.created[0].subtotal).toBe(draft.subtotal)
+    expect(h.state.created[0].total).toBe(draft.total)
+    expect(h.state.created[0].customerPays).toBe(draft.customerPays)
+   })
+  }
+ }
+}
+
+test('automatic draft still prefers actual ATA rows over a stale saved total', async () => {
+ const h = harness()
+ h.tables.project_change[0].total = 99999
+ const result = await h.draft()
+ expect(result.subtotal).toBe(1400)
+ expect(result.ataChangeIds).toEqual(['a'])
+})
+
+for (const status of ['draft', 'pending', 'sent', 'declined', 'rejected', 'invoiced']) {
+ test(`automatic draft never falls back to a total-only ATA in ${status}`, async () => {
+  const h = harness()
+  Object.assign(h.tables.project_change[0], { status, items: [], total: 300.50 })
+  const result = await h.draft()
+  expect(result.subtotal).toBe(1100)
+  expect(result.ataChangeIds).toEqual([])
+ })
+}
+
 for(const table of ['invoice','quotes','quote_items','project_change'])test(`automatic draft refuses incomplete data when ${table} read fails`,async()=>{
  const h=harness();h.state.failTable=table;h.tables.quotes[0].items=[{description:'Old mirror',quantity:1,unit_price:50}]
  expect((await h.draft()).ok).toBe(false)
@@ -112,4 +158,3 @@ test('two concurrent final-invoice calls yield one invoice: the loser of the rac
  expect([ja,jb].filter(r=>r.concurrent===true)).toHaveLength(1)
  expect(fs.readFileSync('sql/v219_en_slutfaktura_per_projekt.sql','utf8')).toContain("WHERE invoice_type = 'final'")
 })
-
