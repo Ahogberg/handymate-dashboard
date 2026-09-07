@@ -97,6 +97,8 @@ const PORTAL_TOKEN_ROUTES = [
   'app/api/portal/[token]/jobbpass/route.ts',
   'app/api/portal/[token]/documents/route.ts',
   'app/api/portal/[token]/installations/route.ts',
+  'app/api/portal/[token]/decisions/route.ts',
+  'app/api/portal/[token]/review/route.ts',
 ]
 
 test.describe('konsolidering (Sweep A) — inga kvarvarande dubblettimplementationer', () => {

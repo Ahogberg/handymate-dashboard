@@ -24,6 +24,8 @@ const MUTABLE_PUBLIC_GET_ROUTES = [
   'app/api/portal/[token]/documents/route.ts',
   'app/api/portal/[token]/installations/route.ts',
   'app/api/portal/[token]/invoices/[id]/route.ts',
+  'app/api/portal/[token]/decisions/route.ts',
+  'app/api/portal/[token]/review/route.ts',
   'app/api/portal/route.ts',
 ] as const
 

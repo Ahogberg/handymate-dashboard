@@ -16,11 +16,13 @@ import PortalMessagesThread from './components/PortalMessagesThread'
 import PortalReviewCTA from './components/PortalReviewCTA'
 import PortalContact from './components/PortalContact'
 import PortalHandymateAttribution from './components/PortalHandymateAttribution'
+import PortalAtaDecision from './components/PortalAtaDecision'
 import { formatDateTime, getProjectStatusText } from './helpers'
 import type {
   PortalInstallation,
   PortalJobbpassSummary,
   PortalDocument,
+  PortalDecisions,
   PortalReport,
   BusinessInfo,
   Invoice,
@@ -39,8 +41,10 @@ import type {
  * tab-bar, men styrs av samma orchestrator.
  *
  * URL `?tab=review` öppnar review-vyn direkt (från review-SMS).
+ * URL `?tab=ata&change=<id>` öppnar beslutskortet för ett tilläggsarbete
+ * (portalens beslutskort, 2026-09-07).
  */
-type SubRoute = 'project-detail' | 'quote' | 'invoice' | 'messages' | 'review' | 'jobbpass' | null
+type SubRoute = 'project-detail' | 'quote' | 'invoice' | 'messages' | 'review' | 'jobbpass' | 'ata' | null
 
 export default function CustomerPortalPage() {
   const params = useParams()
@@ -61,10 +65,12 @@ export default function CustomerPortalPage() {
     if (t === 'contact') return { tab: 'contact' as BottomTab, sub: null }
     // ?tab=jobbpass&project=<id> från utskicket (Fastighetspasset steg 1)
     if (t === 'jobbpass') return { tab: 'project' as BottomTab, sub: 'jobbpass' as SubRoute }
+    if (t === 'ata') return { tab: 'home' as BottomTab, sub: 'ata' as SubRoute }
     return { tab: 'home' as BottomTab, sub: null }
   })()
 
   const initialJobbpassProject = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('project')
+  const initialAtaChange = typeof window === 'undefined' ? null : new URLSearchParams(window.location.search).get('change')
   const [tab, setTab] = useState<BottomTab>(initialFromUrl.tab)
   const [subRoute, setSubRoute] = useState<SubRoute>(initialFromUrl.sub)
 
@@ -101,6 +107,24 @@ export default function CustomerPortalPage() {
   const [documents, setDocuments] = useState<PortalDocument[]>([])
   const [reports, setReports] = useState<PortalReport[]>([])
   const [installations, setInstallations] = useState<PortalInstallation[]>([])
+  // Portalens beslutskort (2026-09-07): allt som väntar på kunden + vald ÄTA.
+  const [decisions, setDecisions] = useState<PortalDecisions | null>(null)
+  const [selectedAta, setSelectedAta] = useState<string | null>(initialAtaChange)
+
+  async function refreshDecisions() {
+    try {
+      const res = await fetch(`/api/portal/${token}/decisions`)
+      if (res.ok) setDecisions(await res.json())
+    } catch { /* kortet visar senast kända läge */ }
+  }
+
+  async function refreshProjects() {
+    try {
+      const res = await fetch(`/api/portal/${token}/projects`)
+      const data = await res.json()
+      setProjects(data.projects || [])
+    } catch { /* nästa hämtning försöker igen */ }
+  }
 
   // Initial load
   useEffect(() => {
@@ -131,7 +155,9 @@ export default function CustomerPortalPage() {
     async function fetchTabData() {
       setLoadingTab(true)
       try {
-        if (tab === 'project' || subRoute === 'project-detail') {
+        // Beslutskortet för en ÄTA och fakturans "Det här ingår" läser ur
+        // projektlistan — därför hämtas den även för de sub-routerna.
+        if (tab === 'project' || subRoute === 'project-detail' || subRoute === 'ata' || subRoute === 'invoice') {
           const res = await fetch(`/api/portal/${token}/projects`)
           const data = await res.json()
           setProjects(data.projects || [])
@@ -159,6 +185,11 @@ export default function CustomerPortalPage() {
         if (tab === 'home') {
           const res = await fetch(`/api/portal/${token}/installations`)
           if (res.ok) { const data = await res.json(); setInstallations(data.installations || []) }
+        }
+        // "Väntar på dig" på Hem + räknarna på snabbknapparna. Omdömesvyn
+        // behöver veta om omdömet redan är lämnat.
+        if (tab === 'home' || subRoute === 'review') {
+          await refreshDecisions()
         }
         if (tab === 'docs') {
           const res = await fetch(`/api/portal/${token}/documents`)
@@ -208,9 +239,13 @@ export default function CustomerPortalPage() {
 
   // Navigation helper for cross-screen jumps
   function navigate(
-    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass',
-    payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
+    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass' | 'ata' | 'invoice' | 'review',
+    payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices'; changeId?: string; invoiceId?: string },
   ) {
+    // Beslutskorten (2026-09-07): raden på Hem går rakt till beslutet.
+    if (route === 'ata') { setSubRoute('ata'); if (payload?.changeId) setSelectedAta(payload.changeId); return }
+    if (route === 'invoice') { setSubRoute('invoice'); if (payload?.invoiceId) setSelectedInvoice(payload.invoiceId); return }
+    if (route === 'review') { setSubRoute('review'); return }
     if (route === 'jobbpass') { setTab('project'); setSubRoute('jobbpass'); if (payload?.projectId) setSelectedPassProject(payload.projectId); return }
     if (route === 'project') { setTab('project'); setSubRoute(null); setSelectedProject(null) }
     else if (route === 'docs') {
@@ -233,6 +268,7 @@ export default function CustomerPortalPage() {
     setSubRoute(null)
     setSelectedProject(null)
     setSelectedInvoice(null)
+    setSelectedAta(null)
   }
 
   if (loading) {
@@ -280,9 +316,43 @@ export default function CustomerPortalPage() {
   if (subRoute === 'review') {
     return (
       <PortalThemeProvider business={portal.business}>
-        <PortalReviewCTA portal={portal} onBack={() => setSubRoute(null)} />
+        <PortalReviewCTA
+          portal={portal}
+          token={token}
+          review={decisions?.review ?? null}
+          onBack={() => setSubRoute(null)}
+          onSubmitted={refreshDecisions}
+        />
       </PortalThemeProvider>
     )
+  }
+
+  if (subRoute === 'ata') {
+    const hit = projects
+      .flatMap(p => p.atas.map(a => ({ ata: a, project: p })))
+      .find(x => x.ata.change_id === selectedAta)
+    if (hit) {
+      return (
+        <PortalThemeProvider business={portal.business}>
+          <PortalAtaDecision
+            portal={portal}
+            ata={hit.ata}
+            project={hit.project}
+            onBack={() => { setSubRoute(null); setSelectedAta(null) }}
+            onDecided={async () => { await refreshProjects(); await refreshDecisions() }}
+            onOpenInvoice={() => navigate('docs', { docsSection: 'invoices' })}
+          />
+        </PortalThemeProvider>
+      )
+    }
+    if (loadingTab) {
+      return (
+        <div className="bp-screen" style={{ alignItems: 'center', justifyContent: 'center' }}>
+          <Loader2 size={32} className="animate-spin" style={{ color: 'var(--bee-700)' }} />
+        </div>
+      )
+    }
+    // Okänt eller borttaget tilläggsarbete → Hem, inte en vit sida.
   }
 
   if (subRoute === 'jobbpass') {
@@ -304,11 +374,7 @@ export default function CustomerPortalPage() {
           onOpenJobbpass={() => navigate('jobbpass', { projectId: selectedProjectData.project_id })}
           reports={reports.filter(r => r.project_id === selectedProjectData.project_id)}
           onBack={() => { setSubRoute(null); setSelectedProject(null) }}
-          onAtaSigned={async () => {
-            const res = await fetch(`/api/portal/${token}/projects`)
-            const data = await res.json()
-            setProjects(data.projects || [])
-          }}
+          onOpenAta={(changeId) => navigate('ata', { changeId })}
         />
       </PortalThemeProvider>
     )
@@ -338,7 +404,17 @@ export default function CustomerPortalPage() {
           invoice={selectedInvoiceData}
           paymentInfo={paymentInfo}
           token={token}
+          portal={portal}
+          atas={projects.find(p => p.project_id === selectedInvoiceData.project_id)?.atas ?? []}
           onBack={() => { setSubRoute(null); setSelectedInvoice(null) }}
+          onClaimed={async () => {
+            try {
+              const res = await fetch(`/api/portal/${token}/invoices`)
+              if (res.ok) { const data = await res.json(); setInvoices(data.invoices || []) }
+            } catch { /* listan uppdateras vid nästa besök */ }
+            await refreshDecisions()
+          }}
+          onReview={() => navigate('review')}
         />
       </PortalThemeProvider>
     )
@@ -353,6 +429,7 @@ export default function CustomerPortalPage() {
           token={token}
           passes={passes}
           installations={installations}
+          decisions={decisions}
           onNavigate={navigate}
         />
       )}

@@ -1,22 +1,16 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import {
   ArrowLeft,
   CheckCircle,
   FileSignature,
   FileText,
   Hammer,
-  Loader2,
-  PenTool,
   Truck,
   ShieldCheck,
   ChevronRight,
 } from 'lucide-react'
-import SignatureCanvas, {
-  ClearSignatureButton,
-  type SignatureCanvasHandle,
-} from './SignatureCanvas'
 import { formatCurrency, formatDate } from '../helpers'
 import type { PortalAta, PortalReport, Project } from '../types'
 import { ataKundStatusLabel, ataTypLabel } from '@/lib/ata/labels'
@@ -24,7 +18,9 @@ import { ataKundStatusLabel, ataTypLabel } from '@/lib/ata/labels'
 interface PortalProjectDetailProps {
   project: Project
   onBack: () => void
-  onAtaSigned: () => void
+  /** Portalens beslutskort (2026-09-07): ÄTA-kortet öppnar beslutsvyn
+      (PortalAtaDecision) — signeringen bor inte längre inline här. */
+  onOpenAta: (changeId: string) => void
   /** Fastighetspasset steg 1: finns ett publicerat jobbpass för projektet? */
   jobbpassAvailable?: boolean
   onOpenJobbpass?: () => void
@@ -35,9 +31,8 @@ interface PortalProjectDetailProps {
 /**
  * Projektdetalj-vy (port av bp-project.jsx).
  * Inkluderar milstolpe-tracker (5 stegs-ikoner), foto-galleri (öppnar
- * lightbox), och inline ÄTA-signering med shared SignatureCanvas.
- *
- * Bevarar exakt befintlig signing-logik mot /api/ata/sign/[token].
+ * lightbox) och ÄTA-korten — varje kort är tryckbart och leder till
+ * beslutsvyn där kunden godkänner eller tackar nej.
  */
 const MILESTONE_DEFAULTS = [
   { id: 'plan',  name: 'Planering',     Icon: FileSignature, status: 'done' as const },
@@ -49,27 +44,13 @@ const MILESTONE_DEFAULTS = [
 export default function PortalProjectDetail({
   project,
   onBack,
-  onAtaSigned,
+  onOpenAta,
   jobbpassAvailable = false,
   onOpenJobbpass,
   reports = [],
 }: PortalProjectDetailProps) {
   const [animPct, setAnimPct] = useState(0)
   const [lightboxIdx, setLightboxIdx] = useState<number | null>(null)
-  const [signingAtaId, setSigningAtaId] = useState<string | null>(null)
-  const [signerName, setSignerName] = useState('')
-  const [signingSaving, setSigningSaving] = useState(false)
-  // Optimistic state: sätter status='signed' lokalt direkt efter sign-success.
-  // Parent gör en re-fetch (page.tsx onAtaSigned), men om den hänger eller
-  // kommer från cache visar vi ändå rätt status omedelbart.
-  const [recentlySigned, setRecentlySigned] = useState<
-    Map<string, { signed_by_name: string; signed_at: string }>
-  >(new Map())
-  const ataCanvasRef = useRef<SignatureCanvasHandle>(null)
-
-  function effectiveStatus(ata: { change_id: string; status: string }): string {
-    return recentlySigned.has(ata.change_id) ? 'signed' : ata.status
-  }
 
   const photos = project.photos || []
   const milestones = project.milestones && project.milestones.length > 0
@@ -88,48 +69,6 @@ export default function PortalProjectDetail({
     const t = setTimeout(() => setAnimPct(targetPct), 200)
     return () => clearTimeout(t)
   }, [targetPct])
-
-  async function signAta(signToken: string) {
-    if (!signerName.trim()) return
-    const signatureData = ataCanvasRef.current?.toDataURL()
-    if (!signatureData) return
-
-    setSigningSaving(true)
-    try {
-      const res = await fetch(`/api/ata/sign/${signToken}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'sign',
-          name: signerName.trim(),
-          signature_data: signatureData,
-        }),
-      })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        alert(data.error || 'Kunde inte signera')
-      } else {
-        // Optimistisk uppdatering — sätt status='signed' lokalt direkt
-        // så badge + signed_at-rad visas innan parent's re-fetch returnerar.
-        if (signingAtaId) {
-          setRecentlySigned(prev => {
-            const next = new Map(prev)
-            next.set(signingAtaId, {
-              signed_by_name: signerName.trim(),
-              signed_at: new Date().toISOString(),
-            })
-            return next
-          })
-        }
-        setSigningAtaId(null)
-        setSignerName('')
-        onAtaSigned()
-      }
-    } catch {
-      alert('Kunde inte signera ÄTA')
-    }
-    setSigningSaving(false)
-  }
 
   // PhotoLightbox lazy import — undviker circular import om vi nån gång
   // återanvänder från flera ställen.
@@ -398,143 +337,71 @@ export default function PortalProjectDetail({
         {/* ÄTA changes */}
         {project.atas && project.atas.length > 0 && (
           <div style={{ padding: '24px 18px 0' }}>
-            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>ÄTA-ändringar</h3>
-            <div className="bp-card" style={{ padding: 0 }}>
-              {project.atas.map((ata, i) => (
-                <div
-                  key={ata.change_id}
-                  style={{
-                    padding: 14,
-                    borderBottom: i < project.atas.length - 1 ? '1px solid var(--border)' : 'none',
-                  }}
-                >
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
-                        ÄTA-{ata.ata_number}: {ata.description}
-                      </div>
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
-                        {ataTypLabel(ata.change_type)}
-                        {ata.sent_at ? ` · skickad ${formatDate(ata.sent_at)}` : ''}
-                      </div>
-                    </div>
-                    {/* Etiketten kommer från backend (lib/ata/labels.ts) — aldrig rå status.
-                        Optimistiskt signerad → samma ord som backend skulle ge. */}
-                    <span
-                      className={`bp-badge ${
-                        effectiveStatus(ata) === 'signed' ? 'green' : effectiveStatus(ata) === 'sent' ? 'amber' : 'gray'
-                      }`}
-                    >
-                      {recentlySigned.has(ata.change_id) ? ataKundStatusLabel('signed') : (ata.status_label || ataKundStatusLabel(ata.status))}
-                    </span>
-                  </div>
-
-                  <AtaRaderOchSummor ata={ata} />
-
-                  {(() => {
-                    const optimistic = recentlySigned.get(ata.change_id)
-                    const signedByName = ata.signed_by_name || optimistic?.signed_by_name
-                    const signedAt = ata.signed_at || optimistic?.signed_at
-                    if (!signedByName || !signedAt) return null
-                    return (
-                      <div style={{ fontSize: 11, color: 'var(--green-600)', marginTop: 4 }}>
-                        Signerad av {signedByName}, {formatDate(signedAt)}
-                      </div>
-                    )
-                  })()}
-
-                  {effectiveStatus(ata) === 'sent' && ata.sign_token && (
-                    <div style={{ marginTop: 12 }}>
-                      {signingAtaId === ata.change_id ? (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, paddingTop: 12, borderTop: '1px solid var(--border)' }}>
-                          <div>
-                            <label style={{ fontSize: 11, color: 'var(--muted)', marginBottom: 4, display: 'block' }}>
-                              Ditt namn
-                            </label>
-                            <input
-                              type="text"
-                              value={signerName}
-                              onChange={e => setSignerName(e.target.value)}
-                              placeholder="Förnamn Efternamn"
-                              style={{
-                                width: '100%',
-                                padding: '10px 12px',
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--r-md)',
-                                fontSize: 14,
-                                fontFamily: 'inherit',
-                                outline: 'none',
-                              }}
-                            />
-                          </div>
-                          <div>
-                            <div
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                marginBottom: 4,
-                              }}
-                            >
-                              <label style={{ fontSize: 11, color: 'var(--muted)' }}>Signatur</label>
-                              <ClearSignatureButton
-                                variant="corner"
-                                onClick={() => ataCanvasRef.current?.clear()}
-                              />
-                            </div>
-                            <SignatureCanvas
-                              ref={ataCanvasRef}
-                              mode="ata"
-                              className="w-full h-24 border border-gray-300 rounded-lg bg-white cursor-crosshair touch-none"
-                            />
-                          </div>
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button
-                              type="button"
-                              onClick={() => { setSigningAtaId(null); setSignerName('') }}
-                              style={{
-                                flex: 1,
-                                padding: '10px 12px',
-                                background: 'var(--bg)',
-                                border: '1px solid var(--border)',
-                                borderRadius: 'var(--r-md)',
-                                fontSize: 13,
-                                color: 'var(--muted)',
-                                cursor: 'pointer',
-                                fontFamily: 'inherit',
-                              }}
-                            >
-                              Avbryt
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => signAta(ata.sign_token!)}
-                              disabled={!signerName.trim() || signingSaving}
-                              className="bp-cta bee"
-                              style={{ flex: 1, height: 40, fontSize: 13, gap: 6 }}
-                            >
-                              {signingSaving ? <Loader2 size={14} className="animate-spin" /> : <PenTool size={14} />}
-                              Signera
-                            </button>
-                          </div>
+            <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--ink)', marginBottom: 10 }}>Tilläggsarbeten</h3>
+            <div className="bp-card" style={{ padding: 0, overflow: 'hidden' }}>
+              {project.atas.map((ata, i) => {
+                const attGodkanna = ata.status === 'sent' && !!ata.sign_token
+                const statusCls = ata.status === 'signed' || ata.status === 'approved'
+                  ? 'godkand'
+                  : ata.status === 'declined'
+                    ? 'avbojd'
+                    : ata.status === 'invoiced'
+                      ? 'fakturerad'
+                      : attGodkanna ? 'att-godkanna' : 'forslag'
+                return (
+                  <div
+                    key={ata.change_id}
+                    role="button"
+                    tabIndex={0}
+                    className="bp-card-tap"
+                    onClick={() => onOpenAta(ata.change_id)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpenAta(ata.change_id) } }}
+                    style={{
+                      padding: 14,
+                      cursor: 'pointer',
+                      borderBottom: i < project.atas.length - 1 ? '1px solid var(--border)' : 'none',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>
+                          ÄTA-{ata.ata_number}: {ata.description}
                         </div>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setSigningAtaId(ata.change_id)
-                            setTimeout(() => ataCanvasRef.current?.init(), 100)
-                          }}
-                          className="bp-cta bee"
-                          style={{ height: 40, fontSize: 13 }}
-                        >
-                          <PenTool size={14} /> Granska och signera
-                        </button>
-                      )}
+                        <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
+                          {ataTypLabel(ata.change_type)}
+                          {ata.sent_at ? ` · skickad ${formatDate(ata.sent_at)}` : ''}
+                        </div>
+                      </div>
+                      {/* Etiketten kommer från backend (lib/ata/labels.ts) — aldrig rå status. */}
+                      <span className={`bp-status ${statusCls}`}>
+                        {ata.status_label || ataKundStatusLabel(ata.status)}
+                      </span>
+                      <ChevronRight size={16} style={{ color: '#94A3B8', flexShrink: 0 }} />
                     </div>
-                  )}
-                </div>
-              ))}
+
+                    <AtaRaderOchSummor ata={ata} />
+
+                    {ata.signed_by_name && ata.signed_at && (
+                      <div style={{ fontSize: 11, color: 'var(--green-600)', marginTop: 4 }}>
+                        Godkänd av {ata.signed_by_name}, {formatDate(ata.signed_at)}
+                      </div>
+                    )}
+                    {ata.status === 'declined' && (
+                      <div style={{ fontSize: 11, color: 'var(--red-600)', marginTop: 4 }}>
+                        Du tackade nej{ata.declined_at ? ` ${formatDate(ata.declined_at)}` : ''}.
+                      </div>
+                    )}
+
+                    {attGodkanna && (
+                      <div style={{ marginTop: 12 }}>
+                        <span className="bp-btn-primary" style={{ height: 44, fontSize: 14 }}>
+                          Granska och godkänn
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
@@ -629,6 +496,7 @@ function AtaRaderOchSummor({ ata }: { ata: PortalAta }) {
           href={ata.pdf_url}
           target="_blank"
           rel="noopener noreferrer"
+          onClick={e => e.stopPropagation()}
           style={{
             display: 'inline-flex',
             alignItems: 'center',

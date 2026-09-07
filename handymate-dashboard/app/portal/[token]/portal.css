@@ -114,32 +114,34 @@
   z-index: 20;
   background: linear-gradient(180deg, #fff 0%, rgba(255,255,255,0.95) 100%);
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid var(--border);
+  /* Accentlinjen under sidhuvudet är firmans enda färgyta i portalen
+     (portalens beslutskort, Design 2026-09-07) — knapparna är alltid mörka. */
+  border-bottom: 2px solid var(--bee-500);
   padding: 14px 18px;
   display: flex;
   align-items: center;
   gap: 12px;
 }
 .bp-logo {
-  width: 40px; height: 40px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--bee-500), var(--bee-600));
-  color: #fff;
+  width: 42px; height: 42px;
+  border-radius: 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  color: var(--bee-700);
   display: flex; align-items: center; justify-content: center;
   font-weight: 800;
   font-size: 18px;
   letter-spacing: -0.02em;
-  box-shadow: 0 2px 8px rgba(217,119,6,0.25);
   flex-shrink: 0;
   overflow: hidden;
 }
 .bp-logo img {
-  width: 100%; height: 100%;
-  object-fit: cover;
+  width: 34px; height: 34px;
+  object-fit: contain;
 }
 .bp-brand { flex: 1; min-width: 0; }
-.bp-brand-name { font-size: 14px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
-.bp-brand-sub  { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.bp-brand-name { font-size: 16px; font-weight: 700; color: var(--ink); letter-spacing: -0.01em; }
+.bp-brand-sub  { font-size: 12.5px; color: var(--muted); margin-top: 1px; }
 .bp-icon-btn {
   width: 38px; height: 38px;
   border-radius: 50%;
@@ -346,3 +348,211 @@
   color: var(--subtle);
 }
 .bp-hm-attr a, .bp-hm-attr span { color: var(--hm-700); font-weight: 600; text-decoration: none; }
+
+/* ═══ Portalens beslutskort (Design "Kundportal beslut", 2026-09-07) ═══
+   Ett vitt kort med fem zoner (huvud, innehåll, summering, beslut, efterläge)
+   delat av ÄTA, faktura och omdöme. Primärknappen är ALLTID mörk (#0F172A);
+   accenten används bara i logolinjen, prickar, stegnummer, projektstapel
+   och stjärnor. */
+.bp-stack { display: flex; flex-direction: column; gap: 12px; padding: 12px 16px 28px; }
+.bp-eyebrow {
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.14em; text-transform: uppercase;
+  color: var(--muted);
+}
+.bp-status {
+  display: inline-flex; align-items: center;
+  padding: 3px 9px;
+  border-radius: var(--r-pill);
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 0.06em; text-transform: uppercase;
+  white-space: nowrap;
+}
+.bp-status.att-godkanna { background: #FEF3C7; color: #92400E; }
+.bp-status.godkand      { background: #DCFCE7; color: #166534; }
+.bp-status.avbojd       { background: #FEE2E2; color: #991B1B; }
+.bp-status.forslag      { background: #F1F5F9; color: #475569; }
+.bp-status.fakturerad   { background: #DBEAFE; color: #1E40AF; }
+.bp-status.pagar        { background: #DBEAFE; color: #1E40AF; }
+.bp-status.klart        { background: #DCFCE7; color: #166534; }
+.bp-btn-primary {
+  width: 100%; height: 52px;
+  border: none; border-radius: 12px;
+  background: #0F172A; color: #fff;
+  font-size: 16px; font-weight: 600; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; text-decoration: none;
+  transition: opacity var(--t-fast);
+}
+.bp-btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
+.bp-btn-secondary {
+  width: 100%; height: 48px;
+  border: 1px solid var(--border-strong); border-radius: 12px;
+  background: #fff; color: var(--ink);
+  font-size: 15px; font-weight: 600; font-family: inherit;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer; text-decoration: none;
+}
+.bp-btn-secondary:disabled { opacity: 0.6; cursor: not-allowed; }
+.bp-link-btn {
+  background: none; border: none; padding: 0;
+  font-size: 13.5px; font-weight: 600; font-family: inherit;
+  color: #334155; cursor: pointer; text-decoration: none;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.bp-field { display: flex; flex-direction: column; gap: 6px; font-size: 13px; color: var(--muted); }
+.bp-input {
+  height: 48px; width: 100%;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 0 14px;
+  font-size: 15px; font-family: inherit; color: var(--ink);
+  background: #fff; outline: none;
+}
+.bp-input:focus, .bp-textarea:focus { border-color: var(--ink); }
+.bp-textarea {
+  width: 100%;
+  border: 1px solid var(--border-strong); border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px; line-height: 1.45; font-family: inherit; color: var(--ink);
+  background: #fff; outline: none; resize: none;
+}
+.bp-check-row {
+  display: flex; gap: 12px; align-items: flex-start;
+  font-size: 14px; line-height: 1.5; color: #334155;
+  cursor: pointer;
+}
+.bp-check {
+  width: 24px; height: 24px; flex: none;
+  border-radius: 7px; border: 2px solid var(--border-strong);
+  background: #fff; color: #fff;
+  display: flex; align-items: center; justify-content: center;
+  margin-top: 1px;
+  transition: background var(--t-fast), border-color var(--t-fast);
+}
+.bp-check.on { background: #0F172A; border-color: #0F172A; }
+.bp-dark-card {
+  background: #0F172A; color: #fff;
+  border-radius: 16px; padding: 22px 20px;
+  animation: bp-rise 0.4s both;
+}
+.bp-dark-card .sub { font-size: 13.5px; line-height: 1.55; color: rgba(255,255,255,0.7); }
+.bp-rows { display: flex; flex-direction: column; }
+.bp-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  padding: 10px 0;
+  font-size: 14px; color: #334155;
+}
+.bp-row + .bp-row { border-top: 1px solid #F1F5F9; }
+.bp-row .amt { font-variant-numeric: tabular-nums; white-space: nowrap; color: var(--ink); }
+.bp-row.sum { font-weight: 600; border-top: 1px solid var(--border); }
+.bp-row.total {
+  border-top: 1.5px solid #0F172A;
+  font-size: 16px; font-weight: 700; color: var(--ink);
+  padding-top: 12px;
+}
+.bp-row.total .amt { font-size: 24px; }
+.bp-row.rot, .bp-row.rot .amt { color: var(--green-600); }
+.bp-row.fee, .bp-row.fee .amt { color: var(--red-600); }
+.bp-pill-prel {
+  display: inline-block; margin-left: 6px;
+  padding: 1px 6px; border-radius: var(--r-pill);
+  border: 1px solid #bbf7d0; background: #f0fdf4;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--green-600);
+}
+.bp-micro { font-size: 12px; line-height: 1.5; color: var(--muted); }
+.bp-context {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 18px;
+  background: var(--bg); border-top: 1px solid var(--border);
+  font-size: 13px; line-height: 1.5; color: #334155;
+}
+.bp-steps { display: flex; flex-direction: column; gap: 12px; }
+.bp-step { display: flex; gap: 12px; align-items: flex-start; font-size: 14px; line-height: 1.5; color: #334155; }
+.bp-step-n {
+  width: 24px; height: 24px; flex: none;
+  border-radius: 50%;
+  background: var(--bee-50); color: var(--bee-700);
+  font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.bp-counter {
+  min-width: 22px; height: 22px; padding: 0 7px;
+  border-radius: var(--r-pill);
+  background: #0F172A; color: #fff;
+  font-size: 12px; font-weight: 600;
+  display: inline-flex; align-items: center; justify-content: center;
+}
+.bp-counter.red {
+  position: absolute; top: 6px; right: 6px;
+  min-width: 18px; height: 18px; padding: 0 5px;
+  background: var(--red-600); font-size: 11px;
+}
+.bp-waiting-row {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 13px 18px;
+  border: none; border-top: 1px solid #F1F5F9;
+  background: #fff; color: var(--ink);
+  text-align: left; cursor: pointer; font-family: inherit;
+}
+.bp-waiting-row:hover { background: var(--bg); }
+.bp-dot { width: 8px; height: 8px; border-radius: 50%; flex: none; background: var(--bee-500); }
+.bp-dot.red { background: var(--red-600); }
+.bp-copy-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 0;
+}
+.bp-copy-row + .bp-copy-row { border-top: 1px solid rgba(255,255,255,0.1); }
+.bp-copy-row.light + .bp-copy-row.light { border-top: 1px solid var(--border); }
+.bp-copy-btn {
+  height: 30px; padding: 0 10px;
+  border-radius: 8px; border: none;
+  background: rgba(255,255,255,0.12); color: #fff;
+  font-size: 12.5px; font-weight: 600; font-family: inherit;
+  cursor: pointer; white-space: nowrap;
+}
+.bp-copy-btn.light { background: #fff; border: 1px solid var(--border); color: var(--ink); }
+.bp-star {
+  width: 44px; height: 44px;
+  border: none; background: transparent; padding: 0;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; color: var(--border-strong);
+}
+.bp-star.on { color: var(--bee-500); }
+.bp-tag {
+  height: 36px; padding: 0 13px;
+  border-radius: var(--r-pill); border: 1px solid var(--border);
+  background: #fff; color: #334155;
+  font-size: 13.5px; font-weight: 500; font-family: inherit;
+  cursor: pointer;
+}
+.bp-tag.on { border-color: #0F172A; background: #0F172A; color: #fff; }
+.bp-banner {
+  display: flex; gap: 10px; align-items: flex-start;
+  padding: 12px 14px; border-radius: 12px;
+  font-size: 13.5px; line-height: 1.5;
+}
+.bp-banner.blue { background: #EFF6FF; border: 1px solid #BFDBFE; color: #1E3A8A; }
+.bp-banner.gray { background: #F1F5F9; color: #334155; }
+.bp-footer {
+  margin-top: 8px; padding: 16px 16px 8px;
+  border-top: 1px solid var(--border);
+  font-size: 12.5px; line-height: 1.6; color: var(--muted);
+  text-align: center;
+}
+.bp-footer strong { color: #334155; }
+.bp-footer .bp-hm-attr {
+  display: inline-flex; margin-top: 12px; padding: 6px 12px;
+  border-radius: var(--r-pill); border: 1px solid var(--border);
+  background: #fff; font-size: 12px; color: var(--muted);
+}
+.bp-sig-pad {
+  width: 100%; height: 110px;
+  border: 1.5px dashed var(--border-strong); border-radius: 12px;
+  background: #fff; touch-action: none; display: block;
+}
+.bp-rise { animation: bp-rise 0.3s both; }
+@keyframes bp-rise { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .bp-rise, .bp-dark-card { animation: none; }
+}

@@ -1,57 +1,53 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Copy } from 'lucide-react'
 import { formatCurrency } from '../helpers'
 
 interface PortalSwishBlockProps {
   swishNumber: string
   amount: number
   invoiceNumber: string
-  invoiceId: string
-  token: string
 }
 
 /**
- * Mörkt Swish-block med riktig QR från /api/swish-qr.
- * Bevarar Claude Designs estetik (gradient + Swish-rosa "S"-logo).
+ * "Betala med Swish" — portalens beslutskort (Design 2026-09-07).
+ * Mörkt kort med EN vit knapp som öppnar Swish med belopp och meddelande
+ * förifyllda. På mobilen visas aldrig en QR-kod (man kan inte skanna sin
+ * egen skärm); på desktop (≥768 px) läggs den till som "Skanna med Swish".
+ * Kopieringsraderna är reserven när deeplinken inte fungerar.
+ *
+ * "Jag har betalat" ligger utanför blocket (PortalInvoiceDetail) — den
+ * gäller lika mycket för bankgiro.
  */
-export default function PortalSwishBlock({
-  swishNumber,
-  amount,
-  invoiceNumber,
-  invoiceId,
-  token,
-}: PortalSwishBlockProps) {
+export default function PortalSwishBlock({ swishNumber, amount, invoiceNumber }: PortalSwishBlockProps) {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null)
+  const [desktop, setDesktop] = useState(false)
   const [copied, setCopied] = useState<string | null>(null)
-  // 'idle' | 'sending' | 'claimed' — kundens "Jag har betalat"-bekräftelse.
-  const [claimState, setClaimState] = useState<'idle' | 'sending' | 'claimed'>('idle')
-
-  async function claimPaid() {
-    if (claimState !== 'idle') return
-    setClaimState('sending')
-    try {
-      const res = await fetch(`/api/portal/${token}/invoices/${invoiceId}/claim-paid`, { method: 'POST' })
-      // Både ok och already_pending/already_paid → visa tack (idempotent).
-      setClaimState(res.ok ? 'claimed' : 'idle')
-    } catch {
-      setClaimState('idle')
-    }
-  }
 
   useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return
+    const mq = window.matchMedia('(min-width: 768px)')
+    const sync = () => setDesktop(mq.matches)
+    sync()
+    mq.addEventListener?.('change', sync)
+    return () => mq.removeEventListener?.('change', sync)
+  }, [])
+
+  useEffect(() => {
+    if (!desktop) return
     const url = `/api/swish-qr?number=${encodeURIComponent(swishNumber)}&amount=${Math.round(amount)}&message=${encodeURIComponent(invoiceNumber)}`
+    let cancelled = false
     fetch(url)
       .then(r => r.ok ? r.json() : null)
-      .then(d => { if (d?.qr) setQrDataUrl(d.qr) })
+      .then(d => { if (!cancelled && d?.qr) setQrDataUrl(d.qr) })
       .catch(() => {})
-  }, [swishNumber, amount, invoiceNumber])
+    return () => { cancelled = true }
+  }, [desktop, swishNumber, amount, invoiceNumber])
 
   function copy(key: string, value: string) {
     if (navigator.clipboard) navigator.clipboard.writeText(value).catch(() => {})
     setCopied(key)
-    setTimeout(() => setCopied(null), 1500)
+    setTimeout(() => setCopied(null), 2000)
   }
 
   const swishDataString = JSON.stringify({
@@ -63,165 +59,55 @@ export default function PortalSwishBlock({
   const swishUrl = `swish://payment?data=${encodeURIComponent(swishDataString)}`
 
   return (
-    <div
-      style={{
-        background: 'linear-gradient(135deg, #0F172A, #1E293B)',
-        borderRadius: 'var(--r-2xl)',
-        padding: 20,
-        color: '#fff',
-        position: 'relative',
-        overflow: 'hidden',
-      }}
-    >
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <div
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 6,
-            background: '#EE3A88',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontWeight: 800,
-            fontSize: 11,
-            color: '#fff',
-          }}
-        >
-          S
+    <div style={{ background: '#0F172A', borderRadius: 16, padding: 18, color: '#fff' }}>
+      <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8, marginBottom: 14 }}>
+        <span style={{ fontSize: 17, fontWeight: 700 }}>Betala med Swish</span>
+        <span style={{ fontSize: 11, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', color: 'rgba(255,255,255,0.55)' }}>Snabbast</span>
+      </div>
+
+      {desktop && (
+        <div style={{ background: '#fff', borderRadius: 12, padding: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          {qrDataUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={qrDataUrl} alt="Swish QR-kod" width={150} height={150} />
+          ) : (
+            <div style={{ width: 150, height: 150, background: '#F1F5F9', borderRadius: 6, animation: 'bp-shimmer 1.4s infinite' }} />
+          )}
+          <span style={{ fontSize: 12.5, color: '#475569' }}>Skanna med Swish</span>
         </div>
-        <span style={{ fontSize: 13, fontWeight: 600 }}>Betala med Swish</span>
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'rgba(255,255,255,0.5)' }}>Snabbast</span>
-      </div>
-
-      <div
-        style={{
-          background: '#fff',
-          borderRadius: 'var(--r-md)',
-          padding: 12,
-          display: 'flex',
-          justifyContent: 'center',
-          marginBottom: 14,
-        }}
-      >
-        {qrDataUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={qrDataUrl} alt="Swish QR" width={150} height={150} />
-        ) : (
-          <div
-            style={{
-              width: 150,
-              height: 150,
-              background: '#F1F5F9',
-              borderRadius: 6,
-              animation: 'bp-shimmer 1.4s infinite',
-            }}
-          />
-        )}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-        {([
-          { k: 'swish',  label: 'Swish-nummer', val: swishNumber },
-          { k: 'amount', label: 'Belopp',       val: formatCurrency(amount) },
-          { k: 'msg',    label: 'Meddelande',   val: invoiceNumber },
-        ] as const).map(r => (
-          <div
-            key={r.k}
-            onClick={() => copy(r.k, r.val)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '8px 0',
-              borderBottom: '1px solid rgba(255,255,255,0.08)',
-              cursor: 'pointer',
-            }}
-          >
-            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.6)' }}>{r.label}</span>
-            <span
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontFamily: 'ui-monospace, monospace',
-                fontSize: 13,
-                fontWeight: 600,
-              }}
-            >
-              {r.val}
-              <span style={{ color: copied === r.k ? '#10B981' : 'rgba(255,255,255,0.4)' }}>
-                {copied === r.k ? <Check size={13} strokeWidth={3} /> : <Copy size={13} />}
-              </span>
-            </span>
-          </div>
-        ))}
-      </div>
+      )}
 
       <a
         href={swishUrl}
         style={{
-          marginTop: 14,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-          width: '100%',
-          padding: '12px 16px',
-          background: '#EE3A88',
-          color: '#fff',
-          borderRadius: 'var(--r-md)',
-          fontWeight: 600,
-          fontSize: 14,
-          textDecoration: 'none',
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          height: 52, borderRadius: 12,
+          background: '#fff', color: '#0F172A',
+          fontSize: 16, fontWeight: 600, textDecoration: 'none',
         }}
       >
-        Öppna Swish
+        Öppna Swish · {formatCurrency(amount)}
       </a>
+      <div style={{ marginTop: 8, textAlign: 'center', fontSize: 12.5, color: 'rgba(255,255,255,0.7)' }}>
+        Belopp och meddelande är förifyllda.
+      </div>
 
-      {/* "Jag har betalat" — bekräftelse till hantverkaren (ingen auto-avprickning) */}
-      {claimState === 'claimed' ? (
-        <div
-          style={{
-            marginTop: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            padding: '10px 16px',
-            fontSize: 13,
-            color: 'rgba(255,255,255,0.8)',
-          }}
-        >
-          <Check size={15} strokeWidth={3} style={{ color: '#10B981' }} />
-          Tack! Vi bekräftar när betalningen kommit in.
-        </div>
-      ) : (
-        <button
-          type="button"
-          onClick={claimPaid}
-          disabled={claimState === 'sending'}
-          style={{
-            marginTop: 10,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: 8,
-            width: '100%',
-            padding: '11px 16px',
-            background: 'transparent',
-            color: 'rgba(255,255,255,0.75)',
-            border: '1px solid rgba(255,255,255,0.18)',
-            borderRadius: 'var(--r-md)',
-            fontWeight: 600,
-            fontSize: 13,
-            cursor: claimState === 'sending' ? 'default' : 'pointer',
-            opacity: claimState === 'sending' ? 0.6 : 1,
-          }}
-        >
-          {claimState === 'sending' ? 'Skickar…' : 'Jag har betalat'}
-        </button>
-      )}
+      <div style={{ marginTop: 10 }}>
+        {([
+          { k: 'swish', label: 'Swish-nummer', val: swishNumber },
+          { k: 'msg', label: 'Meddelande', val: invoiceNumber },
+        ] as const).map(r => (
+          <div key={r.k} className="bp-copy-row">
+            <div>
+              <div style={{ fontSize: 11.5, color: 'rgba(255,255,255,0.6)' }}>{r.label}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, fontVariantNumeric: 'tabular-nums' }}>{r.val}</div>
+            </div>
+            <button type="button" className="bp-copy-btn" onClick={() => copy(r.k, r.val)}>
+              {copied === r.k ? 'Kopierat' : 'Kopiera'}
+            </button>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

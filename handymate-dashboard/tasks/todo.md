@@ -62,8 +62,43 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
   verkaren kopierar den från projektsidan (gap att besluta om). Cookie-
   bannern ligger över de publika sidorna (global, inte min). QA-raden
   (fr-qa-claude-visual-check-2026-09-07) raderad efter skärmdumparna.
-- [ ] Yta 4 portalens beslutskort — Design-brief skriven 2026-09-07
-      (docs/design/briefs/04-portalens-beslutskort.md), väntar på Design
+- [x] Yta 4 portalens beslutskort — BYGGD 2026-09-07 (Design: "Kundportal
+      beslut.dc.html"). Fyra ytor i app/portal/[token]: Hem "Väntar på dig"
+      (EN sanning: GET /api/portal/[token]/decisions → ÄTA i 'sent', obetalda
+      fakturor + öppet confirm_payment-kort, omdöme efterfrågat men ej lämnat;
+      varje rad går rakt in i beslutet; röd räknare på Fakturor), ÄTA
+      "Tilläggsarbete att godkänna" (PortalAtaDecision: namn + bindande kryss
+      som standard, ritad signatur per firma via
+      business_config.portal_ata_signature_mode, "Tacka nej" med meddelande,
+      samma /api/ata/sign/[token] som SMS-länken; projektvyn signerar inte
+      längre inline — ÄTA-kortet öppnar beslutsvyn), Faktura "Att betala"
+      (PortalInvoiceDetail: hero med status, "Det här ingår" med godkända ÄTA
+      ur portalens ÄTA-lista, Swish-block med EN knapp + QR bara ≥768 px,
+      bankgiro/OCR som reserv, "Jag har betalat" utanför Swish-blocket,
+      dokumentet öppet nedanför med oförändrat återförsök), Omdöme "Hur blev
+      det?" (PortalReviewCTA + POST/PATCH /api/portal/[token]/review: 1–3 →
+      sparas + går som meddelande i tråden, aldrig Google; 4–5 → sparas +
+      Google-kort; 409 = ett omdöme per kund). PortalFooter (firma, org.nr,
+      F-skatt, stämpel) på alla tre beslutsvyerna. Migration
+      sql/v221_portal_beslut.sql (portal_review + RLS enligt v101,
+      portal_ata_signature_mode) — KÖRS FÖRE push, annars 500 i portalen.
+      Facit tests/portal-beslutskort.spec.ts (22); decisions + review
+      registrerade i launch-public-token-contract och portal-error-swallow;
+      portal-invoice-recovery.ui mockar nu ./PortalFooter. tsc 0, build grön.
+- Beslut yta 4: ÄTA-foton visas INTE i beslutsvyn (portalens projekt-route
+  exponerar inga bilagor — följdpunkt); Offerter får ingen räknare (Hem
+  laddar inte offertantalet — inga uppfunna siffror); fakturadokumentet
+  öppet som standard (recovery-facitet läser det på mount); Swish-QR bara
+  på desktop (man skannar inte sin egen skärm); "Jag har betalat" gäller
+  även bankgiro-firmor.
+- Lärdomar yta 4: recovery-facitet transpilerar PortalInvoiceDetail mot en
+  fast modulkarta — varje ny import i komponenten måste in i kartan, annars
+  faller testet med "Error: ./X" i pageerror. Kolumnen på pending_approvals
+  heter approval_type, inte type.
+- [ ] Yta 4 kvar: skarptest med två telefoner — ÄTA-godkännande (SMS →
+  portal → godkänd → ÄTA på slutfakturan), "Jag har betalat" →
+  confirm_payment-kort hos hantverkaren, lågt omdöme → tråden, högt →
+  Google-länk. Aldrig signera via UI på testkonto utan att radera raderna.
 - [x] Yta 2 dokumentfamiljen (PDF) — pushad 2026-09-07: EN helper
       lib/branding/pdf.ts (loadPdfBranding/pdfBrandingFrom/loadPdfLogo,
       drawBrandHeader → content-y, drawBrandFooter med "Sida i av n";
@@ -85,7 +120,23 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
   F11 (data-builder äldre lokalt).
 - [ ] Yta 2 kvar: skarptest — öppna en byggdagbok-, ÄTA- och arbetsorder-
       PDF på ett konto MED logga (Bee) och ett UTAN; jobbrapport vid approve.
-- [ ] Design-ytorna 5, 6, 8–10 från listan 2026-09-07 (ej påbörjade)
+- [x] v221 KÖRD i prod 2026-09-07 (verifierad: 10 kolumner, RLS, två
+      policyer, anon utan rättigheter, default name_checkbox) → yta 4 pushad.
+- [ ] Yta 5 BOKNINGSFLÖDET — nästa bygge (Andreas "kör" 2026-09-07). Beslut:
+      hemsidan (/site/[slug]) designas INTE om — ICP 5–20 anställda har egen
+      hemsida; bokningslänken är det de saknar. Brief docs/design/briefs/05-
+      bokningsflodet-och-hemsidan.md (trimmad), Design "Bokning.dc.html".
+      Bygge: app/site/[slug]/boka i brand-lagret (loadBranding, accent-ramp,
+      stämpel), WeekPicker/SlotGrid/BookingSummary/ContactForm/Confirmation,
+      ICS "Lägg i kalendern" (klient), "Din bokningslänk" + kopiera i
+      /dashboard/settings/kundvy. Sanningsrättningar mot designen: "kostar
+      inget" bakom inställning (default av), inget "fast pris", vem som
+      kommer = contact_name annars firmanamnet. Lisa/Matte skickar länken =
+      ny feature, EFTER lansering.
+- [ ] Yta 9 demo-offert till dig själv — brief skriven 2026-09-07
+      (docs/design/briefs/09-demo-offert-till-dig-sjalv.md), väntar på Design
+      + tre beslut (SMS/e-post, firmanamn som avsändare, Calendly-länk).
+- [ ] Design-ytorna 6, 8, 10 (ej påbörjade)
 
 # Partnergrinden GRÖN 2026-09-07 (Claude)
 
@@ -151,6 +202,18 @@ Claudes förmätning 2026-09-03, allt verifierat lokalt/via MCP:
       (2/27 konton har jobbtyper idag)
 - [ ] Märk upp vilka av de 27 kontona (5 aktiva prenumerationer) som är
       riktiga vs testkonton före 10-kundersprogrammet
+- [ ] Portalens beslutskort (yta 4, Claude 2026-09-07) — skarptest med två
+      telefoner på testkontot, EFTER att v221 körts och koden pushats:
+      (a) ÄTA: skicka ÄTA → SMS-länk → portalen visar "Väntar på dig" →
+      "Granska och godkänn" med namn+kryss → status Godkänd i portal +
+      dashboard, ÄTA:n med på slutfakturan; (b) "Tacka nej" på en andra
+      ÄTA → meddelandet syns i tråden hos hantverkaren; (c) faktura: Swish-
+      knapp öppnar appen med belopp/meddelande, "Jag har betalat" → EN
+      confirm_payment-kort, andra tryck ger "Redan anmält"; (d) omdöme 2/5
+      → hamnar i tråden, ALDRIG Google-kort; nytt konto/omdöme 5/5 → Google-
+      kort, andra försök = 409; (e) ogiltig portal-token → 404 utan 500.
+      Radera QA-raderna (project_change, portal_review, pending_approvals)
+      efteråt. Bevis: skärmbilder + id:n i docs/launch/.
 - Regel under programmet: inga nya features, bara P0/P1 mot låst release-SHA;
   varje bevis bokförs i docs/launch/ med SHA + tidpunkt; BLOCKERAD ≠ PASS
 
