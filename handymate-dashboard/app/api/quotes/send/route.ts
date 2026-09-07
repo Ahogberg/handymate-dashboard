@@ -4,11 +4,10 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
-import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
-import { halsning } from '@/lib/customers/namn'
+import { buildQuoteSmsText } from '@/lib/quotes/quote-sms'
 import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
 import { buildQuoteEmailHtml } from '@/lib/quotes/quote-email'
 
@@ -332,13 +331,6 @@ export async function POST(request: NextRequest) {
     // person, samma identitet som kunddokumentet. Null för gamla offerter.
     const emailCreator = await fetchQuoteCreator(supabase, quote.created_by)
 
-    const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
-    }
-
-    const customerPays = quote.rot_rut_type ? quote.customer_pays : quote.total
-    const rotText = quote.rot_rut_type ? ` (efter ${quote.rot_rut_type.toUpperCase()}: ${formatCurrency(customerPays)} kr)` : ''
-
     // Generate/get sign_token and build signing URL
     let signToken = quote.sign_token
     if (!signToken) {
@@ -371,18 +363,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Kunden saknar telefonnummer' }, { status: 400 })
       }
 
-      const suffix = buildSmsSuffix(business.business_name, business.assigned_phone_number)
-      const smsMessage = `${halsning(quote.customer.name)}
-
-Här kommer din offert från ${business.business_name}:
-
-Totalt: ${formatCurrency(quote.total)} kr${rotText}
-${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}\n` : ''}
-Öppna din kundportal:
-${portalUrl}
-
-Frågor? Ring ${business.phone_number}
-${suffix}`
+      // Texten bor i lib/quotes/quote-sms.ts — demo-offerten på handymate.se
+      // (api/public/demo-quote) skickar EXAKT samma SMS (yta 9, 2026-09-07).
+      const smsMessage = buildQuoteSmsText({
+        customerName: quote.customer.name,
+        businessName: business.business_name,
+        businessPhone: business.phone_number,
+        assignedPhoneNumber: business.assigned_phone_number,
+        total: quote.total,
+        customerPays: quote.customer_pays,
+        rotRutType: quote.rot_rut_type,
+        validUntil: quote.valid_until,
+        portalUrl,
+      })
 
       const smsResult = await sendSMS(supabase, business.business_id, quote.customer.phone_number, smsMessage, business.business_name, quote.customer_id, quoteId)
       smsSent = smsResult.sent

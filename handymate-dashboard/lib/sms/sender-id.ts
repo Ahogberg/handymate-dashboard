@@ -33,8 +33,21 @@ export function sanitizeSenderId(name: string | null | undefined): string {
   let n = (name || '').trim()
   // Strip vanliga företagsformer + ev. ledande mellanslag/komma
   n = n.replace(/[\s,]+(AB|HB|KB|Aktiebolag|Handelsbolag|Kommanditbolag|Inc|Corp|Corporation|Ltd|Limited|LLC)\.?$/i, '')
+  // 2026-09-08: åäö translittereras i stället för att strippas. "Ekström
+  // Bygg" blev "EkstrmBygg" — ett hål mitt i namnet i kundens mobil. Nu
+  // "EkstromBygg". Samma för é (Renée → Renee), ü, ø/æ (norska/danska namn).
+  n = translitereraTillAscii(n)
   const sanitized = n.replace(/[^A-Za-z0-9]/g, '').substring(0, 11)
   return sanitized || 'Handymate'
+}
+
+const ASCII_ERSATTNING: Record<string, string> = {
+  å: 'a', ä: 'a', ö: 'o', é: 'e', è: 'e', ü: 'u', ø: 'o', æ: 'ae',
+  Å: 'A', Ä: 'A', Ö: 'O', É: 'E', È: 'E', Ü: 'U', Ø: 'O', Æ: 'Ae',
+}
+
+function translitereraTillAscii(s: string): string {
+  return s.replace(/[åäöéèüøæÅÄÖÉÈÜØÆ]/g, (ch) => ASCII_ERSATTNING[ch] ?? ch)
 }
 
 /**

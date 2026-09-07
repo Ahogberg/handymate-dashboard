@@ -314,5 +314,19 @@ export async function GET(request: NextRequest) {
     results.experiment_readouts_error = err.message
   }
 
+  // ── 6. Demo-offerten på handymate.se — städning (yta 9, 2026-09-08) ────
+  //
+  // Besökare som skickat en offert till sig själva ligger som kunder hos
+  // demo-företaget Ekström Bygg. Efter sju dagar (offertens giltighetstid)
+  // raderas kund + offert + projekt + affär via SQL-funktionen i v223.
+  // Fail-soft: saknas v223 (42883) loggas det och cronen går vidare.
+  try {
+    const { stadaDemoOfferter } = await import('@/lib/demo/demo-quote-cleanup')
+    results.demo_quote_cleanup = await stadaDemoOfferter(supabase)
+  } catch (err: any) {
+    console.error('[maintenance] demo-offert-städningen failade:', err.message)
+    results.demo_quote_cleanup_error = err.message
+  }
+
   return NextResponse.json({ ok: true, ...results })
 }
