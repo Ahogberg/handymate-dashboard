@@ -38,8 +38,11 @@ test.describe('grinden — welcome_tour_seen + localStorage, dubbelt skydd', () 
   test('localStorage-nyckeln hm_hemtur_klar är det andra skyddet', () => {
     const s = read(HEMTUR)
     expect(s).toContain("SEEN_KEY = 'hm_hemtur_klar'")
-    expect(s).toContain('localStorage.getItem(SEEN_KEY)')
-    expect(s).toContain('localStorage.setItem(SEEN_KEY')
+    // Repin 2026-09-07: b0bf7321 (PR #13 "Första nyttan") skopade nyckeln per
+    // företag — ett kontobyte i samma webbläsare får inte ärva "turen sedd".
+    // Samma dubbla skydd, samma try/catch-gate, ny nyckelform.
+    expect(s).toContain('localStorage.getItem(`${SEEN_KEY}:${business.business_id}`)')
+    expect(s).toContain('localStorage.setItem(`${SEEN_KEY}:${business.business_id}`')
   })
 
   test('trasig localStorage failar STÄNGT (ingen tur) — inte öppet', () => {
@@ -183,10 +186,13 @@ test.describe('kedjningen (Company Scan, tasks/jaunty-pondering-hummingbird.md) 
   test('JarvisHome väntar med HemTur tills CompanyScan stängts — HemTur renderas villkorat, inte ovillkorat', () => {
     const hem = read(HEM)
     expect(hem).toContain('const [scanKlar, setScanKlar] = useState(false)')
-    expect(hem).toContain('{scanKlar && !forstaAtgardId && <HemTur />}')
+    // Repin 2026-09-07: b0bf7321 (PR #13) lade till !jobbkompisenOpen — turen
+    // väntar även på att Jobbkompisen stängts. Samma repin gjordes i
+    // tests/company-scan.spec.ts; skannen står fortfarande FÖRE i kedjan.
+    expect(hem).toContain('{scanKlar && !forstaAtgardId && !jobbkompisenOpen && <HemTur />}')
     // CompanyScan står FÖRE i JSX-trädet — det är hela kedjningen.
     const scanIdx = hem.indexOf('<CompanyScan onClose=')
-    const hemturIdx = hem.indexOf('{scanKlar && !forstaAtgardId && <HemTur />}')
+    const hemturIdx = hem.indexOf('{scanKlar && !forstaAtgardId && !jobbkompisenOpen && <HemTur />}')
     expect(scanIdx).toBeGreaterThan(-1)
     expect(scanIdx).toBeLessThan(hemturIdx)
   })

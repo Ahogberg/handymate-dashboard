@@ -101,7 +101,9 @@ test.describe('resultatlandningarna är riktiga publika routes', () => {
       .map(route => read(`app/${route}/page.tsx`))
       .join('\n')
     expect(all).not.toMatch(/svarar i telefon|pratar med kunden i telefon|röstagent/i)
-    expect(all).toContain('återkopplar Lisa via SMS')
+    // 695c0a04 (lanseringssanning): SMS-uppföljningen lovas bara när telefonkanalen
+    // är aktiverad och verifierad — gränsen (SMS, aldrig röst) uttrycks fortfarande.
+    expect(all).toContain('missade samtal följas upp via SMS')
   })
 })
 

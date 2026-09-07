@@ -55,6 +55,11 @@ function klientLasare(): string[] {
     if (!s.includes("from('business_config')")) continue
     // service_role => server-sida, utanför RLS.
     if (s.includes('SUPABASE_SERVICE_ROLE_KEY')) continue
+    // getServerSupabase() (lib/supabase.ts) ÄR service_role — bara ett annat
+    // sätt att säga samma sak. app/via/[code]/page.tsx (1f4e4ddb) är en
+    // server component utan 'use client' som läser via den helpern; den rör
+    // inte RLS och ska inte klassas som en webbläsarläsning.
+    if (s.includes('getServerSupabase(') && !/^\s*['"]use client['"]/m.test(s)) continue
     ut.push(path.relative(ROOT, fil).replace(/\\/g, '/'))
   }
   return ut.sort()

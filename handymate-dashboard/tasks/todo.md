@@ -1014,3 +1014,21 @@ två skrivs som spec till efter lansering.
 - [x] Mobilprov utan telefon: nio ui-specar körda headless i 375 px och
       1280 px, 37 prov gröna (se lessons om headless-shell-symlinken).
       Kvar: inloggade flöden på riktig telefon (Andreas i morgon).
+
+# Nattsviten ärlig igen (Claude 2026-09-07 morgon)
+
+- [x] Sviten hade dött i OOM i tsc varje natt sedan 2 sep (ecc4d38c gav
+      heap). Första riktiga körningen 06:46 UTC: 7707 gröna, 25 röda i 20 filer.
+- [x] Triage i tre grupper. Två riktiga regressioner rättade i kod:
+      "dygnet runt" i partnermaterialet (leave-behind, partnerdeck) → "varje
+      dag"; Obesvarat-märket i inspelningslistan hade aldrig blivit committat
+      (facit fanns, koden saknades) → call_status + märke återställt.
+- [x] 22 facit-uppdateringar till medvetna ändringar (PR #13/#14, transkrip-
+      tionsmodulen 9e400e55, kom-igang-signalerna, per-företags-nycklar i
+      HemTur, A/B-presentatören, launch-truth-copyn), var och en med commit-
+      referens i specen. Ingen intent försvagad.
+- [x] Miljö: tests/customer-preparation/ ignoreras av standardkonfigen (kräver
+      dev-server; körs via playwright.preparation.config.ts). Filming-isolering
+      intakt. Ny allowlist-post för veckorapportens ägar-SMS (recipient internal).
+- [x] Lokalt: 454 prov i de berörda filerna gröna, kontraktsgrinden 1694 gröna.
+      Nästa nattkörning ~06:30 UTC 8 sep ska vara helt grön.

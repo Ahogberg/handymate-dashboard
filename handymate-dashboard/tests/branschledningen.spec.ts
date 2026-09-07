@@ -44,7 +44,16 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(
 // lucide-react — ska inte laddas i ett facit).
 function onboardingTradeIds(): string[] {
   const s = read('app/onboarding/constants.ts')
-  const block = s.slice(s.indexOf('export const TRADES'), s.indexOf('export const SPECIALTIES_BY_TRADE'))
+  // 5a01bfc0 (2026-09-06) gjorde SPECIALTIES_BY_TRADE till en re-export ur
+  // lib/job-type-catalog — slutmarkören "export const SPECIALTIES_BY_TRADE"
+  // finns inte längre, och en slice utan slut svepte in LEAD_PLATFORMS
+  // ('offerta' m.fl. — leadmarknader, inte branscher). Läs bara TRADES-
+  // arrayen: från deklarationen till dess avslutande "]" på egen rad.
+  const start = s.indexOf('export const TRADES')
+  expect(start, 'TRADES saknas i onboardingens constants').toBeGreaterThan(-1)
+  const end = s.indexOf('\n]', start)
+  expect(end, 'TRADES-arrayens slut hittades inte').toBeGreaterThan(start)
+  const block = s.slice(start, end)
   return Array.from(block.matchAll(/id:\s*'([a-z_]+)'/g)).map(m => m[1])
 }
 

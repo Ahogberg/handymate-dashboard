@@ -457,6 +457,9 @@ test.describe('spärrhaken — läckaget får bara krympa', () => {
     const TILLATNA_INTERNA_SITES = [
       'lib/agent/morning-report.ts',
       'app/api/cron/monthly-review/route.ts',
+      // Autopilot pass C (e122d343): fredagens veckorapport-SMS går till
+      // business_config.phone_number — ägarens eget nummer, aldrig en kund.
+      'app/api/cron/veckorapport/route.ts',
       'lib/leads/golden-path.ts',
       'lib/onboarding/first-event-sms.ts',
       'lib/referral/discounts.ts',
@@ -542,11 +545,22 @@ test.describe('billing-sidan visar inga falska siffror', () => {
 
 test.describe('Whisper och samtalsminuter', () => {
   test('Whisper bokförs där ljudlängden är känd', () => {
-    const s = kod('app/api/voice/transcribe/route.ts')
+    // Ompinnat 2026-09-07: 9e400e55 flyttade transkriberingen (och därmed
+    // bokföringen) från routen in i lib/transcription/transcribe.ts — EN
+    // bokföring per anrop, samma helper, samma spärr. Routerna bokför inte
+    // själva längre; de skickar den kända längden in i modulen.
+    const s = kod('lib/transcription/transcribe.ts')
     expect(s).toContain("resource: 'whisper'")
-    expect(s).toContain('whisperCostOre(ljudSekunder)')
+    expect(s).toContain('whisperCostOre(durationSeconds)')
     // Utan känd längd bokförs inget — hellre omätt än gissat.
-    expect(s).toContain('ljudSekunder > 0')
+    expect(s).toContain('durationSeconds > 0')
+
+    // Samtalsvägen skickar in den kända ljudlängden ur databasen och bokför
+    // inte en gång till på egen hand (dubbelbokföring).
+    const route = kod('app/api/voice/transcribe/route.ts')
+    expect(route).toContain('knownDurationSeconds: Number(recording.duration_seconds)')
+    expect(route).toContain("refType: 'call_recording'")
+    expect(route, 'routen bokför Whisper själv igen — dubbelt').not.toContain("resource: 'whisper'")
   })
 
   test('samtalsminuter bokförs INTE än — payloaden ska avstämmas först', () => {

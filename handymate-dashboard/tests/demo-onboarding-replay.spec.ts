@@ -175,7 +175,10 @@ test.describe('Klient-stegen grenar BARA på demo-flaggan — icke-demo-vägen �
 test.describe('"Visa onboardingen" — presentatörsverktygen', () => {
   test('PresenterBar anropar replay-rutten och navigerar till /onboarding', () => {
     expect(presenterBarSource).toContain('/api/admin/demo-onboarding-replay')
-    expect(presenterBarSource).toContain("window.location.assign('/onboarding')")
+    // Repin 2026-09-07: f7070548 gav presentatören ett A/B-val per knapp
+    // (klassisk vs Setup Studio) — samma hårda navigering till /onboarding,
+    // nu med ?studio=1 / ?classic=1 som väljer flödet.
+    expect(presenterBarSource).toContain("window.location.assign(mode === 'studio' ? '/onboarding?studio=1' : '/onboarding?classic=1')")
   })
 
   test('dashboard/demo-sidan anropar replay-rutten och navigerar till /onboarding', () => {

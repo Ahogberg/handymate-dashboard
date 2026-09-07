@@ -16,7 +16,9 @@ const specs = fs
 
 test('playwright.config har ett isolerat filming-projekt som standardsviten ignorerar', () => {
   const cfg = las('playwright.config.ts')
-  expect(cfg).toMatch(/testIgnore: \[.*filming\[\\\\\/\]\/\],/)
+  // Posten ska finnas i toppnivåns testIgnore — inte nödvändigtvis sist
+  // (launch-proof och customer-preparation har lagts till efter den).
+  expect(cfg).toMatch(/testIgnore: \[[^\n]*\/tests\[\\\\\/\]filming\[\\\\\/\]\//)
   const block = cfg.slice(cfg.indexOf("name: 'filming'"))
   expect(block).toContain("testDir: './tests/filming'")
   expect(block).toContain('testIgnore: []')

@@ -93,7 +93,7 @@ export default function PartnerdeckPage() {
             ))}
           </div>
           <p className="text-[15px] text-slate-600 leading-relaxed mt-8">
-            Alla pratar svenska, jobbar dygnet runt och skickar aldrig något till en kund utan ditt OK.
+            Alla pratar svenska, jobbar varje dag och skickar aldrig något till en kund utan ditt OK.
           </p>
         </section>
 

@@ -73,7 +73,11 @@ test.describe('steg 3 — inga döda knappar, ingen röst-copy', () => {
   test('"svara rätt i telefonen" är borta — Lisa har ingen röst', () => {
     const s = read(STEG3)
     expect(s.replace(/^\s*\{\/\*[\s\S]*?\*\/\}/gm, '')).not.toContain('svara rätt i telefonen')
-    expect(s).toContain('svara kunderna rätt')
+    // Repin 2026-09-07: 5a01bfc0 (PR #14) bytte ingressen till jobbtyper →
+    // offertunderlag. Fortfarande ingen röst-copy; den nya ingressen pinnas
+    // så att en återinförd "svara rätt i telefonen"-formulering inte kan
+    // smyga in via en tom/omskriven ob-sub.
+    expect(s).toContain('Dina jobbtyper följer med till nya affärer och hjälper oss att förbereda rätt offertunderlag.')
   })
 
   test('knappen är klickbar i ogiltigt läge och SÄGER vad som saknas', () => {
@@ -83,7 +87,9 @@ test.describe('steg 3 — inga döda knappar, ingen röst-copy', () => {
     // korrekta aria-variant. Kräv att 'disabled' inte föregås av 'aria-'.
     expect(s, 'disabled-knapp utan besked är tillbaka').not.toMatch(/(?<!aria-)disabled=\{!valid\}/)
     expect(s).toContain('aria-disabled={!valid}')
-    expect(s).toContain('välj minst en specialitet')
+    // Repin 2026-09-07: 5a01bfc0 (PR #14) — specialitet heter jobbtyp; beskedet
+    // säger fortfarande exakt vad som saknas.
+    expect(s).toContain('välj minst en jobbtyp')
     expect(s).toContain('markera minst en arbetsdag')
   })
 })
@@ -154,8 +160,14 @@ test.describe('touren kan aldrig hålla någon fången (B7-fyndet: evighetsloope
     const s = read('app/onboarding/components/Step6LiveTour.tsx')
     expect(s).toContain('Hoppa till start')
     // Utvägen renderas när touren INTE är klar — motsatt villkor mot CTA:n.
+    // Repin 2026-09-07: c7c33661 (PR #13, mobil) gömmer knappen bara medan
+    // välkomst-toasten ligger över samma hörn. Toasten släcks av en
+    // OVILLKORLIG timer (2,8 s) — den kan aldrig bli permanent, så utvägen
+    // finns under hela turen; säkerhetsnätet på 5 s ovan är kvar orört.
     const utvag = s.indexOf('Hoppa till start')
-    const villkor = s.lastIndexOf('{!finished && (', utvag)
+    const villkor = s.lastIndexOf('{!finished && !showToast && (', utvag)
     expect(villkor, 'utvägen är gated bakom fel villkor').toBeGreaterThan(-1)
+    expect(s, 'toasten måste släckas av en timer, annars gömmer den utvägen för alltid')
+      .toContain('setTimeout(() => setShowToast(false), 2800)')
   })
 })

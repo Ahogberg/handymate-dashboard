@@ -18,7 +18,14 @@ export default defineConfig({
   // user.json istället för demo-employee.json). De tre nya golden-path-*-
   // projekten längst ner sätter egen testIgnore:[] för att inte ärva
   // undantaget de själva behöver träffa.
-  testIgnore: [/.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /.*\.launch\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/, /tests[\\/]launch[\\/]/],
+  //
+  // tests/customer-preparation/** hör till andra körare: ui.spec.ts kräver
+  // en dev-server på :3020 (webServer i playwright.preparation.config.ts,
+  // npm run test:feature-integration) och gav ERR_CONNECTION_REFUSED i
+  // nattsviten mot produktion; contract.test.mjs är en node:test-fil
+  // (node --test i test:contracts) som Playwrights standard-testMatch
+  // (*.test.mjs) annars laddar och kör vid import.
+  testIgnore: [/.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /.*\.launch\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/, /tests[\\/]launch[\\/]/, /tests[\\/]customer-preparation[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,

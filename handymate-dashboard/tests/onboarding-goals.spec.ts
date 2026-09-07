@@ -34,8 +34,11 @@ test.describe('page.tsx — årsmålet skrivs inte längre från onboardingen', 
     const gren = onboardingPage.slice(grenStart, grenSlut)
     expect(gren).not.toContain('config.revenue_target_annual_sek')
     expect(gren).not.toContain('config.margin_target_percent')
-    // Fokuset följer med i onboarding_data via formulärdatat — ingen egen kolumn
-    expect(onboardingPage).toContain('await saveProgress(newStep, sanitizeForSave(data), config)')
+    // Fokuset följer med i onboarding_data via formulärdatat — ingen egen kolumn.
+    // Repin 2026-09-07: 5a01bfc0 (PR #14 jobbtyper) gav anropet ett fjärde
+    // argument (strict = step === 2) så att ett misslyckat jobbtypssparande
+    // kastar i stället för att tystas — samma payload, samma tre första argument.
+    expect(onboardingPage).toContain('await saveProgress(newStep, sanitizeForSave(data), config, step === 2)')
   })
 })
 
@@ -73,8 +76,10 @@ test.describe('steg 2 frågar bara det Lisa behöver (Lager 3 / B10, 2026-08-27)
     for (const f of ['internalHourlyCost', 'vatPeriod', 'isEmployer', 'fiscalYearEndMonth']) {
       expect(step3, `${f} finns kvar i steg 2`).not.toContain(f)
     }
-    // Det Lisa behöver finns kvar
-    expect(step3).toContain('Specialiteter')
+    // Det Lisa behöver finns kvar. Repin 2026-09-07: 5a01bfc0 (PR #14)
+    // ersatte "Specialiteter" med konkreta jobbtyper ("Vilka jobb gör ni
+    // oftast?") som följer med till offertstandarderna — samma fråga, ny form.
+    expect(step3).toContain('Vilka jobb gör ni oftast?')
     expect(step3).toContain('FIRST_FOCUS_OPTIONS.map')
   })
 

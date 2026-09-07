@@ -226,7 +226,9 @@ test.describe('Kom igång-railen + Hemturen monterade (2026-08-13, docs/design/F
 
   test('KomIgangRail läser sin egen completion-rutt, inte statiska false', () => {
     const rail = fs.readFileSync(path.join(ROOT, 'components/jarvis/KomIgangRail.tsx'), 'utf8')
-    expect(rail).toContain("fetch('/api/onboarding/kom-igang')")
+    // Repin 2026-09-07: b0bf7321 (PR #13) hämtar om vid fokus/återkomst med
+    // cache: 'no-store' — fortfarande rutten, aldrig statiska false.
+    expect(rail).toContain("fetch('/api/onboarding/kom-igang', { signal: controller.signal, cache: 'no-store' })")
     expect(rail).toContain('ring_test')
     expect(rail).toContain('forsta_artefakten')
     expect(rail).toContain('pwa')
@@ -234,17 +236,32 @@ test.describe('Kom igång-railen + Hemturen monterade (2026-08-13, docs/design/F
 
   test('railen har en completion-källa per uppdrag i backend-rutten (RIKTIG data, inte gissad)', () => {
     const route = fs.readFileSync(path.join(ROOT, 'app/api/onboarding/kom-igang/route.ts'), 'utf8')
-    expect(route).toContain("from('call_recording')")
+    // Repin 2026-09-07: 8e2f782f flyttade basluckorna (call_recording,
+    // push_subscriptions m.fl.) till lib/onboarding/kom-igang-signals.ts så
+    // startsidan och livscykelmailen läser SAMMA sanning. Rutten anropar
+    // hjälparen och läser meeting_job/quotes själv — ingen källa är gissad.
+    const signals = fs.readFileSync(path.join(ROOT, 'lib/onboarding/kom-igang-signals.ts'), 'utf8')
+    expect(route).toContain("import { hamtaKomIgangSignals } from '@/lib/onboarding/kom-igang-signals'")
+    expect(route).toContain('hamtaKomIgangSignals(supabase, businessId)')
+    expect(route).toContain('const ring_test = baseSignals.ring_test')
+    expect(route).toContain('const pwa = baseSignals.pwa')
+    expect(signals).toContain("from('call_recording')")
+    expect(signals).toContain("from('push_subscriptions')")
     expect(route).toContain("from('meeting_job')")
     expect(route).toContain("from('quotes')")
-    expect(route).toContain("from('push_subscriptions')")
     expect(route).toContain('getAuthenticatedBusiness')
   })
 
-  test('railen döljs permanent i localStorage när alla tre uppdrag är klara', () => {
+  test('railen döljs när alla uppdrag är klara — ur riktig data, inte ur en global localStorage-flagga', () => {
     const rail = fs.readFileSync(path.join(ROOT, 'components/jarvis/KomIgangRail.tsx'), 'utf8')
-    expect(rail).toContain("DONE_KEY = 'hm_kom_igang_klar'")
-    expect(rail).toContain('localStorage.setItem(DONE_KEY')
+    // Repin 2026-09-07: b0bf7321 (PR #13) tog bort DONE_KEY med flit — den
+    // globala nyckeln kunde gömma en ANNAN firmas start i samma webbläsare.
+    // Döljningen kommer nu ur allaKlara (serverns completion) och railen
+    // monteras om per business_id så inget gammalt svar följer med.
+    expect(rail).not.toContain('hm_kom_igang_klar')
+    expect(rail).toContain('const allaKlara = data !== null && tasks.length > 0 && tasks.every(t => t.klar)')
+    expect(rail).toContain('if (!data || allaKlara || tasks.length === 0) return null')
+    expect(rail).toContain('<AccountStartRail key={business.business_id} />')
   })
 })
 

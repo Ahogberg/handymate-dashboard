@@ -44,7 +44,7 @@ export default function LeaveBehindPage() {
             </h1>
             <p className="text-[13px] text-slate-600 leading-relaxed mt-2 max-w-xl">
               Sex AI-kollegor som går igenom firman varje morgon, tar möten och samtal vidare under
-              dagen och visar i slutet av veckan vad det var värt. På svenska, dygnet runt.
+              dagen och visar i slutet av veckan vad det var värt. På svenska, varje dag.
               Inget når en kund utan ditt OK.
             </p>
           </div>

@@ -157,9 +157,19 @@ test.describe('samtycket och rummet', () => {
 
 test.describe('kostnaden bokförs som telefonivägen', () => {
   test('Whisper-sekunder går till COGS-mätaren, per segment', () => {
+    // Ompinnat 2026-09-07: 9e400e55 flyttade bokföringen in i den delade
+    // modulen lib/transcription/transcribe.ts. Process-jobbet anropar den
+    // en gång per segment med segmentets kända längd och refType
+    // 'meeting_segment' (samma bucket som förut) — och bokför inte själv.
+    const modul = kod('lib/transcription/transcribe.ts')
+    expect(modul).toContain('recordCost')
+    expect(modul).toContain('whisperCostOre')
+
     const s = kod(PROCESS_JOB)
-    expect(s).toContain('recordCost')
-    expect(s).toContain('whisperCostOre')
+    expect(s).toContain("from '@/lib/transcription/transcribe'")
+    expect(s).toContain('knownDurationSeconds: segment.duration_seconds')
+    expect(s).toContain("refType: 'meeting_segment'")
+    expect(s, 'process-jobbet bokför Whisper själv igen — dubbelt').not.toContain("resource: 'whisper'")
   })
 })
 

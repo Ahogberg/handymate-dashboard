@@ -36,6 +36,10 @@ interface Recording {
   transcribed_at: string | null
   phone_number: string | null
   direction: 'inbound' | 'outbound'
+  // Utgående samtal (Ring via Handymate): 'initiated' | 'answered' | 'connected'
+  // | 'busy' | 'no_answer' | 'craftsman_no_answer' | 'failed'. Skrivs av
+  // /api/voice/outbound + /hangup. Inkommande samtal har null.
+  call_status: string | null
   created_at: string
   customer?: {
     name: string
@@ -409,6 +413,14 @@ export default function RecordingsPage() {
                             }`}>
                               {recording.direction === 'inbound' ? 'Inkommande' : 'Utgående'}
                             </span>
+                            {/* Ring via Handymate: kunden svarade men hantverkaren nådde
+                                inte fram till kopplingen — samtalet blev aldrig av och
+                                måste synas, annars ser raden ut som ett genomfört samtal. */}
+                            {recording.call_status === 'craftsman_no_answer' && (
+                              <span className="px-2 py-0.5 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-200">
+                                Obesvarat
+                              </span>
+                            )}
                             {recording.transcript && (
                               <span className="px-2 py-0.5 text-xs rounded-full bg-primary-100 text-primary-700 border border-[#E2E8F0]">
                                 Transkriberad

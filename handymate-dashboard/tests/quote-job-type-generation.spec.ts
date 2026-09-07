@@ -267,10 +267,14 @@ test('delat underlag trådas till generatorn från alla tre ingångar och priser
   const generator = read('lib/ai-quote-generator.ts')
   expect(generator.indexOf('items = applyGeneratedPriceTruth(')).toBeLessThan(generator.indexOf('const laborCost ='))
   expect(generator).toContain('options = applyGeneratedPriceTruth(')
+  // Repin 2026-09-07: 5a01bfc0 (PR #14 jobbtyper) skrev om copyn — samma kedja
+  // (valt jobb → standardrader/mall → egna artikelpriser), och reservations-
+  // förslaget bor nu i förhandsvisningen (JobTypeQuotePreview) i stället för
+  // i en caption i JobTypeQuoteSetup.
   const onboarding = read('app/onboarding/components/StepProductRegister.tsx')
-  expect(onboarding).toContain('jobbtyp, koppla en offertmall')
-  expect(onboarding).toContain('sätt priser på dina artiklar')
-  expect(read('components/onboarding/JobTypeQuoteSetup.tsx')).toContain('Artikelkopplade reservationer föreslås')
+  expect(onboarding).toContain('Börja med ett av jobben du valt. Lägg till standardrader och sätt dina egna artikelpriser.')
+  expect(read('components/onboarding/JobTypeQuoteSetup.tsx')).toContain('Utgå från en befintlig offertmall')
+  expect(read('components/onboarding/JobTypeQuotePreview.tsx')).toContain('Daniel kommer att föreslå förbehåll')
 })
 
 test('riktiga sparmapparen behåller kund, affär, jobbtyp, artikel och accepterad reservation', () => {
