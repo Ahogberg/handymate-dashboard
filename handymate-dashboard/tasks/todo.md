@@ -1,3 +1,255 @@
+# Varumärkeslagret för kundmail — I PROD 2026-09-07 (Claude, abb215fa)
+
+Andreas: "vi hjälper dom också att se mer professionella ut" → Design-
+briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
+"Ja kör det" på förarbetet: en sanning för varumärket + en masterlayout.
+
+- [x] `lib/branding/get-branding.ts` — loadBranding/brandingFromConfig,
+      accent valideras (#rrggbb annars teal), kastar aldrig, fallback-select
+      utan attribution_link_enabled (v202-fällan), stämpeln ur samma rad
+- [x] `emailLayout()` + byggstenar i lib/email-templates.ts — Claude Designs
+      master byts i EN fil, anroparna märker inget
+- [x] Åtta kundvägar genom layouten: offert, faktura, påminnelse, portal-
+      notiser, signeringsbekräftelse, jobbrapport, V3 send_email, nurture,
+      legacy auto-generate. orders/send (B2B) medvetet kvar på direkt stämpel
+- [x] Påminnelsekortets emailBody = FRAGMENT nu; leveransen lägger layouten.
+      Kort skapade före 2026-09-07 bär hela dokument → arRedanHeltMejl()
+      känner igen dem och stämplar bara. Ta bort grenen när kön är tömd.
+- [x] Facit: tests/brand-layer.spec.ts (runtime) + facit-attribution-email
+      (källskanning). 17 specar: 270 gröna, 1 skipped. tsc 0.
+- [x] Claude Designs master INTAGEN 2026-09-07 (f2c751cc): emailLayout med
+      meta-etikett/compact, amountBlock, paymentBlock (Swish primär +
+      bankgiro/OCR-kort), statusBand, summaryTable/summaryCard, rotRutNotice,
+      steps, dateCard, personRow, receiptCard, signature, formatDag.
+      Åtta ytor omskrivna med designens copy (offert, bekräftelse med/utan
+      ROT-uppgifter, faktura, fyra påminnelsenivåer, portalnotis kompakt,
+      jobbrapport, auto-faktura). Visuellt granskat mot design-1.html.
+- [x] emoji-fältet i EVENT_COPY rensat (samma commit)
+- Beslut att nämna för Andreas: påminnelsen visar avgift/ränta som
+  "tillkommer"-rader när de är konfigurerade (designen visade inga);
+  Swish-länken bär fakturabeloppet. Bokning/Kvitto/Omdöme har block men
+  ingen egen sändväg än (nurture/jobCompletedEmail är de som finns).
+- Facit-fälla: invoice-reminder-send måste innehålla EXAKT
+  `html = emailLayout(branding, messages.emailBody)` — ingen meta där.
+- [x] Yta 7 "Så ser dina kunder dig" — I PROD 2026-09-07 (a1a45571):
+      /dashboard/settings/kundvy (ägare/admin), länkad från Företag →
+      Uppgifter. Logotyp, accent (sex förval + hex, kontrastvarning < 4,5:1),
+      offertmall, härledd SMS-signatur, Färdig att skicka x/7, sju kort +
+      stor vy (mail i iframe på 375 px skalad, SMS-bubbla, sidmockuper),
+      testmail till egen adress. Offertmailets byggare utbruten till
+      lib/quotes/quote-email.ts (send-routen + preview använder SAMMA).
+      Visuellt granskat desktop 1380 + mobil 390 mot dev-servern.
+- Beslut/lärdomar yta 7: bokning + omdöme visas som SMS (så går de på
+  riktigt, designen visade mail); bara exempeldata (Anna Lindqvist), inte
+  senaste offerten; SMS-signaturen härleds ur firmanamnet — ingen kolumn
+  (följdpunkt om Andreas vill kunna ändra den); firmanamn = business_name
+  före display_name, samma som brandingFromConfig (testkontot har olika).
+- Lokala arbetsträdet ligger LÅNGT bakom origin (merge-base 1a345735) —
+  verifiering gjordes mot origin/main-export + mina 18 filer i scratchpad
+  (junction till node_modules). 40 röda i gaten där = identiska på ren
+  origin/main i samma miljö (.github saknas i exporten, ESM-laddning,
+  @electric-sql/pglite ej installerad lokalt). Inte mina.
+- [x] Yta 3 fältrapportens signeringssida — I PROD 2026-09-07 (dcc6e4d3):
+      /sign/report/{token} är syskon till offertsidan (logotyp, accent,
+      sektioner, foton Före/Efter, Utförare + F-skatt, Godkänn arbetet med
+      namn + kryss, invändning som kräver text). Publika routen bär
+      loadBranding + stämpel. Sign-routen ORÖRD. Facit
+      tests/faltrapport-signering.spec.ts. Fyra lägen granskade visuellt
+      (visning, invändning, godkänd, avvisad) desktop 1380 + mobil 390.
+- Lärdomar yta 3: gamla sidan ignorerade res.ok (ett 400 blev "Signerat!")
+  och saknade avvisat-läge. field_reports har 0 rader i prod — funktionen
+  har aldrig använts. Länken skickas ALDRIG automatiskt till kund; hant-
+  verkaren kopierar den från projektsidan (gap att besluta om). Cookie-
+  bannern ligger över de publika sidorna (global, inte min). QA-raden
+  (fr-qa-claude-visual-check-2026-09-07) raderad efter skärmdumparna.
+- [x] Yta 4 portalens beslutskort — BYGGD 2026-09-07 (Design: "Kundportal
+      beslut.dc.html"). Fyra ytor i app/portal/[token]: Hem "Väntar på dig"
+      (EN sanning: GET /api/portal/[token]/decisions → ÄTA i 'sent', obetalda
+      fakturor + öppet confirm_payment-kort, omdöme efterfrågat men ej lämnat;
+      varje rad går rakt in i beslutet; röd räknare på Fakturor), ÄTA
+      "Tilläggsarbete att godkänna" (PortalAtaDecision: namn + bindande kryss
+      som standard, ritad signatur per firma via
+      business_config.portal_ata_signature_mode, "Tacka nej" med meddelande,
+      samma /api/ata/sign/[token] som SMS-länken; projektvyn signerar inte
+      längre inline — ÄTA-kortet öppnar beslutsvyn), Faktura "Att betala"
+      (PortalInvoiceDetail: hero med status, "Det här ingår" med godkända ÄTA
+      ur portalens ÄTA-lista, Swish-block med EN knapp + QR bara ≥768 px,
+      bankgiro/OCR som reserv, "Jag har betalat" utanför Swish-blocket,
+      dokumentet öppet nedanför med oförändrat återförsök), Omdöme "Hur blev
+      det?" (PortalReviewCTA + POST/PATCH /api/portal/[token]/review: 1–3 →
+      sparas + går som meddelande i tråden, aldrig Google; 4–5 → sparas +
+      Google-kort; 409 = ett omdöme per kund). PortalFooter (firma, org.nr,
+      F-skatt, stämpel) på alla tre beslutsvyerna. Migration
+      sql/v221_portal_beslut.sql (portal_review + RLS enligt v101,
+      portal_ata_signature_mode) — KÖRS FÖRE push, annars 500 i portalen.
+      Facit tests/portal-beslutskort.spec.ts (22); decisions + review
+      registrerade i launch-public-token-contract och portal-error-swallow;
+      portal-invoice-recovery.ui mockar nu ./PortalFooter. tsc 0, build grön.
+- Beslut yta 4: ÄTA-foton visas INTE i beslutsvyn (portalens projekt-route
+  exponerar inga bilagor — följdpunkt); Offerter får ingen räknare (Hem
+  laddar inte offertantalet — inga uppfunna siffror); fakturadokumentet
+  öppet som standard (recovery-facitet läser det på mount); Swish-QR bara
+  på desktop (man skannar inte sin egen skärm); "Jag har betalat" gäller
+  även bankgiro-firmor.
+- Lärdomar yta 4: recovery-facitet transpilerar PortalInvoiceDetail mot en
+  fast modulkarta — varje ny import i komponenten måste in i kartan, annars
+  faller testet med "Error: ./X" i pageerror. Kolumnen på pending_approvals
+  heter approval_type, inte type.
+- [ ] Yta 4 kvar: skarptest med två telefoner — ÄTA-godkännande (SMS →
+  portal → godkänd → ÄTA på slutfakturan), "Jag har betalat" →
+  confirm_payment-kort hos hantverkaren, lågt omdöme → tråden, högt →
+  Google-länk. Aldrig signera via UI på testkonto utan att radera raderna.
+- [x] Yta 2 dokumentfamiljen (PDF) — pushad 2026-09-07: EN helper
+      lib/branding/pdf.ts (loadPdfBranding/pdfBrandingFrom/loadPdfLogo,
+      drawBrandHeader → content-y, drawBrandFooter med "Sida i av n";
+      stämpeln ritar renderaren själv — facit-attribution-pdf kräver
+      literalen). Sex renderare går genom den: byggdagbok, egenkontroll/
+      formulärsvar, arbetsorder, ÄTA (pdf-data laddar brand, pdf.ts tar
+      `brand`), jobbrapporten (brand laddas FÄRSKT vid approve, payloaden
+      kan vara dagar gammal; margin-option 15 mm) och faktura-jsPDF-
+      fallbacken (accent + logga via logo_base64/logo_format; HTML→Chromium-
+      vägen är primär och orörd). AuthenticatedBusiness typad med
+      logo_url/accent_color/f_skatt_registered (raden är select('*')).
+      Facit tests/pdf-varumarke.spec.ts (31: källskanning + riktig jsPDF-
+      rendering). tsc 0 (körs från handymate-dashboard/handymate-dashboard —
+      från repo-roten sväljer tsc syskonprojekt och OOM:ar).
+- Fälla yta 2: lokala lib/ata/pdf.ts låg FÖRE Codex F10-fix (d79fb2ac,
+  notes ur kund-PDF:en) — hade återinfört ANTECKNINGAR-blocket. Fångat i
+  baskontrollen mot origin, rättat, livegenomgang-f10 grönt. Rött lokalt
+  utan koppling: work-report.spec (matte/chat äldre lokalt + CRLF) och
+  F11 (data-builder äldre lokalt).
+- [ ] Yta 2 kvar: skarptest — öppna en byggdagbok-, ÄTA- och arbetsorder-
+      PDF på ett konto MED logga (Bee) och ett UTAN; jobbrapport vid approve.
+- [x] v221 KÖRD i prod 2026-09-07 (verifierad: 10 kolumner, RLS, två
+      policyer, anon utan rättigheter, default name_checkbox) → yta 4 pushad.
+- [x] Yta 5 BOKNINGSFLÖDET — BYGGD 2026-09-07 (Design "Bokning.dc.html").
+      Beslut: hemsidan (/site/[slug]) designas INTE om — ICP 5–20 anställda
+      har egen hemsida; bokningslänken är det de saknar. Bygge:
+      app/site/[slug]/boka omskriven i brand-lagret (BrandMark + accent-ramp,
+      mobil: kort med veckopil/dagchips/tidsluckor → summering "Ändra" →
+      formulär; desktop: två kolumner med löftet "Vi kommer ut och tittar.
+      Sedan får du en offert." + tre steg, kortet till höger), bekräftelse
+      "Tack {förnamn}. Besöket är bokat." med "Lägg i kalendern" (ICS byggs
+      i klienten, buildVisitIcs) + "Vad händer nu" + "ändra via telefon";
+      409 → listan laddas om + lugn ruta, 429 → hänvisning till telefon,
+      inga alert(). EN publik route GET /api/public/booking-page/[slug]
+      (force-dynamic, is_published-grind som availability, loadBranding,
+      14 dagars slots med samma computeAvailableSlots, telefon formaterad).
+      Ren logik i lib/bookings/booking-page.ts (veckor, svenska datum,
+      ISO-vecka, hoursSummary, ICS). Kundvyn: "Din bokningslänk" (kopiera/
+      öppna; utan slug → Hemsida; opublicerad → amber) + reglaget "Besöket
+      kostar inget" (business_config.booking_visit_free, sql/v222, default
+      false — sidan säger "kostar inget" BARA då). Facit
+      tests/bokningsflodet.spec.ts (21). tsc 0, build grön (NODE_OPTIONS=
+      --max-old-space-size=8192 krävs, annars OOM vid typkollen). Visuellt
+      granskat mot dev-server + prod-data (slug test) 390 + 1280: val,
+      formulär, bekräftelse, 409, 429, 400, 404.
+- Fynd yta 5: fyra seed/testkonton (biz_rollprov_a/b, elexperten_sthlm,
+  biz_al7pjuu5smi) har working_hours i legacyform {start,end} utan
+  `active` → gamla availability-routen gav 0 tider varje dag. Rättat i
+  lib/bookings/availability.ts (isWorkingDayActive: saknat active = aktiv
+  när tider finns; kanoniska rader opåverkade). Riktiga konton (onboarding/
+  settings) skriver alltid {active,start,end}.
+- Beslut/lärdomar yta 5: is_published-grinden BEHÅLLS (bokningslänken
+  kräver publicerad hemsida — följdfråga om länken ska funka utan);
+  "vem som kommer" = contact_name annars firmanamnet; footnoten
+  "mån–fre 08–17" härleds ur firmans working_hours, inte påhittad; cookie-
+  bannern (global, teal) ligger över bokningssidan liksom över portalen.
+  Facit-inventeringen: yta 4:s decisions + review pushades UTAN post i
+  PUBLIC_BY_DESIGN och utan höjt tak — rättat nu (151, räknat på origin),
+  docs/audits/TENANT_SWEEP uppdaterad; production-schema-columns.json får
+  booking_visit_free (kolumnkontraktet). Playwright-skript måste ligga i
+  projektkatalogen (scratchpad hittar inte modulen) — kopiera in, kör, radera.
+- [ ] Yta 5 kvar: v222 KÖRA i prod (koden pushad före — sidan läser
+      kolumnen tolerant, reglaget i kundvyn toastar fel tills den finns).
+      Skarptest: boka på /site/test/boka med eget nummer →
+      SMS + lead hos Nordström El AB (radera efteråt), kundvyns kort +
+      reglage, mobil Safari (ICS-nedladdning). Lisa/Matte skickar länken =
+      ny feature, EFTER lansering.
+- [ ] Yta 9 demo-offert till dig själv — brief skriven 2026-09-07
+      (docs/design/briefs/09-demo-offert-till-dig-sjalv.md), väntar på Design
+      + tre beslut (SMS/e-post, firmanamn som avsändare, Calendly-länk).
+- [ ] Design-ytorna 6, 8, 10 (ej påbörjade)
+
+# Partnergrinden GRÖN 2026-09-07 (Claude)
+
+- [x] sql/v206 var REDAN KÖRD (verifierat i prod: funktionen
+      create_partner_self_billing_batch läser business_name, fantomfältet
+      company_name är borta). Todo-raden var föråldrad — v208:s efterskrift
+      dokumenterade körningen.
+- [x] `npm run proof:partner` GRÖNT mot riktig databas: hela kedjan
+      claim → konflikt → 180 dagar → självfaktura → betald, 1 passed.
+- [x] Städningen verifierad efteråt: 0 kvarvarande testpartners, 0 provisions-
+      rader, 0 attributionsbeslut, 0 referral kvar på testkontona.
+- Förutsättning som saknades: `.env.integration` fanns inte (gitignorerad).
+  Skapad lokalt från .env.local + PARTNER_TEST_ALLOW_DB_WRITES-spärren.
+- FÄLLA för nästa körning: testet skapar en partner med testföretagets EGEN
+  contact_email (för att pröva självhänvisningsspärren). Konton med
+  andreashogberg93@gmail.com krockar därför med den riktiga partner-raden
+  från mars. Använd konton med unik mejl — nu satta till biz_lc0g3raeu4
+  (test@test.com) och biz_5is3beewoe9 (asads@asd.com).
+- KVAR för partner-GO enligt Codex: publicerad 12-månaderstext ersatt,
+  juridik/redovisning stängd, de två migrerade partnernas acceptans.
+  Notera: 0 av 2 partners har accepterat avtalet ännu.
+
+# P1-fynd 2026-09-04: kundskapande gick inte via Ny deal (Andreas hittade)
+
+Rotorsak: kundskapande går via TVÅ API:er och bara den ena hade fixats.
+Kunder-sidan → /api/actions create_customer (fixad 2026-08-27).
+Ny deal-modalen → /api/customers POST (aldrig fixad) = anonymt 500 vid
+upptaget telefonnummer, och modalen läste inte ens serverns felkropp.
+
+- [x] 87dd34fa: 23505/unique_phone_per_business → 409 phone_taken med
+      förklaring; NewDealModal visar serverns meddelande i båda vägarna
+- [x] 521d1da2: dubblettkontrollen likriktad (findCustomerDuplicates +
+      force_create). I deal-flödet väljer ett klick den BEFINTLIGA kunden
+      till affären — Kunder-sidan navigerar bort, vilket skulle tappa dealen
+- [x] tsc 0; 69 kontrakt gröna
+- [ ] Efter GO: bryt ut kundskapandet till en delad helper så nästa fix inte
+      kan hamna på bara ena vägen
+- [ ] Efter GO: död kod bort i NewDealModal — inline-snabbkundformen ligger
+      kvar wrappad i `{false && ...}` sedan CustomerModal tog över (~40 rader)
+
+# Lanseringsprogrammet — testkörning (Andreas + Claude, startar 2026-09-04)
+
+Codex program (mål GO 14 sept), sanningskälla docs/launch/GO_NO_GO.md.
+Claudes förmätning 2026-09-03, allt verifierat lokalt/via MCP:
+
+- [ ] BESLUT (Andreas): fixa kodgrinden — `npm install` (lokalt) ELLER
+      npx-prefix i de fyra package.json-skripten (Codex fil, robustare).
+      node_modules/.bin/ är TOMT ⇒ test:contracts/test:partner-launch-gate/
+      proof:partner/test:tenant-isolation är okörbara som de står.
+- [x] Testinnehållet friskt: samma grind via npx = 344/344 gröna 2026-09-03
+      (Codex två röda i genomgang-fore-betalning + kundminne-kanaler åtgärdade)
+- [ ] Kör sql/v206 manuellt (business_config.company_name saknas i prod —
+      MCP-verifierat) → sedan `npm run proof:partner` grönt före push/GO
+- [ ] Grind A: build + contracts + partner-gate + launch:smoke + admin-JSON
+      (READY_FOR_MANUAL_PROOF, blocked=0) — spara JSON+SHA+tid i docs/launch/
+- [ ] Stripe-skarpbeviset ALDRIG kört: enda fuel_topup_completed är
+      evt_test_... (14 aug), fuel_ledger har 1 rad. Live-priser finns (5 st).
+      100 kr riktigt kort → exakt 10000 öre; Claude verifierar via MCP+Stripe-MCP
+- [ ] 46elks: saldo var 0 kr — påfyllning + nummer har LEDTID, förkrav för
+      Lisa-stationen (LISA_SHARP_PROOF.md), ordna FÖRE 8-10 sept
+- [ ] Färskkontoprovet (4 konton bygg/el/måleri/VVS): granska branschlistorna
+      i docs/bransch/ FÖRST — annars mäter provet ett system utan branschdata
+      (2/27 konton har jobbtyper idag)
+- [ ] Märk upp vilka av de 27 kontona (5 aktiva prenumerationer) som är
+      riktiga vs testkonton före 10-kundersprogrammet
+- [ ] Portalens beslutskort (yta 4, Claude 2026-09-07) — skarptest med två
+      telefoner på testkontot, EFTER att v221 körts och koden pushats:
+      (a) ÄTA: skicka ÄTA → SMS-länk → portalen visar "Väntar på dig" →
+      "Granska och godkänn" med namn+kryss → status Godkänd i portal +
+      dashboard, ÄTA:n med på slutfakturan; (b) "Tacka nej" på en andra
+      ÄTA → meddelandet syns i tråden hos hantverkaren; (c) faktura: Swish-
+      knapp öppnar appen med belopp/meddelande, "Jag har betalat" → EN
+      confirm_payment-kort, andra tryck ger "Redan anmält"; (d) omdöme 2/5
+      → hamnar i tråden, ALDRIG Google-kort; nytt konto/omdöme 5/5 → Google-
+      kort, andra försök = 409; (e) ogiltig portal-token → 404 utan 500.
+      Radera QA-raderna (project_change, portal_review, pending_approvals)
+      efteråt. Bevis: skärmbilder + id:n i docs/launch/.
+- Regel under programmet: inga nya features, bara P0/P1 mot låst release-SHA;
+  varje bevis bokförs i docs/launch/ med SHA + tidpunkt; BLOCKERAD ≠ PASS
+
 ## ÄTA-belopp utan rader (Codex 2026-09-07)
 
 - [x] Läs senaste kod, PR:er, CI och producent/konsument för dagsrapport → ÄTA → faktura.

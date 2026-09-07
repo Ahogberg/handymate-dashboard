@@ -87,7 +87,8 @@ function brandMarkup(a: Attribution, linkStyle: string): string {
 /** Fotrad för utgående e-post (HTML). */
 export function attributionEmailHtml(a: Attribution): string {
   const brand = brandMarkup(a, `color:${LINK_COLOR};text-decoration:none`)
-  return `<p style="margin:24px 0 0;font-size:12px;color:${MUTED_COLOR};text-align:center">${PREFIX}${brand}</p>`
+  // Designens stämpelrad i sidfoten (Kundmail-mastern): 11 px, ljusgrå, 14 px ovanför.
+  return `<p style="margin:14px 0 0;font-size:11px;color:#94a3b8;text-align:center">${PREFIX}${brand}</p>`
 }
 
 /** Fotrad för HTML→PDF-mallarna (puppeteer) — länken blir klickbar i PDF:en. */

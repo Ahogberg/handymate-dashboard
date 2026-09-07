@@ -28,6 +28,9 @@ export interface PortalData {
     workingHours?: Record<string, WorkingHoursDay> | null
     swish?: string | null
     bankgiro?: string | null
+    /** Hur kunden godkänner ÄTA i portalen (sql/v221): namn + bindande
+        kryss (standard) eller ritad signatur. */
+    ataSignatureMode?: 'name_checkbox' | 'drawn'
   }
   unreadMessages: number
   /** "Skickat via Handymate"-stämpeln (lib/branding/attribution.ts) — laddad
@@ -84,6 +87,10 @@ export interface PortalAta {
   sent_at: string | null
   signed_at: string | null
   signed_by_name: string | null
+  /** true när kunden ritade — annars namn + kryss. Bilden skickas aldrig. */
+  signed_with_drawing?: boolean
+  declined_at?: string | null
+  declined_reason?: string | null
   created_at: string
 }
 
@@ -160,6 +167,40 @@ export interface Invoice {
   reminder_count?: number
   introduction_text?: string | null
   conclusion_text?: string | null
+  project_id?: string | null
+  /** Kunden har tryckt "Jag har betalat" och hantverkaren har inte bekräftat än. */
+  claimed_at?: string | null
+}
+
+/**
+ * "Väntar på dig" — allt kunden har att besluta om, ur
+ * /api/portal/[token]/decisions (portalens beslutskort, 2026-09-07).
+ */
+export interface PortalDecisions {
+  atas: Array<{
+    change_id: string
+    ata_number: number
+    description: string
+    project_id: string
+    project_name: string | null
+    project_number: string | null
+    sent_at: string | null
+    att_betala: number
+  }>
+  invoices: Array<{
+    invoice_id: string
+    invoice_number: string
+    amount: number
+    due_date: string | null
+    overdue: boolean
+    claimed_at: string | null
+  }>
+  review: {
+    requested: boolean
+    left_at: string | null
+    rating: number | null
+    pending: boolean
+  }
 }
 
 export interface PaymentInfo {

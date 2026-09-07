@@ -7,6 +7,15 @@ import { DIARY_BUCKET, isDiaryPhotoPath } from '@/lib/diary/photos'
 import { isDiaryRowLocked, lockReason } from '@/lib/diary/locking'
 import { WEATHER_LABELS, isDiaryWeather } from '@/lib/diary/weather'
 import { sumTimeEntryHoursByDate } from '@/lib/diary/time-summary'
+import { stampAttributionOnPdf } from '@/lib/branding/attribution'
+import {
+  drawBrandHeader,
+  drawBrandFooter,
+  loadPdfBranding,
+  PDF_TEXT_PRIMARY as TEXT_PRIMARY,
+  PDF_TEXT_SECONDARY as TEXT_SECONDARY,
+  PDF_TEXT_MUTED as TEXT_MUTED,
+} from '@/lib/branding/pdf'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -14,10 +23,6 @@ export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 export const maxDuration = 30
 
-const ACCENT_RGB = [15, 118, 110] as const
-const TEXT_PRIMARY = [30, 41, 59] as const
-const TEXT_SECONDARY = [148, 163, 184] as const
-const TEXT_MUTED = [100, 116, 139] as const
 const AMBER_RGB = [180, 83, 9] as const
 
 const PAGE_BOTTOM = 275
@@ -102,12 +107,9 @@ export async function GET(
     const fromOk = !!from && /^\d{4}-\d{2}-\d{2}$/.test(from)
     const toOk = !!to && /^\d{4}-\d{2}-\d{2}$/.test(to)
 
-    const [{ data: business }, { data: project }] = await Promise.all([
-      supabase
-        .from('business_config')
-        .select('business_name, public_phone, phone_number, contact_email')
-        .eq('business_id', businessId)
-        .maybeSingle(),
+    // Varumärket (logga, accent, org.nr, F-skatt) ur brand-lagret — yta 2.
+    const [brand, { data: project }] = await Promise.all([
+      loadPdfBranding(supabase, businessId, 'projects/logs/pdf'),
       supabase
         .from('project')
         .select('name, start_date, end_date, customer:customer_id (name)')
@@ -145,7 +147,7 @@ export async function GET(
     const ataById = new Map((ataRes.data ?? []).map(a => [a.change_id, a as { change_id: string; ata_number: number | null; description: string | null }]))
     const attesterById = new Map((attesterRes.data ?? []).map(u => [u.id, u as { id: string; name: string | null }]))
 
-    const businessName = business?.business_name || 'Företag'
+    const ACCENT_RGB = brand.accent
     const customer = (project as { customer?: { name?: string | null } | { name?: string | null }[] | null }).customer
     const customerName = Array.isArray(customer) ? customer[0]?.name : customer?.name
 
@@ -181,37 +183,19 @@ export async function GET(
       doc.setFont('helvetica', 'normal')
     }
 
-    // Sidhuvud
-    doc.setFontSize(16)
-    doc.setTextColor(...TEXT_PRIMARY)
-    doc.text(businessName, margin, y + 6)
-    doc.setFontSize(9)
-    doc.setTextColor(...TEXT_SECONDARY)
-    const contactLine = [business?.public_phone || business?.phone_number, business?.contact_email].filter(Boolean).join(' · ')
-    if (contactLine) doc.text(contactLine, margin, y + 12)
-    doc.setFontSize(8)
-    doc.setTextColor(...ACCENT_RGB)
-    doc.text('BYGGDAGBOK', pageWidth - margin, y + 3, { align: 'right' })
-    doc.setFontSize(14)
-    doc.setTextColor(...TEXT_PRIMARY)
-    doc.text(project.name || 'Projekt', pageWidth - margin, y + 11, { align: 'right' })
-    y += 22
-
+    // Sidhuvud ur brand-lagret (lib/branding/pdf.ts) — samma som ÄTA/egenkontroll/arbetsorder.
+    const totalHours = logs.reduce((s, l) => s + (typeof l.hours_worked === 'number' ? l.hours_worked : 0), 0)
     const metaLines: string[] = []
     if (customerName) metaLines.push(`Kund: ${customerName}`)
     if (project.start_date) metaLines.push(`Projektperiod: ${project.start_date}${project.end_date ? ` – ${project.end_date}` : ' –'}`)
     if (fromOk || toOk) metaLines.push(`Urval: ${fromOk ? from : '…'} – ${toOk ? to : '…'}`)
-    const totalHours = logs.reduce((s, l) => s + (typeof l.hours_worked === 'number' ? l.hours_worked : 0), 0)
-    metaLines.push(`Antal dagboksrader: ${logs.length}${totalHours > 0 ? ` · Timmar enligt dagbok: ${totalHours} h` : ''}`)
-    metaLines.push(`Exporterad: ${new Date().toLocaleDateString('sv-SE')}`)
-    doc.setFontSize(9)
-    doc.setTextColor(...TEXT_MUTED)
-    for (const line of metaLines) { doc.text(line, margin, y); y += 4.5 }
-    y += 4
-    doc.setDrawColor(226, 232, 240)
-    doc.setLineWidth(0.3)
-    doc.line(margin, y, pageWidth - margin, y)
-    y += 6
+    metaLines.push(`${logs.length} dagboksrader${totalHours > 0 ? ` · ${totalHours} h enligt dagbok` : ''}`)
+    metaLines.push(`Exporterad ${new Date().toLocaleDateString('sv-SE')}`)
+    y = drawBrandHeader(doc, brand, {
+      docType: 'Byggdagbok',
+      title: project.name || 'Projekt',
+      meta: metaLines,
+    })
 
     if (logs.length === 0) {
       doc.setFontSize(10)
@@ -356,19 +340,9 @@ export async function GET(
       y += 5
     }
 
-    // Sidfot
-    const pageCount = doc.getNumberOfPages()
-    for (let i = 1; i <= pageCount; i++) {
-      doc.setPage(i)
-      doc.setFontSize(7)
-      doc.setTextColor(...TEXT_SECONDARY)
-      doc.text(
-        `${businessName} — Byggdagbok — Sida ${i} av ${pageCount}`,
-        pageWidth / 2,
-        doc.internal.pageSize.getHeight() - 10,
-        { align: 'center' }
-      )
-    }
+    // Sidfot (firma · org.nr · F-skatt · kontakt + sidnummer) + stämpeln sist.
+    drawBrandFooter(doc, brand)
+    stampAttributionOnPdf(doc, brand.branding.attribution)
 
     const pdfBuffer = Buffer.from(doc.output('arraybuffer'))
     return new NextResponse(pdfBuffer, {

@@ -41,7 +41,14 @@ import { randomUUID } from 'crypto'
 import { prepareInvoiceManifest, markInvoiceDelivered } from '@/lib/invoices/evidence-manifest'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
-import { buildAttribution, attributionEmailHtml, type Attribution } from '@/lib/branding/attribution'
+import { buildAttribution } from '@/lib/branding/attribution'
+import { loadPdfLogo } from '@/lib/branding/pdf'
+import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
+import { halsning } from '@/lib/customers/namn'
+import {
+  emailLayout, emailParagraph, emailSection, amountBlock, paymentBlock, summaryTable, rotRutNotice,
+  secondaryButton, secondaryLink, linkBlock, escapeEmailText, formatKr, formatDag, type SummaryRow,
+} from '@/lib/email-templates'
 
 function getResend() {
   return new Resend(process.env.RESEND_API_KEY)
@@ -220,11 +227,15 @@ export async function sendInvoice(
       } catch (htmlPdfErr) {
         console.error('[invoices/send] HTML→PDF-vägen misslyckades — faller tillbaka till jsPDF:', htmlPdfErr)
         console.error('[invoices/send] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, mejlbilagan skickas med den äldre jsPDF-renderaren')
-        const swishQR = await generateSwishQR(
-          businessConfig?.swish_number,
-          amountToPay || invoice.total,
-          invoice.invoice_number,
-        )
+        const [swishQR, logo] = await Promise.all([
+          generateSwishQR(
+            businessConfig?.swish_number,
+            amountToPay || invoice.total,
+            invoice.invoice_number,
+          ),
+          // Firmans logga + accent även i fallbacken (yta 2, 2026-09-07).
+          loadPdfLogo(businessConfig?.logo_url, 'invoices/send'),
+        ])
         pdfBuffer = generateInvoicePDF(
           {
             invoice_number: invoice.invoice_number,
@@ -261,6 +272,9 @@ export async function sendInvoice(
             swish_number: businessConfig?.swish_number,
             swish_qr: swishQR || undefined,
             f_skatt_registered: businessConfig?.f_skatt_registered,
+            accent_color: businessConfig?.accent_color || undefined,
+            logo_base64: logo?.data,
+            logo_format: logo?.format,
           },
           // businessConfig är hela raden (select('*')) — stämpeln byggs direkt.
           { attribution: buildAttribution(businessConfig) },
@@ -291,25 +305,23 @@ export async function sendInvoice(
         subject: `Faktura ${invoice.invoice_number} från ${businessConfig?.business_name || 'oss'}`,
         html: buildInvoiceEmailHtml({
           customerName: invoice.customer?.name || '',
-          businessName: businessConfig?.business_name || '',
+          // businessConfig är hela raden (select('*')) → varumärke + stämpel
+          // utan extra query (lib/branding/get-branding.ts).
+          branding: brandingFromConfig(businessConfig),
           invoiceNumber: invoice.invoice_number,
+          // description = fakturans rubrik (data-builder.ts: "Utfört arbete" som fallback)
+          title: invoice.description,
           dueDate: invoice.due_date,
           subtotal: invoice.subtotal,
           vatRate: invoice.vat_rate,
           vatAmount: invoice.vat_amount,
+          total: invoice.total || 0,
           amountToPay: amountToPay || 0,
           rotRutType: invoice.rot_rut_type,
           rotRutDeduction: invoice.rot_rut_deduction,
-          bankgiro: businessConfig?.bankgiro,
           ocrNumber: invoice.ocr_number || generateOCR(invoice.invoice_number || ''),
-          swishNumber: businessConfig?.swish_number,
-          orgNumber: businessConfig?.org_number,
-          contactEmail: businessConfig?.contact_email,
-          contactPhone: businessConfig?.public_phone || businessConfig?.phone_number,
           portalUrl: portalUrl || pdfUrl,
           pdfUrl,
-          // businessConfig är hela raden (select('*')) → ingen extra query.
-          attribution: buildAttribution(businessConfig),
         }),
         attachments: [
           {
@@ -597,141 +609,74 @@ export async function triggerPostSendAutomations(params: PostSendAutomationsPara
   // specifika ovillkorliga trigger vid utskick är borttagen.
 }
 
-// ── Faktura-mailmall (teal, matchar offertmall) ─────────────────────
+// ── Faktura-mailet — företagets varumärke via masterlayouten ─────────
+//
+// Varumärkeslagret 2026-09-07: tidigare hårdkodad teal utan logotyp, medan
+// offertmailet bar företagets logga och accent — samma kund fick två
+// identiteter i samma affär. Nu emailLayout() + byggblocken; stämpeln
+// kommer med varumärket (brandingFromConfig → buildAttribution).
 
-function buildInvoiceEmailHtml(opts: {
+/**
+ * Designens fakturamail: "Att betala" som stor siffra med förfallodatum,
+ * totalsumma och preliminärt ROT/RUT bredvid; Swish som primärknapp med
+ * bankgiro/OCR under; sedan brödtext, summering, ROT-blocket och portalen.
+ */
+export function buildInvoiceEmailHtml(opts: {
   customerName: string
-  businessName: string
+  branding: Branding
   invoiceNumber: string
+  title?: string | null
   dueDate: string
   subtotal: number
   vatRate: number
   vatAmount: number
+  total: number
   amountToPay: number
   rotRutType?: string | null
   rotRutDeduction?: number | null
-  bankgiro?: string | null
   ocrNumber: string
-  swishNumber?: string | null
-  orgNumber?: string | null
-  contactEmail?: string | null
-  contactPhone?: string | null
   portalUrl: string
   pdfUrl: string
-  /** Handymate-stämpeln i foten (lib/branding/attribution.ts). */
-  attribution: Attribution
 }): string {
-  const firstName = opts.customerName.split(' ')[0] || 'Kund'
+  const b = opts.branding
+  const rot = opts.rotRutType && opts.rotRutDeduction ? { type: opts.rotRutType, amount: opts.rotRutDeduction } : null
+  const forfaller = formatDag(opts.dueDate)
+  const nr = escapeEmailText(opts.invoiceNumber)
+  const titel = escapeEmailText(opts.title)
 
-  const rotSection = opts.rotRutType ? `
-    <div style="background: #F0FDF4; border: 1px solid #BBF7D0; border-radius: 8px; padding: 16px; margin: 20px 0;">
-      <p style="margin: 0 0 4px; font-weight: 600; color: #166534;">🏠 ${opts.rotRutType.toUpperCase()}-avdrag tillämpas</p>
-      <p style="margin: 0; color: #374151; font-size: 14px;">
-        Avdraget på <strong>${opts.rotRutDeduction?.toLocaleString('sv-SE')} kr</strong> dras automatiskt via Skatteverket.
-      </p>
-    </div>` : ''
+  const rows: SummaryRow[] = [
+    { label: 'Delsumma exkl. moms', value: formatKr(opts.subtotal) },
+    { label: `Moms ${opts.vatRate} %`, value: formatKr(opts.vatAmount) },
+  ]
+  if (rot) {
+    rows.push({ label: 'Totalt inkl. moms', value: formatKr(opts.total), total: true })
+    rows.push({ label: `Preliminärt ${rot.type.toUpperCase()}-avdrag`, value: `−${formatKr(rot.amount)}`, deduction: true })
+  }
+  rows.push({ label: 'Att betala', value: formatKr(opts.amountToPay), emphasis: true })
 
-  const rotRow = opts.rotRutType ? `
-    <tr>
-      <td style="padding: 12px 16px; color: #374151; font-size: 14px;">${opts.rotRutType.toUpperCase()}-avdrag</td>
-      <td style="padding: 12px 16px; text-align: right; color: #059669; font-size: 14px; font-weight: 600;">-${opts.rotRutDeduction?.toLocaleString('sv-SE')} kr</td>
-    </tr>` : ''
-
-  const swishSection = opts.swishNumber ? (() => {
-    const swishData = JSON.stringify({
-      version: 1,
-      payee: { value: (opts.swishNumber as string).replace(/\D/g, '') },
-      amount: { value: Math.round(opts.amountToPay) },
-      message: { value: opts.invoiceNumber },
-    })
-    const swishLink = 'swish://payment?data=' + encodeURIComponent(swishData)
-    return `
-    <div style="text-align: center; margin: 24px 0; padding: 20px; background: #F0FDFA; border: 1px solid #99F6E4; border-radius: 8px;">
-      <p style="font-size: 13px; color: #6B7280; margin: 0 0 12px;">Betala enkelt med Swish</p>
-      <a href="${swishLink}"
-         style="display: inline-block; background: #0F766E; color: #ffffff; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-size: 15px; font-weight: 600;">
-        Betala ${opts.amountToPay.toLocaleString('sv-SE')} kr med Swish
-      </a>
-      <p style="font-size: 13px; color: #374151; margin: 12px 0 0;">
-        Swish-nummer: <strong>${opts.swishNumber}</strong>
-      </p>
-      <p style="font-size: 12px; color: #9CA3AF; margin: 4px 0 0;">
-        Märk betalningen: <strong>${opts.invoiceNumber}</strong>
-      </p>
-    </div>`
-  })() : ''
-
-  const paymentInfo = [
-    opts.bankgiro ? `Bankgiro: <strong>${opts.bankgiro}</strong>` : '',
-    `OCR-nummer: <strong>${opts.ocrNumber}</strong>`,
-  ].filter(Boolean).join('<br>')
-
-  return `<!DOCTYPE html>
-<html>
-<head><meta charset="utf-8"></head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 0; padding: 20px; background: #f8fafc; color: #1F2937;">
-  <div style="max-width: 600px; margin: 0 auto;">
-
-    <div style="background: #0F766E; padding: 24px; border-radius: 12px 12px 0 0; text-align: center;">
-      <h1 style="color: white; margin: 0; font-size: 20px; font-weight: 700;">${opts.businessName}</h1>
-      <p style="color: rgba(255,255,255,0.8); margin: 4px 0 0; font-size: 14px;">Faktura ${opts.invoiceNumber}</p>
-    </div>
-
-    <div style="background: white; padding: 28px; border: 1px solid #E5E7EB; border-top: none; border-radius: 0 0 12px 12px;">
-
-      <h2 style="color: #111827; font-size: 18px; margin: 0 0 8px;">Hej ${firstName}!</h2>
-      <p style="color: #374151; line-height: 1.6; margin: 0 0 20px;">
-        Här kommer din faktura. Nedan hittar du en sammanfattning — du kan se alla detaljer i din kundportal eller i bifogad PDF.
-      </p>
-
-      ${rotSection}
-
-      <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #E5E7EB; border-radius: 8px; overflow: hidden; margin-bottom: 20px;">
-        <tr style="background: #F9FAFB;">
-          <td style="padding: 12px 16px; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Beskrivning</td>
-          <td style="padding: 12px 16px; text-align: right; color: #6B7280; font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Belopp</td>
-        </tr>
-        <tr>
-          <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-top: 1px solid #E5E7EB;">Delsumma</td>
-          <td style="padding: 12px 16px; text-align: right; color: #374151; font-size: 14px; border-top: 1px solid #E5E7EB;">${opts.subtotal?.toLocaleString('sv-SE')} kr</td>
-        </tr>
-        <tr>
-          <td style="padding: 12px 16px; color: #374151; font-size: 14px; border-top: 1px solid #F3F4F6;">Moms (${opts.vatRate}%)</td>
-          <td style="padding: 12px 16px; text-align: right; color: #374151; font-size: 14px; border-top: 1px solid #F3F4F6;">${opts.vatAmount?.toLocaleString('sv-SE')} kr</td>
-        </tr>
-        ${rotRow}
-        <tr style="background: #F0FDFA;">
-          <td style="padding: 14px 16px; color: #0F766E; font-size: 16px; font-weight: 700; border-top: 2px solid #0F766E;">Att betala</td>
-          <td style="padding: 14px 16px; text-align: right; color: #0F766E; font-size: 16px; font-weight: 700; border-top: 2px solid #0F766E;">${opts.amountToPay.toLocaleString('sv-SE')} kr</td>
-        </tr>
-      </table>
-
-      <div style="background: #F9FAFB; border: 1px solid #E5E7EB; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
-        <p style="margin: 0 0 4px; font-weight: 600; color: #111827; font-size: 14px;">Betalningsinformation</p>
-        <p style="margin: 0; color: #374151; font-size: 14px; line-height: 1.6;">${paymentInfo}</p>
-        <p style="margin: 8px 0 0; color: #6B7280; font-size: 13px;">Förfallodatum: <strong>${new Date(opts.dueDate).toLocaleDateString('sv-SE')}</strong></p>
-      </div>
-
-      ${swishSection}
-
-      <div style="text-align: center; margin: 24px 0 8px;">
-        <a href="${opts.portalUrl}" style="display: inline-block; background: #0F766E; color: white; padding: 12px 28px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 14px;">
-          Visa i kundportalen
-        </a>
-        <p style="margin: 12px 0 0; font-size: 13px;">
-          <a href="${opts.pdfUrl}" style="color: #0F766E; text-decoration: underline;">Ladda ner som PDF</a>
-        </p>
-      </div>
-
-      <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 24px 0;" />
-
-      <p style="color: #6B7280; font-size: 13px; text-align: center; margin: 0; line-height: 1.5;">
-        ${opts.businessName}${opts.orgNumber ? ` · Org.nr: ${opts.orgNumber}` : ''}<br>
-        ${[opts.contactEmail, opts.contactPhone].filter(Boolean).join(' · ')}
-      </p>
-    </div>
-    ${attributionEmailHtml(opts.attribution)}
-  </div>
-</body>
-</html>`
+  const content = `
+    ${amountBlock({
+      label: 'Att betala',
+      amount: opts.amountToPay,
+      due: forfaller,
+      total: rot ? opts.total : undefined,
+      rot: rot ? { type: rot.type, deduction: rot.amount } : null,
+    })}
+    ${paymentBlock({
+      swishNumber: b.swishNumber,
+      amount: opts.amountToPay,
+      message: opts.invoiceNumber,
+      bankgiro: b.bankgiro,
+      ocr: opts.ocrNumber,
+      due: forfaller,
+      accent: b.accentColor,
+    })}
+    ${emailParagraph(`${escapeEmailText(halsning(opts.customerName))} Här kommer fakturan${titel ? ` för <strong style="color:#0f172a;">${titel}</strong>` : ` <strong style="color:#0f172a;">${nr}</strong>`}. Alla detaljer finns i bifogad PDF${opts.portalUrl ? ' och i kundportalen' : ''}.`)}
+    ${summaryTable(rows)}
+    ${rot ? rotRutNotice(rot.type, rot.amount, 'Blir avdraget lägre fakturerar vi skillnaden.') : ''}
+    ${opts.portalUrl
+      ? emailSection(secondaryButton('Visa i kundportalen', opts.portalUrl) + secondaryLink('Ladda ner fakturan (PDF)', opts.pdfUrl, b.accentColor))
+      : linkBlock('Ladda ner fakturan (PDF)', opts.pdfUrl, b.accentColor)}
+  `
+  return emailLayout(b, content, { meta: `Faktura ${nr}`, preheader: `Att betala ${formatKr(opts.amountToPay)} · förfaller ${forfaller}` })
 }

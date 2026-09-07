@@ -19,6 +19,11 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateOCR } from '@/lib/ocr'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import type { ReminderDeliveryInput } from '@/lib/invoice-reminder-send'
+import { extractFirstName } from '@/lib/customers/namn'
+import {
+  emailHeading, emailParagraph, statusBand, amountBlock, paymentBlock, summaryTable, signature,
+  escapeEmailText, formatDag, type StatusTone, type SummaryRow,
+} from '@/lib/email-templates'
 
 export const DEFAULT_SCHEDULE = [
   { level: 'friendly', emailToo: false },
@@ -59,9 +64,17 @@ export function getReminderMessage(level: ReminderLevel, vars: {
   assignedPhoneNumber?: string | null
   swishNumber?: string | null
   amountRaw?: number
+  /** Kundens namn → förnamn i mailets tilltal (SMS:et är oförändrat). */
+  customerName?: string | null
+  /** Företagets telefon → signatur + "ring oss på" i den formella påminnelsen. */
+  phone?: string | null
 }): { sms: string; emailSubject: string; emailBody: string } {
   const { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount } = vars
   const suffix = buildSmsSuffix(businessName, vars.assignedPhoneNumber)
+  const emailVars = {
+    invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount,
+    swishNumber: vars.swishNumber, amountRaw: vars.amountRaw, customerName: vars.customerName, phone: vars.phone,
+  }
 
   // Bygg Swish-betalningslänk om numret finns
   const swishNote = vars.swishNumber && vars.amountRaw
@@ -81,7 +94,7 @@ export function getReminderMessage(level: ReminderLevel, vars: {
       .replace(/\{late_fee_percent\}/g, String(reminderFee))
     return {
       sms: sms + '\n' + suffix,
-      ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
+      ...generateEmailContent(level, emailVars),
     }
   }
 
@@ -97,77 +110,111 @@ export function getReminderMessage(level: ReminderLevel, vars: {
     case 'friendly':
       return {
         sms: `Hej! Faktura ${invoiceNumber} på ${amount} kr förföll ${dueDate}. Kanske missades?${swishNote} ${payInfo}\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
+        ...generateEmailContent(level, emailVars),
       }
     case 'firm':
       return {
         sms: `Påminnelse 2: Faktura ${invoiceNumber} på ${amount} kr är ${daysOverdue} dagar försenad.${feeNote}${swishNote} ${payInfo}\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
+        ...generateEmailContent(level, emailVars),
       }
     case 'formal':
       return {
         sms: `Viktig påminnelse: Faktura ${invoiceNumber}, ${amount} kr, ${daysOverdue} dagar försenad.${feeNote}${interestNote}${swishNote} ${payInfo}\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
+        ...generateEmailContent(level, emailVars),
       }
     case 'final':
       return {
         sms: `SISTA PÅMINNELSE: Faktura ${invoiceNumber}, ${amount} kr, ${daysOverdue} dagar försenad. Ärendet kan överlämnas till inkasso.${feeNote}${interestNote}${swishNote} ${payInfo}\n${suffix}`,
-        ...generateEmailContent(level, { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount, swishNumber: vars.swishNumber }),
+        ...generateEmailContent(level, emailVars),
       }
   }
 }
 
+/**
+ * Varumärkeslagret 2026-09-07: emailBody är nu ett INNEHÅLLSFRAGMENT
+ * (byggstenar ur lib/email-templates.ts), inte ett komplett dokument.
+ * Leveranspunkten (lib/invoice-reminder-send.ts) lägger på företagets
+ * masterlayout — logotyp, accentfärg, sidfot med stämpel — via emailLayout().
+ * Fragmentet lagras i godkännandekortets payload (delivery.messages) och
+ * förhandsvisas där; kort skapade före detta datum bär det gamla hela
+ * dokumentet, se arRedanHeltMejl i invoice-reminder-send.
+ */
 export function generateEmailContent(level: ReminderLevel, vars: {
   invoiceNumber: string; amount: string; dueDate: string; ocr: string
   businessName: string; daysOverdue: number; bankgiro: string
   reminderFee: number; interestAmount: number; swishNumber?: string | null
+  amountRaw?: number; customerName?: string | null; phone?: string | null
 }): { emailSubject: string; emailBody: string } {
   const { invoiceNumber, amount, dueDate, ocr, businessName, daysOverdue, bankgiro, reminderFee, interestAmount } = vars
+  const nr = escapeEmailText(invoiceNumber)
+  const firma = escapeEmailText(businessName)
+  const forfoll = formatDag(dueDate)
+  const belopp = `${amount} kr`
+  const first = escapeEmailText(extractFirstName(vars.customerName))
+  const kontakt = vars.phone ? `ring oss på ${escapeEmailText(vars.phone)}` : 'hör av dig till oss'
 
-  const feeRow = reminderFee > 0 && level !== 'friendly'
-    ? `<tr><td style="padding:4px 0;color:#64748b">Påminnelseavgift</td><td style="text-align:right;padding:4px 0">${reminderFee} kr</td></tr>`
-    : ''
-  const interestRow = interestAmount > 0 && (level === 'formal' || level === 'final')
-    ? `<tr><td style="padding:4px 0;color:#64748b">Dröjsmålsränta</td><td style="text-align:right;padding:4px 0">${Math.round(interestAmount)} kr</td></tr>`
-    : ''
-
+  // Designens fyra tonlägen (Kundmail-mastern, mail 5): vänlig → bestämd →
+  // formell → sista. Ämne, band, rubrik och brödtext skärps steg för steg;
+  // beloppsblocket och betalvägarna är desamma i alla fyra.
   const subjectMap: Record<ReminderLevel, string> = {
-    friendly: `Påminnelse: Faktura ${invoiceNumber}`,
-    firm: `Andra påminnelse: Faktura ${invoiceNumber} förfallen`,
-    formal: `Tredje påminnelse: Faktura ${invoiceNumber} — ${daysOverdue} dagar försenad`,
-    final: `Sista påminnelse: Faktura ${invoiceNumber} — risk för inkasso`,
+    friendly: `Kanske missades? Faktura ${invoiceNumber} från ${businessName}`,
+    firm: `Påminnelse: faktura ${invoiceNumber} är förfallen`,
+    formal: `Betalningspåminnelse — faktura ${invoiceNumber}, ${belopp}`,
+    final: `Sista påminnelsen — faktura ${invoiceNumber}`,
+  }
+  const bandMap: Record<ReminderLevel, string> = {
+    friendly: 'Påminnelse',
+    firm: `Påminnelse 2 · förfallen ${forfoll}`,
+    formal: 'Betalningspåminnelse 3',
+    final: 'Sista påminnelsen',
+  }
+  const titleMap: Record<ReminderLevel, string> = {
+    friendly: 'Kanske missades?',
+    firm: 'Fakturan är förfallen',
+    formal: 'Betalningspåminnelse',
+    final: 'Sista påminnelsen',
+  }
+  const bodyMap: Record<ReminderLevel, string> = {
+    friendly: `${first ? `Hej ${first}!` : 'Hej!'} Vi ser att fakturan ${nr} inte har kommit in ännu. Det är lätt att ett mail försvinner i flödet, så här kommer betalningsuppgifterna igen. Har du redan betalat kan du bortse från det här.`,
+    firm: `${first ? `Hej ${first}.` : 'Hej.'} Fakturan ${nr} på ${belopp} förföll ${forfoll} och vi har ännu inte fått betalningen. Betala gärna så snart du kan. Om något är oklart med fakturan, hör av dig så löser vi det.`,
+    formal: `Vår faktura ${nr} med förfallodatum ${forfoll} är fortfarande obetald. Vi ber dig betala beloppet ${belopp} omgående. Har du frågor om fakturan eller behöver dela upp betalningen, ${kontakt}.`,
+    final: `Trots tidigare påminnelser är fakturan ${nr} på ${belopp} fortfarande obetald. Betalas inte fakturan lämnas ärendet vidare till inkasso. Vill du undvika det, betala nu eller kontakta oss omgående.`,
+  }
+  const toneMap: Record<ReminderLevel, StatusTone> = {
+    friendly: 'neutral', firm: 'warning', formal: 'strong', final: 'danger',
+  }
+  const closingMap: Record<ReminderLevel, string> = {
+    friendly: 'Vänliga hälsningar', firm: 'Vänliga hälsningar', formal: 'Med vänlig hälsning', final: 'Med vänlig hälsning',
   }
 
-  const introMap: Record<ReminderLevel, string> = {
-    friendly: `<p>Vi vill vänligen påminna om att faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> förföll den ${dueDate}.</p><p>Om betalningen redan är skickad, bortse från detta meddelande.</p>`,
-    firm: `<p>Vi har ännu inte fått betalning för faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> som förföll den ${dueDate} (${daysOverdue} dagar sedan).</p><p>Vänligen betala snarast möjligt.</p>`,
-    formal: `<p>Trots tidigare påminnelser har vi inte fått betalning för faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong>.</p><p>Fakturan förföll den ${dueDate}, vilket innebär att betalningen nu är <strong>${daysOverdue} dagar försenad</strong>.</p><p>Dröjsmålsränta enligt räntelagen debiteras.</p>`,
-    final: `<p>Detta är en sista påminnelse gällande faktura <strong>${invoiceNumber}</strong> på <strong>${amount} kr</strong> som förföll den ${dueDate}.</p><p>Betalningen är nu <strong>${daysOverdue} dagar försenad</strong>. Om betalning inte sker inom 10 dagar kan ärendet komma att överlämnas till inkassobolag.</p>`,
+  // Avgift och ränta när företaget har dem konfigurerade — tillkommer utöver
+  // fakturabeloppet (Swish-länken bär fakturabeloppet, aldrig summan).
+  const harAvgift = reminderFee > 0 && level !== 'friendly'
+  const harRanta = interestAmount > 0 && (level === 'formal' || level === 'final')
+  const rows: SummaryRow[] = []
+  if (harAvgift || harRanta) {
+    rows.push({ label: 'Fakturabelopp', value: belopp })
+    if (harAvgift) rows.push({ label: 'Påminnelseavgift (tillkommer)', value: `${reminderFee} kr` })
+    if (harRanta) rows.push({ label: 'Dröjsmålsränta (tillkommer)', value: `${Math.round(interestAmount)} kr` })
   }
 
   return {
     emailSubject: subjectMap[level],
     emailBody: `
-      <div style="font-family:'Segoe UI',system-ui,sans-serif;max-width:600px;margin:0 auto;padding:24px;color:#1a1a1a;">
-        <div style="background:#0F766E;color:white;padding:16px 24px;border-radius:12px 12px 0 0;">
-          <h2 style="margin:0;font-size:18px;">${subjectMap[level]}</h2>
-        </div>
-        <div style="padding:24px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;">
-          <p>Hej,</p>
-          ${introMap[level]}
-          ${(feeRow || interestRow) ? `
-          <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:14px;">
-            <tr style="border-bottom:1px solid #e2e8f0"><td style="padding:4px 0;color:#64748b">Fakturabelopp</td><td style="text-align:right;padding:4px 0">${amount} kr</td></tr>
-            ${feeRow}
-            ${interestRow}
-          </table>` : ''}
-          <div style="background:#f8fafc;border-radius:8px;padding:16px;margin:16px 0;">
-            <p style="margin:0 0 4px;font-weight:600;font-size:14px;">Betalningsinformation</p>
-            <p style="margin:0;font-size:14px;color:#64748b;">${bankgiro ? `Bankgiro: ${bankgiro}<br>` : ''}OCR: ${ocr}${vars.swishNumber ? `<br><strong>Swish:</strong> ${vars.swishNumber}` : ''}</p>
-          </div>
-          <p>Med vänlig hälsning,<br><strong>${businessName}</strong></p>
-        </div>
-      </div>
+      ${statusBand(bandMap[level], toneMap[level])}
+      ${emailHeading(titleMap[level])}
+      ${emailParagraph(bodyMap[level])}
+      ${amountBlock({ label: 'Att betala', amount: belopp, sub: `Faktura ${nr} · förföll ${forfoll}` })}
+      ${paymentBlock({
+        swishNumber: vars.swishNumber,
+        amount: vars.amountRaw || 0,
+        message: invoiceNumber,
+        bankgiro,
+        ocr,
+        inline: true,
+      })}
+      ${rows.length ? summaryTable(rows) : ''}
+      ${signature(firma, undefined, { closing: closingMap[level], phone: vars.phone ? escapeEmailText(vars.phone) : undefined })}
     `,
   }
 }
@@ -281,6 +328,8 @@ export function composeReminderStep(params: {
     assignedPhoneNumber: cfg.assigned_phone_number,
     swishNumber: cfg.swish_number,
     amountRaw: amountToPay,
+    customerName: customer?.name ?? null,
+    phone: cfg.phone_number,
   })
   const nextCount = currentCount + 1
   const nextDays = reminderDays[nextCount]

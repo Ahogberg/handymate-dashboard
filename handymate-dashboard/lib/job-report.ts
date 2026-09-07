@@ -1,5 +1,15 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { buildAttribution, loadAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
+import { DEFAULT_ACCENT_COLOR } from '@/lib/branding/get-branding'
+import {
+  drawBrandHeader,
+  drawBrandFooter,
+  loadPdfBranding,
+  pdfBrandingFrom,
+  PDF_TEXT_PRIMARY,
+  PDF_TEXT_MUTED,
+  type PdfBranding,
+} from '@/lib/branding/pdf'
 
 /**
  * V23: Automatisk jobbrapport vid avslutat jobb.
@@ -216,58 +226,49 @@ export async function triggerJobReport(
  *
  * Handymate-stämpeln (lib/branding/attribution.ts) skickas som separat option — inte i
  * JobReportData, som är den lagrade payloaden i pending_approvals och inte
- * ska bära ett värde som slås upp vid renderingstillfället.
+ * ska bära ett värde som slås upp vid renderingstillfället. Samma sak med
+ * varumärket (yta 2, 2026-09-07): sidhuvud/sidfot ritas ur brand-lagret
+ * (lib/branding/pdf.ts) så att rapporten ser ut som firmans övriga dokument
+ * även om payloaden är dagar gammal. Utan `brand` faller vi tillbaka på
+ * payloadens namn/org.nr — loggan ritas då inte.
  */
 export async function generateJobReportPdf(
   data: JobReportData,
-  opts: { attribution?: Attribution } = {},
+  opts: { attribution?: Attribution; brand?: PdfBranding } = {},
 ): Promise<Buffer> {
   // Dynamic import to avoid SSR issues
   const jsPDFModule = await import('jspdf')
   const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF
   await import('jspdf-autotable')
 
+  const brand: PdfBranding = opts.brand ?? pdfBrandingFrom({
+    businessName: data.businessName,
+    accentColor: DEFAULT_ACCENT_COLOR,
+    contactName: data.contactName || undefined,
+    orgNumber: data.orgNumber || undefined,
+    fSkattRegistered: false,
+    attribution: opts.attribution ?? buildAttribution(null),
+  })
+  const ACCENT = brand.accent
+
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const pageWidth = doc.internal.pageSize.getWidth()
-  let y = 15
 
-  // Header bar
-  doc.setFillColor(15, 118, 110) // teal-700
-  doc.rect(0, 0, pageWidth, 25, 'F')
-  doc.setTextColor(255, 255, 255)
-  doc.setFontSize(16)
-  doc.setFont('helvetica', 'bold')
-  doc.text(data.businessName, 15, 16)
+  // Sidhuvud ur brand-lagret (logga, firma, org.nr) + titel/projekt till höger.
+  const meta: string[] = [`Kund: ${data.customerName}`]
+  if (data.customerAddress) meta.push(`Adress: ${data.customerAddress}`)
+  meta.push(`Avslutat ${new Date(data.completedAt).toLocaleDateString('sv-SE')}`)
+  let y = drawBrandHeader(doc, brand, {
+    docType: 'Jobbrapport',
+    title: data.projectName,
+    meta,
+    y: 15,
+    margin: 15,
+  })
+
+  // Info
   doc.setFontSize(9)
-  doc.setFont('helvetica', 'normal')
-  if (data.orgNumber) {
-    doc.text(`Org.nr: ${data.orgNumber}`, pageWidth - 15, 16, { align: 'right' })
-  }
-
-  y = 35
-  doc.setTextColor(30, 41, 59) // gray-800
-
-  // Title
-  doc.setFontSize(18)
-  doc.setFont('helvetica', 'bold')
-  doc.text(`Jobbrapport`, 15, y)
-  y += 8
-  doc.setFontSize(11)
-  doc.setFont('helvetica', 'normal')
-  doc.text(data.projectName, 15, y)
-  y += 8
-
-  // Info box
-  doc.setFontSize(9)
-  doc.setTextColor(107, 114, 128) // gray-500
-  doc.text(`Kund: ${data.customerName}`, 15, y)
-  y += 5
-  if (data.customerAddress) {
-    doc.text(`Adress: ${data.customerAddress}`, 15, y)
-    y += 5
-  }
-  doc.text(`Avslutat: ${new Date(data.completedAt).toLocaleDateString('sv-SE')}`, 15, y)
-  y += 5
+  doc.setTextColor(...PDF_TEXT_MUTED)
   doc.text(`Utfört av: ${data.contactName}`, 15, y)
   y += 5
   if (data.diaryHours != null && data.diaryHours > 0) {
@@ -277,7 +278,7 @@ export async function generateJobReportPdf(
   y += 5
 
   // Utfört arbete
-  doc.setTextColor(30, 41, 59)
+  doc.setTextColor(...PDF_TEXT_PRIMARY)
   doc.setFontSize(12)
   doc.setFont('helvetica', 'bold')
   doc.text('Utfört arbete', 15, y)
@@ -326,7 +327,7 @@ export async function generateJobReportPdf(
       head: [['Material', 'Antal', 'Enhet']],
       body: data.materials.map(m => [m.name, String(m.quantity), m.unit]),
       styles: { fontSize: 8, cellPadding: 2 },
-      headStyles: { fillColor: [15, 118, 110], textColor: 255 },
+      headStyles: { fillColor: [...ACCENT], textColor: 255 },
       alternateRowStyles: { fillColor: [249, 250, 251] },
     })
     y = (doc as any).lastAutoTable.finalY + 8
@@ -346,11 +347,8 @@ export async function generateJobReportPdf(
   doc.text(`Materialgaranti: ${data.warrantyMaterialYears} år (från ${warrantyFrom})`, 15, y)
   y += 10
 
-  // Footer
-  doc.setFontSize(8)
-  doc.setTextColor(156, 163, 175) // gray-400
-  const footerY = doc.internal.pageSize.getHeight() - 10
-  doc.text(`${data.businessName} · ${data.contactName}${data.orgNumber ? ` · ${data.orgNumber}` : ''}`, 15, footerY)
+  // Sidfot (firma · org.nr · F-skatt · kontakt + sidnummer) + stämpeln sist.
+  drawBrandFooter(doc, brand, { margin: 15 })
   stampAttributionOnPdf(doc, opts.attribution ?? buildAttribution(null))
 
   return Buffer.from(doc.output('arraybuffer'))
@@ -368,9 +366,12 @@ export async function approveJobReport(
 
   try {
     // Generate PDF — stämpeln laddas här (EN query) eftersom rutten bara
-    // har businessId, inte business_config-raden.
+    // har businessId, inte business_config-raden. Varumärket (logga, accent,
+    // F-skatt) laddas färskt i stället för ur payloaden — den kan vara
+    // dagar gammal och firman kan ha bytt logga sedan dess.
     const attribution = await loadAttribution(supabase, businessId)
-    const pdfBuffer = await generateJobReportPdf(reportData, { attribution })
+    const brand = await loadPdfBranding(supabase, businessId, 'job-report')
+    const pdfBuffer = await generateJobReportPdf(reportData, { attribution, brand })
 
     // Upload to Supabase Storage
     const fileName = `job-report-${reportData.projectId}-${Date.now()}.pdf`
@@ -415,16 +416,24 @@ export async function approveJobReport(
     if (reportData.customerEmail) {
       try {
         const { sendEmail } = await import('@/lib/email')
+        // Varumärkeslagret 2026-09-07: masterlayouten (logotyp/accent/stämpel)
+        // i stället för nakna <p> med hårdkodad teal.
+        const { loadBranding } = await import('@/lib/branding/get-branding')
+        const { emailLayout, emailHeading, emailParagraph, actionBlock, signature } = await import('@/lib/email-templates')
+        const { escapeHtml } = await import('@/lib/document-html')
+        const branding = await loadBranding(supabase, businessId)
+        const firstName = escapeHtml(reportData.customerName.split(' ')[0])
+        const content = `
+          ${emailHeading(`Jobbrapport — ${escapeHtml(reportData.projectName)}`, `${firstName ? `Hej ${firstName}! ` : ''}Här kommer jobbrapporten för arbetet hos dig.`)}
+          ${emailParagraph('Rapporten innehåller utfört arbete, material och garantiinformation. Spara den — det är din dokumentation över jobbet.')}
+          ${actionBlock({ text: 'Öppna jobbrapporten (PDF)', url: pdfUrl }, branding.accentColor)}
+          ${signature(escapeHtml(reportData.businessName), reportData.contactName ? escapeHtml(reportData.contactName) : undefined, { phone: branding.contactPhone ? escapeHtml(branding.contactPhone) : undefined })}
+        `
         await sendEmail({
+          businessId,
           to: reportData.customerEmail,
           subject: `Jobbrapport — ${reportData.projectName} från ${reportData.businessName}`,
-          html: `
-            <p>Hej ${reportData.customerName.split(' ')[0]}!</p>
-            <p>Här kommer jobbrapporten för <strong>${reportData.projectName}</strong>.</p>
-            <p>Rapporten innehåller utfört arbete, material och garantiinformation.</p>
-            <p><a href="${pdfUrl}" style="display:inline-block;padding:12px 24px;background:#0F766E;color:white;text-decoration:none;border-radius:8px;font-weight:600;">Öppna jobbrapport (PDF)</a></p>
-            <p>Med vänliga hälsningar,<br/>${reportData.contactName}<br/>${reportData.businessName}</p>
-          `,
+          html: emailLayout(branding, content, { meta: 'Jobbrapport' }),
           fromName: reportData.businessName,
         })
       } catch { /* non-blocking */ }

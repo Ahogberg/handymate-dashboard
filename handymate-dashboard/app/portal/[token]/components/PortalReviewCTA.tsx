@@ -1,48 +1,52 @@
 'use client'
 
 import { useState } from 'react'
-import { ArrowLeft, ExternalLink, Send, Star } from 'lucide-react'
-import type { PortalData } from '../types'
+import { ArrowLeft, ArrowUpRight, Check, Loader2, Star } from 'lucide-react'
+import type { PortalData, PortalDecisions } from '../types'
+import { formatDate } from '../helpers'
+import { REVIEW_TAGS, REVIEW_COMMENT_MAX, isLowRating } from '@/lib/portal/review'
+import PortalFooter from './PortalFooter'
 
 interface PortalReviewCTAProps {
   portal: PortalData
+  token: string
+  review: PortalDecisions['review'] | null
   onBack: () => void
+  onSubmitted?: () => void | Promise<void>
 }
 
-const TAG_OPTIONS = [
-  'Punktlig',
-  'Snyggt utfört',
-  'Ren & städad',
-  'Bra kommunikation',
-  'Värd pengarna',
-  'Skulle anlita igen',
-]
+const STAR_LABELS = ['Inte bra', 'OK', 'Bra', 'Mycket bra', 'Fantastiskt!']
 
-const STAR_LABELS: Record<number, string> = {
-  1: 'Inte bra',
-  2: 'OK',
-  3: 'Bra',
-  4: 'Mycket bra',
-  5: 'Fantastiskt!',
+function fornamn(name: string | null | undefined): string {
+  return (name || '').trim().split(/\s+/)[0] || ''
 }
 
 /**
- * Recensions-CTA (port av bp-review.jsx).
- * Stars + tags + kommentar + Google-CTA + confetti vid submit.
+ * "Hur blev det?" — portalens beslutskort (Design 2026-09-07).
  *
- * Notering: vi sparar INTE recensionen i DB i denna iteration —
- * den är bara ett konvertering-steg som leder kunden till Google.
- * Att samla feedback internt kräver ny review-tabell (framtida).
+ * Ett kompakt kort: fem stjärnor och en etikett. Betyget styr vägen:
+ *   1–3 → "Vad blev inte bra?" — meddelandet går direkt till hantverkaren
+ *         (POST /api/portal/[token]/review → tråden). Inget Google.
+ *   4–5 → etiketter + frivillig text → "Skicka omdöme" → mörkt tack-kort +
+ *         "Vill du dela på Google?" när firman har en länk. Texten kopieras
+ *         så kunden kan klistra in den.
+ * Ett omdöme per kund: finns det redan visas bara "Tack för ditt omdöme".
  */
-export default function PortalReviewCTA({ portal, onBack }: PortalReviewCTAProps) {
+export default function PortalReviewCTA({ portal, token, review, onBack, onSubmitted }: PortalReviewCTAProps) {
+  const business = portal.business
+  const kund = fornamn(portal.customer.name)
+  const hantverkare = fornamn(business.contactName) || business.name
+
   const [stars, setStars] = useState(0)
-  const [hover, setHover] = useState(0)
   const [tags, setTags] = useState<Set<string>>(new Set())
   const [comment, setComment] = useState('')
-  const [submitted, setSubmitted] = useState(false)
-  const [confettiOn, setConfettiOn] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [sent, setSent] = useState<{ low: boolean; googleReviewUrl: string | null } | null>(null)
+  const [alreadyAt, setAlreadyAt] = useState<string | null>(review?.left_at ?? null)
+  const [copiedToClipboard, setCopiedToClipboard] = useState(false)
 
-  const customerFirstName = portal.customer.name?.split(' ')[0] || ''
+  const low = stars > 0 && isLowRating(stars)
 
   function toggleTag(t: string) {
     setTags(prev => {
@@ -53,329 +57,210 @@ export default function PortalReviewCTA({ portal, onBack }: PortalReviewCTAProps
     })
   }
 
-  function submit() {
-    if (!stars) return
-    setSubmitted(true)
-    setConfettiOn(true)
-    setTimeout(() => setConfettiOn(false), 2400)
+  async function submit() {
+    if (!stars || saving) return
+    if (low && !comment.trim()) {
+      setError('Berätta kort vad som inte blev bra så kan det rättas till.')
+      return
+    }
+    setSaving(true)
+    setError(null)
+    try {
+      const res = await fetch(`/api/portal/${token}/review`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rating: stars, tags: Array.from(tags), comment: comment.trim() }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (res.status === 409 && data?.left_at) {
+        setAlreadyAt(data.left_at)
+        return
+      }
+      if (!res.ok) {
+        setError(data?.error || 'Det gick inte att skicka just nu. Försök igen.')
+        return
+      }
+      setSent({ low: !!data.low, googleReviewUrl: data.googleReviewUrl || business.googleReviewUrl || null })
+      // Kundens egna ord i urklipp så Google-recensionen blir ett klistra in.
+      if (!data.low && comment.trim() && navigator.clipboard) {
+        navigator.clipboard.writeText(comment.trim()).then(() => setCopiedToClipboard(true)).catch(() => {})
+      }
+      await onSubmitted?.()
+    } catch {
+      setError('Det gick inte att skicka just nu. Försök igen.')
+    } finally {
+      setSaving(false)
+    }
   }
 
-  if (submitted) {
+  function googleClicked() {
+    fetch(`/api/portal/${token}/review`, { method: 'PATCH' }).catch(() => {})
+  }
+
+  const header = (
+    <div className="bp-header">
+      <button type="button" onClick={onBack} className="bp-icon-btn" aria-label="Tillbaka">
+        <ArrowLeft size={18} />
+      </button>
+      <div className="bp-brand">
+        <div className="bp-brand-name">{business.name}</div>
+        <div className="bp-brand-sub">Hur blev det?</div>
+      </div>
+    </div>
+  )
+
+  // ── Redan lämnat ──
+  if (alreadyAt && !sent) {
     return (
-      <div
-        className="bp-body"
-        style={{
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: '40px 24px',
-          textAlign: 'center',
-          position: 'relative',
-          overflow: 'hidden',
-          minHeight: '70vh',
-        }}
-      >
-        {/* Confetti */}
-        {confettiOn &&
-          Array.from({ length: 28 }).map((_, i) => {
-            const colors = ['#F59E0B', '#FBBF24', '#16A34A', '#2563EB', '#DC2626']
-            return (
-              <span
-                key={i}
-                style={{
-                  position: 'absolute',
-                  top: '40%',
-                  left: `${10 + i * 3}%`,
-                  width: 8,
-                  height: 12,
-                  background: colors[i % colors.length],
-                  borderRadius: 2,
-                  animation: `bp-confetti 2.2s ${i * 40}ms forwards`,
-                  transform: `rotate(${i * 23}deg)`,
-                }}
-              />
-            )
-          })}
-
-        <div
-          style={{
-            width: 80,
-            height: 80,
-            borderRadius: '50%',
-            background: 'linear-gradient(135deg, var(--bee-400), var(--bee-600))',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: '#fff',
-            marginBottom: 22,
-            animation: 'bp-pop-in 540ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-            boxShadow: '0 10px 30px rgba(217,119,6,0.35)',
-          }}
-        >
-          <Star size={40} fill="currentColor" />
-        </div>
-        <h1 style={{ fontSize: 22, fontWeight: 700, letterSpacing: '-0.02em', marginBottom: 8 }}>
-          Tack {customerFirstName}!
-        </h1>
-        <p
-          style={{
-            fontSize: 14,
-            color: 'var(--muted)',
-            marginBottom: 24,
-            maxWidth: 280,
-            lineHeight: 1.5,
-          }}
-        >
-          Din recension hjälper {portal.business.name} att fortsätta leverera kvalitet.
-        </p>
-
-        {stars >= 4 && portal.business.googleReviewUrl && (
-          <div
-            className="bp-card"
-            style={{
-              padding: 16,
-              width: '100%',
-              maxWidth: 320,
-              marginBottom: 16,
-              animation: 'bp-slide-up 480ms 240ms both',
-            }}
-          >
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10, color: 'var(--ink)' }}>
-              Vill du dela på Google?
-            </div>
-            <a
-              href={portal.business.googleReviewUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="bp-cta bee"
-              style={{ height: 44, fontSize: 14, textDecoration: 'none' }}
-            >
-              <Star size={16} /> Recensera på Google <ExternalLink size={14} />
-            </a>
-            <p
-              style={{
-                fontSize: 11,
-                color: 'var(--subtle)',
-                marginTop: 10,
-                lineHeight: 1.4,
-              }}
-            >
-              Hjälper andra hitta bra hantverkare.
-            </p>
+      <div className="bp-screen">
+        {header}
+        <div className="bp-stack bp-rise">
+          <div className="bp-card" style={{ padding: '14px 18px', display: 'flex', alignItems: 'center', gap: 12 }}>
+            <span style={{ width: 26, height: 26, borderRadius: '50%', background: '#f0fdf4', color: '#16A34A', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Check size={15} strokeWidth={3} />
+            </span>
+            <span style={{ fontSize: 14, color: 'var(--ink)' }}>Tack för ditt omdöme, lämnat {formatDate(alreadyAt)}.</span>
           </div>
-        )}
-        <button
-          type="button"
-          onClick={onBack}
-          className="bp-cta ghost"
-          style={{ maxWidth: 320 }}
-        >
-          Klar
-        </button>
+          <PortalFooter business={business} attribution={portal.attribution} />
+        </div>
       </div>
     )
   }
 
+  // ── Skickat ──
+  if (sent) {
+    return (
+      <div className="bp-screen">
+        {header}
+        <div className="bp-stack">
+          {sent.low ? (
+            <div className="bp-card bp-rise" style={{ padding: 20 }}>
+              <div style={{ fontSize: 21, fontWeight: 700, lineHeight: 1.25, color: 'var(--ink)' }}>
+                Tack{kund ? ` ${kund}` : ''}. {hantverkare} har fått ditt meddelande.
+              </div>
+              <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 8, lineHeight: 1.5 }}>
+                Hör av sig så snart det går. Omdömet stannar mellan dig och {business.name}.
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="bp-dark-card">
+                <div style={{ display: 'flex', gap: 2, color: 'var(--bee-500)', marginBottom: 12 }}>
+                  {[1, 2, 3, 4, 5].map(n => <Star key={n} size={20} fill="currentColor" strokeWidth={0} />)}
+                </div>
+                <div style={{ fontSize: 23, fontWeight: 700, lineHeight: 1.2 }}>Tack{kund ? ` ${kund}` : ''}!</div>
+                <div className="sub" style={{ marginTop: 6 }}>Ditt omdöme är skickat till {business.name}.</div>
+              </div>
+              {sent.googleReviewUrl && (
+                <div className="bp-card bp-rise" style={{ padding: 20 }}>
+                  <div style={{ fontSize: 17, fontWeight: 700, color: 'var(--ink)' }}>Vill du dela på Google?</div>
+                  <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 6, lineHeight: 1.5 }}>
+                    Det betyder mycket för en liten firma.{copiedToClipboard ? ' Din text är kopierad så du kan klistra in den.' : ''}
+                  </div>
+                  <a
+                    href={sent.googleReviewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bp-btn-primary"
+                    style={{ height: 50, marginTop: 14 }}
+                    onClick={googleClicked}
+                  >
+                    Recensera på Google <ArrowUpRight size={18} />
+                  </a>
+                </div>
+              )}
+            </>
+          )}
+          <PortalFooter business={business} attribution={portal.attribution} />
+        </div>
+      </div>
+    )
+  }
+
+  // ── Formuläret ──
   return (
-    <>
-      <div className="bp-header">
-        <button
-          type="button"
-          onClick={onBack}
-          className="bp-icon-btn"
-          style={{ background: 'transparent', border: 'none' }}
-          aria-label="Tillbaka"
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <div className="bp-brand">
-          <div className="bp-brand-name">Recensera jobbet</div>
-          <div className="bp-brand-sub">{portal.business.name}</div>
-        </div>
-      </div>
-
-      <div className="bp-body" style={{ padding: '8px 18px 100px' }}>
-        {/* Hero */}
-        <div
-          style={{
-            background: 'linear-gradient(135deg, var(--bee-50), var(--bee-100))',
-            borderRadius: 'var(--r-xl)',
-            padding: '24px 20px',
-            textAlign: 'center',
-            marginTop: 12,
-            border: '1px solid var(--bee-100)',
-          }}
-        >
-          <div
-            style={{
-              width: 56,
-              height: 56,
-              borderRadius: '50%',
-              background: 'linear-gradient(135deg, var(--bee-500), var(--bee-700))',
-              color: '#fff',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontWeight: 700,
-              fontSize: 22,
-              margin: '0 auto 14px',
-            }}
-          >
-            {(portal.business.contactName || portal.business.name || 'H').charAt(0).toUpperCase()}
+    <div className="bp-screen">
+      {header}
+      <div className="bp-stack bp-rise">
+        <div className="bp-card" style={{ padding: 18 }}>
+          <div style={{ fontSize: 19, fontWeight: 700, color: 'var(--ink)' }}>Hur blev det?</div>
+          <div style={{ fontSize: 13.5, color: 'var(--muted)', marginTop: 4 }}>
+            {kund ? `${kund}, hur` : 'Hur'} upplevde du jobbet med {business.name}?
           </div>
-          <h2 style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', marginBottom: 6 }}>
-            Hur var {portal.business.contactName || portal.business.name}?
-          </h2>
-          <p
-            style={{
-              fontSize: 13,
-              color: 'var(--muted)',
-              maxWidth: 280,
-              margin: '0 auto',
-              lineHeight: 1.5,
-            }}
-          >
-            Din feedback hjälper oss bli bättre — och hjälper andra hitta bra hantverkare.
-          </p>
-        </div>
 
-        {/* Stars */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: 6, padding: '28px 0 8px' }}>
-          {[1, 2, 3, 4, 5].map(n => {
-            const filled = n <= (hover || stars)
-            return (
+          <div style={{ display: 'flex', justifyContent: 'center', gap: 2, marginTop: 14 }}>
+            {[1, 2, 3, 4, 5].map(n => (
               <button
-                type="button"
                 key={n}
-                onMouseEnter={() => setHover(n)}
-                onMouseLeave={() => setHover(0)}
-                onClick={() => setStars(n)}
-                style={{
-                  background: 'none',
-                  border: 'none',
-                  cursor: 'pointer',
-                  color: filled ? 'var(--bee-500)' : 'var(--border-strong)',
-                  padding: 4,
-                  transform: stars === n ? 'scale(1.15)' : 'scale(1)',
-                  transition: 'all 200ms cubic-bezier(0.34, 1.56, 0.64, 1)',
-                  fontFamily: 'inherit',
-                }}
-              >
-                <Star size={42} strokeWidth={1.5} fill={filled ? 'currentColor' : 'none'} />
-              </button>
-            )
-          })}
-        </div>
-
-        <div
-          style={{
-            textAlign: 'center',
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--ink-2)',
-            minHeight: 20,
-            marginBottom: 24,
-          }}
-        >
-          {stars === 0 ? <span style={{ color: 'var(--subtle)' }}>Tryck för att betygsätta</span> : STAR_LABELS[stars]}
-        </div>
-
-        {/* Tag chips */}
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            marginBottom: 10,
-          }}
-        >
-          Vad var bäst?
-        </div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 24 }}>
-          {TAG_OPTIONS.map(t => {
-            const on = tags.has(t)
-            return (
-              <button
                 type="button"
-                key={t}
-                onClick={() => toggleTag(t)}
-                style={{
-                  padding: '8px 14px',
-                  border: on ? '1.5px solid var(--bee-500)' : '1px solid var(--border)',
-                  background: on ? 'var(--bee-50)' : 'var(--surface)',
-                  color: on ? 'var(--bee-700)' : 'var(--ink-2)',
-                  borderRadius: 'var(--r-pill)',
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: 'pointer',
-                  transition: 'all var(--t-fast)',
-                  fontFamily: 'inherit',
-                }}
+                className={`bp-star${n <= stars ? ' on' : ''}`}
+                onClick={() => { setStars(n); setError(null) }}
+                aria-label={`${n} av 5`}
+                aria-pressed={n <= stars}
               >
-                {t}
+                <Star size={30} fill={n <= stars ? 'currentColor' : 'none'} strokeWidth={n <= stars ? 0 : 1.5} />
               </button>
-            )
-          })}
+            ))}
+          </div>
+          <div style={{ textAlign: 'center', fontSize: 14, fontWeight: 600, color: '#334155', minHeight: 20, marginTop: 4 }}>
+            {stars > 0 ? STAR_LABELS[stars - 1] : ''}
+          </div>
+
+          {stars > 0 && (
+            <div className="bp-rise" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 14 }}>
+              {low ? (
+                <>
+                  <div className="bp-banner gray">
+                    Berätta vad som inte blev bra. {hantverkare} får meddelandet direkt och kan rätta till det.
+                  </div>
+                  <label className="bp-field">
+                    Vad blev inte bra?
+                    <textarea
+                      className="bp-textarea"
+                      rows={4}
+                      value={comment}
+                      onChange={e => setComment(e.target.value.slice(0, REVIEW_COMMENT_MAX))}
+                      placeholder="Berätta vad som hände"
+                    />
+                  </label>
+                </>
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                    {REVIEW_TAGS.map(t => (
+                      <button key={t} type="button" className={`bp-tag${tags.has(t) ? ' on' : ''}`} onClick={() => toggleTag(t)} aria-pressed={tags.has(t)}>
+                        {t}
+                      </button>
+                    ))}
+                  </div>
+                  <label className="bp-field">
+                    <span style={{ display: 'flex', justifyContent: 'space-between' }}>
+                      <span>Vill du skriva något?</span>
+                      <span style={{ color: 'var(--subtle)' }}>{comment.length}/{REVIEW_COMMENT_MAX}</span>
+                    </span>
+                    <textarea
+                      className="bp-textarea"
+                      rows={3}
+                      value={comment}
+                      onChange={e => setComment(e.target.value.slice(0, REVIEW_COMMENT_MAX))}
+                      placeholder="T.ex. vad du var mest nöjd med"
+                    />
+                  </label>
+                </>
+              )}
+
+              {error && <div role="alert" style={{ fontSize: 13.5, color: 'var(--red-600)' }}>{error}</div>}
+
+              <button type="button" className="bp-btn-primary" disabled={saving || (low && !comment.trim())} onClick={submit}>
+                {saving ? <Loader2 size={18} className="animate-spin" /> : null}
+                {low ? `Skicka till ${hantverkare}` : 'Skicka omdöme'}
+              </button>
+            </div>
+          )}
         </div>
 
-        {/* Comment */}
-        <div
-          style={{
-            fontSize: 12,
-            fontWeight: 600,
-            color: 'var(--muted)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.06em',
-            marginBottom: 10,
-          }}
-        >
-          Kommentar (valfritt)
-        </div>
-        <textarea
-          value={comment}
-          onChange={e => setComment(e.target.value)}
-          placeholder="Berätta gärna om upplevelsen…"
-          maxLength={400}
-          rows={4}
-          style={{
-            width: '100%',
-            resize: 'none',
-            padding: 14,
-            border: '1px solid var(--border)',
-            borderRadius: 'var(--r-md)',
-            background: 'var(--surface)',
-            fontFamily: 'inherit',
-            fontSize: 14,
-            lineHeight: 1.5,
-            color: 'var(--ink)',
-            outline: 'none',
-          }}
-        />
-        <div style={{ textAlign: 'right', fontSize: 11, color: 'var(--subtle)', marginTop: 4 }}>
-          {comment.length} / 400
-        </div>
+        <PortalFooter business={business} attribution={portal.attribution} />
       </div>
-
-      {/* Sticky submit */}
-      <div
-        style={{
-          position: 'sticky',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          padding: '12px 18px 22px',
-          background: 'rgba(255,255,255,0.96)',
-          backdropFilter: 'blur(12px)',
-          borderTop: '1px solid var(--border)',
-        }}
-      >
-        <button type="button" onClick={submit} disabled={!stars} className="bp-cta bee">
-          <Send size={16} /> Skicka recension
-        </button>
-      </div>
-    </>
+    </div>
   )
 }

@@ -1,8 +1,9 @@
 /**
  * Portal notifications — automatiska mail till kunden vid viktiga events.
  *
- * Mallen matchar Modern offert: hantverkarens logo + accent_color prominent,
- * Handymate-stämpeln (lib/branding/attribution.ts) subtle i footern.
+ * Renderas genom masterlayouten (lib/email-templates.ts emailLayout) med
+ * varumärket ur lib/branding/get-branding.ts: hantverkarens logo + accent
+ * prominent, Handymate-stämpeln (lib/branding/attribution.ts) subtle i footern.
  *
  * Anti-spam: samma event till samma kund inom 1h hoppas över.
  *
@@ -10,7 +11,8 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
-import { loadAttribution, attributionEmailHtml, type Attribution } from '@/lib/branding/attribution'
+import { loadBranding, type Branding } from '@/lib/branding/get-branding'
+import { emailLayout, emailSection, actionBlock } from '@/lib/email-templates'
 
 export type PortalNotificationEvent =
   | 'new_message'
@@ -54,7 +56,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
   body: (ctx: Record<string, any>) => string
   /** Statisk knapptext, eller funktion när CTA beror på context. */
   cta: string | ((ctx: Record<string, any>) => string)
-  emoji: string
 }> = {
   new_message: {
     subject: (_ctx, biz) => `Nytt meddelande från ${biz}`,
@@ -63,7 +64,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       ? `Du har fått ett nytt meddelande i din kundportal:<br/><br/><em style="color:#475569;">"${escapeHtml(String(ctx.preview).slice(0, 200))}"</em>`
       : 'Du har fått ett nytt meddelande i din kundportal.',
     cta: 'Öppna meddelandet',
-    emoji: '💬',
   },
   quote_sent: {
     subject: (_ctx, biz) => `Ny offert från ${biz}`,
@@ -72,7 +72,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       ? `En ny offert <strong>${escapeHtml(String(ctx.title))}</strong> har lagts i din kundportal — granska och godkänn när du vill.`
       : 'En ny offert har lagts i din kundportal — granska och godkänn när du vill.',
     cta: 'Granska offert',
-    emoji: '📄',
   },
   invoice_sent: {
     subject: (_ctx, biz) => `Ny faktura från ${biz}`,
@@ -83,7 +82,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `En ny faktura${amount}${due} ligger i din portal.`
     },
     cta: 'Visa faktura',
-    emoji: '🧾',
   },
   invoice_paid: {
     subject: (_ctx, _biz) => 'Tack för din betalning',
@@ -95,7 +93,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
     // Auto-detect: om review_request redan skickats — visa portal-CTA istället
     // för att undvika att be om recension två gånger.
     cta: (ctx) => ctx.review_already_sent ? 'Se i din portal' : 'Lämna en recension',
-    emoji: '🙏',
   },
   invoice_overdue: {
     subject: (_ctx, _biz) => `Vänlig påminnelse — fakturan har förfallit`,
@@ -105,7 +102,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `Vi vill bara påminna om att fakturan${amount} har passerat förfallodatum. Hör gärna av dig om något är oklart.`
     },
     cta: 'Visa faktura',
-    emoji: '⏰',
   },
   project_update: {
     subject: (ctx, biz) => ctx.stage_name
@@ -118,7 +114,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `${proj}${stage}. Följ utvecklingen direkt i portalen.`
     },
     cta: 'Följ projektet',
-    emoji: '🔨',
   },
   photos_added: {
     subject: (_ctx, biz) => `Nya bilder från ${biz}`,
@@ -130,7 +125,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return 'Nya bilder från arbetet har lagts upp i din portal.'
     },
     cta: 'Visa bilder',
-    emoji: '📸',
   },
   jobbpass_published: {
     subject: (ctx, biz) => ctx.project_name ? `Jobbpasset för ${ctx.project_name} är klart — ${biz}` : `Ditt jobbpass från ${biz}`,
@@ -140,7 +134,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `${proj} är klart. I din kundportal finns nu jobbpasset: vad som ingick, godkända tillägg, egenkontroll och bilder. Spara det — det är din dokumentation över arbetet.`
     },
     cta: 'Öppna jobbpasset',
-    emoji: '🏠',
   },
   review_request: {
     subject: (_ctx, biz) => `Hur var samarbetet med ${biz}?`,
@@ -150,7 +143,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `Tack för förtroendet${proj}! Det skulle betyda mycket om du tog några sekunder att lämna en recension. Det hjälper oss växa och nå fler kunder som dig.`
     },
     cta: 'Lämna recension',
-    emoji: '⭐',
   },
 }
 
@@ -205,10 +197,10 @@ export async function sendPortalNotification(
     return { success: true, skipped: 'no_portal' }
   }
 
-  // Hämta business (logo + accent_color + namn)
+  // Hämta business — bara för att skilja "finns inte" från "finns men tomt".
   const { data: business } = await supabase
     .from('business_config')
-    .select('business_name, contact_name, contact_email, logo_url, accent_color')
+    .select('business_id')
     .eq('business_id', businessId)
     .maybeSingle()
 
@@ -216,8 +208,11 @@ export async function sendPortalNotification(
     return { success: false, error: 'Business config hittades inte' }
   }
 
-  const businessName = business.business_name || 'Hantverkaren'
-  const accentColor = isValidHex(business.accent_color) ? business.accent_color : '#0F766E'
+  // Varumärkeslagret 2026-09-07: logotyp/accent/kontakt/stämpel ur EN
+  // sanning (lib/branding/get-branding.ts) — mailet renderas genom
+  // emailLayout() som alla andra kundmail.
+  const branding = await loadBranding(supabase, businessId)
+  const businessName = branding.businessName
   const portalUrl = `${APP_URL}/portal/${customer.portal_token}`
 
   // Auto-detect: vid invoice_paid, slå upp om en review_request-notis redan
@@ -238,20 +233,13 @@ export async function sendPortalNotification(
   const copy = EVENT_COPY[event]
   const subject = copy.subject(context, businessName)
   const ctaText = typeof copy.cta === 'function' ? copy.cta(context) : copy.cta
-  // Stämpelns underlag — egen felisolerad query (business-selecten ovan är en
-  // explicit kolumnlista och attribution_link_enabled finns först i sql/v202).
-  const attribution = await loadAttribution(supabase, businessId)
   const html = buildEmailHtml({
-    accentColor,
-    businessName,
-    logoUrl: business.logo_url || null,
+    branding,
     customerName: customer.name || 'Kund',
     heading: copy.heading,
     bodyHtml: copy.body(context),
-    emoji: copy.emoji,
     cta: ctaText,
     portalUrl: portalUrl + eventToPortalAnchor(event, context),
-    attribution,
   })
 
   // Skicka via Resend
@@ -268,7 +256,7 @@ export async function sendPortalNotification(
         to: [customer.email],
         subject,
         html,
-        reply_to: business.contact_email || undefined,
+        reply_to: branding.contactEmail || undefined,
       }),
     })
 
@@ -319,10 +307,6 @@ function eventToPortalAnchor(event: PortalNotificationEvent, ctx?: Record<string
   }
 }
 
-function isValidHex(c: any): c is string {
-  return typeof c === 'string' && /^#[0-9a-fA-F]{6}$/.test(c)
-}
-
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -347,84 +331,30 @@ function formatDate(d: string): string {
 }
 
 interface BuildOpts {
-  accentColor: string
-  businessName: string
-  logoUrl: string | null
+  branding: Branding
   customerName: string
   heading: string
   bodyHtml: string
-  emoji: string
   cta: string
   portalUrl: string
-  attribution: Attribution
 }
 
 /**
- * Bygg HTML-mall som matchar Modern offert. Hantverkarens branding
- * (logo + accentfärg) prominent, Handymate-stämpeln subtle.
+ * Portalnotisen — designens KOMPAKTA variant av masterlayouten
+ * (lib/email-templates.ts emailLayout, compact): mindre sidhuvud, rubrik +
+ * en rad, en knapp in i portalen, enradig sidfot med stämpel. Notisen ska
+ * ta kunden till portalen, inte återge innehållet.
  */
 function buildEmailHtml(opts: BuildOpts): string {
   const firstName = (opts.customerName.split(' ')[0] || opts.customerName).trim()
-
-  const logoBlock = opts.logoUrl
-    ? `<img src="${opts.logoUrl}" alt="${escapeHtml(opts.businessName)}" style="max-height: 56px; max-width: 200px; margin-bottom: 12px; display: inline-block;" />`
-    : `<div style="font-size: 22px; font-weight: 700; color: #ffffff; letter-spacing: 0.5px;">${escapeHtml(opts.businessName)}</div>`
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${escapeHtml(opts.heading)}</title>
-</head>
-<body style="margin: 0; padding: 0; background: #F8FAFC; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; color: #1F2937;">
-  <div style="max-width: 600px; margin: 0 auto; padding: 24px 16px;">
-
-    <!-- Brand header -->
-    <div style="background: ${opts.accentColor}; padding: 28px 24px; border-radius: 16px 16px 0 0; text-align: center;">
-      ${logoBlock}
-    </div>
-
-    <!-- Card -->
-    <div style="background: #ffffff; padding: 32px 28px; border-radius: 0 0 16px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.04); border: 1px solid #E5E7EB; border-top: none;">
-
-      <div style="font-size: 32px; line-height: 1; margin-bottom: 8px;">${opts.emoji}</div>
-
-      <h1 style="margin: 0 0 8px; font-size: 22px; font-weight: 700; color: #0F172A; line-height: 1.3;">
-        ${escapeHtml(opts.heading)}
-      </h1>
-
-      <p style="margin: 0 0 20px; font-size: 14px; color: #64748B;">
-        Hej ${escapeHtml(firstName)},
-      </p>
-
-      <div style="font-size: 15px; line-height: 1.65; color: #334155; margin: 0 0 28px;">
-        ${opts.bodyHtml}
-      </div>
-
-      <!-- CTA -->
-      <div style="text-align: center; margin: 32px 0 24px;">
-        <a href="${opts.portalUrl}" style="display: inline-block; background: ${opts.accentColor}; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 10px; font-weight: 600; font-size: 15px; letter-spacing: 0.2px;">
-          ${escapeHtml(opts.cta)} →
-        </a>
-      </div>
-
-      <p style="margin: 24px 0 0; font-size: 13px; color: #94A3B8; text-align: center; line-height: 1.5;">
-        Eller kopiera länken: <br/>
-        <span style="color: #64748B; word-break: break-all;">${opts.portalUrl}</span>
-      </p>
-
-      <hr style="border: none; border-top: 1px solid #E5E7EB; margin: 32px 0 20px;" />
-
-      <p style="margin: 0; font-size: 13px; color: #64748B; line-height: 1.5;">
-        Med vänliga hälsningar,<br/>
-        <strong style="color: #1F2937;">${escapeHtml(opts.businessName)}</strong>
-      </p>
-    </div>
-
-    <!-- Footer (stämpeln, lib/branding/attribution.ts) -->
-    ${attributionEmailHtml(opts.attribution)}
-  </div>
-</body>
-</html>`
+  const b = opts.branding
+  const content = `
+    ${emailSection(
+      `<div style="font-size:18px;line-height:1.3;font-weight:700;color:#0f172a;">${escapeHtml(opts.heading)}</div>` +
+      `<p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#475569;">${firstName ? `Hej ${escapeHtml(firstName)}! ` : ''}${opts.bodyHtml}</p>`,
+      '24px 24px 0',
+    )}
+    ${actionBlock({ text: escapeHtml(opts.cta), url: opts.portalUrl }, b.accentColor, undefined, { small: true })}
+  `
+  return emailLayout(b, content, { compact: true })
 }

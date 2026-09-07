@@ -22,11 +22,15 @@ import { normaliseraAtaRader, ataRadNamn } from './items'
 import { beraknaAtaSummor } from './totals'
 import { ataStatusLabel, ataTypLabel } from './labels'
 import { buildAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
+import {
+  drawBrandHeader,
+  drawBrandFooter,
+  PDF_TEXT_PRIMARY as TEXT_PRIMARY,
+  PDF_TEXT_SECONDARY as TEXT_SECONDARY,
+  PDF_TEXT_MUTED as TEXT_MUTED,
+  type PdfBranding,
+} from '@/lib/branding/pdf'
 
-const ACCENT_RGB = [15, 118, 110] as const
-const TEXT_PRIMARY = [30, 41, 59] as const
-const TEXT_SECONDARY = [148, 163, 184] as const
-const TEXT_MUTED = [100, 116, 139] as const
 const AMBER_RGB = [180, 83, 9] as const
 
 export interface AtaPdfAta {
@@ -52,15 +56,6 @@ export interface AtaPdfAta {
   signature_data?: string | null
 }
 
-export interface AtaPdfBusiness {
-  business_name?: string | null
-  org_number?: string | null
-  address?: string | null
-  phone_number?: string | null
-  contact_email?: string | null
-  logo_url?: string | null
-}
-
 export interface AtaPdfCustomer {
   name?: string | null
   address_line?: string | null
@@ -83,7 +78,8 @@ export interface AtaPdfBilaga {
 
 export interface GenerateAtaPdfInput {
   ata: AtaPdfAta
-  business: AtaPdfBusiness | null
+  /** Varumärket (lib/branding/pdf.ts) — sidhuvud, accentfärg, sidfot. */
+  brand: PdfBranding
   customer: AtaPdfCustomer | null
   project: AtaPdfProject | null
   attachments: AtaPdfBilaga[]
@@ -125,7 +121,8 @@ async function hamtaBild(url: string): Promise<{ data: string; format: 'PNG' | '
 }
 
 export async function generateAtaPDF(input: GenerateAtaPdfInput): Promise<Buffer> {
-  const { ata, business, customer, project, attachments } = input
+  const { ata, brand, customer, project, attachments } = input
+  const ACCENT_RGB = brand.accent
 
   const vatRate = Number(ata.vat_rate ?? 25)
   const rader = normaliseraAtaRader(ata.items)
@@ -150,65 +147,16 @@ export async function generateAtaPDF(input: GenerateAtaPdfInput): Promise<Buffer
     }
   }
 
-  // ── Sidhuvud ──
-  let textX = margin
-  if (business?.logo_url) {
-    const logo = await hamtaBild(business.logo_url)
-    if (logo) {
-      try {
-        const maxW = 35
-        const maxH = 14
-        let w = maxW
-        let h = maxH
-        const props = doc.getImageProperties(logo.data)
-        if (props?.width && props?.height) {
-          const ratio = props.width / props.height
-          h = maxH
-          w = h * ratio
-          if (w > maxW) { w = maxW; h = w / ratio }
-        }
-        doc.addImage(logo.data, logo.format, margin, y, w, h)
-        textX = margin + w + 4
-      } catch (err) {
-        console.error('[ata/pdf] kunde inte rita logga:', err)
-        textX = margin
-      }
-    }
-  }
-
-  doc.setFontSize(14)
-  doc.setTextColor(...TEXT_PRIMARY)
-  doc.text(business?.business_name || 'Företag', textX, y + 5)
-
-  doc.setFontSize(8)
-  doc.setTextColor(...TEXT_MUTED)
-  const foretagsrader = [
-    business?.org_number ? `Org.nr ${business.org_number}` : null,
-    business?.address || null,
-    [business?.phone_number, business?.contact_email].filter(Boolean).join(' · ') || null,
-  ].filter(Boolean) as string[]
-  foretagsrader.forEach((rad, i) => doc.text(rad, textX, y + 10 + i * 4))
-
-  doc.setFontSize(9)
-  doc.setTextColor(...ACCENT_RGB)
-  doc.text('ÄNDRINGS- OCH TILLÄGGSARBETE', pageWidth - margin, y + 3, { align: 'right' })
-  doc.setFontSize(20)
-  doc.setTextColor(...TEXT_PRIMARY)
-  doc.text(`ÄTA-${ata.ata_number ?? '?'}`, pageWidth - margin, y + 11, { align: 'right' })
-  doc.setFontSize(8)
-  doc.setTextColor(...TEXT_MUTED)
-  const metaHoger = [
-    `Datum: ${datum(ata.created_at) || '–'}`,
-    `Typ: ${ataTypLabel(ata.change_type)}`,
-    `Status: ${ataStatusLabel(ata.status)}`,
-  ]
-  metaHoger.forEach((rad, i) => doc.text(rad, pageWidth - margin, y + 17 + i * 4, { align: 'right' }))
-
-  y += 32
-  doc.setDrawColor(226, 232, 240)
-  doc.setLineWidth(0.3)
-  doc.line(margin, y, pageWidth - margin, y)
-  y += 7
+  // ── Sidhuvud (lib/branding/pdf.ts — samma som byggdagbok/egenkontroll/arbetsorder) ──
+  y = drawBrandHeader(doc, brand, {
+    docType: 'Ändrings- och tilläggsarbete',
+    title: `ÄTA-${ata.ata_number ?? '?'}`,
+    meta: [
+      `Datum: ${datum(ata.created_at) || '–'}`,
+      `Typ: ${ataTypLabel(ata.change_type)}`,
+      `Status: ${ataStatusLabel(ata.status)}`,
+    ],
+  })
 
   // ── Projekt + kund ──
   const kolB = margin + contentWidth / 2
@@ -430,26 +378,21 @@ export async function generateAtaPDF(input: GenerateAtaPdfInput): Promise<Buffer
     y += 8
   }
 
-  // ── Vattenstämpel + sidfot på varje sida ──
-  const pageCount = doc.getNumberOfPages()
-  for (let i = 1; i <= pageCount; i++) {
-    doc.setPage(i)
-    if (arUtkast) {
+  // ── Vattenstämpel på varje sida ──
+  if (arUtkast) {
+    const pageCount = doc.getNumberOfPages()
+    for (let i = 1; i <= pageCount; i++) {
+      doc.setPage(i)
       doc.setFontSize(48)
       doc.setTextColor(215, 215, 215)
       doc.setFont('helvetica', 'bold')
       doc.text('UTKAST — ej skickad', pageWidth / 2, pageHeight / 2, { align: 'center', angle: 45 })
       doc.setFont('helvetica', 'normal')
     }
-    doc.setFontSize(7)
-    doc.setTextColor(...TEXT_SECONDARY)
-    doc.text(
-      `${business?.business_name || ''} — ÄTA-${ata.ata_number ?? '?'} — Sida ${i} av ${pageCount}`,
-      pageWidth / 2,
-      pageHeight - 10,
-      { align: 'center' },
-    )
   }
+
+  // Sidfoten (firma · org.nr · F-skatt · kontakt + sidnummer) på varje sida.
+  drawBrandFooter(doc, brand)
 
   // Stämpeln — bara sista sidan, under sidfoten.
   stampAttributionOnPdf(doc, input.attribution ?? buildAttribution(null))

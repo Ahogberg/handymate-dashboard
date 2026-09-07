@@ -398,6 +398,18 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
       why: 'R3/R4: GET lämnade ut invite_token till alla i firman och PATCH returnerade hela raden inkl. intern timkostnad. Båda svaren går nu genom lib/team/member-projection.ts.',
     },
   ],
+  'Varumärket (Så ser dina kunder dig)': [
+    {
+      route: 'settings/kundvy/preview',
+      requires: 'owner-admin',
+      why: 'Renderar hela kundresan med företagets Swish, bankgiro, org.nr och kontaktuppgifter inbakade i mailen. Bara exempeldata som kund, men företagets betaluppgifter är ägarens sak — samma grind som sidan själv.',
+    },
+    {
+      route: 'settings/kundvy/testmail',
+      requires: 'owner-admin',
+      why: 'Skickar ett riktigt mail i företagets namn (till den inloggades egen adress). Ett utskick i firmans namn ska inte kunna triggas av vilken anställd som helst.',
+    },
+  ],
   'Integrationer': [
     {
       route: 'integrations/fortnox/disconnect',
