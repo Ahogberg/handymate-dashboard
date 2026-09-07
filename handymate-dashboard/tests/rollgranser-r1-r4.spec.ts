@@ -309,3 +309,68 @@ test.describe('Projektlistan — riktiga handlerns identitetsgräns', () => {
     expect(api.dynamic).toBe('force-dynamic')
   })
 })
+
+// Hela auth-helpern med serverns getUser-svar som gräns. Ger inga konton
+// superadmin i produktion; verifierar hur ett serververifierat svar används.
+function authHelper(serverUser: Record<string, any> | null) {
+  const superCode = ts.transpileModule(read('lib/auth/superadmin.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+  const superExports: Record<string, any> = {}
+  new Function('require', 'exports', superCode)(require, superExports)
+  const db = {
+    auth: { getUser: async () => ({ data: { user: serverUser }, error: serverUser ? null : new Error('invalid token') }) },
+    from(table: string) {
+      const filters: Record<string, any> = {}
+      const q: any = {
+        select: () => q,
+        eq: (key: string, value: any) => { filters[key] = value; return q },
+        single: async () => ({ data: table === 'business_config'
+          ? filters.business_id === 'biz-a' ? { business_id: 'biz-a' }
+            : filters.user_id === 'auth-b' ? { business_id: 'biz-b' } : null
+          : null, error: null }),
+      }
+      return q
+    },
+  }
+  const code = ts.transpileModule(read('lib/auth.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+  const api: Record<string, any> = {}
+  const mocks: Record<string, any> = {
+    '@supabase/supabase-js': { createClient: () => db },
+    '@/lib/auth/superadmin': superExports,
+    './feature-gates': {},
+  }
+  new Function('require', 'exports', 'setInterval', code)((id: string) => mocks[id] ?? require(id), api, () => 0)
+  return api
+}
+
+test.describe('Impersonering — verklig auth-helper med isolerad Supabase-gräns', () => {
+  const baseUser = { id: 'auth-b', email: 'roll-test@example.com', app_metadata: {}, user_metadata: {} }
+  const request = () => new NextRequest('https://test/api/projects', {
+    headers: { authorization: 'Bearer synthetic-test-token', cookie: 'hm_impersonate=biz-a' },
+  })
+
+  test('ogiltig session nekas även med impersoneringscookie', async () => {
+    expect(await authHelper(null).getAuthenticatedBusiness(request())).toBeNull()
+  })
+
+  test('vanlig medlem kan inte byta företag med cookie', async () => {
+    const result = await authHelper(baseUser).getAuthenticatedBusiness(request())
+    expect(result.business_id).toBe('biz-b')
+    expect(result._impersonation).toBeUndefined()
+  })
+
+  test('användarredigerbar user_metadata ger aldrig superadmin', async () => {
+    const result = await authHelper({ ...baseUser, user_metadata: { is_superadmin: true } }).getAuthenticatedBusiness(request())
+    expect(result.business_id).toBe('biz-b')
+    expect(result._impersonation).toBeUndefined()
+  })
+
+  test('serververifierad app_metadata krävs för att byta till målföretaget', async () => {
+    const result = await authHelper({ ...baseUser, app_metadata: { is_superadmin: true } }).getAuthenticatedBusiness(request())
+    expect(result.business_id).toBe('biz-a')
+    expect(result._impersonation).toEqual({ admin_user_id: 'auth-b', admin_email: baseUser.email })
+  })
+})
