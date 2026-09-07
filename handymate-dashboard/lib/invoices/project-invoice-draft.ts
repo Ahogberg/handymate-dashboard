@@ -174,7 +174,10 @@ export async function byggProjektFakturaUnderlag(
     })
 
     for (const ata of atas) {
-      if (ata.items && Array.isArray(ata.items)) {
+      // skapaAta normaliserar saknade legacy-rader till [] men bevarar
+      // beloppet i total. Även en tom array måste därför nå fallbacken,
+      // som i create-final-invoice, annars källmarkeras ÄTA:n utan belopp.
+      if (Array.isArray(ata.items) && ata.items.length > 0) {
         for (const item of ata.items) {
           const sign = ata.change_type === 'removal' ? -1 : 1
           ataItems.push({

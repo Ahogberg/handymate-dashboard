@@ -1,3 +1,17 @@
+## ÄTA-belopp utan rader (Codex 2026-09-07)
+
+- [x] Läs senaste kod, PR:er, CI och producent/konsument för dagsrapport → ÄTA → faktura.
+- [x] Reproducera att automatunderlaget tappar godkänd ÄTA med `items: []` och sparat totalbelopp (4 röda / 30 gröna före fix).
+- [x] Låt tom radlista använda samma befintliga beloppsfallback som saknade rader; bevara avgående tecken och statusfilter.
+- [x] Kör riktade beteendeprov, typkontroll, lint och bygg där miljön medger; dokumentera begränsningar separat.
+- [x] Skriv kodförankrat innovations- och granskningsunderlag för draft-PR. Ingen produktion, merge eller kundkommunikation.
+
+Review: 15 nya regressioner i befintlig testfil. 4 röda / 30 gröna före fix;
+150/150 riktade kontroller efter fix. TypeScript och produktionsbygge exit 0.
+Lint är inte verifierad: kommandot öppnar ESLint-konfiguration. Ingen ändring
+av queries, schema eller beroenden. Riktigt DB-/mobilprov återstår.
+Underlag: [Nästa produktsteg](../docs/handoffs/NEXT_PRODUCT_STEP_2026-09-07.md).
+
 ## Offertupplevelse (Codex 2026-09-05)
 
 - [x] Skissa och bygg enligt [planen](../docs/design/quote-experience/PLAN.md).
