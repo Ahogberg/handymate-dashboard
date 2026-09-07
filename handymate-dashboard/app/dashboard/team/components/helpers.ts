@@ -14,7 +14,7 @@ export function getInitials(name: string): string {
 
 export function getStatusInfo(member: TeamMember): { label: string; className: string } {
   if (!member.is_active) return { label: 'Inaktiv', className: 'bg-red-100 text-red-600 border-red-200' }
-  if (member.invite_token && !member.accepted_at) return { label: 'Inbjuden', className: 'bg-amber-100 text-amber-600 border-amber-200' }
+  if (member.invite_pending) return { label: 'Inbjuden', className: 'bg-amber-100 text-amber-600 border-amber-200' }
   return { label: 'Aktiv', className: 'bg-emerald-100 text-emerald-600 border-emerald-200' }
 }
 

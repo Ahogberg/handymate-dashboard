@@ -277,7 +277,7 @@ export default function TeamPage() {
   const filteredMembers = useMemo(() => {
     let result = members
     if (filter === 'active') result = result.filter(m => m.is_active && m.accepted_at)
-    else if (filter === 'invited') result = result.filter(m => m.invite_token && !m.accepted_at)
+    else if (filter === 'invited') result = result.filter(m => m.invite_pending)
     else if (filter === 'inactive') result = result.filter(m => !m.is_active)
     if (searchTerm) {
       const q = searchTerm.toLowerCase()
@@ -290,7 +290,7 @@ export default function TeamPage() {
   const counts = useMemo(() => ({
     all: members.length,
     active: members.filter(m => m.is_active && m.accepted_at).length,
-    invited: members.filter(m => m.invite_token && !m.accepted_at).length,
+    invited: members.filter(m => m.invite_pending).length,
     inactive: members.filter(m => !m.is_active).length,
   }), [members])
 
@@ -965,7 +965,7 @@ export default function TeamPage() {
               </button>
 
               {/* Resend invite button (if invited but not accepted) */}
-              {editingMember.invite_token && !editingMember.accepted_at && (
+              {editingMember.invite_pending && (
                 <button
                   onClick={handleResendInvite}
                   disabled={actionLoading}

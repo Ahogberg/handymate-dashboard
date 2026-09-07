@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission, AuthError } from '@/lib/permissions'
+import { canSeeInternalCosts, projiceraMedlem, projiceraMedlemmar } from '@/lib/team/member-projection'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -9,15 +10,12 @@ export const dynamic = 'force-dynamic'
 
 
 /**
- * Rollskydd för intern lönekostnad (v53, Etapp 2.0).
- * Endast owner/admin får se eller redigera `internal_hourly_cost`.
- * Permission-helpern `see_financials` är medvetet INTE använd här —
- * Andreas spec 2026-05-21: 'employee/PM/kalkylator ser ALDRIG' även
- * om de har can_see_financials=true.
+ * Rollskydd (v53 + rollgranskningen 2026-09-07, R3/R4): varje medlemsrad som
+ * lämnar den här filen går genom lib/team/member-projection.ts. Lönekostnad
+ * ser bara owner/admin (Andreas spec 2026-05-21, medvetet inte see_financials);
+ * invite_token ser bara den med manage_users. GET och PATCH delar projektionen
+ * så PATCH-svaret aldrig kan läcka det GET döljer.
  */
-function canSeeInternalCosts(role: string | null | undefined): boolean {
-  return role === 'owner' || role === 'admin'
-}
 
 /**
  * GET /api/team - Lista teammedlemmar
@@ -41,14 +39,7 @@ export async function GET(request: NextRequest) {
 
     if (error) throw error
 
-    // Strippa internal_hourly_cost OCH legacy hourly_cost för icke-owner/admin
-    // innan response. Defense-in-depth utöver UI-rollskydd. (TD-59: hourly_cost
-    // saknade motsvarande skydd trots att den innehåller samma typ av känslig
-    // lönekostnadsdata som internal_hourly_cost.)
-    const canSee = canSeeInternalCosts(currentUser?.role)
-    const safeMembers = (members || []).map(m =>
-      canSee ? m : { ...m, internal_hourly_cost: null, hourly_cost: null },
-    )
+    const safeMembers = projiceraMedlemmar(members || [], currentUser)
 
     return NextResponse.json({ members: safeMembers })
 
@@ -155,7 +146,8 @@ export async function PATCH(request: NextRequest) {
 
     if (error) throw error
 
-    return NextResponse.json({ member })
+    // Samma projektion som GET — R4: `.select()` bär hela raden inkl. lönekostnad.
+    return NextResponse.json({ member: projiceraMedlem(member, currentUser) })
 
   } catch (error: any) {
     if (error instanceof AuthError) {

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { getCurrentUser, hasPermission, isOwnerOrAdmin } from '@/lib/permissions'
 import { getNextProjectNumber, bumpCounter } from '@/lib/numbering'
 import { getQuoteBudgetDerivation } from '@/lib/quotes/get-quote-budget-derivation'
 import { suggestChecklistForProject } from '@/lib/egenkontroll/suggest-checklist'
@@ -834,12 +834,23 @@ export async function PUT(request: NextRequest) {
 
 /**
  * DELETE - Ta bort projekt (bara om inga tidrapporter kopplade)
+ *
+ * Rollgrind (rollgranskningen 2026-09-07, R2): bara owner/admin. Tidigare
+ * räckte medlemskap i firman — en anställd utan en enda tilldelning kunde
+ * radera vilket projekt som helst utan tidrapporter. Beslut 2026-09-07:
+ * radering är ägare/admin, en PM får inte den rätten via see_all_projects.
+ * Okänd betraktare (null) faller öppet av samma skäl som GET ovan.
  */
 export async function DELETE(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const actor = await getCurrentUser(request, business.business_id)
+    if (actor && !isOwnerOrAdmin(actor)) {
+      return NextResponse.json({ error: 'Bara ägare eller admin kan ta bort projekt' }, { status: 403 })
     }
 
     const supabase = getServerSupabase()

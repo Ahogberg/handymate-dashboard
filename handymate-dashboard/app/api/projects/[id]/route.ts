@@ -3,6 +3,8 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { maybeStripAtaList } from '@/lib/ata/strip-prices'
 import { arAvtaladAta } from '@/lib/ata/lifecycle'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { projiceraProjektdetalj } from '@/lib/projects/ekonomiprojektion'
 // Auth via request.headers i importerad helper — utan force-dynamic kan
 // rutten frysas i Full Route Cache och servera fel företags data
 // (2026-08-22-klassen, se CLAUDE.md; residualsvep 2026-08-31).
@@ -16,6 +18,17 @@ export const dynamic = 'force-dynamic'
  * icke-see_financials. Konsekvent med /api/projects/[id]/changes
  * och /api/ata. Bevarar publik sign-flöde (/api/ata/sign/[token]
  * är separat och opåverkad).
+ *
+ * Rollgranskningen 2026-09-07 (R1): två luckor till.
+ *  - Tilldelning: en anställd utan see_all_projects kunde läsa vilket
+ *    projekt som helst i firman via id, trots att listan bara visar
+ *    tilldelade. Nu samma grind som listan: utan tilldelning → 404,
+ *    innan en enda barnfråga körs. Okänd betraktare (null) faller öppet
+ *    av samma dokumenterade skäl som listan (superadmin-impersonation,
+ *    se app/api/projects/route.ts) — aldrig mer begränsad än listan.
+ *  - Ekonomi: summeringen nollades men quote.total, materialpriser,
+ *    tidposternas timpris och milstolpsintäkt gick ut råa. Hela svaret
+ *    går nu genom lib/projects/ekonomiprojektion.ts när prices_redacted.
  */
 export async function GET(
   request: NextRequest,
@@ -40,6 +53,23 @@ export async function GET(
 
     if (error || !project) {
       return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+    }
+
+    // Tilldelningsgrind (R1) — före kund- och barnfrågorna.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (currentUser && !hasPermission(currentUser, 'see_all_projects')) {
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_assignment')
+        .select('project_id')
+        .eq('business_id', business.business_id)
+        .eq('project_id', projectId)
+        .eq('business_user_id', currentUser.id)
+        .limit(1)
+        .maybeSingle()
+      if (assignmentError) throw assignmentError
+      if (!assignment) {
+        return NextResponse.json({ error: 'Project not found' }, { status: 404 })
+      }
     }
 
     // Fetch customer separately (no FK on project table)
@@ -168,7 +198,7 @@ export async function GET(
     const ataResult = await maybeStripAtaList(request, changes || [])
     const redacted = ataResult.flag.prices_redacted === true
 
-    return NextResponse.json({
+    return NextResponse.json(projiceraProjektdetalj({
       project,
       quote,
       milestones: milestonesWithTime,
@@ -195,7 +225,7 @@ export async function GET(
         material_sell_total: redacted ? 0 : Math.round(materialSellTotal),
         uninvoiced_material_sell: redacted ? 0 : Math.round(uninvoicedMaterialSell)
       }
-    })
+    }, redacted))
 
   } catch (error: any) {
     console.error('Get project detail error:', error)

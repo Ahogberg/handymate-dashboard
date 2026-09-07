@@ -386,6 +386,18 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
     },
   ],
 
+  'Projekt och personal (rollgranskningen 2026-09-07)': [
+    {
+      route: 'projects/[id]',
+      requires: 'see_all_projects',
+      why: 'R1: detaljen kringgick listans tilldelningsgrind — en anställd utan tilldelning kunde läsa vilket projekt som helst via id, med råa priser i quote/materials/time_entries. Nu tilldelning eller see_all_projects, och ekonomiprojektion (tests/rollgranser-r1-r4.spec.ts).',
+    },
+    {
+      route: 'team',
+      requires: 'manage_users',
+      why: 'R3/R4: GET lämnade ut invite_token till alla i firman och PATCH returnerade hela raden inkl. intern timkostnad. Båda svaren går nu genom lib/team/member-projection.ts.',
+    },
+  ],
   'Integrationer': [
     {
       route: 'integrations/fortnox/disconnect',
@@ -406,7 +418,7 @@ const SENSITIVE_ROUTES: Record<string, RouteRule[]> = {
  */
 const UNPROTECTED_BY_DESIGN: Record<string, string> = {
   'projects':
-    'Grindar inte utan DEGRADERAR svaret (canSeeAllProjects/canSeeFinancials filtrerar fälten). Fail-open på !currentUser är medvetet för superadmin-impersonation.',
+    'GET grindar inte utan DEGRADERAR svaret (canSeeAllProjects/canSeeFinancials filtrerar fälten). Fail-open på !currentUser är medvetet för superadmin-impersonation. DELETE är sedan 2026-09-07 (R2) owner/admin-only via isOwnerOrAdmin — kvar här för att GET-mönstret är undantaget.',
   'voice/outbound':
     '46elks voice_start-webhook för "Ring via Handymate": ingen inloggad användare finns, anroparen är telefonileverantören. Skyddas av HMAC (verifyElksSignature) FÖRE varje databasläsning plus nummermatchning mot raden — se tests/voice-boundaries.spec.ts.',
   'voice/outbound/hangup':

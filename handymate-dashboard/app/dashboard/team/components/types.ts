@@ -23,6 +23,8 @@ export interface TeamMember {
   can_manage_users: boolean
   can_approve_time: boolean
   can_create_invoices: boolean
+  /** Servern (lib/team/member-projection.ts) sätter den — token bär bara den med manage_users. */
+  invite_pending: boolean
   invite_token: string | null
   invite_expires_at: string | null
   invited_at: string | null

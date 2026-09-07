@@ -656,3 +656,6 @@ Lars kundunderlagskontroll, jobbförberedelsen och Daniels agentrad.
 
 ## 2026-09-07 — Avgränsa leveransen utan att överskatta kundupplevelsen
 Skilj små lanseringsfixar från belägg för en sammanhängande kundresa. Samma härledningsfunktion räcker inte om kanalerna matar in olika bevis. Läsfel är inte tom data, och uppskattad tid måste förbli märkt även när den återges i mejl.
+
+## 2026-09-07 — Behörighetskontrakt som kollar att en grind finns ser inte vad som läcker förbi den
+Codex rollgranskning: 60 behörighetsprov gröna, fyra luckor öppna (docs/security/role-audit-2026-09-07). Teamlistan valde invite_token åt alla, PATCH returnerade `.select()` rått, projektdetaljen kontrollerade firma men inte tilldelning, DELETE ingen roll alls. Mönstret: en grind i GET ger ingen trygghet för PATCH-svaret, och "prices_redacted: true" bredvid råa underobjekt är värre än inget. Regel: varje svar som bär en känslig rad går genom EN projektionsfunktion (lib/team/member-projection.ts, lib/projects/ekonomiprojektion.ts), och facit provar både att grinden finns och vad som kommer ut (tests/rollgranser-r1-r4.spec.ts). Codex reproduktion med syntetisk DB var det snabbaste beviset åt båda hållen — verify-fix.cjs bredvid reproduce.cjs.
