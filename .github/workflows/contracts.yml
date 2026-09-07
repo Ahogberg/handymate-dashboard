@@ -180,6 +180,7 @@ jobs:
           tests/live-project-navigation-refresh.spec.ts
           tests/livegenomgang-f04.spec.ts
           tests/rollgranser-r1-r4.spec.ts
+          tests/sasongskampanj-beskrivning.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
