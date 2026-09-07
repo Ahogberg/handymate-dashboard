@@ -1,3 +1,4 @@
+import { requireApprovalReview } from '@/lib/approvals/review-guard'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -129,7 +130,7 @@ export async function POST(
 
     const body = await request.json()
     const { action, edited_payload, reject_reason, action_overrides } = body
-    if (!action || !['approve', 'reject', 'edit', 'retry', 'snooze'].includes(action)) {
+    if (!action || !['approve', 'reject', 'edit', 'retry', 'snooze', 'preview'].includes(action)) {
       return NextResponse.json({ error: 'action must be approve, reject, edit, retry or snooze' }, { status: 400 })
     }
 
@@ -163,6 +164,19 @@ export async function POST(
         { status: 403 },
       )
     }
+
+    // Must run before BOTH pending→approved and the retry CAS. Older clients,
+    // edits and direct API calls cannot bypass review. Rejection/snooze are exempt.
+    if (action === 'preview' && !['approve', 'edit', 'retry'].includes(body.decision_action)) {
+      return NextResponse.json({ error: 'Ogiltig granskningshandling' }, { status: 400 })
+    }
+    const reviewGate = requireApprovalReview({ approval,
+      body: action === 'preview' ? { ...body, action: body.decision_action, review_token: undefined } : body,
+      businessId: business.business_id, actorId: currentUser.id,
+    }, process.env.SUPABASE_SERVICE_ROLE_KEY || '')
+    if (reviewGate) return NextResponse.json(reviewGate.data, { status: reviewGate.status, headers: { 'Cache-Control': 'no-store' } })
+
+    if (action === 'preview') return NextResponse.json({ review_not_required: true }, { headers: { 'Cache-Control': 'no-store' } })
 
     // "Skjut upp" (Mission Control mobil 4a, v181): kortet förblir pending
     // men filtreras ur kön tills snoozed_until passerat. INGEN statusflipp,
@@ -221,6 +235,7 @@ export async function POST(
         .eq('id', params.id)
         .eq('business_id', business.business_id)
         .eq('status', 'approved')
+        .eq('payload', JSON.stringify(approval.payload))
         .or(
           `payload->execution_result->>outcome.eq.failed,and(payload->execution_result->>outcome.eq.retrying,payload->execution_result->>executed_at.lt.${staleCutoffIso})`,
         )
@@ -327,6 +342,8 @@ export async function POST(
       .update(updateData)
       .eq('id', params.id)
       .eq('status', 'pending')
+      .eq('business_id', business.business_id)
+      .eq('payload', JSON.stringify(approval.payload))
       .select('id')
 
     if (updateError) throw updateError
@@ -1177,7 +1194,7 @@ async function executeApprovalPayload(
         const r = await sendEmailViaResend({
           to,
           subject,
-          html: bodyText.replace(/\n/g, '<br>'),
+          html: bodyText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'),
           fromName: businessName || 'Handymate',
         })
         await logEmail({
@@ -1557,48 +1574,8 @@ async function executeApprovalPayload(
       }
 
       case 'seasonal_campaign': {
-        const supabase = (await import('@/lib/supabase')).getServerSupabase()
-        const pl = payload as any
-        const smsText = pl.sms_text || ''
-        const customers = pl.customers || []
-
-        if (customers.length === 0 || !smsText) {
-          return { action: 'seasonal_campaign', skipped: 'no customers or sms text' }
-        }
-
-        // Skapa sms_campaign
-        const campaignId = 'camp_' + Math.random().toString(36).substr(2, 9)
-        await supabase.from('sms_campaign').insert({
-          campaign_id: campaignId,
-          business_id: businessId,
-          name: `Säsong: ${pl.theme || pl.month_name}`,
-          message: smsText,
-          status: 'scheduled',
-          scheduled_at: new Date().toISOString(),
-          recipient_count: customers.length,
-          campaign_type: 'broadcast',
-        })
-
-        // Skapa mottagare
-        const recipients = customers.map((c: any) => ({
-          campaign_id: campaignId,
-          customer_id: c.customer_id,
-          phone_number: c.phone_number,
-          status: 'pending',
-        }))
-        await supabase.from('sms_campaign_recipient').insert(recipients)
-
-        // Uppdatera seasonal_campaigns status
-        if (pl.month && pl.year) {
-          await supabase
-            .from('seasonal_campaigns')
-            .update({ status: 'approved' })
-            .eq('business_id', businessId)
-            .eq('year', pl.year)
-            .eq('month', pl.month)
-        }
-
-        return { action: 'seasonal_campaign', campaign_id: campaignId, recipients: customers.length }
+        const { queueSeasonalCampaign } = await import('@/lib/approvals/queue-seasonal-campaign')
+        return queueSeasonalCampaign(await getSupabase(), businessId, approvalId, payload as Record<string, any>)
       }
 
       case 'meeting_followup': {

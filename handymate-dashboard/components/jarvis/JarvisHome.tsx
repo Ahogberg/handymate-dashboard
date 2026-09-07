@@ -1,5 +1,7 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { buildValueReceipt } from '@/lib/approvals/value-receipt'
@@ -785,7 +787,7 @@ export default function JarvisHome({
         const fragment = editedText != null ? buildApprovalEdit(approval, editedText) : null
         if (fragment) body.edited_payload = fragment
       }
-      const res = await fetch(`/api/approvals/${approval.id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
         body: JSON.stringify(body),
@@ -793,6 +795,7 @@ export default function JarvisHome({
         // inte få iväg anropet innan sidan rivs.
         keepalive: true,
       })
+      if (res.status === 499) { setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n }); return }
       if (!res.ok) {
         setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n })
         flash(res.status === 409
@@ -823,6 +826,8 @@ export default function JarvisHome({
         // Serverns orsak slutar ofta redan med punkt — ingen ".." i bannern.
         const orsak = orsakRaw.replace(/[.\s]+$/, '')
         flash(`Godkänt — men utförandet misslyckades${orsak ? `: ${orsak}` : ''}. Öppna ärendet för att försöka igen.`, true, '/dashboard/approvals', 'Öppna ärendet')
+      } else if (utforande?.receipt) {
+        flash(String(utforande.receipt), false)
       } else if (kvitto) {
         flash(kvitto.text, false, kvitto.link, kvitto.linkLabel)
       }
@@ -832,7 +837,7 @@ export default function JarvisHome({
         key: `fresh-${approval.id}`,
         time: formatClock(new Date().toISOString()),
         agent: agentForApproval(approval),
-        text: kvitto?.text ?? doneRowText({
+        text: utforande?.receipt ?? kvitto?.text ?? doneRowText({
           action,
           title: approval.title,
           executed: utforande?.executed,
@@ -864,6 +869,7 @@ export default function JarvisHome({
     if (medlemmar.length === 0) return
     const forsta = medlemmar[0]
 
+    if (action !== 'reject') { void (async () => { for (const item of medlemmar) await executeSend(item, action, editedText) })(); return }
     setEditingId(null)
     setHiddenIds(prev => {
       const n = new Set(prev)
@@ -874,12 +880,12 @@ export default function JarvisHome({
     const flera = medlemmar.length > 1
     setSnack({
       approvalId: forsta.id,
-      // Ångra-rutan sa "Skickar: …" även för kort som inte kan skicka något.
+      // Ångra-rutan sa "Granskar: …" även för kort som inte kan skicka något.
       // Samma lögn som Klart idag-raden, bara några sekunder tidigare.
       text: action === 'reject'
         ? flera ? `${medlemmar.length} förslag avvisas` : 'Förslaget avvisas'
         : mayExecute(forsta.approval_type)
-          ? flera ? `Skickar ${medlemmar.length} st` : `Skickar: ${forsta.title.slice(0, 60)}`
+          ? flera ? `Granskar ${medlemmar.length} st` : `Granskar: ${forsta.title.slice(0, 60)}`
           : flera ? `Behandlar ${medlemmar.length} st` : `Behandlar: ${forsta.title.slice(0, 60)}`,
     })
 

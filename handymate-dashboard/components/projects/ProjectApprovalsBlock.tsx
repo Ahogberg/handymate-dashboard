@@ -1,5 +1,7 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 import { useCallback, useEffect, useState } from 'react'
 import { Check, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
@@ -163,7 +165,7 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         const key = getEditableKey(approval)
         if (key && editedText != null) body.edited_payload = { [key]: editedText }
       }
-      const res = await fetch(`/api/approvals/${approval.id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -171,10 +173,13 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         },
         body: JSON.stringify(body),
       })
+      if (res.status === 499) return
       if (!res.ok) {
         setError('Kunde inte spara — försök igen')
         return
       }
+      const result = await res.json().catch(() => null)
+      if (result?.execution_outcome?.outcome === 'failed') { setError(result.execution_outcome.error_text || 'Handlingen misslyckades'); return }
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
       setEditingId(null)
     } catch {

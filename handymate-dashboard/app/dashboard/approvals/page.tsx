@@ -1,5 +1,7 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import {
@@ -330,8 +332,10 @@ export default function ApprovalsPage() {
           ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
         },
       })
+      if (res.status === 499) return
       if (res.ok) {
-        const result = await res.json().catch(() => null)
+        if (res.status === 499) return
+      const result = await res.json().catch(() => null)
         setApprovals(result?.approvals || [])
       }
       // Misslyckade utföranden (senaste 7 dagarna) — egen pseudo-status i
@@ -354,7 +358,7 @@ export default function ApprovalsPage() {
     setRetryLoading(id)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -362,6 +366,7 @@ export default function ApprovalsPage() {
         },
         body: JSON.stringify({ action: 'retry' }),
       })
+      if (res.status === 499) return
       const result = await res.json().catch(() => null)
       if (res.ok && result?.execution_outcome?.outcome === 'success') {
         const retriedItem = failedExecutions.find(a => a.id === id)
@@ -404,15 +409,9 @@ export default function ApprovalsPage() {
     return () => clearTimeout(timer)
   }, [approvals])
 
-  // Typer som INTE behöver bekräftelse (rena acknowledgements)
-  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge', 'egenkontroll_foto', 'egenkontroll_avvikelse', 'checklist_forslag', 'tidrapport_forslag']
-
+  // Shared server-bound review replaces the incomplete type-specific shortcut.
   function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
-    if (SKIP_CONFIRM.includes(approval.approval_type)) {
-      handleAction(approval.id, 'approve', editedPayload)
-    } else {
-      setConfirmModal({ approval, editedPayload })
-    }
+    void handleAction(approval.id, 'approve', editedPayload)
   }
 
   function confirmAndExecute() {
@@ -431,7 +430,7 @@ export default function ApprovalsPage() {
       if (editedPayload) body.edited_payload = editedPayload
 
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -439,8 +438,10 @@ export default function ApprovalsPage() {
         },
         body: JSON.stringify(body),
       })
+      if (res.status === 499) return
       if (res.ok) {
-        const result = await res.json().catch(() => null)
+        if (res.status === 499) return
+      const result = await res.json().catch(() => null)
         // Hämta approval-typen innan vi filtrerar bort den
         const approvedItem = approvals.find(a => a.id === id)
         setApprovals(prev => prev.filter(a => a.id !== id))
@@ -550,7 +551,7 @@ export default function ApprovalsPage() {
     setActionLoading(id + 'approve')
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -558,7 +559,9 @@ export default function ApprovalsPage() {
         },
         body: JSON.stringify({ action: 'edit', edited_payload: { answers } }),
       })
+      if (res.status === 499) return
       const result = await res.json().catch(() => null)
+      if (res.status === 499) return
       if (res.ok) {
         setApprovals(prev => prev.filter(a => a.id !== id))
         setDebriefModal(null)
@@ -616,7 +619,7 @@ export default function ApprovalsPage() {
       }
 
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${approval.id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -627,6 +630,7 @@ export default function ApprovalsPage() {
           action_overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
         }),
       })
+      if (res.status === 499) return
       if (res.ok) {
         setApprovals(prev => prev.filter(a => a.id !== approval.id))
         setExpandedPackage(null)

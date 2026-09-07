@@ -1,5 +1,7 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 /**
  * OperatingExperiment Etapp 2 (2026-08-19) — beslutssidan för ett
  * redovisningskort ('operating_experiment_readout').
@@ -113,7 +115,7 @@ export default function ExperimentReadoutPage({ params }: { params: { approvalId
     setError(null)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${approval.id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

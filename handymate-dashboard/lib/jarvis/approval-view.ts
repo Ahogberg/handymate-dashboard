@@ -8,8 +8,8 @@
  * Rena funktioner — tests/approval-view.spec.ts.
  */
 
+import { classify } from '@/lib/approvals/action-contract'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
-import { formatRequestedDateShort } from '@/lib/quotes/booking-suggestions'
 
 interface ApprovalLike {
   approval_type: string
@@ -46,6 +46,8 @@ export function agentForApproval(approval: ApprovalLike): string {
 
 export const TYPE_LABEL: Record<string, string> = {
   send_sms: 'SMS',
+  seasonal_campaign: 'Säsongskampanj',
+  send_email: 'E-post',
   send_quote: 'Offert',
   send_invoice: 'Faktura',
   create_booking: 'Bokning',
@@ -96,79 +98,11 @@ export function needsAttention(approval: ApprovalLike): boolean {
   return BRADSKANDE.has(approval.approval_type)
 }
 
-/**
- * Texten på Godkänn-knappen.
- *
- * "Godkänn" i största allmänhet säger inte vad som händer. "Skicka
- * påminnelsen" gör det — och den som trycker ska veta vad han sätter igång.
- */
-/**
- * Utfallsspråk (2026-08-08): när kortet bär ett VERKLIGT belopp står det på
- * knappen — "Skicka påminnelsen om 24 300 kr" säger varför man ska trycka,
- * "Godkänn" säger ingenting. Beloppet läses ur strukturerade payloadfält
- * (samma regel som momentlagret); finns inget står verbet utan siffra.
- * Aldrig en påhittad summa på en knapp som utför något.
- */
-export function approveLabel(approvalType: string, payload?: Record<string, unknown> | null): string {
-  const p = payload ?? {}
-  const kr = (v: unknown): string | null =>
-    typeof v === 'number' && Number.isFinite(v) && v > 0
-      ? `${Math.round(v).toLocaleString('sv-SE')} kr`
-      : null
-
-  // Utfallsspråk: knappen säger vad som händer OCH hur mycket det gäller.
-  // Beloppet lyftes till payloadens toppnivå 2026-08-08 (det låg bara nästlat
-  // under `delivery`, så varken den här funktionen eller cardContext såg det).
-  if (approvalType === 'invoice_reminder') {
-    const varde = kr(p.amount_kr)
-    return varde ? `Påminn om ${varde}` : 'Skicka påminnelsen'
-  }
-  // create_quote_draft SKAPAR offerten som utkast — den skickas inte.
-  // Exekveraren POST:ar till /api/quotes och returnerar ett quote_id; något
-  // utskick sker aldrig (approvals/[id]/route.ts, case 'create_quote_draft').
-  // "Godkänn & skicka" hade alltså varit en osanning på själva knappen.
-  if (approvalType === 'create_quote_draft') {
-    const varde = kr(p.estimated_value)
-    return varde ? `Skapa offerten — ${varde}` : 'Skapa offerten'
-  }
-  if (approvalType === 'create_ata_draft') {
-    const varde = kr(p.amount_estimate)
-    return varde ? `Skapa ÄTA:n — ${varde}` : 'Skapa ÄTA:n'
-  }
-  // fakturera_projekt SKICKAR fakturan — beloppet på knappen är det kunden
-  // betalar (amount_kr sätts till customer_pays när kortet skapas).
-  if (approvalType === 'fakturera_projekt') {
-    const varde = kr(p.amount_kr)
-    return varde ? `Godkänn & skicka — ${varde}` : 'Godkänn & skicka'
-  }
-  // Starttiden (2026-09-05): kunden signerade offerten och valde en vecka —
-  // knappen säger vilken dag godkännandet faktiskt bokar in, precis som
-  // beloppsreglerna ovan säger vilket belopp en åtgärd gäller. Gäller bara
-  // source:'quote_signing' (executorn i approvals/[id]/route.ts), men
-  // etiketten här känner inte till source — den läser bara requested_date,
-  // vilket alltid finns när den finns.
-  if (approvalType === 'new_booking_request') {
-    const datum = typeof p.requested_date === 'string' && p.requested_date
-      ? formatRequestedDateShort(p.requested_date)
-      : null
-    return datum ? `Boka ${datum}` : 'Boka'
-  }
-  if (approvalType === 'send_quote') return 'Godkänn & skicka'
-  if (approvalType === 'send_sms') return 'Skicka'
-  // project_log_note SPARAR en intern dagboksrad — inget går till kunden.
-  if (approvalType === 'project_log_note') return 'Spara i dagboken'
-  if (approvalType === 'autonomy_offer') return 'Ja, kör automatiskt'
-  // profitability_warning är INFORMATIONAL i action-contract — inget att
-  // utföra. Denna etikett syns bara om kortet någonsin renderas med en
-  // approve-knapp (voice='fragar' bygger annars sina egna alternativ, se
-  // lib/jarvis/card-voice.ts reviewAlternatives).
-  if (approvalType === 'profitability_warning') return 'Jag har sett det'
-  // Startkorten är INFORMATIONAL (action-contract.ts) — godkänn = "jag har
-  // läst det", ingenting utförs. Samma ord som profitability_warning ovan.
-  if (approvalType === 'team_intro') return 'Jag har läst det'
-  // Måndagskortet är också INFORMATIONAL — samma ord, samma regel.
-  if (approvalType === 'monday_brief') return 'Jag har läst det'
-  return 'Godkänn'
+/** First action opens review; the final effect-specific label comes from the
+ * server-bound review. Informational cards only acknowledge reading. */
+export function approveLabel(approvalType: string, _payload?: Record<string, unknown> | null): string {
+  const klass = classify(approvalType)
+  return klass === 'INFORMATIONAL' || klass === 'ACKNOWLEDGEMENT' ? 'Jag har läst' : 'Granska'
 }
 
 /**

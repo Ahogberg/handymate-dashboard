@@ -112,9 +112,9 @@ test.describe('de enkla källorna', () => {
     expect(isEditable(a)).toBe(false)
   })
 
-  test('lång text kapas', () => {
+  test('redigerbar text bevaras i sin helhet', () => {
     const lang = 'x'.repeat(400)
-    expect(approvalPreview({ approval_type: 'send_sms', payload: { message: lang } }).text).toHaveLength(200)
+    expect(approvalPreview({ approval_type: 'send_sms', payload: { message: lang } }).text).toHaveLength(400)
   })
 })
 
