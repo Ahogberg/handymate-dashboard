@@ -74,7 +74,7 @@ export default function DemoManusPage() {
           <p className="mt-2">Gå snabbt. <strong>Säg:</strong> &rdquo;Offert på minuter, ROT/RUT rätt per jobbtyp, Fortnox i takt med e-faktura, byggdagbok med foto och attest, leverantörsfakturor på projektet, moms- och AGI-datum bevakade.&rdquo; Stanna bara på det de frågar om.</p>
 
           <H2>6 · Pengarna (2 min)</H2>
-          <p className="mt-2"><strong>Säg:</strong> &rdquo;Missat samtal — kunden får ett SMS direkt och stannar hos dig. Faktura — Karin påminner dag 5 och dag 12 tills det är betalt. Du godkänner med ett tryck. Vill du att hon sköter det själv säger du det.&rdquo;</p>
+          <p className="mt-2"><strong>Säg:</strong> &rdquo;När telefonkanalen är aktiverad och verifierad kan Lisa följa upp missade samtal via SMS. Karin föreslår fakturapåminnelser utifrån era inställningar. Du granskar innan utskick eller ger ett avgränsat mandat.&rdquo;</p>
           <p className="mt-1.5 text-slate-500"><strong>Fråga:</strong> &rdquo;Hur mycket ligger ute hos dig just nu som du inte har hunnit jaga?&rdquo;</p>
 
           <H2>7 · Kunden (1 min)</H2>
@@ -85,21 +85,21 @@ export default function DemoManusPage() {
           <p className="mt-1.5 text-slate-500"><strong>Poäng att landa:</strong> &rdquo;Vi kallar aldrig något återvunnet förrän pengarna är på kontot. Du ska kunna lita på siffrorna.&rdquo;</p>
 
           <H2>9 · Du bestämmer (2 min)</H2>
-          <p className="mt-2">Det här är sliden för den vanligaste oron: kontroll. <strong>Säg:</strong> &rdquo;Inget når en kund utan ditt OK. Du kan ge teamet ett mål med gränser — &rsquo;få in 80 000 före månadsskiftet, max fem utskick om dagen&rsquo;. Frånvaroläge när du är ledig. Och bränslemätaren visar exakt vad AI:n kostar.&rdquo;</p>
+          <p className="mt-2">Det här är sliden för den vanligaste oron: kontroll. <strong>Säg:</strong> &rdquo;Inget når en kund utan ditt OK. Du kan ge teamet ett mål med gränser — &rsquo;få in 80 000 före månadsskiftet, max fem utskick om dagen&rsquo;. Frånvaroläge när du är ledig. Och bränslemätaren visar bokförd användning.&rdquo;</p>
 
-          <H2>10 · Igång på 15 minuter (1 min)</H2>
-          <p className="mt-2"><strong>Säg:</strong> &rdquo;Dag ett är inte tomt. Du kopplar Fortnox, Matte går igenom allt som finns och du landar i en firma som redan är i gång. Allt är märkt importerat, möjlighet eller uppskattat.&rdquo;</p>
+          <H2>10 · Första riktiga jobbet (1 min)</H2>
+          <p className="mt-2"><strong>Säg:</strong> &rdquo;Vi börjar med din firma och ett riktigt arbetsflöde. Har du historik kan vi gå igenom den; börjar du utan historik väljer vi första jobbet tillsammans. Vi kontrollerar vad som fungerar och vad som återstår.&rdquo;</p>
 
           <H2>11 · Nästa steg (1 min)</H2>
-          <p className="mt-2"><strong>Säg:</strong> &rdquo;5 995 i månaden, hela teamet, ingen bindningstid, 30 dagar pengarna tillbaka. Det är mindre än en missad kund i månaden.&rdquo;</p>
+          <p className="mt-2"><strong>Säg:</strong> &rdquo;Firman kostar 5 995 kronor per månad exklusive moms vid månadsbetalning, utan bindningstid. Hela teamet ingår och standardgarantin är 30 dagar. Bränsle ingår upp till planens gräns; extra påfyllning köps separat. Vi går igenom aktuella villkor tillsammans.&rdquo;</p>
           <p className="mt-1.5"><strong>Gör:</strong> Kör Företagskollen tillsammans direkt på mobilen. Det tar två minuter och ger dem en egen siffra att gå hem med. Lämna leave-behind-bladet med din kontakt.</p>
 
           <H2>Vanliga invändningar</H2>
           <div className="mt-2 space-y-2">
-            <p><strong>&rdquo;Jag har redan Bygglet/Easoft.&rdquo;</strong> → &rdquo;Bra, då har du papperet. Det här är teamet som jobbar i det. De ger dig ett verktyg, vi ger dig ett team.&rdquo;</p>
+            <p><strong>&rdquo;Jag har redan Bygglet/Easoft.&rdquo;</strong> → &rdquo;Då utgår vi från hur ni arbetar idag och visar ett konkret moment i Handymate. Vi kontrollerar separat vilket underlag som kan föras över.&rdquo;</p>
             <p><strong>&rdquo;Jag vill inte att en AI pratar med mina kunder.&rdquo;</strong> → &rdquo;Den gör inte det utan ditt OK. Du godkänner allt tills du själv väljer att släppa mer.&rdquo;</p>
             <p><strong>&rdquo;Det är dyrt.&rdquo;</strong> → &rdquo;Vad kostar ett missat jobb? Ett ÄTA som ingen fakturerade? Räkna på dina egna siffror — Företagskollen hjälper dig.&rdquo;</p>
-            <p><strong>&rdquo;Jag hinner inte sätta upp något nytt.&rdquo;</strong> → &rdquo;Femton minuter. Sen jobbar teamet med det som redan finns i Fortnox.&rdquo;</p>
+            <p><strong>&rdquo;Jag hinner inte sätta upp något nytt.&rdquo;</strong> → &rdquo;Vi väljer ett första moment som gör skillnad för dig. Tiden beror på vilket underlag och vilka anslutningar som behövs. Du får veta vad som ingår innan vi börjar.&rdquo;</p>
             <p><strong>&rdquo;Hur vet jag att den har rätt?&rdquo;</strong> → &rdquo;Tryck på &rsquo;Varför?&rsquo;. Du ser mötet, offerten och citatet. Och veckorapporten visar bara det som är verifierat.&rdquo;</p>
           </div>
 

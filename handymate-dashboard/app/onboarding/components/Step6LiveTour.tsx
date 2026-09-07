@@ -209,7 +209,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
               animation: 'ob-pulse-ring 1.5s infinite',
             }}
           />
-          Lisa är på linjen. Karin har koll. Du är live.
+          Här ser du hur startsidan fungerar.
         </div>
       )}
 
@@ -342,7 +342,7 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
           }}
         >
           <span style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--ob-green-600)' }} />
-          Live
+          Förhandsvisning
         </div>
       </div>
 

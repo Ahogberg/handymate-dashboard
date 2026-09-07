@@ -287,13 +287,13 @@ export default function PartnerdeckPage() {
         <section className="bg-slate-50 px-6 py-12">
           <Eyebrow>Dag ett</Eyebrow>
           <h2 className="text-[26px] font-bold tracking-tight text-slate-900 leading-tight mt-2">
-            Ge Handymate 15 minuter så börjar teamet jobba
+            Börja med ett riktigt jobb
           </h2>
           <p className="text-[15px] text-slate-600 leading-relaxed mt-3">
-            Koppla Fortnox, mejlen och kalendern. Matte går igenom det som finns och du landar i en firma som redan är i gång.
+            Vi går igenom din firma och väljer ett första arbetsflöde. Anslut de tjänster du behöver och kontrollera vad som fungerar innan du börjar använda dem.
           </p>
           <div className="mt-7 bg-white border border-slate-200 rounded-2xl p-5 shadow-[0_8px_30px_rgba(15,23,42,.08)]">
-            <p className="text-lg font-semibold text-slate-900">Matte sätter upp firman…</p>
+            <p className="text-lg font-semibold text-slate-900">Exempel: en firma med importerad historik</p>
             <div className="flex flex-col gap-2.5 mt-4 text-[15px] text-slate-700">
               {[
                 '347 kunder hittade',
@@ -316,23 +316,23 @@ export default function PartnerdeckPage() {
             </div>
           </div>
           <p className="text-sm text-slate-500 leading-relaxed mt-5">
-            Allt är märkt importerat, möjlighet eller uppskattat. Ingenting hittas på för att det ska se bra ut.
+            Siffrorna ovan är exempel. I din firma visas det underlag som faktiskt finns — nästa steg anpassas även om du börjar utan historik.
           </p>
         </section>
 
         {/* 11 · Nästa steg — förifylld med partnerns kontakt */}
         <section className="bg-[#0f2e2a] text-white px-6 py-12 flex flex-col gap-8">
           <div>
-            <Eyebrow ljus>Ett pris. Allt ingår.</Eyebrow>
+            <Eyebrow ljus>Hela teamet. Tydliga villkor.</Eyebrow>
             <div className="flex items-baseline gap-2 mt-4">
               <span className="text-5xl font-bold tracking-tight">5 995 kr</span>
               <span className="text-xl text-white/60">/mån</span>
             </div>
             <p className="text-[15px] text-white/65 leading-relaxed mt-3">
-              Hela teamet. Ingen bindningstid. 30 dagars pengarna-tillbaka. Storfirman 11 995 kr/mån för större team.
+              Firman: 5 995 kr/mån exkl. moms vid månadsbetalning, utan bindningstid. 30 dagars pengarna-tillbaka-garanti. Storfirman: 11 995 kr/mån exkl. moms för större volym. Bränsle ingår upp till planens gräns; extra påfyllning köps separat.
             </p>
             <p className="text-xl font-semibold leading-snug mt-6">
-              Det kostar mindre än <span className="text-teal-300">en missad kund i månaden</span>.
+              Utgå från <span className="text-teal-300">vad det kan göra för din firma</span>.
             </p>
           </div>
           <div className="flex flex-col gap-3">

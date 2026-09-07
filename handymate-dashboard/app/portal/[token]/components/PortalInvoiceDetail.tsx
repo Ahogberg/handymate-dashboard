@@ -65,6 +65,7 @@ export default function PortalInvoiceDetail({
 
   const [doc, setDoc] = useState<InvoiceDocumentResponse | null>(null)
   const [docLoading, setDocLoading] = useState(true)
+  const [documentAttempt, setDocumentAttempt] = useState(0)
 
   useEffect(() => {
     let cancelled = false
@@ -76,7 +77,23 @@ export default function PortalInvoiceDetail({
       .catch(() => { if (!cancelled) setDoc(null) })
       .finally(() => { if (!cancelled) setDocLoading(false) })
     return () => { cancelled = true }
-  }, [token, inv.invoice_id])
+  }, [token, inv.invoice_id, documentAttempt])
+
+  const documentUnavailable = (
+    <div role="alert" style={{ padding: 18, color: 'var(--ink-2)', fontSize: 14, lineHeight: 1.5 }}>
+      <p>Fakturadokumentet kunde inte visas. Försök igen eller öppna PDF-filen.</p>
+      <button
+        type="button"
+        onClick={() => setDocumentAttempt(attempt => attempt + 1)}
+        style={{ marginTop: 12, minHeight: 44, padding: '10px 14px', border: '1px solid var(--border)', borderRadius: 'var(--r-md)', background: '#fff', cursor: 'pointer' }}
+      >
+        Försök igen
+      </button>
+      <a href={pdfHref} target="_blank" rel="noopener noreferrer" style={{ display: 'inline-block', padding: '12px 14px' }}>
+        Öppna PDF
+      </a>
+    </div>
+  )
 
   return (
     <>
@@ -129,7 +146,7 @@ export default function PortalInvoiceDetail({
                   <QuoteDocument data={doc.template_data} mode="static" />
                 </DocumentScaler>
               ) : (
-                <DocumentSkeleton />
+                documentUnavailable
               )
             ) : doc?.document_html ? (
               <iframe
@@ -148,7 +165,7 @@ export default function PortalInvoiceDetail({
                 }}
               />
             ) : (
-              <DocumentSkeleton />
+              documentUnavailable
             )}
           </div>
         </div>

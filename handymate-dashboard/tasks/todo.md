@@ -1032,3 +1032,13 @@ två skrivs som spec till efter lansering.
       intakt. Ny allowlist-post för veckorapportens ägar-SMS (recipient internal).
 - [x] Lokalt: 454 prov i de berörda filerna gröna, kontraktsgrinden 1694 gröna.
       Nästa nattkörning ~06:30 UTC 8 sep ska vara helt grön.
+# Kundens första intryck och värde (Codex 2026-09-07)
+
+- [x] Granska första tio minuterna: intro, val, telefon, import, betalning, första uppgift och tom start.
+- [x] Granska beställarens offert-, ÄTA- och fakturaresa inklusive kvitton och felvägar.
+- [x] Jämför offentliga löften, partnertexter och köpflöde med aktuell kod och launch-underlag.
+- [x] Genomför avgränsade förbättringar och skapa färdiga kundstarts-/partnermallar.
+- [x] Kör relevanta lokala kontroller, typkontroll och bygge; redovisa gränsen mot skarpa prov.
+- [ ] Leverera draft-PR och samlad rapport, utan merge/deployment/utskick.
+
+Review: se [kundupplevelserapporten](../docs/handoffs/CUSTOMER_EXPERIENCE_2026-09-07.md) för leverans, verifiering och återstående skarpa prov.

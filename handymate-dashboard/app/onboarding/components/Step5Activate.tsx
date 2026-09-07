@@ -497,7 +497,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
           </div>
           {[
             'Pengarna tillbaka om garantin inte infrias',
-            'AI-teamet är aktivt från första minuten',
+            'Välj första uppdraget och kontrollera dina anslutningar',
             'Avsluta när som helst',
           ].map((t, i) => (
             <div
