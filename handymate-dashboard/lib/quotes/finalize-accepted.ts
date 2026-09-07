@@ -100,6 +100,27 @@ export async function finalizeAcceptedQuote(
     console.error('[finalize-accepted] deal-flytt misslyckades (icke-blockerande):', err)
   }
 
+  // ── Demo-offerten på handymate.se (yta 9, 2026-09-07) ─────────────────
+  // ENDA extra steget för demo-företaget: SMS 2 till prospektet om vad som
+  // just hände. Grindat på business_id — en riktig hantverkares kund får
+  // aldrig det här SMS:et. Dynamisk import så vanliga accepter inte drar in
+  // demo-modulen. Non-blocking som allt annat här.
+  try {
+    const { arDemoOffertForetag } = await import('@/lib/demo/demo-quote')
+    if (arDemoOffertForetag(input.businessId)) {
+      const { skickaDemoEfterSms } = await import('@/lib/demo/demo-quote')
+      await skickaDemoEfterSms(supabase, {
+        quoteId: input.quoteId,
+        customerId: input.customerId ?? null,
+        customerPhone: input.customerPhone ?? null,
+        projectCreated: result.projectCreated,
+        dealMoved: result.dealMoved,
+      })
+    }
+  } catch (err) {
+    console.error('[finalize-accepted] demo-efter-SMS misslyckades (icke-blockerande):', err)
+  }
+
   return result
 }
 

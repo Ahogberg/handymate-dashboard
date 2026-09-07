@@ -107,6 +107,8 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'auth/logout': 'Supabase-session',
   'auth/register': 'Ingen (registrering) — business_id genereras kryptografiskt server-side',
   'foretagsskannern/spar': 'Ingen tenant (anonym publik sida, ingen DB-skrivning) — honeypot + IP-tak, 2026-09-02',
+  'public/demo-quote': 'Ingen — besökaren på handymate.se är ingen tenant; skriver BARA i demo-företaget (business_id hårdkodat, fail-closed på is_demo_tenant), tre fail-closed tak (nummer/dygn, IP/timme, globalt/dygn) eftersom varje anrop kostar ett riktigt SMS (yta 9, 2026-09-08)',
+  'public/demo-quote/[token]/status': 'sign_token (randomUUID) i path + låst till demo-företaget — läsning av tidsstämplar, IP-tak (yta 9, 2026-09-08)',
 }
 
 /** Publika rutter som SKRIVER något dyrt (SMS/LLM/kort/rad) måste ha fail-closed tak. */
@@ -123,6 +125,8 @@ const KRAVER_PUBLIKT_TAK = [
   'leads/intake',
   'widget/chat',
   'foretagsskannern/spar',
+  'public/demo-quote',
+  'public/demo-quote/[token]/status',
 ]
 
 test('varje rutt utan standardgrind bär en känd grind eller står i PUBLIC_BY_DESIGN', () => {
@@ -196,6 +200,9 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // portal/[token]/review (portal_token, pushade utan att höja taket — rättat
   // här), yta 5 gav public/booking-page/[slug] (storefront-slug, samma grind
   // som availability). RÄKNAT på origin/main + bokningsrutten → 151.
+  // 2026-09-08 varumärkeslagret yta 9 (demo-offerten): public/demo-quote +
+  // public/demo-quote/[token]/status — ingen tenant, skriver bara i det
+  // hårdkodade demo-företaget, fail-closed tak → 153.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(151)
+  expect(utanStandard.length).toBeLessThanOrEqual(153)
 })

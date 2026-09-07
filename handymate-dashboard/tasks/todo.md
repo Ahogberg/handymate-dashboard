@@ -160,15 +160,58 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
   docs/audits/TENANT_SWEEP uppdaterad; production-schema-columns.json får
   booking_visit_free (kolumnkontraktet). Playwright-skript måste ligga i
   projektkatalogen (scratchpad hittar inte modulen) — kopiera in, kör, radera.
-- [ ] Yta 5 kvar: v222 KÖRA i prod (koden pushad före — sidan läser
-      kolumnen tolerant, reglaget i kundvyn toastar fel tills den finns).
-      Skarptest: boka på /site/test/boka med eget nummer →
+- [x] v222 KÖRD i prod 2026-09-07 (booking_visit_free finns, default false).
+- [ ] Yta 5 kvar — skarptest: boka på /site/test/boka med eget nummer →
       SMS + lead hos Nordström El AB (radera efteråt), kundvyns kort +
       reglage, mobil Safari (ICS-nedladdning). Lisa/Matte skickar länken =
       ny feature, EFTER lansering.
-- [ ] Yta 9 demo-offert till dig själv — brief skriven 2026-09-07
-      (docs/design/briefs/09-demo-offert-till-dig-sjalv.md), väntar på Design
-      + tre beslut (SMS/e-post, firmanamn som avsändare, Calendly-länk).
+- [x] Yta 9 DEMO-OFFERTEN — dashboard-sidan BYGGD 2026-09-08 (Design
+      "Demo-offert block.dc.html"). Portal-first på riktigt: besökaren får
+      det RIKTIGA offert-SMS:et från demo-företaget Ekström Bygg AB
+      (biz_demo_ekstrom, sql/v223), öppnar den riktiga portalen, godkänner,
+      finalizeAcceptedQuote skapar projekt + vinner affären, SMS 2 från
+      "Handymate" länkar tillbaka till efteråt-vyn (?demo=TOKEN#demo-offert).
+      Filer: lib/quotes/quote-sms.ts (offert-SMS:et utbrutet ur send-routen —
+      EN text för riktiga och demo), lib/demo/demo-quote{,-data,-cleanup}.ts,
+      app/api/public/demo-quote (POST, 3 fail-closed tak) +
+      [token]/status (GET, låst till demo-företaget), finalize-hooken,
+      maintenance-cronen sektion 6 (städning efter 7 dagar via RPC),
+      lib/sms/sender-id.ts (åäö→ascii: "EkstromBygg" i stället för
+      "EkstrmBygg" — gäller ALLA avsändare), tests/demo-offert.spec.ts,
+      route-inventeringen 151→153.
+- Beslut yta 9: ROT räknas på RIKTIGT (13 500 kr → kunden betalar 64 000,
+  inte designens 38 750); offertnummer i riktigt format; SMS 2 påstår bara
+  det som faktiskt hände (projectCreated/dealMoved); firmanamn som
+  avsändare INTE byggt (Ekström alltid — firm är bara leaddata); "Boka en
+  demo" → kanoniska "Boka en genomgång"-mailto; demo-företaget har
+  agents_globally_paused + automation_settings av (inga påminnelser till
+  besökare); phone_number NULL → "Frågor? Ring"-raden utelämnas (tidigare
+  skrevs "Ring null" när numret saknades — rättat för alla).
+- Lärdom yta 9: arbetskatalogen ligger EFTER origin (Codex-rutter som
+  preparation/[token] saknas lokalt) → route-inventeringen kan bara köras
+  i ett exporterat träd: `git archive origin/main … | tar -x` i scratchpad,
+  egna filer ovanpå, junction till node_modules. Två facit (demo-reset,
+  cogs-matare) faller där av exportskäl (CRLF, supabase/ saknas) — inte fel.
+- [x] v223 KÖRD i prod 2026-09-08 (dashboard-pushen 04304363). Fälla:
+      business_config.subscription_plan har check-constraint
+      starter|professional|enterprise — 'business' avvisades, 'professional'
+      insatt. Verifierat: is_demo_tenant/agents_globally_paused true,
+      automation av, 0 business_users, cleanup('biz_finns_inte') kastar.
+- [x] Yta 9 landningsblocket BYGGT 2026-09-08 (handymate-landing:
+      #demo-offert i index.html före #bevis, egen CSS `.demo-*`, IIFE sist
+      i body; api/save-lead.js: 'demo-offert' i allowlisten, e-post valfri
+      BARA för KALLOR_UTAN_EPOST + mobil ≥9 siffror, name persisteras;
+      tests/demo-offert.test.mjs 35 gröna, npm test grönt). Leaden sparas
+      bara med kryssrutan i, efter kvittot, fire-and-forget.
+- [ ] v224_landing_leads_email_valfri.sql — KÖRS på "kör": landing_leads.email
+      är NOT NULL i prod → demo-leads faller tyst (23502) tills den körts.
+- [ ] Yta 9 kvar: 46elks-saldo 0,20 kr → fyll på före skarptest;
+      NEXT_PUBLIC_LANDING_URL i Vercel (default https://handymate.se);
+      skarptest med eget nummer: SMS 1 → portal → godkänn → SMS 2 →
+      efteråt-vyn (?demo=TOKEN); kryssa i → rad i landing_leads med
+      source demo-offert; kör demo_quote_cleanup('biz_demo_ekstrom', 0)
+      efteråt. Känt: Vercel-preview-URL:er fälls av CORS (bara
+      handymate.se), firmanamnet ändrar inte avsändaren (alltid Ekström).
 - [ ] Design-ytorna 6, 8, 10 (ej påbörjade)
 
 # Partnergrinden GRÖN 2026-09-07 (Claude)
