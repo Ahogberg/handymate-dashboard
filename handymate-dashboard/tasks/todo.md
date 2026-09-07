@@ -1067,3 +1067,11 @@ Review: 9 röda / 2 gröna nya prov före rättning. Efteråt 94 riktade kod-/ko
 Företagsmedlemskap är inte rollbehörighet. Ingen produktionsdata, riktiga inbjudningar, SMS, betalningar eller användarändringar används i granskningen.
 
 Underlag: docs/security/role-audit-2026-09-07/README.md. Fyra reproducerade luckor; 14 syntetiska observationer; 60 befintliga källkodskontrakt passerar. Ingen produktfix eller fullständig plattformscertifiering.
+
+## Codex rollprov 2026-09-07 — uppföljning
+- [x] Hämta aktuell main och befintlig v220-överlämning; undvik dubbletter.
+- [x] Reproducera projektlistans null-identitetslucka före rättning.
+- [x] Kräv tenant-scopad identitet eller serververifierad impersonering i listan.
+- [x] 8 isolerade GET-kontroller och 17 befintliga R1–R4-kontrakt gröna.
+- [ ] Liveprov med testidentiteter, ekonomisvar och återkallelse; kräver säker inloggning.
+Se docs/security/role-audit-2026-09-07/FOLLOWUP_CODEX.md.

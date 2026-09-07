@@ -18,6 +18,7 @@ import { getSystemStage, PROJECT_SYSTEM_STAGES } from '@/lib/project-stages/stag
 // påslaget — samma anledning som invoices/send/route.ts behöver 30s.
 export const runtime = 'nodejs'
 export const maxDuration = 30
+export const dynamic = 'force-dynamic'
 
 /**
  * GET - Lista projekt för ett företag
@@ -34,18 +35,15 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
 
-    // Behörighetskoll (Etapp 2, tasks/multi-employee-parity-plan.md): en
-    // anställd utan can_see_all_projects ska bara se sina egna tilldelade
-    // projekt, och en anställd utan can_see_financials ska inte få budget/
-    // ekonomifält i svaret. getCurrentUser() returnerar null dels för
-    // superadmin-impersonation, dels om ingen business_users-rad hittas för
-    // auth-användaren (ska i praktiken inte hända för ägare — se
-    // sql/business_users.sql punkt 4 samt app/api/auth/register/route.ts
-    // som båda skapar en owner-rad — men vi failsafe:ar öppet mot null så
-    // ägarens vy ALDRIG blir mer begränsad än idag).
-    const currentUser = await getCurrentUser(request)
-    const canSeeAllProjects = !currentUser || hasPermission(currentUser, 'see_all_projects')
-    const canSeeFinancials = !currentUser || hasPermission(currentUser, 'see_financials')
+    // Samma identitetsgrind som projektdetaljen: null är inte ett bevis
+    // på impersonering. Undantaget kommer endast från serverns auth-helper.
+    const currentUser = await getCurrentUser(request, businessId)
+    if (!currentUser && !business._impersonation) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    }
+    const verifiedViewer = !currentUser && !!business._impersonation
+    const canSeeAllProjects = verifiedViewer || (currentUser !== null && hasPermission(currentUser, 'see_all_projects'))
+    const canSeeFinancials = verifiedViewer || (currentUser !== null && hasPermission(currentUser, 'see_financials'))
 
     // include=workflow → joina stage-data per projekt så mobilen slipper N+1
     // mot /api/projects/[id]/workflow. Utan param: bakåtkompatibel respons.
