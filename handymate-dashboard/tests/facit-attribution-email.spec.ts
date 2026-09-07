@@ -28,7 +28,7 @@ const kod = (rel: string) => fs.readFileSync(path.join(ROOT, rel), 'utf8').repla
 
 /** Kundmejl som renderas genom masterlayouten (stämpeln följer med layouten). */
 const LAYOUT_YTOR = [
-  'app/api/quotes/send/route.ts',        // 1. offertmejl (Gmail + Resend, samma HTML)
+  // 1. offertmejl: se OFFERTMEJLET nedan — byggaren är utbruten till lib/quotes/quote-email.ts
   'lib/invoices/send-invoice.ts',        // 2. fakturamejl
   'lib/invoice-reminder-send.ts',        // 3. påminnelsemejl (leveranspunkten)
   'lib/portal/notification-emails.ts',   // 4. portalnotiser
@@ -36,6 +36,17 @@ const LAYOUT_YTOR = [
   'lib/job-report.ts',                   // 7. jobbrapport-mejlet
   'lib/automation-engine.ts',            // 8. V3 send_email-regler (fritext)
 ]
+
+/**
+ * 1. Offertmejlet (Gmail + Resend, samma HTML) är delat sedan 2026-09-07:
+ * routen läser varumärket (brandingFromConfig + skaparens override) och
+ * byggaren lib/quotes/quote-email.ts renderar genom emailLayout. Samma
+ * byggare används av "Så ser dina kunder dig" — det är poängen med delningen.
+ */
+const OFFERTMEJLET = {
+  route: 'app/api/quotes/send/route.ts',
+  builder: 'lib/quotes/quote-email.ts',
+}
 
 /** Ytor som stämplar direkt via helpern (B2B/leverantör — ingen kundlayout). */
 const DIREKT_YTOR = [
@@ -51,6 +62,15 @@ test.describe('stämpeln kommer från helpern — direkt eller via emailLayout',
       expect(src).toMatch(/(from '@\/lib\/branding\/get-branding'|import\('@\/lib\/branding\/get-branding'\))/)
     })
   }
+  test(`${OFFERTMEJLET.route} läser varumärket ur get-branding och renderar via ${OFFERTMEJLET.builder}`, () => {
+    const route = kod(OFFERTMEJLET.route)
+    expect(route).toContain('brandingFromConfig(business)')
+    expect(route).toContain("from '@/lib/branding/get-branding'")
+    expect(route).toContain('buildQuoteEmailHtml(')
+    const builder = kod(OFFERTMEJLET.builder)
+    expect(builder).toContain('emailLayout(')
+    expect(builder).toContain("from '@/lib/branding/get-branding'")
+  })
   for (const rel of DIREKT_YTOR) {
     test(`${rel} importerar från lib/branding/attribution`, () => {
       const src = kod(rel)
@@ -58,7 +78,7 @@ test.describe('stämpeln kommer från helpern — direkt eller via emailLayout',
       expect(src).toContain('attributionEmailHtml(')
     })
   }
-  for (const rel of [...LAYOUT_YTOR, ...DIREKT_YTOR, 'lib/email-templates.ts', 'lib/nurture.ts', 'app/api/invoices/auto-generate/route.ts']) {
+  for (const rel of [...LAYOUT_YTOR, ...DIREKT_YTOR, OFFERTMEJLET.route, OFFERTMEJLET.builder, 'lib/email-templates.ts', 'lib/nurture.ts', 'app/api/invoices/auto-generate/route.ts']) {
     test(`${rel} har ingen egen Handymate-klartext kvar`, () => {
       const src = kod(rel)
       expect(src).not.toContain('via Handymate')
@@ -137,7 +157,7 @@ test.describe('underlaget hämtas rätt', () => {
 
 test.describe('sanningsregler i kundmejlen', () => {
   test('ROT/RUT är alltid preliminärt — aldrig "dras automatiskt"', () => {
-    for (const rel of ['lib/invoices/send-invoice.ts', 'app/api/quotes/send/route.ts', 'lib/quote-confirmation-email.ts', 'lib/email-templates.ts']) {
+    for (const rel of ['lib/invoices/send-invoice.ts', 'app/api/quotes/send/route.ts', 'lib/quotes/quote-email.ts', 'lib/quote-confirmation-email.ts', 'lib/email-templates.ts']) {
       expect(kod(rel), rel).not.toMatch(/dras automatiskt/i)
     }
     expect(kod('lib/email-templates.ts')).toContain('Skatteverket fastställer det slutgiltiga beloppet')

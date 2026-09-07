@@ -7,13 +7,10 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
-import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { halsning } from '@/lib/customers/namn'
 import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
-import {
-  emailLayout, emailHeading, emailParagraph, amountBlock, rotRutNotice, actionBlock, signature, formatDag,
-} from '@/lib/email-templates'
+import { buildQuoteEmailHtml } from '@/lib/quotes/quote-email'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -109,10 +106,9 @@ async function sendEmail(
 /**
  * Offertmailet — företagets varumärke via masterlayouten (lib/email-templates.ts).
  *
- * Varumärkeslagret 2026-09-07: skalet, sidhuvudet, sidfoten och stämpeln
- * kommer från emailLayout(); den här funktionen komponerar bara innehållet.
- * "Du betalar"-logiken speglar offertsidan: beloppet efter preliminärt
- * ROT/RUT är huvudsiffran, totalsumman står ärligt bredvid.
+ * Varumärkeslagret 2026-09-07: den här funktionen löser bara VEM som står
+ * som avsändare (skaparen före företaget) och lämnar sedan över till
+ * buildQuoteEmailHtml. "Du betalar"-logiken bor i byggaren.
  */
 function generateEmailHTML(
   quote: any,
@@ -135,50 +131,24 @@ function generateEmailHTML(
     contactEmail: (creator?.email ?? base.contactEmail) || undefined,
   }
 
-  // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
-  // beskrivning och namn kan innehålla tecken som annars tolkas som markup.
-  // R1: hälsningen använder kundens FÖRNAMN, aldrig rått fullnamn.
-  const customerGreeting = escapeHtml(halsning(quote.customer?.name))
-  const quoteTitle = escapeHtml(quote.title || 'Offert')
-  const quoteDescription = escapeHtml(quote.description)
-  const contactName = creator?.name ? escapeHtml(creator.name) : ''
-  const accent = branding.accentColor
-
-  // Designens offertmail: dokumentreferens i sidhuvudet, offertens titel som
-  // rubrik, "Du betalar" som stor siffra med totalsumman och preliminärt
-  // ROT/RUT bredvid, en knapp in i portalen, PDF som hjälprad.
-  const harRot = Boolean(quote.rot_rut_type && quote.customer_pays != null)
-  const rotType = harRot ? String(quote.rot_rut_type) : ''
-  const rotDeduction = harRot ? Number(quote.total) - Number(quote.customer_pays) : 0
-  const giltig = quote.valid_until ? `Giltig till ${formatDag(quote.valid_until)}` : undefined
-  const belopp = harRot
-    ? amountBlock({ label: 'Du betalar', amount: Number(quote.customer_pays), total: Number(quote.total), rot: { type: rotType, deduction: rotDeduction }, sub: giltig })
-    : amountBlock({ label: 'Totalt inkl. moms', amount: Number(quote.total), sub: giltig })
-
-  const pdfRad = pdfUrl ? 'Offerten finns också som PDF i det här mailet.' : undefined
-  const handling = signUrl
-    ? actionBlock({ text: 'Öppna offerten', url: signUrl }, accent, undefined, { helper: pdfRad })
-    : branding.contactPhone
-      ? actionBlock({ text: `Ring ${escapeHtml(branding.contactPhone)}`, url: `tel:${escapeHtml(branding.contactPhone)}` }, accent, pdfUrl ? { text: 'Ladda ner offerten (PDF)', url: pdfUrl } : undefined, { helper: 'Har du frågor eller vill boka? Ring oss.' })
-      : pdfUrl
-        ? actionBlock({ text: 'Ladda ner offerten (PDF)', url: pdfUrl }, accent)
-        : ''
-
-  const content = `
-    ${emailHeading(quoteTitle, `${customerGreeting} Tack för att vi fick komma förbi. Här är vår offert${quote.description ? ':' : '.'}`)}
-    ${quote.description ? emailParagraph(`<span style="white-space:pre-line;">${quoteDescription}</span>`) : ''}
-    ${belopp}
-    ${handling}
-    ${harRot ? rotRutNotice(rotType, rotDeduction) : ''}
-    ${signature(escapeHtml(branding.businessName), contactName || undefined, { phone: branding.contactPhone ? escapeHtml(branding.contactPhone) : undefined })}
-  `
-
-  // Spårningspixeln ligger sist i dokumentet — efter </html> duger för
-  // mailklienter, men vi lägger den inne i body för säkerhets skull.
-  const html = emailLayout(branding, content, { meta: `Offert ${quote.quote_number || ''}`.trim() })
-  return trackingPixelUrl
-    ? html.replace('</body>', `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" /></body>`)
-    : html
+  // Själva innehållet byggs av den rena byggaren (lib/quotes/quote-email.ts)
+  // — samma funktion som inställningssidan "Så ser dina kunder dig"
+  // förhandsvisar med, så det kunden får och det ägaren ser är ett och samma.
+  return buildQuoteEmailHtml({
+    branding,
+    customerName: quote.customer?.name,
+    quoteNumber: quote.quote_number,
+    title: quote.title,
+    description: quote.description,
+    total: Number(quote.total),
+    customerPays: quote.customer_pays,
+    rotRutType: quote.rot_rut_type,
+    validUntil: quote.valid_until,
+    signUrl,
+    pdfUrl,
+    contactName: creator?.name,
+    trackingPixelUrl,
+  })
 }
 
 export async function POST(request: NextRequest) {
