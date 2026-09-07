@@ -45,8 +45,8 @@ import { buildAttribution } from '@/lib/branding/attribution'
 import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
 import { halsning } from '@/lib/customers/namn'
 import {
-  emailLayout, emailHeading, amountHero, summaryTable, rotRutNotice, swishBlock,
-  infoBlock, detailRows, actionBlock, formatKr, formatDatum, type SummaryRow,
+  emailLayout, emailParagraph, emailSection, amountBlock, paymentBlock, summaryTable, rotRutNotice,
+  secondaryButton, secondaryLink, linkBlock, escapeEmailText, formatKr, formatDag, type SummaryRow,
 } from '@/lib/email-templates'
 
 function getResend() {
@@ -301,10 +301,13 @@ export async function sendInvoice(
           // utan extra query (lib/branding/get-branding.ts).
           branding: brandingFromConfig(businessConfig),
           invoiceNumber: invoice.invoice_number,
+          // description = fakturans rubrik (data-builder.ts: "Utfört arbete" som fallback)
+          title: invoice.description,
           dueDate: invoice.due_date,
           subtotal: invoice.subtotal,
           vatRate: invoice.vat_rate,
           vatAmount: invoice.vat_amount,
+          total: invoice.total || 0,
           amountToPay: amountToPay || 0,
           rotRutType: invoice.rot_rut_type,
           rotRutDeduction: invoice.rot_rut_deduction,
@@ -605,14 +608,21 @@ export async function triggerPostSendAutomations(params: PostSendAutomationsPara
 // identiteter i samma affär. Nu emailLayout() + byggblocken; stämpeln
 // kommer med varumärket (brandingFromConfig → buildAttribution).
 
-function buildInvoiceEmailHtml(opts: {
+/**
+ * Designens fakturamail: "Att betala" som stor siffra med förfallodatum,
+ * totalsumma och preliminärt ROT/RUT bredvid; Swish som primärknapp med
+ * bankgiro/OCR under; sedan brödtext, summering, ROT-blocket och portalen.
+ */
+export function buildInvoiceEmailHtml(opts: {
   customerName: string
   branding: Branding
   invoiceNumber: string
+  title?: string | null
   dueDate: string
   subtotal: number
   vatRate: number
   vatAmount: number
+  total: number
   amountToPay: number
   rotRutType?: string | null
   rotRutDeduction?: number | null
@@ -622,26 +632,43 @@ function buildInvoiceEmailHtml(opts: {
 }): string {
   const b = opts.branding
   const rot = opts.rotRutType && opts.rotRutDeduction ? { type: opts.rotRutType, amount: opts.rotRutDeduction } : null
+  const forfaller = formatDag(opts.dueDate)
+  const nr = escapeEmailText(opts.invoiceNumber)
+  const titel = escapeEmailText(opts.title)
 
   const rows: SummaryRow[] = [
-    { label: 'Delsumma', value: formatKr(opts.subtotal) },
-    { label: `Moms (${opts.vatRate}%)`, value: formatKr(opts.vatAmount) },
+    { label: 'Delsumma exkl. moms', value: formatKr(opts.subtotal) },
+    { label: `Moms ${opts.vatRate} %`, value: formatKr(opts.vatAmount) },
   ]
-  if (rot) rows.push({ label: `Preliminärt ${rot.type.toUpperCase()}-avdrag`, value: `−${formatKr(rot.amount)}`, deduction: true })
+  if (rot) {
+    rows.push({ label: 'Totalt inkl. moms', value: formatKr(opts.total), total: true })
+    rows.push({ label: `Preliminärt ${rot.type.toUpperCase()}-avdrag`, value: `−${formatKr(rot.amount)}`, deduction: true })
+  }
   rows.push({ label: 'Att betala', value: formatKr(opts.amountToPay), emphasis: true })
 
   const content = `
-    ${emailHeading(halsning(opts.customerName), 'Här kommer din faktura. Nedan hittar du en sammanfattning — alla detaljer finns i din kundportal och i bifogad PDF.')}
-    ${amountHero('Att betala', formatKr(opts.amountToPay), `Faktura ${opts.invoiceNumber} · förfaller ${formatDatum(opts.dueDate)}`)}
-    ${summaryTable(rows, b.accentColor)}
-    ${rot ? rotRutNotice(rot.type, rot.amount) : ''}
-    ${b.swishNumber ? swishBlock({ swishNumber: b.swishNumber, amount: opts.amountToPay, amountLabel: formatKr(opts.amountToPay), message: opts.invoiceNumber }) : ''}
-    ${infoBlock('Betalningsinformation', detailRows([
-      { label: 'Bankgiro', value: b.bankgiro || '' },
-      { label: 'OCR-nummer', value: opts.ocrNumber },
-      { label: 'Förfallodatum', value: formatDatum(opts.dueDate) },
-    ]))}
-    ${actionBlock({ text: 'Visa i kundportalen', url: opts.portalUrl }, b.accentColor, { text: 'Ladda ner som PDF', url: opts.pdfUrl })}
+    ${amountBlock({
+      label: 'Att betala',
+      amount: opts.amountToPay,
+      due: forfaller,
+      total: rot ? opts.total : undefined,
+      rot: rot ? { type: rot.type, deduction: rot.amount } : null,
+    })}
+    ${paymentBlock({
+      swishNumber: b.swishNumber,
+      amount: opts.amountToPay,
+      message: opts.invoiceNumber,
+      bankgiro: b.bankgiro,
+      ocr: opts.ocrNumber,
+      due: forfaller,
+      accent: b.accentColor,
+    })}
+    ${emailParagraph(`${escapeEmailText(halsning(opts.customerName))} Här kommer fakturan${titel ? ` för <strong style="color:#0f172a;">${titel}</strong>` : ` <strong style="color:#0f172a;">${nr}</strong>`}. Alla detaljer finns i bifogad PDF${opts.portalUrl ? ' och i kundportalen' : ''}.`)}
+    ${summaryTable(rows)}
+    ${rot ? rotRutNotice(rot.type, rot.amount, 'Blir avdraget lägre fakturerar vi skillnaden.') : ''}
+    ${opts.portalUrl
+      ? emailSection(secondaryButton('Visa i kundportalen', opts.portalUrl) + secondaryLink('Ladda ner fakturan (PDF)', opts.pdfUrl, b.accentColor))
+      : linkBlock('Ladda ner fakturan (PDF)', opts.pdfUrl, b.accentColor)}
   `
-  return emailLayout(b, content)
+  return emailLayout(b, content, { meta: `Faktura ${nr}`, preheader: `Att betala ${formatKr(opts.amountToPay)} · förfaller ${forfaller}` })
 }

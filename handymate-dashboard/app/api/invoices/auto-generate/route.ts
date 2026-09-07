@@ -318,6 +318,7 @@ async function generateInvoicesForBusiness(params: {
             customerName,
             invoiceNumber,
             totalAmount: total.toLocaleString('sv-SE'),
+            totalAmountNum: total,
             dueDate: dueDate.toLocaleDateString('sv-SE'),
           })
 

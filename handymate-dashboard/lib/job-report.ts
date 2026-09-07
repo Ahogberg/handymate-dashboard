@@ -421,17 +421,18 @@ export async function approveJobReport(
         const { emailLayout, emailHeading, emailParagraph, actionBlock, signature } = await import('@/lib/email-templates')
         const { escapeHtml } = await import('@/lib/document-html')
         const branding = await loadBranding(supabase, businessId)
+        const firstName = escapeHtml(reportData.customerName.split(' ')[0])
         const content = `
-          ${emailHeading(`Hej ${escapeHtml(reportData.customerName.split(' ')[0])}!`, `Här kommer jobbrapporten för <strong>${escapeHtml(reportData.projectName)}</strong>.`)}
-          ${emailParagraph('Rapporten innehåller utfört arbete, material och garantiinformation.')}
-          ${actionBlock({ text: 'Öppna jobbrapport (PDF)', url: pdfUrl }, branding.accentColor)}
-          ${signature(escapeHtml(reportData.businessName), reportData.contactName ? escapeHtml(reportData.contactName) : undefined)}
+          ${emailHeading(`Jobbrapport — ${escapeHtml(reportData.projectName)}`, `${firstName ? `Hej ${firstName}! ` : ''}Här kommer jobbrapporten för arbetet hos dig.`)}
+          ${emailParagraph('Rapporten innehåller utfört arbete, material och garantiinformation. Spara den — det är din dokumentation över jobbet.')}
+          ${actionBlock({ text: 'Öppna jobbrapporten (PDF)', url: pdfUrl }, branding.accentColor)}
+          ${signature(escapeHtml(reportData.businessName), reportData.contactName ? escapeHtml(reportData.contactName) : undefined, { phone: branding.contactPhone ? escapeHtml(branding.contactPhone) : undefined })}
         `
         await sendEmail({
           businessId,
           to: reportData.customerEmail,
           subject: `Jobbrapport — ${reportData.projectName} från ${reportData.businessName}`,
-          html: emailLayout(branding, content),
+          html: emailLayout(branding, content, { meta: 'Jobbrapport' }),
           fromName: reportData.businessName,
         })
       } catch { /* non-blocking */ }

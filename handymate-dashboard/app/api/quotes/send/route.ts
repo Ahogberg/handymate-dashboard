@@ -9,10 +9,10 @@ import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
-import { extractFirstName, halsning } from '@/lib/customers/namn'
+import { halsning } from '@/lib/customers/namn'
 import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
 import {
-  emailLayout, emailHeading, emailParagraph, amountHero, infoBlock, rotRutNotice, actionBlock, formatKr,
+  emailLayout, emailHeading, emailParagraph, amountBlock, rotRutNotice, actionBlock, signature, formatDag,
 } from '@/lib/email-templates'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
@@ -126,14 +126,13 @@ function generateEmailHTML(
   // stämpel utan extra query. Kontaktuppgifter = offertens SKAPARE när den
   // finns (samma identitet som kunddokumentet visar), annars företagets.
   // `??` — en skapare med tomt telefonfält faller ändå tillbaka på företagets.
+  // Layouten escapar varumärkesfälten själv — ingen förescapning här.
   const base = brandingFromConfig(business)
   const branding: Branding = {
     ...base,
-    businessName: escapeHtml(base.businessName),
-    contactPhone: escapeHtml(creator?.phone ?? base.contactPhone) || undefined,
-    contactEmail: escapeHtml(creator?.email ?? base.contactEmail) || undefined,
-    logoUrl: base.logoUrl ? escapeHtml(base.logoUrl) : undefined,
-    orgNumber: base.orgNumber ? escapeHtml(base.orgNumber) : undefined,
+    contactName: creator?.name || base.contactName,
+    contactPhone: (creator?.phone ?? base.contactPhone) || undefined,
+    contactEmail: (creator?.email ?? base.contactEmail) || undefined,
   }
 
   // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
@@ -143,43 +142,40 @@ function generateEmailHTML(
   const quoteTitle = escapeHtml(quote.title || 'Offert')
   const quoteDescription = escapeHtml(quote.description)
   const contactName = creator?.name ? escapeHtml(creator.name) : ''
+  const accent = branding.accentColor
 
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
-
+  // Designens offertmail: dokumentreferens i sidhuvudet, offertens titel som
+  // rubrik, "Du betalar" som stor siffra med totalsumman och preliminärt
+  // ROT/RUT bredvid, en knapp in i portalen, PDF som hjälprad.
   const harRot = Boolean(quote.rot_rut_type && quote.customer_pays != null)
-  const hero = harRot
-    ? amountHero(
-        'Du betalar',
-        formatKr(quote.customer_pays),
-        `efter preliminärt ${String(quote.rot_rut_type).toUpperCase()}-avdrag · totalt ${formatKr(quote.total)} inkl. moms`,
-      )
-    : amountHero('Totalt', formatKr(quote.total), 'inkl. moms')
+  const rotType = harRot ? String(quote.rot_rut_type) : ''
+  const rotDeduction = harRot ? Number(quote.total) - Number(quote.customer_pays) : 0
+  const giltig = quote.valid_until ? `Giltig till ${formatDag(quote.valid_until)}` : undefined
+  const belopp = harRot
+    ? amountBlock({ label: 'Du betalar', amount: Number(quote.customer_pays), total: Number(quote.total), rot: { type: rotType, deduction: rotDeduction }, sub: giltig })
+    : amountBlock({ label: 'Totalt inkl. moms', amount: Number(quote.total), sub: giltig })
 
+  const pdfRad = pdfUrl ? 'Offerten finns också som PDF i det här mailet.' : undefined
   const handling = signUrl
-    ? `${infoBlock(
-        'Redo att godkänna offerten?',
-        'I din kundportal kan du granska offerten, godkänna den och följa ditt projekt.',
-        'success',
-      )}
-      ${actionBlock({ text: 'Öppna din kundportal', url: signUrl }, branding.accentColor, pdfUrl ? { text: 'Ladda ner offert (PDF)', url: pdfUrl } : undefined)}
-      ${emailParagraph(`Eller kopiera länken: ${signUrl}`, { muted: true })}`
-    : `${emailParagraph('Har du frågor eller vill boka? Kontakta oss:')}
-      ${actionBlock({ text: `Ring ${branding.contactPhone || ''}`, url: `tel:${branding.contactPhone || ''}` }, branding.accentColor, pdfUrl ? { text: 'Ladda ner offert (PDF)', url: pdfUrl } : undefined)}`
+    ? actionBlock({ text: 'Öppna offerten', url: signUrl }, accent, undefined, { helper: pdfRad })
+    : branding.contactPhone
+      ? actionBlock({ text: `Ring ${escapeHtml(branding.contactPhone)}`, url: `tel:${escapeHtml(branding.contactPhone)}` }, accent, pdfUrl ? { text: 'Ladda ner offerten (PDF)', url: pdfUrl } : undefined, { helper: 'Har du frågor eller vill boka? Ring oss.' })
+      : pdfUrl
+        ? actionBlock({ text: 'Ladda ner offerten (PDF)', url: pdfUrl }, accent)
+        : ''
 
   const content = `
-    ${emailHeading(customerGreeting, 'Tack för att du kontaktade oss. Här kommer din offert för:')}
-    ${infoBlock(quoteTitle, quote.description ? `<span style="white-space:pre-line;">${quoteDescription}</span>` : '')}
-    ${hero}
-    ${harRot ? rotRutNotice(String(quote.rot_rut_type), Number(quote.total) - Number(quote.customer_pays)) : ''}
-    ${quote.valid_until ? emailParagraph(`Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>.`) : ''}
+    ${emailHeading(quoteTitle, `${customerGreeting} Tack för att vi fick komma förbi. Här är vår offert${quote.description ? ':' : '.'}`)}
+    ${quote.description ? emailParagraph(`<span style="white-space:pre-line;">${quoteDescription}</span>`) : ''}
+    ${belopp}
     ${handling}
-    ${contactName ? emailParagraph(`Din kontakt: <strong>${contactName}</strong>`, { muted: true }) : ''}
+    ${harRot ? rotRutNotice(rotType, rotDeduction) : ''}
+    ${signature(escapeHtml(branding.businessName), contactName || undefined, { phone: branding.contactPhone ? escapeHtml(branding.contactPhone) : undefined })}
   `
 
   // Spårningspixeln ligger sist i dokumentet — efter </html> duger för
   // mailklienter, men vi lägger den inne i body för säkerhets skull.
-  const html = emailLayout(branding, content)
+  const html = emailLayout(branding, content, { meta: `Offert ${quote.quote_number || ''}`.trim() })
   return trackingPixelUrl
     ? html.replace('</body>', `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" /></body>`)
     : html

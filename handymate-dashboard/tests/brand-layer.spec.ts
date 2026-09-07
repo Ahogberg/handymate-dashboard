@@ -18,6 +18,7 @@ import {
 import { ATTRIBUTION_TEXT } from '../lib/branding/attribution'
 import {
   emailLayout, summaryTable, rotRutNotice, swishDeeplink, formatKr, ctaButton, detailRows,
+  amountBlock, paymentBlock, statusBand, formatDag,
 } from '../lib/email-templates'
 
 test.describe('normalizeAccentColor', () => {
@@ -131,28 +132,75 @@ test.describe('emailLayout', () => {
     expect(ctaButton('Visa', 'https://x', '#GGGGGG')).toContain(`background:${DEFAULT_ACCENT_COLOR}`)
     expect(ctaButton('Visa', 'https://x', '#112233')).toContain('background:#112233')
   })
+
+  test('meta-etikett i sidhuvudet, escapad; compact-läge ger kort sidfot utan org.nr', () => {
+    const full = emailLayout(branding, '', { meta: 'Faktura <2026-001>' })
+    expect(full).toContain('Faktura &lt;2026-001&gt;')
+    expect(full).toContain('Org.nr 556000-0000')
+
+    const compact = emailLayout(branding, '', { compact: true })
+    expect(compact).not.toContain('Org.nr')
+    expect(compact).toContain('070-1')
+    expect(compact).toContain(ATTRIBUTION_TEXT)
+    // Legacy-anropet (sträng = footerExtra) fungerar fortfarande.
+    expect(emailLayout(branding, '', '<b>extra</b>')).toContain('<b>extra</b>')
+  })
 })
 
 test.describe('byggstenarna', () => {
-  test('summaryTable: första raden utan linje, avdrag grönt, summering i accent', () => {
+  test('summaryTable: första raden utan linje, avdrag grönt, summeringsraden mörk och fet', () => {
     const html = summaryTable([
       { label: 'Delsumma', value: '1 000 kr' },
       { label: 'Preliminärt ROT-avdrag', value: '−300 kr', deduction: true },
       { label: 'Att betala', value: '700 kr', emphasis: true },
-    ], '#123456')
-    const rows = html.split('<tr>').slice(1)
+    ])
+    // Blocket ligger i en sektions-tabell (en yttre <tr>) — raderna är de tre sista.
+    const rows = html.split('<tr>').slice(2)
     expect(rows).toHaveLength(3)
     expect(rows[0]).not.toContain('border-top')
-    expect(rows[1]).toContain('#059669')
-    expect(rows[2]).toContain('#123456')
+    expect(rows[1]).toContain('#15803d')
+    expect(rows[1]).toContain('border-bottom:1.5px solid #0f172a')
+    expect(rows[2]).toContain('#0f172a')
+    expect(rows[2]).toContain('font-weight:700')
   })
 
   test('rotRutNotice säger preliminärt och pekar på Skatteverket — aldrig "dras automatiskt"', () => {
     const html = rotRutNotice('rot', 12345)
-    expect(html).toContain('Preliminärt ROT-avdrag')
+    expect(html).toMatch(/ROT-avdraget på .* är preliminärt/)
     expect(html.replace(/[\s  ]/g, ' ')).toContain('12 345 kr')
     expect(html).toContain('Skatteverket fastställer det slutgiltiga beloppet')
     expect(html).not.toMatch(/dras automatiskt/i)
+  })
+
+  test('amountBlock: belopp, förfallodag, totalt och preliminärt ROT-piller', () => {
+    const html = amountBlock({
+      label: 'Du betalar', amount: 700, total: 1000, rot: { type: 'rot', deduction: 300 }, due: '30 september',
+    }).replace(/[\s  ]/g, ' ')
+    expect(html).toContain('Du betalar')
+    expect(html).toContain('700 kr')
+    expect(html).toContain('Totalt 1 000 kr inkl. moms')
+    expect(html).toContain('Preliminärt ROT')
+    expect(html).toContain('<strong>30 september</strong>')
+    expect(html).not.toMatch(/dras automatiskt/i)
+  })
+
+  test('paymentBlock: Swish-knapp med djuplänk, bankgiro + OCR, utan Swish bara bankgiro', () => {
+    const med = paymentBlock({ swishNumber: '123 456 78 90', amount: 700, message: 'Faktura 1042', bankgiro: '123-4567', ocr: '10420' })
+    expect(med).toContain('swish://payment?data=')
+    expect(med).toContain('123-4567')
+    expect(med).toContain('10420')
+    const utan = paymentBlock({ amount: 700, message: 'Faktura 1042', bankgiro: '123-4567' })
+    expect(utan).not.toContain('swish://')
+    expect(utan).toContain('123-4567')
+  })
+
+  test('statusBand + formatDag', () => {
+    expect(statusBand('Offerten är godkänd', 'success')).toContain('Offerten är godkänd')
+    expect(statusBand('<x>')).toContain('&lt;x&gt;')
+    const iar = new Date('2026-09-07T12:00:00')
+    expect(formatDag('2026-09-30', iar)).toBe('30 september')
+    expect(formatDag('2027-01-15', iar)).toBe('15 januari 2027')
+    expect(formatDag('inte ett datum', iar)).toBe('inte ett datum')
   })
 
   test('swishDeeplink: bara siffror i payee, heltalsbelopp, JSON-kodad', () => {
