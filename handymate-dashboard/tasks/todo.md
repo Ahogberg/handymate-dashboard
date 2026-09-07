@@ -192,8 +192,12 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
   i ett exporterat träd: `git archive origin/main … | tar -x` i scratchpad,
   egna filer ovanpå, junction till node_modules. Två facit (demo-reset,
   cogs-matare) faller där av exportskäl (CRLF, supabase/ saknas) — inte fel.
-- [ ] Yta 9 kvar: v223 KÖRA i prod (koden är fail-closed utan raden →
-      503); landningssidan (handymate-landing: #demo-offert-blocket,
+- [x] v223 KÖRD i prod 2026-09-08 (dashboard-pushen 04304363). Fälla:
+      business_config.subscription_plan har check-constraint
+      starter|professional|enterprise — 'business' avvisades, 'professional'
+      insatt. Verifierat: is_demo_tenant/agents_globally_paused true,
+      automation av, 0 business_users, cleanup('biz_finns_inte') kastar.
+- [ ] Yta 9 kvar: landningssidan (handymate-landing: #demo-offert-blocket,
       save-lead allowlist 'demo-offert' + e-post-kravet); 46elks-saldo
       0,20 kr → fyll på före skarptest; NEXT_PUBLIC_LANDING_URL i Vercel
       (default https://handymate.se); skarptest med eget nummer: SMS 1 →

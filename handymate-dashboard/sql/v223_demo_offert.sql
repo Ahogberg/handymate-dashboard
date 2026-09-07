@@ -54,7 +54,7 @@ INSERT INTO business_config (
 ) VALUES (
   'biz_demo_ekstrom', 'Ekström Bygg AB', '556123-4567', 'Nacka', true,
   '#F59E0B', 25, true, 'hantverkare',
-  'business', 'active', true,
+  'professional', 'active', true,   -- check-constraint: starter|professional|enterprise
   true, true, now()
 )
 ON CONFLICT (business_id) DO UPDATE SET

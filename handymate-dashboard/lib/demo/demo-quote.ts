@@ -20,7 +20,7 @@ import { ensureDefaultStages, ensureDealForQuote } from '@/lib/pipeline'
  *   - Städning — lib/demo/demo-quote-cleanup.ts (maintenance-cronen).
  *
  * Demo-företaget är ett vanligt business_config med is_demo_tenant = true,
- * subscription_plan 'business' (bränslemätaren kräver en plan) och
+ * subscription_plan 'professional' (bränslemätaren kräver en plan) och
  * agents_globally_paused = true (ingen agent ska jaga demo-kunder).
  * automation_settings-raden har sms_auto_enabled = false så förfallo-
  * nudgen i quote-follow-up aldrig går ut.
