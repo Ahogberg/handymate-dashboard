@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ApprovalReview } from './review-contract'
 import { approvalArtifactId, insertApprovalArtifact } from './artifact-write'
-import { fortnoxRequest, createFortnoxProject, fortnoxProjectNumberFor, fortnoxProjectStatus, type FortnoxProject } from '@/lib/fortnox'
+import { FortnoxRequestNotSentError, fortnoxRequest, createFortnoxProject, fortnoxProjectNumberFor, fortnoxProjectStatus, type FortnoxProject } from '@/lib/fortnox'
 
 type Plan = { projectId: string; document: FortnoxProject; alreadyLinked: string | null }
 const purpose = 'fortnox:project:review'
@@ -98,11 +98,12 @@ export async function executeProjectSyncReview(db: SupabaseClient, businessId: s
       journal.result = { project_number: remote.ProjectNumber, reconciled: true }
     } catch (error) { return { ...base, ok: false, partial: true, error: error instanceof Error ? error.message : 'Fortnox-avstämningen misslyckades.' } }
   }
-  if (journal.status === 'prepared' && current.data.fortnox_project_number === plan.document.ProjectNumber) {
+  if (['prepared', 'not_sent'].includes(journal.status) && current.data.fortnox_project_number === plan.document.ProjectNumber) {
     return { ...base, ok: true, already_linked: true, project_number: plan.document.ProjectNumber }
   }
-  if (journal.status === 'prepared') {
-    const claim = await db.from('v3_automation_logs').update({ status: 'sending' }).eq('id', journal.id).eq('business_id', businessId).eq('status', 'prepared').select('id')
+  const maySend = ['prepared', 'not_sent'].includes(journal.status)
+  if (maySend) {
+    const claim = await db.from('v3_automation_logs').update({ status: 'sending' }).eq('id', journal.id).eq('business_id', businessId).eq('status', journal.status).select('id')
     if (claim.error || !claim.data?.length) return { ...base, ok: false, error: 'Ett annat försök kan ha påbörjat synken. Öppna kvittensen igen.' }
     try {
       const created = await createFortnoxProject(businessId, plan.document)
@@ -111,13 +112,20 @@ export async function executeProjectSyncReview(db: SupabaseClient, businessId: s
         .eq('id', journal.id).eq('business_id', businessId).eq('status', 'sending').select('id')
       if (accepted.error || !accepted.data?.length) return { ...base, ok: false, partial: true, project_number: created.ProjectNumber, error: 'Fortnox bekräftade projektet men kvittensen kunde inte sparas. Öppna igen för att kontrollera journalen; skapa inte om projektet.' }
     } catch (error) {
+      if (error instanceof FortnoxRequestNotSentError) {
+        const recorded = await db.from('v3_automation_logs').update({ status: 'not_sent', error_message: error.message })
+          .eq('id', journal.id).eq('business_id', businessId).eq('status', 'sending').select('id')
+        return { ...base, ok: false, partial: !!recorded.error || !recorded.data?.length, error: recorded.error || !recorded.data?.length
+          ? 'Inget projektanrop gjordes, men journalen kunde inte uppdateras. Öppna granskningen igen för att kontrollera läget.'
+          : 'Inget projektanrop gjordes eftersom Fortnox-anslutningen inte kunde användas. Återställ anslutningen och försök igen med samma underlag.' }
+      }
       // Never treat a thrown response as proof that Fortnox did not create it.
       await db.from('v3_automation_logs').update({ status: 'unknown', error_message: error instanceof Error ? error.message : 'Okänt Fortnox-svar' })
         .eq('id', journal.id).eq('business_id', businessId).eq('status', 'sending')
       return { ...base, ok: false, partial: true, error: 'Fortnox kunde ha skapat projektet. Avstämning krävs innan ett nytt anrop.' }
     }
   } else if (!['accepted', 'saved'].includes(journal.status)) return { ...base, ok: false, error: 'Synkjournalens status kunde inte verifieras.' }
-  if (journal.status !== 'prepared' && journal.result?.project_number !== plan.document.ProjectNumber) return { ...base, ok: false, error: 'Fortnox-kvittensen saknar rätt projektnummer.' }
+  if (!maySend && journal.result?.project_number !== plan.document.ProjectNumber) return { ...base, ok: false, error: 'Fortnox-kvittensen saknar rätt projektnummer.' }
   const updated = await db.from('project').update({ fortnox_project_number: plan.document.ProjectNumber, fortnox_synced_at: new Date().toISOString(), fortnox_sync_error: null })
     .eq('project_id', plan.projectId).eq('business_id', businessId).is('fortnox_project_number', null).select('project_id')
   const verified = await db.from('project').select('fortnox_project_number').eq('project_id', plan.projectId).eq('business_id', businessId).maybeSingle()

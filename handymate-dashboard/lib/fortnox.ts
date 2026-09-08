@@ -288,6 +288,12 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
  * Make an authenticated request to Fortnox API.
  * Loggar alla anrop till fortnox_api_log för debugging.
  */
+// Only raised before the resource request reaches fetch. Never use this for
+// network errors or HTTP responses, which may follow a committed mutation.
+export class FortnoxRequestNotSentError extends Error {
+  constructor(message: string) { super(message); this.name = 'FortnoxRequestNotSentError' }
+}
+
 export async function fortnoxRequest<T = unknown>(
   businessId: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -307,7 +313,7 @@ export async function fortnoxRequest<T = unknown>(
       error_message: 'Fortnox not connected or token refresh failed',
       duration_ms: Date.now() - startTime,
     })
-    throw new Error('Fortnox not connected or token refresh failed')
+    throw new FortnoxRequestNotSentError('Fortnox not connected or token refresh failed')
   }
 
   const url = `${FORTNOX_API_BASE}${endpoint}`
