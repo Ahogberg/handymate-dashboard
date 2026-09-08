@@ -202,11 +202,19 @@ function timeUntilExpiry(expiresAt: string): string {
   return `${Math.floor(hours / 24)} dag kvar`
 }
 
-function ApprovalHistoryReceipt({ approval }: { approval: Approval }) {
-  const receipt = (approval.payload?.execution_result as { receipt?: { state: string; text: string } } | undefined)?.receipt
-  if (approval.status === 'pending' || !receipt?.text) return null
-  const needsAttention = ['partial', 'failed', 'needs_action'].includes(receipt.state)
-  return <p className={`mt-2 text-sm whitespace-pre-wrap ${needsAttention ? 'text-amber-800' : 'text-slate-700'}`}>{receipt.text}</p>
+function ApprovalHistoryReceipt({ approval, onRetry, busy }: { approval: Approval; onRetry: (id: string) => void; busy: boolean }) {
+  const execution = approval.payload?.execution_result as { outcome?: string; receipt?: { state: string; text: string } } | undefined
+  const receipt = execution?.receipt
+  if (approval.status === 'pending') return null
+  const retryable = approval.status === 'approved' && ['failed', 'retrying'].includes(execution?.outcome || '')
+  const needsAttention = retryable || ['partial', 'failed', 'needs_action'].includes(receipt?.state || '')
+  return <div className="mt-2">
+    {needsAttention && <p className="text-xs font-semibold text-amber-800">Behöver följas upp</p>}
+    {receipt?.text && <p className={`text-sm whitespace-pre-wrap ${needsAttention ? 'text-amber-800' : 'text-slate-700'}`}>{receipt.text}</p>}
+    {retryable && <button type="button" disabled={busy} onClick={(event) => { event.stopPropagation(); onRetry(approval.id) }} className="mt-2 min-h-[44px] px-3 rounded-lg bg-amber-100 text-amber-900 text-sm font-medium disabled:opacity-50">
+      {busy ? 'Öppnar granskning...' : 'Granska återförsök'}
+    </button>}
+  </div>
 }
 
 function getRecipient(payload: Record<string, unknown>): string {
@@ -346,7 +354,7 @@ export default function ApprovalsPage() {
       const result = await res.json().catch(() => null)
         setApprovals(result?.approvals || [])
       }
-      // Misslyckade utföranden (senaste 7 dagarna) — egen pseudo-status i
+      // Misslyckade utföranden (även äldre ouppklarade ärenden) — egen pseudo-status i
       // GET-routen. Hämtas tyst; ett fel här får aldrig störa huvudkön.
       const failedRes = await fetch(`/api/approvals?status=execution_failed&limit=20${callFilter}`, {
         headers: {
@@ -377,10 +385,11 @@ export default function ApprovalsPage() {
       if (res.status === 499) return
       const result = await res.json().catch(() => null)
       if (res.ok && result?.execution_outcome?.outcome === 'success') {
-        const retriedItem = failedExecutions.find(a => a.id === id)
+        const retriedItem = failedExecutions.find(a => a.id === id) || approvals.find(a => a.id === id)
         const receipt = buildValueReceipt(retriedItem, result?.execution, result.execution_outcome.outcome)
         setFailedFeedback(null)
         setFailedExecutions(prev => prev.filter(a => a.id !== id))
+        await fetchApprovals()
         setFeedbackMsg(result?.receipt?.text || receipt?.text || 'Beslutet är registrerat.')
         setFeedbackLink(receipt?.link || null)
         setFeedbackLinkLabel(receipt?.linkLabel || 'Öppna utkastet')
@@ -879,7 +888,7 @@ export default function ApprovalsPage() {
                             <span className="font-semibold text-gray-900">{approval.title}</span>
                           </div>
                           <p className="text-sm text-gray-500">{approval.package_data.customer_name} · {approval.description}</p>
-                          <ApprovalHistoryReceipt approval={approval} />
+                          <ApprovalHistoryReceipt approval={approval} onRetry={handleRetry} busy={retryLoading === approval.id} />
                         </div>
                         {approval.status === 'pending' && (
                           <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">
@@ -1073,7 +1082,7 @@ export default function ApprovalsPage() {
                         {approval.description && (
                           <p className="text-sm text-slate-500 mt-1">{approval.description}</p>
                         )}
-                        <ApprovalHistoryReceipt approval={approval} />
+                        <ApprovalHistoryReceipt approval={approval} onRetry={handleRetry} busy={retryLoading === approval.id} />
                         {/* Visa offert-länk för quote-relaterade approvals */}
                         {QUOTE_RELATED_TYPES.includes(approval.approval_type) && (() => {
                           const quoteId = getQuoteId(approval)

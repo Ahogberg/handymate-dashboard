@@ -62,11 +62,10 @@ export async function GET(request: NextRequest) {
       // 'approved' och syns inte i någon kö. 'retrying' tas med: en
       // strandad omkörning (server dog) ska också gå att se och köra om
       // (retry-endpointen släpper igenom den efter 10 min).
-      const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      // Unresolved actions do not expire merely because seven days passed.
       query = query
         .eq('status', 'approved')
         .in('payload->execution_result->>outcome', ['failed', 'retrying'])
-        .gte('resolved_at', sevenDaysAgoIso)
     } else {
       query = query.eq('status', status)
       // Snoozade kort (v181, "Skjut upp") göms ur pending-kön tills tiden
