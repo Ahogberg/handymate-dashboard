@@ -53,12 +53,28 @@ export async function assignApprovalWork(db: SupabaseClient, businessId: string,
   if (member.error || !member.data) return { action: 'dispatch_suggestion', ok: false, error: 'Medarbetaren kunde inte verifieras.' }
   const name = member.data.name
   if (typeof name !== 'string' || !name.trim()) return { action: 'dispatch_suggestion', ok: false, error: 'Medarbetaren saknar namn. Uppdatera medarbetaren före tilldelning.' }
-  const update = await db.from(type === 'booking' ? 'booking' : 'work_orders').update({
+  const plan = p.dispatchPlan
+  const fields = type === 'booking' ? ['assigned_to', 'assigned_user_id'] : ['assigned_to']
+  if (!plan || plan.type !== type || plan.id !== p.context_id || plan.memberId !== p.member_id ||
+    !plan.before || !plan.after || plan.after.assigned_to !== name ||
+    (type === 'booking' && plan.after.assigned_user_id !== member.data.id) ||
+    fields.some(key => !(key in plan.before))) return { action: 'dispatch_suggestion', ok: false, error: 'Granskat tilldelningsunderlag saknas.' }
+  const table = type === 'booking' ? 'booking' : 'work_orders'
+  const key = type === 'booking' ? 'booking_id' : 'id'
+  const find = () => db.from(table).select('*').eq(key, p.context_id).eq('business_id', businessId).maybeSingle()
+  const matches = (row: any, values: any) => !!row && fields.every(field => (row[field] ?? null) === values[field])
+  const current = await find()
+  if (current.error || !current.data) return { action: 'dispatch_suggestion', ok: false, error: 'Uppdraget kunde inte verifieras.' }
+  const success = () => ({ action: 'dispatch_suggestion', ok: true, assigned: name, context_type: type, context_id: p.context_id })
+  if (matches(current.data, plan.after)) return success()
+  if (!matches(current.data, plan.before)) return { action: 'dispatch_suggestion', ok: false, error: 'Uppdraget har fått en annan tilldelning. Ingen ändring har gjorts.' }
+  let query = db.from(table).update({
     assigned_to: name, ...(type === 'booking' ? { assigned_user_id: member.data.id } : {}),
     dispatch_reasoning: { reasons: p.reasons, score: p.score, alternatives: p.alternatives, week_utilization_pct: p.week_utilization_pct, certificates: p.certificates },
-  }).eq(type === 'booking' ? 'booking_id' : 'id', p.context_id).eq('business_id', businessId).select(type === 'booking' ? 'booking_id' : 'id')
-  const saved = await db.from(type === 'booking' ? 'booking' : 'work_orders').select('*')
-    .eq(type === 'booking' ? 'booking_id' : 'id', p.context_id).eq('business_id', businessId).maybeSingle()
-  if (saved.error || !saved.data || saved.data.assigned_to !== name || (type === 'booking' && saved.data.assigned_user_id !== member.data.id)) return { action: 'dispatch_suggestion', ok: false, error: 'Tilldelningen kunde inte sparas i ditt företag.' }
-  return { action: 'dispatch_suggestion', ok: true, assigned: name, context_type: type }
+  }).eq(key, p.context_id).eq('business_id', businessId)
+  for (const field of fields) query = plan.before[field] === null ? query.is(field, null) : query.eq(field, plan.before[field])
+  await query.select(key)
+  const saved = await find()
+  if (saved.error || !matches(saved.data, plan.after)) return { action: 'dispatch_suggestion', ok: false, error: 'Tilldelningen kunde inte verifieras. Ett återförsök kontrollerar samma underlag.' }
+  return success()
 }

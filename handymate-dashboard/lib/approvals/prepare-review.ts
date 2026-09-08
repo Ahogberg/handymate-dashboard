@@ -250,9 +250,20 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         const booking = p.context_type === 'booking'
         if (!booking && p.context_type !== 'work_order') throw new Error('Tilldelningen saknar giltigt uppdrag.')
         const target = await row(booking ? 'booking' : 'work_orders', booking ? 'booking_id' : 'id', p.context_id, 'Uppdraget')
-        detail('Tilldela', person.name || person.full_name || p.member_name); detail('Uppdrag', target.title || target.notes || target.description)
-        detail('Datum', target.scheduled_date); detail('Start', target.scheduled_start); detail('Slut', target.scheduled_end); detail('Nuvarande tilldelning', target.assigned_to); list('Skäl', p.reasons)
-        return complete('Byter tilldelad medarbetare på detta uppdrag.', 'Spara tilldelningen')
+        if (typeof person.name !== 'string' || !person.name.trim()) throw new Error('Medarbetaren saknar namn.')
+        const before = { assigned_to: target.assigned_to ?? null, ...(booking ? { assigned_user_id: target.assigned_user_id ?? null } : {}) }
+        const after = { assigned_to: person.name, ...(booking ? { assigned_user_id: person.id } : {}) }
+        const plan = action === 'retry' ? p.execution_result?.review_evidence?.dispatchPlan :
+          { type: p.context_type, id: p.context_id, memberId: p.member_id, before, after }
+        if (!plan || plan.type !== p.context_type || plan.id !== p.context_id || plan.memberId !== p.member_id ||
+          JSON.stringify(plan.after) !== JSON.stringify(after)) throw new Error('Tidigare granskat tilldelningsunderlag saknas eller medarbetaren har ändrats.')
+        const matches = (value: Record<string, unknown>) => Object.entries(value).every(([key, v]) => (target[key] ?? null) === v)
+        if (!matches(plan.before) && !matches(plan.after)) throw new Error('Uppdraget har fått en annan tilldelning. Granska uppdraget innan du försöker igen.')
+        detail('Tilldela', person.name); detail('Uppdrag', target.title || target.notes || target.description)
+        detail('Datum', target.scheduled_date); detail('Start', target.scheduled_start); detail('Slut', target.scheduled_end); detail('Nuvarande tilldelning', target.assigned_to || 'Ingen'); list('Skäl', p.reasons)
+        return { ...complete('Byter tilldelad medarbetare på detta uppdrag.', 'Spara tilldelningen'),
+          executionPayload: { dispatchPlan: plan }, executionEvidence: { dispatchPlan: plan } }
+
       }
       case 'time_attestation': {
         const checkin = await row('time_checkins', 'id', p.checkin_id, 'Incheckningen')

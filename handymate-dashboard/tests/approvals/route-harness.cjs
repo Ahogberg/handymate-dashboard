@@ -7,6 +7,7 @@ class FortnoxRequestNotSentError extends Error {}
 let ownerPushCalls=[],ownerPushFail=true
 const projectSyncLogs = new Map(), fortnoxCalls = []
 let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
+let failDispatch=false,loseDispatch=false,dispatchWrites=0
 let memoryRow, memoryWrites=0, failMemory=false, loseMemory=false
 let priceRow, priceWrites=0, priceWriteFails=false, losePriceResponse=false
 const timeEntries=new Map();let timeInserts=0
@@ -123,6 +124,11 @@ const db = { from(table) {
       if (['push_tokens','push_subscriptions'].includes(table)) { const device=table==='push_tokens'?{id:'expo1',token:'ExponentPushToken[test]'}:{id:'web1',endpoint:'https://push.test/secret',p256dh:'key',auth:'auth'};return resolve({data:single?device:[device],error:null}) }
       if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
       if (table === 'booking') {
+        if(operation==='update'){
+          const selected=bookingRows.filter(matches);dispatchWrites++
+          if(!failDispatch)selected.forEach(item=>Object.assign(item,structuredClone(values)))
+          return resolve({data:loseDispatch?null:structuredClone(selected),error:loseDispatch?{message:'response lost'}:null})
+        }
         const notePattern = filters.find(([key]) => key === 'notes')?.[1]
         if (notePattern) { const needle=String(notePattern).replaceAll('%',''); return resolve({ data: structuredClone(bookingRows.filter(item=>String(item.notes||'').includes(needle))), error:null }) }
         const wanted = filters.find(([key]) => key === 'booking_id')?.[1]
@@ -178,6 +184,29 @@ const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
 const reset = () => { checklists.clear();checklistInserts=0; diaryRows.clear();diaryInserts=0;loseDiary=false;failDiary=false; memoryRow={id:'memory1',business_id:'b1',agent_id:'matte',content:'Reviewed memory',confirmed_at:null,superseded_by:null};memoryWrites=0;failMemory=false;loseMemory=false; priceRow={id:'price1',business_id:'b1',name:'Standard',hourly_rate_normal:800};priceWrites=0;priceWriteFails=false;losePriceResponse=false; facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
+  reset();row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'dispatch1',member_id:'member1'}
+  bookingRows=[{booking_id:'dispatch1',business_id:'b1',assigned_to:null,assigned_user_id:null,notes:'Reviewed booking',scheduled_start:'2026-09-08T12:00:00Z'}]
+  let dispatchPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(dispatchPreview.review.confirmLabel,'Spara tilldelningen',JSON.stringify(dispatchPreview));assert.equal(dispatchWrites,0)
+  bookingRows[0].assigned_to='Other'
+  assert.equal((await post({action:'approve',review_token:dispatchPreview.review_token})).status,428);assert.equal(dispatchWrites,0)
+  bookingRows[0].assigned_to=null;dispatchPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  failDispatch=true
+  let dispatchResult=await (await post({action:'approve',review_token:dispatchPreview.review_token})).json()
+  assert.equal(dispatchResult.receipt.state,'failed',JSON.stringify(dispatchResult))
+  assert.equal(row.payload.execution_result.review_evidence.dispatchPlan.before.assigned_to,null)
+  dispatchPreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  failDispatch=false;loseDispatch=true
+  dispatchResult=await (await post({action:'retry',review_token:dispatchPreview.review_token})).json()
+  assert.equal(dispatchResult.receipt.state,'saved',JSON.stringify(dispatchResult));assert.equal(bookingRows[0].assigned_user_id,'member1')
+  assert.deepEqual(row.payload.execution_result.receipt,dispatchResult.receipt)
+  const assignment=load(path.join(root,'lib/approvals/internal-writes.ts')).assignApprovalWork
+  const dispatchPayload={...row.payload,dispatchPlan:row.payload.execution_result.review_evidence.dispatchPlan}
+  assert.equal((await assignment(db,'b1',dispatchPayload)).ok,true);assert.equal(dispatchWrites,2)
+  bookingRows[0].assigned_to='Newer';bookingRows[0].assigned_user_id='newer'
+  assert.equal((await assignment(db,'b1',dispatchPayload)).ok,false);assert.equal(dispatchWrites,2)
+  loseDispatch=false
+  console.log('PASS dispatch booking route: signed preview, stale decision denied, persisted original plan, failed write, lost-response retry, durable receipt, no repeated success write or newer assignment overwrite')
   reset();row.approval_type='tidrapport_forslag';row.payload={project_id:'p1',booking_date:'2026-02-31',suggested_minutes:75}
   let timePreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(timeInserts,0);assert(!timePreview.review?.canExecute)

@@ -1508,7 +1508,7 @@ async function executeApprovalPayload(
 
       case 'dispatch_suggestion': {
         const { assignApprovalWork } = await import('@/lib/approvals/internal-writes')
-        return assignApprovalWork(await getSupabase(), businessId, payload)
+        return assignApprovalWork(await getSupabase(), businessId, { ...payload, dispatchPlan: reviewedPayload?.dispatchPlan })
       }
       case 'time_attestation': {
         const { attestApprovalTime } = await import('@/lib/approvals/internal-writes')
