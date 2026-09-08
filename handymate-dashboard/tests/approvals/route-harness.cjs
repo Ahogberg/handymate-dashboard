@@ -7,6 +7,7 @@ class FortnoxRequestNotSentError extends Error {}
 let ownerPushCalls=[],ownerPushFail=true
 const projectSyncLogs = new Map(), fortnoxCalls = []
 let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
+let memoryRow, memoryWrites=0, failMemory=false, loseMemory=false
 let priceRow, priceWrites=0, priceWriteFails=false, losePriceResponse=false
 const facts = new Map(), factWrites = []; let failedFact = null, lostFact = null
 const inboxItems = new Map()
@@ -21,6 +22,15 @@ const db = { from(table) {
         if (!matches(row)) return resolve({ data: [], error: null })
         if (operation === 'update') Object.assign(row, structuredClone(values))
         return resolve({ data: operation === 'read' ? structuredClone(row) : [{ id: row.id }], error: null })
+      }
+      if (table === 'agent_memories') {
+        const selected=memoryRow && matches(memoryRow) ? memoryRow : null
+        if (operation === 'update' && selected) {
+          memoryWrites++
+          if (!failMemory) Object.assign(selected,structuredClone(values))
+          if (loseMemory) return resolve({data:null,error:{message:'Lost confirmation response'}})
+        }
+        return resolve({data:structuredClone(single?selected:selected?[selected]:[]),error:null})
       }
       if (table === 'price_lists_v2') {
         const selected=priceRow && matches(priceRow) ? priceRow : null
@@ -137,9 +147,27 @@ function load(file) {
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
-const reset = () => { priceRow={id:'price1',business_id:'b1',name:'Standard',hourly_rate_normal:800};priceWrites=0;priceWriteFails=false;losePriceResponse=false; facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
+const reset = () => { memoryRow={id:'memory1',business_id:'b1',agent_id:'matte',content:'Reviewed memory',confirmed_at:null,superseded_by:null};memoryWrites=0;failMemory=false;loseMemory=false; priceRow={id:'price1',business_id:'b1',name:'Standard',hourly_rate_normal:800};priceWrites=0;priceWriteFails=false;losePriceResponse=false; facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
+  reset();row.approval_type='agent_memory_confirmation';row.payload={memory_id:'memory1'}
+  let memoryPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(memoryPreview.review.confirmLabel,'Bekräfta minnet',JSON.stringify(memoryPreview));assert.equal(memoryWrites,0)
+  memoryRow.content='Changed memory'
+  assert.equal((await post({action:'approve',review_token:memoryPreview.review_token})).status,428);assert.equal(memoryWrites,0)
+  memoryRow.content='Reviewed memory';memoryPreview=await (await post({action:'preview',decision_action:'approve'})).json();failMemory=true
+  let memoryResult=await (await post({action:'approve',review_token:memoryPreview.review_token})).json()
+  assert.equal(memoryResult.receipt.state,'failed',JSON.stringify(memoryResult));assert.equal(memoryRow.confirmed_at,null)
+  memoryPreview=await (await post({action:'preview',decision_action:'retry'})).json();failMemory=false;loseMemory=true
+  memoryResult=await (await post({action:'retry',review_token:memoryPreview.review_token})).json()
+  assert.equal(memoryResult.receipt.state,'saved',JSON.stringify(memoryResult));assert(memoryRow.confirmed_at)
+  assert.deepEqual(row.payload.execution_result.receipt,memoryResult.receipt)
+  const memoryExecutor=load(path.join(root,'lib/approvals/memory-confirmation.ts')).executeMemoryConfirmation
+  const memoryPlan={id:'memory1',content:'Reviewed memory',agent_id:'matte'},stamp=memoryRow.confirmed_at
+  assert.equal((await memoryExecutor(db,'b1',memoryPlan)).ok,true);assert.equal(memoryWrites,2);assert.equal(memoryRow.confirmed_at,stamp)
+  assert.equal((await memoryExecutor(db,'foreign',memoryPlan)).ok,false)
+  memoryRow.content='Changed again';assert.equal((await memoryExecutor(db,'b1',memoryPlan)).ok,false)
+  console.log('PASS memory confirmation route: stale review, failed update, reviewed retry, lost response readback, immutable confirmation timestamp, tenant/content guards and durable receipt')
   reset();row.approval_type='price_adjustment';row.payload={price_list_id:'price1',suggested_rate:950}
   let pricePreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(pricePreview.review.confirmLabel,'Ändra timpriset',JSON.stringify(pricePreview))

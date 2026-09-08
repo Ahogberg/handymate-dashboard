@@ -219,8 +219,12 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       }
       case 'agent_memory_confirmation': {
         const memory = await row('agent_memories', 'id', p.memory_id, 'Minnet')
+        if (memory.superseded_by) throw new Error('Minnet har ersatts av ett nyare minne.')
+        if (typeof memory.content !== 'string' || !memory.content.trim()) throw new Error('Minnets innehåll saknas.')
+        const plan = { id: memory.id, content: memory.content, agent_id: memory.agent_id ?? null }
         detail('Minnet som bekräftas', memory.content); detail('Agent', memory.agent_id)
-        return complete('Bekräftar det visade minnet för framtida användning i företagets AI-hantering.', 'Bekräfta minnet')
+        if (memory.confirmed_at) detail('Status', 'Redan bekräftat. Bekräftelsedatumet ändras inte.')
+        return { ...complete('Bekräftar det visade minnet för framtida användning i företagets AI-hantering.', 'Bekräfta minnet'), executionPayload: { memoryConfirmation: plan }, executionEvidence: { memoryConfirmation: plan } }
       }
       case 'price_adjustment': {
         const price = await row('price_lists_v2', 'id', p.price_list_id, 'Prislistan')
