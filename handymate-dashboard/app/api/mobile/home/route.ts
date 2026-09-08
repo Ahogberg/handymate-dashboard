@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
       night: {
         since: senasteKvallsgrans(nu).toISOString(),
         count: nattRader.length,
-        latest: nattRader.slice(0, 3).map(r => ({ id: r.id, rule_name: r.rule_name, created_at: r.created_at })),
+        latest: nattRader.map(r => ({ id: r.id, rule_name: r.rule_name, created_at: r.created_at })),
       },
       active_missions: missionRes.count ?? 0,
     })
