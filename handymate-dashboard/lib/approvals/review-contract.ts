@@ -44,7 +44,7 @@ export function buildApprovalReview(approval: {
   if (internal) {
     review.effect = internal.effect
     review.details = Object.entries(internal.fields).flatMap(([key, label]) =>
-      (typeof p[key] === 'string' || typeof p[key] === 'number') ? [{ label, text: String(p[key]) }] : [])
+      (typeof p[key] === 'string' || typeof p[key] === 'number') ? [{ label, text: key === 'priority' ? (p[key] === 'high' || p[key] === 'urgent' ? 'Hög' : 'Normal') : String(p[key]) }] : [])
     if (internal.required.some(key => p[key] == null || p[key] === '') ||
         (type === 'price_adjustment' && (typeof p.suggested_rate !== 'number' || p.suggested_rate <= 0 || !p.price_list_name))) {
       review.blockedReason = 'Underlaget är ofullständigt. Öppna ärendet och komplettera före beslut.'

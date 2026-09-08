@@ -98,6 +98,15 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
   })
 }
 
+// Notify readers after a submitted decision, including a lost response. Never resend.
+export const APPROVAL_QUEUE_CHANGED = 'handymate:approval-queue-changed'
+async function submitDecision(url: string, init: RequestInit): Promise<Response> {
+  try { return await fetch(url, init) }
+  finally {
+    if (typeof window !== 'undefined') window.dispatchEvent(new Event(APPROVAL_QUEUE_CHANGED))
+  }
+}
+
 /** Explicit read-only preflight: an old server rejects `preview`, never sends. */
 export async function reviewedApprovalFetch(url: string, init: RequestInit): Promise<Response> {
   const body = JSON.parse(String(init.body || '{}'))
@@ -105,12 +114,12 @@ export async function reviewedApprovalFetch(url: string, init: RequestInit): Pro
   const preview = await fetch(url, { ...init, keepalive: false,
     body: JSON.stringify({ ...body, action: 'preview', decision_action: body.action }) })
   const data = await preview.clone().json().catch(() => null)
-  if (preview.ok && data?.review_not_required === true) return fetch(url, init)
+  if (preview.ok && data?.review_not_required === true) return submitDecision(url, init)
   if (!data?.review) return preview
   const decision = await showApprovalReview(data.review, init.headers)
   if (!decision.confirmed || !data.review_token || !data.review.confirmLabel) {
     return Response.json({ cancelled: true, error: 'Avbrutet. Ärendet ligger kvar.' }, { status: 499 })
   }
   // Never retry delivery on network error. A new click must start a fresh review.
-  return fetch(url, { ...init, keepalive: false, body: JSON.stringify({ ...body, ...(decision.actionOverrides ? { action_overrides: { ...(body.action_overrides || {}), ...decision.actionOverrides } } : {}), review_token: data.review_token }) })
+  return submitDecision(url, { ...init, keepalive: false, body: JSON.stringify({ ...body, ...(decision.actionOverrides ? { action_overrides: { ...(body.action_overrides || {}), ...decision.actionOverrides } } : {}), review_token: data.review_token }) })
 }

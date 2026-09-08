@@ -1,5 +1,6 @@
 'use client'
 
+import { APPROVAL_QUEUE_CHANGED } from '@/lib/approvals/review-client'
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import { usePathname, useSearchParams, useRouter } from 'next/navigation'
@@ -196,6 +197,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
   const plan: PlanType = business.subscription_plan || 'starter'
   const [pendingCount, setPendingCount] = useState(0)
   const [approvalCount, setApprovalCount] = useState(0)
+  const approvalRequest = useRef(0)
   const [openGroups, setOpenGroups] = useState<Set<string>>(new Set())
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [userMenuOpen, setUserMenuOpen] = useState(false)
@@ -394,6 +396,8 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Pending approvals count ─────────────────────────────────────────
   useEffect(() => {
+    ++approvalRequest.current
+    setApprovalCount(0)
     if (!businessId) return
 
     fetchApprovalCount()
@@ -412,26 +416,33 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
       )
       .subscribe()
 
+    const refresh = () => { void fetchApprovalCount() }
+    window.addEventListener(APPROVAL_QUEUE_CHANGED, refresh)
+    window.addEventListener('focus', refresh)
     const interval = setInterval(fetchApprovalCount, 30000)
 
     return () => {
+      ++approvalRequest.current
+      window.removeEventListener(APPROVAL_QUEUE_CHANGED, refresh)
+      window.removeEventListener('focus', refresh)
       supabase.removeChannel(channel)
       clearInterval(interval)
     }
-  }, [businessId])
+  }, [businessId, currentUser?.user_id])
 
   async function fetchApprovalCount() {
     if (!businessId) return
+    const request = ++approvalRequest.current
     try {
       // Andreas fynd 2026-08-18: rå DB-räkning inkluderade rader som SIDAN
       // gömmer (testdata-filtret + routing-behörigheten i /api/approvals) —
       // en kvarliggande test-markerad rad gav en evig "1"-badge mot en tom
       // kö. Badgen räknar nu via SAMMA API som sidan visar — samma filter,
-      // per konstruktion samma siffra, för alltid.
+      // Beslutshändelsen uppdaterar direkt; sekvensen skyddar mot gamla svar.
       const res = await fetch('/api/approvals?status=pending')
       if (res.ok) {
         const data = await res.json()
-        setApprovalCount((data.approvals || []).length)
+        if (request === approvalRequest.current) setApprovalCount(Array.isArray(data.approvals) ? data.approvals.length : 0)
       }
     } catch { /* silent */ }
 
@@ -444,7 +455,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         .eq('business_id', businessId)
         .eq('status', 'failed')
         .gte('created_at', yesterday)
-      setAutomationFailed((failedCount || 0) > 0)
+      if (request === approvalRequest.current) setAutomationFailed((failedCount || 0) > 0)
     } catch { /* table may not exist yet */ }
 
     // Okopplade leverantörsfakturor — Karins matchningskö (project_id IS
@@ -456,7 +467,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
         .select('*', { count: 'exact', head: true })
         .eq('business_id', businessId)
         .is('project_id', null)
-      if (!queueError) setSupplierQueueCount(queueCount || 0)
+      if (!queueError && request === approvalRequest.current) setSupplierQueueCount(queueCount || 0)
     } catch { /* silent */ }
   }
 
