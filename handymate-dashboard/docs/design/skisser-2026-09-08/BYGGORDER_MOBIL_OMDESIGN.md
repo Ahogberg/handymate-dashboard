@@ -30,11 +30,27 @@ för att flusha ut avslagsrisken hos Apple innan bygge 14.
 Duken märker två saker `NY FUNKTION`. Ingen av dem byggs i det här passet.
 
 - **"Fredag 12 sep · 09:00"** i 1b steg 3. Kräver den schemalagda åtgärden
-  som byggs separat. Tills den finns: **inga veckodagar och inga klockslag i
-  agenttext.** Skriv "Planerat" eller "Bevakar" utan tid. Det här är en
-  regel, inte en rekommendation; mönstret har återkommit fyra gånger.
-- **"Ge teamet ett uppdrag"** som startpunkt för ny kund. Mission Control
-  får ingen ny menyplats och inget nytt flöde nu.
+  som byggs parallellt. Detta är sekvens, inte avslag: den ritas in så snart
+  primitiven landat och granskats, och blir då ett litet tillägg i en yta
+  som redan är omdesignad. Skälet att inte vänta in den är att de två
+  arbetena annars låser varandra.
+
+  Tills primitiven finns: **inga veckodagar och inga klockslag i agenttext.**
+  Skriv "Planerat" eller "Bevakar" utan tid. Det här är en regel, inte en
+  rekommendation; mönstret har återkommit fyra gånger i skisser.
+- **"Ge teamet ett uppdrag"** som tredje ruta i tomläget. Ersätts av
+  **"Koppla telefonen"** (beslut Andreas 2026-09-08). Skälet: Mission Control
+  har noll rader i produktion, ingen firma har någonsin skapat ett uppdrag,
+  och en ny kunds första minut ska inte satsas på det mest oprövade i
+  produkten. Lisa är kärnlöftet och telefonkopplingen är det som faktiskt
+  får teamet att börja leverera. Flödet finns: `Step4PhoneNumber` och
+  kanalhälsan (`lib/onboarding/channel-health.ts`).
+
+  Tomlägets tre rutor blir alltså: lägg till din första kund, koppla
+  kalendern, koppla telefonen. Rutorna försvinner när kunden är igång, så de
+  behöver inte täcka allt teamet kan göra.
+
+  Mission Control får fortfarande ingen ny menyplats och inget nytt flöde.
 
 Ingen ny backend i det här passet. Saknas ett fält ritas inte elementet.
 
