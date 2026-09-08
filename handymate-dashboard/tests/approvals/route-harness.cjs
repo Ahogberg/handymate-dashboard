@@ -11,7 +11,7 @@ let failDispatch=false,loseDispatch=false,dispatchWrites=0
 let workOrderRows=[]
 let memoryRow, memoryWrites=0, failMemory=false, loseMemory=false
 let priceRow, priceWrites=0, priceWriteFails=false, losePriceResponse=false
-const timeEntries=new Map();let timeInserts=0
+const timeEntries=new Map();let timeInserts=0;let timeInsertMode=null,timeReadError=false
 const checklists=new Map();let checklistInserts=0
 const diaryRows=new Map();let diaryInserts=0,loseDiary=false,failDiary=false
 const facts = new Map(), factWrites = []; let failedFact = null, lostFact = null
@@ -29,7 +29,8 @@ const db = { from(table) {
         return resolve({ data: operation === 'read' ? structuredClone(row) : [{ id: row.id }], error: null })
       }
       if (table === 'time_entry') {
-        if(operation==='insert'){timeInserts++;timeEntries.set(values.time_entry_id,structuredClone(values))}
+        if(operation==='read'&&timeReadError)return resolve({data:null,error:{message:'Read unavailable'}})
+        if(operation==='insert'){timeInserts++;if(timeInsertMode!=='fail')timeEntries.set(values.time_entry_id,structuredClone(values));if(timeInsertMode==='throw')throw Error('Response lost');if(timeInsertMode)return resolve({data:null,error:{message:'Write response unavailable'}})}
         const selected=[...timeEntries.values()].filter(matches)
         return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
       }
@@ -173,7 +174,7 @@ function load(file) {
     if (name === '@/lib/leads/golden-path') return { activatePendingLead: async (leadId,_db,options) => { leadActivationCalls.push({leadId,options:structuredClone(options)}); return {dealId:options.createDeal?'deal1':null,dealError:null,effects:[{effect:'lead_status',status:'succeeded',message:'Status ändrad till ny'},{effect:'deal',status:options.createDeal?'succeeded':'skipped'},{effect:'internal_sms',status:options.prepareInternalSms?'succeeded':'skipped',approval_id:options.prepareInternalSms?'child-sms':undefined},{effect:'lead_received_rules',status:options.runAutomationRules?'succeeded':'skipped'}]} } }
     if (name === '@/lib/automation-engine') return { runApprovedAutomationAction: async (...args) => { automationCalls.push({businessId:args[1],actionType:args[2],config:structuredClone(args[3]),context:structuredClone(args[4])}); return {success:true,data:{lead_id:args[4].lead_id,status:'lost'}} } }
     if (name === '@/lib/egenkontroll/suggest-time-entry') return load(path.join(root,'lib/egenkontroll/suggest-time-entry.ts'))
-    if (name === '@/lib/approvals/artifact-write') return { insertApprovalArtifact: async (...args) => { if(['customer_fact','project_checklist','time_entry'].includes(args[1]))return load(path.join(root,'lib/approvals/artifact-write.ts')).insertApprovalArtifact(...args); artifactCalls.push({table:args[1],purpose:args[5],values:structuredClone(args[6])}); return {data:{id:`child-${artifactCalls.length}`},error:null} } }
+    if (name === '@/lib/approvals/artifact-write') return { approvalArtifactId: load(path.join(root,'lib/approvals/artifact-write.ts')).approvalArtifactId, insertApprovalArtifact: async (...args) => { if(['customer_fact','project_checklist','time_entry'].includes(args[1]))return load(path.join(root,'lib/approvals/artifact-write.ts')).insertApprovalArtifact(...args); artifactCalls.push({table:args[1],purpose:args[5],values:structuredClone(args[6])}); return {data:{id:`child-${artifactCalls.length}`},error:null} } }
     if (name === '@/lib/invoices/payment-decision') return load(path.join(root, name.slice(2)+'.ts'))
     if (name === '@/lib/projects/complete-project') return { completeProject: async args => { completionCalls.push(structuredClone({businessId:args.businessId,projectId:args.projectId,authorization:args.authorization,options:args.options})); const chosen=args.options; return { ok:true,completed:true,transitioned:true,already_completed:false,requires_approval:false,project:{project_id:'p1'},invoice_created:chosen.createInvoiceDraft?{invoice_id:'inv1',invoice_number:'1001',total:10000,status:'draft'}:null,effects:[{effect:'workflow_stage',status:'succeeded'},{effect:'auto_invoice',status:chosen.createInvoiceDraft?'succeeded':'skipped',message:chosen.createInvoiceDraft?undefined:'Fakturautkast valdes bort i granskningen'},{effect:'review_request',status:chosen.createReviewRequest?'succeeded':'skipped',message:chosen.createReviewRequest?undefined:'Kunduppföljning valdes bort i granskningen'},{effect:'job_completed_event',status:chosen.runAutomations?'attempted':'skipped'}],warnings:[] } } }
     if (name === '@/lib/customers/namn') return { halsning: name => `Hej ${String(name || '').split(' ')[0]}!` }
@@ -329,6 +330,46 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.deepEqual(row.payload.execution_result.receipt,timeResult.receipt)
   await post({action:'approve',review_token:timePreview.review_token});assert.equal(timeInserts,1)
   console.log('PASS time proposal real route/artifact: invalid date rejected, explicit CTA, exact approved billable row and receipt, duplicate decision denied')
+  for(const mode of ['error','throw','fail']) {
+    reset();timeEntries.clear();timeInserts=0;timeInsertMode=mode;timeReadError=false
+    row.approval_type='tidrapport_forslag';row.payload={project_id:'p1',project_name:'Reviewed project',booking_date:'2026-09-08',suggested_minutes:75,assigned_user_id:'member1'}
+    let preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    assert(preview.review.details.some(d=>d.label==='Beskrivning'&&d.text==='Tidrapport-förslag · Reviewed project'))
+    let result=await (await post({action:'approve',review_token:preview.review_token})).json()
+    assert.equal(result.receipt.state,mode==='fail'?'failed':'saved',JSON.stringify(result))
+    assert.equal(timeInserts,1)
+    if(mode==='fail') {
+      assert.equal(timeEntries.size,0);timeInsertMode=null
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert.equal(preview.review.confirmLabel,'Registrera tidrapporten')
+      result=await (await post({action:'retry',review_token:preview.review_token})).json()
+      assert.equal(result.receipt.state,'saved');assert.equal(timeEntries.size,1)
+    }
+    const entry=[...timeEntries.values()][0],baseline=structuredClone(entry),count=timeInserts
+    row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}}
+    timeInsertMode=null
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert.equal(preview.review.confirmLabel,'Bekräfta registrerad tid')
+    result=await (await post({action:'retry',review_token:preview.review_token})).json()
+    assert.equal(result.receipt.state,'saved');assert.equal(timeInserts,count)
+    assert.deepEqual(entry,baseline);assert.deepEqual(row.payload.execution_result.receipt,result.receipt)
+    for(const change of [{duration_minutes:90},{description:'Later edited note'},{work_date:'2026-09-07'},{business_user_id:'other'},{is_billable:false},{approval_status:'pending'}]) {
+      Object.assign(entry,baseline,change);row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}}
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert(!preview.review.confirmLabel,JSON.stringify(change));assert.equal(timeInserts,count)
+    }
+    Object.assign(entry,baseline)
+    timeReadError=true
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert(!preview.review.confirmLabel);assert.equal(timeInserts,count)
+    timeReadError=false
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    entry.duration_minutes=80
+    assert.equal((await post({action:'retry',review_token:preview.review_token})).status,422)
+    assert.equal(timeInserts,count);assert.equal(entry.duration_minutes,80)
+  }
+  timeInsertMode=null;timeReadError=false
+  console.log('PASS time proposal lost/error responses read back exact row; real failed insert can retry; existing row is reviewed and not reinserted; edited fields/read error/stale snapshot block without overwriting')
   reset();row.approval_type='checklist_forslag';row.payload={project_id:'p1',template_name:'Safety check',template_items:[{id:'one',text:'Check fixture',required:true,checked:true},{id:'two',text:'Read note',required:false,checked:false}]}
   let checklistPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(checklistPreview.review.confirmLabel,'Skapa checklistan',JSON.stringify(checklistPreview));assert.equal(checklistInserts,0)
