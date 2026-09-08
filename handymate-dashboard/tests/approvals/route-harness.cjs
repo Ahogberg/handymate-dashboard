@@ -140,6 +140,12 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   syncPreview=await (await post({action:'preview',decision_action:'approve'})).json();fortnoxNotSent=true
   syncResult=await (await post({action:'approve',review_token:syncPreview.review_token})).json();assert.equal(syncResult.receipt.state,'failed');assert.equal(fortnoxCalls.length,0)
   fortnoxNotSent=false;syncPreview=await (await post({action:'preview',decision_action:'retry'})).json();syncResult=await (await post({action:'retry',review_token:syncPreview.review_token})).json();assert.equal(syncResult.receipt.state,'saved',JSON.stringify(syncResult));assert.equal(fortnoxCalls.length,1)
+  reset();row.approval_type='automation';row.payload={project_id:'p1',rule_action_type:'sync_to_fortnox',rule_action_config:{entity_type:'project'}};Object.assign(projectRow,{business_id:'b1',project_number:'P-1042',fortnox_project_number:null})
+  syncPreview=await (await post({action:'preview',decision_action:'approve'})).json();loseFortnoxResponse=true;await post({action:'approve',review_token:syncPreview.review_token});fortnoxRemote.Description='Verified renamed project'
+  syncPreview=await (await post({action:'preview',decision_action:'retry'})).json();assert.equal(syncPreview.review.choices[0].required,true);const beforeConflictDecision=mutations
+  assert.equal((await post({action:'retry',review_token:syncPreview.review_token})).status,422);assert.equal(mutations,beforeConflictDecision);assert.equal(projectRow.fortnox_project_number,null)
+  syncResult=await (await post({action:'retry',review_token:syncPreview.review_token,action_overrides:{confirm_project_identity:'approved'}})).json();assert.equal(syncResult.receipt.state,'saved',JSON.stringify(syncResult));assert.equal(fortnoxCalls.length,1);assert.equal(fortnoxRemote.Description,'Verified renamed project');assert.equal(projectRow.fortnox_project_number,'1042')
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(syncResult.receipt))
   reset(); row.approval_type='automation'; row.created_at='2026-09-08T12:00:00Z'; row.payload={customer_id:'c-site',rule_action_type:'schedule_followup',rule_action_config:{days_until:2,description:'Ring {{customer_name}}'}}
   const followupPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(mutations,0); assert(followupPreview.review.details.some(d=>d.text==='Ring Anna Andersson (senast 2026-09-10)'))

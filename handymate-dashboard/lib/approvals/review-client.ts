@@ -34,7 +34,7 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
     for (const choice of review.choices || []) {
       const label = document.createElement('label')
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = choice.defaultSelected
-      checkbox.onchange = () => { choiceState[choice.id] = checkbox.checked }
+      checkbox.onchange = () => { choiceState[choice.id] = checkbox.checked; updateConfirmState() }
       label.append(checkbox, document.createTextNode(` ${choice.label}`)); dialog.append(label)
       add('p', choice.description)
     }
@@ -42,6 +42,9 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
     const objectUrls: string[] = []
     const attachmentChecks: HTMLInputElement[] = []
     let confirmButton: HTMLButtonElement | undefined
+    const updateConfirmState = () => {
+      if (confirmButton) confirmButton.disabled = (review.choices || []).some(choice => choice.required && !choiceState[choice.id]) || !attachmentChecks.every(check => check.checked && !check.disabled)
+    }
     let settled = false
     const finish = (confirmed: boolean) => {
       if (settled) return
@@ -64,7 +67,7 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
       const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.disabled = true
       attachmentChecks.push(checkbox)
       checkLabel.append(checkbox, document.createTextNode(` Jag har granskat: ${attachment.label}`)); dialog.append(checkLabel)
-      checkbox.onchange = () => { if (confirmButton) confirmButton.disabled = !attachmentChecks.every(check => check.checked && !check.disabled) }
+      checkbox.onchange = () => { updateConfirmState() }
       if (!attachment.url.startsWith('/api/')) { status.textContent = 'Underlaget har en ogiltig adress.'; continue }
       void fetch(attachment.url, { headers }).then(async response => {
         if (!response.ok) throw new Error('Kunde inte läsa underlaget')
@@ -85,7 +88,7 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
     if (review.confirmLabel) {
       const confirm = add('button', review.confirmLabel) as HTMLButtonElement
       confirmButton = confirm
-      confirm.type = 'button'; confirm.disabled = attachmentChecks.length > 0
+      confirm.type = 'button'; updateConfirmState()
       Object.assign(confirm.style, { padding: '12px 20px', marginLeft: '12px', background: '#0F766E', color: 'white', borderRadius: '12px' })
       confirm.onclick = () => { confirm.disabled = true; finish(true) }
     }

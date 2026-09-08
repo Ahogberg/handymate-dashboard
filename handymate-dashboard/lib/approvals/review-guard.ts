@@ -31,6 +31,9 @@ export function requireApprovalReview(input: {
         Object.entries(overrides).some(([key, value]) => !allowed.has(key) || !['approved', 'rejected'].includes(String(value))))) {
       return { status: 422, data: { error: 'Ett valt delbeslut hör inte till det granskade underlaget.', code: 'approval_review_choice_invalid', review } }
     }
+    if (body.review_token && review.choices.some(choice => choice.required && overrides?.[choice.id] !== 'approved')) {
+      return { status: 422, data: { error: 'Bekräfta det obligatoriska delbeslutet innan du fortsätter.', code: 'approval_review_choice_required', review } }
+    }
     boundOverrides = null
   }
   const binding = canonical({ id: approval.id, businessId: input.businessId, actorId: input.actorId,

@@ -23,6 +23,12 @@ const {chromium}=require('playwright')
   await page.evaluate(()=>{window.reviewApi.reviewedApprovalFetch('/api/approvals/a',{method:'POST',body:JSON.stringify({action:'approve'})}).then(r=>window.result=r.status)})
   await page.getByRole('button',{name:'Bekräfta och köa',exact:true}).click();await page.waitForFunction(()=>window.result===200)
   assert.equal(posts.length,3);assert.equal(posts[2].review_token,'test-proof')
+  await page.evaluate(r=>{window.result=null;window.reviewApi.showApprovalReview({...r,choices:[{id:'identity',label:'Verifierat projekt',description:'Kontrollera identiteten',defaultSelected:false,required:true}]}).then(r=>window.result=r)},review)
+  assert.equal(await page.getByRole('button',{name:'Bekräfta och köa'}).isDisabled(),true)
+  await page.getByRole('checkbox',{name:'Verifierat projekt'}).check();assert.equal(await page.getByRole('button',{name:'Bekräfta och köa'}).isEnabled(),true)
+  await page.getByRole('checkbox',{name:'Verifierat projekt'}).uncheck();assert.equal(await page.getByRole('button',{name:'Bekräfta och köa'}).isDisabled(),true)
+  await page.getByRole('checkbox',{name:'Verifierat projekt'}).check();await page.getByRole('button',{name:'Bekräfta och köa'}).click()
+  assert.equal((await page.evaluate(()=>window.result)).actionOverrides.identity,'approved')
   const documentReview={...review,attachments:[{label:'Dokument',url:'/api/document',kind:'document'}]}
   await page.evaluate(r=>{window.result=null;window.reviewApi.showApprovalReview(r).then(r=>window.result=r)},documentReview)
   const check=page.getByRole('checkbox');await check.waitFor();await page.waitForFunction(()=>!document.querySelector('input[type=checkbox]').disabled)
@@ -43,6 +49,7 @@ const {chromium}=require('playwright')
    {id:'review',label:'Förbered kunduppföljning',description:'Skapar separat förslag.',defaultSelected:true},
   ]}
   await page.evaluate(r=>{window.result=null;window.reviewApi.reviewedApprovalFetch('/api/approvals/a',{method:'POST',body:JSON.stringify({action:'approve'})}).then(r=>window.result=r.status);window.nextReview=r},choiceReview)
+  await page.getByRole('dialog').waitFor()
   // Route-mocken lämnar standard-reviewn, så prova det signerade valbeslutet
   // direkt i samma verkliga dialog och kontrollera dess exakta wire-format.
   await page.keyboard.press('Escape')

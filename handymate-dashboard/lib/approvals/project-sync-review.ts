@@ -11,14 +11,14 @@ function canonical(value: any): string {
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
 }
-async function inspectRemoteProject(businessId: string, expected: FortnoxProject): Promise<FortnoxProject> {
+async function inspectRemoteProject(businessId: string, expected: FortnoxProject, allowDifferences = false): Promise<FortnoxProject> {
   const response = await fortnoxRequest<{ Project: FortnoxProject }>(businessId, 'GET', `/projects/${encodeURIComponent(expected.ProjectNumber)}`)
   const actual = response?.Project
   if (!actual || actual.ProjectNumber !== expected.ProjectNumber) throw new Error('Fortnox-projektet kunde inte verifieras.')
   // A matching number alone is not proof of the intended project. Never overwrite
   // or silently adopt a different register entry after a lost response.
   for (const key of ['Description', 'StartDate', 'EndDate', 'Status'] as const) {
-    if ((actual[key] || '') !== (expected[key] || '')) throw new Error(`Fortnox-projektets ${key} skiljer sig från det granskade underlaget. Ingen koppling ändrades.`)
+    if (!allowDifferences && (actual[key] || '') !== (expected[key] || '')) throw new Error(`Fortnox-projektets ${key} skiljer sig från det granskade underlaget. Ingen koppling ändrades.`)
   }
   return actual
 }
@@ -35,7 +35,7 @@ function reviewFor(plan: Plan, state?: string): ApprovalReview {
       ...(state ? [{ label: 'Tidigare försök', text: state === 'accepted' ? 'Fortnox bekräftade projektet. Endast lokal lagring återstår.' : state === 'saved' ? 'Kopplingen är sparad; inget nytt anrop görs.' : state === 'sending' || state === 'unknown' ? 'Fortnox-utfallet är osäkert. Inget nytt skapande tillåts innan avstämning.' : 'Inget Fortnox-anrop har påbörjats.' }] : []),
     ] }
 }
-export async function prepareProjectSyncReview(db: SupabaseClient, businessId: string, payload: Record<string, any>) {
+export async function prepareProjectSyncReview(db: SupabaseClient, businessId: string, payload: Record<string, any>, overrides?: Record<string, unknown>) {
   const projectId = payload.project_id || payload.entity_id || payload.rule_action_config?.entity_id
   if (typeof projectId !== 'string' || !projectId) throw new Error('Projekt saknas för Fortnox-synk.')
   const current = await db.from('project').select('*').eq('project_id', projectId).eq('business_id', businessId).maybeSingle()
@@ -48,14 +48,29 @@ export async function prepareProjectSyncReview(db: SupabaseClient, businessId: s
     if (['sending', 'unknown'].includes(previous.data.status)) {
       // Read-only reconciliation becomes a concrete, signed decision. A failed
       // lookup is not proof that POST failed and never enables another POST.
-      const remote = await inspectRemoteProject(businessId, plan.document)
+      const remote = await inspectRemoteProject(businessId, plan.document, true)
       const review = reviewFor(plan, previous.data.status)
       review.confirmLabel = 'Koppla det hittade Fortnox-projektet'
       review.effect = 'Fortnox-projektet finns och motsvarar underlaget nedan. Beslutet sparar kopplingen till detta befintliga projekt. Inget nytt projekt eller kundutskick skapas.'
       review.details = [...(review.details || []).filter(d => d.label !== 'Tidigare försök'), { label: 'Avstämning', text: 'Projektnummer, beskrivning, datum och status har lästs från Fortnox och matchar underlaget. Kopplingen kontrolleras igen vid beslut.' }]
-      return { review, snapshot: { journal: previous.data, current: current.data, remote }, executionPayload: { plan, reconcile: true }, executionEvidence: { plan, remote, reconcile: true } }
+      const fields = ['Description', 'StartDate', 'EndDate', 'Status'] as const
+      const differences = fields.filter(key => (remote[key] || '') !== (plan.document[key] || ''))
+      if (differences.length) {
+        const labels = { Description: 'Beskrivning', StartDate: 'Startdatum', EndDate: 'Slutdatum', Status: 'Status' }
+        review.effect = 'Fortnox-projektet har andra uppgifter än det ursprungliga underlaget. Bekräfta bara kopplingen om du har identifierat det som rätt projekt. Beslutet ändrar ingen uppgift i Fortnox och skapar inget nytt projekt.'
+        review.details = [...(review.details || []).filter(d => d.label !== 'Avstämning'), ...differences.map(key => ({ label: `${labels[key]} — skillnad`, text: `Granskat: ${plan.document[key] || 'Inte angivet'}\nI Fortnox: ${remote[key] || 'Inte angivet'}` }))]
+        review.choices = [{ id: 'confirm_project_identity', label: 'Jag har verifierat att detta är rätt projekt trots skillnaderna', description: 'Kopplingen gör att Handymate använder detta Fortnox-projektnummer. Ingen beskrivning, tid eller status skrivs över.', defaultSelected: false, required: true }]
+      }
+      const reconcileConflict = differences.length > 0
+      const confirmIdentity = overrides?.confirm_project_identity === 'approved'
+      return { review, snapshot: { journal: previous.data, current: current.data, remote }, executionPayload: { plan, reconcile: true, remote, reconcileConflict, confirmIdentity }, executionEvidence: { plan, remote, reconcile: true, reconcileConflict, confirmIdentity } }
+
     }
-    return { review: reviewFor(plan, previous.data.status), snapshot: { journal: previous.data, current: current.data }, executionPayload: { plan }, executionEvidence: { plan } }
+    const review = reviewFor(plan, previous.data.status)
+    if (previous.data.result?.identity_confirmed) {
+      review.details = [...(review.details || []), { label: 'Tidigare bekräftad avvikelse', text: `Fortnox-projekt ${previous.data.result.remote?.ProjectNumber}: ${previous.data.result.remote?.Description || 'Ingen beskrivning'}. Start: ${previous.data.result.remote?.StartDate || 'Inte angivet'}. Slut: ${previous.data.result.remote?.EndDate || 'Inte angivet'}. Status: ${previous.data.result.remote?.Status || 'Inte angiven'}. Kopplingen är uttryckligen bekräftad.` }]
+    }
+    return { review, snapshot: { journal: previous.data, current: current.data }, executionPayload: { plan }, executionEvidence: { plan } }
   }
   if (payload.execution_result?.receipt?.state === 'partial') throw new Error('Det tidigare försöket saknar en verifierbar synkjournal. Ett nytt Fortnox-anrop får inte göras.')
   const config = await db.from('business_config').select('fortnox_connected').eq('business_id', businessId).maybeSingle()
@@ -90,12 +105,15 @@ export async function executeProjectSyncReview(db: SupabaseClient, businessId: s
   if (journal.status === 'sending' || journal.status === 'unknown') {
     if (reviewed.reconcile !== true) return { ...base, ok: false, partial: true, error: 'Öppna granskningen för att stämma av projektet mot Fortnox. Inget nytt projekt skapades.' }
     try {
-      const remote = await inspectRemoteProject(businessId, plan.document)
-      const accepted = await db.from('v3_automation_logs').update({ status: 'accepted', result: { project_number: remote.ProjectNumber, reconciled: true } })
+      if (reviewed.reconcileConflict && reviewed.confirmIdentity !== true) throw new Error('Bekräfta först att Fortnox-projektet är rätt projekt trots skillnaderna.')
+      const remote = await inspectRemoteProject(businessId, plan.document, reviewed.reconcileConflict === true)
+      if (!reviewed.remote || canonical(remote) !== canonical(reviewed.remote)) throw new Error('Fortnox-projektet har ändrats sedan granskningen. Öppna underlaget igen.')
+      const reconciliation = { project_number: remote.ProjectNumber, reconciled: true, remote, identity_confirmed: reviewed.reconcileConflict === true }
+      const accepted = await db.from('v3_automation_logs').update({ status: 'accepted', result: reconciliation })
         .eq('id', journal.id).eq('business_id', businessId).eq('status', journal.status).select('id')
       if (accepted.error || !accepted.data?.length) return { ...base, ok: false, partial: true, error: 'Avstämningskvittensen kunde inte sparas. Öppna granskningen igen; inget nytt projekt skapas.' }
       journal.status = 'accepted'
-      journal.result = { project_number: remote.ProjectNumber, reconciled: true }
+      journal.result = reconciliation
     } catch (error) { return { ...base, ok: false, partial: true, error: error instanceof Error ? error.message : 'Fortnox-avstämningen misslyckades.' } }
   }
   if (['prepared', 'not_sent'].includes(journal.status) && current.data.fortnox_project_number === plan.document.ProjectNumber) {
@@ -131,6 +149,6 @@ export async function executeProjectSyncReview(db: SupabaseClient, businessId: s
   const verified = await db.from('project').select('fortnox_project_number').eq('project_id', plan.projectId).eq('business_id', businessId).maybeSingle()
   if (verified.error || verified.data?.fortnox_project_number !== plan.document.ProjectNumber) return { ...base, ok: false, partial: true, project_number: plan.document.ProjectNumber, error: updated.error?.message || 'Fortnox-projektet är bekräftat. Endast den lokala kopplingen återstår; återförsök skickar inte igen.' }
   const completed = await db.from('v3_automation_logs').update({ status: 'saved' }).eq('id', journal.id).eq('business_id', businessId).select('id')
-  return { ...base, ok: !completed.error && !!completed.data?.length, partial: !!completed.error || !completed.data?.length, project_number: plan.document.ProjectNumber,
+  return { ...base, ok: !completed.error && !!completed.data?.length, partial: !!completed.error || !completed.data?.length, already_linked: journal.result?.reconciled === true, project_number: plan.document.ProjectNumber,
     ...(completed.error || !completed.data?.length ? { error: 'Projektkopplingen är sparad men slutkvittensen återstår. Återförsök gör inget nytt Fortnox-anrop.' } : {}) }
 }
