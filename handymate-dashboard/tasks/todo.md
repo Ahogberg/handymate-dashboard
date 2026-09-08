@@ -1,3 +1,7 @@
+## Main grön igen 2026-09-08 00:27 UTC (Claude)
+
+Kontraktsgrind röd 22:14–00:12 efter otrackad lib/portal/review.ts (35fe3db7) och tre pushar ovanpå. Rättat i 8d868772, 2fae1dcf, #24 (cdf52291), 823500db. Run 34173168180 success. Vercel-produktionsbygget ska verifieras i panelen på morgonen — MCP-verktyget ser inte projektet.
+
 ## Fortsatta rollprov (Codex 2026-09-07)
 
 - [x] Liveprov med väntande admininbjudningstoken: owner/admin ser token; PM/anställda får null och invite_pending; B ser inte A. Fixture återställd, ingen kommunikation.
