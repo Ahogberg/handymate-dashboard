@@ -127,7 +127,7 @@ test.describe('källskanning — manifest-hookarna bor i kärnan', () => {
 
 type Row = Record<string, any>
 
-function createFakeSupabase(tables: Record<string, Row[]> = {}) {
+function createFakeSupabase(tables: Record<string, Row[]> = {}, failures: Record<string, string> = {}) {
   const state: Record<string, Row[]> = tables
 
   function builder(table: string) {
@@ -173,6 +173,7 @@ function createFakeSupabase(tables: Record<string, Row[]> = {}) {
     }
 
     function execute(): { data: any; error: any } {
+      if (failures[`${table}:${mode}`]) return { data: null, error: { message: failures[`${table}:${mode}`] } }
       if (!state[table]) state[table] = []
       const rows = state[table]
 
@@ -221,6 +222,41 @@ function preparedManifestRow(invoiceId: string, businessId: string): Row {
 
 test.describe('applyInvoiceDeliveryOutcome — leverans-strypunktens invariant', () => {
   const invoice = { business_id: 'biz_1', customer_id: 'cust_1', invoice_number: 'FV-2026-001' }
+
+  test('främmande företag avvisas utan statusskrivning eller historik', async () => {
+    const db = createFakeSupabase({ invoice: [{ invoice_id: 'inv_1', business_id: 'other', status: 'draft' }] })
+    await expect(applyInvoiceDeliveryOutcome(db as any, { businessId: 'biz_1', invoiceId: 'inv_1', invoice: { ...invoice, business_id: 'other' }, results: { email: true, errors: [] } })).rejects.toThrow('tillhör inte')
+    expect(db._state.invoice[0].status).toBe('draft')
+    expect(db._state.customer_activity).toBeUndefined()
+  })
+
+  test('statusskrivningen är företagsscopad även om samma id förekommer hos annat företag', async () => {
+    const db = createFakeSupabase({ invoice: [{ invoice_id: 'inv_1', business_id: 'other', status: 'draft' }], invoice_evidence_manifest: [preparedManifestRow('inv_1', 'biz_1')] })
+    const results = { email: true, errors: [] as string[] }
+    const result = await applyInvoiceDeliveryOutcome(db as any, { businessId: 'biz_1', invoiceId: 'inv_1', invoice, results })
+    expect(result.delivered).toBe(true)
+    expect(db._state.invoice[0].status).toBe('draft')
+    expect(results.errors.join(' ')).toContain('Ingen fakturarad')
+    expect(db._state.customer_activity[0].business_id).toBe('biz_1')
+  })
+
+  for (const [failure, expected] of [['invoice:update', 'Status:'], ['customer_activity:insert', 'kundhistoriken'], ['invoice_evidence_manifest:update', 'Leveransunderlag:']]) {
+    test(`${failure} redovisas utan att förneka accepterat utskick`, async () => {
+      const db = createFakeSupabase({ invoice: [{ invoice_id: 'inv_1', business_id: 'biz_1', status: 'draft' }], invoice_evidence_manifest: [preparedManifestRow('inv_1', 'biz_1')] }, { [failure]: 'injected error' })
+      const results = { email: true, errors: [] as string[] }
+      const result = await applyInvoiceDeliveryOutcome(db as any, { businessId: 'biz_1', invoiceId: 'inv_1', invoice, results })
+      expect(result.delivered).toBe(true)
+      expect(results.errors.join(' ')).toContain(expected)
+    })
+  }
+
+  test('misslyckat utskick vars status inte sparas får separat fel i kvittensen', async () => {
+    const db = createFakeSupabase({ invoice: [{ invoice_id: 'inv_1', business_id: 'biz_1' }] }, { 'invoice:update': 'injected error' })
+    const results = { errors: [] as string[] }
+    const result = await applyInvoiceDeliveryOutcome(db as any, { businessId: 'biz_1', invoiceId: 'inv_1', invoice, results })
+    expect(result.delivered).toBe(false)
+    expect(results.errors).toContain('Utskicksförsökets status kunde inte sparas.')
+  })
 
   test('email lyckades → status sent + sent_at + sent_method + manifest delivered', async () => {
     const db = createFakeSupabase({
