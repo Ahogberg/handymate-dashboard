@@ -54,17 +54,15 @@ export async function GET(request: NextRequest) {
         body: JSON.stringify({ campaignId: campaign.campaign_id }),
       })
 
-      if (res.ok) {
+      const data = await res.json().catch(() => ({}))
+      if (res.ok && data.success === true) {
         results.push({ campaignId: campaign.campaign_id, success: true })
         console.log(`[send-campaigns] Sent campaign ${campaign.campaign_id} (${campaign.name})`)
       } else {
-        const data = await res.json().catch(() => ({}))
-        results.push({ campaignId: campaign.campaign_id, success: false, error: data.error })
-        // Mark as failed so it doesn't retry forever
-        await supabase
-          .from('sms_campaign')
-          .update({ status: 'failed' })
-          .eq('campaign_id', campaign.campaign_id)
+        results.push({ campaignId: campaign.campaign_id, success: false, error: data.warning || data.error || `Kampanjen fick status ${data.status || res.status}` })
+        // Sändrutten har redan sparat partial/needs_reconciliation per
+        // mottagare. Cron får aldrig skriva över ett osäkert utfall med ett
+        // generiskt failed som kan locka till en ny helsändning.
       }
     } catch (err: any) {
       console.error(`[send-campaigns] Error for ${campaign.campaign_id}:`, err)

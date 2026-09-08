@@ -30,9 +30,9 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 
 1. **Offert-, faktura- och jobbrapportsutskick:** färdigt dokument, exakt meddelande, alla mottagare/kanaler och dokumentversion behöver bindas i samma beslut. Fakturans Fortnox-/e-fakturagren måste ingå. Jobbrapporten skapar faktiskt PDF och kan mejla kunden; den tidigare rapportens beskrivning som en kvittens var fel och är korrigerad här.
 2. **Bokning, platsbesök och projektavslut:** generiska tidsförslag, signerad-offertbokning, platsbesök och projektavslut har nu specifika flöden. Beständigt återförsök av varje fristående avslutsföljd återstår.
-3. **Betalning och lead:** betalningsregistrering kan starta automation och portalmeddelande. Leadaktivering skapar affär, kan skicka internt SMS och triggar lead_received-regler. Detta är mer än en statusändring och måste slutföras med tydliga följdval.
+3. **Betalning och lead:** båda har nu tydliga, signerade följdval och sent skapade kund-/internutskick blir separata kort. Beständig återföring av enskilda workflow-/regelföljder och övriga automationsvarianter återstår.
 4. **Övriga automationer och specialvyer:** varje åtgärdsvariant behöver ett eget fullständigt kontrakt. Webbhänvisningar för intäktsfynd, jobbpass, installationer och liknande innebär ingen färdig mobilresa. Mobilen saknar flera motsvarande vyer; dessa kort blir kvar.
-5. **Historik och återförsök:** nya kvittenser finns, men hela historik-/aktivitetskedjan och återförsök av enbart misslyckade paketdelar är inte slutprovade. Leveranskedjan efter kampanjköning behöver egna prov.
+5. **Historik och återförsök:** paketdelar och kampanjmottagare har nu beständiga delutfall, selektiv återföring respektive spärr vid osäkert leveransläge. Hela historik-/aktivitetskedjan och motsvarande stöd för övriga flerledade flöden är inte slutprovade.
 6. **Slutprov och release:** inga riktiga kundutskick har gjorts. Ny Expo-build och samordnad backendversion krävs. TestFlight 1.0.0 build 12 är oförändrad. PR-utkasten är inte en färdig generell release.
 
 ## Matris – alla 77 korttyper
@@ -288,3 +288,17 @@ Nästa fortsättningspunkt är återstående automationsvarianter samt del 4: be
 Verifiering: faktisk approval-route med minnesdatabas och mockad boknings-/SMS-adapter provar aktuellt mottagarnummer, full bokningspreview, lyckad bokning kombinerad med avvisat SMS, beständiga delresultat, retry av endast SMS, oförändrat antal bokningar samt osäkert SMS-svar med spärr. 90 riktade regressionsprov och `npx tsc --noEmit` passerar. Inga riktiga bokningar, SMS eller produktionsskrivningar gjordes.
 
 Del 4 är ännu inte komplett: kampanjköns faktiska sändarjobb och förlorade svar ska provas och övriga flerledade flöden behöver samma deljournal. Del 1:s offert/faktura/Fortnox-journal, del 2:s fristående avslutsföljder, återstående automationsvarianter och del 5:s native specialvyer/TestFlight återstår.
+
+### Fortsättning 8 september — kampanjkö till faktisk sändare
+
+Kampanjkedjan efter Hannas köade kort har nu ett isolerat prov av den verkliga sändrutten och följande skydd:
+
+- Varje mottagarrad anspråks atomiskt från `pending` till `sending`. Parallella cron-/webbanrop kan läsa samma lista men bara en arbetare får anropa SMS-leverantören för respektive mottagare.
+- Varje mottagare använder en stabil sändidentitet baserad på kampanj och mottagarrad genom den centrala SMS-grinden. Redan loggad leverans återanvänds i stället för att skickas dubbelt.
+- Bekräftat leverantörssvar sparas som `sent` eller `failed`. Ett kastat anrop eller svar utan HTTP-status sparas som `unknown`; kampanjen får `needs_reconciliation` och får inte plockas upp av cron igen. En andra anropning skickar inte om terminala eller osäkra mottagarrader.
+- Kampanjens levererade/misslyckade antal och slutstatus räknas från de beständiga mottagarraderna. Blandat utfall blir `partial`, inte falskt `sent`. Ett parallellt pågående anrop lämnar kampanjen i `sending` i stället för att skriva en för tidig slutstatus. Kampanjlistan visar nu `Delvis skickad`, `Leverans måste kontrolleras` och `Misslyckad` i stället för tom status.
+- Cronjobbet kräver nu både HTTP-framgång och `success:true`. Det skriver inte längre över en detaljerad `partial`/`needs_reconciliation` med ett generiskt `failed`.
+
+Verifiering: `node tests/approvals/campaign-send-harness.cjs` kör den faktiska sändrutten med minnesdatabas och ersatt SMS-leverantör. Det provar blandat accepterat/avvisat utfall, stabila mottagaridentiteter, oförändrat antal sändanrop vid återöppning, förlorat leverantörssvar, beständig avstämningsstatus och omsändningsspärr. `npx tsc --noEmit` passerar. Inget verkligt SMS eller produktionsanrop gjordes.
+
+Del 4 är förbättrad men inte generell: en operatörsvy för att avstämma `unknown` mot 46elks och explicit återställa ett säkert avvisat kampanj-SMS saknas, liksom deljournal för övriga sammansatta typer. Nästa arbete är återstående automationsvarianter och därefter mobilens kompletta specialvyer. Ekonomiflödenas fulla versions-/Fortnox-journal och fristående projektavslutsretry är fortfarande blockerande öppna punkter.
