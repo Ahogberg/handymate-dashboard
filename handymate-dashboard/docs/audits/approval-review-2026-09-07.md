@@ -47,7 +47,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `send_invoice` | Skickar befintlig faktura via e-post och/eller SMS. | Stopp – komplett granskning återstår |
 | `send_matte_customer_reply` | Skickar customer_reply_pending, annars message, till entity.phone. | Full meddelandegranskning |
 | `quote_nudge` | Skickar uppföljnings-SMS; är inte bara en påminnelse till ägaren. | Full meddelandegranskning |
-| `confirm_payment` | Registrerar betalningsbeslut och kan trigga pipeline-/projektregler, payment_received och portalmeddelande. | Stopp – komplett granskning återstår |
+| `confirm_payment` | Visar aktuell faktura, kund, projekt, belopp, ROT/RUT, betalningsövergång och tre följdval. Registrerar betalningen; kundbesked blir separata granskningskort och payment_received-regler tvingas till nya godkännanden. | Versionsbunden granskning och delkvittens; beständig betalningsjournal/per-följd-återförsök återstår |
 | `create_booking` | Skapar bokning via boknings-API:t. Nedströms bokningsregler och notiser behöver granskas. | Stopp – komplett granskning återstår |
 | `create_quote_draft` | AI genererar och sparar offertutkast; inget kundutskick i denna hanterare. | Internt granskningsunderlag |
 | `create_ata_draft` | AI genererar och sparar ÄTA-utkast, med offertutkast som reservväg när projekt saknas. | Internt granskningsunderlag |
@@ -88,7 +88,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `four_eyes_quote` | Återställer offerten till utkast efter granskning och skickar intern push till skaparen. Skickar inte offerten till kunden. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `four_eyes_project_close` | Visar aktuellt projekt, kund, ansvarig, ekonomiskt fakturaunderlag och tre uttryckliga val. Avslutar projektet, skapar vid val endast fakturautkast samt separata granskningskort för kunduppföljning, internt fakturabesked och automationshandlingar. | Versionsbundet delval, företagsscope och faktisk delkvittens i webb/app; beständigt återförsök av en enskild misslyckad avslutsföljd återstår |
 | `deal_flow_site_visit` | Granskningskort utan specifik utförandehanterare i denna route. | Hänvisning till webbens specialvy; inget generiskt utförande; mobilresa återstår |
-| `lead_review` | Aktiverar lead, skapar pipelineaffär, kan skicka internt SMS och triggar lead_received-automation. Avvisa markerar lead som lost. | Stopp – komplett granskning återstår |
+| `lead_review` | Visar aktuell lead/kund, befintlig affär, intern SMS-text och tre följdval. Aktiverar leaden; internnotis blir ett separat granskningskort och lead_received-regler tvingas till nya godkännanden. Avvisa markerar lead som lost. | Versionsbunden granskning, företagsscope och idempotenta affär/SMS-följder; per-regel-återförsök återstår |
 | `time_attestation` | Attesterar incheckning och skapar godkänd, fakturerbar tid. Befintliga databasfel ignoreras; flera skrivningar saknar företagsscope. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `tidrapport_forslag` | Skapar godkänd, fakturerbar tid med vald person/projekt/datum/minuter. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `checklist_forslag` | Skapar projektchecklista från mallpunkterna. | Verifierat underlag och granskningsbeslut; slutprov återstår |
@@ -257,3 +257,21 @@ De tre vanliga Matte-varianterna `propose_booking_times`, `reschedule_request` o
 Verifiering: den faktiska approval-routen kördes med isolerad databas, kalender och SMS-adapter. Proven täcker gammal tid som ersätts före första beslutet, token som blir ogiltig när kalendern ändras, aktuell bokning/ansvarig/projekt, leadmottagare, saknat/främmande mål, definitivt leverantörsfel, beständig felkvittens, exakt återförsök trots senare kalenderändring samt förlorat leverantörssvar utan omsändning. `npx tsc --noEmit` är rent. Inga riktiga meddelanden, kalenderändringar eller produktionsskrivningar gjordes.
 
 Nästa fortsättningspunkt är del 3: `confirm_payment`, `lead_review` och de återstående automationsvarianternas verkliga följder samt separata granskningskort för kundutskick som uppstår först efter huvudhandlingen. Del 1:s dokument-/Fortnox-journal och del 2:s per-följd-återförsök är fortfarande öppna och får inte beskrivas som färdiga.
+
+### Fortsättning 8 september — betalning och lead med synliga följder
+
+Två del-3-flöden har nu riktiga, signerade följdval i stället för att dölja kund- och automationshandlingar bakom huvudbeslutet. **Del 3 och helheten är fortfarande inte klara.**
+
+- `confirm_payment` hämtar aktuell företagsskopad faktura, kund och projekt. Previewn visar fakturabelopp, registrerat belopp, ROT/RUT-avdrag, återstående Skatteverksbelopp och resulterande status. Ändrad faktura, kund eller projekt ogiltigförklarar underlaget.
+- Betalningsbeslutet har tre val: uppdatera affär/projekt, förbered kundbesked och kör `payment_received`-regler. Den granskade vägen stänger av det gamla direkta smarta kundutskicket. Portal-/tackmejl och omdömes-SMS skapas med exakt mottagare och text som två separata granskningskort; inget av dem skickas vid betalningsbeslutet. Regelhandlingar tvingas till nya godkännanden.
+- `lead_review` visar aktuell lead/kund, källa, beskrivning, status, befintlig affär och exakt internnotis. Beslutet väljer separat affär, internnotis och `lead_received`-regler. Lead- och affärsuppslag samt statusändring är företagsskopade. Befintlig affär återanvänds och internnotisen blir ett separat `send_sms`-kort; inget SMS skickas av leadbeslutet. Regelhandlingar tvingas till nya godkännanden.
+- Båda flödena redovisar verkligt utfall per följd i kortkvittensen. Barnkort har stabila id:n per huvudkort; återkörning återanvänder dem. Ett betalningskort för en redan helt betald faktura kvitterar detta utan ny betalning eller följdhandling.
+
+Verifiering med minnesdatabas och ersatta leverantörer:
+
+- Den faktiska approval-routen provar aktuell preview, ekonomiska belopp, tre val, ändrat underlag, valt/avvalt, företagsscope och detaljerad kvittens för betalning och lead.
+- Den faktiska betalningskärnan provar ROT-övergång till `customer_paid`, två exakta barnkort, inga direkta kundsändare, tvingade regelgodkännanden och återkörning utan dubbla barnkort.
+- Den faktiska leadkärnan provar statusändring, affärsskapande, separat intern-SMS-granskning, tvingade regelgodkännanden, främmande företag samt återkörning utan dubbel affär eller dubbelt SMS-kort.
+- `npx tsc --noEmit` är rent. Inga riktiga meddelanden, automationshandlingar eller produktionsskrivningar gjordes.
+
+Nästa fortsättningspunkt är återstående automationsvarianter samt del 4: beständig deljournal och återförsök för endast misslyckade följder, kampanjkö till sändare och samma kvittens i omedelbart svar, historik och återöppning. Del 1:s ekonomidokument/Fortnox-journal och del 2:s följdvisa återförsök är fortsatt öppna. Mobilens TestFlight build 12 är oförändrad.

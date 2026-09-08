@@ -25,6 +25,7 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
   if (action === 'snooze') return
   const p = action === 'edit' ? { ...approval.payload, ...body.edited_payload, edited: true } : { ...approval.payload }
   const snapshot: Record<string, unknown> = {}
+  let verifiedCustomer: Record<string, any> | null = null
   const r: ApprovalReview = { title: approval.title || 'Granska ärendet', effect: '', confirmLabel: null, messages: [], details: [] }
   const detail = (label: string, value: unknown) => {
     if (typeof value === 'string' && value.trim() || typeof value === 'number') r.details!.push({ label, text: String(value) })
@@ -54,7 +55,7 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       return { ...prepared, snapshot: { documentVersion: prepared.document.version } }
     }
     if (p.project_id) { const project = await row('project', 'project_id', p.project_id, 'Projektet', 'project_id, name, status'); detail('Projekt', project.name) }
-    if (p.customer_id) { const customer = await row('customer', 'customer_id', p.customer_id, 'Kunden', 'customer_id, name, phone_number, email'); detail('Kund', customer.name) }
+    if (p.customer_id) { verifiedCustomer = await row('customer', 'customer_id', p.customer_id, 'Kunden', 'customer_id, name, phone_number, email'); detail('Kund', verifiedCustomer.name) }
     const navigation: Record<string, { label: string; path: string; effect: string }> = {
       missad_intakt: { label: 'Granska intäktsfyndet', path: p.project_id ? `/dashboard/projects/${encodeURIComponent(p.project_id)}` : '/dashboard/invoices', effect: 'Öppnar underlaget. Ingen faktura skapas eller skickas genom att öppna det.' },
       manual_project_create: { label: 'Öppna projekthanteringen', path: p.project_id ? `/dashboard/projects/${encodeURIComponent(p.project_id)}` : '/dashboard/projects', effect: 'Öppnar projektet för att färdigställa registreringen.' },
@@ -83,19 +84,30 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       const { prepareProjectCloseReview } = await import('./project-close-review')
       return await prepareProjectCloseReview(db, businessId, p, body.action_overrides)
     }
+    if (type === 'confirm_payment') {
+      const { preparePaymentReview } = await import('./payment-review')
+      return await preparePaymentReview(db, businessId, p, body.action_overrides)
+    }
+    if (p.source === 'payment_followup' && type === 'send_email' && (!verifiedCustomer?.email || p.to !== verifiedCustomer.email)) {
+      throw new Error('Kundens e-postadress har ändrats sedan betalningsbeskedet förbereddes.')
+    }
+    if (p.source === 'payment_followup' && type === 'review_request' && (!verifiedCustomer?.phone_number || p.to !== verifiedCustomer.phone_number)) {
+      throw new Error('Kundens telefonnummer har ändrats sedan omdömesförfrågan förbereddes.')
+    }
     if (['propose_booking_times', 'reschedule_request', 'new_booking_request'].includes(type) && p.source !== 'quote_signing') {
       const { prepareBookingTimesReview } = await import('./booking-times-review')
       return await prepareBookingTimesReview(db, businessId, type as 'propose_booking_times' | 'reschedule_request' | 'new_booking_request', p, action === 'retry')
     }
     if (type === 'send_sms' && p.recipient === 'internal') {
-      const { data: config, error } = await db.from('business_config').select('personal_phone').eq('business_id', businessId).maybeSingle()
-      if (error || !config?.personal_phone || config.personal_phone !== p.to || typeof p.message !== 'string' || !p.message.trim()) {
+      const { data: config, error } = await db.from('business_config').select('personal_phone, phone_number').eq('business_id', businessId).maybeSingle()
+      const internalPhone = config?.personal_phone || config?.phone_number || null
+      if (error || !internalPhone || internalPhone !== p.to || typeof p.message !== 'string' || !p.message.trim()) {
         throw new Error('Det interna SMS:ets mottagare eller text kunde inte verifieras.')
       }
-      r.messages.push({ channel: 'SMS', recipients: [config.personal_phone], text: p.message })
+      r.messages.push({ channel: 'SMS', recipients: [internalPhone], text: p.message })
       detail('Mottagartyp', 'Intern ägare/administratör')
       return { ...complete('Skickar det visade interna SMS:et. Ingen kund kontaktas.', 'Skicka internt SMS'),
-        executionPayload: { to: config.personal_phone, message: p.message, relatedId: p.related_id || null } }
+        executionPayload: { to: internalPhone, message: p.message, relatedId: p.related_id || null } }
     }
     if (type === 'automation' && p.rule_action_type === 'create_approval') {
       detail('Uppmaning', approval.description)
@@ -246,11 +258,8 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         return complete(p.decision === 'made_standard' ? 'Sparar arbetssättet i företagskunskapen och kopplar det till försöket.' : 'Registrerar beslutet att fortsätta testa och tar fram ett nytt separat förslag.', 'Bekräfta beslutet')
       }
       case 'lead_review': {
-        throw new Error('Förfrågans interna notis och automatiska följdåtgärder behöver förberedas före beslut.')
-        /*
-        const lead = await row('leads', 'lead_id', p.lead_id, 'Kundförfrågan')
-        detail('Kund', lead.name || lead.customer_name); detail('Förfrågan', lead.description || lead.message); detail('Nuvarande status', lead.status)
-        return complete('Aktiverar kundförfrågan.', 'Aktivera förfrågan') */
+        const { prepareLeadActivationReview } = await import('./lead-review')
+        return await prepareLeadActivationReview(db, businessId, p, body.action_overrides)
       }
       case 'four_eyes_quote': {
         const quote = await row('quotes', 'quote_id', p.quote_id, 'Offerten')

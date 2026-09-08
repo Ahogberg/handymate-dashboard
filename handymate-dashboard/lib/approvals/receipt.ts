@@ -57,6 +57,29 @@ export function approvalReceipt(type: string, action: string, result: Record<str
       text: `Projektet är avslutat.${lines.length ? `\n${lines.join('\n')}` : ''}`,
     }
   }
+  if (type === 'confirm_payment' && r.ok === true && r.metadata?.already_paid === true) {
+    return { state: 'acknowledged', text: 'Fakturan var redan registrerad som helt betald. Ingen ny betalning eller följdhandling utfördes.' }
+  }
+  if (type === 'confirm_payment' && r.ok === true && Array.isArray(r.effects)) {
+    const names: Record<string, string> = {
+      pipeline: 'Affär', project_check: 'Projektkontroll', project_stage: 'Projektsteg', workflows: 'Affär/projekt',
+      smart_communication: 'Direkt kundutskick', payment_received_rules: 'Betalningsregler',
+      customer_messages: 'Kundbesked', portal_message: 'Portal-/tackmejl', review_request: 'Omdömesförfrågan',
+    }
+    const incomplete = r.effects.some((effect: any) => effect.status === 'failed')
+    const states: Record<string, string> = { succeeded: 'klart', attempted: 'kontrollerat', skipped: 'inte utfört', failed: 'misslyckades' }
+    const lines = r.effects.map((effect: any) => `${names[effect.effect] || effect.effect}: ${states[effect.status] || effect.status}${effect.message ? ` — ${effect.message}` : ''}`)
+    return { state: incomplete ? 'partial' : 'saved', text: `Betalningen är registrerad.${lines.length ? `\n${lines.join('\n')}` : ''}` }
+  }
+  if (type === 'lead_review' && Array.isArray(r.effects)) {
+    const names: Record<string, string> = {
+      lead_status: 'Kundförfrågan', deal: 'Affär', internal_sms: 'Internnotis', lead_received_rules: 'Leadregler',
+    }
+    const states: Record<string, string> = { succeeded: 'klart', skipped: 'inte utfört', failed: 'misslyckades' }
+    const incomplete = r.effects.some((effect: any) => effect.status === 'failed')
+    const lines = r.effects.map((effect: any) => `${names[effect.effect] || effect.effect}: ${states[effect.status] || effect.status}${effect.message ? ` — ${effect.message}` : ''}`)
+    return { state: incomplete ? 'partial' : 'saved', text: `Kundförfrågan är aktiverad.${lines.length ? `\n${lines.join('\n')}` : ''}` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true
