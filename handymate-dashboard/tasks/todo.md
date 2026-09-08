@@ -1398,3 +1398,7 @@ Review: 9 röda / 2 gröna nya prov före rättning. Efteråt 94 riktade kod-/ko
 Företagsmedlemskap är inte rollbehörighet. Ingen produktionsdata, riktiga inbjudningar, SMS, betalningar eller användarändringar används i granskningen.
 
 Underlag: docs/security/role-audit-2026-09-07/README.md. Fyra reproducerade luckor; 14 syntetiska observationer; 60 befintliga källkodskontrakt passerar. Ingen produktfix eller fullständig plattformscertifiering.
+
+# 2026-09-08 — Arbetsprov, överlämning och synligt lärande
+
+- [ ] Genomför prioritet 1–3 enligt docs/design/first-value/PRODUCTION_V1.md.

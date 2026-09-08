@@ -8,6 +8,9 @@ import type { WorkPricingModel } from '@/lib/onboarding/pricing-start'
  */
 
 export interface OnboardingFormData {
+  workSampleSeen?: boolean
+  workSampleSource?: string
+  workSample?: import('@/lib/onboarding/work-sample').WorkSample | null
   // ── Step 2: Företaget + konto ────────────────────────────
   companyName?: string
   trade?: string

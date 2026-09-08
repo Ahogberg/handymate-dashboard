@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
+import { applyVisitRule, readVisitRule, type VisitRule } from '@/lib/quotes/visit-rule'
 import { getServerSupabase } from '@/lib/supabase'
 import { matchGeneratedItem, type MatchableProduct } from '@/lib/products/match-generated-items'
 import { WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
@@ -124,7 +125,7 @@ export interface GeneratedQuote {
       Tom lista är normalt: inga regler sparade än. Returneras av samma skäl
       som lessons/customerFacts — så anroparen (och UI:t) kan visa VAD som
       faktiskt påverkade offerten, inte bara påstå att det hände. */
-  rules: Array<{ observation: string }>
+  rules: Array<{ observation: string; visitRule?: VisitRule }>
   priceListEmpty: boolean
   missingPriceCount: number
   /**
@@ -288,16 +289,16 @@ async function fetchCustomerFactsForQuote(
  * (business_knowledge, knowledge_type='business_rule', confidence=1 —
  * skiljer dem från agenternas egna lägre-confidence-observationer).
  *
- * Ingen job_type-kolumn finns på business_knowledge (till skillnad från
- * project_lesson) — en regel är en generell policy ("vi tar inte kök
- * under 80 000"), inte en jobbspecifik lärdom, så ALLA aktiva regler
- * hämtas och modellen får själv avgöra relevans för just det här jobbet.
+ * Globala regler kompletteras med regler för exakt den valda jobbtypen.
+ * Typade besöksregler får en deterministisk effekt i beskrivningen;
+ * de ändrar aldrig kalkylens priser eller timmar.
  *
  * Fail-safe: kastar aldrig, degraderar till tom lista.
  */
 async function fetchBusinessRules(
   businessId: string,
-): Promise<Array<{ observation: string }>> {
+  jobType?: string,
+): Promise<Array<{ observation: string; visitRule?: VisitRule }>> {
   const supabase = getServerSupabase()
   try {
     const { data, error } = await supabase
@@ -305,6 +306,7 @@ async function fetchBusinessRules(
       .select('observation, created_at')
       .eq('business_id', businessId)
       .eq('knowledge_type', 'business_rule')
+      .is('job_type', null)
       .is('dismissed_at', null)
       .order('created_at', { ascending: false })
       .limit(5)
@@ -316,7 +318,28 @@ async function fetchBusinessRules(
       }
       return []
     }
-    return (data || []).map(row => ({ observation: (row as any).observation as string }))
+    const rules: Array<{ observation: string; visitRule?: VisitRule }> = (data || []).map(row => ({ observation: row.observation as string }))
+    if (jobType) {
+      const scoped = await supabase.from('business_knowledge').select('observation, data_basis')
+        .eq('business_id', businessId).eq('knowledge_type', 'business_rule').eq('job_type', jobType)
+        .is('dismissed_at', null).order('created_at', { ascending: false }).limit(5)
+      if (scoped.error) throw scoped.error
+      for (const row of scoped.data || []) {
+        const visitRule = readVisitRule(row.data_basis)
+        rules.push({ observation: row.observation, ...(visitRule?.jobType === jobType ? { visitRule } : {}) })
+      }
+      // A saved structured rule must not disappear behind five newer free-text rules.
+      if (!rules.some(rule => rule.visitRule)) {
+        const planned = await supabase.from('business_knowledge').select('observation, data_basis')
+          .eq('business_id', businessId).eq('knowledge_type', 'business_rule').eq('job_type', jobType)
+          .is('dismissed_at', null).contains('data_basis', { kind: 'planned_visits' })
+          .order('created_at', { ascending: false }).limit(1)
+        if (planned.error) throw planned.error
+        const visitRule = readVisitRule(planned.data?.[0]?.data_basis)
+        if (visitRule?.jobType === jobType) rules.push({ observation: planned.data![0].observation, visitRule })
+      }
+    }
+    return rules
   } catch (err) {
     console.error('[ai-quote-generator] business_knowledge-läsning kastade (fail-safe, tom lista):', err)
     if (!arSchemaSaknas(err)) {
@@ -813,7 +836,7 @@ export async function generateQuoteFromInput(
     description ? getAveragePrice(input.businessId, description) : Promise.resolve({ average: 0, min: 0, max: 0, count: 0 }),
     fetchRecentLessons(input.businessId, input.jobType),
     input.customerId ? fetchCustomerFactsForQuote(input.businessId, input.customerId) : Promise.resolve([]),
-    fetchBusinessRules(input.businessId),
+    fetchBusinessRules(input.businessId, input.jobType),
     fetchConfirmedPatterns(input.businessId, input.jobType),
   ])
 
@@ -1150,7 +1173,9 @@ Svara ENDAST med JSON (ingen markdown):
 
   return {
     jobTitle: parsed.jobTitle || 'Offert',
-    jobDescription: parsed.jobDescription || '',
+    jobDescription: rules.some(rule => rule.visitRule)
+      ? applyVisitRule(parsed.jobDescription || '', rules.find(rule => rule.visitRule)!.visitRule!.visits)
+      : parsed.jobDescription || '',
     items,
     options,
     estimatedHours: parsed.estimatedHours || 0,
