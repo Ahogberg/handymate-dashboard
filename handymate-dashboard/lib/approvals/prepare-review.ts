@@ -185,7 +185,21 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         if (p.fact_type === 'commitment' && p.due_date_iso && !normalizeDueDateIso(p.due_date_iso)) throw new Error('Löftet måste ha ett giltigt datum.')
         detail('Uppgift', p.content); detail('Källa', p.evidence_quote); detail('Datum för löftet', p.due_date_iso)
         const replaces = ['contact', 'commitment'].includes(p.fact_type)
-        return complete(`Sparar kunduppgiften${replaces ? ' och ersätter tidigare aktiva uppgifter av samma typ för kunden' : ''}.${p.fact_type === 'commitment' && p.due_date_iso ? ' Aktiverar bevakning av löftets datum.' : ''}`, 'Spara kunduppgiften')
+        let targets: { id: string; content: string }[] = []
+        if (replaces) {
+          const { data, error } = await db.from('customer_fact').select('id, content')
+            .eq('business_id', businessId).eq('customer_id', p.customer_id)
+            .eq('fact_type', p.fact_type).is('superseded_by', null).order('id')
+          if (error || !Array.isArray(data) || data.some(f => !f.id || typeof f.content !== 'string')) throw new Error('Tidigare kunduppgifter kunde inte verifieras.')
+          targets = data
+          snapshot.replacedCustomerFacts = targets
+          if (!targets.length) detail('Tidigare uppgifter', 'Inga aktiva uppgifter av samma typ ersätts.')
+          targets.forEach((fact, index) => detail(`Ersätter uppgift ${index + 1}`, fact.content))
+        }
+        return { ...complete(`Sparar kunduppgiften${replaces ? ` och ersätter ${targets.length} granskade uppgifter av samma typ för kunden` : ''}.${p.fact_type === 'commitment' && p.due_date_iso ? ' Aktiverar bevakning av löftets datum.' : ''}`, 'Spara kunduppgiften'),
+          executionPayload: { customerFactReplacementTargets: targets },
+          executionEvidence: { customerFactReplacementTargets: targets } }
+
       }
       case 'agent_memory_confirmation': {
         const memory = await row('agent_memories', 'id', p.memory_id, 'Minnet')

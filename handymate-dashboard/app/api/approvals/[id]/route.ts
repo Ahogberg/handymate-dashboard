@@ -1624,6 +1624,10 @@ async function executeApprovalPayload(
           return { action: 'customer_fact', ok: false, error: 'Kortet saknar kund eller innehåll.' }
         }
         const factType = pl.fact_type || 'preference'
+        const replacementTargets = reviewedPayload?.customerFactReplacementTargets as { id: string; content: string }[] | undefined
+        if (['contact', 'commitment'].includes(factType) && !Array.isArray(replacementTargets)) {
+          return { action: 'customer_fact', ok: false, error: 'Granskat ersättningsunderlag saknas.' }
+        }
         const supabaseCF = await getSupabase()
 
         // Promise-to-Proof (Etapp N, 2026-08-17, sql/v147_promise_dates.sql):
@@ -1679,14 +1683,19 @@ async function executeApprovalPayload(
         // sparat och godkänt faktum.
         if (factType === 'contact' || factType === 'commitment') {
           try {
-            const { error: supersedeErr } = await supabaseCF
-              .from('customer_fact')
-              .update({ superseded_by: fact.id })
-              .eq('business_id', businessId)
-              .eq('customer_id', pl.customer_id)
-              .eq('fact_type', factType)
-              .is('superseded_by', null)
-              .neq('id', fact.id)
+            let supersedeErr: { message: string } | null = null
+            for (const target of replacementTargets || []) {
+              if (target.id === fact.id) continue
+              const { data: replaced, error } = await supabaseCF.from('customer_fact')
+                .update({ superseded_by: fact.id })
+                .eq('business_id', businessId).eq('customer_id', pl.customer_id)
+                .eq('fact_type', factType).eq('id', target.id).eq('content', target.content)
+                .is('superseded_by', null).select('id')
+              if (error || !replaced?.length) {
+                supersedeErr = { message: error?.message || 'En granskad kunduppgift ändrades eller kunde inte ersättas.' }
+                break
+              }
+            }
             if (supersedeErr) {
               factFollowupErrors.push('Tidigare kunduppgifter kunde inte markeras som ersatta.')
               console.error('[approvals/customer_fact] supersede misslyckades (icke-blockerande):', supersedeErr.message)
