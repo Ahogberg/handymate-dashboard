@@ -48,3 +48,14 @@ Earlier zero-Auth-user observations refer to the initial DB probe, before this s
 Deployment Protection Exceptions are disabled under the current Vercel configuration and require the displayed USD 150/month Advanced Deployment Protection add-on. No upgrade or project-wide protection change was made. Prefer a separately configured test-only Vercel project with its own access settings before native acceptance; do not embed the existing project-wide automation bypass secret in the mobile application.
 
 The new Vercel deployment completed successfully: Ready, build duration 4m 32s. Runtime commit is unchanged; no native build was submitted.
+
+## Dedicated mobile test project created
+
+Vercel project `handymate-vision-test` (ID `prj_XggvvjhoAe7Ubtr08mizCHjVQta8`) now exists in Andreas' projects. Framework Next.js, root directory `handymate-dashboard`, repository Ahogberg/handymate-dashboard. Branch tracking for this test project's primary environment was changed from main to `codex/vision-integration-20260908` and Vercel confirmed the save. The automatically started initial main build was cancelled. Vercel Cron Jobs is verified Disabled; the separate Supabase test pg_cron runner is unaffected.
+
+Primary address: https://handymate-vision-test.vercel.app/
+Settings: https://vercel.com/andreas-projects-f2b98374/handymate-vision-test/settings
+
+The project still has no environment variables and no successful deployment. The public address returns DEPLOYMENT_NOT_FOUND. Default Standard Protection remains configured; no access controls in the original project were changed.
+
+Automatic approval review rejected copying the test Supabase service-role credential and new signing secret into this NEW project, requesting explicit destination-specific user authorization. The earlier authorization covered the original project's Preview branch. Pending approval, do not retry that credential transmission. After approval: save only test credentials/config, set both app URL variables to the verified primary address, leave external providers unconfigured, deploy the integration branch as this test project's primary environment, verify unauthenticated JSON 401 and real test-account HTTP journeys, then configure mobile's vision-testflight environment. No paid protection add-on was activated.
