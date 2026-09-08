@@ -23,7 +23,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { classify, nonExecutableResult } from '@/lib/approvals/action-contract'
 import { extractAgentId } from '@/lib/patterns/utils/extract-agent-id'
 import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm'
-import { halsning } from '@/lib/customers/namn'
 import { completeProject } from '@/lib/projects/complete-project'
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
@@ -262,6 +261,7 @@ export async function POST(
           retryAuthHeader,
           currentUser.id,
           prepared?.document,
+          prepared?.executionPayload,
         )
       } catch (execErr: any) {
         console.error(`[approvals/${params.id}] retry: executeApprovalPayload kastade okontrollerat:`, execErr)
@@ -286,6 +286,7 @@ export async function POST(
               executed_at: new Date().toISOString(),
               retried: true,
               receipt: retryReceipt,
+              ...(prepared?.executionEvidence ? { review_evidence: prepared.executionEvidence } : {}),
               ...(retryArtifacts ? { artifacts: retryArtifacts } : {}),
             },
           },
@@ -541,6 +542,7 @@ export async function POST(
           authHeader,
           currentUser.id,
           prepared?.document,
+          prepared?.executionPayload,
         )
       } catch (execErr: any) {
         console.error(`[approvals/${params.id}] executeApprovalPayload kastade okontrollerat:`, execErr)
@@ -575,6 +577,7 @@ export async function POST(
               error_text,
               receipt,
               ...(Array.isArray(executionResult?.results) ? { results: executionResult.results } : {}),
+              ...(prepared?.executionEvidence ? { review_evidence: prepared.executionEvidence } : {}),
               executed_at: new Date().toISOString(),
               ...(artifacts ? { artifacts } : {}),
             },
@@ -824,6 +827,7 @@ async function executeApprovalPayload(
   // om den någon gång tappar sessionen).
   resolvedByUserId?: string | null,
   reviewedDocument?: ReviewedDocument,
+  reviewedPayload?: Record<string, unknown>,
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
@@ -1034,23 +1038,16 @@ async function executeApprovalPayload(
    * sendSmsViaElks (via sendSms-closuren ovan) har sin egen approvalId-
    * baserade idempotens och skickar aldrig samma kort två gånger.
    */
-  async function executeQuoteSigningBooking(pl: Record<string, any>): Promise<Record<string, unknown>> {
-    const requestedDate = typeof pl.requested_date === 'string' ? pl.requested_date : ''
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate) || !pl.customer_id) {
+  async function executeQuoteSigningBooking(pl: Record<string, any>, reviewed: Record<string, any> | undefined): Promise<Record<string, unknown>> {
+    if (!reviewed?.customerId || !reviewed?.scheduledStart || !reviewed?.scheduledEnd || !reviewed?.notes) {
       return {
         action: 'new_booking_request',
         ok: false,
-        error: 'Ofullständigt bokningsönskemål — saknar kund eller datum',
+        error: 'Det granskade bokningsunderlaget saknas eller är ofullständigt.',
       }
     }
 
     const supabase = await getSupabase()
-    const { data: config } = await supabase
-      .from('business_config')
-      .select('working_hours, business_name, assigned_phone_number')
-      .eq('business_id', businessId)
-      .maybeSingle()
-
     let bookingId: string
     let scheduledStart: string
 
@@ -1058,45 +1055,19 @@ async function executeApprovalPayload(
     if (befintlig) {
       bookingId = befintlig.booking_id
       scheduledStart = befintlig.scheduled_start
+      if (scheduledStart !== reviewed.scheduledStart) return { action: 'new_booking_request', ok: false, error: 'Den befintliga bokningen har en annan tid än det granskade underlaget.' }
     } else {
-      // Firmans egen starttid för veckodagen (business_config.working_hours,
-      // lib/bookings/availability.ts — samma källa som den publika
-      // självbokningen redan läser). Ingen satt arbetstid för dagen →
-      // 07:30, aldrig en gissning på ett klockslag ingen bett om.
-      const { workingDayFor, stockholmLocalToISO } = await import('@/lib/bookings/availability')
-      const workDay = workingDayFor(config?.working_hours as any, requestedDate)
-      const startTime = workDay?.start || '07:30'
-      scheduledStart = stockholmLocalToISO(requestedDate, startTime)
-
-      // Projektet finns redan — offertsignering skapar det via
-      // createProjectFromQuote (project.quote_id, sql/v103/v136). quotes
-      // saknar en egen project_id-kolumn, så uppslaget går via projektets
-      // quote_id. Fail-soft: hittas inget slår POST /api/bookings ändå in
-      // en koppling via applyBookingPipelineEffects/customer_id.
-      let projectId: string | null = null
-      if (pl.quote_id) {
-        const { data: project } = await supabase
-          .from('project')
-          .select('project_id')
-          .eq('business_id', businessId)
-          .eq('quote_id', pl.quote_id)
-          .maybeSingle()
-        projectId = project?.project_id || null
-      }
-
-      const notes = [
-        pl.quote_title ? `Bokat från offert: ${pl.quote_title}` : 'Bokat från signerad offert',
-        idempotensMarkorFor(approvalId),
-      ].join(' ')
+      scheduledStart = reviewed.scheduledStart
 
       const res = await fetch(`${appUrl}/api/bookings`, {
         method: 'POST',
         headers: forwardHeaders(),
         body: JSON.stringify({
-          customer_id: pl.customer_id,
+          customer_id: reviewed.customerId,
           scheduled_start: scheduledStart,
-          notes,
-          project_id: projectId,
+          scheduled_end: reviewed.scheduledEnd,
+          notes: reviewed.notes,
+          project_id: reviewed.projectId,
         }),
       })
       const r = await classifyResponse(res)
@@ -1113,7 +1084,7 @@ async function executeApprovalPayload(
     // SMS — ENDAST efter att bokningen faktiskt finns (skapad nyss, eller
     // redan skapad vid ett tidigare försök). Aldrig något ovisst i texten:
     // datum/tid kommer från den faktiska bokningsraden, inte kundens önskan.
-    if (!pl.customer_phone) {
+    if (!reviewed.customerPhone || !reviewed.confirmationMessage) {
       return {
         action: 'new_booking_request',
         ok: true,
@@ -1123,18 +1094,10 @@ async function executeApprovalPayload(
       }
     }
 
-    const { buildBookingConfirmationSms } = await import('@/lib/bookings/confirmation-sms')
-    const message = buildBookingConfirmationSms({
-      customerName: pl.customer_name,
-      businessName: config?.business_name || 'Handymate',
-      assignedPhoneNumber: config?.assigned_phone_number,
-      scheduledStart,
-    })
-
     const smsResult = await sendSms({
-      to: pl.customer_phone,
-      message,
-      customerId: pl.customer_id,
+      to: reviewed.customerPhone,
+      message: reviewed.confirmationMessage,
+      customerId: reviewed.customerId,
       relatedId: bookingId,
       messageType: 'booking_confirmation',
       purpose: 'transactional',
@@ -1877,7 +1840,7 @@ async function executeApprovalPayload(
         // ingenting. Se docs/audits/WOW_GENOMLYSNING_2026-09-05.md, "A.
         // Starttiden", och tests/starttid-loop.spec.ts (facit).
         if (approval_type === 'new_booking_request' && pl.source === 'quote_signing') {
-          return await executeQuoteSigningBooking(pl)
+          return await executeQuoteSigningBooking(pl, reviewedPayload as Record<string, any> | undefined)
         }
 
         const message = bookingProposalMessage(pl)
@@ -2360,32 +2323,19 @@ async function executeApprovalPayload(
       }
 
       case 'propose_site_visit': {
-        const pl = payload as any
-        if (!pl.entity?.phone) return { action: 'propose_site_visit', skipped: 'no phone' }
-
-        // Hämta lediga tider
-        let slotsText = ''
-        try {
-          const { getAvailableSlots } = await import('@/lib/matte/calendar-slots')
-          const slots = await getAvailableSlots(businessId, 1)
-          if (slots.length > 0) {
-            slotsText = slots.map((s: any, i: number) => `${i + 1}) ${s.label}`).join('\n')
-          }
-        } catch { /* no calendar */ }
-
-        const message = slotsText
-          ? `${halsning(pl.entity?.customerName)} Vi skulle gärna komma och titta på jobbet. Passar någon av dessa tider?\n${slotsText}\nSvara med 1, 2 eller 3. //${pl.businessName || ''}`
-          : pl.customer_reply_pending || `Hej! Vi vill gärna boka in ett platsbesök. Vilken tid passar dig? //${pl.businessName || ''}`
+        const reviewed = reviewedPayload as any
+        if (!reviewed?.to || !reviewed?.message || !Array.isArray(reviewed.slots)) return { action: 'propose_site_visit', ok: false, error: 'Det granskade platsbesöksunderlaget saknas.' }
 
         // Audit-3 Fix A (2026-06-01)
         const r = await sendSms({
-          to: pl.entity.phone,
-          message,
-          customerId: pl.entity?.customerId || null,
+          to: reviewed.to,
+          message: reviewed.message,
+          customerId: reviewed.customerId || null,
           messageType: 'propose_site_visit',
           purpose: 'conversational',
         })
-        return { action: 'propose_site_visit', sms_sent: r.sms_sent, error: r.error }
+        return { action: 'propose_site_visit', sms_sent: r.sms_sent, sms_id: r.sms_id, error: r.error,
+          recipient: reviewed.to, offered_slots: reviewed.slots }
       }
 
       case 'four_eyes_project_close': {

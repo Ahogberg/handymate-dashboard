@@ -7,7 +7,13 @@ import { classify } from './action-contract'
 import { rejectionEffect } from './receipt'
 import type { ReviewedDocument } from './document-delivery'
 
-export interface PreparedApprovalReview { review: ApprovalReview; snapshot: Record<string, unknown>; document?: ReviewedDocument }
+export interface PreparedApprovalReview {
+  review: ApprovalReview
+  snapshot: Record<string, unknown>
+  document?: ReviewedDocument
+  executionPayload?: Record<string, unknown>
+  executionEvidence?: Record<string, unknown>
+}
 /** Read-only preparation. Each target lookup is explicitly tenant-scoped.
  * Live values are part of the signed review, never silently substituted later.
  */
@@ -65,6 +71,14 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       if (!underlag) throw new Error('Arbetsbeskrivning saknas.')
       detail('Arbetsbeskrivning', underlag); detail('Kund', p.entity?.customerName || p.entity?.name)
       return complete('AI tar fram och sparar ett offertutkast för separat granskning. Offerten skickas inte nu.', 'Skapa offertutkastet')
+    }
+    if (type === 'propose_site_visit') {
+      const { prepareSiteVisitReview } = await import('./site-visit-review')
+      return await prepareSiteVisitReview(db, businessId, p)
+    }
+    if (type === 'new_booking_request' && p.source === 'quote_signing') {
+      const { prepareQuoteSigningBookingReview } = await import('./quote-signing-booking-review')
+      return await prepareQuoteSigningBookingReview(db, businessId, approval.id, p)
     }
     if (['propose_booking_times', 'reschedule_request', 'new_booking_request'].includes(type) && p.source !== 'quote_signing') {
       const message = bookingProposalMessage(p)
@@ -256,7 +270,7 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
   } catch (error) {
     r.effect ||= 'Underlaget måste kunna verifieras före beslut.'
     r.confirmLabel = null
-    r.blockedReason = error instanceof Error ? error.message : 'Granskningen kunde inte förberedas.'
+    r.blockedReason = error instanceof Error ? error.message : String(error || 'Granskningen kunde inte förberedas.')
     return { review: r, snapshot }
   }
 }

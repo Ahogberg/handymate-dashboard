@@ -66,9 +66,9 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `quote_request` | AI genererar och sparar offertutkast. | Stopp – komplett granskning återstår |
 | `quote_addition` | AI genererar och sparar offertutkast utifrån önskat tillägg. | Stopp – komplett granskning återstår |
 | `propose_booking_times` | Skickar SMS med svar eller föreslagna tider; skapar normalt ingen bokning. | Exakt SMS-granskning; ingen bokning utlovas |
-| `propose_site_visit` | Hämtar tillgängliga tider vid utförandet och bygger/skickar ett SMS då. | Stopp – komplett granskning återstår |
+| `propose_site_visit` | Förbereder aktuella tidsförslag, verifierar kunden och visar exakt SMS; skickar samma frysta tider/text utan kalender- eller projektändring. | Versionsbunden granskning, beständig evidens och route-integrationstest; verklig leverantör/app återstår |
 | `reschedule_request` | Skickar SMS med svar eller föreslagna tider; själva ombokningen måste särskiljas från förslaget. | Exakt SMS-granskning; ingen bokning utlovas |
-| `new_booking_request` | Vid quote_signing: skapar bokning och försöker skicka bekräftelse-SMS. Övriga källor: skickar tidsförslag via SMS. | SMS-grenen stöds; offertsigneringens bokningsgren återstår |
+| `new_booking_request` | Vid quote_signing: väljer första aktuella lediga timmen, visar bokning/projekt/fakturaföljd och exakt bekräftelse-SMS, skapar samma bokning och skickar SMS först efter lyckad bokning. Övriga källor skickar tidsförslag. | Offertsigneringsgrenen versionsbunden och route-integrationstestad; generiska varianter och verklig kalender/app återstår |
 | `dispatch_suggestion` | Tilldelar person på bokning/arbetsorder. Befintlig hanterare ignorerar databasfel och saknar företagsscope på uppdateringen. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `publish_microsite` | Publicerar webbsidan, vilket gör innehållet externt tillgängligt. | Stopp – komplett granskning återstår |
 | `invoice_reminder` | Skickar SMS och eventuellt e-post samt uppdaterar påminnelseavgift/ränta och historik. | Granskning av kanaler och avgifter; kontrollerad delutfallskvittens |
@@ -204,3 +204,24 @@ Verifiering:
 3. Bygg leveransjournal/avstämning för offert och faktura innan återförsök exponeras. Kvittensen i det nya offertsvaret återhämtas ännu inte från historik vid förlorat svar; invoice `delivery_failed` skiljer ännu inte alla osäkra leveranser från säkert avvisade. Ingen dubbelsändningsgaranti lämnas för manuellt omklick, Gmail-interna försök, Fortnox eller dessa äldre sändvägar.
 4. Synliggör offertens `fireEvent('quote_sent')`, pipeline och affärsskapande samt fakturans projekt-/pipelinesteg. Kastade offertfel syns nu, men funktioner som returnerar ett delutfall utan att kasta behöver egna delkvittenser. Sent genererade utskick ska få nya konkreta granskningar. Fyrögonskortets återgång till utkast behöver ett beständigt versionsbundet mandat så skaparen inte fastnar i en ny likadan begäran.
 5. Därefter kvarstår del 2–5 i föregående fortsättningslista: bokning/projektavslut, betalning/lead/automationer, paket/kampanjkö/historik samt kompletta native specialvyer och testbuild. Mobilkod och TestFlight build 12 är oförändrade; ingen publicering, main-merge eller verklig kundhandling har gjorts.
+
+### Fortsättning 8 september — dynamiskt platsbesök och bokning efter signerad offert
+
+Två del-2-flöden har fått verkliga ersättningsvägar. **Del 2 och alla fem delar är fortfarande inte klara.**
+
+- `propose_site_visit` verifierar nu kund och aktuellt telefonnummer inom företaget, hämtar högst tre aktuella kalenderförslag före beslutet och visar ansvarig, varje tidsintervall, exakt SMS samt uttryckligen att ingen bokning, kalender- eller projektändring görs. Slutbeslutet använder endast det signerade underlaget; ändrade tider eller mottagare kräver ny preview. Exakt mottagare, text, tider och följdbeskrivning sparas som `review_evidence` och återges med utfallet.
+- `new_booking_request/source:quote_signing` verifierar aktuell kund, signerad/accepterad offert, företagets arbetstider, befintliga bokningar och eventuell projektkoppling. Förhandsvisningen väljer första verkligt lediga entimmesluckan på kundens önskade dag och visar start/slut, ansvarig, projekt-, kalender-, SMS- och fakturaföljd. Den exakta bokningsraden och SMS-texten binds till beslutet. Bokningen skapas före SMS; inget fakturautskick görs. Om kalendern ändras mellan preview och beslut blir token ogiltig och ett nytt beslut krävs.
+- Bokningsanteckningen bär fortsatt stabil kortmarkör. Dubbelklick hittar samma bokning; en befintlig bokning med annan starttid nekas i stället för att få en missvisande SMS-kvittens. Faktiska delar sparas i `execution_result`, inklusive granskningsbeviset.
+- Kundens offentliga offertvy säger nu sanningsenligt att veckorna har utrymme att börja och att exakt tid bekräftas senare; den lovar inte att de visade datumen redan är bokningsbara klockslag.
+
+Verifiering utan produktionsdata eller riktiga sändare:
+
+- Faktisk approval-route i minnesharness: läsande platsbesökspreview, ändrade kalendertider som ogiltigförklarar token, exakt skickat SMS, beständig evidens, främmande/saknad kund och saknade tider. Samma harness provar signerad offert, aktuellt ledigt intervall, exakt boknings-POST, projekt-/fakturaföljd, SMS efter bokning och nekad icke-signerad offert.
+- **140 riktade Playwright-prov passerar**, inklusive samtliga valda approval-kontrakt, review/preview/receipt/routing och Starttiden. `npm run test:approval-economy` passerar 23 offert- och 12 fakturascenarier. `npm run test:approval-documents` passerar sina fem körbara sviter. `npx tsc --noEmit` är rent. Full Next-produktionsbuild passerar med 327 statiska sidor; befintliga Sentry-/metadata-/dynamisk-rendering-varningar kvarstår.
+- Inget verkligt SMS, kalenderinlägg, kundutskick, Fortnox-anrop eller produktionsskrivning gjordes. Ingen iPhone-/TestFlight-verifiering har gjorts och build 12 är fortsatt oförändrad.
+
+Nästa konkreta fortsättningspunkt:
+
+1. Del 1 är fortfarande prioriterad: fryst offert-/fakturadokumentversion, komplett ekonomisammanställning, To/CC/BCC/kanal, Fortnox/e-faktura och beständig återförsöksjournal.
+2. I del 2 återstår `four_eyes_project_close`, inklusive uttryckliga val och separata utfall för projektavslut, kundbekräftelse och eventuell faktura. Generiska `propose_booking_times`/`reschedule_request` behöver samma verifierade kundscope och beständiga evidens som platsbesöket.
+3. Del 3–5 återstår enligt planen: betalning/lead/automationers följder, paketdelar och avstämningsbara återförsök/historik, därefter fullständiga native specialvyer och en ny verkligt provad TestFlight-build.
