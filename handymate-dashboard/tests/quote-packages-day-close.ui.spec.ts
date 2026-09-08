@@ -30,6 +30,11 @@ async function mount(page:Page, kind:'packages'|'report') {
   let confirmationAttempts=0
   await page.route('**/*',async route=>{
     const req=route.request()
+    const url=new URL(req.url())
+    if(url.pathname==='/api/day-close'){
+      if(url.searchParams.get('view')==='reports')return route.fulfill({json:{enabled:false,reports:[]}})
+      return route.fulfill({json:{summary:{projectId:'p',date:url.searchParams.get('date'),ownMinutes:0,ownEntryCount:0,ownNotes:[],activeTimer:false,scope:'Egen tid och anteckningar för valt datum.'}}})
+    }
     if(req.url()==='http://wave2.test/') return route.fulfill({contentType:'text/html',body:'<html lang="sv"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><main id="root" style="max-width:1000px;margin:20px auto;padding:12px"></main></body></html>'})
     if(req.url().endsWith('/api/matte/transcribe')) return route.fulfill({json:{text:'Tre timmar montering idag.'}})
     if(req.url().endsWith('/api/matte/chat')) {
@@ -103,7 +108,7 @@ for(const width of [375,1280]) test(`day close: failure retry keeps same token a
   expect(await page.evaluate(()=>(window as any).refreshCount||0)).toBe(0)
   expect(h.calls[0]).toMatchObject({context:{projectId:'p',workReport:true},require_confirm_external:true})
   await page.getByRole('button',{name:'Lägg till tiden'}).click()
-  await expect(page.getByRole('alert')).toBeVisible()
+  await expect(page.getByRole('alert')).toContainText('Rapporten kunde inte hanteras')
   await expect(page.getByRole('heading',{name:'Sparat i den här rapporten'})).toHaveCount(0)
   expect(await page.evaluate(()=>(window as any).refreshCount||0)).toBe(0)
   await page.getByRole('button',{name:'Lägg till tiden'}).click()
