@@ -212,7 +212,8 @@ export async function PUT(
               businessId: business.business_id,
               businessName: bizName,
               to: cust.phone_number,
-              message: `Hej${firstName ? ' ' + firstName : ''}! "${milestoneName}" i ditt projekt "${project.name}" är nu klart (${completedCount}/${totalCount}).${portalLink} // ${bizName}`,
+              // Kundtext utan interna namn (beslut Andreas 2026-09-08).
+              message: `Hej${firstName ? ' ' + firstName : ''}! Ett delmoment i ditt projekt är nu klart (${completedCount} av ${totalCount}).${portalLink} // ${bizName}`,
               customerId: project.customer_id,
               relatedId: params.id,
               messageType: 'milestone_completed',

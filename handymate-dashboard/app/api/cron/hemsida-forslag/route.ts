@@ -55,6 +55,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // Pausad (beslut Andreas 2026-09-08): ett hemsideförslag som publiceras
+  // på ett tryck utan förhandsgranskning ska inte skapas alls förrän
+  // godkännandeflödet visar sidan först (Codex #26). Slå på med
+  // HEMSIDA_FORSLAG_ENABLED=true när det finns.
+  if (process.env.HEMSIDA_FORSLAG_ENABLED !== 'true') {
+    return NextResponse.json({ paused: true, reason: 'HEMSIDA_FORSLAG_ENABLED är inte satt (beslut 2026-09-08)' })
+  }
+
   const supabase = getServerSupabase()
   const appUrl = getAppBaseUrl()
 
@@ -153,7 +161,7 @@ export async function GET(request: NextRequest) {
       const businessName = (biz.business_name || '').trim()
       const title = businessName ? `🌐 Förslag på hemsida — ${businessName}` : '🌐 Förslag på hemsida'
       const description_ = 'Hanna har byggt ett förslag på hemsida utifrån din företagsprofil. '
-        + 'Godkänn för att publicera den — sidan blir då synlig för alla på internet.'
+        + 'Godkänn för att öppna förslaget. Publicera gör du själv efter att du sett sidan.'
 
       const payload = {
         routed_agent: 'hanna',

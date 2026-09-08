@@ -326,7 +326,9 @@ async function runDefaultAutomations(
         await sendStageSms({
           businessId,
           to: customerPhone,
-          message: `Hej! Vi har mottagit er signerade offert för ${projectName}. Vi återkommer snart med startdatum. // ${companyName}`,
+          // Kundtext utan interna namn (beslut Andreas 2026-09-08): projekt- och
+          // offertnamn är hantverkarens egna etiketter och ska aldrig ut i SMS.
+          message: `Hej! Vi har mottagit er signerade offert. Vi återkommer snart med startdatum. // ${companyName}`,
           title: `Lars: SMS — kontrakt signerat (${projectName})`,
           routedAgent: 'lars',
           project,
@@ -339,7 +341,7 @@ async function runDefaultAutomations(
         await sendStageSms({
           businessId,
           to: customerPhone,
-          message: `Hej! Vi har nu startat arbetet med ${projectName}. Följ projektets framsteg i din portal. // ${companyName}`,
+          message: `Hej! Vi har nu startat arbetet hos dig. Följ projektets framsteg i din portal. // ${companyName}`,
           title: `Lars: SMS — jobb startat (${projectName})`,
           routedAgent: 'lars',
           project,

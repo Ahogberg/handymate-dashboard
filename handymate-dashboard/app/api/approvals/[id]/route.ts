@@ -2865,26 +2865,18 @@ async function executeApprovalPayload(
         // app/api/cron/hemsida-forslag/route.ts. Godkänn = publicera.
         // Avvisa = inget händer, utkastet ligger kvar (kan publiceras
         // manuellt senare via /dashboard/website).
+        // Beslut Andreas 2026-09-08: Godkänn publicerar INTE. Sidan blir
+        // synlig för hela internet — det ska ske på /dashboard/website efter
+        // förhandsgranskning, aldrig från ett kort utan att sidan visats.
+        // Kortet leder dit; utkastet ligger kvar opublicerat.
         const pl = payload as any
-        if (!pl.storefront_id) {
-          return { action: 'publish_microsite', error: 'payload saknar storefront_id' }
-        }
-        const supabasePM = (await import('@/lib/supabase')).getServerSupabase()
-        const { error: publishError } = await supabasePM
-          .from('storefront')
-          .update({ is_published: true, updated_at: new Date().toISOString() })
-          .eq('id', pl.storefront_id)
-          .eq('business_id', businessId)
-
-        if (publishError) {
-          return { action: 'publish_microsite', ok: false, error: publishError.message }
-        }
         return {
           action: 'publish_microsite',
           ok: true,
+          published: false,
           slug: pl.slug,
-          public_url: pl.public_url,
-          navigate_to: pl.public_url || (pl.slug ? `/site/${pl.slug}` : '/dashboard/website'),
+          navigate_to: '/dashboard/website',
+          note: 'Förhandsgranska och publicera på hemsidesidan',
         }
       }
 

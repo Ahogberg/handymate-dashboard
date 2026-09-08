@@ -182,6 +182,7 @@ jobs:
           tests/rollgranser-r1-r4.spec.ts
           tests/sasongskampanj-beskrivning.spec.ts
           tests/massutskick-bekraftelse.spec.ts
+          tests/kundtext-utan-interna-namn.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
