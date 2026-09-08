@@ -1,9 +1,9 @@
 const fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),assert=require('node:assert/strict')
 const root=path.resolve(__dirname,'../..'),cache={}
-let tables,calls,failLink,lostAccept,lostProvider
+let tables,calls,failLink,lostAccept,lostProvider,remote,lookups
 function load(file){file=path.resolve(file);if(cache[file])return cache[file];const mod={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS}}).outputText,{module:mod,exports:mod.exports,Date,console,process:{env:{}},require:name=>{
  if(name.startsWith('node:'))return require(name)
- if(name==='@/lib/fortnox')return {fortnoxProjectNumberFor:n=>n.replace(/\D/g,''),fortnoxProjectStatus:()=> 'ONGOING',createFortnoxProject:async(b,p)=>{assert.equal(b,'b1');calls.push(structuredClone(p));if(lostProvider)throw Error('network lost');return {ProjectNumber:p.ProjectNumber}}}
+ if(name==='@/lib/fortnox')return {fortnoxRequest:async(b,method,url)=>{assert.equal(b,'b1');assert.equal(method,'GET');assert.equal(url,'/projects/1042');lookups++;if(!remote)throw Error('Remote lookup unavailable');return {Project:structuredClone(remote)}},fortnoxProjectNumberFor:n=>n.replace(/\D/g,''),fortnoxProjectStatus:()=> 'ONGOING',createFortnoxProject:async(b,p)=>{assert.equal(b,'b1');calls.push(structuredClone(p));remote=structuredClone(p);if(lostProvider)throw Error('network lost');return {ProjectNumber:p.ProjectNumber}}}
  if(name.startsWith('./'))return load(path.resolve(path.dirname(file),name+'.ts'))
  throw Error('Forbidden dependency '+name)
 }});return cache[file]=mod.exports}
@@ -24,7 +24,7 @@ const db={from(table){let op='read',values,filters=[],single=false;const chain=n
  }
  return(...args)=>{if(['eq','is'].includes(key))filters.push(args);if(['single','maybeSingle'].includes(key))single=true;if(['insert','update'].includes(key)){op=key;values=args[0]}return chain}
 }});return chain}}
-function reset(){tables={project:[{project_id:'p1',business_id:'b1',project_number:'P-1042',name:'Test',status:'active',fortnox_project_number:null}],business_config:[{business_id:'b1',fortnox_connected:true}],v3_automation_logs:[]};calls=[];failLink=false;lostAccept=false;lostProvider=false}
+function reset(){tables={project:[{project_id:'p1',business_id:'b1',project_number:'P-1042',name:'Test',status:'active',fortnox_project_number:null}],business_config:[{business_id:'b1',fortnox_connected:true}],v3_automation_logs:[]};calls=[];failLink=false;lostAccept=false;lostProvider=false;remote=null;lookups=0}
 const {prepareProjectSyncReview:prepare,executeProjectSyncReview:execute}=load(path.join(root,'lib/approvals/project-sync-review.ts'))
 const payload={project_id:'p1'}
 ;(async()=>{
@@ -36,7 +36,10 @@ const payload={project_id:'p1'}
  await execute(db,'b1','a1',(await prepare(db,'b1',payload)).executionPayload);assert.equal(calls.length,1)
  reset();p=await prepare(db,'b1',payload);failLink=true;await execute(db,'b1','a1',p.executionPayload);const stored=tables.v3_automation_logs[0].context.plan;tables.v3_automation_logs[0].context.plan={alreadyLinked:stored.alreadyLinked,document:stored.document,projectId:stored.projectId};failLink=false;assert.equal((await execute(db,'b1','a1',p.executionPayload)).ok,true);assert.equal(calls.length,1)
  reset();p=await prepare(db,'b1',payload);lostAccept=true;assert.equal((await execute(db,'b1','a1',p.executionPayload)).partial,true);assert.equal((await execute(db,'b1','a1',(await prepare(db,'b1',payload)).executionPayload)).ok,true);assert.equal(calls.length,1)
- reset();p=await prepare(db,'b1',payload);lostProvider=true;assert.equal((await execute(db,'b1','a1',p.executionPayload)).partial,true);await execute(db,'b1','a1',(await prepare(db,'b1',payload)).executionPayload);assert.equal(calls.length,1);assert.equal(tables.v3_automation_logs[0].status,'unknown')
+ reset();p=await prepare(db,'b1',payload);lostProvider=true;assert.equal((await execute(db,'b1','a1',p.executionPayload)).partial,true);const reconciled=await prepare(db,'b1',payload);assert.equal(reconciled.review.confirmLabel,'Koppla det hittade Fortnox-projektet');assert.equal(tables.project[0].fortnox_project_number,null);assert.equal((await execute(db,'b1','a1',reconciled.executionPayload)).ok,true);assert.equal(calls.length,1);assert.equal(tables.v3_automation_logs[0].status,'saved');assert.equal(lookups,2)
+ reset();p=await prepare(db,'b1',payload);lostProvider=true;await execute(db,'b1','a1',p.executionPayload);remote=null;await assert.rejects(()=>prepare(db,'b1',payload),/unavailable/);assert.equal(calls.length,1);assert.equal(tables.project[0].fortnox_project_number,null)
+ reset();p=await prepare(db,'b1',payload);lostProvider=true;await execute(db,'b1','a1',p.executionPayload);remote.Description='Different project';await assert.rejects(()=>prepare(db,'b1',payload),/skiljer/);assert.equal(calls.length,1)
+ reset();p=await prepare(db,'b1',payload);lostProvider=true;await execute(db,'b1','a1',p.executionPayload);const stale=await prepare(db,'b1',payload);remote.Status='FINISHED';assert.equal((await execute(db,'b1','a1',stale.executionPayload)).ok,false);assert.equal(tables.project[0].fortnox_project_number,null);assert.equal(calls.length,1)
  reset();p=await prepare(db,'b1',payload);const both=await Promise.all([execute(db,'b1','a1',p.executionPayload),execute(db,'b1','a2',p.executionPayload)]);assert.equal(calls.length,1);assert(both.some(r=>r.ok))
  reset();p=await prepare(db,'b1',payload);tables.project[0].fortnox_project_number='1042';assert.equal((await execute(db,'b1','a1',p.executionPayload)).already_linked,true);assert.equal(calls.length,0)
  reset();tables.project[0].fortnox_project_number='1042';p=await prepare(db,'b1',payload);assert.equal((await execute(db,'b1','a1',p.executionPayload)).already_linked,true);assert.equal(calls.length,0)

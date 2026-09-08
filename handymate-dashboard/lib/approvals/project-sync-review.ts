@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ApprovalReview } from './review-contract'
 import { approvalArtifactId, insertApprovalArtifact } from './artifact-write'
-import { createFortnoxProject, fortnoxProjectNumberFor, fortnoxProjectStatus, type FortnoxProject } from '@/lib/fortnox'
+import { fortnoxRequest, createFortnoxProject, fortnoxProjectNumberFor, fortnoxProjectStatus, type FortnoxProject } from '@/lib/fortnox'
 
 type Plan = { projectId: string; document: FortnoxProject; alreadyLinked: string | null }
 const purpose = 'fortnox:project:review'
@@ -10,6 +10,17 @@ function canonical(value: any): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return `[${value.map(canonical).join(',')}]`
   return `{${Object.keys(value).sort().map(key => `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`
+}
+async function inspectRemoteProject(businessId: string, expected: FortnoxProject): Promise<FortnoxProject> {
+  const response = await fortnoxRequest<{ Project: FortnoxProject }>(businessId, 'GET', `/projects/${encodeURIComponent(expected.ProjectNumber)}`)
+  const actual = response?.Project
+  if (!actual || actual.ProjectNumber !== expected.ProjectNumber) throw new Error('Fortnox-projektet kunde inte verifieras.')
+  // A matching number alone is not proof of the intended project. Never overwrite
+  // or silently adopt a different register entry after a lost response.
+  for (const key of ['Description', 'StartDate', 'EndDate', 'Status'] as const) {
+    if ((actual[key] || '') !== (expected[key] || '')) throw new Error(`Fortnox-projektets ${key} skiljer sig från det granskade underlaget. Ingen koppling ändrades.`)
+  }
+  return actual
 }
 function reviewFor(plan: Plan, state?: string): ApprovalReview {
   const uncertain = state === 'sending' || state === 'unknown'
@@ -34,8 +45,19 @@ export async function prepareProjectSyncReview(db: SupabaseClient, businessId: s
   if (previous.data) {
     const plan = previous.data.context?.plan as Plan
     if (!plan?.document?.ProjectNumber || plan.projectId !== projectId) throw new Error('Fortnox-journalens underlag är ofullständigt.')
+    if (['sending', 'unknown'].includes(previous.data.status)) {
+      // Read-only reconciliation becomes a concrete, signed decision. A failed
+      // lookup is not proof that POST failed and never enables another POST.
+      const remote = await inspectRemoteProject(businessId, plan.document)
+      const review = reviewFor(plan, previous.data.status)
+      review.confirmLabel = 'Koppla det hittade Fortnox-projektet'
+      review.effect = 'Fortnox-projektet finns och motsvarar underlaget nedan. Beslutet sparar kopplingen till detta befintliga projekt. Inget nytt projekt eller kundutskick skapas.'
+      review.details = [...(review.details || []).filter(d => d.label !== 'Tidigare försök'), { label: 'Avstämning', text: 'Projektnummer, beskrivning, datum och status har lästs från Fortnox och matchar underlaget. Kopplingen kontrolleras igen vid beslut.' }]
+      return { review, snapshot: { journal: previous.data, current: current.data, remote }, executionPayload: { plan, reconcile: true }, executionEvidence: { plan, remote, reconcile: true } }
+    }
     return { review: reviewFor(plan, previous.data.status), snapshot: { journal: previous.data, current: current.data }, executionPayload: { plan }, executionEvidence: { plan } }
   }
+  if (payload.execution_result?.receipt?.state === 'partial') throw new Error('Det tidigare försöket saknar en verifierbar synkjournal. Ett nytt Fortnox-anrop får inte göras.')
   const config = await db.from('business_config').select('fortnox_connected').eq('business_id', businessId).maybeSingle()
   if (config.error || !config.data?.fortnox_connected) throw new Error('En aktiv Fortnox-anslutning kunde inte verifieras.')
   const p = current.data, number = p.fortnox_project_number || fortnoxProjectNumberFor(p.project_number)
@@ -65,7 +87,17 @@ export async function executeProjectSyncReview(db: SupabaseClient, businessId: s
   if (saved.error || !saved.data) return { ...base, ok: false, error: 'Fortnox-journalen kunde inte sparas.' }
   const journal = saved.data
   if (canonical(journal.context?.plan) !== canonical(plan)) return { ...base, ok: false, error: 'En annan projektversion finns i synkjournalen. Öppna granskningen igen.' }
-  if (journal.status === 'sending' || journal.status === 'unknown') return { ...base, ok: false, partial: true, error: 'Fortnox-utfallet är osäkert. Inget nytt projekt skapades av återförsöket; avstämning krävs.' }
+  if (journal.status === 'sending' || journal.status === 'unknown') {
+    if (reviewed.reconcile !== true) return { ...base, ok: false, partial: true, error: 'Öppna granskningen för att stämma av projektet mot Fortnox. Inget nytt projekt skapades.' }
+    try {
+      const remote = await inspectRemoteProject(businessId, plan.document)
+      const accepted = await db.from('v3_automation_logs').update({ status: 'accepted', result: { project_number: remote.ProjectNumber, reconciled: true } })
+        .eq('id', journal.id).eq('business_id', businessId).eq('status', journal.status).select('id')
+      if (accepted.error || !accepted.data?.length) return { ...base, ok: false, partial: true, error: 'Avstämningskvittensen kunde inte sparas. Öppna granskningen igen; inget nytt projekt skapas.' }
+      journal.status = 'accepted'
+      journal.result = { project_number: remote.ProjectNumber, reconciled: true }
+    } catch (error) { return { ...base, ok: false, partial: true, error: error instanceof Error ? error.message : 'Fortnox-avstämningen misslyckades.' } }
+  }
   if (journal.status === 'prepared' && current.data.fortnox_project_number === plan.document.ProjectNumber) {
     return { ...base, ok: true, already_linked: true, project_number: plan.document.ProjectNumber }
   }

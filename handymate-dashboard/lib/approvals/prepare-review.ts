@@ -43,7 +43,8 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     return data as Record<string, any>
   }
   try {
-    if (action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
+    const journaledProjectSync = type === 'automation' && p.rule_action_type === 'sync_to_fortnox' && (p.rule_action_config?.entity_type || p.entity_type) === 'project'
+    if (!journaledProjectSync && action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
     if (action === 'reject') return complete(rejectionEffect(type), 'Bekräfta avvisningen')
     if (classify(type) === 'INFORMATIONAL' || classify(type) === 'ACKNOWLEDGEMENT') return
     if (type === 'job_report') {
