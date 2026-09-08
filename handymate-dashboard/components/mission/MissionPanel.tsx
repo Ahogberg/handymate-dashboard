@@ -7,6 +7,8 @@
 
 import { useEffect, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
+import { MissionHandoverCard } from './MissionHandoverCard'
+import type { MissionHandover } from '@/lib/mission/handover'
 import { useMission } from '@/lib/mission/MissionProvider'
 import { useJobbuddy } from '@/lib/JobbuddyContext'
 import { groupStepsByClass } from '@/lib/mission/plan-contract-view'
@@ -369,6 +371,7 @@ function MandateFormFields({
 }
 
 export function MissionPanelView({
+  handover,
   mission,
   progress,
   decisions,
@@ -404,6 +407,7 @@ export function MissionPanelView({
   onConfirmRevokeMandate,
   onResumeMandate,
 }: {
+  handover?: MissionHandover | null
   mission: MissionRow
   progress: MissionProgress
   decisions: MissionDecision[]
@@ -494,7 +498,7 @@ export function MissionPanelView({
       {/* Header — mörk, samma bandkontext som MatteHero. */}
       <div className="flex items-start justify-between gap-3 px-5 py-4 bg-primary-700 text-white shrink-0">
         <div className="min-w-0">
-          <p className="m-0 text-[11px] uppercase tracking-[0.1em] text-white/70">Aktivt uppdrag</p>
+          <p className="m-0 text-[11px] uppercase tracking-[0.1em] text-white/70">{mission.status === 'active' ? 'Aktivt uppdrag' : 'Uppdragets tidsram har passerat'}</p>
           <h2 className="m-0 mt-0.5 font-heading text-lg sm:text-xl font-bold leading-tight">{headline}</h2>
           <p className="m-0 mt-1 text-xs text-white/70">Deadline {deadlineLabel}</p>
           <p className="m-0 mt-1.5 text-sm text-white/85 tabular-nums">{progressParts(progress).join(' · ')}</p>
@@ -511,6 +515,7 @@ export function MissionPanelView({
 
       {/* Innehåll */}
       <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+        {handover && <MissionHandoverCard handover={handover} />}
         <div className="space-y-3">
           {sections.map(section => {
             const badge = CLASS_BADGE[section.truth_class]
@@ -835,7 +840,7 @@ export function MissionPanelView({
  * prop-trädning genom layouten behövs.
  */
 export function MissionPanel() {
-  const { mission, progress, decisions, mandate, mandateFacit, panelOpen, setPanelOpen, refresh } = useMission()
+  const { mission, progress, decisions, mandate, mandateFacit, handover, panelOpen, setPanelOpen, refresh } = useMission()
   const { setActiveTab, setIsOpen } = useJobbuddy()
   const [confirmAction, setConfirmAction] = useState<MissionResolveAction | null>(null)
   const [resolving, setResolving] = useState(false)
@@ -918,7 +923,7 @@ export function MissionPanel() {
   }, [panelOpen])
 
   if (!panelOpen) return null
-  if (!mission || mission.status !== 'active' || !progress) return null
+  if (!mission || !progress) return null
 
   // Etapp H: det aktiva uppdragets egen rad ur samma /api/mission/history-
   // svar (normalt facit[0] eftersom bara ETT uppdrag kan vara aktivt åt
@@ -1068,6 +1073,7 @@ export function MissionPanel() {
     <div className="fixed inset-0 z-[60] flex">
       <div onClick={() => setPanelOpen(false)} className="absolute inset-0 bg-slate-900/40" aria-hidden />
       <MissionPanelView
+        handover={handover}
         mission={mission}
         progress={progress}
         decisions={decisions}

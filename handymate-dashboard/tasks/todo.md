@@ -1402,3 +1402,14 @@ Underlag: docs/security/role-audit-2026-09-07/README.md. Fyra reproducerade luck
 # 2026-09-08 — Arbetsprov, överlämning och synligt lärande
 
 - [ ] Genomför prioritet 1–3 enligt docs/design/first-value/PRODUCTION_V1.md.
+
+# Kundens avlastning — tre delar (Codex 2026-09-08)
+
+- [x] Kartlägg nuvarande uppdrag, arbetsprov, rapport och databas.
+- [x] Spara komplett programplan och verifieringsgrindar.
+- [x] Implementera etapp 1 för överlämning, egen start och dagsavslut.
+- [x] Verifiera beteende, felvägar, mobil/desktop och build.
+- [x] Dokumentera etapp 2/3 och begränsningar.
+- [ ] Publicera draft-PR — push blockerad av automatisk godkännandegranskning; inväntar uttryckligt tillstånd.
+
+Plan: docs/handoffs/CUSTOMER_RELIEF_PROGRAM_2026-09-08.md.

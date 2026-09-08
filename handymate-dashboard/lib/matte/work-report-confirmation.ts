@@ -7,6 +7,7 @@ import { loadWorkReportContext, prepareWorkReportAction, workReportSummary, Work
 export function pendingWorkReport(action: WorkReportAction, ctx: WorkReportContext, businessId: string, threadId: string | null, remaining: WorkReportAction[] = [], requestId: string = crypto.randomUUID()) {
   return {
     tool_name: action.toolName, args: action.toolInput, summary: workReportSummary(action, ctx),
+    plan: [action, ...remaining].map(item => ({ tool_name: item.toolName, summary: workReportSummary(item, ctx) })),
     confirm_label: action.toolName === 'log_time' ? 'Lägg till tiden'
       : action.toolName === 'add_work_note' ? 'Spara anteckningen'
       : action.toolName === 'log_material' ? 'Bokför materialet'
@@ -56,6 +57,7 @@ export async function confirmWorkReport(
   return {
     reply, messages: [{ agent: 'lars', content: reply }], current_agent: 'lars', thread_id: pending.threadId,
     action: null, confirmed: ok, pending_confirmation: next,
+    report_continuation: { state: !ok ? 'retry_same' : nextError ? 'blocked' : next ? 'awaiting_review' : 'finished', remaining: scope.remaining.length, error: nextError || null },
     execution_result: { tool: pending.toolName, status: ok ? (result.data?.duplicate ? 'already_saved' : 'saved') : 'failed' },
   }
 }

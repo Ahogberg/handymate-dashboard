@@ -67,6 +67,7 @@ import { resolveGoalType, type MissionGoalType } from './goal-type'
 import { getWeekCapacity, mondayOfWeek } from '@/lib/capacity/week-capacity'
 import { svDateStrPlusDays } from '@/lib/dates'
 import { loadContactOutcomes, type ContactApprovalInput } from './contact-outcomes'
+import { deriveMissionHandover, type MissionHandover } from './handover'
 import { isCustomerSettled } from '@/lib/invoices/status'
 
 export interface MissionRow {
@@ -442,6 +443,7 @@ export async function loadMissionProgressInputs(
   supabase: SupabaseClient,
   mission: MissionRow,
   nowMs: number,
+  strict = false,
 ): Promise<{
   invoices: MissionInvoiceInput[]
   missionApprovals: MissionApprovalRow[]
@@ -458,6 +460,7 @@ export async function loadMissionProgressInputs(
     .eq('business_id', mission.business_id)
     .contains('payload', { mission_id: mission.id })
   if (approvalError) throw new Error(`pending_approvals-uppslag misslyckades: ${approvalError.message}`)
+  if (!Array.isArray(approvalRows) || approvalRows.length >= 1000) throw new Error('Hela uppdragets beslutsunderlag kunde inte läsas.')
   const missionApprovals = asRows<MissionApprovalRow>(approvalRows)
     .map(row => ({ ...row, payload: (row.payload ?? {}) as Record<string, unknown> }))
 
@@ -512,6 +515,7 @@ export async function loadMissionProgressInputs(
       capacityWeek = { bookedHours: wc.booked_hours, configured: wc.configured }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
+      if (strict) throw err
       console.warn('[mission-progress] kapacitet kunde inte läsas (gap_hours blir okonfigurerat):', msg)
       capacityWeek = null
     }
@@ -535,6 +539,7 @@ export async function loadMissionProgressInputs(
       contactOutcomes = await loadContactOutcomes(supabase, mission.business_id, contactApprovals, 7, nowMs)
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
+      if (strict) throw err
       console.warn('[mission-progress] kontaktutfall kunde inte läsas (contacted_count blir 0):', msg)
       contactOutcomes = []
     }
@@ -577,16 +582,16 @@ export interface MissionDecision {
  * Etapp G (expansionspanelen): samma I/O-källa som getMissionProgress —
  * läses EN gång, delas mellan progress och beslutslistan — men svarar också
  * med de öppna besluten så panelen kan lista dem utan en andra fråga.
- * Fail-soft identiskt med getMissionProgress: ett läsfel ger nollprogress +
- * tom beslutslista, aldrig ett kastat fel.
+ * Strikt läsning för kundens överlämning: ett läsfel kastas vidare till
+ * API:t och visas med återförsök. Noll beslut måste vara verifierat.
  */
 export async function getMissionProgressWithDecisions(
   supabase: SupabaseClient,
   mission: MissionRow,
-): Promise<{ progress: MissionProgress; decisions: MissionDecision[] }> {
+): Promise<{ progress: MissionProgress; decisions: MissionDecision[]; handover: MissionHandover }> {
   const nowMs = Date.now()
   try {
-    const { invoices, missionApprovals, quotes, capacityWeek, contactOutcomes } = await loadMissionProgressInputs(supabase, mission, nowMs)
+    const { invoices, missionApprovals, quotes, capacityWeek, contactOutcomes } = await loadMissionProgressInputs(supabase, mission, nowMs, true)
     const progress = byggMissionProgress({ mission, invoices, missionApprovals, quotes, nowMs, capacityWeek, contactOutcomes })
     const decisions: MissionDecision[] = missionApprovals
       .filter(a => a.status === 'pending')
@@ -596,13 +601,10 @@ export async function getMissionProgressWithDecisions(
         status: a.status,
         approval_type: a.approval_type,
       }))
-    return { progress, decisions }
+    return { progress, decisions, handover: deriveMissionHandover(mission, missionApprovals, new Date(nowMs)) }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err)
-    console.warn('[mission-progress] kunde inte härleda progress (nollprogress):', msg)
-    return {
-      progress: byggMissionProgress({ mission, invoices: [], missionApprovals: [], quotes: [], nowMs, capacityWeek: null, contactOutcomes: [] }),
-      decisions: [],
-    }
+    console.warn('[mission-progress] överlämningens underlag kunde inte kontrolleras:', msg)
+    throw new Error('Uppdragets aktuella underlag kunde inte kontrolleras.')
   }
 }

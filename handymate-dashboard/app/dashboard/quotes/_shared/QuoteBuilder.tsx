@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Loader2, X } from 'lucide-react'
 import type { Session, AuthChangeEvent } from '@supabase/supabase-js'
 import { supabase } from '@/lib/supabase'
+import { loadQuoteReliefHandoff } from '@/lib/relief/intake'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import ProductSearchModal from '@/components/ProductSearchModal'
@@ -288,6 +289,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [sourceImageBase64, setSourceImageBase64] = useState<string | null>(null)
   const [sourceTranscript, setSourceTranscript] = useState<string | null>(null)
   const [aiGenerated, setAiGenerated] = useState(false)
+  const [reliefError, setReliefError] = useState('')
   const [aiTextInput, setAiTextInput] = useState('')
   const [aiConfidence, setAiConfidence] = useState<number | null>(null)
   // Kvittoprincipen Fall 1 (docs/design/SYNLIG-INTELLIGENS.md): motorns
@@ -957,6 +959,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     fetchStandardTexts()
     fetchProductsCount()
 
+    const reliefDraft = loadQuoteReliefHandoff(business.business_id, props.recoveryUserId, searchParams?.get('relief') || null)
+    if (searchParams?.get('relief') && !reliefDraft) setReliefError('Det överlämnade underlaget kunde inte läsas i den här sessionen. Gå tillbaka till ditt underlag eller beskriv jobbet här.')
+    if (reliefDraft?.intent === 'quote') {
+      setQuickInput(reliefDraft.text)
+      setAiTextInput(reliefDraft.text)
+      setSourceTranscript(reliefDraft.text)
+    }
     const transcript = searchParams?.get('transcript')
     const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
     const prefillTitle = searchParams?.get('title')
@@ -2404,7 +2413,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
       />
       <QuickIntake
-        jobTypeStart={<>{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
+        jobTypeStart={<>{reliefError && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{reliefError} <a href="/dashboard/avlastning" className="underline">Till mitt underlag</a></p>}{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
           <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
             onApply={sample => { applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
             onSource={text => setQuickInput(text)} />{jobTypeStart}{preparationInput}</>}

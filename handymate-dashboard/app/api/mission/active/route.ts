@@ -3,37 +3,15 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getMissionProgressWithDecisions, type MissionRow } from '@/lib/mission/mission-progress'
+import { svDateStr } from '@/lib/dates'
 import { resolveGoalType } from '@/lib/mission/goal-type'
 import { loadActiveMandateForMission } from '@/lib/mandates/mission-mandate'
 import { loadMandateFacit } from '@/lib/mandates/load-mandate-facit'
 
 export const dynamic = 'force-dynamic'
 
-/**
- * GET /api/mission/active — det (högst) ena aktiva uppdraget + härledd
- * progress + öppna beslut (Goal-to-Plan V1, Etapp A; decisions tillagt i
- * Etapp G: expansionspanelen).
- *
- * Svarsformen: { mission, progress, decisions }. decisions är uppdragets
- * öppna (status 'pending') mission-kort — components/mission/MissionPanel.tsx
- * listar dem utan en egen fråga (samma läsning som progress kommer ur, se
- * getMissionProgressWithDecisions).
- *
- * Fail-soft hela vägen: mission-tabellen körs manuellt (sql/v144_mission.sql)
- * och kan saknas i produktion — då, och vid varje annat läsfel, svarar
- * rutten { mission: null } med en loggad varning. Ytan (Etapp C) renderar
- * förslagsläget; ingen användare möter ett 500 för att en tabell inte
- * hunnit skapas.
- *
- * 'expired' sätts LÄTTJEFULLT här vid läsning när deadline passerats
- * (ingen cron — Hobby-planens crongräns, och läsningen är sanningen).
- * Uppdateringen är best effort: felar den svarar vi ändå med det härledda
- * expired-läget.
- *
- * Rollgrind som value/ledger (Etapp D-härdning): pengamål + verifierat
- * betalt är samma finansiella känslighet — ägare/admin
- * (tests/permission-contract.spec.ts). Klienten degraderar tyst på 403
- * (MissionProvider sätter mission: null, ingen retry).
+/** Läsande uppdragsbild. Tomt svar betyder verifierat tomt; läsfel är 503.
+ * Deadline härleds i svensk tid utan att GET skriver eller gömmer uppdraget.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -63,17 +41,17 @@ export async function GET(request: NextRequest) {
         .eq('status', 'active')
         .maybeSingle()
       if (error) {
-        console.warn('[mission/active] uppslag misslyckades (svarar mission: null):', error.message)
-        return NextResponse.json({ mission: null })
+        console.warn('[mission/active] uppslag misslyckades (läsfel):', error.message)
+        return NextResponse.json({ error: 'Uppdraget kunde inte läsas. Försök igen.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
       }
       row = (data as MissionRow | null) ?? null
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err)
-      console.warn('[mission/active] uppslag kastade (svarar mission: null):', msg)
-      return NextResponse.json({ mission: null })
+      console.warn('[mission/active] uppslag kastade (läsfel):', msg)
+      return NextResponse.json({ error: 'Uppdraget kunde inte läsas. Försök igen.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
     }
 
-    if (!row) return NextResponse.json({ mission: null })
+    if (!row) return NextResponse.json({ mission: null }, { headers: { 'Cache-Control': 'no-store' } })
 
     const mission: MissionRow = {
       ...row,
@@ -85,27 +63,11 @@ export async function GET(request: NextRequest) {
       goal_hours: row.goal_hours == null ? null : Number(row.goal_hours),
     }
 
-    // Lättjefull utgång: deadline passerad → märk som expired (best effort).
-    const idag = new Date().toISOString().slice(0, 10)
-    if (mission.deadline.slice(0, 10) < idag) {
-      const resolvedAt = new Date().toISOString()
-      try {
-        await supabase
-          .from('mission')
-          .update({ status: 'expired', resolved_at: resolvedAt })
-          .eq('id', mission.id)
-          .eq('business_id', business.business_id)
-          .eq('status', 'active')
-      } catch {
-        // Best effort — det härledda läget nedan är ändå sanningen.
-      }
-      mission.status = 'expired'
-      mission.resolved_at = resolvedAt
-    }
+    if (mission.deadline.slice(0, 10) < svDateStr()) mission.status = 'expired'
 
     // Etapp G (expansionspanelen): samma läsning som förut, bara med
     // uppdragets öppna beslut med i svaret — panelen slipper en andra fråga.
-    const { progress, decisions } = await getMissionProgressWithDecisions(supabase, mission)
+    const { progress, decisions, handover } = await getMissionProgressWithDecisions(supabase, mission)
 
     // Etapp X (Mission Mandates V1, ägarens upplevelse): mandatet kopplat
     // till uppdraget — OAVSETT status (panelen behöver visa pausade/
@@ -117,9 +79,9 @@ export async function GET(request: NextRequest) {
     const mandate = await loadActiveMandateForMission(supabase, business.business_id, mission.id)
     const mandateFacit = mandate ? await loadMandateFacit(supabase, business.business_id, mandate) : null
 
-    return NextResponse.json({ mission, progress, decisions, mandate, mandateFacit })
+    return NextResponse.json({ mission, progress, decisions, mandate, mandateFacit, handover }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error: any) {
     console.error('GET /api/mission/active error:', error)
-    return NextResponse.json({ mission: null })
+    return NextResponse.json({ error: 'Uppdraget kunde inte läsas. Försök igen.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })
   }
 }

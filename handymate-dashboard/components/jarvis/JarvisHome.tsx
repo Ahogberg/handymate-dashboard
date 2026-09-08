@@ -1141,6 +1141,9 @@ export default function JarvisHome({
              Tidsfönstret för bevisraden är ett RULLANDE dygn (team-activity,
              HOURS_BACK=24) — halsningsBevis säger det den mäter. */}
         <div className="min-w-0 lg:col-span-2">
+          <Link href="/dashboard/avlastning" className="mb-4 flex min-h-[64px] items-center justify-between gap-4 rounded-2xl border border-teal-200 bg-white p-4 text-teal-900 hover:bg-teal-50">
+            <span><strong className="block text-base">Vad ligger kvar till ikväll?</strong><span className="text-sm text-slate-600">Ta med ett underlag · förbered nästa steg · granska resultatet</span></span><span aria-hidden="true">→</span>
+          </Link>
           <MatteHero
             greetingName={greetingName}
             queueLoaded={queueLoaded}

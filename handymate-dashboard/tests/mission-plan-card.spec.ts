@@ -149,7 +149,9 @@ test.describe('MissionPlanCard — rendering', () => {
 
   test('confirmed-läget visar bekräftelsechippet och inga knappar', () => {
     const markup = renderToStaticMarkup(createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('confirmed') }))
-    expect(markup).toContain('Uppdraget startat')
+    // A persisted plan is not proof that execution or a future check has started.
+    expect(markup).toContain('Planen är sparad')
+    expect(markup).not.toContain('jag säger till')
     expect(markup).not.toContain('Starta uppdraget')
     expect(markup).not.toContain('Justera')
   })
@@ -170,19 +172,19 @@ test.describe('MissionPlanCard — onOpenPanel (Etapp X)', () => {
     const markup = renderToStaticMarkup(
       createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('confirmed'), onOpenPanel: () => {} }),
     )
-    expect(markup).toContain('uppdragspanelen')
+    expect(markup).toContain('Se ansvar, nästa steg och gränser')
   })
 
   test('confirmed-läget, ingen onOpenPanel given → ingen länk renderas (ingen krasch)', () => {
     const markup = renderToStaticMarkup(createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('confirmed') }))
-    expect(markup).not.toContain('uppdragspanelen')
+    expect(markup).not.toContain('Se ansvar, nästa steg och gränser')
   })
 
   test('proposal-läget renderar aldrig länken, även med onOpenPanel given (mandat gäller bara ett STARTAT uppdrag)', () => {
     const markup = renderToStaticMarkup(
       createElement(MissionPlanCard, { presentation: presentationWithTwoKrClasses('proposal'), onOpenPanel: () => {} }),
     )
-    expect(markup).not.toContain('uppdragspanelen')
+    expect(markup).not.toContain('Se ansvar, nästa steg och gränser')
   })
 
   test('källskanning: mandat skapas ALDRIG i chatt-kortet — ingen fetch/nätverksanrop i den här filen alls', () => {

@@ -29,7 +29,7 @@ import type { MissionSuggestion } from '@/lib/mission/suggestions'
  * SkrivRad längst ner i JarvisHome rörs inte (en merge är V2).
  */
 export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] | null }) {
-  const { mission, loading: missionLoading, setPanelOpen } = useMission()
+  const { mission, handover, error, refresh, loading: missionLoading, setPanelOpen } = useMission()
   const { setPendingPrompt, setActiveTab, setIsOpen } = useJobbuddy()
 
   const oppnaMatte = (prefill?: string) => {
@@ -46,30 +46,32 @@ export function Uppdragsrad({ suggestions }: { suggestions: MissionSuggestion[] 
   // lägens rotelement så attributet alltid finns oavsett tillstånd.
   const TOUR_ANCHOR = 'uppdragsband'
 
+  if (error) return <div role="alert" className="rounded-xl bg-white/10 p-3 text-sm text-white"><p>{error}</p><button type="button" className="min-h-[44px] underline" onClick={refresh}>Försök igen</button></div>
+
   // ── Läge 1: laddar ──────────────────────────────────────────────────────
-  if (missionLoading || suggestions === null) {
+  if (missionLoading || !mission && suggestions === null) {
     return <div data-tour={TOUR_ANCHOR} className="h-10 rounded-xl bg-white/10 animate-pulse" aria-hidden />
   }
 
   // ── Läge 2: aktivt uppdrag — heron visar redan rubrik+progress ovanför ──
   // Öppnar expansionspanelen (Etapp G), inte chatten — "Fråga Matte" i
   // panelens footer är vägen dit om hantverkaren ändå vill prata.
-  if (mission && mission.status === 'active') {
+  if (mission) {
     return (
       <button
         type="button"
         data-tour={TOUR_ANCHOR}
         onClick={() => setPanelOpen(true)}
-        className="min-h-[40px] w-full flex items-center justify-between px-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-sm text-white/70"
+        className="min-h-[60px] w-full flex items-center justify-between px-3.5 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-sm text-white/70"
       >
-        <span>Uppdraget pågår</span>
+        <span className="text-left">{handover?.headline ?? 'Uppdraget finns sparat'}{handover && <small className="block mt-1">{handover.pending} beslut väntar · {handover.executed} bekräftade åtgärder</small>}</span>
         <span className="text-primary-300 font-medium">Öppna →</span>
       </button>
     )
   }
 
   // ── Läge 3: förslagschips ────────────────────────────────────────────────
-  if (suggestions.length > 0) {
+  if (suggestions && suggestions.length > 0) {
     return (
       <div data-tour={TOUR_ANCHOR}>
         <h2 className="m-0 mb-2 font-heading text-[13px] font-semibold text-white/80">

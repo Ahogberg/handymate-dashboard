@@ -125,7 +125,7 @@ export function MissionPlanCard({
       ) : (
         <div className="space-y-1.5">
           <span className="inline-flex items-center px-2.5 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-700 text-xs font-medium">
-            ✓ Uppdraget startat — jag säger till när något behöver dig.
+            ✓ Planen är sparad. Öppna överlämningen för att se förberedda beslut och bekräftade åtgärder.
           </span>
           {onOpenPanel && (
             <button
@@ -133,7 +133,7 @@ export function MissionPlanCard({
               onClick={onOpenPanel}
               className="block text-xs text-primary-700 hover:text-primary-800 font-medium underline underline-offset-2"
             >
-              Vill du låta teamet genomföra inom gränser? Öppna uppdragspanelen.
+              Se ansvar, nästa steg och gränser
             </button>
           )}
         </div>

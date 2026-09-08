@@ -2,7 +2,7 @@ export const REPORT_LABELS = {
   log_time: 'Tid', add_work_note: 'Arbetsanteckning', log_material: 'Material', create_ata_draft: 'ÄTA-förslag',
 } as const
 export type ReportTool = keyof typeof REPORT_LABELS
-export interface ReportConfirmation { token: string; tool_name: ReportTool; summary: string; confirm_label: string; args: Record<string, unknown> }
+export interface ReportConfirmation { token: string; tool_name: ReportTool; summary: string; confirm_label: string; args: Record<string, unknown>; plan?: Array<{ tool_name: ReportTool; summary: string }> }
 export function readReportConfirmation(value: unknown, projectId: string, date: string): ReportConfirmation | null {
   if (value == null) return null
   if (typeof value !== 'object') throw new Error('Förslaget kunde inte kontrolleras.')
@@ -10,6 +10,7 @@ export function readReportConfirmation(value: unknown, projectId: string, date: 
   const args = v.args as Record<string, unknown> | null
   if (typeof v.tool_name !== 'string' || !Object.prototype.hasOwnProperty.call(REPORT_LABELS, v.tool_name) || typeof v.token !== 'string' || !v.token || typeof v.summary !== 'string' || typeof v.confirm_label !== 'string' || !args || args.project_id !== projectId) throw new Error('Förslaget hör inte till den här rapporten.')
   if (v.tool_name === 'log_time' && args.work_date !== date || v.tool_name === 'add_work_note' && args.log_date !== date) throw new Error('Förslagets datum stämmer inte med rapporten.')
+  if (v.plan !== undefined && (!Array.isArray(v.plan) || v.plan.length < 1 || v.plan.length > 4 || v.plan[0]?.tool_name !== v.tool_name || !v.plan.every((p: any) => p && Object.prototype.hasOwnProperty.call(REPORT_LABELS, p.tool_name) && typeof p.summary === 'string' && p.summary.length <= 20000))) throw new Error('Rapportens delar kunde inte kontrolleras.')
   return v as unknown as ReportConfirmation
 }
 export function confirmedReportResult(value: unknown, pending: ReportConfirmation): 'saved' | 'already_saved' | null {
