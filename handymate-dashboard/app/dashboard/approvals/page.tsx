@@ -297,7 +297,7 @@ export default function ApprovalsPage() {
   // felbesked som står kvar tills det stängs + "Försök igen", och en sektion
   // för misslyckade utföranden (fångar även fel vars HTTP-svar aldrig nådde
   // klienten — mobilkrasch, stängd flik).
-  const [failedFeedback, setFailedFeedback] = useState<{ id: string; text: string } | null>(null)
+  const [failedFeedback, setFailedFeedback] = useState<{ id: string; text: string; reviewAgain?: { action: 'approve' | 'reject'; editedPayload?: Record<string, unknown> } } | null>(null)
   const [failedExecutions, setFailedExecutions] = useState<Approval[]>([])
   const [retryLoading, setRetryLoading] = useState<string | null>(null)
   // Project Debrief Capture (2026-08-12): kortet ska ALDRIG godkännas rakt
@@ -428,6 +428,7 @@ export default function ApprovalsPage() {
 
   async function handleAction(id: string, action: 'approve' | 'reject', editedPayload?: Record<string, unknown>) {
     setActionLoading(id + action)
+    setFailedFeedback(null)
     try {
       // Servern slår bara ihop edited_payload (och stämplar payload.edited,
       // som streak/approve_rate läser) vid action:'edit' — ett 'approve' med
@@ -526,6 +527,8 @@ export default function ApprovalsPage() {
         setFailedFeedback({
           id,
           text: errData?.error || `Något gick fel (HTTP ${res.status}) — kortet ligger kvar.`,
+          ...(res.status === 428 && errData?.code === 'approval_review_required'
+            ? { reviewAgain: { action, editedPayload } } : {}),
         })
       }
     } catch {
@@ -713,11 +716,13 @@ export default function ApprovalsPage() {
               <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-input text-sm text-red-700 font-medium flex items-center gap-3">
                 <span>{failedFeedback.text}</span>
                 <button
-                  onClick={() => handleRetry(failedFeedback.id)}
-                  disabled={retryLoading === failedFeedback.id}
+                  onClick={() => failedFeedback.reviewAgain
+                    ? handleAction(failedFeedback.id, failedFeedback.reviewAgain.action, failedFeedback.reviewAgain.editedPayload)
+                    : handleRetry(failedFeedback.id)}
+                  disabled={retryLoading === failedFeedback.id || actionLoading !== null}
                   className="px-3 py-1 min-h-[32px] rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
                 >
-                  {retryLoading === failedFeedback.id ? 'Försöker...' : 'Försök igen'}
+                  {retryLoading === failedFeedback.id ? 'Försöker...' : failedFeedback.reviewAgain ? 'Granska på nytt' : 'Försök igen'}
                 </button>
                 <button
                   onClick={() => setFailedFeedback(null)}
