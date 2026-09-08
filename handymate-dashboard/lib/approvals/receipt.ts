@@ -98,6 +98,10 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text:
       `Pipelinebeslut: ${r.ok ? 'klart' : 'inte helt slutfört'}.\n${r.outcomes.map((o: any) => `${o.ok ? 'Klart' : 'Misslyckades'} — ${o.message}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nFöljdförslagen kräver egna beslut; inget utskick eller projekt har skapats här.` }
   }
+  if (type === 'automation' && r.action_type === 'project_create_review' && Array.isArray(r.outcomes)) {
+    return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text:
+      `Projektbeslut: ${r.ok ? 'klart' : 'inte helt slutfört'}.\n${r.outcomes.map((o: any) => `${o.title}: ${o.ok ? 'sparat' : o.error || 'misslyckades'}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nMeddelanden och andra följdförslag är inte utförda. Ingen Fortnox-synk gjordes.` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true

@@ -2939,6 +2939,10 @@ async function executeApprovalPayload(
             note: 'Noterat. Ingenting skickades — kortet var en uppmaning till dig.',
           }
         }
+        if (actionType === 'create_project') {
+          const { executeProjectCreationReview } = await import('@/lib/approvals/project-create-review')
+          return await executeProjectCreationReview(getServerSupabase(), businessId, approvalId, reviewedPayload)
+        }
         if (actionType === 'update_status' && pl.rule_action_config?.stage_key) {
           const { executePipelineReview } = await import('@/lib/approvals/pipeline-review')
           return await executePipelineReview(getServerSupabase(), businessId, approvalId, reviewedPayload)
