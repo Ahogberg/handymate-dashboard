@@ -560,30 +560,43 @@ async function handleUpdateStatus(
 }
 
 async function handleNotifyOwner(
-  _supabase: SupabaseClient,
+  supabase: SupabaseClient,
   businessId: string,
   config: Record<string, unknown>,
   _context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
   const title = (config.title as string) || 'Notis'
   const body = (config.body as string) || ''
-
-  try {
-    // Etapp 0 (2026-08-27): signerad intern push + ärligt utfall — "0
-    // mottagare" är inte "levererat".
-    const { sendInternalPush } = await import('@/lib/notifications/push-internal')
-    const push = await sendInternalPush({
-      business_id: businessId,
-      title,
-      body,
-      url: (config.url as string) || '/dashboard',
-    })
-    if (!push.delivered) return { success: false, error: `Push nådde ingen mottagare (${push.reason || 'no_recipients'})`, data: { title, sent: push.sent } }
-    return { success: true, data: { title, sent: push.sent } }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Push failed'
-    return { success: false, error: msg }
+  // notify_owner is not a company-wide broadcast. Resolve active owners to
+  // auth user ids, which both web and Expo push use for targeting.
+  const owners = await supabase.from('business_users').select('id, user_id, name')
+    .eq('business_id', businessId).eq('role', 'owner').eq('is_active', true)
+  if (owners.error || !owners.data?.length) return { success: false, error: 'Aktiv ägare kunde inte verifieras. Ingen push skickades.' }
+  if (owners.data.some(owner => typeof owner.user_id !== 'string' || !owner.user_id.trim())) {
+    return { success: false, error: 'Ägarens användaridentitet saknas. Ingen push skickades.' }
   }
+  const targets = Array.from(new Map(owners.data.map(owner => [owner.user_id, owner])).values())
+  const outcomes: Array<Record<string, unknown>> = []
+  const { sendInternalPush } = await import('@/lib/notifications/push-internal')
+  for (const owner of targets) {
+    try {
+      const push = await sendInternalPush({ business_id: businessId, target_user_id: owner.user_id,
+        title, body, url: (config.url as string) || '/dashboard' })
+      const rejected = (push.channels?.web?.rejected || 0) + (push.channels?.expo?.rejected || 0)
+      // Acceptance is a provider outcome, never proof that a person read it.
+      outcomes.push({ owner_id: owner.id, owner_name: owner.name, accepted: push.sent,
+        ok: push.delivered && push.sent > 0 && rejected === 0, rejected,
+        uncertain: !push.delivered && (push.reason === 'network' || /^http_5/.test(push.reason || '')),
+        channels: push.channels, reason: push.reason || (rejected ? 'partial_channel_failure' : undefined) })
+    } catch (error) {
+      outcomes.push({ owner_id: owner.id, owner_name: owner.name, accepted: 0, ok: false, uncertain: true,
+        reason: error instanceof Error ? error.message : 'Okänt pushutfall' })
+    }
+  }
+  const success = outcomes.every(outcome => outcome.ok)
+  const partial = !success && outcomes.some(outcome => Number(outcome.accepted) > 0 || outcome.uncertain)
+  return { success, data: { title, outcomes, partial, sent: outcomes.reduce((sum, outcome) => sum + Number(outcome.accepted), 0) },
+    ...(success ? {} : { error: partial ? 'Ägarnotisen accepterades delvis eller har osäkert utfall. Skicka inte hela notisen igen utan avstämning.' : 'Push accepterades inte för alla ägare.' }) }
 }
 
 async function handleRejectLead(

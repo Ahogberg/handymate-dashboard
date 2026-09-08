@@ -107,6 +107,10 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text:
       `Projektbeslut: ${r.ok ? 'klart' : 'inte helt slutfört'}.\n${r.outcomes.map((o: any) => `${o.title}: ${o.ok ? 'sparat' : o.error || 'misslyckades'}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nMeddelanden och andra följdförslag är inte utförda. Ingen Fortnox-synk gjordes.` }
   }
+  if (type === 'automation' && r.action_type === 'notify_owner' && Array.isArray(r.data?.outcomes)) {
+    return { state: r.ok ? 'sent' : r.data.partial ? 'partial' : 'failed', text:
+      `Ägarnotis: ${r.ok ? 'accepterad av pushtjänsten' : 'inte helt slutförd'}.\n${r.data.outcomes.map((o: any) => `${o.owner_name || 'Ägare'}: ${o.accepted || 0} accepterade pushförsök${o.rejected ? `, ${o.rejected} avvisade` : ''}${o.uncertain ? ', osäkert utfall' : ''}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nDetta bekräftar inte att ägaren har läst notisen.` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true

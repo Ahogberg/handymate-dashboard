@@ -98,3 +98,15 @@ test('package receipts count actual writes, not informational or rejected parts'
  const unknown=approvalReceipt('autopilot_package','approve',{ok:false,results:[{id:'sms',type:'sms',ok:false,delivery_state:'unknown',error:'timeout'}]})
  expect(unknown.state).toBe('partial');expect(unknown.text).toContain('skicka inte igen')
 })
+
+test('owner push receipt distinguishes acceptance from partial failure and human reading', () => {
+  const partial = approvalReceipt('automation', 'approve', { action_type: 'notify_owner', ok: false,
+    data: { partial: true, outcomes: [{ owner_name: 'Ägaren', accepted: 1, rejected: 1 }] } })
+  expect(partial.state).toBe('partial')
+  expect(partial.text).toContain('1 accepterade pushförsök, 1 avvisade')
+  expect(partial.text).toContain('inte att ägaren har läst')
+  expect(approvalReceipt('automation', 'approve', { action_type: 'notify_owner', ok: true,
+    data: { outcomes: [{ owner_name: 'Ägaren', accepted: 1 }] } }).state).toBe('sent')
+  expect(approvalReceipt('automation', 'approve', { action_type: 'notify_owner', ok: false,
+    data: { partial: true, outcomes: [{ owner_name: 'Ägaren', accepted: 0, uncertain: true }] } }).text).toContain('osäkert utfall')
+})
