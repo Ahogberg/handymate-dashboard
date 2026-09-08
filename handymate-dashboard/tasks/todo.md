@@ -1426,3 +1426,24 @@ Plan: docs/handoffs/CUSTOMER_RELIEF_PROGRAM_2026-09-08.md.
 Beslut: Jobb=project, Uppdrag=mission; teamuppgifter är innehåll utan egen
 navigation. Omdöpning skjuts upp. Köraren förbereder kort, skickar aldrig själv.
 Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna grindar.
+
+## 2026-09-08 — Din dag, nästa del av kundens avlastning
+- [x] Samla egna tidsrader och anteckningar över behöriga jobb för valt svenskt datum.
+- [x] Visa pågående timer, aktuella beslut och beständiga uppföljningar utan ny navigation.
+- [x] Skilj okänt/läsfel från noll; återanvänd rapportens behörighet och signerade handlingar.
+- [x] Prova isolering, avbrutna laddningar, datumbyte, omladdning och mobil/desktop.
+- [x] TypeScript och första produktionsbygget passerade. Draft-PR #30 ovanpå #29; slutlig körning efter ankarlänksfix kontrolleras i PR. Ingen produktionsaktivering.
+
+## 2026-09-08 — Beständig rapportkedja
+- [x] Stabilt återförsök för material och ÄTA; aldrig kvittera ett orelaterat förslag.
+- [x] Spara oföränderlig plan och delkvitton med konto/person/jobb/datum.
+- [x] Återuppta och avstå i befintlig DayClose med färsk behörighetskontroll.
+- [x] Prov av samtidig bekräftelse, förlorat svar, återläsning och roller.
+- [x] TypeScript och granskningsbart releaseunderlag klara. Slutligt build-/CI-/publiceringsresultat redovisas i leveransens PR ovanpå #30; migrering/aktivering separat.
+
+## Sammanhängande vision och mobiltest 2026-09-08
+- [x] Integrera #26 och #28–#31 utan ändring av main.
+- [x] Native återupptagning av egen serverlagrad rapport: samma godkännanden, kvittenser och behörigheter.
+- [x] Testa stängning, kontobyte, tappat svar, datum och återförsök utan dubbelregistrering.
+- [x] Verifiera integrerad backend samt mobilens fulla typkontroll och Expo-paketering där byggmiljön tillåter.
+- [ ] Publicera draft-underlag med exakt version, flaggor och morgondagens iPhone-/inlämningsgrind.

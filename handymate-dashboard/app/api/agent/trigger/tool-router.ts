@@ -164,7 +164,7 @@ export async function executeTool(
       const report = await loadWorkReportContext(supabase, businessId, user as BusinessUser | null, context.workReport.projectId, context.workReport.date)
       // Permission is checked even on replay. A previously saved action remains
       // saved if a timer was started afterwards; don't mislabel that as failure.
-      if (context.confirmationId) {
+      if (context.confirmationId && (name === 'log_time' || name === 'add_work_note')) {
         const table = name === 'log_time' ? 'time_entry' : 'project_log'
         const column = name === 'log_time' ? 'time_entry_id' : 'id'
         const id = `${name === 'log_time' ? 'time' : 'log'}_report_${context.confirmationId}`
@@ -193,7 +193,7 @@ export async function executeTool(
       case 'create_invoice':
         return await createInvoice(supabase, businessId, input)
       case 'create_ata_draft':
-        return await createAtaDraftTool(supabase, businessId, input)
+        return await createAtaDraftTool(supabase, businessId, input, context)
       case 'check_calendar':
         return await checkCalendar(supabase, businessId, input, context)
       case 'create_booking':
@@ -203,7 +203,7 @@ export async function executeTool(
       case 'log_time':
         return await logTime(supabase, businessId, input, context)
       case 'log_material':
-        return await logMaterial(supabase, businessId, input)
+        return await logMaterial(supabase, businessId, input, context)
       case 'add_work_note':
         return await addWorkNote(supabase, businessId, input, context)
       case 'get_person_schedule':
@@ -1750,7 +1750,7 @@ async function logTime(
  * det som räknas i fält, priset kan sättas när fakturan från grossisten kommer.
  */
 async function logMaterial(
-  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>, context?: ToolContext
 ): Promise<ToolResult> {
   const projectId = typeof params.project_id === 'string' ? params.project_id.trim() : ''
   const name = typeof params.name === 'string' ? params.name.trim() : ''
@@ -1772,9 +1772,15 @@ async function logMaterial(
     : 20
   const sellPrice = Math.round(purchasePrice * (1 + markupPercent / 100) * 100) / 100
 
+  const reportId = context?.workReport?.stableArtifacts && context.confirmationId ? `material_report_${context.confirmationId}` : null
+  if (reportId) {
+    const prior = await supabase.from('project_material').select('material_id').eq('business_id',businessId).eq('project_id',projectId).eq('material_id',reportId).maybeSingle()
+    if (prior.error) return {success:false,error:'Den tidigare materialsparningen kunde inte kontrolleras.'}
+    if (prior.data) return {success:true,data:{material_id:reportId,duplicate:true,message:'Materialet är redan sparat från denna bekräftelse.'}}
+  }
   let befintligt: string | null = null
   try {
-    befintligt = await hittaNyligDubblett({
+    befintligt = reportId ? null : await hittaNyligDubblett({
       supabase,
       tabell: 'project_material',
       idKolumn: 'material_id',
@@ -1798,6 +1804,7 @@ async function logMaterial(
   const { data: material, error } = await supabase
     .from('project_material')
     .insert({
+      ...(reportId ? {material_id:reportId} : {}),
       project_id: projectId,
       business_id: businessId,
       name,
@@ -1813,7 +1820,13 @@ async function logMaterial(
     .select('material_id')
     .single()
 
-  if (error) return { success: false, error: error.message }
+  if (error) {
+    if (reportId && error.code === '23505') {
+      const prior = await supabase.from('project_material').select('material_id').eq('business_id',businessId).eq('project_id',projectId).eq('material_id',reportId).maybeSingle()
+      if (!prior.error && prior.data) return {success:true,data:{material_id:reportId,duplicate:true,message:'Materialet är redan sparat från denna bekräftelse.'}}
+    }
+    return { success: false, error: error.message }
+  }
   return {
     success: true,
     data: {
@@ -1916,7 +1929,7 @@ async function addWorkNote(
  * exekverarens ai-generate-anrop kan använda kundens prislista).
  */
 async function createAtaDraftTool(
-  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>
+  supabase: SupabaseClient, businessId: string, params: Record<string, unknown>, context?: ToolContext
 ): Promise<ToolResult> {
   const projectId = params.project_id ? String(params.project_id) : ''
   const description = params.description ? String(params.description).trim() : ''
@@ -1938,7 +1951,9 @@ async function createAtaDraftTool(
     ? params.amount_estimate
     : (params.amount_estimate ? Number(params.amount_estimate) : undefined)
 
+  const reportId = context?.workReport?.stableArtifacts && context.confirmationId ? context.confirmationId : undefined
   const result = await suggestAtaDraft(supabase, {
+    sourceReportId: reportId,
     businessId,
     projectId,
     description,
@@ -1958,6 +1973,7 @@ async function createAtaDraftTool(
     }
   }
 
+  if (result.reason === 'duplicate' && context?.workReport) return {success:false,error:'Det finns ett annat väntande ÄTA-förslag. Kontrollera det i godkännandekön; den här rapportdelen är inte sparad.'}
   if (result.reason === 'duplicate') {
     return {
       success: true,

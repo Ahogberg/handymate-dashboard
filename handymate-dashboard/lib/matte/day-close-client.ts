@@ -2,7 +2,7 @@ export const REPORT_LABELS = {
   log_time: 'Tid', add_work_note: 'Arbetsanteckning', log_material: 'Material', create_ata_draft: 'ÄTA-förslag',
 } as const
 export type ReportTool = keyof typeof REPORT_LABELS
-export interface ReportConfirmation { token: string; tool_name: ReportTool; summary: string; confirm_label: string; args: Record<string, unknown>; plan?: Array<{ tool_name: ReportTool; summary: string }> }
+export interface ReportConfirmation { report_id?: string; token: string; tool_name: ReportTool; summary: string; confirm_label: string; args: Record<string, unknown>; plan?: Array<{ tool_name: ReportTool; summary: string }> }
 export function readReportConfirmation(value: unknown, projectId: string, date: string): ReportConfirmation | null {
   if (value == null) return null
   if (typeof value !== 'object') throw new Error('Förslaget kunde inte kontrolleras.')

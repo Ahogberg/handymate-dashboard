@@ -4,7 +4,7 @@ import { svDateStr } from '../dates'
 
 export type WorkReportTool = 'log_time' | 'add_work_note' | 'log_material' | 'create_ata_draft'
 export interface WorkReportAction { toolName: WorkReportTool; toolInput: Record<string, unknown> }
-export interface WorkReportScope { projectId: string; userId: string; date: string }
+export interface WorkReportScope { projectId: string; userId: string; date: string; stableArtifacts?: boolean }
 export interface WorkReportContext extends WorkReportScope {
   projectName: string
   userName: string

@@ -1,3 +1,4 @@
+import { createReportSession, reportContinuityEnabled } from '@/lib/matte/report-session'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { loadWorkReportContext, workReportPrompt, prepareWorkReportAction, isWorkReportTool, WorkReportError, type WorkReportContext, type WorkReportAction } from '@/lib/matte/work-report'
@@ -1431,8 +1432,10 @@ export async function POST(request: NextRequest) {
       if (turn.pendingExternal) {
         if (workReport) {
           const action = prepareWorkReportAction(turn.pendingExternal.toolName, turn.pendingExternal.toolInput, workReport)
-          const pending = pendingWorkReport(action, workReport, businessId, thread?.id || null, turn.pendingExternal.remaining || [])
           await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
+          const pending = reportContinuityEnabled()
+            ? await createReportSession(supabase,businessId,workReport,thread?.id || null,[action,...(turn.pendingExternal.remaining || [])])
+            : pendingWorkReport(action, workReport, businessId, thread?.id || null, turn.pendingExternal.remaining || [])
           return NextResponse.json({ messages: [], current_agent: 'lars', thread_id: thread?.id || null, reply: pending.summary, action: null, pending_confirmation: pending })
         }
         if ((turn.text || turn.presentation) && thread) {

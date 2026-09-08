@@ -55,7 +55,7 @@ test.describe('Sentry — på med DSN, av utan, aldrig PII', () => {
     expect(src).toContain('disable: !process.env.SENTRY_AUTH_TOKEN')
     expect(src).toContain('telemetry: false')
     // Den ursprungliga PDF-regeln får inte försvinna i omskrivningen.
-    expect(src).toContain("serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium']")
+    expect(src).toMatch(/serverComponentsExternalPackages:\s*\[[^\]]*'puppeteer-core'[^\]]*'@sparticuz\/chromium'/)
   })
 
   test('@sentry/nextjs är en beroende i package.json', () => {

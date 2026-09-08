@@ -137,7 +137,7 @@ export const BEHALLS: string[] = [
 // ─────────────────────────────────────────────────────────────────────────
 export const RADERAS: string[] = [
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.
-  'agent_followup_event', 'agent_followup',
+  'work_report_session', 'agent_followup_event', 'agent_followup',
   // ── Kundregister, offerter, bokningar, leads, affärer — kärnan ──
   'customer', 'quotes', 'booking', 'leads', 'deal', 'project',
 

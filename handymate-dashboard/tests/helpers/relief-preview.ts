@@ -5,7 +5,7 @@ import postcss from 'postcss'
 import tailwind from 'tailwindcss'
 import config from '../../tailwind.config'
 
-export async function reliefPreview(mode: 'intake' | 'report' | 'mission' = 'intake') {
+export async function reliefPreview(mode: 'intake' | 'report' | 'mission' | 'day' | 'day-page' = 'intake') {
   const modules: Record<string, {code: string; deps: Record<string,string>}> = {}
   const stubs = ['react','react/jsx-runtime','next/navigation','@/lib/JobbuddyContext','@/lib/BusinessContext','@/lib/CurrentUserContext']
   function add(file: string): string {
@@ -22,15 +22,15 @@ export async function reliefPreview(mode: 'intake' | 'report' | 'mission' = 'int
     }
     return file
   }
-  const entry=add(mode==='intake'?'components/relief/ReliefStart.tsx':mode==='report'?'components/day-close/DayClose.tsx':'lib/mission/MissionProvider.tsx')
+  const entry=add(mode==='day-page'?'app/dashboard/avlastning/page.tsx':mode==='day'?'components/relief/MyDayCard.tsx':mode==='intake'?'components/relief/ReliefStart.tsx':mode==='report'?'components/day-close/DayClose.tsx':'lib/mission/MissionProvider.tsx')
   if(mode==='mission')add('components/mission/MissionHandoverCard.tsx')
   const css=(await postcss([tailwind({...config,content:Object.keys(modules)})]).process('@tailwind base; @tailwind components; @tailwind utilities;',{from:undefined})).css
   const script=`
-    window.businessId='b';window.actor={id:'u',user_id:'auth-u',business_id:'b'};
+    window.businessId='b';window.actor={id:'u',user_id:'auth-u',business_id:'b',is_active:true};
     const cache={react:{exports:React},'react/jsx-runtime':{exports:{jsx:(t,p,k)=>React.createElement(t,{...p,key:k}),jsxs:(t,p,k)=>React.createElement(t,{...p,key:k}),Fragment:React.Fragment}},'next/navigation':{exports:{useRouter:()=>({push:url=>{window.navigated=url}})}},
       '@/lib/JobbuddyContext':{exports:{useJobbuddy:()=>({setPendingPrompt:v=>{window.prefilled=v},setActiveTab:()=>{},setIsOpen:()=>{}})}},
       '@/lib/BusinessContext':{exports:{useBusiness:()=>({business_id:window.businessId})}},
-      '@/lib/CurrentUserContext':{exports:{useCurrentUser:()=>({user:window.actor})}}};
+      '@/lib/CurrentUserContext':{exports:{useCurrentUser:()=>({user:window.actor,loading:false,isOwnerOrAdmin:true})}}};
     const bundle=${JSON.stringify({entry,modules})};
     function load(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;new Function('require','module','exports',bundle.modules[id].code)(n=>load(bundle.modules[id].deps[n]),m,m.exports);return m.exports}
     const h=React.createElement;
@@ -40,7 +40,7 @@ export async function reliefPreview(mode: 'intake' | 'report' | 'mission' = 'int
       m.handover?h(load('components/mission/MissionHandoverCard.tsx').MissionHandoverCard,{handover:m.handover}):null,
       !m.loading&&!m.error&&!m.mission?h('p',null,'Inget aktivt uppdrag'):null);}
     function Host(){const [version,setVersion]=React.useState(0);window.switchActor=(id)=>{window.actor={...window.actor,id};setVersion(v=>v+1)};
-      return ${mode==='mission'?"h(load(bundle.entry).MissionProvider,null,h(MissionView))":mode==='report'?"h(load(bundle.entry).default,{projectId:'p',projectName:'Köket',initiallyOpen:true})":"h(load(bundle.entry).ReliefStart,{businessId:'b',userId:'auth-u',canQuote:true})"};}
+      return ${mode==='day-page'?"h(load(bundle.entry).default)":mode==='day'?"h(load(bundle.entry).MyDayCard)":mode==='mission'?"h(load(bundle.entry).MissionProvider,null,h(MissionView))":mode==='report'?"h(load(bundle.entry).default,{projectId:'p',projectName:'Köket',initiallyOpen:true})":"h(load(bundle.entry).ReliefStart,{businessId:'b',userId:'auth-u',canQuote:true})"};}
     ReactDOM.createRoot(document.getElementById('root')).render(h(React.StrictMode,null,h(Host)));
   `
   const safe=(s:string)=>s.replace(/<\/script/gi,'<\\/script')

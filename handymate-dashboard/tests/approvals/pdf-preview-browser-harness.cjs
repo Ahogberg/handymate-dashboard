@@ -13,6 +13,8 @@ const fs=require('node:fs'),ts=require('typescript'),assert=require('node:assert
      :{contentType:'text/html',body:'<h1>Isolerat dokumentprov</h1>'}))
    await page.goto('https://approval.test/')
    const client=ts.transpileModule(fs.readFileSync('lib/approvals/review-client.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
+  const massClient=ts.transpileModule(fs.readFileSync('lib/approvals/klient-bekraftelse.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
+  await page.addScriptTag({content:`window.massClient=(()=>{const exports={};${massClient};return exports})();window.require=name=>{if(name==='./klient-bekraftelse')return window.massClient;throw Error('Unexpected module '+name)}`})
    await page.addScriptTag({content:`window.exports={};${client}`})
    const review={title:'Granskad jobbrapport',effect:'Bifogar den granskade PDF-filen',confirmLabel:'Skicka',messages:[],attachments:[{label:'Rapporten',url:'/api/document',kind:'document'}]}
    await page.evaluate(r=>{window.exports.showApprovalReview(r)},review)

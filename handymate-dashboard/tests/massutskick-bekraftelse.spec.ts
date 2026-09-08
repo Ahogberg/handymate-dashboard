@@ -67,7 +67,7 @@ test.describe('rutten grindar före statusändring och exekvering', () => {
   })
 })
 
-test.describe('webbens ytor går genom postKortbeslut', () => {
+test.describe('webbens ytor granskar först och behåller massutskicksgrinden', () => {
   for (const rel of [
     'app/dashboard/approvals/page.tsx',
     'components/jarvis/JarvisHome.tsx',
@@ -76,7 +76,8 @@ test.describe('webbens ytor går genom postKortbeslut', () => {
   ]) {
     test(rel, () => {
       const s = read(rel)
-      expect(s).toMatch(/postKortbeslut\(/)
+      expect(s).toMatch(/reviewedApprovalFetch\(/)
+      expect(read('lib/approvals/review-client.ts')).toMatch(/postKortbeslut\(/)
       // Inga kvarvarande direkta POST-fetchar mot /api/approvals/{id} för beslut
       // (retry i approvals-sidan är undantaget — den skickar inte ett nytt beslut).
       const direkta = s.match(/fetch\(`\/api\/approvals\/\$\{[^}]+\}`, \{\s*method: 'POST'/g) || []

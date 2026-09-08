@@ -102,8 +102,25 @@ eller skarp agentuppföljning är verifierad här. Endast egen tid och arbetsant
 material, ÄTA och kedjans samtliga delkvitton över enheter återstår. Textutkastet är sessionslagrat,
 inte molnsynkat. Etapp 2 och 3 ovan är planerade, inte implementerade.
 
-Publicering är blockerad: automatisk godkännandegranskning avvisade push till GitHub eftersom
+Historisk notering (ersatt av publiceringsbeslutet nedan): Publicering var blockerad: automatisk godkännandegranskning avvisade push till GitHub eftersom
 användarens implementeringsuppdrag inte bedömdes innehålla uttryckligt tillstånd att dela
 payloaden till destinationen. Ingen alternativ uppladdning har gjorts. Separat godkännande
 behövs för push av denna gren till Ahogberg/handymate-dashboard och skapande av draft-PR.
 Ingen merge, deployment, migrering eller kundkontakt har gjorts.
+
+
+## Fortsättning — Din dag (2026-09-08)
+
+Ovanstående status för publicering är historisk: Andreas godkände därefter publicering,
+PR #28 skapades och dess grind blev grön. PR #29 bygger den beständiga offertkedjan
+på #28 och har också gröna kontroller. De är ännu inte aktiverade i produktion.
+
+Nästa granskningsbara del är Din dag: egen rapporterad tid och anteckningar över
+behöriga jobb, aktuell timer/instämpling, ägarens/admins väntande beslut och
+schemalagda offertuppföljningar med faktiskt tillstånd. Befintlig avlastningsingång
+och rapportdialog återanvänds; ingen ny huvudnavigation. Läsfel och ofullständiga
+resultat visas som okända, aldrig som noll eller ett färdigt dagsavslut.
+
+Detta är en återläsning av befintliga källor. Molnsynkad rapportkedja för material/ÄTA,
+nya faktura-/kundlöftesmotorer, native delning/foto och riktiga iPhone-pilotprov återstår.
+Se MY_DAY_2026-09-08.md för avgränsning och verifiering.
