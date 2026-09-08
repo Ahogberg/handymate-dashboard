@@ -34,7 +34,7 @@ Ingen korttyp är slutgodkänd av detta register. Första batchen är syntetiska
 | `propose_site_visit` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `reschedule_request` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `new_booking_request` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `dispatch_suggestion` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
+| `dispatch_suggestion` | EXECUTABLE_ACTION | Syntetiskt grundfall skapat | Webb: granska/avbryt/beslut | Faktisk skrivning verifierad | Grundfall + historik efter omladdning; ej slutverifierad |
 | `publish_microsite` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `invoice_reminder` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `automation` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
@@ -54,8 +54,8 @@ Ingen korttyp är slutgodkänd av detta register. Första batchen är syntetiska
 | `four_eyes_project_close` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `deal_flow_site_visit` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `lead_review` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `time_attestation` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `tidrapport_forslag` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
+| `time_attestation` | REVIEW_REQUIRED | Syntetiskt grundfall skapat | Webb: granska/avbryt/beslut | Faktisk skrivning verifierad | Grundfall + historik efter omladdning; ej slutverifierad |
+| `tidrapport_forslag` | REVIEW_REQUIRED | Syntetiskt grundfall skapat | Webb: granska/avbryt/beslut | Faktisk skrivning verifierad | Grundfall + historik efter omladdning; ej slutverifierad |
 | `checklist_forslag` | REVIEW_REQUIRED | Syntetiska punkter skapade | Preview/avbryt/skapa | Ej kört | En checklista, korrekt initialstatus och sparad kvittens; övriga varianter öppna |
 | `egenkontroll_foto` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `egenkontroll_avvikelse` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
@@ -164,3 +164,13 @@ Utökad faktisk route och verklig artefakthjälpare med isolerad DB passerar pun
 ### Gemensam historikåterhämtning live — 8 september
 Rekonstruerad syntetisk failed-fixture med resolved_at 14 dagar tillbaka, referens endast till redan bekräftat testminne. Synlig i Väntandes uppföljningslista trots ålder. Hanterade visade Behöver följas upp + Granska återförsök. Klick öppnade verklig signerad dialog med Redan bekräftat, datum ändras inte. Slutbeslut gav success/retried, lagrad kvittens, oförändrat confirmed_at 2026-09-08T13:01:04.388Z och historiken uppdaterades direkt till Minnet är bekräftat utan återförsöksknapp. Ursprungligt fel var syntetiskt rekonstruerat, inte inducerat i drift.
 Sju-dagarsborttagning, historik-CTA och direkt historikrefresh är därmed liveomprovade för detta fall. Inte full native-/samtliga typers återförsökscertifiering. Nästa bredare grupp: tidsattest/tidradsförslag/tilldelningar samt kvarvarande specialfall och isolerade sändarflöden. 77/77 fortfarande inte slutverifierat.
+
+
+### Three internal actions — live base proofs on dbf5542f (2026-09-08)
+Verified Vercel success before final decisions; logged-in owner in TEST Rollprov A. Seed: sql/approval_live_time_dispatch_20260908.sql. Seed presentation fields were completed while pending (user_name/checked_out_at/member_name/job_title); initial blank avatar labels were caused by omitted synthetic payload fields.
+- tidrapport_forslag: aplive_20260908_timeproposal. Preview showed P1, Rollprov Ägare, 2026-09-08, 75 minutes and explicit Registrera tidrapporten. Cancel left zero matching rows. Final decision created exactly one row 3d4966cb-ab2b-5812-ac4a-7b13dd981f3e, bu_rollprov_owner, P1, 75 minutes, approved, billable. Receipt: Tidrapporten är registrerad och godkänd.
+- dispatch_suggestion: aplive_20260908_dispatch, work order aplive_work_order_20260908. Preview showed verified person, title, date and 12:00–13:00. Cancel left assigned_to null/status draft. Spara tilldelningen assigned Rollprov Ägare and kept draft. Receipt: Tilldelningen är sparad. This tests work_order only; booking variant still lacks live proof.
+- time_attestation: aplive_20260908_attestation, check-in a5807a7e-836a-499f-954e-66f132887301. Preview showed P1, Rollprov Ägare, source timestamp and 90 minutes. Cancel left check-in completed and zero time rows. Attestera och registrera tiden created exactly one te_checkin_a5807a7e-836a-499f-954e-66f132887301, 90 minutes, 2026-09-08, bu_rollprov_owner, P1, billable/approved; check-in approved with 90 minutes. Receipt: Tiden är attesterad och registrerad.
+- All three persisted receipts exactly matched history, including after full reload and reopening Hanterade. Pending list returned to two pre-existing SMS cards, untouched. Immediate time-proposal toast observed; transient dispatch/attestation toasts were not captured, so only their persisted/history receipt comparison is claimed.
+- No messages, calendar operations or external provider actions. Synthetic approved time remains in the test project and must not be treated as real wage/invoice material.
+- Still NOT full certification: native app/build, booking dispatch, stale assignment CAS and phone semantics, check-in status/date provenance and conflict repair, proposal lost-response recovery, denied-role and edited-payload UI variants. The isolated response-loss/internal-write tests are separate evidence, not simulated live outages.
