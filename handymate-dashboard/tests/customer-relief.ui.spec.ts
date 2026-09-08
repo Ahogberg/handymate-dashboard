@@ -6,6 +6,7 @@ async function mount(page:Page,mode:'intake'|'report'|'mission', handler:(path:s
   page.on('pageerror',e=>errors.push(e.message))
   await page.route('**/*',async route=>{
     const req=route.request(),path=new URL(req.url()).pathname
+    if(new URL(req.url()).searchParams.get('view')==='reports')return route.fulfill({json:{enabled:false,reports:[]}})
     if(path==='/')return route.fulfill({contentType:'text/html',body:html})
     const body=req.method()==='POST'?req.postDataJSON():null;calls.push({path,body})
     const response=handler(path,body)

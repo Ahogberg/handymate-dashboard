@@ -161,6 +161,8 @@ export interface SuggestAtaDraftParams {
   routedAgent?: string
   /** Internal customer-preparation source; never included in AI text. */
   sourcePreparationId?: string
+  /** Server-generated stable identity for a signed report action. */
+  sourceReportId?: string
   beforeInsert?: () => Promise<boolean>
 }
 
@@ -234,7 +236,7 @@ export async function suggestAtaDraft(
       return { created: false, reason: 'missing_project' }
     }
 
-    const preparationApprovalId = params.sourcePreparationId ? `prep_ata_${params.sourcePreparationId}` : null
+    const preparationApprovalId = params.sourceReportId ? `report_ata_${params.sourceReportId}` : params.sourcePreparationId ? `prep_ata_${params.sourcePreparationId}` : null
     if (preparationApprovalId) {
       const {data:existing,error} = await supabase.from('pending_approvals').select('id')
         .eq('business_id',params.businessId).eq('id',preparationApprovalId).maybeSingle()
@@ -281,7 +283,7 @@ export async function suggestAtaDraft(
       // Inga pengar bundna, inget skickas till kund förrän hantverkaren
       // själv agerar — samma resonemang som create_quote_draft (etapp 2a).
       risk_level: 'low',
-      payload: { ...utkast.payload, ...(params.sourcePreparationId ? { source_preparation_id: params.sourcePreparationId } : {}) },
+      payload: { ...utkast.payload, ...(params.sourceReportId ? {source_report_id:params.sourceReportId} : {}), ...(params.sourcePreparationId ? { source_preparation_id: params.sourcePreparationId } : {}) },
     })
 
     if (insertErr) {

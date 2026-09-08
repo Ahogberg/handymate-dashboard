@@ -12,6 +12,7 @@ for(const width of [375,1280])test(`real day card: reload, unknown source, date 
   if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html})
   methods.push(req.method())
   if(url.pathname==='/api/day-close'){
+   if(url.searchParams.get('view')==='reports')return route.fulfill({json:{enabled:false,reports:[]}})
    const date=url.searchParams.get('date')!
    if(url.searchParams.get('view')!=='day')return route.fulfill({json:{summary:{projectId:'p',date,ownMinutes:minutes,ownEntryCount:1,ownNotes:[],scope:'Din sparade tid',activeTimer:false}}})
    if(mode==='offline')return route.fulfill({status:503,json:{error:'Offline'}})

@@ -20,7 +20,8 @@
     "test:onboarding-tour-ui": "playwright test tests/onboarding-tour-mobile.ui.spec.ts --no-deps --project=chromium --reporter=line",
     "test:customer-relief": "playwright test tests/customer-relief.spec.ts tests/customer-relief.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line",
     "test:durable-followup": "playwright test tests/durable-followup.spec.ts tests/durable-followup-route.spec.ts tests/durable-followup.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line",
-    "test:my-day": "playwright test tests/my-day.spec.ts tests/my-day.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line"
+    "test:my-day": "playwright test tests/my-day.spec.ts tests/my-day.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line",
+    "test:report-continuity": "playwright test tests/report-continuity.spec.ts tests/report-recovery.spec.ts tests/report-continuity.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.17.0",

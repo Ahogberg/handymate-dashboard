@@ -1433,3 +1433,10 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 - [x] Skilj okänt/läsfel från noll; återanvänd rapportens behörighet och signerade handlingar.
 - [x] Prova isolering, avbrutna laddningar, datumbyte, omladdning och mobil/desktop.
 - [x] TypeScript och första produktionsbygget passerade. Draft-PR #30 ovanpå #29; slutlig körning efter ankarlänksfix kontrolleras i PR. Ingen produktionsaktivering.
+
+## 2026-09-08 — Beständig rapportkedja
+- [x] Stabilt återförsök för material och ÄTA; aldrig kvittera ett orelaterat förslag.
+- [x] Spara oföränderlig plan och delkvitton med konto/person/jobb/datum.
+- [x] Återuppta och avstå i befintlig DayClose med färsk behörighetskontroll.
+- [x] Prov av samtidig bekräftelse, förlorat svar, återläsning och roller.
+- [x] TypeScript och granskningsbart releaseunderlag klara. Slutligt build-/CI-/publiceringsresultat redovisas i leveransens PR ovanpå #30; migrering/aktivering separat.
