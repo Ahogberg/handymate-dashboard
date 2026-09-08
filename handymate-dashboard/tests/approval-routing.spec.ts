@@ -249,3 +249,10 @@ test.describe("canActOnApproval — 'project_team' med project_assignment-uppsla
     return canActOnApproval(supabase, user, approval).then((r) => expect(r).toBe(false))
   })
 })
+
+test('owner push approval requires a same-business owner/admin', async () => {
+  const approval: ApprovalRoutingRow = { approval_type:'automation', business_id:'biz_1', routing_role:'any', payload:{rule_action_type:'notify_owner'} }
+  expect(await canActOnApproval(null as any, makeUser(), approval)).toBe(false)
+  expect(await canActOnApproval(null as any, makeUser({role:'admin'}), approval)).toBe(true)
+  expect(await canActOnApproval(null as any, makeUser({role:'owner',business_id:'foreign'}), approval)).toBe(false)
+})

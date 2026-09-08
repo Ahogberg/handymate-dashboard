@@ -44,7 +44,8 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
   }
   try {
     const journaledProjectSync = type === 'automation' && p.rule_action_type === 'sync_to_fortnox' && (p.rule_action_config?.entity_type || p.entity_type) === 'project'
-    if (!journaledProjectSync && action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
+    const journaledOwnerPush = type === 'automation' && p.rule_action_type === 'notify_owner'
+    if (!journaledProjectSync && !journaledOwnerPush && action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
     if (action === 'reject') return complete(rejectionEffect(type), 'Bekräfta avvisningen')
     if (classify(type) === 'INFORMATIONAL' || classify(type) === 'ACKNOWLEDGEMENT') return
     if (type === 'job_report') {
@@ -117,6 +118,10 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     if (type === 'automation' && p.rule_action_type === 'sync_to_fortnox' && (p.rule_action_config?.entity_type || p.entity_type) === 'project') {
       const { prepareProjectSyncReview } = await import('./project-sync-review')
       return await prepareProjectSyncReview(db, businessId, p, body.action_overrides)
+    }
+    if (type === 'automation' && p.rule_action_type === 'notify_owner') {
+      const { prepareOwnerPushReview } = await import('./owner-push-review')
+      return await prepareOwnerPushReview(db, businessId, approval.id, p)
     }
     if (type === 'automation' && p.rule_action_type === 'create_project') {
       const { prepareProjectCreationReview } = await import('./project-create-review')

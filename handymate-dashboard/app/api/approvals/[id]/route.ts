@@ -2943,6 +2943,10 @@ async function executeApprovalPayload(
           const { executeProjectSyncReview } = await import('@/lib/approvals/project-sync-review')
           return await executeProjectSyncReview(getServerSupabase(), businessId, approvalId, reviewedPayload)
         }
+        if (actionType === 'notify_owner') {
+          const { executeOwnerPushReview } = await import('@/lib/approvals/owner-push-review')
+          return await executeOwnerPushReview(getServerSupabase(), businessId, approvalId, reviewedPayload)
+        }
         if (actionType === 'create_project') {
           const { executeProjectCreationReview } = await import('@/lib/approvals/project-create-review')
           return await executeProjectCreationReview(getServerSupabase(), businessId, approvalId, reviewedPayload)

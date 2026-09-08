@@ -111,6 +111,10 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     return { state: r.ok ? 'sent' : r.data.partial ? 'partial' : 'failed', text:
       `Ägarnotis: ${r.ok ? 'accepterad av pushtjänsten' : 'inte helt slutförd'}.\n${r.data.outcomes.map((o: any) => `${o.owner_name || 'Ägare'}: ${o.accepted || 0} accepterade pushförsök${o.rejected ? `, ${o.rejected} avvisade` : ''}${o.uncertain ? ', osäkert utfall' : ''}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nDetta bekräftar inte att ägaren har läst notisen.` }
   }
+  if (type === 'automation' && r.action_type === 'owner_push_review' && Array.isArray(r.outcomes)) {
+    return { state: r.ok ? 'sent' : r.partial ? 'partial' : 'failed', text:
+      `Ägarnotis: ${r.ok ? 'accepterad av pushtjänsterna' : 'inte helt slutförd'}.\n${r.outcomes.map((o: any) => `${o.owner}: ${o.state === 'accepted' ? 'accepterat' : o.state === 'failed' ? 'misslyckat — kan återförsökas' : 'osäkert — skickas inte igen'}${o.error ? ` (${o.error})` : ''}`).join('\n')}\nDetta bekräftar inte att ägaren har läst notisen.` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true

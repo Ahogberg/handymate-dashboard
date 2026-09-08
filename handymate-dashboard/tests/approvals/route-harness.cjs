@@ -4,12 +4,13 @@ const ts = require('typescript'), assert = require('node:assert/strict')
 const root = path.resolve(__dirname, '../..')
 let row, mutations, canAct = true, availableSlots = [], customerRow, leadRow, quoteRow, invoiceRow, projectRow, dealRow, memberRow, bookingRows = [], smsShouldFail = false, smsUnknown = false
 class FortnoxRequestNotSentError extends Error {}
+let ownerPushCalls=[],ownerPushFail=true
 const projectSyncLogs = new Map(), fortnoxCalls = []
 let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
 const inboxItems = new Map()
 const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = [], paymentCalls = [], leadActivationCalls = [], automationCalls = [], artifactCalls = []
 const db = { from(table) {
-  let values, operation = 'read', filters = []
+  let values, operation = 'read', filters = [], single = false
   const chain = new Proxy({}, { get(_, key) {
     if (key === 'then') return resolve => {
       const matches = r => filters.every(([k,v]) => ['payload','package_data'].includes(k) ? JSON.stringify(r[k]) === v : r[k] === v)
@@ -59,6 +60,8 @@ const db = { from(table) {
         return resolve({ data: structuredClone(projectRow), error:null })
       }
       if (table === 'deal') return resolve({ data: structuredClone(dealRow), error:null })
+      if (table === 'business_users' && filters.some(([key])=>key==='role')) return resolve({data:single?{id:'owner1'}:[{id:'owner1',user_id:'owner-auth',name:'Ägare'}],error:null})
+      if (['push_tokens','push_subscriptions'].includes(table)) { const device=table==='push_tokens'?{id:'expo1',token:'ExponentPushToken[test]'}:{id:'web1',endpoint:'https://push.test/secret',p256dh:'key',auth:'auth'};return resolve({data:single?device:[device],error:null}) }
       if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
       if (table === 'booking') {
         const notePattern = filters.find(([key]) => key === 'notes')?.[1]
@@ -69,7 +72,7 @@ const db = { from(table) {
       if (table === 'business_config') return resolve({ data: { business_name:'Testfirman', fortnox_connected:true, assigned_phone_number:'+468100000', personal_phone:'+46708888888', google_review_url:'https://example.test/review', subscription_plan:'pro', working_hours:{monday:{active:true,start:'08:00',end:'17:00'},tuesday:{active:true,start:'08:00',end:'17:00'},wednesday:{active:true,start:'08:00',end:'17:00'},thursday:{active:true,start:'08:00',end:'17:00'},friday:{active:true,start:'08:00',end:'17:00'}} }, error:null })
       return resolve({ data: null, error: null })
     }
-    return (...args) => { if (['eq','ilike','is'].includes(String(key))) filters.push(args); if (key === 'insert' || key === 'update') { operation = key; values = args[0] }; return chain }
+    return (...args) => { if (['single','maybeSingle'].includes(key)) single=true; if (['eq','ilike','is'].includes(String(key))) filters.push(args); if (key === 'insert' || key === 'update') { operation = key; values = args[0] }; return chain }
   } }); return chain
 } }
 const cache = {}
@@ -79,6 +82,7 @@ function load(file) {
   const mod = { exports: {} }; cache[file] = mod.exports
   const code = ts.transpileModule(fs.readFileSync(file,'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
   const req = name => {
+    if (name === './owner-push-send') return {sendReviewedPush:async(table,registration,message)=>{ownerPushCalls.push({table,message});return table==='push_tokens'&&ownerPushFail?{state:'failed',error:'rejected'}:{state:'accepted',reference:'test-ref'}}}
     if (name.startsWith('node:')) return require(name)
     if (name === 'next/server') return { NextResponse: { json: (data, init) => Response.json(data, init) } }
     if (name === '@/lib/supabase') return { getServerSupabase: () => db }
@@ -110,7 +114,7 @@ function load(file) {
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
-const reset = () => { projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
+const reset = () => { ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
   reset()
@@ -146,6 +150,11 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal((await post({action:'retry',review_token:syncPreview.review_token})).status,422);assert.equal(mutations,beforeConflictDecision);assert.equal(projectRow.fortnox_project_number,null)
   syncResult=await (await post({action:'retry',review_token:syncPreview.review_token,action_overrides:{confirm_project_identity:'approved'}})).json();assert.equal(syncResult.receipt.state,'saved',JSON.stringify(syncResult));assert.equal(fortnoxCalls.length,1);assert.equal(fortnoxRemote.Description,'Verified renamed project');assert.equal(projectRow.fortnox_project_number,'1042')
   assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(syncResult.receipt))
+  reset();row.approval_type='automation';row.payload={rule_action_type:'notify_owner',rule_action_config:{title:'Granskad ägarnotis',body:'Exakt text',url:'/dashboard'}}
+  let pushPreview=await (await post({action:'preview',decision_action:'approve'})).json();assert.equal(mutations,0);assert.equal(pushPreview.review.details[0].text,'Granskad ägarnotis')
+  let pushResult=await (await post({action:'approve',review_token:pushPreview.review_token})).json();assert.equal(pushResult.receipt.state,'partial',JSON.stringify(pushResult));assert.equal(ownerPushCalls.length,2)
+  ownerPushFail=false;pushPreview=await (await post({action:'preview',decision_action:'retry'})).json();pushResult=await (await post({action:'retry',review_token:pushPreview.review_token})).json();assert.equal(pushResult.receipt.state,'sent',JSON.stringify(pushResult));assert.equal(ownerPushCalls.length,3);assert.equal(ownerPushCalls.filter(c=>c.table==='push_subscriptions').length,1)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(pushResult.receipt));assert(ownerPushCalls.every(c=>c.message.body==='Exakt text'))
   reset(); row.approval_type='automation'; row.created_at='2026-09-08T12:00:00Z'; row.payload={customer_id:'c-site',rule_action_type:'schedule_followup',rule_action_config:{days_until:2,description:'Ring {{customer_name}}'}}
   const followupPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(mutations,0); assert(followupPreview.review.details.some(d=>d.text==='Ring Anna Andersson (senast 2026-09-10)'))

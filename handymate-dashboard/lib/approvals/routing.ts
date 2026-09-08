@@ -116,6 +116,8 @@ export async function canActOnApproval(
     if ((config?.entity_type || approval.payload.entity_type) === 'project' &&
       (currentUser.business_id !== approval.business_id || !isOwnerOrAdmin(currentUser))) return false
   }
+  if (approval.approval_type === 'automation' && approval.payload?.rule_action_type === 'notify_owner' &&
+    (currentUser.business_id !== approval.business_id || !isOwnerOrAdmin(currentUser))) return false
   if (approval.approval_type === 'job_report' && !hasPermission(currentUser, 'create_invoices')) return false
   if (approval.approval_type === 'four_eyes_quote') {
     const requestedByUserId = (approval.payload as Record<string, unknown> | undefined)
