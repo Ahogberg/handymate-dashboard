@@ -36,6 +36,13 @@ function makeUser(overrides: Partial<BusinessUser> = {}): BusinessUser {
   }
 }
 
+test('job report customer delivery cannot inherit legacy any routing', async () => {
+  const approval: ApprovalRoutingRow = { approval_type: 'job_report', business_id: 'biz_1', routing_role: 'any' }
+  expect(await canActOnApproval(null as any, makeUser(), approval)).toBe(false)
+  expect(await canActOnApproval(null as any, makeUser({ can_create_invoices: true }), approval)).toBe(true)
+  expect(await canActOnApproval(null as any, makeUser({ role: 'owner' }), approval)).toBe(true)
+})
+
 test.describe('getRoutingBucket', () => {
   test("okänd/ej listad approval_type → 'any'", () => {
     expect(getRoutingBucket('send_sms')).toBe('any')

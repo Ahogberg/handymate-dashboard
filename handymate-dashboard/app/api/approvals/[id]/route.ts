@@ -1,6 +1,7 @@
 import { insertApprovalArtifact } from '@/lib/approvals/artifact-write'
 import { bookingProposalMessage } from '@/lib/approvals/booking-message'
 import { prepareApprovalReview } from '@/lib/approvals/prepare-review'
+import type { ReviewedDocument } from '@/lib/approvals/document-delivery'
 import { approvalReceipt } from '@/lib/approvals/receipt'
 import { requireApprovalReview } from '@/lib/approvals/review-guard'
 import { NextRequest, NextResponse } from 'next/server'
@@ -260,6 +261,7 @@ export async function POST(
           retryCookieHeader,
           retryAuthHeader,
           currentUser.id,
+          prepared?.document,
         )
       } catch (execErr: any) {
         console.error(`[approvals/${params.id}] retry: executeApprovalPayload kastade okontrollerat:`, execErr)
@@ -538,6 +540,7 @@ export async function POST(
           cookieHeader,
           authHeader,
           currentUser.id,
+          prepared?.document,
         )
       } catch (execErr: any) {
         console.error(`[approvals/${params.id}] executeApprovalPayload kastade okontrollerat:`, execErr)
@@ -820,6 +823,7 @@ async function executeApprovalPayload(
   // currentUser.id (business_users.id) — null när okänt (t.ex. retry-vägen
   // om den någon gång tappar sessionen).
   resolvedByUserId?: string | null,
+  reviewedDocument?: ReviewedDocument,
 ): Promise<Record<string, unknown>> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const { approval_type, payload } = approval
@@ -1846,9 +1850,9 @@ async function executeApprovalPayload(
       }
 
       case 'job_report': {
-        const { approveJobReport } = await import('@/lib/job-report')
-        const reportPayload = payload as any
-        const result = await approveJobReport(businessId, reportPayload.projectId || '', reportPayload)
+        if (!reviewedDocument || reviewedDocument.businessId !== businessId || reviewedDocument.approvalId !== approval.id) return { action: 'job_report', ok: false, error: 'Granskat dokument saknas' }
+        const { deliverReviewedDocument } = await import('@/lib/approvals/document-delivery')
+        const result = await deliverReviewedDocument(getServerSupabase(), reviewedDocument)
         return { action: 'job_report', ...result }
       }
 

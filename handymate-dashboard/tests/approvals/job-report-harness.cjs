@@ -16,10 +16,11 @@ const db = {
   },
   storage: {from() {return {upload:async()=>{uploads++;return {error:fail === 'upload' ? {message:'upload failed'} : null}}}}},
 }
-class Pdf { internal={pageSize:{getWidth:()=>210}}; setFontSize(){}; setTextColor(){}; setFont(){}; text(){}; splitTextToSize(s){return [s]}; output(){return new ArrayBuffer(8)} }
+class Pdf { internal={pageSize:{getWidth:()=>210}}; setFileId(){}; setCreationDate(){}; setFontSize(){}; setTextColor(){}; setFont(){}; text(){}; splitTextToSize(s){return [s]}; output(){return new ArrayBuffer(8)} }
 const mod={exports:{}}
 const code=ts.transpileModule(fs.readFileSync('lib/job-report.ts','utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText
 vm.runInNewContext(code,{module:mod,exports:mod.exports,Buffer,console,require(name){
+  if(name==='node:crypto')return require(name)
   if(name==='@/lib/supabase')return {getServerSupabase:()=>db}
   if(name==='@/lib/branding/attribution')return {loadAttribution:async()=>({}),buildAttribution:()=>({}),stampAttributionOnPdf:()=>{}}
   if(name==='@/lib/branding/pdf')return {loadPdfBranding:async()=>({accent:[0,0,0]}),drawBrandHeader:()=>20,drawBrandFooter:()=>{},PDF_TEXT_MUTED:[0,0,0],PDF_TEXT_PRIMARY:[0,0,0]}

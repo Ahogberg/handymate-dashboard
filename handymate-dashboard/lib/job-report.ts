@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { createHash } from 'node:crypto'
 import { buildAttribution, loadAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
 import { DEFAULT_ACCENT_COLOR } from '@/lib/branding/get-branding'
 import {
@@ -17,7 +18,7 @@ import {
  * Vid godkännande → genererar PDF → skickar till kund.
  */
 
-interface JobReportData {
+export interface JobReportData {
   projectId: string
   projectName: string
   customerName: string
@@ -240,12 +241,12 @@ export async function triggerJobReport(
  */
 export async function generateJobReportPdf(
   data: JobReportData,
-  opts: { attribution?: Attribution; brand?: PdfBranding } = {},
+  opts: { attribution?: Attribution; brand?: PdfBranding; photos?: Array<{ data: string; format: 'PNG' | 'JPEG'; caption: string | null }> } = {},
 ): Promise<Buffer> {
   // Dynamic import to avoid SSR issues
   const jsPDFModule = await import('jspdf')
   const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF
-  await import('jspdf-autotable')
+  const { autoTable } = await import('jspdf-autotable')
 
   const brand: PdfBranding = opts.brand ?? pdfBrandingFrom({
     businessName: data.businessName,
@@ -258,6 +259,11 @@ export async function generateJobReportPdf(
   const ACCENT = brand.accent
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  // jsPDF otherwise embeds a random file ID and wall-clock timestamp. Identical
+  // reviewed input must produce identical bytes at preview and confirmation.
+  const fingerprint = createHash('sha256').update(JSON.stringify({ data, opts })).digest('hex')
+  doc.setFileId(fingerprint.slice(0, 32))
+  doc.setCreationDate("D:20200101000000+00'00'")
   const pageWidth = doc.internal.pageSize.getWidth()
 
   // Sidhuvud ur brand-lagret (logga, firma, org.nr) + titel/projekt till höger.
@@ -293,9 +299,10 @@ export async function generateJobReportPdf(
   doc.setFont('helvetica', 'normal')
   for (const work of data.workPerformed) {
     const lines = doc.splitTextToSize(`• ${work}`, pageWidth - 30)
-    doc.text(lines, 15, y)
-    y += lines.length * 4.5
-    if (y > 270) { doc.addPage(); y = 15 }
+    for (const line of lines) {
+      if (y > 265) { doc.addPage(); y = 15 }
+      doc.text(line, 15, y); y += 4.5
+    }
   }
   y += 4
 
@@ -313,9 +320,10 @@ export async function generateJobReportPdf(
     doc.setTextColor(180, 83, 9)
     for (const dev of deviations) {
       const lines = doc.splitTextToSize(`• ${dev}`, pageWidth - 30)
-      doc.text(lines, 15, y)
-      y += lines.length * 4.5
-      if (y > 270) { doc.addPage(); y = 15 }
+      for (const line of lines) {
+        if (y > 265) { doc.addPage(); y = 15 }
+        doc.text(line, 15, y); y += 4.5
+      }
     }
     doc.setTextColor(30, 41, 59)
     y += 4
@@ -323,13 +331,14 @@ export async function generateJobReportPdf(
 
   // Material
   if (data.materials.length > 0) {
+    if (y > 245) { doc.addPage(); y = 15 }
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.text('Material', 15, y)
     y += 2
-    ;(doc as any).autoTable({
+    autoTable(doc, {
       startY: y,
-      margin: { left: 15, right: 15 },
+      margin: { left: 15, right: 15, bottom: 25 },
       head: [['Material', 'Antal', 'Enhet']],
       body: data.materials.map(m => [m.name, String(m.quantity), m.unit]),
       styles: { fontSize: 8, cellPadding: 2 },
@@ -337,6 +346,24 @@ export async function generateJobReportPdf(
       alternateRowStyles: { fillColor: [249, 250, 251] },
     })
     y = (doc as any).lastAutoTable.finalY + 8
+  }
+
+  // Photos must be loaded and validated before review; never fetch new bytes
+  // during rendering or silently omit a promised attachment.
+  for (const photo of opts.photos || []) {
+    doc.addPage(); y = 20
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+    doc.text('Fotodokumentation', 15, y); y += 10
+    const props = doc.getImageProperties(photo.data)
+    const scale = Math.min(180 / props.width, 195 / props.height)
+    const w = props.width * scale, h = props.height * scale
+    doc.addImage(photo.data, photo.format, 15, y, w, h)
+    y += h + 8
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+    for (const line of doc.splitTextToSize(photo.caption || '', 180)) {
+      if (y > 265) { doc.addPage(); y = 15 }
+      doc.text(line, 15, y); y += 4.5
+    }
   }
 
   // Garanti

@@ -15,12 +15,16 @@ export interface SendEmailParams {
   /** Kontaktad (2026-08-28): med businessId + customerId flyttas kundens öppna affärer till Kontaktad vid lyckat utskick. */
   businessId?: string | null
   customerId?: string | null
+  /** Immutable reviewed document bytes; never re-render at the provider boundary. */
+  attachments?: Array<{ filename: string; content: string }>
+  idempotencyKey?: string
 }
 
 export interface SendEmailResult {
   success: boolean
   messageId?: string
   error?: string
+  deliveryState?: 'accepted' | 'rejected' | 'unknown'
 }
 
 /**
@@ -28,7 +32,7 @@ export interface SendEmailResult {
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
   if (!RESEND_API_KEY) {
-    return { success: false, error: 'RESEND_API_KEY not configured' }
+    return { success: false, deliveryState: 'rejected', error: 'RESEND_API_KEY not configured' }
   }
 
   const {
@@ -50,22 +54,25 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       html,
     }
     if (replyTo) body.reply_to = replyTo
+    if (params.attachments?.length) body.attachments = params.attachments
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${RESEND_API_KEY}`,
         'Content-Type': 'application/json',
+        ...(params.idempotencyKey ? { 'Idempotency-Key': params.idempotencyKey } : {}),
       },
       body: JSON.stringify(body),
     })
 
     if (!response.ok) {
       const errorText = await response.text()
-      return { success: false, error: `Resend error: ${errorText}` }
+      return { success: false, deliveryState: response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 409 ? 'rejected' : 'unknown', error: `Resend error: ${errorText}` }
     }
 
     const data = await response.json()
+    if (typeof data.id !== 'string' || !data.id) return { success: false, deliveryState: 'unknown', error: 'Mejltjänstens svar saknar leveransreferens' }
     if (businessId && customerId) {
       try {
         const { markCustomerContacted } = await import('@/lib/pipeline/contacted')
@@ -73,9 +80,9 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
         await markCustomerContacted(getServerSupabase(), businessId, customerId, 'mejl')
       } catch { /* best-effort */ }
     }
-    return { success: true, messageId: data.id }
+    return { success: true, deliveryState: 'accepted', messageId: data.id }
   } catch (error: any) {
-    return { success: false, error: error.message }
+    return { success: false, deliveryState: 'unknown', error: error.message }
   }
 }
 

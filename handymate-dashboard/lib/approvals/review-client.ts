@@ -60,13 +60,17 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
       void fetch(attachment.url, { headers }).then(async response => {
         if (!response.ok) throw new Error('Kunde inte läsa underlaget')
         const mime = response.headers.get('content-type') || ''
-        if (!mime.startsWith('image/') && !mime.includes('application/pdf') && !mime.includes('text/html')) throw new Error('Underlaget har fel format')
+        // Raw PDFs do not reliably render in sandboxed frames. The document
+        // endpoint must return rendered pages/HTML, never an empty PDF plugin.
+        if (!mime.startsWith('image/') && !mime.includes('text/html')) throw new Error('Underlaget har fel format')
         const blob = await response.blob()
         if (settled) return
         const url = URL.createObjectURL(blob); objectUrls.push(url)
         const frame = document.createElement('iframe'); frame.title = attachment.label
-        frame.setAttribute('sandbox', ''); frame.src = url; frame.style.width = '100%'; frame.style.height = '65vh'
-        status.replaceWith(frame); checkbox.disabled = false
+        frame.setAttribute('sandbox', ''); frame.style.width = '100%'; frame.style.height = '65vh'
+        frame.onload = () => { if (!settled) checkbox.disabled = false }
+        frame.onerror = () => { checkbox.disabled = true; checkbox.checked = false; if (confirmButton) confirmButton.disabled = true }
+        frame.src = url; status.replaceWith(frame)
       }).catch(() => { if (!settled) status.textContent = 'Underlaget kunde inte laddas. Beslutet kan inte bekräftas.' })
     }
     if (review.confirmLabel) {

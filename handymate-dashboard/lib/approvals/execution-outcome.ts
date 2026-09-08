@@ -84,6 +84,7 @@ export const ARTIFACT_ID_KEYS = [
   'message_id',
   'total',
   'knowledge_id',
+  'document_id',
 ] as const
 
 /**

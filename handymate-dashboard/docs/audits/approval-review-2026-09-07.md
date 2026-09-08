@@ -94,7 +94,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `checklist_forslag` | Skapar projektchecklista från mallpunkterna. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `egenkontroll_foto` | Markerar föreslagna checklistpunkter och kopplar fotoreferens. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `egenkontroll_avvikelse` | Kvitterar avvikelsen; avvikelsen behöver fortsatt saklig hantering. | Uttrycklig läskvittens; avvikelsen markeras inte åtgärdad |
-| `job_report` | Genererar och sparar jobbrapport som PDF och kan mejla en dokumentlänk till kunden. | Stopp – komplett granskning återstår |
+| `job_report` | Förbereder verkliga PDF-bytes och exakt mejl, visar alla sidor och bifogar den granskade PDF-filen efter beslut. | Ny gransknings-/leveransväg integrationstestad; legacyunderlag, återställning av okända leveranser och iPhone-slutprov återstår |
 | `karin_deadline` | Kvitterar att skyldigheten har setts; innebär inte att något har lämnats in. | Kvittens |
 | `cert_expiry_reminder` | Kvitterar att informationen har lästs; utför ingen kundhandling. | Kvittens |
 | `low_stock_alert` | Kvitterar att informationen har lästs; utför ingen kundhandling. | Kvittens |
@@ -145,3 +145,34 @@ Jobbrapporten verifierar nu projekt och aktuell kundadress inom företaget före
 Verifiering: nio isolerade scenarier i `node tests/approvals/job-report-harness.cjs` testar faktisk hjälpkod med mockad databas, PDF och mejltjänst. Befintligt route-harness godkänt. TypeScript har samma tre tidigare portal/review-fel, inga nya. Ingen verklig leverans eller iPhone-verifiering.
 
 Återstår: exakt dokument- och mejlförhandsvisning, versionsbindning, foton i PDF och idempotent leverans med återupptagning. Kortets befintliga spärr kvarstår tills hela flödet är verifierat. Övriga delar i nattplanen är fortfarande öppna.
+
+### Nattpass 8 september — granskat dokument till beständig leveransjournal
+
+Ovanstående direktstartsstatus för jobbrapporten är nu delvis ersatt av följande kod och prov. **Alla fem arbetsdelarna är fortfarande inte klara.**
+
+- Jobbrapporten har en verklig ersättningsväg: läsande förberedelse av full PDF och exakt mejl, synlig mottagare/avsändare/svarsadress, uttryckligen inga kopior/BCC/SMS/faktura/pipelineändringar. PDF-filen skickas som bilaga i stället för en tidsbegränsad länk. Granskningsbeviset binder hash av faktiska PDF-bytes plus hela mejlkuvertet. Exekveraren använder samma förberedda objekt, inte en ny rendering efter beslutet.
+- Autentiserad `GET /api/approvals/[id]/document?version=...` kontrollerar företag, beslutsbehörighet och version. Ändrat dokument ger 409. Jobbrapporten kräver samma `create_invoices`-befogenhet som offert/fakturautskick; äldre `routing_role=any` kringgår inte kontrollen.
+- Ett faktiskt Chromium-prov hittade tom PDF-ruta i sandboxen. Därför rasteriseras nu den verkliga PDF-filen server-side till scriptfria sidbilder. Webb/app kan visa dem utan PDF-plugin. Sidbilder och obligatorisk granskningsmarkering är provade i Chromium; rå PDF accepteras inte längre av webbgranskaren. Stora bildsidor JPEG-komprimeras, hela svaret begränsas till cirka 4 MB efter base64; högst 30 sidor.
+- jsPDF använder stabilt dokument-ID och datum. Det gamla autoTable-anropet fungerade inte med den installerade versionen och är rättat. Långa arbets-/avvikelsetexter sidbryts före sidfoten. Verifierade PNG/JPEG-foton från företagets privata `project-files`-sökvägar ingår nu i PDF. Externa URL:er/andra företags sökvägar nekas före hämtning; max sex foton, 5 MB per foto och 15 MB PDF.
+- `document-delivery.ts` sparar en stabil dokumentrad per kort, PDF-sökväg, kuvert, version, försök och leveransläge. Atomiskt anspråk före uppladdning/utskick hindrar parallella sändare. Tidigare accepterat utskick återger sin referens; säkert avvisat försök kan återföras med samma underlag. Timeout/okänt svar/förlorad slutkvittens leder aldrig till automatiskt omutskick. Resends tidsbegränsade idempotensnyckel är extra skydd, inte det enda skyddet.
+- `sendEmail` kan bära bilaga och idempotensnyckel; saknad leveransreferens/5xx/nätverksfel är okänt utfall, inte framgång. Ingen dold pipelineändring aktiveras i denna dokumentväg. Kortets vanliga kvittens och dokument-/meddelande-ID sparas och är kontrollerade efter återöppning.
+- Den saknade `lib/portal/review.ts` hämtades **oförändrad från aktuell main**, blob `5d91d5cf509f32dba56b859b7ddf7b74655edb21`. De tre tidigare typfelen är därmed borta; ingen main-merge gjordes.
+
+Verifiering i detta pass:
+
+- `npm run test:approval-documents`: fem körbara sviter för faktisk mejladapter, beständig dokumentjournal, verklig PDF-förberedelse, faktiska approval-/document-rutter och riktig Chromium-rendering. Databas och leverantörer är isolerade/mockade; inga riktiga kundhandlingar.
+- Dokumentproven täcker bland annat samtidiga klick, accepterat återspel, avvisat återförsök, borttappad kvittens, okänt leveranssvar, ändrade bytes/mottagare, CAS-konflikt, fel vid uppladdning, 401/403/409, ändrat granskningsbevis och samma kvittens efter återöppning.
+- 97 riktade Playwright-prov passerade (tidigare 79 plus hela routingsviten, inklusive det nya dokumentbehörighetsprovet). Testantalet är inte antal slutprovade korttyper.
+- Befintliga route-, reminder-, job-report- och Chromium-harness passerade. Tre PDF-varianter granskade visuellt: vanlig rapport, syntetiskt foto och lång text; alla 1 200 upprepade textmarkörer finns kvar i tresidorsprovet.
+- `npx tsc --noEmit` är nu rent. Nexts produktionskompilering och typkontroll passerade efter återställningen av portalmodulen; slutlig build-/tracingstatus redovisas i PR-beskrivningen.
+- `pdfjs-dist` 6.3.289 och `@napi-rs/canvas` 1.0.8 är versionslåsta, med lockfil och server-side tracing. Kräver Node >=22.13. Kontrollera paketering/storlek och native-binär i Vercel-preview före release. Ingen produktionsinställning har ändrats.
+
+Fortsättningspunkt, i beställd ordning:
+
+1. **Del 1 kvar:** offert/faktura/Fortnox/e-faktura behöver fortfarande en motsvarande komplett förberedelse och exekvering. Utgå från `app/api/quotes/send/route.ts`, `lib/invoices/send-invoice.ts`, `lib/quotes/quote-email.ts`. Återanvänd principen i dokumentjournalen, men den är ännu jobbrapportsspecifik (bilagans namn) och ska inte kopplas blint till ekonomiflöden. Jobbrapportens äldre publika fotosökvägar, underlagsredigering och gamla försök utan journal behöver riktiga reparationsvyer. Okänt leveransläge behöver leverantörsavstämning; att förhindra omutskick är inte färdig återställning. Om kortkvittensen inte kunde sparas behöver även bulkhistoriken återhämta journalens besked.
+2. **Del 2 kvar:** bokning/platsbesök/projektavslut inklusive dynamiska meddelanden och fakturaval.
+3. **Del 3 kvar:** betalnings-/leadföljder och resterande automationer, med nya konkreta godkännanden för sent genererade kundutskick.
+4. **Del 4 kvar:** återförsök per paketdel, kampanjkö till sändare och sammanhängande historik för alla övriga typer. Den nya dokumentjournalen täcker bara dokumentvägen ovan.
+5. **Del 5 kvar:** native specialvyer och TestFlight. Befintlig mobilgranskare kan ta emot den scriptfria dokumentvisningen, men ingen iPhone-/WebView-slutverifiering har gjorts i detta pass. Mobil-PR #3 och build 12 är oförändrade.
+
+Tekniska källor för nya integrationsdetaljer: [Resend idempotens](https://resend.com/docs/dashboard/emails/idempotency-keys), [Resend bilagor](https://resend.com/docs/dashboard/emails/attachments), [PDF.js exempel](https://mozilla.github.io/pdf.js/examples/). Installerade typdefinitioner och isolerade körningar användes för exakta anrop. Supabases changelog kontrollerades; ingen schemaändring eller produktionsskrivning gjordes.

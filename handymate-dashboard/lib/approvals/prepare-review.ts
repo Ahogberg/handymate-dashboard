@@ -5,8 +5,9 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildApprovalReview, type ApprovalReview } from './review-contract'
 import { classify } from './action-contract'
 import { rejectionEffect } from './receipt'
+import type { ReviewedDocument } from './document-delivery'
 
-export interface PreparedApprovalReview { review: ApprovalReview; snapshot: Record<string, unknown> }
+export interface PreparedApprovalReview { review: ApprovalReview; snapshot: Record<string, unknown>; document?: ReviewedDocument }
 /** Read-only preparation. Each target lookup is explicitly tenant-scoped.
  * Live values are part of the signed review, never silently substituted later.
  */
@@ -36,9 +37,17 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     return data as Record<string, any>
   }
   try {
-    if (action === 'retry' && p.execution_result?.receipt?.state === 'partial' && type !== 'time_attestation') throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
+    if (action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
     if (action === 'reject') return complete(rejectionEffect(type), 'Bekräfta avvisningen')
     if (classify(type) === 'INFORMATIONAL' || classify(type) === 'ACKNOWLEDGEMENT') return
+    if (type === 'job_report') {
+      if (action === 'retry' && !p.execution_result?.artifacts?.document_id) throw new Error('Det äldre försöket saknar en verifierbar leveransjournal. Kontrollera tidigare utskick innan ett nytt rapportbeslut skapas.')
+      // This report is edited in its source underlay, not via the generic SMS editor.
+      if (action === 'edit') throw new Error('Ändra rapportens underlag och öppna sedan en ny dokumentgranskning.')
+      const { prepareJobReport } = await import('./job-report-review')
+      const prepared = await prepareJobReport(db, businessId, approval.id, p)
+      return { ...prepared, snapshot: { documentVersion: prepared.document.version } }
+    }
     if (p.project_id) { const project = await row('project', 'project_id', p.project_id, 'Projektet', 'project_id, name, status'); detail('Projekt', project.name) }
     if (p.customer_id) { const customer = await row('customer', 'customer_id', p.customer_id, 'Kunden', 'customer_id, name, phone_number, email'); detail('Kund', customer.name) }
     const navigation: Record<string, { label: string; path: string; effect: string }> = {
