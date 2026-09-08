@@ -2386,41 +2386,8 @@ async function executeApprovalPayload(
       }
 
       case 'price_adjustment': {
-        // BUGFIX (2026-08-25, Codex-granskningens fynd 1, källverifierat):
-        // producenten (lib/agent/price-analysis.ts, nattliga agentkörningen)
-        // skickar `price_list_id` + `suggested_rate` och läser/föreslår mot
-        // price_lists_v2.hourly_rate_normal — men caset här krävde
-        // `item_id` + `suggested_price` och skrev till LEGACY-tabellen
-        // price_list (0 rader i prod). Varje godkännande av ett riktigt
-        // prisjusteringskort blev alltså ett tyst 'skipped' — användaren
-        // godkände "Ändra pris" och inget pris ändrades, någonsin.
-        const pl = payload as any
-        const supabasePa = (await import('@/lib/supabase')).getServerSupabase()
-
-        // Producentens verkliga kontrakt: timpriset på prislistan (v2).
-        if (pl.price_list_id && pl.suggested_rate) {
-          const { data: updatedPl, error: rateUpdateError } = await supabasePa
-            .from('price_lists_v2')
-            .update({ hourly_rate_normal: pl.suggested_rate, updated_at: new Date().toISOString() })
-            .eq('id', pl.price_list_id)
-            .eq('business_id', businessId)
-            .select('id')
-          if (rateUpdateError) {
-            return { action: 'price_adjustment', ok: false, error: rateUpdateError.message }
-          }
-          if (!updatedPl || updatedPl.length === 0) {
-            // Prislistan kan ha raderats sedan kortet skapades — ärligt fel,
-            // inte tyst success.
-            return { action: 'price_adjustment', ok: false, error: 'Prislistan hittades inte (kan ha tagits bort sedan förslaget skapades)' }
-          }
-          return { action: 'price_adjustment', ok: true, price_list_id: pl.price_list_id, new_rate: pl.suggested_rate }
-        }
-
-        // B2 (Prisslingan V2): legacy-grenen (item_id mot price_list) är
-        // borttagen — tabellen har aldrig innehållit en rad och ingen
-        // producent skapar den payload-formen (bekräftat i kommentaren ovan).
-        // Utfalls-hårdning: dolt no-op får aldrig klassas som success.
-        return { action: 'price_adjustment', skipped: 'payload saknar price_list_id/suggested_rate' }
+        const { executePriceAdjustment } = await import('@/lib/approvals/price-adjustment')
+        return await executePriceAdjustment(getServerSupabase(), businessId, reviewedPayload?.priceChange as any)
       }
 
       case 'profitability_warning': {

@@ -224,9 +224,14 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       }
       case 'price_adjustment': {
         const price = await row('price_lists_v2', 'id', p.price_list_id, 'Prislistan')
-        if (typeof p.suggested_rate !== 'number' || p.suggested_rate <= 0) throw new Error('Det nya timpriset måste vara större än noll.')
-        detail('Prislista', price.name || price.title); detail('Nuvarande timpris (kr)', price.hourly_rate_normal); detail('Nytt timpris (kr)', p.suggested_rate)
-        return complete('Ändrar prislistans ordinarie timpris. Redan skapade dokument ändras inte av denna handling.', 'Ändra timpriset')
+        if (!Number.isFinite(p.suggested_rate) || p.suggested_rate <= 0) throw new Error('Det nya timpriset måste vara större än noll.')
+        if (price.hourly_rate_normal == null || !Number.isFinite(Number(price.hourly_rate_normal))) throw new Error('Nuvarande timpris kunde inte verifieras.')
+        const original = p.execution_result?.review_evidence?.priceChange
+        const plan = action === 'retry' ? original : { id: p.price_list_id, before: Number(price.hourly_rate_normal), after: p.suggested_rate }
+        if (!plan || plan.id !== p.price_list_id || plan.after !== p.suggested_rate || !Number.isFinite(plan.before)) throw new Error('Tidigare granskat prisunderlag saknas.')
+        if (![plan.before, plan.after].includes(Number(price.hourly_rate_normal))) throw new Error('Timpriset har ändrats efter det tidigare försöket. Granska ändringen i prislistan.')
+        detail('Prislista', price.name || price.title); detail('Nuvarande timpris (kr)', price.hourly_rate_normal); detail('Nytt timpris (kr)', plan.after)
+        return { ...complete('Säkerställer det granskade ordinarie timpriset. Redan skapade dokument ändras inte av denna handling.', 'Ändra timpriset'), executionPayload: { priceChange: plan }, executionEvidence: { priceChange: plan } }
       }
       case 'dispatch_suggestion': {
         const person = await row('business_users', 'id', p.member_id, 'Medarbetaren')
