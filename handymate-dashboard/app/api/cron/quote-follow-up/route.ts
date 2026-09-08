@@ -8,6 +8,7 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance } from '@/lib/sms-usage'
 import { OPEN_QUOTE_STATUSES } from '@/lib/quotes/statuses'
+import { quoteFollowupStep } from '@/lib/quotes/followup-cadence'
 import { filterOutConflicting, UNOPENED_CONFLICT_WINDOW_HOURS } from '@/lib/agents/daniel/unopened-quotes'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
@@ -456,11 +457,9 @@ export async function GET(request: NextRequest) {
       // Round 1: SMS efter followupDays dagar
       // Round 2: Email efter followupDays*2 dagar
       // Round 3: SMS efter followupDays*3 dagar (sista)
-      let channel = ''
-      if (daysSinceSent >= followupDays && followUpCount === 0) channel = 'sms'
-      else if (daysSinceSent >= followupDays * 2 && followUpCount === 1) channel = 'email'
-      else if (daysSinceSent >= followupDays * 3 && followUpCount === 2) channel = 'sms'
-      else continue
+      const nextStep = quoteFollowupStep(sentDate, followUpCount, followupDays, now.getTime())
+      if (!nextStep?.due) continue
+      const channel = nextStep.channel
 
       // VP2 (gap 4): kandidatloopen SAMLAR bara — follow_up_count-uppräkning
       // och v3-loggen flyttade till steg 5, EFTER agent-triggern, så loggat

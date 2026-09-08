@@ -1,6 +1,6 @@
 'use client'
 
-import type { Dispatch, SetStateAction } from 'react'
+import type { Dispatch, SetStateAction, ReactNode } from 'react'
 import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
@@ -69,6 +69,7 @@ interface Customer {
  * QuoteBuilder.tsx svårläst utan att vinna något.
  */
 export interface QuoteEditViewProps {
+  visitRuleEditor?: ReactNode
   quoteId: string
   quoteNumber: string
   /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31) — samma
@@ -313,6 +314,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               setDescription={setDescription}
             />
 
+            {props.visitRuleEditor}
             <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
             <QuoteItemsSection
               items={items}

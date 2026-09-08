@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { persistOnboardingProgress } from '@/lib/onboarding/save-progress'
 import { useRouter } from 'next/navigation'
 import Step1MeetTheTeam from './components/Step1MeetTheTeam'
+import { WorkSampleStart } from '@/components/onboarding/WorkSampleStart'
 import Step2Business from './components/Step2Business'
 import Step3HowYouWork from './components/Step3HowYouWork'
 import Step4PhoneNumber from './components/Step4PhoneNumber'
@@ -429,7 +430,17 @@ export default function OnboardingPage() {
       {step === 1 && (
         <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
-      {step === 2 && (
+      {step === 2 && !data.workSampleSeen && data.businessId && <WorkSampleStart
+        key={data.businessId} businessId={data.businessId}
+        source={data.workSampleSource} sample={data.workSample}
+        onContinue={async (source, sample) => {
+          const updated = { ...data, workSampleSeen: true, workSampleSource: source, workSample: sample }
+          const saved = await fetch('/api/onboarding', { method: 'PUT', headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ step: 2, data: sanitizeForSave(updated) }) })
+          if (!saved.ok) throw new Error('Kunde inte spara arbetsprovet. Försök igen; underlaget finns kvar här.')
+          setDataUpdater(() => updated)
+        }} />}
+      {step === 2 && (data.workSampleSeen || !data.businessId) && (
         <Step3HowYouWork busy={savingJobs} error={jobSaveError} onNext={next} onBack={back} data={data} setData={setDataUpdater} />
       )}
       {step === 3 && (

@@ -76,6 +76,9 @@ import { panelStatus } from '@/lib/quotes/panel-status'
 // Komponenter unika för create-flödet (bor kvar i new/components/ — bara
 // QuoteBuilder.tsx själv flyttade till _shared/, se new/page.tsx).
 import { DanielsBedomning } from '../new/components/DanielsBedomning'
+import { VisitRuleEditor } from '@/components/quotes/VisitRuleEditor'
+import { WorkSampleResume } from '@/components/onboarding/WorkSampleResume'
+import { workSampleDraft } from '@/lib/onboarding/work-sample'
 import { QuoteNewAIHelper } from '../new/components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from '../new/components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from '../new/components/QuoteNewAttachmentsCard'
@@ -2247,6 +2250,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   if (isEditMode) {
     return (
       <QuoteEditView
+        visitRuleEditor={<VisitRuleEditor key={`${business.business_id}:${quoteJobType}`} jobType={quoteJobType || null} description={description} onApply={setDescription} />}
         quoteId={quoteId}
         quoteNumber={quoteNumberRef.current}
         completenessSummaries={completenessSummaries}
@@ -2400,7 +2404,10 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
       />
       <QuickIntake
-        jobTypeStart={<>{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}{jobTypeStart}{preparationInput}</>}
+        jobTypeStart={<>{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
+          <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
+            onApply={sample => { applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
+            onSource={text => setQuickInput(text)} />{jobTypeStart}{preparationInput}</>}
         customers={customers}
         selectedCustomer={selectedCustomer}
         onSelectCustomer={setSelectedCustomer}
@@ -2525,6 +2532,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
         {jobTypeStart}
         {preparationInput}
+        {!isEditMode && <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
+          onApply={sample => { applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
+          onSource={text => { setQuickInput(text); setAiTextInput(text) }} />}
         {firstQuoteIntent && jobStartApplied && <FirstQuoteGuide key={business.business_id}
           companyName={business.business_name} hasCustomer={!!selectedCustomer}
           onCustomer={() => {
@@ -2643,6 +2653,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                 minst en rad har ett känt inköpspris. */}
             <QuoteMarginCard items={recalculated} />
             <QuotePriceMemory items={items} onChange={setItems} />
+            <VisitRuleEditor key={`${business.business_id}:${quoteJobType}`} jobType={quoteJobType || null} description={description} onApply={setDescription} />
 
             <div data-first-quote-customer>
             <QuoteNewCustomerSection

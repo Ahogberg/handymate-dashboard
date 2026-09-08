@@ -156,6 +156,7 @@ jobs:
           tests/quote-ata-payment-plan.spec.ts
           tests/facit-material-double-count.spec.ts
           tests/first-value-journey.spec.ts
+          tests/first-value-production.spec.ts
           tests/first-focus.spec.ts
           tests/kom-igang-tasks.spec.ts
           tests/onboarding-first-mission.spec.ts
