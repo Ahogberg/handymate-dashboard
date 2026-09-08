@@ -257,13 +257,13 @@ export async function syncPaymentWithTracking(
 export async function syncProjectWithTracking(
   businessId: string,
   projectId: string,
-): Promise<{ success: boolean; skipped?: boolean; fortnoxId?: string; error?: string }> {
+): Promise<{ success: boolean; skipped?: boolean; partial?: boolean; fortnoxId?: string; error?: string }> {
   const result = await syncProjectToFortnox(businessId, projectId)
   if (result.skipped) {
     return { success: false, skipped: true, error: result.error }
   }
   await trackSync(businessId, 'project', projectId, result.success ? 'synced' : 'error', result.projectNumber, result.error)
-  return { success: result.success, fortnoxId: result.projectNumber, error: result.error }
+  return { success: result.success, partial: result.partial, fortnoxId: result.projectNumber, error: result.error }
 }
 
 /**
@@ -276,14 +276,15 @@ export async function syncNewProjectToFortnox(
   supabase: SupabaseClient,
   businessId: string,
   projectId: string,
-): Promise<{ synced: boolean; skipped: boolean; fortnoxId?: string; error?: string }> {
+): Promise<{ synced: boolean; skipped: boolean; partial?: boolean; fortnoxId?: string; error?: string }> {
   try {
     const { data: cfg, error: cfgError } = await supabase
       .from('business_config')
       .select('fortnox_connected')
       .eq('business_id', businessId)
       .maybeSingle()
-    if (cfgError || !cfg?.fortnox_connected) {
+    if (cfgError) return { synced: false, skipped: false, error: cfgError.message || 'Fortnox-inställningarna kunde inte läsas' }
+    if (!cfg?.fortnox_connected) {
       return { synced: false, skipped: true }
     }
 
@@ -294,7 +295,7 @@ export async function syncNewProjectToFortnox(
         const { rapporteraTystFel } = await import('@/lib/observability/driftlarm')
         await rapporteraTystFel(supabase, businessId, 'project-create:fortnox-sync', result.error || 'okänt fel', { projectId })
       } catch { /* driftlarmet får aldrig fälla skapandet */ }
-      return { synced: false, skipped: false, error: result.error }
+      return { synced: false, skipped: false, partial: result.partial, fortnoxId: result.fortnoxId, error: result.error }
     }
     return { synced: true, skipped: false, fortnoxId: result.fortnoxId }
   } catch (err: unknown) {

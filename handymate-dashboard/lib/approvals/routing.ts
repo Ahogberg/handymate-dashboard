@@ -109,6 +109,13 @@ export async function canActOnApproval(
 ): Promise<boolean> {
   // Customer document delivery must not inherit a legacy routing_role='any'.
   // Match the existing quote/invoice send capability, including owners/admins.
+  // Project-register writes in the accounting integration require an owner/admin,
+  // even on historical automation cards whose routing bucket was 'any'.
+  if (approval.approval_type === 'automation' && approval.payload?.rule_action_type === 'sync_to_fortnox') {
+    const config = approval.payload.rule_action_config as Record<string, unknown> | undefined
+    if ((config?.entity_type || approval.payload.entity_type) === 'project' &&
+      (currentUser.business_id !== approval.business_id || !isOwnerOrAdmin(currentUser))) return false
+  }
   if (approval.approval_type === 'job_report' && !hasPermission(currentUser, 'create_invoices')) return false
   if (approval.approval_type === 'four_eyes_quote') {
     const requestedByUserId = (approval.payload as Record<string, unknown> | undefined)

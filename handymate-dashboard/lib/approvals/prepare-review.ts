@@ -113,6 +113,10 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       detail('Uppmaning', approval.description)
       return complete('Noterar att du har sett uppmaningen. Detta utför inte uppgiften och skapar inget nytt kort.', 'Jag har läst')
     }
+    if (type === 'automation' && p.rule_action_type === 'sync_to_fortnox' && (p.rule_action_config?.entity_type || p.entity_type) === 'project') {
+      const { prepareProjectSyncReview } = await import('./project-sync-review')
+      return await prepareProjectSyncReview(db, businessId, p)
+    }
     if (type === 'automation' && p.rule_action_type === 'create_project') {
       const { prepareProjectCreationReview } = await import('./project-create-review')
       return await prepareProjectCreationReview(db, businessId, approval.id, p)

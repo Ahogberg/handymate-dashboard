@@ -40,5 +40,6 @@ const {prepareProjectCreationReview:prepare,executeProjectCreationReview:execute
  const count=writes.length;await execute(db,'b1','a1',retry.executionPayload);assert.equal(writes.length,count)
  reset();const lost=await prepare(db,'b1','a1',{lead_id:'l1'});lostProject=true;assert.equal((await execute(db,'b1','a1',lost.executionPayload)).ok,false);assert.equal(tables.pending_approvals.length,0)
  assert.equal((await execute(db,'b1','a1',(await prepare(db,'b1','a1',{lead_id:'l1'})).executionPayload)).ok,true);assert.equal(tables.project.length,1)
+ reset();tables.business_config[0].fortnox_connected=true;const connected=await prepare(db,'b1','a1',{lead_id:'l1'});await execute(db,'b1','a1',connected.executionPayload);assert.equal(tables.pending_approvals.filter(a=>a.payload.rule_action_type==='sync_to_fortnox').length,1)
  console.log('PASS reviewed project creation: actual project/milestones, tenant scope, frozen budget, separate SMS/checklist proposals, failed-part-only retry and lost-response recovery without duplicates.')
 })().catch(e=>{console.error(e);process.exitCode=1})

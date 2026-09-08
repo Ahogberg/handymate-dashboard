@@ -2939,6 +2939,10 @@ async function executeApprovalPayload(
             note: 'Noterat. Ingenting skickades — kortet var en uppmaning till dig.',
           }
         }
+        if (actionType === 'sync_to_fortnox' && (pl.rule_action_config?.entity_type || pl.entity_type) === 'project') {
+          const { executeProjectSyncReview } = await import('@/lib/approvals/project-sync-review')
+          return await executeProjectSyncReview(getServerSupabase(), businessId, approvalId, reviewedPayload)
+        }
         if (actionType === 'create_project') {
           const { executeProjectCreationReview } = await import('@/lib/approvals/project-create-review')
           return await executeProjectCreationReview(getServerSupabase(), businessId, approvalId, reviewedPayload)

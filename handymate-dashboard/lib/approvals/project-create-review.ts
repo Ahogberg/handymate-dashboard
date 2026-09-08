@@ -58,7 +58,7 @@ export async function prepareProjectCreationReview(db: SupabaseClient, businessI
     { label: 'Budget exklusive moms', text: amount == null ? 'Inte angiven' : `${amount} kr` }, { label: 'Budget timmar', text: String(hours) },
     { label: 'Ansvarig och kalender', text: 'Ingen person tilldelas och ingen kalenderbokning skapas' },
     { label: 'Projektstatus', text: 'Aktivt, utan påstådd kontraktssignering' },
-    { label: 'Fortnox', text: business.fortnox_connected ? 'Synk återstår separat. Den utförs inte av detta beslut.' : 'Inte anslutet; ingen synk' },
+    { label: 'Fortnox', text: business.fortnox_connected ? 'Ett separat granskningskort för projektsynk skapas. Ingen synk utförs av detta beslut.' : 'Inte anslutet; ingen synk' },
   ] }
   plan.artifacts.push({ title: 'Projekt', table: 'project', key: 'project_id', owner, purpose: 'project', values: {
     name, customer_id: lead.customer_id || null, lead_id: leadId, quote_id: quote?.quote_id || null,
@@ -80,6 +80,7 @@ export async function prepareProjectCreationReview(db: SupabaseClient, businessI
       payload: { ...p, project_id: projectId, parent_approval_id: approvalId },
     } })
   }
+  if (business.fortnox_connected) proposal('fortnox_project', 'Granska projektsynk till Fortnox', 'automation', { rule_action_type: 'sync_to_fortnox', rule_action_config: { entity_type: 'project' }, entity_id: projectId })
   const checklist = getChecklistsForBranch(business.branch || '')[0]
   if (checklist) proposal('checklist', `Checklista: ${checklist.name}`, 'checklist_forslag', { template_name: checklist.name, template_category: checklist.category, template_items: checklist.items })
   if (business.personal_phone) {

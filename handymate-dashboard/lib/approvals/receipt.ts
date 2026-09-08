@@ -98,6 +98,11 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text:
       `Pipelinebeslut: ${r.ok ? 'klart' : 'inte helt slutfört'}.\n${r.outcomes.map((o: any) => `${o.ok ? 'Klart' : 'Misslyckades'} — ${o.message}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nFöljdförslagen kräver egna beslut; inget utskick eller projekt har skapats här.` }
   }
+  if (type === 'automation' && r.action_type === 'project_sync_review') {
+    return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text: r.ok
+      ? `${r.already_linked ? 'Befintlig Fortnox-koppling verifierad' : 'Projekt synkat och kopplingen sparad'}: ${r.project_number}. Ingen faktura eller kundsändning skapades.`
+      : `Projektsynken är inte helt klar${r.project_number ? ` (${r.project_number})` : ''}. ${r.error || 'Kontrollera journalen före nytt försök.'}` }
+  }
   if (type === 'automation' && r.action_type === 'project_create_review' && Array.isArray(r.outcomes)) {
     return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text:
       `Projektbeslut: ${r.ok ? 'klart' : 'inte helt slutfört'}.\n${r.outcomes.map((o: any) => `${o.title}: ${o.ok ? 'sparat' : o.error || 'misslyckades'}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nMeddelanden och andra följdförslag är inte utförda. Ingen Fortnox-synk gjordes.` }
