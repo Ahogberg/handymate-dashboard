@@ -25,11 +25,11 @@ const db = { from(table) {
       if (table === 'customer') return resolve({ data: structuredClone(customerRow), error:null })
       if (table === 'quotes') return resolve({ data: structuredClone(quoteRow), error:null })
       if (table === 'project') return resolve({ data: structuredClone(projectRow), error:null })
-      if (table === 'booking') return resolve({ data: structuredClone(bookingRows), error:null })
+      if (table === 'booking') return resolve({ data: filters.some(([key]) => key === 'notes') ? [] : structuredClone(bookingRows), error:null })
       if (table === 'business_config') return resolve({ data: { business_name:'Testfirman', assigned_phone_number:'+468100000', subscription_plan:'pro', working_hours:{monday:{active:true,start:'08:00',end:'17:00'},tuesday:{active:true,start:'08:00',end:'17:00'},wednesday:{active:true,start:'08:00',end:'17:00'},thursday:{active:true,start:'08:00',end:'17:00'},friday:{active:true,start:'08:00',end:'17:00'}} }, error:null })
       return resolve({ data: null, error: null })
     }
-    return (...args) => { if (key === 'eq') filters.push(args); if (key === 'insert' || key === 'update') { operation = key; values = args[0] }; return chain }
+    return (...args) => { if (['eq','ilike'].includes(String(key))) filters.push(args); if (key === 'insert' || key === 'update') { operation = key; values = args[0] }; return chain }
   } }); return chain
 } }
 const cache = {}
@@ -95,8 +95,10 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'}}
   assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
   reset(); row.approval_type='new_booking_request'; row.payload={source:'quote_signing',quote_id:'q1',customer_id:'c-site',customer_phone:'+46709999999',requested_date:'2030-09-10'}
+  bookingRows=[{scheduled_start:'2030-09-10T06:00:00.000Z',scheduled_end:'2030-09-10T07:00:00.000Z',status:null}]
   let bookingPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert(bookingPreview.review?.messages?.[0],JSON.stringify(bookingPreview)); assert.equal(bookingPosts.length,0); assert(bookingPreview.review.effect.includes('Ingen faktura'))
+  assert(bookingPreview.review.details.some(d=>d.label==='Bokad start'&&d.text==='2030-09-10T07:00:00.000Z'))
   const evidence=bookingPreview.review.details; assert(evidence.some(d=>d.label==='Projektföljd'&&d.text.includes('Badrum hemma'))); assert(evidence.some(d=>d.label==='Kundbekräftelse'))
   const bookingResult=await (await post({action:'approve',review_token:bookingPreview.review_token})).json()
   assert.equal(bookingPosts.length,1,JSON.stringify(bookingResult)); assert.equal(bookingPosts[0].scheduled_start,row.payload.execution_result.review_evidence.scheduledStart); assert.equal(bookingPosts[0].scheduled_end,row.payload.execution_result.review_evidence.scheduledEnd)

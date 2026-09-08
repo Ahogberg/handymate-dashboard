@@ -35,6 +35,9 @@ export async function prepareQuoteSigningBookingReview(
 ): Promise<{ review: ApprovalReview; snapshot: Record<string, unknown>; executionPayload: PreparedQuoteSigningBooking; executionEvidence: Record<string, unknown> }> {
   const requestedDate = typeof payload.requested_date === 'string' ? payload.requested_date : ''
   if (!/^\d{4}-\d{2}-\d{2}$/.test(requestedDate)) throw new Error('Kundens önskade datum saknas eller är ogiltigt.')
+  if (typeof payload.customer_id !== 'string' || !payload.customer_id || typeof payload.quote_id !== 'string' || !payload.quote_id) {
+    throw new Error('Kund eller offert saknas i bokningsunderlaget.')
+  }
 
   const { data: customer, error: customerError } = await db.from('customer')
     .select('customer_id, name, phone_number').eq('customer_id', payload.customer_id).eq('business_id', businessId).maybeSingle()
@@ -54,9 +57,13 @@ export async function prepareQuoteSigningBookingReview(
   const dayEnd = stockholmLocalToISO(isoDayAfter(requestedDate), '00:00')
   const { data: bookings, error: bookingsError } = await db.from('booking')
     .select('scheduled_start, scheduled_end, status').eq('business_id', businessId)
-    .gte('scheduled_start', dayStart).lt('scheduled_start', dayEnd).neq('status', 'cancelled')
+    .gte('scheduled_start', dayStart).lt('scheduled_start', dayEnd)
   if (bookingsError) throw new Error('Kalendern kunde inte kontrolleras för det önskade datumet.')
-  const slots = computeAvailableSlots({ hours: config.working_hours, dateStr: requestedDate, durationMin: 60, bookings: bookings || [] })
+  // Äldre bokningar kan sakna status. Postgres `neq` filtrerar bort NULL,
+  // så cancelled-filtreringen görs i JS för att de äldre raderna också ska
+  // blockera krockar.
+  const activeBookings = (bookings || []).filter((booking: any) => booking.status !== 'cancelled')
+  const slots = computeAvailableSlots({ hours: config.working_hours, dateStr: requestedDate, durationMin: 60, bookings: activeBookings })
   const chosen = slots[0]
   if (!chosen) throw new Error('Det finns inte längre någon ledig timme på kundens önskade datum. Ta fram nya tider.')
 
