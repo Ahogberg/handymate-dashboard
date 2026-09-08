@@ -45,6 +45,12 @@ export interface AuthenticatedBusiness {
   referral_code?: string | null
   /** sql/v202 — undefined tills migrationen är körd, tolkas som PÅ. */
   attribution_link_enabled?: boolean | null
+  /** Varumärket (lib/branding/get-branding.ts) — raden är select('*'), så
+      fälten finns i runtime; typade här så PDF-rutterna kan läsa loggan
+      utan att casta (yta 2, 2026-09-07). */
+  logo_url?: string | null
+  accent_color?: string | null
+  f_skatt_registered?: boolean | null
   /**
    * Om denna business returneras via superadmin-impersonation snarare än
    * användarens egen koppling. API-routes kan kolla denna för att blockera

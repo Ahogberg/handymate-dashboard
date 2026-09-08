@@ -637,8 +637,7 @@ export default function QuoteSignPage() {
                   <h3 className="text-base font-semibold text-gray-900">När vill du att vi börjar?</h3>
                 </div>
                 <p className="text-gray-400 text-xs mb-4 sm:pl-8">
-                  Veckor vi har utrymme att börja. Välj en så återkommer vi med bekräftelse — det är
-                  ett önskemål, inte en bokad tid.
+                  Veckor vi har utrymme att börja. Välj en så återkommer vi med bekräftelse.
                 </p>
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:pl-8">
                   {bookingSuggestions.map((s) => {

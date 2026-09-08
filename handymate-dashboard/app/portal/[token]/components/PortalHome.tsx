@@ -19,7 +19,7 @@ import PortalShellHeader from './PortalShellHeader'
 import PortalHandymateAttribution from './PortalHandymateAttribution'
 import PortalAgreements from './PortalAgreements'
 import { formatCurrency } from '../helpers'
-import type { PortalInstallation, PortalJobbpassSummary, PortalActivity, PortalData, Project } from '../types'
+import type { PortalInstallation, PortalJobbpassSummary, PortalActivity, PortalData, PortalDecisions, Project } from '../types'
 import { groupBostad, formatDatum, formatManad } from './bostad'
 
 interface PortalHomeProps {
@@ -29,10 +29,20 @@ interface PortalHomeProps {
   passes?: PortalJobbpassSummary[]
   /** Fastighetspasset steg 3: bekräftade installationer → "Min bostad". */
   installations?: PortalInstallation[]
+  /** Portalens beslutskort (2026-09-07): det som väntar på kunden. */
+  decisions?: PortalDecisions | null
   onNavigate: (
-    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass',
-    payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices' },
+    route: 'project' | 'docs' | 'contact' | 'messages' | 'project-detail' | 'jobbpass' | 'ata' | 'invoice' | 'review',
+    payload?: { projectId?: string; docsSection?: 'quotes' | 'invoices'; changeId?: string; invoiceId?: string },
   ) => void
+}
+
+/** "Förfaller 21 sep" — kort datum utan år för väntar-raden. */
+function kortDatum(iso: string | null): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  return d.toLocaleDateString('sv-SE', { day: 'numeric', month: 'short' }).replace('.', '')
 }
 
 const ICON_MAP: Record<string, typeof ImageIcon> = {
@@ -47,7 +57,7 @@ const ICON_MAP: Record<string, typeof ImageIcon> = {
  * Hem-vy (port av bp-home.jsx).
  * Hämtar aktivt projekt + aktivitetsfeed.
  */
-export default function PortalHome({ portal, token, passes = [], installations = [], onNavigate }: PortalHomeProps) {
+export default function PortalHome({ portal, token, passes = [], installations = [], decisions = null, onNavigate }: PortalHomeProps) {
   const bostad = groupBostad(passes, installations)
   const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [activity, setActivity] = useState<PortalActivity[]>([])
@@ -95,25 +105,62 @@ export default function PortalHome({ portal, token, passes = [], installations =
 
   // Deep-links (2026-08-10): Offerter och Fakturor gick båda till samma
   // ofiltrerade dokumentlista — nu landar klicket på rätt sektion.
+  // Beslutskorten (2026-09-07): räknaren på Fakturor = öppna fakturor ur
+  // /decisions. Offerter får ingen räknare — portalen laddar inte offert-
+  // antalet på Hem och vi hittar inte på siffror.
+  const openInvoices = decisions?.invoices.length ?? 0
   const quickActions = [
-    { id: 'project' as const, Icon: FolderKanban,    label: 'Projekt',  color: 'var(--bee-700)',   bg: 'var(--bee-50)',   payload: undefined },
-    { id: 'docs' as const,    Icon: FileSignature,   label: 'Offerter', color: 'var(--blue-600)',  bg: 'var(--blue-50)',  payload: { docsSection: 'quotes' as const } },
-    { id: 'docs' as const,    Icon: Receipt,         label: 'Fakturor', color: 'var(--ink)',       bg: 'var(--bg)',       payload: { docsSection: 'invoices' as const } },
-    { id: 'contact' as const, Icon: Phone,           label: 'Kontakt',  color: 'var(--green-600)', bg: 'var(--green-50)', payload: undefined },
+    { id: 'project' as const, Icon: FolderKanban,    label: 'Projekt',  color: 'var(--bee-700)',   bg: 'var(--bee-50)',   payload: undefined, count: 0 },
+    { id: 'docs' as const,    Icon: FileSignature,   label: 'Offerter', color: 'var(--blue-600)',  bg: 'var(--blue-50)',  payload: { docsSection: 'quotes' as const }, count: 0 },
+    { id: 'docs' as const,    Icon: Receipt,         label: 'Fakturor', color: 'var(--ink)',       bg: 'var(--bg)',       payload: { docsSection: 'invoices' as const }, count: openInvoices },
+    { id: 'contact' as const, Icon: Phone,           label: 'Kontakt',  color: 'var(--green-600)', bg: 'var(--green-50)', payload: undefined, count: 0 },
   ]
+
+  // "Väntar på dig" — en rad per beslut, i den ordning kunden bör ta dem:
+  // tilläggsarbeten först (jobbet står annars stilla), sedan fakturor,
+  // sist omdömet. Inget väntar → kortet finns inte.
+  type WaitingRow = { key: string; title: string; sub: string; red: boolean; go: () => void }
+  const waiting: WaitingRow[] = []
+  for (const a of decisions?.atas ?? []) {
+    waiting.push({
+      key: `ata-${a.change_id}`,
+      title: 'Tilläggsarbete att godkänna',
+      sub: `ÄTA-${a.ata_number} · ${formatCurrency(a.att_betala)}`,
+      red: false,
+      go: () => onNavigate('ata', { changeId: a.change_id }),
+    })
+  }
+  for (const inv of decisions?.invoices ?? []) {
+    if (inv.claimed_at) continue
+    const datum = kortDatum(inv.due_date)
+    waiting.push({
+      key: `inv-${inv.invoice_id}`,
+      title: 'Faktura att betala',
+      sub: inv.overdue
+        ? `${datum ? `Förföll ${datum} · ` : ''}${formatCurrency(inv.amount)}`
+        : `${datum ? `Förfaller ${datum} · ` : ''}${formatCurrency(inv.amount)}`,
+      red: inv.overdue,
+      go: () => onNavigate('invoice', { invoiceId: inv.invoice_id }),
+    })
+  }
+  if (decisions?.review.pending) {
+    waiting.push({ key: 'review', title: 'Hur blev det?', sub: 'Lämna ett omdöme', red: false, go: () => onNavigate('review') })
+  }
 
   // Statuschippen följer projektets FAKTISKA läge (2026-08-10): kortet
   // faller tillbaka på första projektet när inget är aktivt, och den gamla
   // hårdkodade "Pågår"-chippen med puls gjorde ett avslutat projekt till
   // ett pågående. Pulsen är reserverad för det som faktiskt pågår.
   const arPagaende = activeProject?.status === 'active' || activeProject?.status === 'in_progress'
+  // Beslutskorten (2026-09-07): Pågår/Klart bär Designs .bp-status-klasser,
+  // Pausat/Planeras behåller sina egna färger.
   const statusChip = arPagaende
-    ? { text: 'Pågår', bg: 'var(--green-50)', color: 'var(--green-600)', puls: true }
+    ? { text: 'Pågår', bg: '#DBEAFE', color: '#1E40AF', cls: 'pagar', puls: true }
     : activeProject?.status === 'completed'
-      ? { text: 'Klart', bg: 'var(--green-50)', color: 'var(--green-600)', puls: false }
+      ? { text: 'Klart', bg: '#DCFCE7', color: '#166534', cls: 'klart', puls: false }
       : activeProject?.status === 'paused'
-        ? { text: 'Pausat', bg: '#FEF3C7', color: '#92400E', puls: false }
-        : { text: 'Planeras', bg: 'var(--bg)', color: 'var(--muted)', puls: false }
+        ? { text: 'Pausat', bg: '#FEF3C7', color: '#92400E', cls: '', puls: false }
+        : { text: 'Planeras', bg: 'var(--bg)', color: 'var(--muted)', cls: '', puls: false }
 
   return (
     <>
@@ -121,6 +168,7 @@ export default function PortalHome({ portal, token, passes = [], installations =
         business={portal.business}
         unreadMessages={portal.unreadMessages}
         onNotificationClick={() => onNavigate('messages')}
+        subtitle={`Hej ${firstName}`}
       />
 
       <div className="bp-body">
@@ -144,32 +192,48 @@ export default function PortalHome({ portal, token, passes = [], installations =
           </p>
         </div>
 
+        {/* Väntar på dig (portalens beslutskort, 2026-09-07): allt kunden
+            har att ta ställning till, en rad per beslut, rakt in i beslutet.
+            Finns inget renderas ingenting — aldrig en tom rubrik. */}
+        {waiting.length > 0 && (
+          <div style={{ padding: '0 18px 16px' }}>
+            <div className="bp-card" style={{ padding: 0, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px 18px 8px' }}>
+                <span className="bp-eyebrow">Väntar på dig</span>
+                <span className="bp-counter">{waiting.length}</span>
+              </div>
+              {waiting.map(row => (
+                <button key={row.key} type="button" className="bp-waiting-row" onClick={row.go}>
+                  <span className={`bp-dot${row.red ? ' red' : ''}`} />
+                  <span style={{ flex: 1, minWidth: 0 }}>
+                    <span style={{ display: 'block', fontSize: 14.5, fontWeight: 600, color: 'var(--ink)' }}>{row.title}</span>
+                    <span style={{ display: 'block', fontSize: 12.5, color: row.red ? 'var(--red-600)' : 'var(--muted)', marginTop: 1 }}>{row.sub}</span>
+                  </span>
+                  <ChevronRight size={18} style={{ color: '#94A3B8', flexShrink: 0 }} />
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         {/* Active project status */}
         {activeProject && (
           <div style={{ padding: '0 18px' }}>
             <div
               className="bp-card bp-card-tap"
               onClick={() => onNavigate('project-detail', { projectId: activeProject.project_id })}
-              style={{
-                padding: 0,
-                overflow: 'hidden',
-                background: 'linear-gradient(135deg, var(--bee-50) 0%, var(--surface) 60%)',
-                borderColor: 'var(--bee-100)',
-                position: 'relative',
-              }}
+              style={{ padding: 0, overflow: 'hidden', position: 'relative' }}
             >
               <div style={{ padding: 16, paddingBottom: 14 }}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 14 }}>
-                  <div>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--bee-700)', letterSpacing: '0.08em', marginBottom: 4 }}>
-                      {arPagaende ? 'AKTIVT PROJEKT' : 'DITT PROJEKT'}
-                    </div>
-                    <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10, marginBottom: 12 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontSize: 17, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
                       {activeProject.name}
                     </div>
-                    {activeProject.project_number && (
-                      <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>Ärende {activeProject.project_number}</div>
-                    )}
+                    <div style={{ fontSize: 12.5, color: 'var(--muted)', marginTop: 2 }}>
+                      {portal.business.name}
+                      {activeProject.project_number ? <> · Ärende {activeProject.project_number}</> : null}
+                    </div>
                     {activeProject.description && (
                       <div style={{ fontSize: 12, color: 'var(--muted)', marginTop: 2 }}>
                         {activeProject.description}
@@ -177,41 +241,46 @@ export default function PortalHome({ portal, token, passes = [], installations =
                     )}
                   </div>
                   <div
-                    style={{
-                      display: 'flex', alignItems: 'center', gap: 6,
-                      padding: '4px 10px',
-                      background: statusChip.bg,
-                      borderRadius: 'var(--r-pill)',
-                      flexShrink: 0,
-                    }}
+                    className={`bp-status${statusChip.cls ? ` ${statusChip.cls}` : ''}`}
+                    style={{ gap: 6, background: statusChip.bg, color: statusChip.color, flexShrink: 0 }}
                   >
                     {statusChip.puls && <span className="bp-live-dot" />}
-                    <span style={{ fontSize: 11, fontWeight: 600, color: statusChip.color }}>{statusChip.text}</span>
+                    <span>{statusChip.text}</span>
                   </div>
                 </div>
 
                 {/* Progress bar */}
-                <div style={{ marginBottom: 6 }}>
+                <div>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
                     <span style={{ fontSize: 12, color: 'var(--muted)' }}>
                       {totalMilestones > 0
                         ? `${completedMilestones} av ${totalMilestones} milstolpar`
                         : 'Framsteg'}
                     </span>
-                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--bee-700)' }}>{progressPct}%</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--ink)' }}>{progressPct}%</span>
                   </div>
-                  <div style={{ height: 8, background: 'var(--bee-100)', borderRadius: 4, overflow: 'hidden' }}>
+                  <div style={{ height: 6, background: '#F1F5F9', borderRadius: 3, overflow: 'hidden' }}>
                     <div
                       style={{
                         width: `${progressPct}%`,
                         height: '100%',
-                        background: 'linear-gradient(90deg, var(--bee-500), var(--bee-600))',
-                        borderRadius: 4,
+                        background: 'var(--bee-500)',
+                        borderRadius: 3,
                         transformOrigin: 'left',
                         animation: 'bp-grow-x 1.2s cubic-bezier(0.4, 0, 0.2, 1)',
                       }}
                     />
                   </div>
+                </div>
+
+                {activeProject.latestLog?.description && (
+                  <div style={{ fontSize: 13.5, color: 'var(--ink-2)', marginTop: 12, lineHeight: 1.45 }}>
+                    {activeProject.latestLog.description}
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 12, fontSize: 13.5, fontWeight: 600, color: '#334155' }}>
+                  Se projektet <ChevronRight size={16} />
                 </div>
               </div>
 
@@ -270,8 +339,10 @@ export default function PortalHome({ portal, token, passes = [], installations =
                   gap: 12,
                   minHeight: 96,
                   fontFamily: 'inherit',
+                  position: 'relative',
                 }}
               >
+                {a.count > 0 && <span className="bp-counter red">{a.count}</span>}
                 <div
                   style={{
                     width: 36, height: 36, borderRadius: 10,

@@ -91,3 +91,42 @@ Dessa kontrakt exekveras i `tests/customer-preparation/contract.test.mjs`.
 
 ### Lars kundunderlagskontroll — 2026-09-05
 POST /api/customer-preparation/review: getAuthenticatedBusiness + aktiv owner/admin, ingen impersonation. Serverladdat underlag med business_id; projekt måste matcha både business_id och customer_id. Privata bilder hämtas endast under företagets och underlagets sökväg. V213 utökar den service-only-tabell som infördes i V212; ingen ny publik databasåtkomst. Driftprovet och migrationens utförande återstår enligt tasks/lars-preparation-review.md.
+
+## Tillägg 2026-09-07 — varumärkeslagret (yta 4 + yta 5)
+
+Tre nya vägar utanför direkt standardgrind (151 totalt):
+- `portal/[token]/decisions`: portal_token via getCustomerFromPortalToken;
+  läser bara kundens egna öppna beslut (ÄTA, faktura, omdöme). Ingen skrivning.
+- `portal/[token]/review`: portal_token; POST sparar högst ett omdöme per kund
+  (409 vid upprepning) och lägger texten i kundens tråd. Ingen SMS, inget LLM
+  — därför inget separat IP-tak. PATCH markerar bara Google-klick.
+- `public/booking-page/[slug]`: storefront-slug + is_published, samma grind som
+  `public/availability/[slug]`. Svarar med varumärke ur brand-lagret (som
+  storefronten redan visar publikt) och beräknade lediga tider. Ingen skrivning;
+  själva bokningen går fortfarande via `public/book/[slug]` med sitt IP-tak.
+
+De två portalrutterna pushades 2026-09-07 (35fe3db7) utan att inventeringen
+höjdes — rättat samma dag.
+
+## Tillägg 2026-09-08 — varumärkeslagret (yta 9, demo-offerten)
+
+Två nya vägar utanför direkt standardgrind (153 totalt, RÄKNAT på
+origin/main + de två rutterna):
+- `public/demo-quote`: POST från handymate.se ("Skicka en offert till dig
+  själv"). Besökaren är ingen tenant — rutten skriver BARA i demo-företaget
+  `biz_demo_ekstrom` (hårdkodat i lib/demo/demo-quote-data.ts) och vägrar
+  om raden saknas eller `is_demo_tenant` inte är true (503). Varje anrop
+  kostar ett riktigt SMS → tre fail-closed tak via checkPublicRateLimitDb:
+  3 per mobilnummer och dygn, 5 per IP och timme, 200 globalt per dygn.
+  CORS låst till handymate.se (+ localhost utanför produktion). `firm`
+  valideras men sparas inte — leaden går till landningens egen save-lead
+  bara när besökaren kryssat i "ni får ringa mig".
+- `public/demo-quote/[token]/status`: GET med offertens sign_token i path,
+  låst till demo-företaget i varje uppslag (offert, projekt, affär) — en
+  riktig offerts token ger 404 här oavsett om den finns. Svarar bara med
+  status + tidsstämplar + förnamn, aldrig telefon/e-post. IP-tak 60/min.
+
+Efter-SMS:et (SMS 2) skickas från `finalizeAcceptedQuote` men bara när
+`arDemoOffertForetag(businessId)` — en riktig hantverkares kund får det
+aldrig. Demo-besökarna städas efter 7 dagar av `demo_quote_cleanup` (v223),
+som själv kastar på företag utan `is_demo_tenant`.

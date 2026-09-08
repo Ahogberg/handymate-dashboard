@@ -172,6 +172,8 @@ export const RADERAS: string[] = [
   'deal_flow_log', 'pipeline_activity', 'nurture_enrollment',
   'gmail_imported_message', 'leads_neighbour_campaigns', 'leads_outbound',
   'review_request', 'portal_notification_log', 'quote_tracking_events',
+  // v221 (portal yta 4, 2026-09-07): kundens omdöme i portalen — firmans data.
+  'portal_review',
 
   // ── Anställda (tid, körjournal, certifikat, push, notiser) ──
   'business_users', // se not nedan — hanteras av en EGEN, senare kodsteg

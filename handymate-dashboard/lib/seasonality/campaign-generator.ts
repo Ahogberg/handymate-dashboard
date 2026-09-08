@@ -7,6 +7,7 @@ import { fuelAllows } from '@/lib/costs/fuel'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getServerSupabase } from '@/lib/supabase'
 import { getSeasonalTheme } from './industry-themes'
+import { branchLabel } from '@/lib/branch'
 import { meterDirectLlmCall } from '@/lib/agents/shared/cost-guard'
 import { llmCostUsd } from '@/lib/costs/meter'
 
@@ -90,7 +91,9 @@ export async function generateSeasonalCampaign(
     business_id: businessId,
     approval_type: 'seasonal_campaign',
     title: `Säsongskampanj: ${theme.theme}`,
-    description: `${validCustomers.length} kunder · ${branch} · ${MONTH_NAMES[month]}`,
+    // Kortets underrad läses av kunden: branschen på svenska (branchLabel),
+    // aldrig segmentnyckeln ("construction"), och rätt numerus.
+    description: `${validCustomers.length} ${validCustomers.length === 1 ? 'kund' : 'kunder'} · ${branchLabel(branch)} · ${MONTH_NAMES[month]}`,
     risk_level: 'medium',
     status: 'pending',
     payload: {

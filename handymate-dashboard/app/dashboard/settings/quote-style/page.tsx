@@ -208,7 +208,7 @@ export default function DocumentStylePage() {
         <div className="mt-6 p-4 bg-amber-50 border border-amber-200 rounded-xl">
           <p className="text-xs text-amber-900 leading-relaxed">
             <strong>Notering:</strong> Modern och Friendly använder ditt varumärkes accent-färg
-            (sätts under Inställningar → Profil). Premium har en låst dark + amber-palett som bevarar
+            (sätts under <Link href="/dashboard/settings/kundvy" className="underline font-medium">Så ser dina kunder dig</Link>). Premium har en låst dark + amber-palett som bevarar
             mallens identitet.
           </p>
         </div>

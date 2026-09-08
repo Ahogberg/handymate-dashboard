@@ -3,7 +3,7 @@ import { sendEmail } from '@/lib/email'
 import { loadBranding, type Branding } from '@/lib/branding/get-branding'
 import { escapeHtml } from '@/lib/document-html'
 import {
-  emailLayout, emailHeading, emailParagraph, infoBlock, detailRows, actionBlock, signature,
+  emailLayout, emailHeading, statusBand, summaryCard, steps, infoBlock, detailRows, actionBlock, linkBlock, signature, formatKr,
 } from '@/lib/email-templates'
 
 /**
@@ -65,9 +65,10 @@ export async function sendQuoteSignedConfirmation(
   const personnummer = quote.personnummer || customer.personal_number || ''
   const fastighet = quote.fastighetsbeteckning || customer.property_designation || ''
 
-  const subject = hasRot
-    ? `Tack för att du godkände offerten — vänligen granska dina uppgifter`
-    : `Tack för att du godkände offerten`
+  const rotSaknas = hasRot && (!personnummer || !fastighet)
+  const subject = rotSaknas
+    ? `Offerten är godkänd — vi behöver dina ROT-uppgifter`
+    : `Offerten är godkänd — tack ${firstName}!`
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const portalUrl = customer.portal_token && customer.portal_enabled
@@ -77,9 +78,11 @@ export async function sendQuoteSignedConfirmation(
   const html = buildConfirmationHtml({
     branding,
     firstName,
-    customerName,
-    customerAddress: customer.address_line || '',
     quoteNumber,
+    quoteTitle: quote.title || '',
+    total: Number(quote.total) || 0,
+    rotDeduction: Number(quote.rot_deduction) || 0,
+    customerPays: Number(quote.rot_customer_pays) || 0,
     hasRot,
     personnummer,
     fastighet,
@@ -133,49 +136,86 @@ export async function sendQuoteSignedConfirmation(
   return result
 }
 
-function buildConfirmationHtml(opts: {
+/**
+ * Designens "Godkänd"-mail: grönt band, tack-rubrik, summeringskort för
+ * offerten, "Vad händer nu" i tre steg. Saknas ROT-uppgifter blir det stora
+ * infoblocket med knappen "Lämna ROT-uppgifter" mailets handling — annars
+ * en knapp in i portalen.
+ */
+export function buildConfirmationHtml(opts: {
   branding: Branding
   firstName: string
-  customerName: string
-  customerAddress: string
   quoteNumber: string
+  quoteTitle: string
+  total: number
+  rotDeduction: number
+  customerPays: number
   hasRot: boolean
   personnummer: string
   fastighet: string
   portalUrl: string
 }): string {
   const b = opts.branding
+  const first = escapeHtml(opts.firstName)
+  const rotSaknas = opts.hasRot && (!opts.personnummer || !opts.fastighet)
+
+  const summering = summaryCard({
+    title: escapeHtml(opts.quoteTitle || 'Offert'),
+    sub: `Offert ${escapeHtml(opts.quoteNumber)}`,
+    rows: opts.hasRot
+      ? [
+          { label: 'Totalt inkl. moms', value: formatKr(opts.total) },
+          { label: 'Preliminärt ROT-avdrag', value: `−${formatKr(opts.rotDeduction)}`, deduction: true },
+          { label: 'Du betalar', value: formatKr(opts.customerPays), emphasis: true },
+        ]
+      : [{ label: 'Totalt inkl. moms', value: formatKr(opts.total), emphasis: true }],
+  })
+
+  const vadHanderNu = steps([
+    { title: 'Vi bokar startdatum.', body: 'Du får en bokningsbekräftelse när tiden är satt.' },
+    { title: 'Vi gör jobbet.', body: opts.portalUrl ? 'Du följer arbetet och ser foton i kundportalen.' : 'Vi håller dig uppdaterad under tiden.' },
+    opts.hasRot
+      ? { title: 'Fakturan kommer när arbetet är klart,', body: 'med preliminärt ROT-avdrag. Skatteverket fastställer det slutgiltiga beloppet.' }
+      : { title: 'Fakturan kommer när arbetet är klart.', body: '' },
+  ])
 
   // ROT-uppgifterna: personnumret maskeras — mailet ska bekräfta att vi HAR
   // uppgiften, inte transportera den.
-  const rotSection = opts.hasRot
-    ? infoBlock(
-        'ROT-uppgifter',
+  let rotBlock = ''
+  let handling = ''
+  if (rotSaknas) {
+    rotBlock = infoBlock(
+      'Vi behöver personnummer och fastighetsbeteckning innan fakturan',
+      opts.portalUrl
+        ? 'Uppgifterna behövs för att vi ska kunna göra ROT-avdraget på fakturan. Det tar en minut i kundportalen.'
+        : 'Uppgifterna behövs för att vi ska kunna göra ROT-avdraget på fakturan. Svara på det här mailet så lägger vi in dem.',
+      opts.portalUrl ? { cta: { text: 'Lämna ROT-uppgifter', url: opts.portalUrl }, accent: b.accentColor } : undefined,
+    )
+    handling = opts.portalUrl ? linkBlock('Visa i kundportalen', opts.portalUrl, b.accentColor) : ''
+  } else {
+    if (opts.hasRot) {
+      rotBlock = infoBlock(
+        'ROT-uppgifter vi har.',
         detailRows([
-          { label: 'Fastighetsbeteckning/lägenhetsnummer', value: escapeHtml(opts.fastighet) || 'Saknas — vänligen meddela oss' },
-          { label: 'Personnummer', value: opts.personnummer ? escapeHtml(opts.personnummer.slice(0, 6)) + '-XXXX' : 'Saknas — behövs för ROT-ansökan' },
-        ]) + `<p style="margin:8px 0 0;font-size:13px;color:#64748b;">Avdraget är preliminärt — Skatteverket fastställer det slutgiltiga beloppet.</p>`,
-        'success',
+          { label: 'Fastighetsbeteckning', value: escapeHtml(opts.fastighet) },
+          { label: 'Personnummer', value: escapeHtml(opts.personnummer.slice(0, 6)) + '-XXXX' },
+        ]) + '<br>Stämmer det inte? Svara på det här mailet.',
       )
-    : ''
+    }
+    handling = opts.portalUrl ? actionBlock({ text: 'Visa i kundportalen', url: opts.portalUrl }, b.accentColor) : ''
+  }
 
   const content = `
+    ${statusBand('Offerten är godkänd', 'success')}
     ${emailHeading(
-      `Tack ${escapeHtml(opts.firstName)}!`,
-      `Tack för att du godkände offert <strong>${escapeHtml(opts.quoteNumber)}</strong>.${opts.hasRot ? ' För att vi ska kunna ansöka om ditt ROT-avdrag behöver vi verifiera följande uppgifter.' : ''}`,
+      first ? `Tack ${first}, offerten är godkänd` : 'Tack, offerten är godkänd',
+      'Vi har tagit emot ditt godkännande. Här är vad som gäller och vad som händer nu.',
     )}
-    ${infoBlock('Fakturauppgifter', detailRows([
-      { label: 'Namn', value: escapeHtml(opts.customerName) },
-      { label: 'Adress', value: escapeHtml(opts.customerAddress) || 'Ej angiven' },
-    ]))}
-    ${rotSection}
-    ${emailParagraph('Stämmer uppgifterna? Svara på detta mail om något behöver korrigeras.')}
-    ${emailParagraph('Vi hör av oss inom kort för att boka in arbetets start.')}
-    ${opts.portalUrl
-      ? `${actionBlock({ text: 'Gå till din kundportal', url: opts.portalUrl }, b.accentColor)}
-         ${emailParagraph('Här kan du följa ditt projekt, se fakturor och skicka meddelanden.', { muted: true })}`
-      : ''}
-    ${signature(escapeHtml(b.businessName), b.contactName ? escapeHtml(b.contactName) : undefined)}
+    ${summering}
+    ${vadHanderNu}
+    ${rotBlock}
+    ${handling}
+    ${signature(escapeHtml(b.businessName), b.contactName ? escapeHtml(b.contactName) : undefined, { phone: b.contactPhone ? escapeHtml(b.contactPhone) : undefined })}
   `
-  return emailLayout(b, content)
+  return emailLayout(b, content, { meta: `Offert ${opts.quoteNumber}` })
 }

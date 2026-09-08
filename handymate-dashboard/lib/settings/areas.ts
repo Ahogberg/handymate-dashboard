@@ -87,6 +87,7 @@ export const SETTINGS_AREAS: SettingsArea[] = [
         label: 'Uppgifter',
         entries: [
           { id: 'company', label: 'Företagsuppgifter', desc: 'Namn, adress, logotyp och kontaktuppgifter', icon: 'building-2' },
+          { id: '_link_kundvy', label: 'Så ser dina kunder dig', desc: 'Logotyp, färg och hela kundresan i förhandsvisning', icon: 'eye', href: '/dashboard/settings/kundvy', ownerOnly: true },
           { id: '_link_bolagsprofil', label: 'Bolagsprofil', desc: 'Bolagsform, momsperiod och räkenskapsår', icon: 'landmark', href: '/dashboard/settings/bolagsprofil', ownerOnly: true },
           { id: 'hours', label: 'Öppettider', desc: 'När ni svarar och när teamet tar över', icon: 'clock' },
         ],

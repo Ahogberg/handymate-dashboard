@@ -12,7 +12,7 @@
 
 import { getServerSupabase } from '@/lib/supabase'
 import { loadBranding, type Branding } from '@/lib/branding/get-branding'
-import { emailLayout, emailHeading, emailParagraph, actionBlock, signature } from '@/lib/email-templates'
+import { emailLayout, emailSection, actionBlock } from '@/lib/email-templates'
 
 export type PortalNotificationEvent =
   | 'new_message'
@@ -56,7 +56,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
   body: (ctx: Record<string, any>) => string
   /** Statisk knapptext, eller funktion när CTA beror på context. */
   cta: string | ((ctx: Record<string, any>) => string)
-  emoji: string
 }> = {
   new_message: {
     subject: (_ctx, biz) => `Nytt meddelande från ${biz}`,
@@ -65,7 +64,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       ? `Du har fått ett nytt meddelande i din kundportal:<br/><br/><em style="color:#475569;">"${escapeHtml(String(ctx.preview).slice(0, 200))}"</em>`
       : 'Du har fått ett nytt meddelande i din kundportal.',
     cta: 'Öppna meddelandet',
-    emoji: '💬',
   },
   quote_sent: {
     subject: (_ctx, biz) => `Ny offert från ${biz}`,
@@ -74,7 +72,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       ? `En ny offert <strong>${escapeHtml(String(ctx.title))}</strong> har lagts i din kundportal — granska och godkänn när du vill.`
       : 'En ny offert har lagts i din kundportal — granska och godkänn när du vill.',
     cta: 'Granska offert',
-    emoji: '📄',
   },
   invoice_sent: {
     subject: (_ctx, biz) => `Ny faktura från ${biz}`,
@@ -85,7 +82,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `En ny faktura${amount}${due} ligger i din portal.`
     },
     cta: 'Visa faktura',
-    emoji: '🧾',
   },
   invoice_paid: {
     subject: (_ctx, _biz) => 'Tack för din betalning',
@@ -97,7 +93,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
     // Auto-detect: om review_request redan skickats — visa portal-CTA istället
     // för att undvika att be om recension två gånger.
     cta: (ctx) => ctx.review_already_sent ? 'Se i din portal' : 'Lämna en recension',
-    emoji: '🙏',
   },
   invoice_overdue: {
     subject: (_ctx, _biz) => `Vänlig påminnelse — fakturan har förfallit`,
@@ -107,7 +102,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `Vi vill bara påminna om att fakturan${amount} har passerat förfallodatum. Hör gärna av dig om något är oklart.`
     },
     cta: 'Visa faktura',
-    emoji: '⏰',
   },
   project_update: {
     subject: (ctx, biz) => ctx.stage_name
@@ -120,7 +114,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `${proj}${stage}. Följ utvecklingen direkt i portalen.`
     },
     cta: 'Följ projektet',
-    emoji: '🔨',
   },
   photos_added: {
     subject: (_ctx, biz) => `Nya bilder från ${biz}`,
@@ -132,7 +125,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return 'Nya bilder från arbetet har lagts upp i din portal.'
     },
     cta: 'Visa bilder',
-    emoji: '📸',
   },
   jobbpass_published: {
     subject: (ctx, biz) => ctx.project_name ? `Jobbpasset för ${ctx.project_name} är klart — ${biz}` : `Ditt jobbpass från ${biz}`,
@@ -142,7 +134,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `${proj} är klart. I din kundportal finns nu jobbpasset: vad som ingick, godkända tillägg, egenkontroll och bilder. Spara det — det är din dokumentation över arbetet.`
     },
     cta: 'Öppna jobbpasset',
-    emoji: '🏠',
   },
   review_request: {
     subject: (_ctx, biz) => `Hur var samarbetet med ${biz}?`,
@@ -152,7 +143,6 @@ const EVENT_COPY: Record<PortalNotificationEvent, {
       return `Tack för förtroendet${proj}! Det skulle betyda mycket om du tog några sekunder att lämna en recension. Det hjälper oss växa och nå fler kunder som dig.`
     },
     cta: 'Lämna recension',
-    emoji: '⭐',
   },
 }
 
@@ -350,19 +340,21 @@ interface BuildOpts {
 }
 
 /**
- * Innehållet i masterlayouten (lib/email-templates.ts emailLayout):
- * rubrik, hälsning, händelsetext, CTA i accentfärgen, kopierbar länk,
- * signatur. Logotyp, sidfot och stämpel kommer från layouten.
+ * Portalnotisen — designens KOMPAKTA variant av masterlayouten
+ * (lib/email-templates.ts emailLayout, compact): mindre sidhuvud, rubrik +
+ * en rad, en knapp in i portalen, enradig sidfot med stämpel. Notisen ska
+ * ta kunden till portalen, inte återge innehållet.
  */
 function buildEmailHtml(opts: BuildOpts): string {
   const firstName = (opts.customerName.split(' ')[0] || opts.customerName).trim()
   const b = opts.branding
   const content = `
-    ${emailHeading(escapeHtml(opts.heading), `Hej ${escapeHtml(firstName)},`)}
-    ${emailParagraph(opts.bodyHtml)}
-    ${actionBlock({ text: escapeHtml(opts.cta), url: opts.portalUrl }, b.accentColor)}
-    ${emailParagraph(`Eller kopiera länken:<br><span style="word-break:break-all;">${opts.portalUrl}</span>`, { muted: true })}
-    ${signature(escapeHtml(b.businessName))}
+    ${emailSection(
+      `<div style="font-size:18px;line-height:1.3;font-weight:700;color:#0f172a;">${escapeHtml(opts.heading)}</div>` +
+      `<p style="margin:8px 0 0;font-size:15px;line-height:1.5;color:#475569;">${firstName ? `Hej ${escapeHtml(firstName)}! ` : ''}${opts.bodyHtml}</p>`,
+      '24px 24px 0',
+    )}
+    ${actionBlock({ text: escapeHtml(opts.cta), url: opts.portalUrl }, b.accentColor, undefined, { small: true })}
   `
-  return emailLayout(b, content)
+  return emailLayout(b, content, { compact: true })
 }

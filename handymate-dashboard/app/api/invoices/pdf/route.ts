@@ -10,6 +10,7 @@ import {
 } from '@/lib/invoice-templates'
 import { buildInvoicePdfBuffer } from '@/lib/invoices/build-invoice-pdf'
 import { buildAttribution } from '@/lib/branding/attribution'
+import { loadPdfLogo } from '@/lib/branding/pdf'
 
 // Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
 // @sparticuz/chromium packar upp binären vid första anropet. Samma mönster
@@ -100,11 +101,16 @@ export async function GET(request: NextRequest) {
       // som offerten — greppbar i Vercel-loggarna) ─────────────────────────
       console.error('[invoices/pdf] FALLBACK-JSPDF AKTIV — Chromium-rendering misslyckades, fakturan laddas ner med den äldre jsPDF-renderaren')
       const payAmount = invoice.rot_rut_type ? invoice.customer_pays : invoice.total
-      const swishQR = await generateSwishQR(
-        businessConfig?.swish_number,
-        payAmount || invoice.total,
-        invoice.invoice_number,
-      )
+      const [swishQR, logo] = await Promise.all([
+        generateSwishQR(
+          businessConfig?.swish_number,
+          payAmount || invoice.total,
+          invoice.invoice_number,
+        ),
+        // Firmans logga i fallbacken också (yta 2) — kunden ska inte kunna se
+        // på fakturan vilken renderare som råkade köra.
+        loadPdfLogo(businessConfig?.logo_url, 'invoices/pdf'),
+      ])
 
       const pdfBuffer = generateInvoicePDF(
         {
@@ -143,7 +149,9 @@ export async function GET(request: NextRequest) {
           swish_qr: swishQR || undefined,
           bank_account_number: businessConfig?.bank_account_number,
           f_skatt_registered: businessConfig?.f_skatt_registered,
-          accent_color: '#0F766E',
+          accent_color: businessConfig?.accent_color || undefined,
+          logo_base64: logo?.data,
+          logo_format: logo?.format,
           invoice_footer_text: businessConfig?.invoice_footer_text,
           penalty_interest: businessConfig?.penalty_interest || businessConfig?.late_fee_percent,
         },

@@ -4,16 +4,12 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkSmsRateLimitDb, checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
-import { buildSmsSuffix } from '@/lib/sms-reply-number'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
-import { escapeHtml } from '@/lib/document-html'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
-import { extractFirstName, halsning } from '@/lib/customers/namn'
+import { buildQuoteSmsText } from '@/lib/quotes/quote-sms'
 import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
-import {
-  emailLayout, emailHeading, emailParagraph, amountHero, infoBlock, rotRutNotice, actionBlock, formatKr,
-} from '@/lib/email-templates'
+import { buildQuoteEmailHtml } from '@/lib/quotes/quote-email'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -109,10 +105,9 @@ async function sendEmail(
 /**
  * Offertmailet — företagets varumärke via masterlayouten (lib/email-templates.ts).
  *
- * Varumärkeslagret 2026-09-07: skalet, sidhuvudet, sidfoten och stämpeln
- * kommer från emailLayout(); den här funktionen komponerar bara innehållet.
- * "Du betalar"-logiken speglar offertsidan: beloppet efter preliminärt
- * ROT/RUT är huvudsiffran, totalsumman står ärligt bredvid.
+ * Varumärkeslagret 2026-09-07: den här funktionen löser bara VEM som står
+ * som avsändare (skaparen före företaget) och lämnar sedan över till
+ * buildQuoteEmailHtml. "Du betalar"-logiken bor i byggaren.
  */
 function generateEmailHTML(
   quote: any,
@@ -126,63 +121,33 @@ function generateEmailHTML(
   // stämpel utan extra query. Kontaktuppgifter = offertens SKAPARE när den
   // finns (samma identitet som kunddokumentet visar), annars företagets.
   // `??` — en skapare med tomt telefonfält faller ändå tillbaka på företagets.
+  // Layouten escapar varumärkesfälten själv — ingen förescapning här.
   const base = brandingFromConfig(business)
   const branding: Branding = {
     ...base,
-    businessName: escapeHtml(base.businessName),
-    contactPhone: escapeHtml(creator?.phone ?? base.contactPhone) || undefined,
-    contactEmail: escapeHtml(creator?.email ?? base.contactEmail) || undefined,
-    logoUrl: base.logoUrl ? escapeHtml(base.logoUrl) : undefined,
-    orgNumber: base.orgNumber ? escapeHtml(base.orgNumber) : undefined,
+    contactName: creator?.name || base.contactName,
+    contactPhone: (creator?.phone ?? base.contactPhone) || undefined,
+    contactEmail: (creator?.email ?? base.contactEmail) || undefined,
   }
 
-  // Escapa all användarstyrd text som interpoleras i HTML — offert-titel,
-  // beskrivning och namn kan innehålla tecken som annars tolkas som markup.
-  // R1: hälsningen använder kundens FÖRNAMN, aldrig rått fullnamn.
-  const customerGreeting = escapeHtml(halsning(quote.customer?.name))
-  const quoteTitle = escapeHtml(quote.title || 'Offert')
-  const quoteDescription = escapeHtml(quote.description)
-  const contactName = creator?.name ? escapeHtml(creator.name) : ''
-
-  const formatDate = (date: string) =>
-    new Date(date).toLocaleDateString('sv-SE', { year: 'numeric', month: 'long', day: 'numeric' })
-
-  const harRot = Boolean(quote.rot_rut_type && quote.customer_pays != null)
-  const hero = harRot
-    ? amountHero(
-        'Du betalar',
-        formatKr(quote.customer_pays),
-        `efter preliminärt ${String(quote.rot_rut_type).toUpperCase()}-avdrag · totalt ${formatKr(quote.total)} inkl. moms`,
-      )
-    : amountHero('Totalt', formatKr(quote.total), 'inkl. moms')
-
-  const handling = signUrl
-    ? `${infoBlock(
-        'Redo att godkänna offerten?',
-        'I din kundportal kan du granska offerten, godkänna den och följa ditt projekt.',
-        'success',
-      )}
-      ${actionBlock({ text: 'Öppna din kundportal', url: signUrl }, branding.accentColor, pdfUrl ? { text: 'Ladda ner offert (PDF)', url: pdfUrl } : undefined)}
-      ${emailParagraph(`Eller kopiera länken: ${signUrl}`, { muted: true })}`
-    : `${emailParagraph('Har du frågor eller vill boka? Kontakta oss:')}
-      ${actionBlock({ text: `Ring ${branding.contactPhone || ''}`, url: `tel:${branding.contactPhone || ''}` }, branding.accentColor, pdfUrl ? { text: 'Ladda ner offert (PDF)', url: pdfUrl } : undefined)}`
-
-  const content = `
-    ${emailHeading(customerGreeting, 'Tack för att du kontaktade oss. Här kommer din offert för:')}
-    ${infoBlock(quoteTitle, quote.description ? `<span style="white-space:pre-line;">${quoteDescription}</span>` : '')}
-    ${hero}
-    ${harRot ? rotRutNotice(String(quote.rot_rut_type), Number(quote.total) - Number(quote.customer_pays)) : ''}
-    ${quote.valid_until ? emailParagraph(`Offerten är giltig till <strong>${formatDate(quote.valid_until)}</strong>.`) : ''}
-    ${handling}
-    ${contactName ? emailParagraph(`Din kontakt: <strong>${contactName}</strong>`, { muted: true }) : ''}
-  `
-
-  // Spårningspixeln ligger sist i dokumentet — efter </html> duger för
-  // mailklienter, men vi lägger den inne i body för säkerhets skull.
-  const html = emailLayout(branding, content)
-  return trackingPixelUrl
-    ? html.replace('</body>', `<img src="${trackingPixelUrl}" width="1" height="1" style="display:none" alt="" /></body>`)
-    : html
+  // Själva innehållet byggs av den rena byggaren (lib/quotes/quote-email.ts)
+  // — samma funktion som inställningssidan "Så ser dina kunder dig"
+  // förhandsvisar med, så det kunden får och det ägaren ser är ett och samma.
+  return buildQuoteEmailHtml({
+    branding,
+    customerName: quote.customer?.name,
+    quoteNumber: quote.quote_number,
+    title: quote.title,
+    description: quote.description,
+    total: Number(quote.total),
+    customerPays: quote.customer_pays,
+    rotRutType: quote.rot_rut_type,
+    validUntil: quote.valid_until,
+    signUrl,
+    pdfUrl,
+    contactName: creator?.name,
+    trackingPixelUrl,
+  })
 }
 
 export async function POST(request: NextRequest) {
@@ -366,13 +331,6 @@ export async function POST(request: NextRequest) {
     // person, samma identitet som kunddokumentet. Null för gamla offerter.
     const emailCreator = await fetchQuoteCreator(supabase, quote.created_by)
 
-    const formatCurrency = (amount: number) => {
-      return new Intl.NumberFormat('sv-SE', { maximumFractionDigits: 0 }).format(amount)
-    }
-
-    const customerPays = quote.rot_rut_type ? quote.customer_pays : quote.total
-    const rotText = quote.rot_rut_type ? ` (efter ${quote.rot_rut_type.toUpperCase()}: ${formatCurrency(customerPays)} kr)` : ''
-
     // Generate/get sign_token and build signing URL
     let signToken = quote.sign_token
     if (!signToken) {
@@ -405,18 +363,19 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Kunden saknar telefonnummer' }, { status: 400 })
       }
 
-      const suffix = buildSmsSuffix(business.business_name, business.assigned_phone_number)
-      const smsMessage = `${halsning(quote.customer.name)}
-
-Här kommer din offert från ${business.business_name}:
-
-Totalt: ${formatCurrency(quote.total)} kr${rotText}
-${quote.valid_until ? `Giltig till: ${new Date(quote.valid_until).toLocaleDateString('sv-SE')}\n` : ''}
-Öppna din kundportal:
-${portalUrl}
-
-Frågor? Ring ${business.phone_number}
-${suffix}`
+      // Texten bor i lib/quotes/quote-sms.ts — demo-offerten på handymate.se
+      // (api/public/demo-quote) skickar EXAKT samma SMS (yta 9, 2026-09-07).
+      const smsMessage = buildQuoteSmsText({
+        customerName: quote.customer.name,
+        businessName: business.business_name,
+        businessPhone: business.phone_number,
+        assignedPhoneNumber: business.assigned_phone_number,
+        total: quote.total,
+        customerPays: quote.customer_pays,
+        rotRutType: quote.rot_rut_type,
+        validUntil: quote.valid_until,
+        portalUrl,
+      })
 
       const smsResult = await sendSMS(supabase, business.business_id, quote.customer.phone_number, smsMessage, business.business_name, quote.customer_id, quoteId)
       smsSent = smsResult.sent

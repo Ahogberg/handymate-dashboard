@@ -17,6 +17,7 @@ function preview() {
       '@/components/quotes/document/QuoteDocument': { default:()=>React.createElement('p',null,'Dokumentmotor') },
       '@/components/quotes/document/DocumentScaler': { DocumentScaler:({children})=>children },
       './PortalSwishBlock': { default:()=>null },
+      './PortalFooter': { default:()=>null },
       '../helpers': { formatCurrency:n=>String(n)+' kr', formatDate:s=>s },
       '@/lib/invoices/status': { isCustomerSettled:s=>s==='paid' }
     };

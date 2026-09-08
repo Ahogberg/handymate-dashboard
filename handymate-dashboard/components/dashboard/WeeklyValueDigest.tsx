@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { TIME_ESTIMATE_ANCHOR, TIME_ESTIMATE_EXPLANATION } from '@/lib/value/time-estimate-copy'
 
 /**
  * "Din vecka med Handymate" — veckovärde i tre ärligt etiketterade nivåer,
@@ -88,6 +89,12 @@ export default function WeeklyValueDigest() {
           )}
         </div>
       </div>
+      {/* Förklaringen mejlen länkar till (#tidsuppskattning) — bara när ett
+          tidsvärde faktiskt visas; ett konto utan värde ska inte få en
+          förklaring till ingenting. */}
+      <p id={TIME_ESTIMATE_ANCHOR} className="mt-4 scroll-mt-24 text-xs text-gray-500">
+        <strong>Så uppskattas tiden: </strong>{TIME_ESTIMATE_EXPLANATION}
+      </p>
     </div>
   )
 }

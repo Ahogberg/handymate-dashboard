@@ -7,6 +7,9 @@ interface PortalShellHeaderProps {
   business: PortalData['business']
   unreadMessages: number
   onNotificationClick?: () => void
+  /** Kontextraden under firmanamnet — "Hej Anna" på Hem (portalens
+      beslutskort, 2026-09-07). Utan värde: orten ur adressen. */
+  subtitle?: string
 }
 
 /**
@@ -18,11 +21,12 @@ export default function PortalShellHeader({
   business,
   unreadMessages,
   onNotificationClick,
+  subtitle: subtitleProp,
 }: PortalShellHeaderProps) {
   const initial = (business.name || 'H').charAt(0).toUpperCase()
-  const subtitle = business.address
+  const subtitle = subtitleProp ?? (business.address
     ? `${business.address.split(',').slice(-1)[0]?.trim() || ''}`
-    : 'Hantverkare'
+    : 'Hantverkare')
 
   return (
     <div className="bp-header">
