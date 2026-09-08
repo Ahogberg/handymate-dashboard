@@ -232,8 +232,9 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
       BARA för KALLOR_UTAN_EPOST + mobil ≥9 siffror, name persisteras;
       tests/demo-offert.test.mjs 35 gröna, npm test grönt). Leaden sparas
       bara med kryssrutan i, efter kvittot, fire-and-forget.
-- [ ] v224_landing_leads_email_valfri.sql — KÖRS på "kör": landing_leads.email
-      är NOT NULL i prod → demo-leads faller tyst (23502) tills den körts.
+- [x] v224_landing_leads_email_valfri.sql KÖRD i prod 2026-09-08 (MCP):
+      email nullable + CHECK landing_leads_kontakt_check (email OR phone)
+      verifierade. Demo-leads utan e-post kan nu sparas.
 - [ ] Yta 9 kvar: 46elks-saldo 0,20 kr → fyll på före skarptest;
       NEXT_PUBLIC_LANDING_URL i Vercel (default https://handymate.se);
       skarptest med eget nummer: SMS 1 → portal → godkänn → SMS 2 →
@@ -241,6 +242,12 @@ briefer 01 (kundmailen) + 07 (Så ser dina kunder dig) skrivna, sedan
       source demo-offert; kör demo_quote_cleanup('biz_demo_ekstrom', 0)
       efteråt. Känt: Vercel-preview-URL:er fälls av CORS (bara
       handymate.se), firmanamnet ändrar inte avsändaren (alltid Ekström).
+- [x] /partners-sidan omskriven 2026-09-08 (handymate-landing 7c65102):
+      säljpartner-vinkel "samarbeta med oss" i stället för tipsportal;
+      fakta mot partneravtalet (20 % exkl. moms, 36 mån, självfakturering,
+      minst 500 kr); produktlöftena i "Det du säljer" orörda. Fix på köpet:
+      partnerpaketets kort var vit text på vitt (mörka .benefit-stilar på
+      ljus sektion).
 - [ ] Design-ytorna 6, 8, 10 (ej påbörjade)
 
 # Partnergrinden GRÖN 2026-09-07 (Claude)
