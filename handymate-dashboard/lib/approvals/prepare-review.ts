@@ -251,9 +251,16 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         if (!booking && p.context_type !== 'work_order') throw new Error('Tilldelningen saknar giltigt uppdrag.')
         const target = await row(booking ? 'booking' : 'work_orders', booking ? 'booking_id' : 'id', p.context_id, 'Uppdraget')
         if (typeof person.name !== 'string' || !person.name.trim()) throw new Error('Medarbetaren saknar namn.')
-        const before = { assigned_to: target.assigned_to ?? null, ...(booking ? { assigned_user_id: target.assigned_user_id ?? null } : {}) }
-        const after = { assigned_to: person.name, ...(booking ? { assigned_user_id: person.id } : {}) }
-        const plan = action === 'retry' ? p.execution_result?.review_evidence?.dispatchPlan :
+        const phone = typeof person.phone === 'string' ? person.phone.trim() || null : null
+        const before = { assigned_to: target.assigned_to ?? null, ...(booking ? { assigned_user_id: target.assigned_user_id ?? null } : { assigned_phone: target.assigned_phone ?? null }) }
+        const after = { assigned_to: person.name, ...(booking ? { assigned_user_id: person.id } : { assigned_phone: phone }) }
+        const savedPlan = action === 'retry' ? p.execution_result?.review_evidence?.dispatchPlan : null
+        if (savedPlan && (savedPlan.type !== p.context_type || savedPlan.id !== p.context_id || savedPlan.memberId !== p.member_id || !savedPlan.before || !savedPlan.after)) throw new Error('Tidigare granskat tilldelningsunderlag hör inte till detta uppdrag.')
+        const legacy = action === 'retry' && (!savedPlan || (!booking && (!('assigned_phone' in savedPlan.before) || !('assigned_phone' in savedPlan.after))))
+        // Missing historical evidence may only be repaired by verifying an already
+        // matching assignment. before=after makes this plan strictly read-only.
+        if (legacy && !Object.entries(after).every(([key, value]) => (target[key] ?? null) === value)) throw new Error('Tidigare granskningsunderlag saknas och den sparade tilldelningen stämmer inte med förslaget. Ingen ändring görs. Granska uppdraget och skapa ett nytt tilldelningsförslag.')
+        const plan = legacy ? { type: p.context_type, id: p.context_id, memberId: p.member_id, before: after, after } : action === 'retry' ? savedPlan :
           { type: p.context_type, id: p.context_id, memberId: p.member_id, before, after }
         if (!plan || plan.type !== p.context_type || plan.id !== p.context_id || plan.memberId !== p.member_id ||
           JSON.stringify(plan.after) !== JSON.stringify(after)) throw new Error('Tidigare granskat tilldelningsunderlag saknas eller medarbetaren har ändrats.')
@@ -262,9 +269,13 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         detail('Tilldela', person.name); detail('Uppdrag', target.title || target.notes || target.description)
         const statusLabels: Record<string, string> = { confirmed: 'Bekräftad', cancelled: 'Avbokad', completed: 'Slutförd', no_show: 'Uteblivet besök', draft: 'Utkast' }
         detail('Uppdragets status', statusLabels[target.status] || target.status || 'Status saknas')
+        if (!booking) {
+          detail('Nuvarande telefon', target.assigned_phone || 'Saknas')
+          detail('Telefon efter tilldelning', phone || (legacy ? 'Saknas' : 'Saknas – tidigare telefonnummer tas bort'))
+        }
 
         detail('Datum', target.scheduled_date); detail('Start', target.scheduled_start); detail('Slut', target.scheduled_end); detail('Nuvarande tilldelning', target.assigned_to || 'Ingen'); list('Skäl', p.reasons)
-        return { ...complete('Byter tilldelad medarbetare på detta uppdrag.', 'Spara tilldelningen'),
+        return { ...complete(legacy ? 'Kontrollerar den redan sparade tilldelningen och återställer kvittensen. Ingen tilldelning ändras och inget meddelande skickas.' : booking ? 'Byter tilldelad medarbetare på detta uppdrag.' : 'Byter tilldelad medarbetare och telefon på arbetsordern. Inget meddelande skickas.', legacy ? 'Bekräfta befintlig tilldelning' : 'Spara tilldelningen'),
           executionPayload: { dispatchPlan: plan }, executionEvidence: { dispatchPlan: plan } }
 
       }
