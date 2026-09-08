@@ -34,3 +34,18 @@ for(const width of [375,1280])test(`real day card: reload, unknown source, date 
  await page.getByLabel('Visa rapportering för').fill(svDateStr());await page.getByRole('button',{name:'Komplettera dagens rapport'}).click();await expect(page.getByRole('button',{name:'Tillbaka och läs sparat arbete'})).toBeVisible();await page.getByRole('button',{name:'Tillbaka och läs sparat arbete'}).click();await expect(page.getByText('2 timmar rapporterade')).toBeVisible()
  expect(methods.every(m=>m==='GET')).toBe(true);expect(errors).toEqual([])
 })
+test('actual avlastning page opens the day anchor after authenticated content mounts',async({page})=>{
+ const html=await reliefPreview('day-page');const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
+ await page.setViewportSize({width:375,height:700})
+ await page.route('**/*',route=>{
+  const url=new URL(route.request().url())
+  if(url.pathname==='/')return route.fulfill({contentType:'text/html',body:html})
+  if(url.pathname==='/api/day-close')return route.fulfill({json:{overview:{date:url.searchParams.get('date'),checkedAt:new Date().toISOString(),work:{state:'ready',value:{minutes:0,entries:0,notes:0,projects:[]}},timer:{state:'ready',value:false},decisions:null,followups:null}}})
+  return route.abort()
+ })
+ await page.goto('https://myday.test/#min-dag')
+ await expect(page.getByRole('heading',{name:'Din dag',exact:true})).toBeInViewport()
+ await expect(page.getByRole('textbox',{name:'Ditt underlag',exact:true})).toHaveCount(1)
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
+ expect(errors).toEqual([])
+})

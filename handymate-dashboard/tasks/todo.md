@@ -1428,8 +1428,8 @@ navigation. Omdöpning skjuts upp. Köraren förbereder kort, skickar aldrig sj�
 Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna grindar.
 
 ## 2026-09-08 — Din dag, nästa del av kundens avlastning
-- [ ] Samla egna tidsrader och anteckningar över behöriga jobb för valt svenskt datum.
-- [ ] Visa pågående timer, aktuella beslut och beständiga uppföljningar utan ny navigation.
-- [ ] Skilj okänt/läsfel från noll; återanvänd rapportens behörighet och signerade handlingar.
-- [ ] Prova isolering, avbrutna laddningar, datumbyte, omladdning och mobil/desktop.
-- [ ] TypeScript, build och CI; draft-PR ovanpå #29. Ingen produktionsaktivering.
+- [x] Samla egna tidsrader och anteckningar över behöriga jobb för valt svenskt datum.
+- [x] Visa pågående timer, aktuella beslut och beständiga uppföljningar utan ny navigation.
+- [x] Skilj okänt/läsfel från noll; återanvänd rapportens behörighet och signerade handlingar.
+- [x] Prova isolering, avbrutna laddningar, datumbyte, omladdning och mobil/desktop.
+- [x] TypeScript och första produktionsbygget passerade. Draft-PR #30 ovanpå #29; slutlig körning efter ankarlänksfix kontrolleras i PR. Ingen produktionsaktivering.
