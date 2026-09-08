@@ -284,6 +284,7 @@ export async function POST(
               executed_at: new Date().toISOString(),
               retried: true,
               receipt: retryReceipt,
+              ...(Array.isArray(retryResult?.results) ? { results: retryResult.results } : {}),
               ...(prepared?.executionEvidence ? { review_evidence: prepared.executionEvidence } : {}),
               ...(retryArtifacts ? { artifacts: retryArtifacts } : {}),
             },
@@ -1672,56 +1673,37 @@ async function executeApprovalPayload(
           return { action: 'customer_fact', ok: false, error: 'Kunde inte spara — försök igen om en stund' }
         }
 
-        // Supersede-regeln (PRELAUNCH_WAVE kandidat 5, 2026-08-12): "contact"
-        // och "commitment" är typer där det senaste naturligt vinner (nytt
-        // telefonnummer ersätter gammalt, nytt löfte ersätter gammalt) — där
-        // markeras tidigare aktiva fakta av SAMMA kund+typ som ersatta av
-        // den nya raden. "preference"/"constraint" behåller alla aktiva —
-        // en kund kan vilja ha både ek OCH halkfritt golv samtidigt, och vi
-        // kan inte avgöra motsägelse automatiskt utan en AI-gissning.
-        // Egen try/catch: en trasig supersede får aldrig fälla ett redan
-        // sparat och godkänt faktum.
-        if (factType === 'contact' || factType === 'commitment') {
+        const results: { id: string; content: string; ok: boolean; error?: string }[] = []
+        if (fact.customer_id !== pl.customer_id || fact.fact_type !== factType || fact.content !== pl.content || fact.superseded_by) {
+          return { action: 'customer_fact', ok: false, partial: true, fact_id: fact.id, error: 'Den sparade kunduppgiften motsvarar inte underlaget.' }
+        }
+        for (const target of replacementTargets || []) {
+          const findTarget = () => supabaseCF.from('customer_fact').select('id, content, superseded_by')
+            .eq('business_id', businessId).eq('customer_id', pl.customer_id)
+            .eq('fact_type', factType).eq('id', target.id).maybeSingle()
           try {
-            let supersedeErr: { message: string } | null = null
-            for (const target of replacementTargets || []) {
-              if (target.id === fact.id) continue
-              const { data: replaced, error } = await supabaseCF.from('customer_fact')
-                .update({ superseded_by: fact.id })
-                .eq('business_id', businessId).eq('customer_id', pl.customer_id)
-                .eq('fact_type', factType).eq('id', target.id).eq('content', target.content)
-                .is('superseded_by', null).select('id')
-              if (error || !replaced?.length) {
-                supersedeErr = { message: error?.message || 'En granskad kunduppgift ändrades eller kunde inte ersättas.' }
-                break
-              }
+            const before = await findTarget()
+            if (target.id === fact.id || before.error || !before.data || before.data.content !== target.content || (before.data.superseded_by && before.data.superseded_by !== fact.id)) throw new Error('Uppgiften har ändrats eller kunde inte verifieras.')
+            if (before.data.superseded_by !== fact.id) {
+              // A lost write response is resolved by reading the actual row, never by blindly writing again.
+              try {
+                await supabaseCF.from('customer_fact').update({ superseded_by: fact.id })
+                  .eq('business_id', businessId).eq('customer_id', pl.customer_id)
+                  .eq('fact_type', factType).eq('id', target.id).eq('content', target.content)
+                  .is('superseded_by', null).select('id')
+              } catch { /* Read back below, including after a lost response. */ }
+              const after = await findTarget()
+              if (after.error || !after.data || after.data.content !== target.content || after.data.superseded_by !== fact.id) throw new Error('Ersättningen kunde inte verifieras. Försök igen för denna del.')
             }
-            if (supersedeErr) {
-              factFollowupErrors.push('Tidigare kunduppgifter kunde inte markeras som ersatta.')
-              console.error('[approvals/customer_fact] supersede misslyckades (icke-blockerande):', supersedeErr.message)
-              await rapporteraTystFel(supabaseCF, businessId, 'approvals/customer_fact:supersede', supersedeErr.message, {
-                factId: fact.id,
-                customerId: pl.customer_id,
-                factType,
-              })
-            }
-          } catch (supersedeCatchErr: any) {
-            factFollowupErrors.push('Tidigare kunduppgifter kunde inte markeras som ersatta.')
-            console.error(
-              '[approvals/customer_fact] supersede kastade (icke-blockerande):',
-              supersedeCatchErr?.message || supersedeCatchErr,
-            )
-            await rapporteraTystFel(
-              supabaseCF,
-              businessId,
-              'approvals/customer_fact:supersede-unexpected',
-              supersedeCatchErr?.message ? String(supersedeCatchErr.message) : String(supersedeCatchErr),
-              { factId: fact.id, customerId: pl.customer_id, factType },
-            )
+            results.push({ ...target, ok: true })
+          } catch (error) {
+            const message = error instanceof Error ? error.message : 'Ersättningen kunde inte verifieras.'
+            results.push({ ...target, ok: false, error: message })
+            factFollowupErrors.push(message)
           }
         }
+        return { action: 'customer_fact', ok: factFollowupErrors.length === 0, partial: factFollowupErrors.length > 0, error: factFollowupErrors.join(' ') || undefined, fact_id: fact.id, results }
 
-        return { action: 'customer_fact', ok: factFollowupErrors.length === 0, partial: factFollowupErrors.length > 0, error: factFollowupErrors.join(' ') || undefined, fact_id: fact.id }
       }
 
       case 'agent_memory_confirmation': {

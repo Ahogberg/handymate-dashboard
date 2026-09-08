@@ -1,3 +1,4 @@
+import { approvalArtifactId } from './artifact-write'
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 import { automationSmsText } from './automation-message'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -45,7 +46,7 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
   try {
     const journaledProjectSync = type === 'automation' && p.rule_action_type === 'sync_to_fortnox' && (p.rule_action_config?.entity_type || p.entity_type) === 'project'
     const journaledOwnerPush = type === 'automation' && p.rule_action_type === 'notify_owner'
-    if (!journaledProjectSync && !journaledOwnerPush && action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
+    if (!journaledProjectSync && !journaledOwnerPush && action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package', 'customer_fact'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
     if (action === 'reject') return complete(rejectionEffect(type), 'Bekräfta avvisningen')
     if (classify(type) === 'INFORMATIONAL' || classify(type) === 'ACKNOWLEDGEMENT') return
     if (type === 'job_report') {
@@ -187,16 +188,31 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         const replaces = ['contact', 'commitment'].includes(p.fact_type)
         let targets: { id: string; content: string }[] = []
         if (replaces) {
-          const { data, error } = await db.from('customer_fact').select('id, content')
-            .eq('business_id', businessId).eq('customer_id', p.customer_id)
-            .eq('fact_type', p.fact_type).is('superseded_by', null).order('id')
-          if (error || !Array.isArray(data) || data.some(f => !f.id || typeof f.content !== 'string')) throw new Error('Tidigare kunduppgifter kunde inte verifieras.')
-          targets = data
+          const factId = approvalArtifactId(businessId, approval.id, 'customer_fact')
+          if (action === 'retry') {
+            const original = p.execution_result?.review_evidence?.customerFactReplacementTargets
+            if (!Array.isArray(original) || original.some((f: any) => typeof f.id !== 'string' || typeof f.content !== 'string')) throw new Error('Tidigare granskat ersättningsunderlag saknas. Kontrollera det sparade resultatet.')
+            targets = original
+            const current = await row('customer_fact', 'id', factId, 'Den sparade kunduppgiften')
+            if (current.customer_id !== p.customer_id || current.fact_type !== p.fact_type || current.content !== p.content || current.superseded_by) throw new Error('Den sparade kunduppgiften har ändrats. Kontrollera kundens uppgifter före återförsök.')
+            detail('Redan sparad', current.content)
+            for (const target of targets) {
+              const previous = await row('customer_fact', 'id', target.id, 'Den tidigare kunduppgiften')
+              if (previous.customer_id !== p.customer_id || previous.fact_type !== p.fact_type || previous.content !== target.content || (previous.superseded_by && previous.superseded_by !== factId)) throw new Error('En tidigare kunduppgift har ändrats. Kontrollera konflikten före återförsök.')
+              detail(previous.superseded_by === factId ? 'Redan ersatt' : 'Återstår att ersätta', target.content)
+            }
+          } else {
+            const { data, error } = await db.from('customer_fact').select('id, content')
+              .eq('business_id', businessId).eq('customer_id', p.customer_id)
+              .eq('fact_type', p.fact_type).is('superseded_by', null).order('id')
+            if (error || !Array.isArray(data) || data.some(f => !f.id || typeof f.content !== 'string')) throw new Error('Tidigare kunduppgifter kunde inte verifieras.')
+            targets = data
+            if (!targets.length) detail('Tidigare uppgifter', 'Inga aktiva uppgifter av samma typ ersätts.')
+            targets.forEach((fact, index) => detail(`Ersätter uppgift ${index + 1}`, fact.content))
+          }
           snapshot.replacedCustomerFacts = targets
-          if (!targets.length) detail('Tidigare uppgifter', 'Inga aktiva uppgifter av samma typ ersätts.')
-          targets.forEach((fact, index) => detail(`Ersätter uppgift ${index + 1}`, fact.content))
         }
-        return { ...complete(`Sparar kunduppgiften${replaces ? ` och ersätter ${targets.length} granskade uppgifter av samma typ för kunden` : ''}.${p.fact_type === 'commitment' && p.due_date_iso ? ' Aktiverar bevakning av löftets datum.' : ''}`, 'Spara kunduppgiften'),
+        return { ...complete(action === 'retry' && replaces ? 'Återanvänder den sparade kunduppgiften och slutför endast kvarvarande granskade ersättningar.' : `Sparar kunduppgiften${replaces ? ` och ersätter ${targets.length} ${targets.length === 1 ? 'granskad uppgift' : 'granskade uppgifter'} av samma typ för kunden` : ''}.${p.fact_type === 'commitment' && p.due_date_iso ? ' Aktiverar bevakning av löftets datum.' : ''}`, action === 'retry' && replaces ? 'Slutför ersättningarna' : 'Spara kunduppgiften'),
           executionPayload: { customerFactReplacementTargets: targets },
           executionEvidence: { customerFactReplacementTargets: targets } }
 

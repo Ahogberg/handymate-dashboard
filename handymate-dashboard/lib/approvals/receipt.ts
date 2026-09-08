@@ -30,6 +30,10 @@ export function rejectionEffect(type: string): string {
 export function approvalReceipt(type: string, action: string, result: Record<string, any> | null, outcome?: string | null): ApprovalReceipt {
   if (action === 'reject') return result?.error ? { state: 'partial', text: `Kortet är avvisat, men en följdändring misslyckades: ${result.error}` } : { state: 'rejected', text: 'Förslaget är avvisat.' }
   const r = result || {}
+  if (type === 'customer_fact' && r.fact_id && Array.isArray(r.results)) {
+    const completed = r.results.filter((item: any) => item.ok === true).length
+    return { state: completed === r.results.length ? 'saved' : 'partial', text: `Kunduppgiften är sparad.${r.results.length ? ` ${completed} av ${r.results.length} tidigare uppgifter är ersatta.\n${r.results.map((item: any) => `${item.ok ? 'Ersatt' : 'Återstår'}: ${item.content}${item.error ? ` — ${item.error}` : ''}`).join('\n')}` : ''}` }
+  }
   if (type === 'autopilot_package' && Array.isArray(r.results)) {
     const selected = r.results.filter((item: any) => !item.skipped && !item.info)
     const failed = selected.filter((item: any) => item.ok !== true)
