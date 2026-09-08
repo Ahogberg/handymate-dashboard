@@ -662,3 +662,6 @@ Codex rollgranskning: 60 behörighetsprov gröna, fyra luckor öppna (docs/secur
 
 ## 2026-09-08 — "tsc 0, build grön" lokalt bevisar inget om filen är otrackad
 35fe3db7 (yta 4) importerade `@/lib/portal/review` som aldrig `git add`:ats. Lokalt grönt, main rött i fem körningar i rad, Vercel byggde inte produktion på flera timmar — och rollgränsrättningarna R1–R4 låg oreleasade bakom. Regel: `git status --short` före varje push till main; `??`-rader som koden importerar är en trasig push. Kontrollera Kontraktsgrind på main efter push, inte bara lokalt.
+
+## 2026-09-08 — Lokalt grönt bevisar inget om filen är otrackad; push utan grön CI kostar produktionen
+35fe3db7 importerade lib/portal/review.ts som aldrig lades till i git. Sessionen som pushade hade "tsc 0, build grön" lokalt — sant, filen fanns på disk. Fem körningar i rad röda på main, Vercel byggde inte produktion på flera timmar, och tre senare pushar (yta 5, yta 9, v223, v224) gick ut ovanpå en röd main utan att någon läste grinden. Regler: (1) `git status --short` före varje push, en `??`-rad under app/ eller lib/ är ett stopp. (2) Ingen push till main förrän förra körningen av Kontraktsgrind är grön, eller den egna pushen rättar den. (3) Den som pushar en kommentar som "tsc 0" ska ha kört det mot `git stash -u`-rent träd, inte mot arbetsträdet.
