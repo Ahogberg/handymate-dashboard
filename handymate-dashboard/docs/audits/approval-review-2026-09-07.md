@@ -164,7 +164,7 @@ Verifiering i detta pass:
 - Dokumentproven täcker bland annat samtidiga klick, accepterat återspel, avvisat återförsök, borttappad kvittens, okänt leveranssvar, ändrade bytes/mottagare, CAS-konflikt, fel vid uppladdning, 401/403/409, ändrat granskningsbevis och samma kvittens efter återöppning.
 - 97 riktade Playwright-prov passerade (tidigare 79 plus hela routingsviten, inklusive det nya dokumentbehörighetsprovet). Testantalet är inte antal slutprovade korttyper.
 - Befintliga route-, reminder-, job-report- och Chromium-harness passerade. Tre PDF-varianter granskade visuellt: vanlig rapport, syntetiskt foto och lång text; alla 1 200 upprepade textmarkörer finns kvar i tresidorsprovet.
-- `npx tsc --noEmit` är nu rent. Nexts produktionskompilering och typkontroll passerade efter återställningen av portalmodulen; slutlig build-/tracingstatus redovisas i PR-beskrivningen.
+- `npx tsc --noEmit` är nu rent. Full `NEXT_TELEMETRY_DISABLED=1 npm run build` avslutades med exit 0 på slutlig kod, inklusive typkontroll, 327 statiska sidor och tracing. Dokumentruttens slutliga trace innehåller PDF-worker, standardfonter och native canvas-binär (52 relevanta filer, inga saknade filer). Befintliga varningar om metadata/dynamisk renderering finns kvar. Ingen Vercel-/produktionsruntime har slutprovats.
 - `pdfjs-dist` 6.3.289 och `@napi-rs/canvas` 1.0.8 är versionslåsta, med lockfil och server-side tracing. Kräver Node >=22.13. Kontrollera paketering/storlek och native-binär i Vercel-preview före release. Ingen produktionsinställning har ändrats.
 
 Fortsättningspunkt, i beställd ordning:
@@ -173,6 +173,6 @@ Fortsättningspunkt, i beställd ordning:
 2. **Del 2 kvar:** bokning/platsbesök/projektavslut inklusive dynamiska meddelanden och fakturaval.
 3. **Del 3 kvar:** betalnings-/leadföljder och resterande automationer, med nya konkreta godkännanden för sent genererade kundutskick.
 4. **Del 4 kvar:** återförsök per paketdel, kampanjkö till sändare och sammanhängande historik för alla övriga typer. Den nya dokumentjournalen täcker bara dokumentvägen ovan.
-5. **Del 5 kvar:** native specialvyer och TestFlight. Befintlig mobilgranskare kan ta emot den scriptfria dokumentvisningen, men ingen iPhone-/WebView-slutverifiering har gjorts i detta pass. Mobil-PR #3 och build 12 är oförändrade.
+5. **Del 5 kvar:** native specialvyer och TestFlight. Befintlig mobilgranskare kan ta emot den scriptfria dokumentvisningen, men ingen iPhone-/WebView-slutverifiering har gjorts i detta pass. De 11 befintliga mockade mobilproven har körts om och passerar. Mobilkoden i PR #3 och build 12 är oförändrade.
 
 Tekniska källor för nya integrationsdetaljer: [Resend idempotens](https://resend.com/docs/dashboard/emails/idempotency-keys), [Resend bilagor](https://resend.com/docs/dashboard/emails/attachments), [PDF.js exempel](https://mozilla.github.io/pdf.js/examples/). Installerade typdefinitioner och isolerade körningar användes för exakta anrop. Supabases changelog kontrollerades; ingen schemaändring eller produktionsskrivning gjordes.
