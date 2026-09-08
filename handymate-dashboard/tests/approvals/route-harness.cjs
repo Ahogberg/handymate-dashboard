@@ -155,6 +155,10 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   let pushResult=await (await post({action:'approve',review_token:pushPreview.review_token})).json();assert.equal(pushResult.receipt.state,'partial',JSON.stringify(pushResult));assert.equal(ownerPushCalls.length,2)
   ownerPushFail=false;pushPreview=await (await post({action:'preview',decision_action:'retry'})).json();pushResult=await (await post({action:'retry',review_token:pushPreview.review_token})).json();assert.equal(pushResult.receipt.state,'sent',JSON.stringify(pushResult));assert.equal(ownerPushCalls.length,3);assert.equal(ownerPushCalls.filter(c=>c.table==='push_subscriptions').length,1)
   assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(pushResult.receipt));assert(ownerPushCalls.every(c=>c.message.body==='Exakt text'))
+  reset();row.approval_type='automation';row.payload={rule_action_type:'create_approval',rule_action_config:{title:'Ring kunden'}}
+  const instructionPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  const instructionResult=await (await post({action:'approve',review_token:instructionPreview.review_token})).json()
+  assert.equal(instructionResult.execution.executed,false,JSON.stringify(instructionResult));assert.equal(automationCalls.length,0);assert.equal(artifactCalls.length,0);assert.equal(smsDeliveries.length,0)
   reset(); row.approval_type='automation'; row.created_at='2026-09-08T12:00:00Z'; row.payload={customer_id:'c-site',rule_action_type:'schedule_followup',rule_action_config:{days_until:2,description:'Ring {{customer_name}}'}}
   const followupPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(mutations,0); assert(followupPreview.review.details.some(d=>d.text==='Ring Anna Andersson (senast 2026-09-10)'))
