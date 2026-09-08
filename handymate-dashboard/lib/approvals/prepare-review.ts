@@ -251,19 +251,21 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         if (!booking && p.context_type !== 'work_order') throw new Error('Tilldelningen saknar giltigt uppdrag.')
         const target = await row(booking ? 'booking' : 'work_orders', booking ? 'booking_id' : 'id', p.context_id, 'Uppdraget')
         detail('Tilldela', person.name || person.full_name || p.member_name); detail('Uppdrag', target.title || target.notes || target.description)
-        detail('Tid', target.scheduled_start); detail('Nuvarande tilldelning', target.assigned_to); list('Skäl', p.reasons)
+        detail('Datum', target.scheduled_date); detail('Start', target.scheduled_start); detail('Slut', target.scheduled_end); detail('Nuvarande tilldelning', target.assigned_to); list('Skäl', p.reasons)
         return complete('Byter tilldelad medarbetare på detta uppdrag.', 'Spara tilldelningen')
       }
       case 'time_attestation': {
         const checkin = await row('time_checkins', 'id', p.checkin_id, 'Incheckningen')
-        if (!Number.isFinite(p.duration_minutes) || p.duration_minutes <= 0) throw new Error('Tiden måste vara större än noll minuter.')
+        if (!Number.isSafeInteger(p.duration_minutes) || p.duration_minutes <= 0) throw new Error('Tiden måste vara större än noll minuter.')
         if (checkin.user_id !== p.user_id) throw new Error('Medarbetaren har ändrats sedan tidsförslaget skapades.')
+        if ((checkin.project_id || null) !== (p.project_id || null)) throw new Error('Projektet har ändrats sedan tidsförslaget skapades.')
         const person = await row('business_users', 'user_id', p.user_id, 'Medarbetaren')
         detail('Medarbetare', person.name || person.full_name); detail('Arbetsdatum', p.checked_in_at || checkin.checked_in_at); detail('Minuter', p.duration_minutes)
         return complete('Attesterar incheckningen och registrerar tiden som godkänd och fakturerbar.', 'Attestera och registrera tiden')
       }
       case 'tidrapport_forslag': {
-        if (!p.project_id || !p.booking_date || !Number.isFinite(p.suggested_minutes) || p.suggested_minutes <= 0) throw new Error('Projekt, arbetsdatum och positiv tidsåtgång måste anges.')
+        if (!p.project_id || !p.booking_date || !Number.isSafeInteger(p.suggested_minutes) || p.suggested_minutes <= 0) throw new Error('Projekt, arbetsdatum och positiv tidsåtgång måste anges.')
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(p.booking_date) || !Number.isFinite(Date.parse(p.booking_date)) || new Date(p.booking_date).toISOString().slice(0, 10) !== p.booking_date) throw new Error('Arbetsdatumet måste vara ett giltigt kalenderdatum.')
         if (p.assigned_user_id) { const user = await row('business_users', 'id', p.assigned_user_id, 'Medarbetaren'); detail('Medarbetare', user.name || user.full_name) }
         else detail('Medarbetare', 'Ingen person knuten till tidraden')
         detail('Datum', p.booking_date); detail('Minuter', p.suggested_minutes)

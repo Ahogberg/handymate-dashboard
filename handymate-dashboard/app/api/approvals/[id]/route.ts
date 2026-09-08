@@ -2771,6 +2771,12 @@ async function executeApprovalPayload(
           approved_at: new Date().toISOString(),
         })
 
+        if (createdTimeEntry && (createdTimeEntry.business_user_id !== assignedUserIdTe ||
+          createdTimeEntry.project_id !== projectIdTe || createdTimeEntry.work_date !== bookingDate ||
+          createdTimeEntry.duration_minutes !== suggestedMinutes || createdTimeEntry.is_billable !== true ||
+          createdTimeEntry.approval_status !== 'approved')) {
+          return { action: 'tidrapport_forslag', ok: false, error: 'Den befintliga tidraden avviker från förslaget. Kontrollera tidrapporten innan du försöker igen.' }
+        }
         if (insertTeErr || !createdTimeEntry) {
           return { action: 'tidrapport_forslag', ok: false, error: insertTeErr?.message || 'Tidraden kunde inte verifieras.' }
         }
