@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
+import { activityLinks } from '@/lib/approvals/activity-links'
 import { canActOnApproval } from '@/lib/approvals/routing'
 
 export const dynamic = 'force-dynamic'
@@ -30,11 +31,11 @@ export async function GET(request: NextRequest) {
     const labels: Record<string, string> = { success: 'Körningen rapporterade lyckat utfall', failed: 'Körningen misslyckades', pending_approval: 'Väntar på godkännande', rejected: 'Avvisad', skipped: 'Överhoppad' }
     const candidates = (approvals.data || []).filter(row => row.business_id === business.business_id && (companyWide || row.resolved_by === user.id))
     const permits = await Promise.all(candidates.map(row => companyWide ? true : canActOnApproval(db, user, row)))
-    const receiptRows = candidates.filter((_, i) => permits[i]).filter(row => row.resolved_at).map(row => {
+    const receiptRows = await Promise.all(candidates.filter((_, i) => permits[i]).filter(row => row.resolved_at).map(async row => {
       const receipt = row.payload?.execution_result?.receipt
       const text = typeof receipt?.text === 'string' ? receipt.text : 'Beslutet är registrerat, men en sparad utförandekvittens saknas.'
-      return { id: `approval:${row.id}`, type: row.approval_type, description: row.title, receipt_text: text, receipt_state: typeof receipt?.state === 'string' ? receipt.state : 'unknown', created_at: row.resolved_at, auto: false }
-    })
+      return { id: `approval:${row.id}`, type: row.approval_type, description: row.title, receipt_text: text, links: await activityLinks(db, user, row.payload?.execution_result?.artifacts), receipt_state: typeof receipt?.state === 'string' ? receipt.state : 'unknown', created_at: row.resolved_at, auto: false }
+    }))
     const represented = new Set(receiptRows.map(row => row.id.slice('approval:'.length)))
     const rows = [
       ...receiptRows,
