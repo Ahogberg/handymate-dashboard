@@ -8,6 +8,7 @@ let ownerPushCalls=[],ownerPushFail=true
 const projectSyncLogs = new Map(), fortnoxCalls = []
 let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
 let failDispatch=false,loseDispatch=false,dispatchWrites=0
+let workOrderRows=[]
 let memoryRow, memoryWrites=0, failMemory=false, loseMemory=false
 let priceRow, priceWrites=0, priceWriteFails=false, losePriceResponse=false
 const timeEntries=new Map();let timeInserts=0
@@ -123,6 +124,15 @@ const db = { from(table) {
       if (table === 'business_users' && filters.some(([key])=>key==='role')) return resolve({data:single?{id:'owner1'}:[{id:'owner1',user_id:'owner-auth',name:'Ägare'}],error:null})
       if (['push_tokens','push_subscriptions'].includes(table)) { const device=table==='push_tokens'?{id:'expo1',token:'ExponentPushToken[test]'}:{id:'web1',endpoint:'https://push.test/secret',p256dh:'key',auth:'auth'};return resolve({data:single?device:[device],error:null}) }
       if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
+      if (table === 'work_orders') {
+        const selected=workOrderRows.filter(matches)
+        if(operation==='update'){
+          dispatchWrites++
+          if(!failDispatch)selected.forEach(item=>Object.assign(item,structuredClone(values)))
+          return resolve({data:loseDispatch?null:structuredClone(selected),error:loseDispatch?{message:'response lost'}:null})
+        }
+        return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
+      }
       if (table === 'booking') {
         if(operation==='update'){
           const selected=bookingRows.filter(matches);dispatchWrites++
@@ -241,6 +251,70 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
     assert.equal(row.status,'pending');assert.equal(smsDeliveries.length,0)
   }
   console.log('PASS active booking dispatch: new/replaced assignment preserves lifecycle and time; changed assignment/status/time or denied role blocks stale approval without effects (isolated DB)')
+  for(const nextPhone of [' +46700000002 ',null]) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    memberRow.phone=nextPhone
+    row.approval_type='dispatch_suggestion';row.payload={context_type:'work_order',context_id:'wo1',member_id:'member1'}
+    workOrderRows=[{id:'wo1',business_id:'b1',title:'Phone reassignment',status:'draft',assigned_to:'Old member',assigned_phone:'+46700000001'}]
+    let preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    assert(preview.review.details.some(d=>d.label==='Nuvarande telefon'&&d.text==='+46700000001'))
+    assert(preview.review.details.some(d=>d.label==='Telefon efter tilldelning'&&d.text.includes(nextPhone?nextPhone.trim():'Saknas')))
+    assert.equal(dispatchWrites,0)
+    // Changing only the source phone invalidates the reviewed decision.
+    memberRow.phone='+46700000003'
+    assert.equal((await post({action:'approve',review_token:preview.review_token})).status,428);assert.equal(dispatchWrites,0)
+    memberRow.phone=nextPhone
+    preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    failDispatch=true
+    let outcome=await (await post({action:'approve',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'failed')
+    assert.equal(workOrderRows[0].assigned_phone,'+46700000001')
+    assert.equal(row.payload.execution_result.review_evidence.dispatchPlan.before.assigned_phone,'+46700000001')
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    failDispatch=false;loseDispatch=true
+    outcome=await (await post({action:'retry',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'saved',JSON.stringify(outcome))
+    assert.equal(workOrderRows[0].assigned_to,'Erik');assert.equal(workOrderRows[0].assigned_phone,nextPhone?nextPhone.trim():null)
+    assert.equal(workOrderRows[0].status,'draft');assert.equal(smsDeliveries.length,0)
+    assert.deepEqual(row.payload.execution_result.receipt,outcome.receipt)
+    const count=dispatchWrites,p={...row.payload,dispatchPlan:row.payload.execution_result.review_evidence.dispatchPlan}
+    assert.equal((await assignment(db,'b1',p)).ok,true);assert.equal(dispatchWrites,count)
+    // A newer phone must be preserved even if the employee name did not change.
+    workOrderRows[0].assigned_phone='+46700000004'
+    assert.equal((await assignment(db,'b1',p)).ok,false);assert.equal(dispatchWrites,count)
+    assert.equal(workOrderRows[0].assigned_phone,'+46700000004')
+  }
+  for(const type of ['booking','work_order']) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    memberRow.phone='+46700000002'
+    row.approval_type='dispatch_suggestion';row.status='approved'
+    row.payload={context_type:type,context_id:'legacy1',member_id:'member1',execution_result:{outcome:'failed',receipt:{state:'failed',text:'Old failure'}}}
+    const target={id:'legacy1',booking_id:'legacy1',business_id:'b1',status:'draft',assigned_to:'Erik',assigned_user_id:'member1',assigned_phone:memberRow.phone}
+    workOrderRows=[target];bookingRows=[target]
+    let preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert.equal(preview.review.confirmLabel,'Bekräfta befintlig tilldelning',JSON.stringify(preview))
+    assert.equal(dispatchWrites,0)
+    const outcome=await (await post({action:'retry',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'saved');assert.equal(dispatchWrites,0)
+    assert.deepEqual(row.payload.execution_result.receipt,outcome.receipt)
+    assert.deepEqual(row.payload.execution_result.review_evidence.dispatchPlan.before,row.payload.execution_result.review_evidence.dispatchPlan.after)
+    if(type==='work_order') {
+      row.payload.execution_result={outcome:'failed',receipt:{state:'failed'},review_evidence:{dispatchPlan:{type,id:'legacy1',memberId:'member1',before:{assigned_to:'Old'},after:{assigned_to:'Erik'}}}}
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert.equal(preview.review.confirmLabel,'Bekräfta befintlig tilldelning')
+      const restored=await (await post({action:'retry',review_token:preview.review_token})).json()
+      assert.equal(restored.receipt.state,'saved');assert.equal(dispatchWrites,0)
+      row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}};target.assigned_phone='+46700000099'
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert(!preview.review.confirmLabel);assert.equal(dispatchWrites,0)
+      target.assigned_phone=memberRow.phone
+    }
+    // Missing evidence cannot authorize overwriting a different saved assignment.
+    row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}};target.assigned_to='Different'
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert(!preview.review.confirmLabel);assert.equal(dispatchWrites,0)
+  }
+  console.log('PASS work-order name/phone pairing, missing-phone clearing, source-phone staleness, failed/lost-response retry and phone-only conflicts; legacy matching assignments recover receipt without writes and conflicts remain blocked')
   reset();row.approval_type='tidrapport_forslag';row.payload={project_id:'p1',booking_date:'2026-02-31',suggested_minutes:75}
   let timePreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(timeInserts,0);assert(!timePreview.review?.canExecute)
