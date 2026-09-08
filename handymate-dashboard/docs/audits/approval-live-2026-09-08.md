@@ -60,29 +60,29 @@ Ingen korttyp är slutgodkänd av detta register. Första batchen är syntetiska
 | `egenkontroll_foto` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `egenkontroll_avvikelse` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `job_report` | REVIEW_REQUIRED | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `karin_deadline` | ACKNOWLEDGEMENT | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `cert_expiry_reminder` | ACKNOWLEDGEMENT | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `low_stock_alert` | ACKNOWLEDGEMENT | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `agent_insight` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `monthly_review` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `monday_brief` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `quote_signed` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `ata_signed_notification` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `ata_declined_notification` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `profitability_warning` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `meeting_summary` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
+| `karin_deadline` | ACKNOWLEDGEMENT | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `cert_expiry_reminder` | ACKNOWLEDGEMENT | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `low_stock_alert` | ACKNOWLEDGEMENT | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `agent_insight` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `monthly_review` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `monday_brief` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `quote_signed` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `ata_signed_notification` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `ata_declined_notification` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `profitability_warning` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `meeting_summary` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
 | `meeting_followup` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `project_log_note` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `customer_fact` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `agent_memory_confirmation` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `autonomy_revoked` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `team_intro` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `expectation_drift_signal` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `promise_deadline_signal` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `mandate_paused_signal` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `external_delivery_failure_signal` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `payment_failed_signal` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
-| `kort_gar_ut` | INFORMATIONAL | Syntetisk läskvittens | Ej kört | Ej kört | Ej verifierat |
+| `autonomy_revoked` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `team_intro` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `expectation_drift_signal` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `promise_deadline_signal` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `mandate_paused_signal` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `external_delivery_failure_signal` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `payment_failed_signal` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
+| `kort_gar_ut` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
 
 ### Liveprov 8 september — förberedelse och faktisk blockering
 77 typer registrerade i `docs/audits/approval-live-2026-09-08.md`. Första seedfilen `sql/approval_live_ack_batch_20260908.sql` innehåller 19 syntetiska läskvittenser, inte fullständiga producent-/händelseunderlag. Inga kort är livegodkända.
@@ -92,3 +92,12 @@ Färska läskontroller: TEST Rollprov A/B finns i Handymates produktionsprojekt,
 Försöket att skapa första batchen avvisades av automatisk säkerhetsgranskning eftersom målet är produktionsdatabasen och tidigare uppdrag förbjuder produktionsmutationer. Efterkontroll gav noll rader med test_run=approval-live-20260908. Seedfilen är alltså INTE körd. Byt inte demo-flagga eller exekveringsväg för att kringgå avvisningen. Fortsättning: uttryckligt avgränsat godkännande av testdataskrivningar i biz_rollprov_a, alternativt separat godkänd testdatabas. Därefter säker browserAuth-inloggning och första klickbatchen. Externa handlingskort får inga aktiva mottagare utan verifierad testtransport. Alla 77 kompletta fixtures, varianter och native-prov återstår. Build 12 oförändrad.
 
 PR-kommentar från 8 september beskriver separat massutskicksgrind på main d560adba och kommande kompatibilitetsbehov med confirm_recipients/HTTP 428. Bevara den vid framtida integration; main och preview får inte räknas som samma version.
+
+### Genomförd första batch — 8 september
+Andreas godkände uttryckligen avgränsade syntetiska testdataskrivningar i biz_rollprov_a efter föregående blockering. Seedfilen kördes framgångsrikt och SELECT verifierade exakt 19 typer/19 pending-rader i rätt företag. Säker browserAuth-inloggning verifierades visuellt som Rollprov Ägare / TEST Rollprov A på PR-previewn.
+
+Alla 19 kort klickades individuellt via den faktiska webbsidan. Köantal 21→2 (två befintliga SMS-kort orörda). Efterkontroll: samtliga 19 approved, kvittens state=acknowledged. Historiken visar 19 kort: 15 med ”Läst och borttagen från listan. Ingenting skickades.”, tre med ”Informationen är noterad.” samt karin_deadline med uttrycklig text att ingen inlämning bekräftas. Omladdning och återöppning visade samma 19 kort och samma kvittensfördelning. mandate_paused_signal tog över 15 sekunder att försvinna; inget nytt beslut skickades, efterläsning visade genomförd kvittens.
+
+Fynd: 18 informations-/påminnelsekort hade generisk Godkänn/Avvisa trots enbart läskvittens; alla historiketiketter sade Godkänd. Detta rättas i approvals/page.tsx med klassbaserad läs-/noteraknapp och historiketikett. monthly_review behåller sin rapportlänk. Sidomenyns badge släpade ibland efter listans antal (30s polling finns); omedelbar samordning återstår.
+
+Begränsningar: ingen generell 19/77-slutcertifiering. Dessa är syntetiska läskvittensprov, inte fulla producentunderlag, roll-/avvisnings-/fel-/retry-/mobilprov. Omedelbar toast fångades inte separat för alla 19; DB/historik bekräftad. Ny etikettkod är typkontrollerad men ännu inte omprovad live. Full build ej omkörd för presentationstillägget. Inga kundutskick, publiceringar eller externa ekonomihandlingar utfördes; build 12 oförändrad. Nästa: liveomprov av etiketter, badge-synk och nästa batch med kompletta interna handlingsunderlag.

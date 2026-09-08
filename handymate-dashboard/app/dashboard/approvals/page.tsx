@@ -1,5 +1,6 @@
 'use client'
 
+import { classify } from '@/lib/approvals/action-contract'
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
 
 import { useEffect, useState } from 'react'
@@ -891,7 +892,7 @@ export default function ApprovalsPage() {
                             approval.status === 'rejected' ? 'bg-red-50 text-red-700' :
                             'bg-gray-100 text-gray-500'
                           }`}>
-                            {approval.status === 'approved' ? 'Godkänd' : approval.status === 'rejected' ? 'Avvisad' : 'Utgången'}
+                            {approval.status === 'approved' ? (classify(approval.approval_type) === 'INFORMATIONAL' ? 'Läst' : classify(approval.approval_type) === 'ACKNOWLEDGEMENT' ? 'Noterad' : 'Godkänd') : approval.status === 'rejected' ? 'Avvisad' : 'Utgången'}
                           </span>
                         )}
                       </div>
@@ -1052,7 +1053,7 @@ export default function ApprovalsPage() {
                                 ? 'bg-blue-50 text-blue-700'
                                 : 'bg-gray-100 text-gray-500'
                             }`}>
-                              {approval.status === 'approved' ? 'Godkänd' :
+                              {approval.status === 'approved' ? (classify(approval.approval_type) === 'INFORMATIONAL' ? 'Läst' : classify(approval.approval_type) === 'ACKNOWLEDGEMENT' ? 'Noterad' : 'Godkänd') :
                                approval.status === 'rejected' ? 'Avvisad' :
                                approval.status === 'auto_approved' ? 'Automatiskt godkänd' :
                                'Utgången'}
@@ -1462,6 +1463,16 @@ export default function ApprovalsPage() {
                             {actionLoading === approval.id + 'approve' ? 'Markerar...' : 'Markera som läst'}
                           </button>
                         </>
+                      ) : ['INFORMATIONAL', 'ACKNOWLEDGEMENT'].includes(classify(approval.approval_type) || '') ? (
+                        <button
+                          onClick={() => handleAction(approval.id, 'approve')}
+                          disabled={actionLoading !== null}
+                          className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          {actionLoading === approval.id + 'approve' ? 'Markerar...' :
+                            classify(approval.approval_type) === 'INFORMATIONAL' ? 'Markera som läst' : 'Notera påminnelsen'}
+                        </button>
                       ) : approval.approval_type === 'project_debrief' ? (
                         // Får INTE godkännas rakt av — knappen öppnar modalen
                         // med de korta frågorna. "Hoppa över" i modalen och
