@@ -49,15 +49,17 @@ export async function attestApprovalTime(db: SupabaseClient, businessId: string,
 export async function assignApprovalWork(db: SupabaseClient, businessId: string, p: Record<string, any>) {
   const type = p.context_type
   if (!['booking', 'work_order'].includes(type) || !p.context_id || !p.member_id) return { action: 'dispatch_suggestion', ok: false, error: 'Uppdrag eller medarbetare saknas.' }
-  const member = await db.from('business_users').select('id, name').eq('id', p.member_id).eq('business_id', businessId).maybeSingle()
+  const member = await db.from('business_users').select('id, name, phone').eq('id', p.member_id).eq('business_id', businessId).maybeSingle()
   if (member.error || !member.data) return { action: 'dispatch_suggestion', ok: false, error: 'Medarbetaren kunde inte verifieras.' }
   const name = member.data.name
   if (typeof name !== 'string' || !name.trim()) return { action: 'dispatch_suggestion', ok: false, error: 'Medarbetaren saknar namn. Uppdatera medarbetaren före tilldelning.' }
   const plan = p.dispatchPlan
-  const fields = type === 'booking' ? ['assigned_to', 'assigned_user_id'] : ['assigned_to']
+  const phone = typeof member.data.phone === 'string' ? member.data.phone.trim() || null : null
+  const fields = type === 'booking' ? ['assigned_to', 'assigned_user_id'] : ['assigned_to', 'assigned_phone']
   if (!plan || plan.type !== type || plan.id !== p.context_id || plan.memberId !== p.member_id ||
     !plan.before || !plan.after || plan.after.assigned_to !== name ||
     (type === 'booking' && plan.after.assigned_user_id !== member.data.id) ||
+    (type === 'work_order' && plan.after.assigned_phone !== phone) ||
     fields.some(key => !(key in plan.before))) return { action: 'dispatch_suggestion', ok: false, error: 'Granskat tilldelningsunderlag saknas.' }
   const table = type === 'booking' ? 'booking' : 'work_orders'
   const key = type === 'booking' ? 'booking_id' : 'id'
@@ -69,7 +71,7 @@ export async function assignApprovalWork(db: SupabaseClient, businessId: string,
   if (matches(current.data, plan.after)) return success()
   if (!matches(current.data, plan.before)) return { action: 'dispatch_suggestion', ok: false, error: 'Uppdraget har fått en annan tilldelning. Ingen ändring har gjorts.' }
   let query = db.from(table).update({
-    assigned_to: name, ...(type === 'booking' ? { assigned_user_id: member.data.id } : {}),
+    assigned_to: name, ...(type === 'booking' ? { assigned_user_id: member.data.id } : { assigned_phone: phone }),
     dispatch_reasoning: { reasons: p.reasons, score: p.score, alternatives: p.alternatives, week_utilization_pct: p.week_utilization_pct, certificates: p.certificates },
   }).eq(key, p.context_id).eq('business_id', businessId)
   for (const field of fields) query = plan.before[field] === null ? query.is(field, null) : query.eq(field, plan.before[field])
