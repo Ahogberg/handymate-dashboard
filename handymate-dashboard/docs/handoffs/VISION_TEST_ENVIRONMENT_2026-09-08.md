@@ -1,3 +1,5 @@
+> Current status: the dedicated test project is deployed successfully at https://handymate-vision-test.vercel.app. Unauthenticated `/api/day-close?view=reports` returns HTTP 401 with application/json and the application login message, without a Vercel login redirect. Three confirmed test Auth accounts are linked. Earlier blockers below are historical; authenticated HTTP journeys, native signing and TestFlight remain pending.
+
 # Vision: database prepared, application connection pending
 
 Backend PR #32: remote commit `8c3ed2516f52b618d2a4aa0cabd87d49cda3a73e`, branch `codex/vision-integration-20260908`. All 13 checks across five workflows passed; Vercel Ready.
@@ -59,3 +61,23 @@ Settings: https://vercel.com/andreas-projects-f2b98374/handymate-vision-test/set
 The project still has no environment variables and no successful deployment. The public address returns DEPLOYMENT_NOT_FOUND. Default Standard Protection remains configured; no access controls in the original project were changed.
 
 Automatic approval review rejected copying the test Supabase service-role credential and new signing secret into this NEW project, requesting explicit destination-specific user authorization. The earlier authorization covered the original project's Preview branch. Pending approval, do not retry that credential transmission. After approval: save only test credentials/config, set both app URL variables to the verified primary address, leave external providers unconfigured, deploy the integration branch as this test project's primary environment, verify unauthenticated JSON 401 and real test-account HTTP journeys, then configure mobile's vision-testflight environment. No paid protection add-on was activated.
+
+## Dedicated project credentials approved and saved
+
+The user explicitly approved credential transmission to `handymate-vision-test`. Supabase service-role values and a separate CRON_SECRET were saved as Secret in that project's primary environment. Config values include test Supabase URL/publishable key, APP_URL/NEXT_PUBLIC_APP_URL pointing to https://handymate-vision-test.vercel.app, both feature flags true, and a nonfunctional Stripe placeholder. No SMS/email/AI keys were copied to this project. The original project's credentials were not changed.
+
+The cloud browser transport closed after successful saves. A documentation-only integration commit triggered the existing Git deployment instead: `647793c6c7380a32cd9f06545ff641c1a9ce38bd`. Application source remains equivalent to 8c3ed25. New deployment:
+https://vercel.com/andreas-projects-f2b98374/handymate-vision-test/xb5ZoNDo2Pn7uUD7AcwpYkEGkuLs
+
+Mobile `vision-testflight` environment values after public API verification:
+- EXPO_PUBLIC_API_URL=https://handymate-vision-test.vercel.app
+- EXPO_PUBLIC_SUPABASE_URL=https://eoodwyfxrdjmlqaealhj.supabase.co
+- EXPO_PUBLIC_SUPABASE_ANON_KEY: test publishable key from provider (not the server key).
+
+The primary environment label is Production only within this test-only Vercel project; it does not refer to app.handymate.se or production Supabase.
+
+## Dedicated deployment verified
+
+Both Vercel commit statuses report success for integration commit `647793c6c7380a32cd9f06545ff641c1a9ce38bd`. The dedicated project deployment is `xb5ZoNDo2Pn7uUD7AcwpYkEGkuLs`. A fresh unauthenticated network request to `https://handymate-vision-test.vercel.app/api/day-close?view=reports` returned HTTP 401, Content-Type application/json, body `{"error":"Logga in för att kontrollera din rapport."}`, with no Vercel authentication redirect. This verifies public routing to application authentication; it does not verify login, authenticated database access, AI, external sends or native acceptance.
+
+The test project setup is complete. Remaining acceptance: real test-account login/refresh/logout and company isolation through HTTP, report save/resume/discard and signed approval flows, then EAS credentials/signing and the iPhone/TestFlight checklist. AI and messaging providers are unconfigured in this dedicated project.
