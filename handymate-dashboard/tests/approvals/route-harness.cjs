@@ -185,9 +185,9 @@ const reset = () => { checklists.clear();checklistInserts=0; diaryRows.clear();d
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
   reset();row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'dispatch1',member_id:'member1'}
-  bookingRows=[{booking_id:'dispatch1',business_id:'b1',assigned_to:null,assigned_user_id:null,notes:'Reviewed booking',scheduled_start:'2026-09-08T12:00:00Z'}]
+  bookingRows=[{booking_id:'dispatch1',business_id:'b1',assigned_to:null,assigned_user_id:null,status:'cancelled',notes:'Reviewed booking',scheduled_start:'2026-09-08T12:00:00Z'}]
   let dispatchPreview=await (await post({action:'preview',decision_action:'approve'})).json()
-  assert.equal(dispatchPreview.review.confirmLabel,'Spara tilldelningen',JSON.stringify(dispatchPreview));assert.equal(dispatchWrites,0)
+  assert.equal(dispatchPreview.review.confirmLabel,'Spara tilldelningen',JSON.stringify(dispatchPreview));assert(dispatchPreview.review.details.some(d=>d.label==='Uppdragets status'&&d.text==='Avbokad'));assert.equal(dispatchWrites,0)
   bookingRows[0].assigned_to='Other'
   assert.equal((await post({action:'approve',review_token:dispatchPreview.review_token})).status,428);assert.equal(dispatchWrites,0)
   bookingRows[0].assigned_to=null;dispatchPreview=await (await post({action:'preview',decision_action:'approve'})).json()

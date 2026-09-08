@@ -260,6 +260,9 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         const matches = (value: Record<string, unknown>) => Object.entries(value).every(([key, v]) => (target[key] ?? null) === v)
         if (!matches(plan.before) && !matches(plan.after)) throw new Error('Uppdraget har fått en annan tilldelning. Granska uppdraget innan du försöker igen.')
         detail('Tilldela', person.name); detail('Uppdrag', target.title || target.notes || target.description)
+        const statusLabels: Record<string, string> = { confirmed: 'Bekräftad', cancelled: 'Avbokad', completed: 'Slutförd', no_show: 'Uteblivet besök', draft: 'Utkast' }
+        detail('Uppdragets status', statusLabels[target.status] || target.status || 'Status saknas')
+
         detail('Datum', target.scheduled_date); detail('Start', target.scheduled_start); detail('Slut', target.scheduled_end); detail('Nuvarande tilldelning', target.assigned_to || 'Ingen'); list('Skäl', p.reasons)
         return { ...complete('Byter tilldelad medarbetare på detta uppdrag.', 'Spara tilldelningen'),
           executionPayload: { dispatchPlan: plan }, executionEvidence: { dispatchPlan: plan } }
