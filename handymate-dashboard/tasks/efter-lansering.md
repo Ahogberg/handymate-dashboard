@@ -1,6 +1,6 @@
 # Efter lansering — den enda ordnade listan
 
-Uppdaterad 2026-09-07. Ersätter ordningarna i tasks/plan-sann-agentstatus.md,
+Uppdaterad 2026-09-08. Ersätter ordningarna i tasks/plan-sann-agentstatus.md,
 docs/audits/WOW_GENOMLYSNING_2026-09-05.md och Codex granskningar. När den
 här och en annan lista säger olika gäller den här.
 
@@ -24,6 +24,7 @@ befintliga löften sanna.
 | 13 | **Field Command** — säg det en gång i fält: tid, ÄTA, bokning ur ett yttrande, med fråga vid tvetydighet, samlat godkännande och kvitto | 5–7 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/field-command.dc.html`). Kartlagt samma kväll: rapportläget finns men fem byggstenar saknas, se avsnittet nedan. Placering i listan avgör Andreas | `lib/matte/work-report.ts` (fyra verktyg, projekt- och personlåst), `work-report-confirmation.ts` (ett kort per åtgärd), `time_checkins` (v17/v76), mobilappens `MatteSheet`/`ProjectReportCard`, `resolvePersonScheduleQuery` (namnmatchning, bara läsning) |
 | 14 | **Karins marginalnotis** — "kunden bad om X på platsbesöket, det finns inte i offerten", fäst vid raden | 4–6 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/agentnarvaro-offert.dc.html`, mönster 2). Kräver en jämförelsemotor och stabila rad-id som inte finns. Placering avgör Andreas | `customer_fact` (v122, `evidence_quote` ordagrant ur mötet), `assemble-transcript.ts` (tidsstämplad tidslinje), `lib/reservations/match.ts` (mönster för radmatchning), `learning_events` |
 | 15 | **Kundstart som hänger ihop** — kundens mål → första verkliga resultat → gemensam uppföljning | 4–6 | Codex genomlysning 2026-09-07 mot main ce00347: byggstenarna finns men bildar ingen kedja. Startkvitto knutet till valt mål ("ÄTA-utkastet är sparat på jobbet Solvägen, kundens godkännande återstår"), olika första uppdrag per mål (idag får fyra mål samma offertstart utan importerad data), en kort kundstartssammanfattning som support, partner och mejl läser (mål, valt första jobb, bekräftat resultat, öppet hinder, ansvarig, nästa kontakt), partnerns "Aktiv kund" på uppnådd nytta i stället för betalning. Prövas med tre nya kundtyper: utan historik, med import, via partner | `lib/onboarding/kom-igang-tasks.ts` (klar = något finns, inte att kunden lyckats), `app/api/onboarding/company-scan`, `app/api/cron/onboarding-followup/route.ts`, `lib/partners/activity.ts`, supportens ärendevy, `lib/weekly-value.ts`. De tre små rättningarna före lansering (läsfel ≠ tom firma i genomgången, "uppskattningsvis" i dag 2/7-mejlen, samma prioritering i mejl och startsida) bygger Codex 2026-09-07 |
+| 16 | **Storfirman blir en egen produkt** — skillnaden mot Firman är inte volym utan att ägaren slutar vara närvarande | 6–9 | Beslut Andreas 2026-09-08: dagens prisplaner skiljs bara av kvoter (SMS 300/1000, samtal 400/obegränsat, projekt 50/obegränsat). Båda får alla sex agenter och obegränsat med användare, så det finns inget att sälja på. Byggs andra halvan av september, se avsnittet nedan | Rollgränserna (`lib/permissions.ts`, `resolved_by` som aktör, `canActOnApproval`) landade 2026-09-07; `lib/projects/compute-person-profitability.ts` finns med rutt men ingen yta; kunskapsbasen är punkt 4 |
 
 ## Punkt 4 i detalj — Firmans kunskapsbas (beslut Andreas 2026-09-06)
 
@@ -111,6 +112,66 @@ Bygg:
    (`tests/quote-document-parity.spec.ts`). Knappar: Lägg till rad, Visa
    varför (citatet med tidsstämpel, offerten saknar raden, prislistans
    uppskattning), Ingår redan. Beslut skrivs till `learning_events`.
+
+## Punkt 16 i detalj — Storfirman som egen produkt (beslut Andreas 2026-09-08)
+
+**Tesen.** Skillnaden mellan en firma med fem man och en med tjugofem är inte
+mängd, det är att ägaren slutar vara närvarande. I den lilla firman står han
+själv på jobbet, känner varje kund och skriver varje offert. I den större
+sitter han i bilen, och arbetet sker genom andra människor som inte gör
+likadant som han. Problemet byter form: från "jag hinner inte med
+pappersarbetet" till "jag ser inte vad mina killar gör, och de gör det inte
+likadant".
+
+> **Firman ger dig en kontorist. Storfirman ger dig en arbetsledare.**
+
+Ingen av delarna nedan tas från Firman. Storfirman är ett lager ovanpå.
+
+### 16a — Delegerad godkännanderätt med spårbarhet (bygg först)
+
+En ägare med tjugo man kan inte godkänna tvåhundra kort i veckan och vill
+inte heller släppa allt. Ägaren delegerar per korttyp och beloppsgräns: den
+här arbetsledaren får godkänna ÄTA upp till tiotusen, den här får attestera
+tid, ingen får godkänna kundutskick över ett visst belopp. Varje beslut
+loggat med vem och när.
+
+Finns redan: rollerna och behörighetsflaggorna, `canActOnApproval`,
+`resolved_by` som identifierar aktören och inte bara företaget,
+massutskicksgrinden (`lib/approvals/massutskick.ts`).
+Saknas: beloppsgränser per korttyp, en delegeringsvy, och en logg ägaren kan
+läsa. Starkaste kandidaten: grunden finns, den är svår att kopiera, och den
+löser ett problem som växer med varje anställd kunden lägger till. Också det
+enda av de tre som gör att kunden inte kan gå tillbaka till Firman när firman
+väl vuxit.
+
+### 16b — Lönsamhet per person
+
+Den siffra ägaren vill ha mest och aldrig får: vilka av mina killar tjänar
+pengar. Meningslös för en enmansfirma, det är ju han själv.
+
+Finns redan: `lib/projects/compute-person-profitability.ts` och
+`app/api/projects/[id]/profitability/per-person/route.ts`.
+Saknas: en yta som konsumerar rutten, aggregat över alla projekt i stället
+för ett, och samma Känt/Uppskattat-märkning som resten av ekonomin.
+Behörighet: ägare och admin, aldrig den anställde själv om andra syns.
+
+### 16c — Firmans standard, tvingande
+
+I Firman lär sig teamet hur firman jobbar. I Storfirman ser teamet till att
+femton man jobbar likadant: prislistor som inte får underskridas utan
+godkännande, obligatoriska checklistor per jobbtyp, ÄTA som måste
+dokumenteras innan arbetet börjar. Kvalitetskontroll, vilket är vad en större
+firma faktiskt köper.
+
+Bygger på punkt 4 (kunskapsbasen). Skillnaden mot punkt 4: där är innehållet
+beskrivande, här är det tvingande.
+
+### Att inte göra
+
+Sälj inte de tre som befintliga före de finns. Fram till dess står
+volymskillnaden kvar i prislistan och Storfirman säljs muntligt på
+riktningen. Samma regel som i produkten: inga löften utan täckning.
+
 
 ## Codex tre förslag 2026-09-07 — delpunkter, inte egna satsningar
 
