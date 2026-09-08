@@ -509,13 +509,16 @@ async function handleUpdateStatus(
 
       // Logga övergången i automation_logs context
       return {
-        success: true,
+        success: !result.partial,
+        ...(result.partial ? { error: result.reason } : {}),
         data: {
           entity: 'lead',
           entity_id: leadId,
           from_stage: result.from_stage,
           to_stage: result.to_stage,
           pipeline_move: true,
+          partial: result.partial || false,
+          effects: result.effects || [],
         },
       }
     } catch (err: unknown) {
