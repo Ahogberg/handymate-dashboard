@@ -737,7 +737,7 @@ export default function ApprovalsPage() {
             ur samma lista som redan är hämtad. "Avklarade idag" utelämnas
             medvetet: den datan finns bara när "Hanterade"-fliken varit
             aktiv, och kravet är att aldrig fetcha mer för en siffra. */}
-        <div className="mt-4 flex gap-3">
+        {activeTab === 'pending' && <div className="mt-4 flex gap-3">
           <div className="bg-white border border-slate-200 rounded-card px-4 py-3 flex-1 sm:flex-none sm:min-w-[140px]">
             <div className="font-heading tabular-nums text-2xl font-bold text-slate-900">{pendingCount}</div>
             <div className="text-xs text-slate-500 mt-0.5">väntar nu</div>
@@ -748,7 +748,7 @@ export default function ApprovalsPage() {
               <div className="text-xs text-slate-500 mt-0.5">äldsta väntande</div>
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Tabbar — segmenterad kontroll, offertytornas etablerade idiom
