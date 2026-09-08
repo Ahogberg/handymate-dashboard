@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/colors_and_type.css">
+<link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/styles.css">
+<script src="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/_ds_bundle.js"></script>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap">
+<script type="module" src="https://cdn.jsdelivr.net/npm/ionicons@7.4.0/dist/ionicons/ionicons.esm.js"></script>
+<style>
+body { margin: 0; background: #E9EEF3; font-family: -apple-system, "SF Pro Text", system-ui, sans-serif; }
+a { color: #0F766E; } a:hover { color: #115E59; }
+ion-icon { display: inline-flex; flex: none; }
+</style>
+</helmet>
+
+<section style="padding: 56px 56px 120px; display: flex; flex-direction: column; gap: 56px">
+
+  <div style="max-width: 760px; display: flex; flex-direction: column; gap: 14px">
+    <div style="font-family: 'Space Grotesk', sans-serif; font-size: 11px; font-weight: 700; letter-spacing: 0.14em; color: #0F766E">REKOMMENDERAD RIKTNING · TUR 1</div>
+    <h1 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 38px; line-height: 1.1; font-weight: 700; letter-spacing: -0.02em; color: #0F172A">Mission Control blir hela överblicken</h1>
+    <p style="margin: 0; font-size: 16px; line-height: 1.65; color: #475569; text-wrap: pretty">Den befintliga ytan längst upp på hemskärmen behålls och byggs ut: det viktigaste beslutet, vad teamet faktiskt arbetar med och senast bekräftade resultat ligger i samma kort. Dagens jobb ligger direkt under. Ingen ny flik, ingen statusinformation som upprepas längre ned.</p>
+    <div style="display: flex; flex-wrap: wrap; gap: 16px; font-size: 14px; font-weight: 600">
+      <a href="Handymate Prototyp.dc.html">Öppna den klickbara prototypen</a>
+      <a href="Handymate Nuläge.dc.html">Se nuläget</a>
+    </div>
+    <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px">
+      <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #E2E8F0; border-radius: 9999px; padding: 6px 12px; font-size: 13px; color: #334155">Behöver dig · ett beslut i taget</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #E2E8F0; border-radius: 9999px; padding: 6px 12px; font-size: 13px; color: #334155">Granskning och godkännande är två steg</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid #E2E8F0; border-radius: 9999px; padding: 6px 12px; font-size: 13px; color: #334155">Resultat visas bara med kvittens</span>
+      <span style="display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px dashed #94A3B8; border-radius: 9999px; padding: 6px 12px; font-size: 13px; color: #475569"><ion-icon name="construct-outline" style="font-size: 14px"></ion-icon>NY FUNKTION = kräver ny funktionalitet</span>
+    </div>
+  </div>
+
+  <div id="1a" style="display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #0F766E; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 6px; padding: 3px 7px">1a</span>
+      <h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0F172A">Startsidan i tre lägen</h2>
+      <span style="font-size: 14px; color: #64748B">ny kund · aktiv arbetsdag · lugn dag</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 44px; align-items: flex-start">
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Ny kund — inget påhittat</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Tomt läge visar teamet och en väg in, aldrig fejkad aktivitet eller resultat.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="flex: 1; overflow: auto; padding: 16px 16px 90px; display: flex; flex-direction: column; gap: 16px">
+
+              <div style="background: #134E4A; border-radius: 20px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+                <div style="font-size: 11px; font-weight: 600; letter-spacing: 1.4px; color: #99F6E4">TISDAG 8 SEPTEMBER</div>
+                <div>
+                  <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #fff; letter-spacing: -0.3px">Välkommen, Niklas</div>
+                  <div style="font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.75); margin-top: 6px">Teamet är på plats men har inget att göra än. Berätta vad du behöver hjälp med — Matte tar emot och fördelar.</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 9999px; padding: 6px 8px">
+                  <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover">
+                  <div style="flex: 1; min-height: 44px; display: flex; align-items: center; padding: 0 4px; font-size: 15px; color: rgba(255,255,255,0.75)">Berätta för Matte…</div>
+                  <div style="width: 46px; height: 46px; border-radius: 23px; background: #0F766E; display: flex; align-items: center; justify-content: center"><ion-icon name="mic" style="font-size: 20px; color: #fff"></ion-icon></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12)">
+                  <div style="display: flex">
+                    <span style="display: block; width: 26px; height: 26px; border-radius: 13px; border: 2px solid #134E4A; box-sizing: border-box; overflow: hidden"><img src="assets/ai-team/Karin.png" alt="Karin" style="width: 100%; height: 100%; object-fit: cover"></span>
+                    <span style="display: block; width: 26px; height: 26px; border-radius: 13px; border: 2px solid #134E4A; box-sizing: border-box; overflow: hidden; margin-left: -7px"><img src="assets/ai-team/Daniel.png" alt="Daniel" style="width: 100%; height: 100%; object-fit: cover"></span>
+                    <span style="display: block; width: 26px; height: 26px; border-radius: 13px; border: 2px solid #134E4A; box-sizing: border-box; overflow: hidden; margin-left: -7px"><img src="assets/ai-team/Lars.png" alt="Lars" style="width: 100%; height: 100%; object-fit: cover"></span>
+                    <span style="display: block; width: 26px; height: 26px; border-radius: 13px; border: 2px solid #134E4A; box-sizing: border-box; overflow: hidden; margin-left: -7px"><img src="assets/ai-team/Hanna.png" alt="Hanna" style="width: 100%; height: 100%; object-fit: cover"></span>
+                    <span style="display: block; width: 26px; height: 26px; border-radius: 13px; border: 2px solid #134E4A; box-sizing: border-box; overflow: hidden; margin-left: -7px"><img src="assets/ai-team/Lisa.png" alt="Lisa" style="width: 100%; height: 100%; object-fit: cover"></span>
+                  </div>
+                  <span style="flex: 1; font-size: 13px; color: rgba(255,255,255,0.7)">Fem specialister plus Matte. Inget pågår ännu.</span>
+                </div>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                <div style="font-size: 15px; font-weight: 700; color: #1E293B">Tre saker som får teamet igång</div>
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <span style="width: 26px; height: 26px; border-radius: 13px; border: 1px solid #CCFBF1; background: #F0FDFA; color: #0F766E; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center">1</span>
+                  <span style="flex: 1; font-size: 14px; color: #334155">Lägg till din första kund</span>
+                  <ion-icon name="chevron-forward" style="font-size: 18px; color: #94A3B8"></ion-icon>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <span style="width: 26px; height: 26px; border-radius: 13px; border: 1px solid #CCFBF1; background: #F0FDFA; color: #0F766E; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center">2</span>
+                  <span style="flex: 1; font-size: 14px; color: #334155">Koppla kalendern så teamet ser din dag</span>
+                  <ion-icon name="chevron-forward" style="font-size: 18px; color: #94A3B8"></ion-icon>
+                </div>
+                <div style="display: flex; align-items: center; gap: 12px">
+                  <span style="width: 26px; height: 26px; border-radius: 13px; border: 1px solid #CCFBF1; background: #F0FDFA; color: #0F766E; font-size: 13px; font-weight: 700; display: flex; align-items: center; justify-content: center">3</span>
+                  <span style="flex: 1; font-size: 14px; color: #334155">Ge teamet ett uppdrag <span style="display: inline-flex; align-items: center; gap: 4px; border: 1px dashed #94A3B8; border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 0.4px; vertical-align: 1px">NY FUNKTION</span></span>
+                  <ion-icon name="chevron-forward" style="font-size: 18px; color: #94A3B8"></ion-icon>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-size: 16px; font-weight: 700; color: #1E293B; margin-bottom: 12px">Dagens jobb</div>
+                <div style="border: 1px dashed #CBD5E1; border-radius: 16px; padding: 24px 16px; display: flex; flex-direction: column; align-items: center; gap: 6px">
+                  <ion-icon name="calendar-outline" style="font-size: 32px; color: #CBD5E1"></ion-icon>
+                  <div style="font-size: 15px; font-weight: 600; color: #64748B">Inget bokat idag</div>
+                  <div style="font-size: 13px; color: #94A3B8; text-align: center">Lägg in ett jobb, eller låt Matte boka in när kunden hör av sig.</div>
+                  <div style="margin-top: 8px; min-height: 44px; display: flex; align-items: center; padding: 0 18px; border-radius: 12px; border: 1px solid #CCFBF1; background: #fff; font-size: 14px; font-weight: 600; color: #0F766E">Lägg till jobb</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E2E8F0; padding: 6px 0 22px; display: flex">
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #0F766E"><ion-icon name="home-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Hem</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="checkmark-circle-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Godkänn</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="calendar-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Schema</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="construct-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Projekt</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="ellipsis-horizontal" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Mer</span></div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Aktiv arbetsdag — ett beslut först</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Behöver dig, teamet arbetar med och senast klart ligger i samma yta. Ingen räknare, inga röda markeringar.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="flex: 1; overflow: auto; padding: 16px 16px 90px; display: flex; flex-direction: column; gap: 16px">
+
+              <div style="background: #134E4A; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="flex: 1; font-size: 11px; font-weight: 600; letter-spacing: 1.4px; color: #99F6E4">GOD MORGON NIKLAS · TIS 8 SEP</span>
+                  <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #99F6E4"><span style="width: 6px; height: 6px; border-radius: 3px; background: #4ADE80"></span>Teamet arbetar</span>
+                </div>
+
+                <div style="background: #fff; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <span style="display: inline-flex; align-items: center; gap: 5px; background: #FFFBEB; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 700; color: #B45309"><ion-icon name="alert-circle-outline" style="font-size: 13px"></ion-icon>Behöver dig</span>
+                    <span style="margin-left: auto; font-size: 12px; color: #64748B">12 min sedan</span>
+                  </div>
+                  <div>
+                    <div style="font-size: 18px; font-weight: 700; color: #0F172A; letter-spacing: -0.2px">Offert till Anna Lindqvist</div>
+                    <div style="font-size: 14px; line-height: 1.5; color: #475569; margin-top: 4px">Daniel har räknat på badrummet: 24 800 kr inkl. moms. Inget är skickat — du granskar först.</div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px">
+                    <img src="assets/ai-team/Daniel.png" alt="Daniel" style="width: 22px; height: 22px; border-radius: 11px; object-fit: cover">
+                    <span style="font-size: 12px; color: #64748B">Daniel förberedde · offert</span>
+                  </div>
+                  <div style="display: flex; gap: 8px">
+                    <div style="flex: 1.6; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; background: #0F766E; border-radius: 12px; font-size: 15px; font-weight: 700; color: #fff">Granska</div>
+                    <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border: 1px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-weight: 600; color: #64748B">Senare</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: #99F6E4">TEAMET ARBETAR MED</div>
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <img src="assets/ai-team/Karin.png" alt="Karin" style="width: 26px; height: 26px; border-radius: 13px; object-fit: cover; margin-top: 1px">
+                    <div style="flex: 1; min-width: 0">
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <span style="flex: 1; font-size: 14px; font-weight: 600; color: #fff">Faktura 2043 · Sandberg AB</span>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.12); border-radius: 9999px; padding: 2px 8px 2px 6px; font-size: 11px; font-weight: 600; color: #fff"><ion-icon name="calendar-outline" style="font-size: 12px"></ion-icon>Planerat</span>
+                      </div>
+                      <div style="font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.72); margin-top: 3px">Nästa: påminnelse förbereds fre 09:00 om betalning saknas. Du godkänner innan den skickas.</div>
+                    </div>
+                  </div>
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <img src="assets/ai-team/Lisa.png" alt="Lisa" style="width: 26px; height: 26px; border-radius: 13px; object-fit: cover; margin-top: 1px">
+                    <div style="flex: 1; min-width: 0">
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <span style="flex: 1; font-size: 14px; font-weight: 600; color: #fff">Svar till Johan Hedlund</span>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.12); border-radius: 9999px; padding: 2px 8px 2px 6px; font-size: 11px; font-weight: 600; color: #fff"><ion-icon name="ellipse" style="font-size: 8px; color: #5EEAD4"></ion-icon>Pågår</span>
+                      </div>
+                      <div style="font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.72); margin-top: 3px">Nästa: Lisa föreslår tre tider för besök, du väljer en.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12)">
+                  <ion-icon name="checkmark-circle" style="font-size: 18px; color: #4ADE80"></ion-icon>
+                  <div style="flex: 1; min-width: 0">
+                    <div style="font-size: 13px; font-weight: 600; color: #fff">Rapporten sparad · Villa Ekvägen</div>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.75)">Igår 17:42 · 6 h och material</div>
+                  </div>
+                  <span style="font-size: 13px; font-weight: 600; color: #99F6E4">Kvittens</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 9999px; padding: 6px 8px">
+                  <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 30px; height: 30px; border-radius: 15px; object-fit: cover">
+                  <div style="flex: 1; min-height: 44px; display: flex; align-items: center; padding: 0 4px; font-size: 15px; color: rgba(255,255,255,0.75)">Lämna över till Matte…</div>
+                  <div style="width: 44px; height: 44px; border-radius: 22px; background: #0F766E; display: flex; align-items: center; justify-content: center"><ion-icon name="mic" style="font-size: 19px; color: #fff"></ion-icon></div>
+                </div>
+                <div style="display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; margin-top: -4px">
+                  <ion-icon name="flag-outline" style="font-size: 14px; color: #99F6E4"></ion-icon>
+                  <span style="font-size: 13px; font-weight: 600; color: #99F6E4">Uppdrag: 18 000 kr kvar i september</span>
+                  <ion-icon name="chevron-forward" style="font-size: 14px; color: #99F6E4"></ion-icon>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px">
+                  <div style="flex: 1; font-size: 16px; font-weight: 700; color: #1E293B">Dagens jobb</div>
+                  <div style="font-size: 13px; font-weight: 600; color: #64748B">2 jobb</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 12px">
+                  <div style="background: #fff; border: 1px solid #E2E8F0; border-left: 4px solid #0EA5E9; border-radius: 16px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                      <ion-icon name="time-outline" style="font-size: 16px; color: #0F766E"></ion-icon>
+                      <span style="font-size: 14px; font-weight: 600; color: #0F766E; font-variant-numeric: tabular-nums">08:00</span>
+                      <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; background: #EFF6FF; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 600; color: #1D4ED8"><ion-icon name="ellipse" style="font-size: 7px"></ion-icon>Pågår</span>
+                    </div>
+                    <div style="font-size: 17px; font-weight: 700; color: #1E293B">Anna Lindqvist</div>
+                    <div style="font-size: 13px; color: #64748B; margin-top: 2px">Villa Ekvägen · dag 3/6 · kakel &amp; klinker</div>
+                    <div style="display: flex; align-items: center; gap: 6px; margin-top: 10px; padding-top: 10px; border-top: 1px solid #F1F5F9">
+                      <ion-icon name="arrow-forward-circle-outline" style="font-size: 16px; color: #0F766E"></ion-icon>
+                      <span style="flex: 1; font-size: 13px; color: #334155">Nästa: rapportera dagens arbete när du är klar</span>
+                    </div>
+                  </div>
+                  <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                      <ion-icon name="time-outline" style="font-size: 16px; color: #0F766E"></ion-icon>
+                      <span style="font-size: 14px; font-weight: 600; color: #0F766E; font-variant-numeric: tabular-nums">14:30</span>
+                      <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; border-radius: 9999px; padding: 3px 9px; font-size: 12px; font-weight: 600; color: #475569">Bekräftad</span>
+                    </div>
+                    <div style="font-size: 17px; font-weight: 700; color: #1E293B">Familjen Ström</div>
+                    <div style="font-size: 13px; color: #64748B; margin-top: 2px">Offertbesök · Storgatan 12, Sollentuna</div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 44px">
+                <span style="font-size: 14px; font-weight: 600; color: #0F766E">Allt teamet gjort idag (6)</span>
+                <ion-icon name="chevron-forward" style="font-size: 16px; color: #0F766E"></ion-icon>
+              </div>
+            </div>
+
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E2E8F0; padding: 6px 0 22px; display: flex">
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #0F766E"><ion-icon name="home-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Hem</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8; position: relative"><ion-icon name="checkmark-circle-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Godkänn</span><span style="position: absolute; top: 1px; left: 50%; margin-left: 8px; width: 7px; height: 7px; border-radius: 4px; background: #0F766E"></span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="calendar-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Schema</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="construct-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Projekt</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="ellipsis-horizontal" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Mer</span></div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Lugn dag — inget väntar</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Utan beslut blir ytan en kvittens på vad teamet gjort. Ingen tom yta, ingen uppmaning att bevaka.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="flex: 1; overflow: auto; padding: 16px 16px 90px; display: flex; flex-direction: column; gap: 16px">
+
+              <div style="background: #134E4A; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="flex: 1; font-size: 11px; font-weight: 600; letter-spacing: 1.4px; color: #99F6E4">GOD EFTERMIDDAG NIKLAS · TIS 8 SEP</span>
+                  <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #99F6E4"><span style="width: 6px; height: 6px; border-radius: 3px; background: #4ADE80"></span>Teamet arbetar</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 12px; background: rgba(255,255,255,0.07); border: 1px solid rgba(255,255,255,0.14); border-radius: 16px; padding: 14px">
+                  <div style="width: 36px; height: 36px; border-radius: 18px; background: #0F766E; display: flex; align-items: center; justify-content: center"><ion-icon name="checkmark" style="font-size: 20px; color: #fff"></ion-icon></div>
+                  <div style="flex: 1; min-width: 0">
+                    <div style="font-size: 16px; font-weight: 700; color: #fff">Inget behöver dig nu</div>
+                    <div style="font-size: 13px; color: rgba(255,255,255,0.72); margin-top: 2px">Vi säger till när något kräver ditt beslut.</div>
+                  </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: #99F6E4">TEAMET ARBETAR MED</div>
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <img src="assets/ai-team/Hanna.png" alt="Hanna" style="width: 26px; height: 26px; border-radius: 13px; object-fit: cover; margin-top: 1px">
+                    <div style="flex: 1; min-width: 0">
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <span style="flex: 1; font-size: 14px; font-weight: 600; color: #fff">Recensionsförfrågan · 4 kunder</span>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.12); border-radius: 9999px; padding: 2px 8px 2px 6px; font-size: 11px; font-weight: 600; color: #fff"><ion-icon name="calendar-outline" style="font-size: 12px"></ion-icon>Planerat</span>
+                      </div>
+                      <div style="font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.72); margin-top: 3px">Nästa: Hanna visar texten för dig på torsdag innan något går ut.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12)">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: #99F6E4">SENAST KLART</div>
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #4ADE80"></ion-icon>
+                    <div style="flex: 1; min-width: 0">
+                      <div style="font-size: 13px; font-weight: 600; color: #fff">Offerten skickad · Anna Lindqvist</div>
+                      <div style="font-size: 11px; color: rgba(255,255,255,0.75)">Idag 08:14 · SMS och e-post</div>
+                    </div>
+                    <span style="font-size: 13px; font-weight: 600; color: #99F6E4">Kvittens</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 8px">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #4ADE80"></ion-icon>
+                    <div style="flex: 1; min-width: 0">
+                      <div style="font-size: 13px; font-weight: 600; color: #fff">Rapporten sparad · Villa Ekvägen</div>
+                      <div style="font-size: 11px; color: rgba(255,255,255,0.75)">Igår 17:42 · 6 h och material</div>
+                    </div>
+                    <span style="font-size: 13px; font-weight: 600; color: #99F6E4">Kvittens</span>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 9999px; padding: 6px 8px">
+                  <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 30px; height: 30px; border-radius: 15px; object-fit: cover">
+                  <div style="flex: 1; min-height: 44px; display: flex; align-items: center; padding: 0 4px; font-size: 15px; color: rgba(255,255,255,0.75)">Lämna över till Matte…</div>
+                  <div style="width: 44px; height: 44px; border-radius: 22px; background: #0F766E; display: flex; align-items: center; justify-content: center"><ion-icon name="mic" style="font-size: 19px; color: #fff"></ion-icon></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="display: flex; align-items: baseline; gap: 8px; margin-bottom: 12px">
+                  <div style="flex: 1; font-size: 16px; font-weight: 700; color: #1E293B">Dagens jobb</div>
+                  <div style="font-size: 13px; font-weight: 600; color: #64748B">1 jobb</div>
+                </div>
+                <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                    <ion-icon name="time-outline" style="font-size: 16px; color: #0F766E"></ion-icon>
+                    <span style="font-size: 14px; font-weight: 600; color: #0F766E; font-variant-numeric: tabular-nums">Hela dagen</span>
+                    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; background: #F0FDF4; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 600; color: #166534"><ion-icon name="checkmark" style="font-size: 12px"></ion-icon>Avslutad</span>
+                  </div>
+                  <div style="font-size: 17px; font-weight: 700; color: #1E293B">Anna Lindqvist</div>
+                  <div style="font-size: 13px; color: #64748B; margin-top: 2px">Villa Ekvägen · dag 3/6 · rapport sparad</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E2E8F0; padding: 6px 0 22px; display: flex">
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #0F766E"><ion-icon name="home-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Hem</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="checkmark-circle-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Godkänn</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="calendar-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Schema</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="construct-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Projekt</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="ellipsis-horizontal" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Mer</span></div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="1b" style="display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #0F766E; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 6px; padding: 3px 7px">1b</span>
+      <h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0F172A">Överlämningen till Matte</h2>
+      <span style="font-size: 14px; color: #64748B">från inmatning till bekräftat nästa steg</span>
+    </div>
+    <p style="margin: 0; max-width: 760px; font-size: 15px; line-height: 1.65; color: #475569">Fyra steg med olika status: mottaget är inte samma sak som klart. Varje steg säger vad som är sparat, vad teamet gör härnäst och när du behöver komma tillbaka.</p>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 44px; align-items: flex-start">
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">1 · Du berättar</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Röst eller text i samma yta. Utkastet sparas medan du skriver.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" keyboard="{{ true }}" hint-size="402px,874px">
+          <div style="min-height: 100%; display: flex; flex-direction: column; background: #134E4A">
+            <div style="flex: 1; background: rgba(15,23,42,0.45)"></div>
+            <div style="background: #F8FAFC; border-radius: 20px 20px 0 0; padding: 8px 16px 16px; display: flex; flex-direction: column; gap: 12px">
+              <div style="width: 36px; height: 4px; border-radius: 2px; background: #CBD5E1; margin: 0 auto"></div>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 28px; height: 28px; border-radius: 14px; object-fit: cover">
+                <span style="font-size: 15px; font-weight: 700; color: #1E293B">Matte</span>
+                <span style="display: inline-flex; align-items: center; gap: 4px; background: #F0FDFA; border-radius: 9999px; padding: 3px 8px; font-size: 11px; font-weight: 600; color: #0F766E"><ion-icon name="briefcase-outline" style="font-size: 12px"></ion-icon>Villa Ekvägen</span>
+                <span style="margin-left: auto; width: 36px; height: 36px; display: flex; align-items: center; justify-content: center"><ion-icon name="close" style="font-size: 22px; color: #64748B"></ion-icon></span>
+              </div>
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 12px; font-size: 15px; line-height: 1.5; color: #0F172A">Anna vill ha en offert på kaklet i hallen också, ungefär 6 kvadrat. Hon vill ha svar innan helgen och undrade om vi kan följa upp på fredag.<span style="display: inline-block; width: 2px; height: 18px; background: #0F766E; vertical-align: -3px; margin-left: 1px"></span></div>
+              <div style="display: flex; align-items: center; gap: 6px">
+                <ion-icon name="cloud-done-outline" style="font-size: 15px; color: #64748B"></ion-icon>
+                <span style="flex: 1; font-size: 12px; color: #64748B">Utkast sparat 09:12 — du kan stänga och fortsätta sen</span>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Skicka till Matte</div>
+                <div style="width: 48px; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #CCFBF1; background: #fff"><ion-icon name="mic" style="font-size: 20px; color: #0F766E"></ion-icon></div>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">2 · Matte kvitterar mottaget</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Vad som förstods, vad som sparats och vad som uttryckligen inte har hänt.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="min-height: 100%; display: flex; flex-direction: column; background: #134E4A">
+            <div style="flex: 1; background: rgba(15,23,42,0.45)"></div>
+            <div style="background: #F8FAFC; border-radius: 20px 20px 0 0; padding: 8px 16px 46px; display: flex; flex-direction: column; gap: 14px">
+              <div style="width: 36px; height: 4px; border-radius: 2px; background: #CBD5E1; margin: 0 auto"></div>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 28px; height: 28px; border-radius: 14px; object-fit: cover">
+                <span style="font-size: 15px; font-weight: 700; color: #1E293B">Matte</span>
+                <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 5px; background: #F1F5F9; border-radius: 9999px; padding: 4px 10px 4px 8px; font-size: 12px; font-weight: 700; color: #475569"><ion-icon name="arrow-down-circle-outline" style="font-size: 13px"></ion-icon>Mottaget</span>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                <div>
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Så här förstod jag det</div>
+                  <div style="font-size: 15px; line-height: 1.5; color: #0F172A; margin-top: 6px">Offert på kakel i hallen, cirka 6 m², till Anna Lindqvist på Villa Ekvägen. Uppföljning på fredag.</div>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px; padding-top: 14px; border-top: 1px solid #F1F5F9">
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #22C55E; margin-top: 1px"></ion-icon>
+                    <div style="flex: 1"><span style="font-size: 14px; font-weight: 600; color: #1E293B">Sparat i jobbet</span><div style="font-size: 13px; color: #64748B; margin-top: 1px">Anteckning + underlag till Daniel, 6 m² hall</div></div>
+                  </div>
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <ion-icon name="arrow-forward-circle-outline" style="font-size: 18px; color: #0F766E; margin-top: 1px"></ion-icon>
+                    <div style="flex: 1"><span style="font-size: 14px; font-weight: 600; color: #1E293B">Nästa: Daniel räknar</span><div style="font-size: 13px; color: #64748B; margin-top: 1px">Du får förslaget att granska innan något skickas</div></div>
+                  </div>
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <ion-icon name="close-circle-outline" style="font-size: 18px; color: #94A3B8; margin-top: 1px"></ion-icon>
+                    <div style="flex: 1"><span style="font-size: 14px; font-weight: 600; color: #475569">Inget är skickat till Anna</span><div style="font-size: 13px; color: #64748B; margin-top: 1px">Ingen kontakt tas utan ditt godkännande</div></div>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #E2E8F0; background: #fff; font-size: 14px; font-weight: 600; color: #334155">Ändra</div>
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #E2E8F0; background: #fff; font-size: 14px; font-weight: 600; color: #64748B">Avstå</div>
+                <div style="flex: 1.4; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Det stämmer</div>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">3 · Planerat och bekräftat</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Bekräftad tidpunkt visas bara när den faktiskt finns. Här kan appen stängas.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="min-height: 100%; display: flex; flex-direction: column; background: #134E4A">
+            <div style="flex: 1; background: rgba(15,23,42,0.45)"></div>
+            <div style="background: #F8FAFC; border-radius: 20px 20px 0 0; padding: 8px 16px 46px; display: flex; flex-direction: column; gap: 14px">
+              <div style="width: 36px; height: 4px; border-radius: 2px; background: #CBD5E1; margin: 0 auto"></div>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 28px; height: 28px; border-radius: 14px; object-fit: cover">
+                <span style="font-size: 15px; font-weight: 700; color: #1E293B">Matte</span>
+                <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 5px; background: #F0FDFA; border-radius: 9999px; padding: 4px 10px 4px 8px; font-size: 12px; font-weight: 700; color: #0F766E"><ion-icon name="calendar-outline" style="font-size: 13px"></ion-icon>Planerat</span>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #CCFBF1; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 8px rgba(15,118,110,0.08)">
+                <div style="width: 40px; height: 40px; border-radius: 20px; background: #F0FDFA; display: flex; align-items: center; justify-content: center"><ion-icon name="calendar-outline" style="font-size: 20px; color: #0F766E"></ion-icon></div>
+                <div>
+                  <div style="font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: #0F172A; letter-spacing: -0.2px">Uppföljningen är planerad</div>
+                  <div style="font-size: 15px; line-height: 1.5; color: #475569; margin-top: 6px">Matte förbereder ett förslag på fredag. Du granskar och godkänner innan något skickas.</div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px">
+                  <ion-icon name="time-outline" style="font-size: 18px; color: #0F766E"></ion-icon>
+                  <div style="flex: 1">
+                    <div style="font-size: 14px; font-weight: 700; color: #1E293B; font-variant-numeric: tabular-nums">Fredag 12 sep · 09:00</div>
+                    <div style="font-size: 12px; color: #64748B; margin-top: 1px">Du får en påminnelse. Inget händer före dess.</div>
+                  </div>
+                  <span style="display: inline-flex; border: 1px dashed #94A3B8; border-radius: 4px; padding: 1px 5px; font-size: 10px; font-weight: 700; color: #475569; letter-spacing: 0.4px">NY FUNKTION</span>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #E2E8F0; background: #fff; font-size: 14px; font-weight: 600; color: #334155">Ändra tidpunkt</div>
+                <div style="flex: 1.2; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Klart, stäng</div>
+              </div>
+              <div style="display: flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px">
+                <span style="font-size: 14px; font-weight: 600; color: #0F766E">Se allt i jobbet</span>
+                <ion-icon name="chevron-forward" style="font-size: 15px; color: #0F766E"></ion-icon>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">4 · Du kommer tillbaka</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Läget är begripligt utan att läsa om chatten: det som pågår ligger kvar i Mission Control.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="flex: 1; overflow: auto; padding: 16px 16px 90px; display: flex; flex-direction: column; gap: 16px">
+              <div style="background: #134E4A; border-radius: 20px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="flex: 1; font-size: 11px; font-weight: 600; letter-spacing: 1.4px; color: #99F6E4">GOD MORGON NIKLAS · TOR 10 SEP</span>
+                  <span style="display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: #99F6E4"><span style="width: 6px; height: 6px; border-radius: 3px; background: #4ADE80"></span>Teamet arbetar</span>
+                </div>
+
+                <div style="background: #fff; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+                  <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 5px; background: #F1F5F9; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 700; color: #475569"><ion-icon name="bookmark-outline" style="font-size: 13px"></ion-icon>Fortsätt där du var</span>
+                  <div>
+                    <div style="font-size: 17px; font-weight: 700; color: #0F172A">Rapport · Villa Ekvägen</div>
+                    <div style="font-size: 14px; line-height: 1.5; color: #475569; margin-top: 3px">Tid och arbetsbeskrivning är sparade. Kvar: foton och eventuellt extra arbete.</div>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px">
+                    <span style="flex: 1; height: 5px; border-radius: 3px; background: #0F766E"></span>
+                    <span style="flex: 1; height: 5px; border-radius: 3px; background: #0F766E"></span>
+                    <span style="flex: 1; height: 5px; border-radius: 3px; background: #E2E8F0"></span>
+                    <span style="flex: 1; height: 5px; border-radius: 3px; background: #E2E8F0"></span>
+                    <span style="font-size: 12px; font-weight: 600; color: #64748B; margin-left: 4px">2 av 4</span>
+                  </div>
+                  <div style="min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Fortsätt rapporten</div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 1.2px; color: #99F6E4">TEAMET ARBETAR MED</div>
+                  <div style="display: flex; gap: 10px; align-items: flex-start">
+                    <img src="assets/ai-team/Daniel.png" alt="Daniel" style="width: 26px; height: 26px; border-radius: 13px; object-fit: cover; margin-top: 1px">
+                    <div style="flex: 1; min-width: 0">
+                      <div style="display: flex; align-items: center; gap: 8px">
+                        <span style="flex: 1; font-size: 14px; font-weight: 600; color: #fff">Offert · kakel i hallen</span>
+                        <span style="display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.12); border-radius: 9999px; padding: 2px 8px 2px 6px; font-size: 11px; font-weight: 600; color: #fff"><ion-icon name="calendar-outline" style="font-size: 12px"></ion-icon>Planerat</span>
+                      </div>
+                      <div style="font-size: 12px; line-height: 1.45; color: rgba(255,255,255,0.72); margin-top: 3px">Nästa: förslag till dig fredag 09:00. Anna är inte kontaktad.</div>
+                    </div>
+                  </div>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.12)">
+                  <ion-icon name="checkmark-circle" style="font-size: 18px; color: #4ADE80"></ion-icon>
+                  <div style="flex: 1; min-width: 0">
+                    <div style="font-size: 13px; font-weight: 600; color: #fff">Anteckningen sparad i jobbet</div>
+                    <div style="font-size: 11px; color: rgba(255,255,255,0.75)">Tis 09:12 · kakel hall, 6 m²</div>
+                  </div>
+                  <span style="font-size: 13px; font-weight: 600; color: #99F6E4">Kvittens</span>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.18); border-radius: 9999px; padding: 6px 8px">
+                  <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 30px; height: 30px; border-radius: 15px; object-fit: cover">
+                  <div style="flex: 1; min-height: 44px; display: flex; align-items: center; padding: 0 4px; font-size: 15px; color: rgba(255,255,255,0.75)">Lämna över till Matte…</div>
+                  <div style="width: 44px; height: 44px; border-radius: 22px; background: #0F766E; display: flex; align-items: center; justify-content: center"><ion-icon name="mic" style="font-size: 19px; color: #fff"></ion-icon></div>
+                </div>
+              </div>
+
+              <div>
+                <div style="font-size: 16px; font-weight: 700; color: #1E293B; margin-bottom: 12px">Dagens jobb</div>
+                <div style="background: #fff; border: 1px solid #E2E8F0; border-left: 4px solid #0EA5E9; border-radius: 16px; padding: 14px 16px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                  <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px">
+                    <ion-icon name="time-outline" style="font-size: 16px; color: #0F766E"></ion-icon>
+                    <span style="font-size: 14px; font-weight: 600; color: #0F766E; font-variant-numeric: tabular-nums">07:30</span>
+                    <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; background: #F1F5F9; border-radius: 9999px; padding: 3px 9px; font-size: 12px; font-weight: 600; color: #475569">Bekräftad</span>
+                  </div>
+                  <div style="font-size: 17px; font-weight: 700; color: #1E293B">Anna Lindqvist</div>
+                  <div style="font-size: 13px; color: #64748B; margin-top: 2px">Villa Ekvägen · dag 4/6 · fogning</div>
+                </div>
+              </div>
+            </div>
+
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E2E8F0; padding: 6px 0 22px; display: flex">
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #0F766E"><ion-icon name="home-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Hem</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="checkmark-circle-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Godkänn</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="calendar-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Schema</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="construct-outline" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Projekt</span></div>
+              <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8"><ion-icon name="ellipsis-horizontal" style="font-size: 24px"></ion-icon><span style="font-size: 10.5px; font-weight: 600">Mer</span></div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+    </div>
+  </div>
+  <div id="1c" style="display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #0F766E; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 6px; padding: 3px 7px">1c</span>
+      <h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0F172A">Jobbets översikt</h2>
+      <span style="font-size: 14px; color: #64748B">samma benämningar som på startsidan</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 44px; align-items: flex-start">
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Villa Ekvägen</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">En kompakt sammanställning: nästa steg, vad teamet gör, beslut, sparade delar och kvittenser. Detaljer öppnas, inte utrullade.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fff; border-bottom: 1px solid #E2E8F0">
+              <ion-icon name="chevron-back" style="font-size: 24px; color: #1E293B"></ion-icon>
+              <span style="flex: 1; font-size: 17px; font-weight: 600; color: #1E293B">Villa Ekvägen</span>
+              <span style="display: inline-flex; align-items: center; gap: 4px; background: #EFF6FF; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 600; color: #1D4ED8"><ion-icon name="ellipse" style="font-size: 7px"></ion-icon>Pågår</span>
+            </div>
+            <div style="flex: 1; overflow: auto; padding: 16px 16px 100px; display: flex; flex-direction: column; gap: 12px">
+
+              <div style="display: flex; align-items: center; gap: 10px">
+                <ion-icon name="person-outline" style="font-size: 16px; color: #94A3B8"></ion-icon>
+                <span style="flex: 1; font-size: 14px; color: #64748B">Anna Lindqvist · dag 3 av 6 · kakel &amp; klinker</span>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 14px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                <div style="display: flex; gap: 10px; align-items: flex-start">
+                  <ion-icon name="arrow-forward-circle-outline" style="font-size: 20px; color: #0F766E; margin-top: 1px"></ion-icon>
+                  <div style="flex: 1">
+                    <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Nästa steg</div>
+                    <div style="font-size: 15px; font-weight: 600; color: #0F172A; margin-top: 3px">Rapportera dagens arbete när du är klar</div>
+                    <div style="font-size: 13px; color: #64748B; margin-top: 2px">Fogning i morgon 07:30, material finns på plats</div>
+                  </div>
+                </div>
+
+                <div style="padding-top: 14px; border-top: 1px solid #F1F5F9; display: flex; flex-direction: column; gap: 10px">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Behöver dig</div>
+                  <div style="display: flex; align-items: center; gap: 10px; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 12px; padding: 12px">
+                    <img src="assets/ai-team/Daniel.png" alt="Daniel" style="width: 26px; height: 26px; border-radius: 13px; object-fit: cover">
+                    <div style="flex: 1; min-width: 0">
+                      <div style="font-size: 14px; font-weight: 700; color: #0F172A">ÄTA · extra eluttag i hall</div>
+                      <div style="font-size: 12px; color: #B45309; margin-top: 1px">Prisbesked till kunden — granska innan det skickas</div>
+                    </div>
+                    <span style="min-height: 40px; display: flex; align-items: center; padding: 0 14px; border-radius: 10px; background: #0F766E; font-size: 14px; font-weight: 700; color: #fff">Granska</span>
+                  </div>
+                </div>
+
+                <div style="padding-top: 14px; border-top: 1px solid #F1F5F9; display: flex; flex-direction: column; gap: 10px">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Teamet arbetar med</div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <img src="assets/ai-team/Lars.png" alt="Lars" style="width: 24px; height: 24px; border-radius: 12px; object-fit: cover">
+                    <span style="flex: 1; font-size: 14px; color: #334155">Materialbeställning fog och list</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px; background: #EFF6FF; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 600; color: #1D4ED8"><ion-icon name="ellipse" style="font-size: 7px"></ion-icon>Pågår</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <img src="assets/ai-team/Karin.png" alt="Karin" style="width: 24px; height: 24px; border-radius: 12px; object-fit: cover">
+                    <span style="flex: 1; font-size: 14px; color: #334155">Delfaktura efter etapp 4</span>
+                    <span style="display: inline-flex; align-items: center; gap: 4px; background: #F0FDFA; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 600; color: #0F766E"><ion-icon name="calendar-outline" style="font-size: 12px"></ion-icon>Planerat</span>
+                  </div>
+                </div>
+
+                <div style="padding-top: 14px; border-top: 1px solid #F1F5F9; display: flex; flex-direction: column; gap: 10px">
+                  <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Sparat och klart</div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #22C55E"></ion-icon>
+                    <div style="flex: 1; min-width: 0"><div style="font-size: 14px; color: #334155">Rapporten sparad · 7 sep, 6 h</div></div>
+                    <span style="font-size: 13px; font-weight: 600; color: #0F766E">Kvittens</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #22C55E"></ion-icon>
+                    <div style="flex: 1; min-width: 0"><div style="font-size: 14px; color: #334155">ÄTA #1 skickad · 5 sep, SMS</div></div>
+                    <span style="font-size: 13px; font-weight: 600; color: #0F766E">Kvittens</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="ellipse-outline" style="font-size: 18px; color: #94A3B8"></ion-icon>
+                    <div style="flex: 1; min-width: 0"><div style="font-size: 14px; color: #475569">Rapport 8 sep · sparad, inte bekräftad</div><div style="font-size: 12px; color: #64748B">2 av 4 delar klara</div></div>
+                    <span style="font-size: 13px; font-weight: 600; color: #0F766E">Fortsätt</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px 16px; display: flex; align-items: center; gap: 10px">
+                <ion-icon name="document-text-outline" style="font-size: 20px; color: #0F766E"></ion-icon>
+                <div style="flex: 1; min-width: 0">
+                  <div style="font-size: 14px; font-weight: 600; color: #1E293B">Dokument och kvittenser</div>
+                  <div style="font-size: 12px; color: #64748B; margin-top: 1px">Signerad offert · ÄTA #1–2 · 7 dagboksrader</div>
+                </div>
+                <ion-icon name="chevron-forward" style="font-size: 18px; color: #94A3B8"></ion-icon>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px 16px">
+                <div style="display: flex; align-items: baseline; justify-content: space-between">
+                  <span style="font-size: 11px; font-weight: 700; color: #94A3B8; text-transform: uppercase; letter-spacing: 0.6px">Aktuell totalsumma</span>
+                  <span style="font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: #0F172A; font-variant-numeric: tabular-nums">142 400 kr</span>
+                </div>
+                <div style="font-size: 12px; color: #64748B; margin-top: 4px">Signerad offert 138 000 kr + ÄTA #1 4 400 kr</div>
+              </div>
+
+              <div style="display: flex; align-items: center; gap: 10px; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 16px; padding: 12px 14px">
+                <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 32px; height: 32px; border-radius: 16px; object-fit: cover">
+                <div style="flex: 1; min-height: 44px; display: flex; align-items: center; font-size: 14px; color: #0F766E; font-weight: 600">Lämna över något i det här jobbet</div>
+                <div style="width: 40px; height: 40px; border-radius: 20px; background: #0F766E; display: flex; align-items: center; justify-content: center"><ion-icon name="mic" style="font-size: 18px; color: #fff"></ion-icon></div>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="max-width: 340px; display: flex; flex-direction: column; gap: 16px; padding-top: 40px">
+        <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 18px">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 10px">Samma ord överallt</div>
+          <div style="font-size: 14px; line-height: 1.6; color: #475569">Ett arbetssteg heter samma sak och har samma status på startsidan, i Matte och inne i jobbet. ”Offert · kakel i hallen” med status <em style="font-style: normal; font-weight: 600; color: #0F766E">Planerat</em> ser identisk ut i alla tre ytorna.</div>
+        </div>
+        <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 18px">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 10px">Ingen aktivitet blir ett stort kort</div>
+          <div style="font-size: 14px; line-height: 1.6; color: #475569">Bara det som behöver dig får kortformat. Allt annat är en rad med status och nästa steg, som öppnas vid behov.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="1d" style="display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #0F766E; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 6px; padding: 3px 7px">1d</span>
+      <h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0F172A">Granskning → godkännande → resultat</h2>
+      <span style="font-size: 14px; color: #64748B">tre steg, aldrig ett</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 44px; align-items: flex-start">
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">1 · Granska</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Innehåll, mottagare och konsekvens innan något skickas.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="display: flex; align-items: center; gap: 8px; padding: 12px 16px; background: #fff; border-bottom: 1px solid #E2E8F0">
+              <ion-icon name="close" style="font-size: 24px; color: #1E293B"></ion-icon>
+              <span style="flex: 1; font-size: 17px; font-weight: 600; color: #1E293B">Granska offert</span>
+              <span style="display: inline-flex; align-items: center; gap: 5px; background: #FFFBEB; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 700; color: #B45309"><ion-icon name="alert-circle-outline" style="font-size: 13px"></ion-icon>Behöver dig</span>
+            </div>
+            <div style="flex: 1; overflow: auto; padding: 16px 16px 120px; display: flex; flex-direction: column; gap: 12px">
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+                <div style="display: flex; align-items: center; gap: 10px">
+                  <ion-icon name="person-outline" style="font-size: 18px; color: #64748B"></ion-icon>
+                  <div style="flex: 1"><div style="font-size: 14px; font-weight: 600; color: #1E293B">Anna Lindqvist</div><div style="font-size: 12px; color: #64748B">070 123 45 67 · anna@exempel.se</div></div>
+                </div>
+                <div style="display: flex; align-items: center; gap: 10px; padding-top: 10px; border-top: 1px solid #F1F5F9">
+                  <ion-icon name="paper-plane-outline" style="font-size: 18px; color: #64748B"></ion-icon>
+                  <div style="flex: 1"><div style="font-size: 14px; font-weight: 600; color: #1E293B">Skickas som SMS och e-post</div><div style="font-size: 12px; color: #64748B">Anna kan signera direkt i länken</div></div>
+                </div>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+                <div style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Det här skickas</div>
+                <div style="font-size: 15px; line-height: 1.55; color: #0F172A">Hej Anna! Här är offerten för badrummet: rivning, tätskikt, kakel och ny blandare. Totalt 24 800 kr inkl. moms, ROT-avdrag inräknat. Hör av dig om något ser fel ut.</div>
+                <div style="display: flex; flex-direction: column; gap: 8px; padding-top: 12px; border-top: 1px solid #F1F5F9">
+                  <div style="display: flex; justify-content: space-between; font-size: 14px; color: #334155"><span>Arbete 24 h</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">14 400 kr</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 14px; color: #334155"><span>Material</span><span style="font-weight: 600; font-variant-numeric: tabular-nums">10 400 kr</span></div>
+                  <div style="display: flex; justify-content: space-between; font-size: 15px; color: #0F172A; padding-top: 8px; border-top: 1px solid #F1F5F9"><span style="font-weight: 700">Totalt inkl. moms</span><span style="font-family: 'Space Grotesk', sans-serif; font-weight: 700; font-variant-numeric: tabular-nums">24 800 kr</span></div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: flex-start; gap: 10px; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px">
+                <ion-icon name="information-circle-outline" style="font-size: 18px; color: #475569; margin-top: 1px"></ion-icon>
+                <div style="flex: 1; font-size: 13px; line-height: 1.5; color: #475569">Firman har inte aktiverat automatiskt utskick för offerter. Ingenting går ut förrän du godkänner.</div>
+              </div>
+            </div>
+            <div style="position: absolute; left: 0; right: 0; bottom: 0; background: #fff; border-top: 1px solid #E2E8F0; padding: 12px 16px 30px; display: flex; gap: 8px">
+              <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border: 1px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-weight: 600; color: #64748B">Avvisa</div>
+              <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border: 1px solid #CCFBF1; border-radius: 12px; font-size: 14px; font-weight: 600; color: #0F766E">Ändra</div>
+              <div style="flex: 1.6; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Godkänn</div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">2 · Godkänn</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Ett separat, uttryckligt ja. Sista chansen att se vad som händer.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="min-height: 100%; display: flex; flex-direction: column; background: #F8FAFC">
+            <div style="flex: 1; background: rgba(15,23,42,0.45)"></div>
+            <div style="background: #F8FAFC; border-radius: 20px 20px 0 0; padding: 8px 16px 46px; display: flex; flex-direction: column; gap: 14px">
+              <div style="width: 36px; height: 4px; border-radius: 2px; background: #CBD5E1; margin: 0 auto"></div>
+              <div style="font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 700; color: #0F172A">Skicka offerten till Anna?</div>
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Mottagare</span><span style="font-weight: 600; color: #1E293B">Anna Lindqvist</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Kanal</span><span style="font-weight: 600; color: #1E293B">SMS och e-post</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Belopp</span><span style="font-weight: 600; color: #1E293B; font-variant-numeric: tabular-nums">24 800 kr</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px; padding-top: 10px; border-top: 1px solid #F1F5F9"><span style="color: #64748B">Efter utskick</span><span style="font-weight: 600; color: #1E293B">Daniel följer upp om 3 dagar</span></div>
+              </div>
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #E2E8F0; background: #fff; font-size: 14px; font-weight: 600; color: #334155">Avbryt</div>
+                <div style="flex: 1.4; min-height: 48px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff"><ion-icon name="paper-plane-outline" style="font-size: 18px"></ion-icon>Ja, skicka nu</div>
+              </div>
+              <div style="font-size: 12px; color: #64748B; text-align: center">Du kan ångra i 5 sekunder efteråt.</div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">3 · Resultat med kvittens</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Belagt resultat: vad, till vem, när. Ingen uppskattad tidsbesparing.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="background: #F8FAFC; height: 100%; box-sizing: border-box; padding: 54px 0 0; position: relative; display: flex; flex-direction: column; overflow: hidden">
+            <div style="flex: 1; overflow: auto; padding: 24px 16px 40px; display: flex; flex-direction: column; gap: 16px">
+              <div style="display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 12px 0 4px">
+                <div style="width: 56px; height: 56px; border-radius: 28px; background: #F0FDF4; border: 1px solid #BBF7D0; display: flex; align-items: center; justify-content: center"><ion-icon name="checkmark" style="font-size: 28px; color: #166534"></ion-icon></div>
+                <div style="font-family: 'Space Grotesk', sans-serif; font-size: 22px; font-weight: 700; color: #0F172A">Offerten är skickad</div>
+                <div style="font-size: 14px; color: #475569; text-align: center; max-width: 300px">Anna har fått den på SMS och e-post. Du behöver inte göra något mer nu.</div>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="font-size: 11px; font-weight: 700; letter-spacing: 0.8px; color: #94A3B8; text-transform: uppercase">Kvittens</span>
+                  <span style="margin-left: auto; display: inline-flex; align-items: center; gap: 4px; background: #F0FDF4; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 700; color: #166534"><ion-icon name="checkmark-circle-outline" style="font-size: 13px"></ion-icon>Klart</span>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Skickat</span><span style="font-weight: 600; color: #1E293B; font-variant-numeric: tabular-nums">Idag 08:14</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Till</span><span style="font-weight: 600; color: #1E293B">Anna Lindqvist</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Belopp</span><span style="font-weight: 600; color: #1E293B; font-variant-numeric: tabular-nums">24 800 kr</span></div>
+                <div style="display: flex; justify-content: space-between; font-size: 14px"><span style="color: #64748B">Godkänt av</span><span style="font-weight: 600; color: #1E293B">Dig, 08:14</span></div>
+                <div style="min-height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #E2E8F0; border-radius: 12px; font-size: 14px; font-weight: 600; color: #334155; margin-top: 2px">Öppna kvittensen</div>
+              </div>
+
+              <div style="display: flex; align-items: flex-start; gap: 10px; background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px">
+                <ion-icon name="arrow-forward-circle-outline" style="font-size: 20px; color: #0F766E; margin-top: 1px"></ion-icon>
+                <div style="flex: 1">
+                  <div style="font-size: 14px; font-weight: 600; color: #1E293B">Nästa: Daniel följer upp</div>
+                  <div style="font-size: 13px; color: #64748B; margin-top: 2px">Om Anna inte svarat till torsdag förbereder han en påminnelse som du godkänner.</div>
+                </div>
+              </div>
+
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border: 1px solid #E2E8F0; background: #fff; border-radius: 12px; font-size: 14px; font-weight: 600; color: #334155">Visa i jobbet</div>
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Klart</div>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+    </div>
+  </div>
+  <div id="1e" style="display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #0F766E; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 6px; padding: 3px 7px">1e</span>
+      <h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0F172A">Återupptagning och verkliga förhållanden</h2>
+      <span style="font-size: 14px; color: #64748B">avbruten rapport, svag uppkoppling, osäker sparstatus</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 44px; align-items: flex-start">
+
+      <div style="display: flex; flex-direction: column; gap: 12px; max-width: 402px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Halvfärdig rapport</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Sparade delar, kvarvarande steg och en handling: fortsätt där du var.</div>
+        <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+          <div style="min-height: 100%; display: flex; flex-direction: column; background: #F8FAFC">
+            <div style="flex: 1; background: rgba(15,23,42,0.45)"></div>
+            <div style="background: #F8FAFC; border-radius: 20px 20px 0 0; padding: 8px 16px 46px; display: flex; flex-direction: column; gap: 14px">
+              <div style="width: 36px; height: 4px; border-radius: 2px; background: #CBD5E1; margin: 0 auto"></div>
+              <div style="display: flex; align-items: center; gap: 8px">
+                <img src="assets/ai-team/Matte.png" alt="Matte" style="width: 28px; height: 28px; border-radius: 14px; object-fit: cover">
+                <span style="font-size: 15px; font-weight: 700; color: #1E293B">Rapport · Villa Ekvägen</span>
+                <span style="margin-left: auto; font-size: 12px; color: #64748B">8 sep</span>
+              </div>
+
+              <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 16px; display: flex; flex-direction: column; gap: 12px">
+                <div style="display: flex; align-items: center; gap: 8px">
+                  <span style="display: inline-flex; align-items: center; gap: 5px; background: #F1F5F9; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 700; color: #475569"><ion-icon name="save-outline" style="font-size: 13px"></ion-icon>Sparat, inte bekräftat</span>
+                  <span style="margin-left: auto; font-size: 12px; font-weight: 600; color: #64748B">2 av 4</span>
+                </div>
+                <div style="display: flex; flex-direction: column; gap: 10px">
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #22C55E"></ion-icon>
+                    <span style="flex: 1; font-size: 14px; color: #334155">Tid · 6 timmar</span>
+                    <span style="font-size: 13px; font-weight: 600; color: #0F766E">Ändra</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="checkmark-circle" style="font-size: 18px; color: #22C55E"></ion-icon>
+                    <span style="flex: 1; font-size: 14px; color: #334155">Arbetsbeskrivning</span>
+                    <span style="font-size: 13px; font-weight: 600; color: #0F766E">Ändra</span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="ellipse-outline" style="font-size: 18px; color: #94A3B8"></ion-icon>
+                    <span style="flex: 1; font-size: 14px; color: #475569">Foton <span style="color: #94A3B8">(valfritt)</span></span>
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 10px">
+                    <ion-icon name="ellipse-outline" style="font-size: 18px; color: #94A3B8"></ion-icon>
+                    <span style="flex: 1; font-size: 14px; color: #475569">Extra arbete som ska prissättas</span>
+                  </div>
+                </div>
+              </div>
+
+              <div style="display: flex; align-items: flex-start; gap: 10px; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 12px; padding: 12px">
+                <ion-icon name="cloud-offline-outline" style="font-size: 18px; color: #B45309; margin-top: 1px"></ion-icon>
+                <div style="flex: 1"><div style="font-size: 14px; font-weight: 700; color: #B45309">Svag uppkoppling</div><div style="font-size: 13px; line-height: 1.5; color: #92400E; margin-top: 2px">Det du skrivit ligger kvar i telefonen och skickas när du är online. Inget är förlorat.</div></div>
+              </div>
+
+              <div style="display: flex; gap: 8px">
+                <div style="flex: 1; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; border: 1px solid #E2E8F0; background: #fff; font-size: 14px; font-weight: 600; color: #334155">Spara och stäng</div>
+                <div style="flex: 1.3; min-height: 48px; display: flex; align-items: center; justify-content: center; border-radius: 12px; background: #0F766E; font-size: 15px; font-weight: 700; color: #fff">Fortsätt</div>
+              </div>
+            </div>
+          </div>
+        </x-import>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 16px; max-width: 420px; padding-top: 40px">
+        <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 18px; display: flex; flex-direction: column; gap: 14px">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Lägen som måste synas</div>
+          <div style="display: flex; flex-direction: column; gap: 10px">
+            <div style="display: flex; align-items: center; gap: 10px; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px 12px">
+              <span style="width: 16px; height: 16px; border-radius: 8px; border: 2px solid #CBD5E1; border-top-color: #0F766E"></span>
+              <span style="flex: 1; font-size: 13px; color: #475569">Laddar — skelett, aldrig tom yta</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; background: #FFFBEB; border: 1px solid #FCD34D; border-radius: 12px; padding: 10px 12px">
+              <ion-icon name="cloud-offline-outline" style="font-size: 16px; color: #B45309"></ion-icon>
+              <span style="flex: 1; font-size: 13px; color: #92400E">Offline — visar senast hämtade, sparar lokalt</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; background: #FEF2F2; border: 1px solid #FECACA; border-radius: 12px; padding: 10px 12px">
+              <ion-icon name="alert-circle-outline" style="font-size: 16px; color: #B91C1C"></ion-icon>
+              <span style="flex: 1; font-size: 13px; color: #991B1B">Fel — samma bekräftelse igen, aldrig dubbel post</span>
+            </div>
+            <div style="display: flex; align-items: center; gap: 10px; background: #F1F5F9; border: 1px solid #E2E8F0; border-radius: 12px; padding: 10px 12px">
+              <ion-icon name="save-outline" style="font-size: 16px; color: #475569"></ion-icon>
+              <span style="flex: 1; font-size: 13px; color: #475569">Osäker sparstatus — ”sparas när du är online”</span>
+            </div>
+          </div>
+        </div>
+        <div style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 18px">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A; margin-bottom: 10px">Rörelse som förklarar</div>
+          <div style="font-size: 14px; line-height: 1.6; color: #475569">Status byter med en 250 ms tonövergång plus glyfbyte, så färg aldrig är enda signalen. Beslutskortet lämnar ytan uppåt när det är godkänt och ersätts av kvittensraden — samma innehåll, ny status. Inga studsar.</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <div id="1f" style="display: flex; flex-direction: column; gap: 20px">
+    <div style="display: flex; align-items: baseline; gap: 12px">
+      <span style="font-family: 'Space Grotesk', sans-serif; font-size: 12px; font-weight: 700; color: #0F766E; background: #F0FDFA; border: 1px solid #CCFBF1; border-radius: 6px; padding: 3px 7px">1f</span>
+      <h2 style="margin: 0; font-family: 'Space Grotesk', sans-serif; font-size: 24px; font-weight: 700; color: #0F172A">Gemensamma komponenter</h2>
+      <span style="font-size: 14px; color: #64748B">status, nästa steg, beslut, kvittens</span>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 24px">
+      <div style="flex: 1 1 360px; min-width: 320px; background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Status — glyf, ord och ton</div>
+        <div style="font-size: 13px; line-height: 1.5; color: #64748B">Fem lägen, aldrig färg som enda bärare. Ordet är alltid med.</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 8px">
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #F1F5F9; border-radius: 9999px; padding: 5px 11px 5px 9px; font-size: 13px; font-weight: 700; color: #475569"><ion-icon name="arrow-down-circle-outline" style="font-size: 14px"></ion-icon>Mottaget</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #F0FDFA; border-radius: 9999px; padding: 5px 11px 5px 9px; font-size: 13px; font-weight: 700; color: #0F766E"><ion-icon name="calendar-outline" style="font-size: 14px"></ion-icon>Planerat</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #EFF6FF; border-radius: 9999px; padding: 5px 11px 5px 9px; font-size: 13px; font-weight: 700; color: #1D4ED8"><ion-icon name="ellipse" style="font-size: 8px"></ion-icon>Pågår</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #FFFBEB; border-radius: 9999px; padding: 5px 11px 5px 9px; font-size: 13px; font-weight: 700; color: #B45309"><ion-icon name="alert-circle-outline" style="font-size: 14px"></ion-icon>Behöver dig</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #F0FDF4; border-radius: 9999px; padding: 5px 11px 5px 9px; font-size: 13px; font-weight: 700; color: #166534"><ion-icon name="checkmark-circle-outline" style="font-size: 14px"></ion-icon>Klart</span>
+          <span style="display: inline-flex; align-items: center; gap: 5px; background: #F1F5F9; border-radius: 9999px; padding: 5px 11px 5px 9px; font-size: 13px; font-weight: 700; color: #475569"><ion-icon name="save-outline" style="font-size: 14px"></ion-icon>Sparat, inte bekräftat</span>
+        </div>
+        <div style="font-size: 13px; line-height: 1.6; color: #475569; padding-top: 10px; border-top: 1px solid #F1F5F9"><strong style="color: #0F172A">Skiljelinjer:</strong> förberett ≠ skickat · planerat ≠ utfört · sparat ≠ bekräftat · bekräftat resultat ≠ uppskattning.</div>
+      </div>
+
+      <div style="flex: 1 1 360px; min-width: 320px; background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Nästa steg och kvittens</div>
+        <div style="display: flex; align-items: flex-start; gap: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px">
+          <ion-icon name="arrow-forward-circle-outline" style="font-size: 18px; color: #0F766E; margin-top: 1px"></ion-icon>
+          <div style="flex: 1"><div style="font-size: 14px; font-weight: 600; color: #1E293B">Nästa: Karin förbereder påminnelse</div><div style="font-size: 12px; color: #64748B; margin-top: 1px">Fre 12 sep · 09:00 · du godkänner först</div></div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px; background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 12px; padding: 12px">
+          <ion-icon name="checkmark-circle" style="font-size: 18px; color: #22C55E"></ion-icon>
+          <div style="flex: 1"><div style="font-size: 14px; font-weight: 600; color: #1E293B">Offerten skickad</div><div style="font-size: 12px; color: #64748B; margin-top: 1px">08:14 · Anna Lindqvist · SMS och e-post</div></div>
+          <span style="font-size: 13px; font-weight: 600; color: #0F766E">Kvittens</span>
+        </div>
+        <div style="font-size: 13px; line-height: 1.6; color: #475569; padding-top: 10px; border-top: 1px solid #F1F5F9">Resultat visas bara när det finns kvittens. Ingen sparad tid, inga intäktslöften, inga aktivitetsräknare.</div>
+      </div>
+
+      <div style="flex: 1 1 360px; min-width: 320px; background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 20px; display: flex; flex-direction: column; gap: 14px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; font-weight: 700; color: #0F172A">Beslutskortet</div>
+        <div style="background: #F8FAFC; border: 1px solid #E2E8F0; border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px">
+          <span style="display: inline-flex; align-self: flex-start; align-items: center; gap: 5px; background: #FFFBEB; border-radius: 9999px; padding: 3px 9px 3px 7px; font-size: 12px; font-weight: 700; color: #B45309"><ion-icon name="alert-circle-outline" style="font-size: 13px"></ion-icon>Behöver dig</span>
+          <div style="font-size: 16px; font-weight: 700; color: #0F172A">Rubrik: vad beslutet gäller</div>
+          <div style="font-size: 13px; line-height: 1.5; color: #475569">En rad om varför och vad som händer om du säger ja. Aldrig mer.</div>
+          <div style="display: flex; gap: 8px">
+            <div style="flex: 1.6; min-height: 44px; display: flex; align-items: center; justify-content: center; background: #0F766E; border-radius: 12px; font-size: 14px; font-weight: 700; color: #fff">Granska</div>
+            <div style="flex: 1; min-height: 44px; display: flex; align-items: center; justify-content: center; border: 1px solid #E2E8F0; background: #fff; border-radius: 12px; font-size: 14px; font-weight: 600; color: #64748B">Senare</div>
+          </div>
+        </div>
+        <div style="font-size: 13px; line-height: 1.6; color: #475569">Ett beslut i taget i Mission Control. Övriga ligger som rader under Godkänn-fliken, i samma ordning och med samma ord.</div>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+</body>
+</html>
