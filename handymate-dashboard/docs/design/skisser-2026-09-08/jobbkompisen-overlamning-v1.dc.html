@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet data-dc-atomics>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/colors_and_type.css">
+<link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/styles.css">
+<script src="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/_ds_bundle.js"></script>
+<script src="./image-slot.js"></script>
+<style>
+body{margin:0;background:#eef0f3;font-family:'DM Sans',system-ui,sans-serif;color:#1e293b}
+a{color:#0f766e}a:hover{color:#115e59}
+.dv-turn{padding:40px 44px 32px;border-bottom:1px solid rgba(0,0,0,.08);scroll-margin-top:16px}
+.dv-thd{display:flex;align-items:baseline;gap:10px;margin:0 0 20px}
+.dv-tid{font:600 10px ui-monospace,Menlo,monospace;padding:3px 7px;background:#1a1a1a;color:#fff;border-radius:4px;text-decoration:none}
+.dv-tname{font:600 13px/1.2 'DM Sans',system-ui,sans-serif;color:#1a1a1a}
+.dv-opts{display:flex;flex-wrap:wrap;gap:36px;align-items:flex-start}
+.dv-opt{flex:none;display:flex;flex-direction:column;gap:10px;scroll-margin-top:16px}
+.dv-oid{font:600 10.5px ui-monospace,Menlo,monospace;padding:3px 7px;background:rgba(0,0,0,.08);color:#1a1a1a;border-radius:5px;text-decoration:none}
+.dv-olabel{display:flex;align-items:baseline;gap:8px;font:500 12px/1.3 'DM Sans',system-ui,sans-serif;color:rgba(0,0,0,.6)}
+.dv-opt:target .dv-oid{background:#0f766e;color:#fff}
+.dv-next{margin:22px 0 0;font:12px/1.5 'DM Sans',system-ui,sans-serif;color:rgba(0,0,0,.5)}
+@keyframes hm-pulse{0%{transform:scale(1);opacity:.6}100%{transform:scale(2.2);opacity:0}}
+@keyframes hm-caret{0%,100%{opacity:1}50%{opacity:0}}
+image-slot[id^="matte-"]:not([data-filled]){opacity:0}
+image-slot[id^="matte-"]:not([data-filled]):hover{opacity:.9}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+</style>
+</helmet>
+
+<section class="dv-turn" id="t1">
+<div class="dv-thd"><a class="dv-tid" href="#t1">1</a><span class="dv-tname">Överlämning till teamet · artboard 1–4 · mobil 375 / desktop 1280</span></div>
+
+<div style="display:flex;flex-wrap:wrap;gap:16px;margin:0 0 28px;align-items:flex-start">
+  <div style="width:560px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;font-size:13px;line-height:1.55;color:#334155">
+    <div style="font:700 11px/1 'DM Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#0f766e;margin-bottom:10px">Antaganden och beslut i skissen</div>
+    <div style="display:grid;gap:6px">
+      <div>Geometrin behålls: launcher 56×56 radie 16, panel 400×560, fixed 24 px från kant. Mikrofonknappen 44 px står kvar.</div>
+      <div>På mobil blir panelen ett bottenark i full bredd (radie 24 upptill, 85 % höjd) i stället för en 400-kort ovanpå 375-skärmen.</div>
+      <div>Väntande notis i bärnsten byter från vit text på amber-500 (2,3:1) till amber-900 på amber-100 (AA). Betydelsen är densamma.</div>
+      <div>Porträtt är bildplatser (dra in filen från Supabase). Reservläget är initialen på agentfärgen, som <span style="font-family:'JetBrains Mono',monospace;font-size:12px">AgentAvatar</span> gör i dag.</div>
+      <div>Inga klockslag ritas. Bevakningar står som «Bevakar». Beräknade tal är märkta Uppskattat.</div>
+    </div>
+  </div>
+  <div style="width:300px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:18px 20px;font-size:13px;line-height:1.55;color:#334155">
+    <div style="font:700 11px/1 'DM Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#0f766e;margin-bottom:10px">Datamarkering</div>
+    <div style="display:grid;gap:8px">
+      <div style="display:flex;gap:8px;align-items:center"><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · fält</span><span>kopplat till en rad i dag</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#fef3c7;color:#78350f;border:1px solid #fcd34d">Backend · vad</span><span>kräver att Codex bygger primitiven</span></div>
+      <div style="display:flex;gap:8px;align-items:center"><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel</span><span>designregel, ingen data</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="dv-opts">
+
+<!-- ═══════════ 1a Jobbkompisen i vila ═══════════ -->
+<div class="dv-opt" id="1a">
+<div class="dv-olabel"><a class="dv-oid" href="#1a">1a</a>Jobbkompisen i vila — tre lägen, mobil och desktop</div>
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="font:500 11px 'DM Sans',sans-serif;color:#64748b">Tyst</div>
+    <div data-screen-label="1a Tyst" style="width:375px;height:380px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+      <div style="height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:24px;height:24px;border-radius:6px;background:#e2e8f0"></div><div style="font:600 15px 'Space Grotesk',sans-serif;color:#1e293b">Badrum hos Andersson</div></div>
+      <div style="padding:16px;display:grid;gap:10px"><div style="height:72px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:48px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:48px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+            <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:center;gap:8px">
+        <div style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+        <div style="width:56px;height:56px;border-radius:16px;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);overflow:hidden;position:relative">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 18px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-launcher-1" shape="rounded" radius="15" placeholder=""></image-slot>
+        </div>
+      </div>
+          </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · sidkontext project</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · team.avatar</span></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="font:500 11px 'DM Sans',sans-serif;color:#64748b">Ett tips</div>
+    <div data-screen-label="1a Tips" style="width:375px;height:380px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+      <div style="height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:24px;height:24px;border-radius:6px;background:#e2e8f0"></div><div style="font:600 15px 'Space Grotesk',sans-serif;color:#1e293b">Badrum hos Andersson</div></div>
+      <div style="padding:16px;display:grid;gap:10px"><div style="height:72px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:48px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:48px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+      <div style="position:absolute;right:24px;bottom:92px;max-width:290px;background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 4px 16px;box-shadow:0 8px 30px rgba(15,118,110,.12);padding:10px 8px 10px 14px;display:flex;align-items:flex-start;gap:6px">
+        <div style="font-size:14px;line-height:1.4;color:#1e293b;padding-top:2px">Säg vad du gjorde här i dag, så skriver jag dagboken.</div>
+        <div aria-label="Stäng tipset" style="width:36px;height:36px;margin:-6px -2px -6px 0;flex:none;display:flex;align-items:center;justify-content:center;color:#94a3b8;border-radius:10px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+      </div>
+            <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:center;gap:8px">
+        <div style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+        <div style="width:56px;height:56px;border-radius:16px;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);overflow:hidden;position:relative">
+          <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 18px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-launcher-2" shape="rounded" radius="15" placeholder=""></image-slot>
+        </div>
+      </div>
+    </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · quickActions(page)</span></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="font:500 11px 'DM Sans',sans-serif;color:#64748b">Väntande notis</div>
+    <div data-screen-label="1a Notis" style="width:375px;height:380px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+      <div style="height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:24px;height:24px;border-radius:6px;background:#e2e8f0"></div><div style="font:600 15px 'Space Grotesk',sans-serif;color:#1e293b">Badrum hos Andersson</div></div>
+      <div style="padding:16px;display:grid;gap:10px"><div style="height:72px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:48px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:48px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+      <div style="position:absolute;right:24px;bottom:92px;height:36px;padding:0 14px 0 12px;background:#fef3c7;border:1px solid #fcd34d;border-radius:9999px;display:flex;align-items:center;gap:8px;box-shadow:0 8px 30px rgba(120,53,15,.10)">
+        <span style="width:8px;height:8px;border-radius:50%;background:#d97706"></span>
+        <span style="font:600 13px 'DM Sans',sans-serif;color:#78350f">1 sak behöver dig</span>
+      </div>
+            <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:center;gap:8px">
+        <div style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+        <div style="width:56px;height:56px;border-radius:16px;background:#fff;border:1px solid #fcd34d;box-shadow:0 8px 30px rgba(15,118,110,.1);position:relative">
+          <div style="width:100%;height:100%;border-radius:15px;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 18px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-launcher-3" shape="rounded" radius="15" placeholder=""></image-slot></div>
+          <span style="position:absolute;top:-4px;right:-4px;width:14px;height:14px;border-radius:50%;background:#d97706;border:2px solid #f8fafc"></span>
+        </div>
+      </div>
+    </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · pending_approvals count</span></div>
+  </div>
+
+  <div style="width:300px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;font-size:13px;line-height:1.5;color:#334155;display:grid;gap:12px">
+    <div><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel</span></div>
+    <div><strong style="color:#0f172a">Tyst</strong> är grundläget. Bara porträttet, ingen siffra, ingen puls.</div>
+    <div><strong style="color:#0f172a">Ett tips</strong> visas tidigast 20 s efter att sidan laddats, högst ett per sida och dag, aldrig om en notis väntar. Texten är sidans egna quickAction, skriven som en mening. Försvinner efter 8 s eller vid × / svep åt höger. Tre avklick i rad utan tryck: tyst i 14 dagar. Träffyta × 44×44 (36 synligt + padding).</div>
+    <div><strong style="color:#0f172a">Väntande notis</strong> går alltid före tipset. Räknaren är antal öppna rader i Behöver dig. Bärnsten på pillret och pricken, ingen röd badge. Pillret öppnar samtalet på kortet.</div>
+    <div style="color:#64748b">Alla tre: launchern trycks till scale .98 på 100 ms. Ingen flytloop.</div>
+  </div>
+</div>
+
+<div style="margin-top:8px;font:500 11px 'DM Sans',sans-serif;color:#64748b">Desktop 1280 · tipsläget</div>
+<div data-screen-label="1a Desktop" style="width:1280px;height:420px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden;display:flex">
+  <div style="width:240px;background:#fff;border-right:1px solid #e2e8f0;padding:20px 16px;display:grid;gap:10px;align-content:start">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:#0f766e"></div><div style="font:700 15px 'Space Grotesk',sans-serif;color:#0f172a">Handymate</div></div>
+    <div style="height:36px;border-radius:10px;background:#f0fdf9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div>
+  </div>
+  <div style="flex:1;padding:28px 32px;display:grid;gap:14px;align-content:start">
+    <div style="font:600 22px 'Space Grotesk',sans-serif;color:#0f172a;letter-spacing:-.02em">Badrum hos Andersson</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px"><div style="height:96px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:96px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:96px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+    <div style="height:140px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div>
+  </div>
+  <div style="position:absolute;right:24px;bottom:92px;max-width:320px;background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 4px 16px;box-shadow:0 8px 30px rgba(15,118,110,.12);padding:10px 8px 10px 14px;display:flex;align-items:flex-start;gap:6px">
+    <div style="font-size:14px;line-height:1.4;color:#1e293b;padding-top:2px">Fråga mig vad Andersson har kostat hittills.</div>
+    <div style="width:36px;height:36px;margin:-6px -2px -6px 0;flex:none;display:flex;align-items:center;justify-content:center;color:#94a3b8"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+  </div>
+  <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:center;gap:8px">
+    <div style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+    <div style="width:56px;height:56px;border-radius:16px;background:#fff;border:1px solid #99f6e0;box-shadow:0 8px 30px rgba(15,118,110,.1);overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 18px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-launcher-4" shape="rounded" radius="15" placeholder=""></image-slot></div>
+  </div>
+  </div>
+<div style="width:1280px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel · samma geometri som mobil, fixed 24/24</span></div>
+</div>
+
+<!-- ═══════════ 1b Samtalet ═══════════ -->
+<div class="dv-opt" id="1b">
+<div class="dv-olabel"><a class="dv-oid" href="#1b">1b</a>Samtalet — bubblan växer, svaret kommer löpande (fråga med källa)</div>
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="font:500 11px 'DM Sans',sans-serif;color:#64748b">A · Tryck</div>
+    <div data-screen-label="1b Tryck" style="width:375px;height:700px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+      <div style="height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:24px;height:24px;border-radius:6px;background:#e2e8f0"></div><div style="font:600 15px 'Space Grotesk',sans-serif;color:#1e293b">Hem</div></div>
+      <div style="padding:16px;display:grid;gap:10px"><div style="height:120px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:64px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:64px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+      <div style="position:absolute;right:24px;bottom:24px;display:flex;align-items:center;gap:8px">
+        <div style="width:44px;height:44px;border-radius:50%;background:#fff;border:1px solid #99f6e0;display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+        <div style="width:56px;height:56px;border-radius:16px;background:#fff;border:2px solid #0f766e;transform:scale(.98);box-shadow:0 0 0 6px rgba(15,118,110,.12);overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 18px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-launcher-5" shape="rounded" radius="14" placeholder=""></image-slot></div>
+      </div>
+          </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel · press scale .98 · 100 ms</span></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="font:500 11px 'DM Sans',sans-serif;color:#64748b">B · Växer (bildruta ~90 ms)</div>
+    <div data-screen-label="1b Växer" style="width:375px;height:700px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+      <div style="height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:24px;height:24px;border-radius:6px;background:#e2e8f0"></div><div style="font:600 15px 'Space Grotesk',sans-serif;color:#1e293b">Hem</div></div>
+      <div style="padding:16px;display:grid;gap:10px"><div style="height:120px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:64px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:64px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+      <div style="position:absolute;inset:0;background:rgba(15,23,42,.18)"></div>
+      <div style="position:absolute;right:0;bottom:0;width:375px;height:595px;transform-origin:calc(100% - 52px) calc(100% - 52px);transform:scale(.5);opacity:.7;background:rgba(255,255,255,.95);border-radius:24px 24px 0 0;box-shadow:0 -8px 40px rgba(15,23,42,.18);overflow:hidden">
+        <div style="height:60px;background:#0f766e;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 14px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-header-1" shape="circle" placeholder=""></image-slot></div><div style="font:600 16px 'Space Grotesk',sans-serif;color:#fff">Matte</div></div>
+      </div>
+          </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel · 180 ms cubic-bezier(.2,.8,.2,1) · origin = launcherns mitt · scale .15→1 + opacity · tryck var som helst hoppar till slutet · reduced-motion: bara opacity 80 ms</span></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:8px">
+    <div style="font:500 11px 'DM Sans',sans-serif;color:#64748b">C · Öppet · fråga → svar med källa</div>
+    <div data-screen-label="1b Öppet" style="width:375px;height:700px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+      <div style="height:56px;background:#fff;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;padding:0 16px;gap:10px"><div style="width:24px;height:24px;border-radius:6px;background:#e2e8f0"></div><div style="font:600 15px 'Space Grotesk',sans-serif;color:#1e293b">Hem</div></div>
+      <div style="position:absolute;inset:0;background:rgba(15,23,42,.35)"></div>
+      <div style="position:absolute;left:0;right:0;bottom:0;height:595px;background:#fff;border-radius:24px 24px 0 0;box-shadow:0 -8px 40px rgba(15,23,42,.18);display:flex;flex-direction:column;overflow:hidden">
+        <div style="height:60px;background:#0f766e;display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex:none">
+          <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 14px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-header-2" shape="circle" placeholder=""></image-slot></div><div><div style="font:600 16px/1.1 'Space Grotesk',sans-serif;color:#fff">Matte</div><div style="font:400 11px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.75)">Chefsagent · teamet lyssnar</div></div></div>
+          <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#fff"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+        </div>
+        <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;overflow:hidden">
+          <div style="display:flex;justify-content:flex-end"><div style="max-width:85%;background:#0f766e;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.5">Hur mycket har vi fakturerat på Solvägen?</div></div>
+          <div style="display:flex;gap:10px">
+            <div style="width:28px;height:28px;border-radius:50%;background:#0f766e;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none;margin-top:16px">M</div>
+            <div style="max-width:85%;min-width:0">
+              <div style="font-size:11px;color:#64748b;margin-bottom:4px">Matte · Chefsagent sammanställde</div>
+              <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;line-height:1.55;color:#1e293b">Ni har fakturerat <strong>148 200 kr</strong> på Solvägen 12, i tre fakturor. Två är betalda, den tredje på 42 600 kr förföll för fem dagar sedan<span style="display:inline-block;width:2px;height:15px;background:#0f766e;margin-left:2px;vertical-align:-2px;animation:hm-caret 1s steps(1) infinite"></span></div>
+              <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+                <div style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:9999px;background:#f0fdf9;border:1px solid #99f6e0;font-size:12px;color:#115e59;font-weight:500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><path d="M14 2v6h6"></path></svg>Källa: 3 fakturor · Solvägen 12 →</div>
+              </div>
+            </div>
+          </div>
+          <div style="margin-top:auto;display:flex;flex-wrap:wrap;gap:6px">
+            <span style="font-size:11px;color:#94a3b8;width:100%;font-weight:600;letter-spacing:.14em;text-transform:uppercase">Här kan du också</span>
+            <div style="height:36px;padding:0 12px;border-radius:9999px;border:1px solid #e2e8f0;background:#fff;font-size:13px;color:#475569;display:flex;align-items:center">Påminn om den förfallna</div>
+            <div style="height:36px;padding:0 12px;border-radius:9999px;border:1px solid #e2e8f0;background:#fff;font-size:13px;color:#475569;display:flex;align-items:center">Vad är kvar att fakturera?</div>
+          </div>
+        </div>
+        <div style="padding:12px 16px 20px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex:none">
+          <div style="width:44px;height:44px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0;display:flex;align-items:center;justify-content:center;color:#64748b"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg></div>
+          <div style="flex:1;height:44px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#94a3b8">Fråga, be om något eller berätta…</div>
+          <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid #99f6e0;display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+        </div>
+      </div>
+                      </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#fef3c7;color:#78350f;border:1px solid #fcd34d">Backend · SSE / ReadableStream</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · invoices where project_id</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · AgentAvatar matte lg</span></div>
+  </div>
+
+  <div style="width:300px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;font-size:13px;line-height:1.5;color:#334155;display:grid;gap:12px">
+    <div><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel</span></div>
+    <div><strong style="color:#0f172a">Rubriken bär porträttet.</strong> Sparkles-ikonen och fliken Chat/Röst tas bort; röst är knappen i skrivraden. Rubriktexten "teamet lyssnar" säger att Matte lämnar över vid behov.</div>
+    <div><strong style="color:#0f172a">En fråga ger ett svar med källa.</strong> Ingen handling, inget kort. Källchippet öppnar listan svaret räknats på. Utan källa visas inget tal.</div>
+    <div><strong style="color:#0f172a">Löpande text</strong> visas med markör tills strömmen stänger. Chips «Här kan du också» kommer först när svaret är klart, och fyller skrivraden utan att skicka.</div>
+    <div style="color:#64748b">Samma sak i de fyra överlämningarna: samma skrivrad, olika svar. Uppgift → <a class="dv-oid" href="#1c">1c</a>. Uppdrag → Mission Control (artboard 6). Underlag → utkast att granska (artboard 5).</div>
+  </div>
+</div>
+
+<div style="margin-top:8px;font:500 11px 'DM Sans',sans-serif;color:#64748b">Desktop 1280 · panelen 400×560 öppen</div>
+<div data-screen-label="1b Desktop" style="width:1280px;height:640px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden;display:flex">
+  <div style="width:240px;background:#fff;border-right:1px solid #e2e8f0;padding:20px 16px;display:grid;gap:10px;align-content:start">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:#0f766e"></div><div style="font:700 15px 'Space Grotesk',sans-serif;color:#0f172a">Handymate</div></div>
+    <div style="height:36px;border-radius:10px;background:#f0fdf9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div>
+  </div>
+  <div style="flex:1;padding:28px 32px;display:grid;gap:14px;align-content:start">
+    <div style="font:600 22px 'Space Grotesk',sans-serif;color:#0f172a;letter-spacing:-.02em">Hem</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px"><div style="height:96px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:96px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div><div style="height:96px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div></div>
+    <div style="height:240px;background:#fff;border:1px solid #e2e8f0;border-radius:14px"></div>
+  </div>
+  <div style="position:absolute;right:24px;bottom:24px;width:400px;height:560px;background:rgba(255,255,255,.95);backdrop-filter:blur(20px);border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 20px 60px rgba(15,23,42,.18);display:flex;flex-direction:column;overflow:hidden">
+    <div style="height:60px;background:#0f766e;display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex:none">
+      <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 14px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-header-3" shape="circle" placeholder=""></image-slot></div><div><div style="font:600 16px/1.1 'Space Grotesk',sans-serif;color:#fff">Matte</div><div style="font:400 11px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.75)">Chefsagent · teamet lyssnar</div></div></div>
+      <div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;color:#fff"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+    </div>
+    <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:14px">
+      <div style="display:flex;justify-content:flex-end"><div style="max-width:85%;background:#0f766e;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.5">Hur mycket har vi fakturerat på Solvägen?</div></div>
+      <div style="display:flex;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:#0f766e;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none;margin-top:16px">M</div>
+        <div style="max-width:85%">
+          <div style="font-size:11px;color:#64748b;margin-bottom:4px">Matte · Chefsagent sammanställde</div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;line-height:1.55;color:#1e293b">Ni har fakturerat <strong>148 200 kr</strong> på Solvägen 12, i tre fakturor. Två är betalda, den tredje på 42 600 kr förföll för fem dagar sedan.</div>
+          <div style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:9999px;background:#f0fdf9;border:1px solid #99f6e0;font-size:12px;color:#115e59;font-weight:500;margin-top:8px;width:max-content">Källa: 3 fakturor · Solvägen 12 →</div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex:none">
+      <div style="width:40px;height:40px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0"></div>
+      <div style="flex:1;height:40px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#94a3b8">Fråga, be om något eller berätta…</div>
+      <div style="width:40px;height:40px;border-radius:12px;background:#fff;border:1px solid #99f6e0;display:flex;align-items:center;justify-content:center;color:#0f766e"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></div>
+    </div>
+  </div>
+  </div>
+<div style="width:1280px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel · växer från launcherns hörn, 400×560, bg #fff/95 + blur 20</span></div>
+</div>
+
+<!-- ═══════════ 1c Samtalet blir arbete ═══════════ -->
+<div class="dv-opt" id="1c">
+<div class="dv-olabel"><a class="dv-oid" href="#1c">1c</a>Samtalet blir arbete — svaret delar sig i information, teamets uppgifter och ett kort i Behöver dig</div>
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+
+  <div data-screen-label="1c Mobil" style="width:375px;height:920px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:rgba(15,23,42,.35)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:850px;background:#fff;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="height:60px;background:#0f766e;display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex:none">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 14px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-header-4" shape="circle" placeholder=""></image-slot></div><div><div style="font:600 16px/1.1 'Space Grotesk',sans-serif;color:#fff">Matte</div><div style="font:400 11px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.75)">Chefsagent · teamet lyssnar</div></div></div>
+        <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#fff"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+      </div>
+      <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:14px;overflow:hidden">
+        <div style="display:flex;justify-content:flex-end"><div style="max-width:85%;background:#0f766e;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.5">Följ upp offerten till Andersson.</div></div>
+        <div style="display:flex;gap:10px">
+          <div style="width:28px;height:28px;border-radius:50%;background:#0f766e;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none;margin-top:16px">M</div>
+          <div style="flex:1;min-width:0">
+            <div style="font-size:11px;color:#64748b;margin-bottom:4px">Matte · Chefsagent sammanställde</div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;line-height:1.55;color:#1e293b">Offerten på badrummet, 86 400 kr, skickades för nio dagar sedan och är inte öppnad. Så här tar vi det:</div>
+
+            <div style="margin-top:10px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff">
+              <div style="padding:8px 12px;font:600 10px/1 'DM Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0">Teamets uppgifter</div>
+              <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid #f1f5f9">
+                <div style="width:28px;height:28px;border-radius:50%;background:#d97706;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none">D</div>
+                <div style="flex:1;min-width:0;font-size:13px;line-height:1.45;color:#1e293b">Daniel har skrivit ett påminnelse-sms till Andersson.<div style="margin-top:3px;display:inline-flex;height:22px;padding:0 8px;border-radius:9999px;background:#fef3c7;border:1px solid #fcd34d;font-size:11px;font-weight:600;color:#78350f;align-items:center">Behöver dig</div></div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-bottom:1px solid #f1f5f9">
+                <div style="width:28px;height:28px;border-radius:50%;background:#d97706;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none">D</div>
+                <div style="flex:1;min-width:0;font-size:13px;line-height:1.45;color:#1e293b">Daniel säger till om offerten öppnas eller signeras.<div style="margin-top:3px;display:inline-flex;height:22px;padding:0 8px;border-radius:9999px;background:#f1f5f9;border:1px solid #e2e8f0;font-size:11px;font-weight:600;color:#475569;align-items:center">Bevakar</div></div>
+              </div>
+              <div style="display:flex;gap:10px;align-items:flex-start;padding:10px 12px">
+                <div style="width:28px;height:28px;border-radius:50%;background:#059669;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none">L</div>
+                <div style="flex:1;min-width:0;font-size:13px;line-height:1.45;color:#1e293b">Lars håller vecka 41 preliminär i kalendern tills du hör något.<div style="margin-top:3px;display:inline-flex;height:22px;padding:0 8px;border-radius:9999px;background:#f0fdf9;border:1px solid #99f6e0;font-size:11px;font-weight:600;color:#115e59;align-items:center">Klart</div></div>
+              </div>
+            </div>
+
+            <div style="margin-top:10px;border:1px solid #fcd34d;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 2px 8px rgba(15,23,42,.05)">
+              <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fffbeb;border-bottom:1px solid #fde68a">
+                <div style="display:flex;align-items:center;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#d97706;color:#fff;font:700 9px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center">D</div><span style="font-size:12px;color:#78350f;font-weight:600">Behöver dig · SMS</span></div>
+                <span style="font:500 10px 'JetBrains Mono',monospace;color:#92400e">apr_7f3e</span>
+              </div>
+              <div style="padding:12px">
+                <div style="font-size:14px;line-height:1.5;color:#1e293b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">Hej Andersson! Daniel här från Bergs Bygg. Vi skickade offerten på badrummet förra veckan. Hör gärna av dig om du har frågor. /Bergs Bygg</div>
+                <div style="display:flex;gap:8px;margin-top:10px">
+                  <div style="flex:1;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 14px rgba(15,118,110,.25)">Skicka</div>
+                  <div style="flex:1;height:44px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center">Ändra</div>
+                </div>
+                <div style="margin-top:8px;font-size:11px;color:#64748b">Inget går till kunden förrän du trycker Skicka.</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 16px 20px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex:none">
+        <div style="width:44px;height:44px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0"></div>
+        <div style="flex:1;height:44px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0;display:flex;align-items:center;padding:0 14px;font-size:14px;color:#94a3b8">Fråga, be om något eller berätta…</div>
+        <div style="width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid #99f6e0"></div>
+      </div>
+    </div>
+                  </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · quotes(status, sent_at, opened_at)</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#fef3c7;color:#78350f;border:1px solid #fcd34d">Backend · steglista med ansvarig agent</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#fef3c7;color:#78350f;border:1px solid #fcd34d">Backend · schemalagd bevakning · därför inget klockslag</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · pending_approvals send_sms · samma id som inkorgen</span></div>
+
+  <div style="width:300px;background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;font-size:13px;line-height:1.5;color:#334155;display:grid;gap:12px">
+    <div><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel</span></div>
+    <div><strong style="color:#0f172a">Tre delar i ett svar.</strong> Först det Matte vet (löpande text). Sedan «Teamets uppgifter» med ansvarig agent och läge. Sist kortet, bara om ett steg behöver dig.</div>
+    <div><strong style="color:#0f172a">Tre lägen på ett steg:</strong> Behöver dig (bärnsten), Bevakar (grått, aldrig med tid förrän primitiven finns), Klart (teal).</div>
+    <div><strong style="color:#0f172a">Kortet är raden</strong> i pending_approvals, med id synligt i hörnet. Godkänner du i inkorgen försvinner kortet här och steget byter till Klart. Ingen kopia, ingen synk.</div>
+    <div><strong style="color:#0f172a">Teamets uppgifter</strong> får ingen egen navigation. De syns här, i kundjobbet och i Mission Control.</div>
+  </div>
+</div>
+
+<div style="margin-top:8px;font:500 11px 'DM Sans',sans-serif;color:#64748b">Desktop 1280 · samma kort i Behöver dig och i samtalet</div>
+<div data-screen-label="1c Desktop" style="width:1280px;height:720px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden;display:flex">
+  <div style="width:240px;background:#fff;border-right:1px solid #e2e8f0;padding:20px 16px;display:grid;gap:10px;align-content:start">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><div style="width:28px;height:28px;border-radius:8px;background:#0f766e"></div><div style="font:700 15px 'Space Grotesk',sans-serif;color:#0f172a">Handymate</div></div>
+    <div style="height:36px;border-radius:10px;background:#f1f5f9"></div>
+    <div style="height:36px;border-radius:10px;background:#f0fdf9;display:flex;align-items:center;justify-content:space-between;padding:0 12px;font-size:13px;font-weight:600;color:#0f766e">Behöver dig <span style="min-width:20px;height:20px;padding:0 6px;border-radius:9999px;background:#fef3c7;border:1px solid #fcd34d;color:#78350f;font-size:11px;display:flex;align-items:center;justify-content:center">3</span></div>
+    <div style="height:36px;border-radius:10px;background:#f1f5f9"></div><div style="height:36px;border-radius:10px;background:#f1f5f9"></div>
+  </div>
+  <div style="flex:1;padding:28px 32px;display:grid;gap:14px;align-content:start;max-width:560px">
+    <div style="font:600 22px 'Space Grotesk',sans-serif;color:#0f172a;letter-spacing:-.02em">Behöver dig</div>
+    <div style="border:1px solid #fcd34d;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 0 0 4px rgba(217,119,6,.10)">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fffbeb;border-bottom:1px solid #fde68a">
+        <div style="display:flex;align-items:center;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#d97706;color:#fff;font:700 9px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center">D</div><span style="font-size:12px;color:#78350f;font-weight:600">SMS · Daniel</span><span style="font-size:12px;color:#92400e">· från ditt samtal med Matte</span></div>
+        <span style="font:500 10px 'JetBrains Mono',monospace;color:#92400e">apr_7f3e</span>
+      </div>
+      <div style="padding:12px;display:grid;gap:10px">
+        <div style="font-size:14px;font-weight:600;color:#0f172a">Påminn Andersson om offerten på badrummet</div>
+        <div style="font-size:13px;line-height:1.5;color:#1e293b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">Hej Andersson! Daniel här från Bergs Bygg. Vi skickade offerten på badrummet förra veckan. Hör gärna av dig om du har frågor. /Bergs Bygg</div>
+        <div style="display:flex;gap:8px"><div style="height:40px;padding:0 16px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-size:14px;font-weight:500;display:flex;align-items:center">Skicka</div><div style="height:40px;padding:0 16px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;font-size:14px;font-weight:500;display:flex;align-items:center">Ändra</div><div style="height:40px;padding:0 12px;color:#64748b;font-size:14px;display:flex;align-items:center">Avfärda</div></div>
+      </div>
+    </div>
+    <div style="border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:12px;display:flex;gap:10px;align-items:center"><div style="width:28px;height:28px;border-radius:50%;background:#2563eb;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center">K</div><div style="flex:1;font-size:14px;color:#0f172a;font-weight:500">Påminn om 42 600 kr · Solvägen 12</div><span style="font-size:12px;color:#64748b">Faktura · Karin</span></div>
+    <div style="border:1px solid #e2e8f0;border-radius:14px;background:#fff;padding:12px;display:flex;gap:10px;align-items:center"><div style="width:28px;height:28px;border-radius:50%;background:#059669;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center">L</div><div style="flex:1;font-size:14px;color:#0f172a;font-weight:500">Boka platsbesök hos Ek</div><span style="font-size:12px;color:#64748b">Bokning · Lars</span></div>
+  </div>
+      <div style="position:absolute;right:24px;bottom:24px;width:400px;height:560px;background:rgba(255,255,255,.95);border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 20px 60px rgba(15,23,42,.18);display:flex;flex-direction:column;overflow:hidden">
+    <div style="height:60px;background:#0f766e;display:flex;align-items:center;padding:0 16px;gap:10px;flex:none"><div style="width:36px;height:36px;border-radius:50%;background:#fff;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 14px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-header-5" shape="circle" placeholder=""></image-slot></div><div><div style="font:600 16px/1.1 'Space Grotesk',sans-serif;color:#fff">Matte</div><div style="font:400 11px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.75)">Chefsagent · teamet lyssnar</div></div></div>
+    <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+      <div style="display:flex;justify-content:flex-end"><div style="max-width:85%;background:#0f766e;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.5">Följ upp offerten till Andersson.</div></div>
+      <div style="display:flex;gap:10px">
+        <div style="width:28px;height:28px;border-radius:50%;background:#0f766e;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none;margin-top:16px">M</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:11px;color:#64748b;margin-bottom:4px">Matte · Chefsagent sammanställde</div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;line-height:1.55;color:#1e293b">Offerten på badrummet, 86 400 kr, är inte öppnad. Daniel har skrivit ett sms, bevakar svaret, och Lars håller vecka 41.</div>
+          <div style="margin-top:10px;border:1px solid #fcd34d;border-radius:14px;background:#fff;overflow:hidden;box-shadow:0 0 0 4px rgba(217,119,6,.10)">
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;background:#fffbeb;border-bottom:1px solid #fde68a">
+              <div style="display:flex;align-items:center;gap:8px"><div style="width:20px;height:20px;border-radius:50%;background:#d97706;color:#fff;font:700 9px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center">D</div><span style="font-size:12px;color:#78350f;font-weight:600">Behöver dig · SMS</span></div>
+              <span style="font:500 10px 'JetBrains Mono',monospace;color:#92400e">apr_7f3e</span>
+            </div>
+            <div style="padding:12px">
+              <div style="font-size:13px;line-height:1.5;color:#1e293b;background:#f8fafc;border:1px solid #e2e8f0;border-radius:10px;padding:10px 12px">Hej Andersson! Daniel här från Bergs Bygg. Vi skickade offerten på badrummet förra veckan. Hör gärna av dig om du har frågor. /Bergs Bygg</div>
+              <div style="display:flex;gap:8px;margin-top:10px"><div style="flex:1;height:40px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center">Skicka</div><div style="flex:1;height:40px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center">Ändra</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div style="padding:12px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex:none"><div style="width:40px;height:40px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0"></div><div style="flex:1;height:40px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0"></div><div style="width:40px;height:40px;border-radius:12px;background:#fff;border:1px solid #99f6e0"></div></div>
+  </div>
+</div>
+<div style="width:1280px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · samma rad, pending_approvals.id</span></div>
+</div>
+
+<!-- ═══════════ 1d Agentöverlämning ═══════════ -->
+<div class="dv-opt" id="1d">
+<div class="dv-olabel"><a class="dv-oid" href="#1d">1d</a>Agentöverlämning — Daniel kommenterar offerten med synlig källa</div>
+<div style="display:flex;gap:20px;align-items:flex-start;flex-wrap:wrap">
+
+  <div data-screen-label="1d Mobil" style="width:375px;height:920px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:rgba(15,23,42,.35)"></div>
+    <div style="position:absolute;left:0;right:0;bottom:0;height:850px;background:#fff;border-radius:24px 24px 0 0;display:flex;flex-direction:column;overflow:hidden">
+      <div style="height:60px;background:#0f766e;display:flex;align-items:center;justify-content:space-between;padding:0 16px;flex:none">
+        <div style="display:flex;align-items:center;gap:10px"><div style="width:36px;height:36px;border-radius:50%;background:#fff;overflow:hidden;position:relative"><div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:#0f766e;color:#fff;font:700 14px 'Space Grotesk',sans-serif;pointer-events:none">M</div><image-slot style="position:relative;z-index:1" id="matte-header-6" shape="circle" placeholder=""></image-slot></div><div><div style="font:600 16px/1.1 'Space Grotesk',sans-serif;color:#fff">Matte</div><div style="font:400 11px/1.2 'DM Sans',sans-serif;color:rgba(255,255,255,.75)">Chefsagent · teamet lyssnar</div></div></div>
+        <div style="width:44px;height:44px;display:flex;align-items:center;justify-content:center;color:#fff"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"></path></svg></div>
+      </div>
+      <div style="padding:6px 16px;background:#f0fdf9;border-bottom:1px solid #ccfbef;font-size:12px;color:#115e59;display:flex;align-items:center;gap:6px;flex:none"><span style="width:6px;height:6px;border-radius:50%;background:#0f766e"></span>Offert #2041 · Badrum hos Andersson</div>
+      <div style="flex:1;padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden">
+        <div style="display:flex;justify-content:flex-end"><div style="max-width:85%;background:#0f766e;color:#fff;border-radius:16px 16px 4px 16px;padding:10px 14px;font-size:14px;line-height:1.5">Ser timmarna rimliga ut innan jag skickar?</div></div>
+
+        <div style="display:flex;gap:10px">
+          <div style="width:28px;height:28px;border-radius:50%;background:#0f766e;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none;margin-top:16px">M</div>
+          <div style="max-width:85%"><div style="font-size:11px;color:#64748b;margin-bottom:4px">Matte · Chefsagent</div>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-left:2px solid #cbd5e1;border-radius:16px 16px 16px 4px;padding:8px 14px;font-size:13px;line-height:1.5;color:#475569;display:flex;gap:6px;align-items:flex-start"><svg style="flex:none;margin-top:3px" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"></path></svg>Lämnar över till Daniel. Offerter är hans område, och han har era avslutade badrum att jämföra med.</div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+          <div style="width:28px;height:28px;border-radius:50%;background:#d97706;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none;margin-top:16px">D</div>
+          <div style="flex:1;min-width:0"><div style="font-size:11px;color:#64748b;margin-bottom:4px">Daniel · Säljare hittade</div>
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px;padding:10px 14px;font-size:14px;line-height:1.55;color:#1e293b">Arbetsraden ligger på <strong>32 h</strong>. På tre avslutade badrum med samma mall blev det 6–9 h mer än offererat. Jag skulle lägga till 6 h.</div>
+            <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px">
+              <div style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:9999px;background:#f0fdf9;border:1px solid #99f6e0;font-size:12px;color:#115e59;font-weight:500">Offert #2041 · rad 2 Arbete 32 h →</div>
+              <div style="display:flex;align-items:center;gap:6px;height:28px;padding:0 10px;border-radius:9999px;background:#f0fdf9;border:1px solid #99f6e0;font-size:12px;color:#115e59;font-weight:500">3 avslutade jobb · Visa varför</div>
+            </div>
+            <div style="margin-top:8px;border:1px solid #e2e8f0;border-radius:14px;overflow:hidden;background:#fff">
+              <div style="padding:8px 12px;font:600 10px/1 'DM Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#64748b;background:#f8fafc;border-bottom:1px solid #e2e8f0">Så kom Daniel fram till det</div>
+              <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px"><span style="color:#1e293b">Badrum Ekvägen · avslutat maj 2026</span><span style="font:600 13px 'JetBrains Mono',monospace;color:#b45309">+8 h</span></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 12px;border-bottom:1px solid #f1f5f9;font-size:13px"><span style="color:#1e293b">Badrum Lind · avslutat mars 2026</span><span style="font:600 13px 'JetBrains Mono',monospace;color:#b45309">+6 h</span></div>
+              <div style="display:flex;justify-content:space-between;padding:8px 12px;font-size:13px"><span style="color:#1e293b">Badrum Solvägen · avslutat jan 2026</span><span style="font:600 13px 'JetBrains Mono',monospace;color:#b45309">+9 h</span></div>
+            </div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <div style="flex:1;height:44px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center">Lägg till 6 h</div>
+              <div style="flex:1;height:44px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;font-size:14px;font-weight:500;display:flex;align-items:center;justify-content:center">Behåll 32 h</div>
+            </div>
+            <div style="margin-top:6px;font-size:11px;color:#64748b">Öppnar redigeraren. Inga timmar ändras här. Ditt val lär Daniel hur du räknar.</div>
+          </div>
+        </div>
+      </div>
+      <div style="padding:12px 16px 20px;border-top:1px solid #e2e8f0;display:flex;align-items:center;gap:8px;flex:none"><div style="width:44px;height:44px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0"></div><div style="flex:1;height:44px;border-radius:12px;background:#f1f5f9;border:1px solid #e2e8f0"></div><div style="width:44px;height:44px;border-radius:12px;background:#fff;border:1px solid #99f6e0"></div></div>
+    </div>
+                  </div>
+<div style="width:375px;display:flex;flex-wrap:wrap;gap:6px;margin-top:6px"><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · sidkontext quoteId</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · handoff_to_agent</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#fef3c7;color:#78350f;border:1px solid #fcd34d">Backend · kommentaren bär source_id (quote_line)</span><span style="font:600 10px/1.4 'JetBrains Mono',monospace;padding:3px 6px;border-radius:4px;background:#ccfbef;color:#115e59;border:1px solid #5eead4">Finns · project_outcome · agentrad-evidence</span></div>
+
+  <div style="width:300px;display:grid;gap:16px">
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;font-size:13px;line-height:1.5;color:#334155;display:grid;gap:12px">
+      <div><span style="font:600 10px/1 'JetBrains Mono',monospace;padding:4px 6px;border-radius:4px;background:#f1f5f9;color:#475569;border:1px solid #cbd5e1">Regel</span></div>
+      <div><strong style="color:#0f172a">Överlämningen är ett skifte, inte ett svar.</strong> Dämpad bubbla, pil, vänsterkant, som AgentMessage gör i dag. Den säger vem och varför.</div>
+      <div><strong style="color:#0f172a">Porträttet är avsändaren.</strong> Daniels ansikte, hans byline i tredje person. Aldrig Mattes ansikte på Daniels ord.</div>
+      <div><strong style="color:#0f172a">En agent uttalar sig bara om det den kan läsa,</strong> och kommentaren pekar på raden: offertraden först, jämförelsen som andra chip. Bevisen är samma tre projekt som Daniels agentrad på offertsidan.</div>
+      <div><strong style="color:#0f172a">Timmarna ändras i redigeraren,</strong> inte i chatten. Knappen öppnar den med bufferten ifylld.</div>
+    </div>
+    <div style="background:#fff;border:1px solid #e2e8f0;border-radius:14px;padding:16px 18px;font-size:13px;line-height:1.5;color:#334155;display:grid;gap:10px">
+      <div style="font:700 11px/1 'DM Sans',sans-serif;letter-spacing:.14em;text-transform:uppercase;color:#b91c1c">Visas inte</div>
+      <div style="display:flex;gap:10px;opacity:.55">
+        <div style="width:28px;height:28px;border-radius:50%;background:#d97706;color:#fff;font:700 11px 'DM Sans',sans-serif;display:flex;align-items:center;justify-content:center;flex:none"></div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px 16px 16px 4px;padding:8px 12px;font-size:13px;color:#1e293b;text-decoration:line-through">Priset känns lite lågt för ett badrum.</div>
+      </div>
+      <div>Utan källa finns ingen kommentar. Har Daniel färre än tre jämförbara jobb lämnar Matte inte över, utan svarar: «Daniel har inte tillräckligt många liknande jobb att jämföra med ännu.»</div>
+    </div>
+  </div>
+</div>
+</div>
+
+</div>
+<p class="dv-next">Nästa: «rita artboard 5–7» · «visa <a class="dv-oid" href="#1a">1a</a> med bokstavsreserv i stället för bildplats» · «gör <a class="dv-oid" href="#1b">1b</a> som klickbar övergång»</p>
+</section>
+</x-dc>
+</body>
+</html>
