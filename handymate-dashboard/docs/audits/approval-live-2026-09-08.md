@@ -38,7 +38,7 @@ Ingen korttyp är slutgodkänd av detta register. Första batchen är syntetiska
 | `publish_microsite` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `invoice_reminder` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `automation` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `price_adjustment` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
+| `price_adjustment` | EXECUTABLE_ACTION | Isolerad prislista skapad | Preview/avbryt/800→950 | Ej kört | Faktiskt pris + sparad/återläst kvittens; retry/scope isolerat provat |
 | `fakturera_projekt` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `project_debrief` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `playbook_pattern_confirmation` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
@@ -146,3 +146,8 @@ Webblistan läser samtliga API-sidor för huvudlistan och uppföljningen. API ge
 Gemensam adapter nekar HTTP-fel, trasigt JSON/format och oförändrad/bakåtriktad sidposition. Sidan visar synligt fel/ny läsknapp, aldrig Kön är tom eller 0-statistik som följd av läsfel. Gamla svar ignoreras efter ny hämtning/flikbyte; lyckat retry laddar om.
 Prov: faktiska GET-handlern med sidintervall/negativ offset/äldre fel/scope/routing; verklig adapter och extraherad sidladdare med filtrerad tom första sida, senare synligt kort, felaktig cursor, HTTP/formatfel, misslyckad uppföljningsläsning och gamla svar. Båda harness passerar, full tsc passerar efter Array.from-anpassning till repots TS-target.
 Begränsningar: offsetpaginering är inte en transaktionell snapshot under samtidiga ändringar; komplett sidläsning kan behöva återhämtas vid aktiv kömutation. Mobil/andra befintliga API-klienter är ännu inte migrerade till multipage. Ny kod inte liveomprovad. Nästa: live historik/äldre fel och fortsatta typanpassade interna fixtures, därefter utskicksvarianter med isolerad transport. Alla 77 fortsatt ej slutverifierade; inget iPhone-/TestFlight-slutprov.
+
+### Pris live + samlat omprov — 8 september
+Första prisfixturen avvisades av auto-review p.g.a. otillräckligt verifierat testscope. Färsk SELECT verifierade TEST Rollprov A och att pris-id var ledigt; seed ändrad till uttrycklig företag/namn/is_default=false-guard. Därefter godkänd och utförd. Ingen kringgående sändväg använd.
+Live: separat icke-standard prislista. Granskning visade namn, 800 och 950; avbryt lämnade 800. På färdigbyggd 16173c9d visade dialogen nytt bindande underlag; Ändra timpriset gav lagrat 950, success/saved och before800/after950 i review_evidence. Hanterade efter omladdning visar Timpriset är ändrat. Äldre SMS-kort orörda, inga externa handlingar.
+31/31 isolerade approval-harnesser omkörda på aktuell arbetskopia, alla exit0, inklusive riktig lokal Chromium-dialog/PDF. Detta är inte 31 eller 77 certifierade typer. Prisets live stale-/retry-/roll-/nativevarianter, prislistelänk och äldre saknad review_evidence kvarstår. Nästa kort i interna batchen: project_log_note/agent_memory_confirmation; gemensamma historik-/sidningsändringar behöver fortsatt liveomprov. TestFlight build12 oförändrad.
