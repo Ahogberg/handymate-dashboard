@@ -61,6 +61,10 @@ export function approvalReceipt(type: string, action: string, result: Record<str
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true
   const errors = r.error || ([...(Array.isArray(r.errors) ? r.errors : []), ...(Array.isArray(metadata.errors) ? metadata.errors : [])].join('; ') || null)
+  if (r.delivery_state === 'unknown') return {
+    state: 'partial',
+    text: `Det gick inte att avgöra om SMS-tjänsten tog emot utskicket${errors ? `: ${errors}` : '.'} Skicka inte igen innan leveransen har kontrollerats.`,
+  }
   if (outcome === 'failed' || r.ok === false || errors) return { state: delivered || r.partial === true ? 'partial' : 'failed',
     text: `${delivered || r.partial === true ? 'Handlingen utfördes delvis' : 'Handlingen kunde inte slutföras'}${errors ? `: ${errors}` : '.'}` }
   if (r.queued === true) return { state: 'queued', text: r.receipt || 'Utskicket är köat. Leverans är inte bekräftad ännu.' }

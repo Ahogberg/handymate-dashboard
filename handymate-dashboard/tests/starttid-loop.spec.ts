@@ -66,19 +66,18 @@ test.describe('quote_signing-grenen finns och nås', () => {
     expect(gren).toContain('executeQuoteSigningBooking(pl, reviewedPayload')
   })
 
-  test('gissningsvägen (no message or phone) nås ALDRIG för source:quote_signing — grenen ligger textmässigt före', () => {
+  test('den signerade generiska SMS-vägen nås ALDRIG för source:quote_signing — grenen ligger textmässigt före', () => {
     const i = EXECUTOR.indexOf("case 'new_booking_request': {")
     const gren = EXECUTOR.slice(i, i + 1500)
     const guardIdx = gren.indexOf("pl.source === 'quote_signing'")
-    const skippedIdx = gren.indexOf("skipped: 'no message or phone'")
+    const genericIdx = gren.indexOf("const reviewed = reviewedPayload as any")
     expect(guardIdx).toBeGreaterThan(-1)
-    expect(skippedIdx).toBeGreaterThan(-1)
+    expect(genericIdx).toBeGreaterThan(-1)
     // quote_signing-grenen returnerar (return-satsen finns mellan guarden
-    // och gissningsraden) INNAN koden som läser customer_reply_pending/
-    // entity.phone ens exekveras.
+    // och den generiska vägen) innan ett tidsförslags-underlag används.
     const returnIdx = gren.indexOf('return await executeQuoteSigningBooking')
     expect(returnIdx).toBeGreaterThan(guardIdx)
-    expect(returnIdx).toBeLessThan(skippedIdx)
+    expect(returnIdx).toBeLessThan(genericIdx)
   })
 })
 

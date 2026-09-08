@@ -1,5 +1,4 @@
 import { insertApprovalArtifact } from '@/lib/approvals/artifact-write'
-import { bookingProposalMessage } from '@/lib/approvals/booking-message'
 import { prepareApprovalReview } from '@/lib/approvals/prepare-review'
 import type { ReviewedDocument } from '@/lib/approvals/document-delivery'
 import { approvalReceipt } from '@/lib/approvals/receipt'
@@ -1851,17 +1850,16 @@ async function executeApprovalPayload(
           return await executeQuoteSigningBooking(pl, reviewedPayload as Record<string, any> | undefined)
         }
 
-        const message = bookingProposalMessage(pl)
-
-        if (!message || !pl.entity?.phone) {
-          return { action: approval_type, skipped: 'no message or phone' }
+        const reviewed = reviewedPayload as any
+        if (!reviewed?.message || !reviewed?.to || !Array.isArray(reviewed.slots) || !reviewed.slots.length) {
+          return { action: approval_type, ok: false, error: 'Det signerade tidsförslaget saknas.' }
         }
 
         // Audit-3 Fix A (2026-06-01)
         const r = await sendSms({
-          to: pl.entity.phone,
-          message,
-          customerId: pl.entity?.customerId || null,
+          to: reviewed.to,
+          message: reviewed.message,
+          customerId: reviewed.customerId || null,
           messageType: approval_type,
           purpose: 'conversational',
         })
@@ -1869,7 +1867,9 @@ async function executeApprovalPayload(
           action: approval_type,
           sms_sent: r.sms_sent,
           error: r.error,
-          slots_count: pl.available_slots?.length || 0,
+          delivery_state: r.sms_sent ? 'accepted' : typeof r.sms_status === 'number' ? 'rejected' : 'unknown',
+          slots_count: reviewed.slots.length,
+          current_booking_id: reviewed.bookingId || null,
         }
       }
 

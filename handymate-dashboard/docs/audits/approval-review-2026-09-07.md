@@ -65,10 +65,10 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `customer_quote_question` | Samma portalsvarsflöde som customer_message, inklusive möjlig SMS-notis. | Stopp – komplett granskning återstår |
 | `quote_request` | AI genererar och sparar offertutkast. | Stopp – komplett granskning återstår |
 | `quote_addition` | AI genererar och sparar offertutkast utifrån önskat tillägg. | Stopp – komplett granskning återstår |
-| `propose_booking_times` | Skickar SMS med svar eller föreslagna tider; skapar normalt ingen bokning. | Exakt SMS-granskning; ingen bokning utlovas |
+| `propose_booking_times` | Hämtar aktuella kalenderluckor, verifierar kund/lead och visar exakt SMS; skapar ingen bokning. | Versionsbunden granskning, beständig evidens och säkert SMS-återförsök; verklig leverantör/app återstår |
 | `propose_site_visit` | Förbereder aktuella tidsförslag, verifierar kunden och visar exakt SMS; skickar samma frysta tider/text utan kalender- eller projektändring. | Versionsbunden granskning, beständig evidens och route-integrationstest; verklig leverantör/app återstår |
-| `reschedule_request` | Skickar SMS med svar eller föreslagna tider; själva ombokningen måste särskiljas från förslaget. | Exakt SMS-granskning; ingen bokning utlovas |
-| `new_booking_request` | Vid quote_signing: väljer första aktuella lediga timmen, visar bokning/projekt/fakturaföljd och exakt bekräftelse-SMS, skapar samma bokning och skickar SMS först efter lyckad bokning. Övriga källor skickar tidsförslag. | Offertsigneringsgrenen versionsbunden och route-integrationstestad; generiska varianter och verklig kalender/app återstår |
+| `reschedule_request` | Verifierar aktuell kund/lead och eventuell befintlig bokning, hämtar nya kalenderluckor och skickar exakt granskat SMS. Bokningen flyttas inte; svaret hanteras separat. | Versionsbunden granskning, beständig evidens och säkert SMS-återförsök; verklig leverantör/app återstår |
+| `new_booking_request` | Vid quote_signing: väljer första aktuella lediga timmen, visar bokning/projekt/fakturaföljd och exakt bekräftelse-SMS, skapar samma bokning och skickar SMS först efter lyckad bokning. Övriga källor skickar verifierade aktuella tidsförslag utan kalenderändring. | Båda grenarna versionsbundna och route-integrationstestade; verklig kalender/app återstår |
 | `dispatch_suggestion` | Tilldelar person på bokning/arbetsorder. Befintlig hanterare ignorerar databasfel och saknar företagsscope på uppdateringen. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `publish_microsite` | Publicerar webbsidan, vilket gör innehållet externt tillgängligt. | Stopp – komplett granskning återstår |
 | `invoice_reminder` | Skickar SMS och eventuellt e-post samt uppdaterar påminnelseavgift/ränta och historik. | Granskning av kanaler och avgifter; kontrollerad delutfallskvittens |
@@ -242,4 +242,18 @@ Verifiering utan produktionsdata eller riktiga sändare:
 - 60 riktade Playwright-prov för review, receipt, kanoniskt projektavslut, fyra ögon och automationsgrindar passerar. Därutöver passerar faktisk route- och Chromium-dialog. `npm run test:approval-economy` passerar 23+12 isolerade scenarier och `npm run test:approval-documents` samtliga fem körbara sviter. Backendens `npx tsc --noEmit` är rent.
 - Mobilens riktiga granskningskomponent och adapter passerar 13 mockade interaktions-/livscykel-/protokollfall; riktad TypeScript-kontroll är ren. Detta är inte ett iPhone- eller TestFlight-slutprov. Build 12 är oförändrad.
 
-Kvar i beställd ordning: färdig versionsbunden offert/faktura/Fortnox-journal; generiska boknings-/ombokningsvarianter och återförsök per avslutsföljd; betalning/lead och återstående automationsåtgärder; paket/kampanjsändare/sammanhängande historik; därefter återstående native specialvyer och en ny verkligt provad TestFlight-build. Inga kundutskick, produktionsskrivningar, merges eller driftsättningar gjordes.
+Kvar i beställd ordning: färdig versionsbunden offert/faktura/Fortnox-journal; återförsök per avslutsföljd; betalning/lead och återstående automationsåtgärder; paket/kampanjsändare/sammanhängande historik; därefter återstående native specialvyer och en ny verkligt provad TestFlight-build. Inga kundutskick, produktionsskrivningar, merges eller driftsättningar gjordes.
+
+### Fortsättning 8 september — generiska tidsförslag och ombokningsförslag
+
+De tre vanliga Matte-varianterna `propose_booking_times`, `reschedule_request` och `new_booking_request` använder inte längre kundnummer, fritext eller tider direkt ur det gamla kortets payload:
+
+- Previewn verifierar aktuell kund eller lead inom företaget, mottagarens nuvarande telefonnummer och företagets avsändare. Ett oregistrerat eller främmande mål kan inte skickas till.
+- Högst tre aktuella luckor hämtas från kalendern före beslutet. Den gamla AI-texten och gamla `available_slots` används inte som sändunderlag. Exakt mottagare, SMS och ISO-intervall binds till signaturen; ändrade luckor kräver ny preview.
+- Vid ombokningsförslag verifieras angiven befintlig bokning, ansvarig och projekt inom företaget och visas i granskningen. Handlingen är fortfarande ett tidsförslag: den flyttar ingen bokning, ändrar ingen ansvarig/projektstatus och inväntar ett separat kundsvar.
+- Exekveraren tar bara emot den signerade `executionPayload`; den tidigare vägen byggde om SMS:et från den gamla payloaden. Mottagare, text, tider, befintlig bokning och följdbeskrivningar sparas som `review_evidence` tillsammans med den vanliga kvittensen.
+- Efter ett säkert avvisat SMS-försök visar återförsök samma mottagare, text och tider och sänder endast den misslyckade SMS-delen. Nya kalenderluckor ersätter inte tyst det granskade försöket. Ett förlorat leverantörssvar ger i stället en beständig partiell kvittens med omsändningsspärr; ett lyckat eller osäkert utförande får inte skickas om via denna väg.
+
+Verifiering: den faktiska approval-routen kördes med isolerad databas, kalender och SMS-adapter. Proven täcker gammal tid som ersätts före första beslutet, token som blir ogiltig när kalendern ändras, aktuell bokning/ansvarig/projekt, leadmottagare, saknat/främmande mål, definitivt leverantörsfel, beständig felkvittens, exakt återförsök trots senare kalenderändring samt förlorat leverantörssvar utan omsändning. `npx tsc --noEmit` är rent. Inga riktiga meddelanden, kalenderändringar eller produktionsskrivningar gjordes.
+
+Nästa fortsättningspunkt är del 3: `confirm_payment`, `lead_review` och de återstående automationsvarianternas verkliga följder samt separata granskningskort för kundutskick som uppstår först efter huvudhandlingen. Del 1:s dokument-/Fortnox-journal och del 2:s per-följd-återförsök är fortfarande öppna och får inte beskrivas som färdiga.

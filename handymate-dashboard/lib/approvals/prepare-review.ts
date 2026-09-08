@@ -1,6 +1,5 @@
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 import { automationSmsText } from './automation-message'
-import { bookingProposalMessage } from './booking-message'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { buildApprovalReview, type ApprovalReview } from './review-contract'
 import { classify } from './action-contract'
@@ -85,10 +84,8 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       return await prepareProjectCloseReview(db, businessId, p, body.action_overrides)
     }
     if (['propose_booking_times', 'reschedule_request', 'new_booking_request'].includes(type) && p.source !== 'quote_signing') {
-      const message = bookingProposalMessage(p)
-      if (!message || typeof p.entity?.phone !== 'string' || !/^\+?[0-9 ()-]{7,20}$/.test(p.entity.phone)) throw new Error('Fullständig meddelandetext och telefonnummer krävs.')
-      r.messages.push({ channel: 'SMS', recipients: [p.entity.phone], text: message })
-      return complete('Skickar detta tidsförslag till kunden via SMS. Ingen tid bokas eller flyttas av meddelandet.', 'Skicka tidsförslaget')
+      const { prepareBookingTimesReview } = await import('./booking-times-review')
+      return await prepareBookingTimesReview(db, businessId, type as 'propose_booking_times' | 'reschedule_request' | 'new_booking_request', p, action === 'retry')
     }
     if (type === 'send_sms' && p.recipient === 'internal') {
       const { data: config, error } = await db.from('business_config').select('personal_phone').eq('business_id', businessId).maybeSingle()

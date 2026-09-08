@@ -2,7 +2,7 @@
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const ts = require('typescript'), assert = require('node:assert/strict')
 const root = path.resolve(__dirname, '../..')
-let row, mutations, canAct = true, availableSlots = [], customerRow, quoteRow, projectRow, dealRow, memberRow, bookingRows = []
+let row, mutations, canAct = true, availableSlots = [], customerRow, leadRow, quoteRow, projectRow, dealRow, memberRow, bookingRows = [], smsShouldFail = false, smsUnknown = false
 const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = []
 const db = { from(table) {
   let values, operation = 'read', filters = []
@@ -22,12 +22,23 @@ const db = { from(table) {
         return resolve({ data: [{ campaign_id: 'x' }], error: null })
       }
       if (table === 'sms_campaign_recipient' && operation === 'insert') deliveries.push(...structuredClone(values))
-      if (table === 'customer') return resolve({ data: structuredClone(customerRow), error:null })
+      if (table === 'customer') {
+        const wanted = filters.find(([key]) => key === 'customer_id')?.[1]
+        return resolve({ data: !wanted || customerRow?.customer_id === wanted ? structuredClone(customerRow) : null, error:null })
+      }
+      if (table === 'leads') {
+        const wanted = filters.find(([key]) => key === 'lead_id')?.[1]
+        return resolve({ data: !wanted || leadRow?.lead_id === wanted ? structuredClone(leadRow) : null, error:null })
+      }
       if (table === 'quotes') return resolve({ data: structuredClone(quoteRow), error:null })
       if (table === 'project') return resolve({ data: structuredClone(projectRow), error:null })
       if (table === 'deal') return resolve({ data: structuredClone(dealRow), error:null })
       if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
-      if (table === 'booking') return resolve({ data: filters.some(([key]) => key === 'notes') ? [] : structuredClone(bookingRows), error:null })
+      if (table === 'booking') {
+        if (filters.some(([key]) => key === 'notes')) return resolve({ data: [], error:null })
+        const wanted = filters.find(([key]) => key === 'booking_id')?.[1]
+        return resolve({ data: wanted ? structuredClone(bookingRows.find(item => item.booking_id === wanted) || null) : structuredClone(bookingRows), error:null })
+      }
       if (table === 'business_config') return resolve({ data: { business_name:'Testfirman', assigned_phone_number:'+468100000', personal_phone:'+46708888888', google_review_url:'https://example.test/review', subscription_plan:'pro', working_hours:{monday:{active:true,start:'08:00',end:'17:00'},tuesday:{active:true,start:'08:00',end:'17:00'},wednesday:{active:true,start:'08:00',end:'17:00'},thursday:{active:true,start:'08:00',end:'17:00'},friday:{active:true,start:'08:00',end:'17:00'}} }, error:null })
       return resolve({ data: null, error: null })
     }
@@ -46,7 +57,7 @@ function load(file) {
     if (name === '@/lib/supabase') return { getServerSupabase: () => db }
     if (name === '@/lib/auth') return { getAuthenticatedBusiness: async () => ({ business_id: 'b1' }), getBusinessPlanFromConfig: () => 'pro' }
     if (name === '@/lib/permissions') return { getCurrentUser: async () => ({ id: 'u1' }) }
-    if (name === '@/lib/sms-send') return { sendSmsViaElks: async ({supabase,...args}) => { smsDeliveries.push(structuredClone(args)); return { success:true, smsId:'sms-site', elksId:'elks-site', status:200 } } }
+    if (name === '@/lib/sms-send') return { sendSmsViaElks: async ({supabase,...args}) => { smsDeliveries.push(structuredClone(args)); return smsUnknown ? { success:false, error:'provider response lost', status:null } : smsShouldFail ? { success:false, error:'provider rejected', status:503 } : { success:true, smsId:'sms-site', elksId:'elks-site', status:200 } } }
     if (name === '@/lib/sms-usage') return { checkSmsAllowance: async () => ({ allowed:true }) }
     if (name === '@/lib/matte/calendar-slots') return { getAvailableSlots: async () => structuredClone(availableSlots) }
     if (name === '@/lib/invoices/project-invoice-draft') return { byggProjektFakturaUnderlag: async () => ({ ok:true, project:{ project_id:'p1',customer_id:'c-site',quote_id:'q1' }, items:[{description:'Arbete',quantity:10,unit:'tim',unit_price:800,total:8000}], subtotal:8000,vatRate:25,vatAmount:2000,total:10000,rotRutType:'rot',rotRutDeduction:3000,customerPays:7000,hasAta:false,ataChangeIds:[] }) }
@@ -66,7 +77,7 @@ function load(file) {
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
-const reset = () => { row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',review_request_sent_at:null }; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
+const reset = () => { row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',review_request_sent_at:null }; leadRow={lead_id:'l-site',name:'Leo Lead',phone:'+46707777777'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
   reset()
@@ -109,6 +120,41 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
   reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'}}
   assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='reschedule_request'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'},booking_id:'book-current',available_slots:[{label:'gammal tid'}]}
+  bookingRows=[{booking_id:'book-current',customer_id:'c-site',project_id:'p1',scheduled_start:'2026-09-09T08:00:00Z',scheduled_end:'2026-09-09T09:00:00Z',status:'confirmed',assigned_to:'Erik',assigned_user_id:'member1'}]
+  availableSlots=[{start:'2026-09-11T08:00:00Z',end:'2026-09-11T09:00:00Z',label:'fredag 11 sep kl 10:00–11:00'}]
+  let reschedulePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert(reschedulePreview.review.messages[0].text.includes('fredag 11 sep')); assert(!reschedulePreview.review.messages[0].text.includes('gammal tid'))
+  assert(reschedulePreview.review.details.some(d=>d.label==='Befintlig bokning'&&d.text.includes('2026-09-09')))
+  assert(reschedulePreview.review.details.some(d=>d.label==='Ansvarig'&&d.text==='Erik'))
+  assert(reschedulePreview.review.details.some(d=>d.label==='Projektföljd'&&d.text.includes('Badrum hemma')))
+  assert(reschedulePreview.review.effect.includes('Ingen bokning skapas eller flyttas')); assert.equal(smsDeliveries.length,0)
+  availableSlots=[{start:'2026-09-12T08:00:00Z',end:'2026-09-12T09:00:00Z',label:'lördag 12 sep kl 10:00–11:00'}]
+  assert.equal((await post({action:'approve',review_token:reschedulePreview.review_token})).status,428); assert.equal(smsDeliveries.length,0)
+  reschedulePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  smsShouldFail=true
+  let rescheduleResponse=await post({action:'approve',review_token:reschedulePreview.review_token})
+  let rescheduleResult=await rescheduleResponse.json(); assert.equal(rescheduleResponse.status,200,JSON.stringify(rescheduleResult)); assert.equal(rescheduleResult.receipt.state,'failed')
+  const failedText=reschedulePreview.review.messages[0].text; const failedSlots=structuredClone(row.payload.execution_result.review_evidence.slots)
+  availableSlots=[{start:'2026-09-14T08:00:00Z',end:'2026-09-14T09:00:00Z',label:'måndag 14 sep kl 10:00–11:00'}]; smsShouldFail=false
+  const retryPreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  assert.equal(retryPreview.review.messages[0].text,failedText); assert.deepEqual(row.payload.execution_result.review_evidence.slots,failedSlots)
+  rescheduleResponse=await post({action:'retry',review_token:retryPreview.review_token}); rescheduleResult=await rescheduleResponse.json()
+  assert.equal(rescheduleResponse.status,200,JSON.stringify(rescheduleResult)); assert.equal(rescheduleResult.receipt.state,'sent'); assert.equal(smsDeliveries.at(-1).message,failedText)
+  reset(); row.approval_type='propose_booking_times'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'}}
+  availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T09:00:00Z',label:'tisdag 15 sep kl 10:00–11:00'}]
+  const unknownPreview=await (await post({action:'preview',decision_action:'approve'})).json(); smsUnknown=true
+  const unknownResponse=await (await post({action:'approve',review_token:unknownPreview.review_token})).json()
+  assert.equal(unknownResponse.receipt.state,'partial'); assert(unknownResponse.receipt.text.includes('Skicka inte igen'))
+  assert.equal((await post({action:'preview',decision_action:'retry'})).status,422); assert.equal(smsDeliveries.length,1)
+  reset(); row.approval_type='propose_booking_times'; row.payload={entity:{leadId:'l-site',phone:'+46707777777'},duration_hours:2}
+  availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T10:00:00Z',label:'tisdag 15 sep kl 10:00–12:00'}]
+  const leadPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(leadPreview.review.messages[0].recipients[0],leadRow.phone); assert(leadPreview.review.details.some(d=>d.label==='Kundförfrågan'&&d.text==='Leo Lead'))
+  reset(); row.approval_type='new_booking_request'; row.payload={entity:{phone:'+46709999999'}}; availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T09:00:00Z',label:'tisdag'}]
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='propose_booking_times'; row.payload={entity:{customerId:'foreign',phone:'+46709999999'}}; availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T09:00:00Z',label:'tisdag'}]
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
   reset(); row.approval_type='new_booking_request'; row.payload={source:'quote_signing',quote_id:'q1',customer_id:'c-site',customer_phone:'+46709999999',requested_date:'2030-09-10'}
   bookingRows=[{scheduled_start:'2030-09-10T06:00:00.000Z',scheduled_end:'2030-09-10T07:00:00.000Z',status:null}]
   let bookingPreview=await (await post({action:'preview',decision_action:'approve'})).json()
@@ -125,5 +171,5 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal(internalPreview.review.messages[0].recipients[0],'+46708888888'); assert.equal(internalPreview.review.messages[0].text,row.payload.message); assert.equal(smsDeliveries.length,0)
   const internalResult=await (await post({action:'approve',review_token:internalPreview.review_token})).json()
   assert.equal(smsDeliveries.length,1); assert.equal(smsDeliveries[0].recipient,'internal'); assert.equal(smsDeliveries[0].message,internalPreview.review.messages[0].text); assert.equal(internalResult.receipt.state,'sent')
-  console.log('PASS route integration: exact campaign queue, project-close choices/results, deferred internal SMS, site-visit times, and signed-quote booking/SMS are review-bound with durable evidence.')
+  console.log('PASS route integration: exact campaign queue, project-close choices/results, deferred internal SMS, site-visit/generic booking times with retry, and signed-quote booking/SMS are review-bound with durable evidence.')
 })().catch(e => { console.error(e); process.exitCode=1 })

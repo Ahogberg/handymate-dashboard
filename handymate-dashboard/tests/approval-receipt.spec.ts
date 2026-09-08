@@ -30,11 +30,9 @@ test('project close receipt lists each actual consequence and exposes partial fa
   expect(receipt.text).toContain('Fakturautkast: delvis klart')
   expect(receipt.text).toContain('Kunduppföljning: inte utfört')
 })
-test('SMS time proposal preview is the exact execution text and does not promise a booking', async () => {
-  const payload={entity:{phone:'+46701234567'},available_slots:[{label:'Tisdag 10:00'},{label:'Onsdag 14:00'}]}
-  const prepared=await prepareApprovalReview({from(){throw Error('No lookup expected')}} as any,'b',{id:'a',approval_type:'reschedule_request',payload},{action:'approve'})
-  expect(prepared?.review.messages[0].text).toBe(bookingProposalMessage(payload))
-  expect(prepared?.review.effect).toContain('Ingen tid bokas eller flyttas')
+test('legacy SMS time-message formatter rejects incomplete slots', () => {
+  const payload={available_slots:[{label:'Tisdag 10:00'},{label:'Onsdag 14:00'}]}
+  expect(bookingProposalMessage(payload)).toContain('Tisdag 10:00')
   expect(bookingProposalMessage({available_slots:[{}]})).toBeNull()
 })
 test('live target changes invalidate confirmation and all reads carry business scope', async () => {
