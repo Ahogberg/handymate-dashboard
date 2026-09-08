@@ -25,3 +25,26 @@ After completing provider login:
 Use mobile PR #4's `vision-testflight` EAS profile and Preview environment. Set explicit `EXPO_PUBLIC_API_URL`, `EXPO_PUBLIC_SUPABASE_URL` and `EXPO_PUBLIC_SUPABASE_ANON_KEY` to the same test environment. API requests must return application responses, not Vercel login HTML.
 
 Complete EAS login and Apple signing, build a signed iOS artifact, submit to TestFlight, then run the iPhone checklist in `VISION_TESTBUILD_2026-09-08.md`. EAS was not logged in. The complete vision and native release are not marked finished.
+
+## Follow-up: credentials configured and Auth fixtures linked
+
+Vercel and Supabase GitHub logins now succeed. Thirteen overrides were saved for Preview branch `codex/vision-integration-20260908` only. Seven server/config values were stored as Secret: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_SERVICE_KEY, CRON_SECRET, WORK_REPORT_CONTINUITY_ENABLED, DURABLE_QUOTE_FOLLOWUP_ENABLED and APP_URL. Three NEXT_PUBLIC values point to the isolated Supabase project and exact preview hostname. ELKS_API_USER, ELKS_API_PASSWORD and RESEND_API_KEY are invalid `vision-test-disabled` placeholders because Vercel rejects empty form values. No provider-send acceptance is claimed. The existing provider-issued legacy service_role key was verified to contain the test project reference; no key is included here.
+
+Vercel bulk saving was partially successful despite reporting public-prefix validation errors. Reloading confirmed the seven server values, then the six remaining config values saved successfully. Production scope was excluded before both saves.
+
+Redeployment of commit 8c3ed2516f52b618d2a4aa0cabd87d49cda3a73e was started with no build cache:
+https://vercel.com/andreas-projects-f2b98374/handymate-dashboard/HhFNEoJufyXmaKHgssAZabGyik2D
+
+Three synthetic Auth accounts were created through Supabase admin UI with email auto-confirmed, no invitation email and generated passwords. `18_bind_auth_accounts.sql` binds them to existing DB actors and verifies confirmation:
+
+| Actor | Auth ID | Company | Role |
+| --- | --- | --- | --- |
+| bu_vision_owner | 9ab26d3a-8d8c-454e-9e9f-7389df286d6b | biz_vision_test_a | owner |
+| bu_vision_worker | e0aef347-5578-434f-8347-64a044af5d9c | biz_vision_test_a | employee |
+| bu_vision_other | b18856d1-4b87-43a7-b187-f1065c525bc2 | biz_vision_test_b | owner |
+
+Earlier zero-Auth-user observations refer to the initial DB probe, before this step. Generated passwords were not committed. Actual application login/refresh/HTTP acceptance remains unverified.
+
+Deployment Protection Exceptions are disabled under the current Vercel configuration and require the displayed USD 150/month Advanced Deployment Protection add-on. No upgrade or project-wide protection change was made. Prefer a separately configured test-only Vercel project with its own access settings before native acceptance; do not embed the existing project-wide automation bypass secret in the mobile application.
+
+The new Vercel deployment completed successfully: Ready, build duration 4m 32s. Runtime commit is unchanged; no native build was submitted.
