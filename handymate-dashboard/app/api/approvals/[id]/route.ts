@@ -1,4 +1,4 @@
-import { insertApprovalArtifact } from '@/lib/approvals/artifact-write'
+import { approvalArtifactId, insertApprovalArtifact } from '@/lib/approvals/artifact-write'
 import { prepareApprovalReview } from '@/lib/approvals/prepare-review'
 import type { ReviewedDocument } from '@/lib/approvals/document-delivery'
 import { approvalReceipt } from '@/lib/approvals/receipt'
@@ -14,7 +14,6 @@ import { classifyExecutionResult, extractExecutionArtifacts } from '@/lib/approv
 import { canActOnApproval } from '@/lib/approvals/routing'
 import { createDiaryEntry } from '@/lib/diary/write'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
-import { resolveTimeEntryBusinessUserId } from '@/lib/egenkontroll/suggest-time-entry'
 import { getBusinessPlanFromConfig } from '@/lib/auth'
 import { checkSmsAllowance } from '@/lib/sms-usage'
 import { hubAllowsProactiveSend } from '@/lib/outbound/hub-gate'
@@ -2734,59 +2733,31 @@ async function executeApprovalPayload(
         // ovan (project_id/work_date/duration_minutes/description/
         // is_billable) fast med data från förslaget istället för en
         // incheckning.
-        const plTe = payload as any
-        const projectIdTe = plTe.project_id as string | undefined
-        const bookingDate = plTe.booking_date as string | undefined
-        const suggestedMinutes = Number(plTe.suggested_minutes) || 0
-        if (!projectIdTe || !bookingDate) {
-          return { action: 'tidrapport_forslag', skipped: 'no project_id or booking_date' }
-        }
-
-        // R1-D (resurs-masterplan.md): se resolveTimeEntryBusinessUserId
-        // (lib/egenkontroll/suggest-time-entry.ts) för fullständig motivering
-        // — payload.assigned_user_id är redan ett business_users.id, satt
-        // bara när attributionSource var bokningens EGEN tilldelning. Saknas
-        // fältet: null, exakt tidigare beteende (ingen gissning).
-        const assignedUserIdTe = resolveTimeEntryBusinessUserId(plTe)
-
-        // approval_status sätts explicit till 'approved' — samma bugg och
-        // samma fix som 'time_attestation'-caset ovan (och som
-        // checkin/approve/route.ts redan dokumenterar): utan detta faller
-        // raden på DB-defaulten 'pending', hamnar i "Att attestera" igen
-        // och räknas inte som fakturerbar i BillableView.tsx trots att
-        // hantverkaren just godkänt kortet.
+        const { timeProposalFields, timeProposalMatches } = await import('@/lib/approvals/time-proposal')
+        // assigned_user_id remains a business_users.id, or null; never guess an owner.
+        const expected = timeProposalFields(payload as Record<string, any>)
         const supabaseTe = getServerSupabase()
-        const { data: createdTimeEntry, error: insertTeErr } = await insertApprovalArtifact(supabaseTe, 'time_entry', 'time_entry_id', businessId, approvalId, 'time_proposal', {
-          business_id: businessId,
-          business_user_id: assignedUserIdTe,
-          project_id: projectIdTe,
-          work_date: bookingDate,
-          duration_minutes: suggestedMinutes,
-          description: plTe.project_name
-            ? `Tidrapport-förslag · ${plTe.project_name}`
-            : 'Tidrapport-förslag',
-          is_billable: true,
-          approval_status: 'approved',
-          approved_by: resolvedByUserId ?? null,
-          approved_at: new Date().toISOString(),
-        })
-
-        if (createdTimeEntry && (createdTimeEntry.business_user_id !== assignedUserIdTe ||
-          createdTimeEntry.project_id !== projectIdTe || createdTimeEntry.work_date !== bookingDate ||
-          createdTimeEntry.duration_minutes !== suggestedMinutes || createdTimeEntry.is_billable !== true ||
-          createdTimeEntry.approval_status !== 'approved')) {
+        try {
+          await insertApprovalArtifact(supabaseTe, 'time_entry', 'time_entry_id', businessId, approvalId, 'time_proposal', {
+            ...expected,
+            approved_by: resolvedByUserId ?? null,
+            approved_at: new Date().toISOString(),
+          })
+        } catch {
+          // The write may have succeeded before its response was lost. Read back
+          // the same stable identity; never issue a second insert in this attempt.
+        }
+        const entryId = approvalArtifactId(businessId, approvalId, 'time_proposal')
+        const saved = await supabaseTe.from('time_entry').select('*').eq('time_entry_id', entryId).eq('business_id', businessId).maybeSingle()
+        if (saved.error || !saved.data) {
+          return { action: 'tidrapport_forslag', ok: false, error: 'Tidraden kunde inte verifieras. Ett återförsök kontrollerar samma tidrad.' }
+        }
+        if (!timeProposalMatches(saved.data, expected)) {
           return { action: 'tidrapport_forslag', ok: false, error: 'Den befintliga tidraden avviker från förslaget. Kontrollera tidrapporten innan du försöker igen.' }
         }
-        if (insertTeErr || !createdTimeEntry) {
-          return { action: 'tidrapport_forslag', ok: false, error: insertTeErr?.message || 'Tidraden kunde inte verifieras.' }
-        }
-
         return {
-          action: 'tidrapport_forslag',
-          ok: true,
-          time_entry_id: createdTimeEntry.time_entry_id,
-          project_id: projectIdTe,
-          minutes: suggestedMinutes,
+          action: 'tidrapport_forslag', ok: true, time_entry_id: entryId,
+          project_id: expected.project_id, minutes: expected.duration_minutes,
         }
       }
 
