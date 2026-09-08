@@ -71,9 +71,9 @@ Ingen korttyp är slutgodkänd av detta register. Första batchen är syntetiska
 | `ata_declined_notification` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
 | `profitability_warning` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
 | `meeting_summary` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
-| `meeting_followup` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
+| `meeting_followup` | EXECUTABLE_ACTION | Skapad | Preview/avbryt/spara | Ej kört | En task + sparad historikkvittens; övriga varianter öppna |
 | `project_log_note` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
-| `customer_fact` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
+| `customer_fact` | EXECUTABLE_ACTION | Preferens/kontakt/retry skapade | Preview/avbryt/spara/retry | Ej kört | Faktiska rader + återläst kvittens; commitment/konflikter kvar |
 | `agent_memory_confirmation` | EXECUTABLE_ACTION | Ej skapad | Ej kört | Ej kört | Ej verifierat |
 | `autonomy_revoked` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
 | `team_intro` | INFORMATIONAL | Skapad och kvitterad | Klick + bort ur kö | Ej kört | Sparad kvittens och historik efter omladdning; övrigt ej provat |
@@ -140,3 +140,9 @@ GET execution_failed har inte längre en sjudagarsgräns eller krav på resolved
 Historikens gemensamma kvittenskomponent (vanligt kort och paket) visar Behöver följas upp och Granska återförsök för approved med failed/retrying. Knappen använder befintlig signerad reviewedApprovalFetch, stoppar överordnad klickning och är låst under anrop. Lyckat retry hämtar om historiken så gammal kvittens/CTA inte blir kvar. Serverns gransknings-/omsändningsspärrar gäller oförändrat.
 Verifierat med history-recovery-harness: faktisk GET-handler returnerar gammalt och null-daterat misslyckande men inte annat företag, nekat kort eller lyckad handling (DB/routing isolerade); faktisk extraherad React-komponent visar receipt, anropar callback med rätt id, stoppar bubbling, busy-lås och ingen retryknapp vid success. Full tsc passerar. Ingen ny liveprovning av denna UI-version ännu.
 Kvar: liveomprov, komplett paginering och synliga fel om uppföljningslistans hämtning misslyckas; statusetiketten Godkänd beskriver fortfarande beslutet även vid partiellt utförande (kompletterande Behöver följas upp finns nu). Övriga 77-typsluckor kvarstår. Ingen ny TestFlight-build eller extern handling.
+
+### Komplett sidläsning och synliga läsfel — 8 september
+Webblistan läser samtliga API-sidor för huvudlistan och uppföljningen. API ger next_offset utifrån rå sidlängd före routing, deterministisk created_at/id-sortering och validerad offset. Därmed stoppar inte en behörighetsfiltrerad tom sida nästa tillåtna kort. Identiska id:n dedupliceras. Befintliga klienter kan fortsatt använda enstaka sida.
+Gemensam adapter nekar HTTP-fel, trasigt JSON/format och oförändrad/bakåtriktad sidposition. Sidan visar synligt fel/ny läsknapp, aldrig Kön är tom eller 0-statistik som följd av läsfel. Gamla svar ignoreras efter ny hämtning/flikbyte; lyckat retry laddar om.
+Prov: faktiska GET-handlern med sidintervall/negativ offset/äldre fel/scope/routing; verklig adapter och extraherad sidladdare med filtrerad tom första sida, senare synligt kort, felaktig cursor, HTTP/formatfel, misslyckad uppföljningsläsning och gamla svar. Båda harness passerar, full tsc passerar efter Array.from-anpassning till repots TS-target.
+Begränsningar: offsetpaginering är inte en transaktionell snapshot under samtidiga ändringar; komplett sidläsning kan behöva återhämtas vid aktiv kömutation. Mobil/andra befintliga API-klienter är ännu inte migrerade till multipage. Ny kod inte liveomprovad. Nästa: live historik/äldre fel och fortsatta typanpassade interna fixtures, därefter utskicksvarianter med isolerad transport. Alla 77 fortsatt ej slutverifierade; inget iPhone-/TestFlight-slutprov.

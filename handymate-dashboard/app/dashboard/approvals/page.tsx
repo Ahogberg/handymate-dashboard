@@ -1,9 +1,10 @@
 'use client'
 
+import { fetchApprovalList } from '@/lib/approvals/list-client'
 import { classify } from '@/lib/approvals/action-contract'
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import {
   Bot,
@@ -274,6 +275,8 @@ export default function ApprovalsPage() {
   const business = useBusiness()
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [loading, setLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
+  const listRequest = useRef(0)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -325,48 +328,34 @@ export default function ApprovalsPage() {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { listRequest.current++; supabase.removeChannel(channel) }
   }, [business?.business_id, activeTab])
 
   async function fetchApprovals() {
     if (!business?.business_id) return
+    const requestId = ++listRequest.current
     setLoading(true)
+    setListError(null)
     try {
-      // Etapp 3a (multi-employee-parity-plan.md): hämtar via GET
-      // /api/approvals istället för direkt Supabase-query — routing-
-      // filtret (canActOnApproval) körs server-side där. Realtime-
-      // subscriptionen nedan används fortfarande, men bara som "något
-      // ändrades, hämta om"-trigger — inte längre som datakälla.
-      // status='resolved' motsvarar den tidigare
-      // .in('status', ['approved','rejected','expired','auto_approved']).
       const { data: { session } } = await supabase.auth.getSession()
       const status = activeTab === 'pending' ? 'pending' : 'resolved'
       const recordingId = new URLSearchParams(window.location.search).get('recording_id')
       const callFilter = recordingId ? `&recording_id=${encodeURIComponent(recordingId)}` : ''
-      const res = await fetch(`/api/approvals?status=${status}&limit=50${callFilter}`, {
-        headers: {
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      })
-      if (res.status === 499) return
-      if (res.ok) {
-        if (res.status === 499) return
-      const result = await res.json().catch(() => null)
-        setApprovals(result?.approvals || [])
-      }
-      // Misslyckade utföranden (även äldre ouppklarade ärenden) — egen pseudo-status i
-      // GET-routen. Hämtas tyst; ett fel här får aldrig störa huvudkön.
-      const failedRes = await fetch(`/api/approvals?status=execution_failed&limit=20${callFilter}`, {
-        headers: {
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      }).catch(() => null)
-      if (failedRes?.ok) {
-        const failedResult = await failedRes.json().catch(() => null)
-        setFailedExecutions(failedResult?.approvals || [])
-      }
+      const headers = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined
+      const [items, failed] = await Promise.all([
+        fetchApprovalList(`/api/approvals?status=${status}&limit=50${callFilter}`, headers),
+        fetchApprovalList(`/api/approvals?status=execution_failed&limit=20${callFilter}`, headers),
+      ])
+      if (requestId !== listRequest.current) return
+      setApprovals(items as Approval[])
+      setFailedExecutions(failed as Approval[])
+    } catch {
+      if (requestId !== listRequest.current) return
+      setApprovals([])
+      setFailedExecutions([])
+      setListError('Godkännanden och uppföljningar kunde inte hämtas. Listan kan vara ofullständig. Försök att uppdatera igen.')
     } finally {
-      setLoading(false)
+      if (requestId === listRequest.current) setLoading(false)
     }
   }
 
@@ -746,7 +735,7 @@ export default function ApprovalsPage() {
             ur samma lista som redan är hämtad. "Avklarade idag" utelämnas
             medvetet: den datan finns bara när "Hanterade"-fliken varit
             aktiv, och kravet är att aldrig fetcha mer för en siffra. */}
-        {activeTab === 'pending' && <div className="mt-4 flex gap-3">
+        {activeTab === 'pending' && !listError && !loading && <div className="mt-4 flex gap-3">
           <div className="bg-white border border-slate-200 rounded-card px-4 py-3 flex-1 sm:flex-none sm:min-w-[140px]">
             <div className="font-heading tabular-nums text-2xl font-bold text-slate-900">{pendingCount}</div>
             <div className="text-xs text-slate-500 mt-0.5">väntar nu</div>
@@ -791,6 +780,11 @@ export default function ApprovalsPage() {
           ))}
         </div>
       </div>
+
+      {listError && <div role="alert" className="mx-4 sm:mx-8 mb-4 p-4 rounded-xl bg-amber-50 text-amber-900">
+        <p>{listError}</p>
+        <button type="button" onClick={() => fetchApprovals()} className="mt-2 min-h-[44px] font-semibold">Försök hämta igen</button>
+      </div>}
 
       {/* Misslyckade utföranden (Fas 0-härdningen) — godkända rader vars
           exekvering gick fel, oavsett från vilken yta godkännandet gjordes.
@@ -840,7 +834,7 @@ export default function ApprovalsPage() {
           <div className="flex items-center justify-center py-16">
             <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
           </div>
-        ) : approvals.length === 0 ? (
+        ) : listError ? null : approvals.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-primary-700" />
