@@ -44,6 +44,6 @@ export function requireApprovalReview(input: {
   if (Number.isSafeInteger(expires) && expires > now && expires <= now + TTL && /^[a-f0-9]{64}$/.test(signature || '') &&
       timingSafeEqual(Buffer.from(signature, 'hex'), Buffer.from(sign(expires), 'hex'))) return null
   const expiryAt = now + TTL
-  return { status: 428, data: { code: 'approval_review_required', error: 'Granska hela innehållet och mottagarna innan du bekräftar.',
+  return { status: 428, data: { code: 'approval_review_required', error: 'Granska det aktuella underlaget innan du bekräftar.',
     review, review_token: `${expiryAt}.${sign(expiryAt)}` } }
 }
