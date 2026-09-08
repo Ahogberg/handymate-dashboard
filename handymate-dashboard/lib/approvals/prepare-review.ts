@@ -113,6 +113,10 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       detail('Uppmaning', approval.description)
       return complete('Noterar att du har sett uppmaningen. Detta utför inte uppgiften och skapar inget nytt kort.', 'Jag har läst')
     }
+    if (type === 'automation' && p.rule_action_type === 'update_status' && p.rule_action_config?.stage_key) {
+      const { preparePipelineReview } = await import('./pipeline-review')
+      return await preparePipelineReview(db, businessId, approval.id, p)
+    }
     if (type === 'automation' && p.rule_action_type === 'update_status' && !p.rule_action_config?.stage_key) {
       const { prepareAutomationStatusReview } = await import('./automation-status-review')
       return await prepareAutomationStatusReview(db, businessId, p)

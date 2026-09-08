@@ -94,6 +94,10 @@ export function approvalReceipt(type: string, action: string, result: Record<str
   if (type === 'automation' && r.action_type === 'update_status' && r.ok === true) {
     return { state: 'saved', text: `Status för ${r.entity_id} är verifierad som ${r.new_status}.${r.already_current ? ' Värdet fanns redan; ingen ändring gjordes.' : ''} Inget utskick eller betalningsregistrering utfördes.` }
   }
+  if (type === 'automation' && r.action_type === 'pipeline_review' && Array.isArray(r.outcomes)) {
+    return { state: r.ok ? 'saved' : r.partial ? 'partial' : 'failed', text:
+      `Pipelinebeslut: ${r.ok ? 'klart' : 'inte helt slutfört'}.\n${r.outcomes.map((o: any) => `${o.ok ? 'Klart' : 'Misslyckades'} — ${o.message}`).join('\n')}${r.error ? `\n${r.error}` : ''}\nFöljdförslagen kräver egna beslut; inget utskick eller projekt har skapats här.` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true
