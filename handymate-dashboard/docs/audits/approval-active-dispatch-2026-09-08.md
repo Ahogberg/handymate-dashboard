@@ -47,3 +47,35 @@ Inga fler exekveringsvägar prövades. SELECT efter samtliga försök bekräftar
 Den sparade SQL-filen är nu den fristående testkundsvarianten: cust_aplive_active_20260908, Testkund KORTPROV AKTIV, tom telefon, NULL e-post, portal_enabled=false, sms_opt_out=true, email_opt_out=true, invoice_email=false. Den återanvänder inga befintliga kundmottagare.
 Denna revision ersätter texten ovan om customer_id NULL och är INTE KÖRD.
 Nästa nödvändiga steg är uttryckligt tillstånd även till den enda syntetiska kundposten i biz_rollprov_a, med tre bokningar/kort och det redan godkända konfliktprovet. Ingen kundkontakt eller extern kalenderändring ingår. Sex isolerade prov är fortsatt enda nya provbeviset; inga nya liveprov får räknas.
+
+## Genomfört live efter uttryckligt kundgodkännande — slutstatus 8 september
+Tidigare blockering är löst. Andreas godkände separat den syntetiska kundposten. Sparad SQL körd: 1 kund, 3 confirmed/scheduled-bokningar och 3 pending-kort, verifierat med SELECT.
+Kunden har tom telefon, NULL e-post, portal av, SMS/e-post opt-out. Bokningarna har hanterade påminnelse-/uppföljnings-/pushmarkörer och inga externa kalenderreferenser.
+
+| Kort/boknings-id | Liveprov | Verifierat slutresultat |
+| --- | --- | --- |
+| aplive_active_new_20260908 | Preview visar Bekräftad/Ingen/rätt person; Tillbaka -> null/null; återöppna och Spara | Rollprov Anställd tilldelad / bu_rollprov_emp_assigned, approved/success/saved |
+| aplive_active_replace_20260908 | Preview visar tidigare Rollprov Ägare; Tillbaka bevarar ägaren; nytt beslut | Samma rätta nya person/id, ursprunglig ägare i sparad dispatchPlan |
+| aplive_active_stale_20260908 | Tilldelning ändras medan dialogen är öppen; gammalt beslut nekas; Granska på nytt -> nytt konkret underlag -> Spara | Nyare tilldelning bevaras efter nekandet, kort pending/result null; efter färskt beslut rätt ny person, approved/success/saved |
+
+Alla tre behåller confirmed/scheduled och ursprungliga start/slut den 12 september. Samma lagrade kvittens ”Tilldelningen är sparad.” synlig för varje kort i Hanterade och efter full omladdning/återöppning. Två äldre SMS-kort är kvar, orörda. Ingen separat garanti om varje transient toast; det är de beständiga/historikvisade kvittenserna som jämförts.
+
+### Fynd och rättning som liveprovet gav
+Första konfliktprovet bevarade den nya tilldelningen, men felbannerknappen Försök igen använde action=retry för ett fortfarande pending kort. Ny dialog blockerades felaktigt med saknat tidigare exekveringsunderlag.
+Rättat i page.tsx: explicit approval_review_required/428 behåller ursprunglig approve/reject/editedPayload och visar Granska på nytt. Knappen gör ny signerad granskning; utförandefel behåller den riktiga retryvägen. Ny handling rensar gammalt felbesked och knappen låses vid pågående beslut.
+review-guard.ts använder ”Granska det aktuella underlaget innan du bekräftar.” även för interna handlingar.
+Liveomprov på 9e7a1953cd2c4bca78765c7925b18f62399d6c2b efter Vercel success: Admin i granskning -> scoped SQL byter till Ägare -> gammalt beslut nekat och Ägare bevarad -> Granska på nytt visar Ägare -> separat slutbeslut sparar medarbetaren. Konfliktkortets kvittens kvar efter omladdning.
+Reproducerbara SQL-filer för första konflikt och omprov är sparade separat.
+
+### Kodverifiering
+- stale-review-recovery-harness: faktisk sidhandler och banner provar approve/edit/reject, bibehållen redigering, avbruten granskning, rätt retry för utförandefel och knappspärr.
+- Hela faktiska route-harness passerar, inklusive sex aktiva isolerade scenarier och tidigare regressioner.
+- history-recovery-harness passerar.
+- Full tsc --noEmit --incremental false passerar med 8 GB heap, exit 0/tom logg. Första körningen slog i 4 GB minnesgräns, inte ett TypeScript-fel.
+- Full npm run build passerar, exit 0/327 sidor/tracing, med syntetiska Supabase-värden. Befintliga Sentry-/metadata-/dynamisk-rendering- och syntetiska anslutningsvarningar kvar.
+- Publicerad sidblob 0f521a91c68a28c25b4ba8ad8f47ffaeb4ea3fa7 och guardblob ea9bcb129fc5b35174d2a72f95f45ad7c77728be matchar lokalt testade filer exakt.
+
+### Kvar efter detta pass
+Dessa tre aktiva tilldelningsvarianter är liveprovade; detta är inte full bokningslivscykel eller 77/77-certifiering.
+Dialogen visar fortfarande råa ISO-tider (presentationsfynd). Live rollinloggningar/ändrad tid/status, race efter granskningens serverkontroll, telefonsemantik, legacy-reparation och övriga kortflöden kvarstår.
+Ingen ny iPhone-/Expo-/TestFlight-verifiering; build 12 och mobil PR #3 oförändrade i passet. Ingen main-merge eller produktionsdriftsättning.
