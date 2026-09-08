@@ -1426,3 +1426,10 @@ Plan: docs/handoffs/CUSTOMER_RELIEF_PROGRAM_2026-09-08.md.
 Beslut: Jobb=project, Uppdrag=mission; teamuppgifter är innehåll utan egen
 navigation. Omdöpning skjuts upp. Köraren förbereder kort, skickar aldrig själv.
 Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna grindar.
+
+## 2026-09-08 — Din dag, nästa del av kundens avlastning
+- [ ] Samla egna tidsrader och anteckningar över behöriga jobb för valt svenskt datum.
+- [ ] Visa pågående timer, aktuella beslut och beständiga uppföljningar utan ny navigation.
+- [ ] Skilj okänt/läsfel från noll; återanvänd rapportens behörighet och signerade handlingar.
+- [ ] Prova isolering, avbrutna laddningar, datumbyte, omladdning och mobil/desktop.
+- [ ] TypeScript, build och CI; draft-PR ovanpå #29. Ingen produktionsaktivering.

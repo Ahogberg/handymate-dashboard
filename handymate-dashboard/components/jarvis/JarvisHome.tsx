@@ -1144,6 +1144,7 @@ export default function JarvisHome({
           <Link href="/dashboard/avlastning" className="mb-4 flex min-h-[64px] items-center justify-between gap-4 rounded-2xl border border-teal-200 bg-white p-4 text-teal-900 hover:bg-teal-50">
             <span><strong className="block text-base">Vad ligger kvar till ikväll?</strong><span className="text-sm text-slate-600">Ta med ett underlag · förbered nästa steg · granska resultatet</span></span><span aria-hidden="true">→</span>
           </Link>
+          <Link href="/dashboard/avlastning#min-dag" className="mb-3 inline-flex min-h-[44px] items-center text-sm text-teal-800 underline">Se din dag · rapporterat arbete och nästa steg</Link>
           <MatteHero
             greetingName={greetingName}
             queueLoaded={queueLoaded}

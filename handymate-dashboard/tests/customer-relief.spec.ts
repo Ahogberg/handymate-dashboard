@@ -100,7 +100,7 @@ test('report exposes the exact remaining summaries and separates blocked continu
 function routeHarness(auth: any, actor: any, db: any) {
   const mod={exports:{} as any}
   const code=ts.transpileModule(fs.readFileSync('app/api/day-close/route.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
-  const imports: any={'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>auth},'@/lib/permissions':{getCurrentUser:async()=>actor},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/relief/day-summary':{loadDaySummary},'@/lib/matte/work-report':{WorkReportError:require('../lib/matte/work-report').WorkReportError}}
+  const imports: any={'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>auth},'@/lib/permissions':{getCurrentUser:async()=>actor},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/relief/my-day':{loadMyDay:require('../lib/relief/my-day').loadMyDay},'@/lib/relief/day-summary':{loadDaySummary},'@/lib/matte/work-report':{WorkReportError:require('../lib/matte/work-report').WorkReportError}}
   new Function('require','module','exports',code)((key:string)=>{if(!(key in imports))throw new Error(key);return imports[key]},mod,mod.exports)
   return mod.exports.GET(new NextRequest('https://local.test/api/day-close?projectId=p&date=2026-09-08'))
 }
