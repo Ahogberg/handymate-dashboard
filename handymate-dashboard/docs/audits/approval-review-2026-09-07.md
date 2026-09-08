@@ -18,7 +18,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 - Intern granskning har utökats till tidsattest, tilldelning, tidsförslag, checklistor, fotobaserad egenkontroll, kundfakta, minnen, projektlärdomar, intern offertgranskning, försöksupplägg, försöksbeslut och framtida autonomi. Detta är implementerat stöd med villkor, inte ett godkänt slutprov av samtliga typer.
 - Tidsförslags-SMS använder samma textbyggare i granskning och utförande. Knappen lovar uttryckligen inte en bokning eller ombokning.
 - Fakturapåminnelser visar kanaler, avgift, ränta och nästa påminnelse. E-postinnehåll visas i en isolerad HTML-vy. SMS/e-postautomationer har stöd för färdig meddelandegranskning; andra automationer behöver fortsatt arbete.
-- Paket visar valda SMS- och materialdelar och ger kvittens per delåtgärd. Paket med vald bokningsdel är fortfarande inte färdiga. Informationsdelar räknas inte som utförda handlingar.
+- Paket visar valda SMS-, boknings- och materialdelar och ger kvittens per delåtgärd. Informationsdelar räknas inte som utförda handlingar. Säkert misslyckade delar kan köras om utan att redan lyckade delar körs igen; osäkert SMS-läge spärrar omsändning.
 - Webbens dokument måste laddas och markeras som granskade före bekräftelse. Mobilen har motsvarande bild-/dokumentvisning och spärr, verifierad med komponentprov; iPhone-slutprov återstår.
 - En gemensam serverkvittens skiljer noterat, sparat, köat, accepterat utskick, delvis utfört och misslyckat. Kvittensen sparas i kortets utförandespår och används i de generiska webb- och mobilvägarna. Full kontroll av alla historikytor återstår.
 - Tilldelning och tidsattest har företagsfilter och kontrollerade skrivresultat. Ett återförsök efter misslyckad attestering återanvänder samma tidrad. Stabil artefaktidentitet införs även för kundfakta, checklistor, tidsförslag, uppgifter, materialrader, projektlärdomar och försöksrader.
@@ -29,7 +29,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 ## Återstående brister – hindrar generell utrullning
 
 1. **Offert-, faktura- och jobbrapportsutskick:** färdigt dokument, exakt meddelande, alla mottagare/kanaler och dokumentversion behöver bindas i samma beslut. Fakturans Fortnox-/e-fakturagren måste ingå. Jobbrapporten skapar faktiskt PDF och kan mejla kunden; den tidigare rapportens beskrivning som en kvittens var fel och är korrigerad här.
-2. **Bokning, platsbesök och projektavslut:** dynamiska tider, kalenderkoppling, projektändringar, kundbekräftelser och eventuell faktura behöver kompletta gransknings- och delutfallsflöden. Pakets bokningsdel återstår.
+2. **Bokning, platsbesök och projektavslut:** generiska tidsförslag, signerad-offertbokning, platsbesök och projektavslut har nu specifika flöden. Beständigt återförsök av varje fristående avslutsföljd återstår.
 3. **Betalning och lead:** betalningsregistrering kan starta automation och portalmeddelande. Leadaktivering skapar affär, kan skicka internt SMS och triggar lead_received-regler. Detta är mer än en statusändring och måste slutföras med tydliga följdval.
 4. **Övriga automationer och specialvyer:** varje åtgärdsvariant behöver ett eget fullständigt kontrakt. Webbhänvisningar för intäktsfynd, jobbpass, installationer och liknande innebär ingen färdig mobilresa. Mobilen saknar flera motsvarande vyer; dessa kort blir kvar.
 5. **Historik och återförsök:** nya kvittenser finns, men hela historik-/aktivitetskedjan och återförsök av enbart misslyckade paketdelar är inte slutprovade. Leveranskedjan efter kampanjköning behöver egna prov.
@@ -52,7 +52,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `create_quote_draft` | AI genererar och sparar offertutkast; inget kundutskick i denna hanterare. | Internt granskningsunderlag |
 | `create_ata_draft` | AI genererar och sparar ÄTA-utkast, med offertutkast som reservväg när projekt saknas. | Internt granskningsunderlag |
 | `create_invoice_from_report` | Kvitterar och returnerar navigation till fakturor; skapar ingen faktura. | Hänvisning till webbens specialvy; inget generiskt utförande; mobilresa återstår |
-| `autopilot_package` | Utför valda delåtgärder: bokning, kund-SMS och materialrader. Projektinformation är en nollhandling. Delvis fel är möjligt. | Valda SMS-/materialdelar granskas; bokningsdel återstår |
+| `autopilot_package` | Verifierar och fryser valda bokningar, kund-SMS och materialrader mot aktuella företagsskopade rader. Projektinformation är en nollhandling. Sparar utfall per del; återför endast säkert misslyckade delar och spärrar osäkra SMS-svar. | Signerad delgranskning, idempotent bokning/material och sammanhängande historikkvittens; verklig kalender/SMS-miljö återstår |
 | `autonomy_offer` | Beviljar framtida autonomi för en åtgärdstyp. Kan därmed möjliggöra senare utskick utan nytt kortbeslut. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `review_request` | Skickar SMS om recension och skriver uppföljningsmetadata. | Full meddelandegranskning |
 | `scheduled_review_request` | Skickar SMS om recension och skriver uppföljningsmetadata. | Full meddelandegranskning |
@@ -275,3 +275,16 @@ Verifiering med minnesdatabas och ersatta leverantörer:
 - `npx tsc --noEmit` är rent. Inga riktiga meddelanden, automationshandlingar eller produktionsskrivningar gjordes.
 
 Nästa fortsättningspunkt är återstående automationsvarianter samt del 4: beständig deljournal och återförsök för endast misslyckade följder, kampanjkö till sändare och samma kvittens i omedelbart svar, historik och återöppning. Del 1:s ekonomidokument/Fortnox-journal och del 2:s följdvisa återförsök är fortsatt öppna. Mobilens TestFlight build 12 är oförändrad.
+
+### Fortsättning 8 september — paketdelar och selektivt återförsök
+
+`autopilot_package` har nu en exekveringsbunden ersättningsväg för samtliga registrerade deltyper i paketproducenten:
+
+- Kund-SMS hämtar kundens aktuella telefon inom företaget och visar exakt text/mottagare. Ett bekräftat leverantörsavslag kan återföras; ett kastat eller saknat leverantörssvar lagras som osäkert och spärrar omsändning.
+- Bokningsdelen verifierar aktuell kund, projekt och start/slut före beslut, visar kalender-/projektföljden och skickar inget kundmeddelande eller faktura. En stabil kort-/delmarkör sparas i bokningen. Vid förlorat API-svar hittas samma bokning före ett nytt POST; uppslagsfel blockerar för att undvika dubbla kalenderposter.
+- Materialdelen verifierar aktuellt företagsskoppat projekt och varje namn/antal/pris. Varje rad använder stabil artefaktidentitet, så en delvis misslyckad materialdel kan återupptas utan dubbla rader.
+- `execution_result.results` bär ett separat beständigt utfall per del. Vid retry skickas bara säkert misslyckade delar till exekveraren; lyckad bokning/SMS/material, informationsdelar och valda bort delar följer med oförändrade i den samlade kvittensen och körs inte igen. Samma sparade kvittens läses av historikkomponenten efter återöppning.
+
+Verifiering: faktisk approval-route med minnesdatabas och mockad boknings-/SMS-adapter provar aktuellt mottagarnummer, full bokningspreview, lyckad bokning kombinerad med avvisat SMS, beständiga delresultat, retry av endast SMS, oförändrat antal bokningar samt osäkert SMS-svar med spärr. 90 riktade regressionsprov och `npx tsc --noEmit` passerar. Inga riktiga bokningar, SMS eller produktionsskrivningar gjordes.
+
+Del 4 är ännu inte komplett: kampanjköns faktiska sändarjobb och förlorade svar ska provas och övriga flerledade flöden behöver samma deljournal. Del 1:s offert/faktura/Fortnox-journal, del 2:s fristående avslutsföljder, återstående automationsvarianter och del 5:s native specialvyer/TestFlight återstår.

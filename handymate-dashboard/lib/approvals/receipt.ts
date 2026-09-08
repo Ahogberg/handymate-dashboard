@@ -33,10 +33,11 @@ export function approvalReceipt(type: string, action: string, result: Record<str
   if (type === 'autopilot_package' && Array.isArray(r.results)) {
     const selected = r.results.filter((item: any) => !item.skipped && !item.info)
     const failed = selected.filter((item: any) => item.ok !== true)
+    const uncertain = failed.filter((item: any) => item.delivery_state === 'unknown')
     const completed = selected.length - failed.length
     const labels: Record<string, string> = { sms: 'SMS', materials: 'Material', booking: 'Bokning' }
-    const lines = r.results.map((item: any) => `${labels[item.type] || 'Information'}: ${item.skipped ? 'valdes bort' : item.info ? 'läst, ingen ändring' : item.ok === true ? (item.type === 'sms' ? 'accepterat av SMS-tjänsten' : item.type === 'materials' ? `${item.count} rader sparade` : 'sparad') : `${item.partial ? 'delvis utfört — ' : ''}${item.error || 'kunde inte slutföras'}`}`)
-    return { state: !selected.length ? 'acknowledged' : failed.length ? (completed > 0 || failed.some((item: any) => item.partial) ? 'partial' : 'failed') : 'saved', text: `${completed} av ${selected.length} valda handlingar slutfördes.\n${lines.join('\n')}` }
+    const lines = r.results.map((item: any) => `${labels[item.type] || 'Information'}: ${item.skipped ? 'valdes bort' : item.info ? 'läst, ingen ändring' : item.ok === true ? (item.type === 'sms' ? 'accepterat av SMS-tjänsten' : item.type === 'materials' ? `${item.count} rader sparade` : item.reused ? 'redan sparad, kördes inte igen' : 'sparad') : item.delivery_state === 'unknown' ? `osäkert leveransläge — ${item.error || 'kontrollera leverantören'}; skicka inte igen` : `${item.partial ? 'delvis utfört — ' : ''}${item.error || 'kunde inte slutföras'}`}`)
+    return { state: !selected.length ? 'acknowledged' : failed.length ? (uncertain.length || completed > 0 || failed.some((item: any) => item.partial) ? 'partial' : 'failed') : 'saved', text: `${completed} av ${selected.length} valda handlingar slutfördes.\n${lines.join('\n')}` }
   }
   if (type === 'four_eyes_project_close' && r.closeout?.completed === true) {
     const names: Record<string, string> = {

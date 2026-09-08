@@ -8,7 +8,7 @@ const db = { from(table) {
   let values, operation = 'read', filters = []
   const chain = new Proxy({}, { get(_, key) {
     if (key === 'then') return resolve => {
-      const matches = r => filters.every(([k,v]) => k === 'payload' ? JSON.stringify(r[k]) === v : r[k] === v)
+      const matches = r => filters.every(([k,v]) => ['payload','package_data'].includes(k) ? JSON.stringify(r[k]) === v : r[k] === v)
       if (operation !== 'read') mutations++
       if (table === 'pending_approvals') {
         if (!matches(row)) return resolve({ data: [], error: null })
@@ -37,7 +37,8 @@ const db = { from(table) {
       if (table === 'deal') return resolve({ data: structuredClone(dealRow), error:null })
       if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
       if (table === 'booking') {
-        if (filters.some(([key]) => key === 'notes')) return resolve({ data: [], error:null })
+        const notePattern = filters.find(([key]) => key === 'notes')?.[1]
+        if (notePattern) { const needle=String(notePattern).replaceAll('%',''); return resolve({ data: structuredClone(bookingRows.filter(item=>String(item.notes||'').includes(needle))), error:null }) }
         const wanted = filters.find(([key]) => key === 'booking_id')?.[1]
         return resolve({ data: wanted ? structuredClone(bookingRows.find(item => item.booking_id === wanted) || null) : structuredClone(bookingRows), error:null })
       }
@@ -78,7 +79,7 @@ function load(file) {
     return new Proxy({}, { get: (_, key) => () => { throw Error(`Unexpected effect: ${name}.${String(key)}`) } })
   }
   vm.runInNewContext(code, { module: mod, exports: mod.exports, require: req, process: { env: { SUPABASE_SERVICE_ROLE_KEY: 'test-only' } },
-    console, Buffer, Date, fetch: async (url,init) => { if (!String(url).endsWith('/api/bookings')) throw Error('Network is forbidden in this harness'); const body=JSON.parse(init.body); bookingPosts.push(body); return Response.json({ success:true, booking:{booking_id:'book-new'} }) } }, { filename: file })
+    console, Buffer, Date, fetch: async (url,init) => { if (!String(url).endsWith('/api/bookings')) throw Error('Network is forbidden in this harness'); const body=JSON.parse(init.body); bookingPosts.push(body); bookingRows.push({...body,booking_id:'book-new'}); return Response.json({ success:true, booking:{booking_id:'book-new'} }) } }, { filename: file })
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
@@ -122,6 +123,23 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal(activationResult.receipt.state,'saved'); assert(activationResult.receipt.text.includes('Internnotis: klart')); assert(activationResult.receipt.text.includes('Leadregler: inte utfört'))
   reset(); row.approval_type='lead_review'; row.payload={lead_id:'l-site'}; leadRow.business_id='foreign'
   assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(leadActivationCalls.length,0)
+  reset(); row.approval_type='autopilot_package'; row.payload={}; row.package_data={actions:[
+    {id:'sms-part',type:'customer_sms',title:'Kundbesked',data:{customer_id:'c-site',to:'+46700000000',message:'Exakt paketmeddelande'}},
+    {id:'booking-part',type:'booking_suggestion',title:'Boka besök',data:{customer_id:'c-site',scheduled_start:'2026-09-20T08:00:00Z',scheduled_end:'2026-09-20T09:00:00Z',notes:'Paketbokning'}},
+  ]}
+  let packagePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(packagePreview.review.messages[0].recipients[0],customerRow.phone_number); assert(packagePreview.review.details.some(d=>d.label==='Boka besök'&&d.text.includes('2026-09-20')))
+  smsShouldFail=true; let packageResponse=await post({action:'approve',review_token:packagePreview.review_token}); let packageResult=await packageResponse.json()
+  assert.equal(packageResponse.status,200,JSON.stringify(packageResult)); assert.equal(packageResult.receipt.state,'partial'); assert.equal(bookingPosts.length,1); assert.equal(smsDeliveries.length,1)
+  assert.equal(row.payload.execution_result.results.find(r=>r.id==='booking-part').ok,true); assert.equal(row.payload.execution_result.results.find(r=>r.id==='sms-part').delivery_state,'rejected')
+  smsShouldFail=false; packagePreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  assert.equal(packagePreview.review.messages.length,1); assert(packagePreview.review.effect.includes('endast om')); assert(packagePreview.review.details.some(d=>d.label==='Boka besök'&&d.text.includes('körs inte igen')))
+  packageResponse=await post({action:'retry',review_token:packagePreview.review_token}); packageResult=await packageResponse.json()
+  assert.equal(packageResponse.status,200,JSON.stringify(packageResult)); assert.equal(packageResult.receipt.state,'saved'); assert.equal(bookingPosts.length,1,'successful booking part must not run again'); assert.equal(smsDeliveries.length,2)
+  reset(); row.approval_type='autopilot_package'; row.payload={}; row.package_data={actions:[{id:'sms-only',type:'customer_sms',title:'SMS',data:{customer_id:'c-site',message:'Osäkert SMS'}}]}
+  packagePreview=await (await post({action:'preview',decision_action:'approve'})).json(); smsUnknown=true
+  packageResult=await (await post({action:'approve',review_token:packagePreview.review_token})).json(); assert.equal(packageResult.receipt.state,'partial'); assert(packageResult.receipt.text.includes('skicka inte igen'))
+  assert.equal((await post({action:'preview',decision_action:'retry'})).status,422); assert.equal(smsDeliveries.length,1)
   reset(); row.approval_type='four_eyes_project_close'; row.payload={project_id:'p1',responsible_name:'Erik'}
   const closePreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(mutations,0); assert.equal(closePreview.review.choices.length,3); assert(closePreview.review.details.some(d=>d.label==='Kunden betalar'&&d.text==='7 000 kr'))
@@ -202,5 +220,5 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal(internalPreview.review.messages[0].recipients[0],'+46708888888'); assert.equal(internalPreview.review.messages[0].text,row.payload.message); assert.equal(smsDeliveries.length,0)
   const internalResult=await (await post({action:'approve',review_token:internalPreview.review_token})).json()
   assert.equal(smsDeliveries.length,1); assert.equal(smsDeliveries[0].recipient,'internal'); assert.equal(smsDeliveries[0].message,internalPreview.review.messages[0].text); assert.equal(internalResult.receipt.state,'sent')
-  console.log('PASS route integration: exact campaign queue, payment choices, project-close choices/results, deferred internal SMS, site-visit/generic booking times with retry, and signed-quote booking/SMS are review-bound with durable evidence.')
+  console.log('PASS route integration: campaign, payment, lead, package retry, project close and booking variants are review-bound with durable per-action evidence.')
 })().catch(e => { console.error(e); process.exitCode=1 })
