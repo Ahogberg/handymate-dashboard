@@ -17,7 +17,7 @@ export interface PreparedApprovalReview {
  * Live values are part of the signed review, never silently substituted later.
  */
 export async function prepareApprovalReview(db: SupabaseClient, businessId: string,
-  approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any },
+  approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any; created_at?: string },
   body: Record<string, any>,
 ): Promise<PreparedApprovalReview | undefined> {
   const type = approval.approval_type
@@ -112,6 +112,10 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     if (type === 'automation' && p.rule_action_type === 'create_approval') {
       detail('Uppmaning', approval.description)
       return complete('Noterar att du har sett uppmaningen. Detta utför inte uppgiften och skapar inget nytt kort.', 'Jag har läst')
+    }
+    if (type === 'automation' && p.rule_action_type === 'schedule_followup') {
+      const { prepareAutomationFollowupReview } = await import('./automation-followup-review')
+      return await prepareAutomationFollowupReview(db, businessId, { ...approval, payload: p })
     }
     if (type === 'automation' && p.rule_action_type === 'reject_lead') {
       const { prepareAutomationRejectLeadReview } = await import('./automation-reject-lead-review')

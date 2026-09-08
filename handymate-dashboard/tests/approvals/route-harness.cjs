@@ -3,6 +3,7 @@ const fs = require('node:fs'), path = require('node:path'), vm = require('node:v
 const ts = require('typescript'), assert = require('node:assert/strict')
 const root = path.resolve(__dirname, '../..')
 let row, mutations, canAct = true, availableSlots = [], customerRow, leadRow, quoteRow, invoiceRow, projectRow, dealRow, memberRow, bookingRows = [], smsShouldFail = false, smsUnknown = false
+const inboxItems = new Map()
 const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = [], paymentCalls = [], leadActivationCalls = [], automationCalls = [], artifactCalls = []
 const db = { from(table) {
   let values, operation = 'read', filters = []
@@ -14,6 +15,10 @@ const db = { from(table) {
         if (!matches(row)) return resolve({ data: [], error: null })
         if (operation === 'update') Object.assign(row, structuredClone(values))
         return resolve({ data: operation === 'read' ? structuredClone(row) : [{ id: row.id }], error: null })
+      }
+      if (table === 'inbox_item') {
+        if (operation === 'insert') inboxItems.set(values.inbox_item_id, structuredClone(values))
+        return resolve({ data: [...inboxItems.values()].find(matches) || null, error: null })
       }
       if (table === 'sms_campaign') {
         if (operation === 'read') return resolve({ data: campaigns.get(filters.find(([k]) => k === 'campaign_id')?.[1]) || null, error: null })
@@ -99,6 +104,16 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal([...campaigns.values()][0].message, 'Min granskade text'); assert.equal(deliveries.length,1)
   assert.equal(deliveries[0].phone_number,preview.review.messages[0].recipients[0])
   await post(body); assert.equal(deliveries.length,1); assert.equal(campaigns.size,1)
+  reset(); row.approval_type='automation'; row.created_at='2026-09-08T12:00:00Z'; row.payload={customer_id:'c-site',rule_action_type:'schedule_followup',rule_action_config:{days_until:2,description:'Ring {{customer_name}}'}}
+  const followupPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0); assert(followupPreview.review.details.some(d=>d.text==='Ring Anna Andersson (senast 2026-09-10)'))
+  customerRow.name='Ny kundtext'; assert.equal((await post({action:'approve',review_token:followupPreview.review_token})).status,428)
+  assert.equal(automationCalls.length,0)
+  const updatedFollowup=await (await post({action:'preview',decision_action:'approve'})).json()
+  const followupResult=await (await post({action:'approve',review_token:updatedFollowup.review_token})).json()
+  assert.equal(followupResult.receipt.state,'saved',JSON.stringify(followupResult)); assert.equal(inboxItems.size,1)
+  assert(followupResult.receipt.text.includes('Ny kundtext')); assert.equal(automationCalls.length,0)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(followupResult.receipt))
   reset(); row.approval_type='confirm_payment'; row.payload={invoice_id:'inv1',invoice_number:'1001',customer_id:'c-site',total:10000}
   let paymentPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(paymentPreview.review.choices.length,3); assert(paymentPreview.review.details.some(d=>d.label==='Registreras som betalt'&&d.text==='7 000 kr'))
