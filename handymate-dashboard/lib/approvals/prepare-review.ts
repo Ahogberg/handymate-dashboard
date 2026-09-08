@@ -80,11 +80,25 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       const { prepareQuoteSigningBookingReview } = await import('./quote-signing-booking-review')
       return await prepareQuoteSigningBookingReview(db, businessId, approval.id, p)
     }
+    if (type === 'four_eyes_project_close') {
+      const { prepareProjectCloseReview } = await import('./project-close-review')
+      return await prepareProjectCloseReview(db, businessId, p, body.action_overrides)
+    }
     if (['propose_booking_times', 'reschedule_request', 'new_booking_request'].includes(type) && p.source !== 'quote_signing') {
       const message = bookingProposalMessage(p)
       if (!message || typeof p.entity?.phone !== 'string' || !/^\+?[0-9 ()-]{7,20}$/.test(p.entity.phone)) throw new Error('Fullständig meddelandetext och telefonnummer krävs.')
       r.messages.push({ channel: 'SMS', recipients: [p.entity.phone], text: message })
       return complete('Skickar detta tidsförslag till kunden via SMS. Ingen tid bokas eller flyttas av meddelandet.', 'Skicka tidsförslaget')
+    }
+    if (type === 'send_sms' && p.recipient === 'internal') {
+      const { data: config, error } = await db.from('business_config').select('personal_phone').eq('business_id', businessId).maybeSingle()
+      if (error || !config?.personal_phone || config.personal_phone !== p.to || typeof p.message !== 'string' || !p.message.trim()) {
+        throw new Error('Det interna SMS:ets mottagare eller text kunde inte verifieras.')
+      }
+      r.messages.push({ channel: 'SMS', recipients: [config.personal_phone], text: p.message })
+      detail('Mottagartyp', 'Intern ägare/administratör')
+      return { ...complete('Skickar det visade interna SMS:et. Ingen kund kontaktas.', 'Skicka internt SMS'),
+        executionPayload: { to: config.personal_phone, message: p.message, relatedId: p.related_id || null } }
     }
     if (type === 'automation' && p.rule_action_type === 'create_approval') {
       detail('Uppmaning', approval.description)

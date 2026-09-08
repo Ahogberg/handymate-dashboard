@@ -38,6 +38,25 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     const lines = r.results.map((item: any) => `${labels[item.type] || 'Information'}: ${item.skipped ? 'valdes bort' : item.info ? 'läst, ingen ändring' : item.ok === true ? (item.type === 'sms' ? 'accepterat av SMS-tjänsten' : item.type === 'materials' ? `${item.count} rader sparade` : 'sparad') : `${item.partial ? 'delvis utfört — ' : ''}${item.error || 'kunde inte slutföras'}`}`)
     return { state: !selected.length ? 'acknowledged' : failed.length ? (completed > 0 || failed.some((item: any) => item.partial) ? 'partial' : 'failed') : 'saved', text: `${completed} av ${selected.length} valda handlingar slutfördes.\n${lines.join('\n')}` }
   }
+  if (type === 'four_eyes_project_close' && r.closeout?.completed === true) {
+    const names: Record<string, string> = {
+      workflow_stage: 'Arbetsflöde', job_completed_event: 'Avslutsautomationer', auto_invoice: 'Fakturautkast',
+      project_outcome: 'Efterkalkyl', business_twin_forecasts: 'Prognosutfall', project_debrief: 'Debrief',
+      agent_trigger: 'Intern analys', review_request: 'Kunduppföljning', jobbpass_proposal: 'Jobbpass',
+      installation_register: 'Installationsregister', deal_stage: 'Affärssteg', completion_batch: 'Gruppering',
+    }
+    const effects = Array.isArray(r.closeout.effects) ? r.closeout.effects : []
+    const incomplete = effects.some((effect: any) => effect.status === 'failed' || effect.status === 'partial')
+    const statusText: Record<string, string> = {
+      succeeded: 'klart', partial: 'delvis klart', failed: 'misslyckades', skipped: 'inte utfört',
+      dispatched: 'startat, inväntar utfall', attempted: 'regler granskade; nya handlingar ligger som egna förslag',
+    }
+    const lines = effects.map((effect: any) => `${names[effect.effect] || effect.effect}: ${statusText[effect.status] || effect.status}${effect.message ? ` — ${effect.message}` : ''}`)
+    return {
+      state: incomplete ? 'partial' : 'saved',
+      text: `Projektet är avslutat.${lines.length ? `\n${lines.join('\n')}` : ''}`,
+    }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true

@@ -2,8 +2,8 @@
 const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
 const ts = require('typescript'), assert = require('node:assert/strict')
 const root = path.resolve(__dirname, '../..')
-let row, mutations, canAct = true, availableSlots = [], customerRow, quoteRow, projectRow, bookingRows = []
-const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = []
+let row, mutations, canAct = true, availableSlots = [], customerRow, quoteRow, projectRow, dealRow, memberRow, bookingRows = []
+const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = []
 const db = { from(table) {
   let values, operation = 'read', filters = []
   const chain = new Proxy({}, { get(_, key) {
@@ -25,8 +25,10 @@ const db = { from(table) {
       if (table === 'customer') return resolve({ data: structuredClone(customerRow), error:null })
       if (table === 'quotes') return resolve({ data: structuredClone(quoteRow), error:null })
       if (table === 'project') return resolve({ data: structuredClone(projectRow), error:null })
+      if (table === 'deal') return resolve({ data: structuredClone(dealRow), error:null })
+      if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
       if (table === 'booking') return resolve({ data: filters.some(([key]) => key === 'notes') ? [] : structuredClone(bookingRows), error:null })
-      if (table === 'business_config') return resolve({ data: { business_name:'Testfirman', assigned_phone_number:'+468100000', subscription_plan:'pro', working_hours:{monday:{active:true,start:'08:00',end:'17:00'},tuesday:{active:true,start:'08:00',end:'17:00'},wednesday:{active:true,start:'08:00',end:'17:00'},thursday:{active:true,start:'08:00',end:'17:00'},friday:{active:true,start:'08:00',end:'17:00'}} }, error:null })
+      if (table === 'business_config') return resolve({ data: { business_name:'Testfirman', assigned_phone_number:'+468100000', personal_phone:'+46708888888', google_review_url:'https://example.test/review', subscription_plan:'pro', working_hours:{monday:{active:true,start:'08:00',end:'17:00'},tuesday:{active:true,start:'08:00',end:'17:00'},wednesday:{active:true,start:'08:00',end:'17:00'},thursday:{active:true,start:'08:00',end:'17:00'},friday:{active:true,start:'08:00',end:'17:00'}} }, error:null })
       return resolve({ data: null, error: null })
     }
     return (...args) => { if (['eq','ilike'].includes(String(key))) filters.push(args); if (key === 'insert' || key === 'update') { operation = key; values = args[0] }; return chain }
@@ -47,6 +49,8 @@ function load(file) {
     if (name === '@/lib/sms-send') return { sendSmsViaElks: async ({supabase,...args}) => { smsDeliveries.push(structuredClone(args)); return { success:true, smsId:'sms-site', elksId:'elks-site', status:200 } } }
     if (name === '@/lib/sms-usage') return { checkSmsAllowance: async () => ({ allowed:true }) }
     if (name === '@/lib/matte/calendar-slots') return { getAvailableSlots: async () => structuredClone(availableSlots) }
+    if (name === '@/lib/invoices/project-invoice-draft') return { byggProjektFakturaUnderlag: async () => ({ ok:true, project:{ project_id:'p1',customer_id:'c-site',quote_id:'q1' }, items:[{description:'Arbete',quantity:10,unit:'tim',unit_price:800,total:8000}], subtotal:8000,vatRate:25,vatAmount:2000,total:10000,rotRutType:'rot',rotRutDeduction:3000,customerPays:7000,hasAta:false,ataChangeIds:[] }) }
+    if (name === '@/lib/projects/complete-project') return { completeProject: async args => { completionCalls.push(structuredClone({businessId:args.businessId,projectId:args.projectId,authorization:args.authorization,options:args.options})); const chosen=args.options; return { ok:true,completed:true,transitioned:true,already_completed:false,requires_approval:false,project:{project_id:'p1'},invoice_created:chosen.createInvoiceDraft?{invoice_id:'inv1',invoice_number:'1001',total:10000,status:'draft'}:null,effects:[{effect:'workflow_stage',status:'succeeded'},{effect:'auto_invoice',status:chosen.createInvoiceDraft?'succeeded':'skipped',message:chosen.createInvoiceDraft?undefined:'Fakturautkast valdes bort i granskningen'},{effect:'review_request',status:chosen.createReviewRequest?'succeeded':'skipped',message:chosen.createReviewRequest?undefined:'Kunduppföljning valdes bort i granskningen'},{effect:'job_completed_event',status:chosen.runAutomations?'attempted':'skipped'}],warnings:[] } } }
     if (name === '@/lib/customers/namn') return { halsning: name => `Hej ${String(name || '').split(' ')[0]}!` }
     if (name === '@/lib/sms-reply-number') return { buildSmsSuffix: name => `//${name}` }
     if (name.startsWith('@/lib/bookings/')) return load(path.join(root, name.slice(2)+'.ts'))
@@ -62,7 +66,7 @@ function load(file) {
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
-const reset = () => { row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999' }; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; projectRow={project_id:'p1',name:'Badrum hemma'}; bookingRows=[] }
+const reset = () => { row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',review_request_sent_at:null }; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
   reset()
@@ -76,7 +80,18 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal([...campaigns.values()][0].message, 'Min granskade text'); assert.equal(deliveries.length,1)
   assert.equal(deliveries[0].phone_number,preview.review.messages[0].recipients[0])
   await post(body); assert.equal(deliveries.length,1); assert.equal(campaigns.size,1)
-  reset(); row.approval_type='four_eyes_project_close'; assert.equal((await post({action:'approve'})).status,422); assert.equal(mutations,0); assert.equal(row.status,'pending')
+  reset(); row.approval_type='four_eyes_project_close'; row.payload={project_id:'p1',responsible_name:'Erik'}
+  const closePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0); assert.equal(closePreview.review.choices.length,3); assert(closePreview.review.details.some(d=>d.label==='Kunden betalar'&&d.text==='7 000 kr'))
+  assert(closePreview.review.details.some(d=>d.label==='Ansvarig'&&d.text==='Erik'))
+  assert(closePreview.review.effect.includes('skickas aldrig direkt'))
+  const closeResponse=await post({action:'approve',review_token:closePreview.review_token,action_overrides:{create_invoice_draft:'rejected',create_review_request:'approved',run_automations:'rejected'}})
+  const closeResult=await closeResponse.json(); assert.equal(closeResponse.status,200,JSON.stringify(closeResult))
+  assert.equal(completionCalls.length,1,JSON.stringify(closeResult)); assert.deepEqual(completionCalls[0].options,{createInvoiceDraft:false,createReviewRequest:true,runAutomations:false})
+  assert.equal(closeResult.receipt.state,'saved'); assert(closeResult.receipt.text.includes('Fakturautkast: inte utfört')); assert(closeResult.receipt.text.includes('Kunduppföljning: klart'))
+  reset(); row.approval_type='four_eyes_project_close'; row.payload={project_id:'p1'}
+  const stalePreview=await (await post({action:'preview',decision_action:'approve'})).json(); projectRow.name='Ändrat projekt'
+  assert.equal((await post({action:'approve',review_token:stalePreview.review_token})).status,428); assert.equal(completionCalls.length,0)
   reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',customerName:'Fel namn',phone:'+46709999999'},duration_hours:1,responsible_name:'Erik'}
   availableSlots=[{start:'2026-09-09T08:00:00Z',end:'2026-09-09T09:00:00Z',label:'onsdag 9 sep kl 10:00–11:00'}]
   let sitePreview=await (await post({action:'preview',decision_action:'approve'})).json()
@@ -105,5 +120,10 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal(smsDeliveries.at(-1).message,bookingPreview.review.messages[0].text); assert.equal(bookingResult.receipt.state,'saved')
   reset(); row.approval_type='new_booking_request'; row.payload={source:'quote_signing',quote_id:'q1',customer_id:'c-site',customer_phone:'+46709999999',requested_date:'2030-09-10'}; quoteRow.status='draft'
   assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(bookingPosts.length,0)
-  console.log('PASS route integration: exact campaign queue, hidden invoice block, site-visit times, and signed-quote booking/SMS are review-bound with durable evidence.')
+  reset(); row.approval_type='send_sms'; row.payload={recipient:'internal',to:'+46708888888',message:'Faktura 1001 skapades som utkast.',related_id:'inv1'}
+  const internalPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(internalPreview.review.messages[0].recipients[0],'+46708888888'); assert.equal(internalPreview.review.messages[0].text,row.payload.message); assert.equal(smsDeliveries.length,0)
+  const internalResult=await (await post({action:'approve',review_token:internalPreview.review_token})).json()
+  assert.equal(smsDeliveries.length,1); assert.equal(smsDeliveries[0].recipient,'internal'); assert.equal(smsDeliveries[0].message,internalPreview.review.messages[0].text); assert.equal(internalResult.receipt.state,'sent')
+  console.log('PASS route integration: exact campaign queue, project-close choices/results, deferred internal SMS, site-visit times, and signed-quote booking/SMS are review-bound with durable evidence.')
 })().catch(e => { console.error(e); process.exitCode=1 })

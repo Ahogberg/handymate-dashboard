@@ -19,6 +19,17 @@ test('every acknowledgement says what is noted without claiming delivery', () =>
   expect(approvalReceipt('karin_deadline','approve',{acknowledged:true}).text).toContain('inte någon inlämning')
   expect(approvalReceipt('egenkontroll_avvikelse','approve',{acknowledged:true}).state).toBe('acknowledged')
 })
+test('project close receipt lists each actual consequence and exposes partial failure', () => {
+  const receipt = approvalReceipt('four_eyes_project_close', 'approve', { closeout: { completed: true, effects: [
+    { effect: 'workflow_stage', status: 'succeeded' },
+    { effect: 'auto_invoice', status: 'partial', message: 'Granskningskortet kunde inte sparas' },
+    { effect: 'review_request', status: 'skipped', message: 'Valdes bort' },
+  ] } })
+  expect(receipt.state).toBe('partial')
+  expect(receipt.text).toContain('Arbetsflöde: klart')
+  expect(receipt.text).toContain('Fakturautkast: delvis klart')
+  expect(receipt.text).toContain('Kunduppföljning: inte utfört')
+})
 test('SMS time proposal preview is the exact execution text and does not promise a booking', async () => {
   const payload={entity:{phone:'+46701234567'},available_slots:[{label:'Tisdag 10:00'},{label:'Onsdag 14:00'}]}
   const prepared=await prepareApprovalReview({from(){throw Error('No lookup expected')}} as any,'b',{id:'a',approval_type:'reschedule_request',payload},{action:'approve'})

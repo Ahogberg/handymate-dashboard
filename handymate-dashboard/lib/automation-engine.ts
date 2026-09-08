@@ -886,7 +886,13 @@ export async function executeRule(
     ((typedRule.action_type === 'send_sms' || typedRule.action_type === 'send_email') && settings.require_approval_send_sms) ||
     (typedRule.action_type === 'generate_quote' && settings.require_approval_send_quote) ||
     (typedRule.action_type === 'create_booking' && settings.require_approval_create_booking)
-  const needsApproval = typedRule.requires_approval || globalApproval
+  // En redan granskad huvudhandling får kräva att varje NY följdhandling
+  // granskas separat. Det gäller även regler som normalt har autonomi: användaren
+  // har godkänt att regeln får föreslå nästa steg, inte ett ännu osynligt
+  // kundutskick. `create_approval` är redan bara ett förslag och undantas i den
+  // befintliga grenen nedan.
+  const forcedByParentReview = context.require_explicit_approval === true
+  const needsApproval = forcedByParentReview || typedRule.requires_approval || globalApproval
 
   // Förtjänad autonomi: om regeln mappar till en allowlistad nyckel OCH
   // hantverkaren beviljat autonomi för den → hoppa över approval-grenen och
@@ -902,7 +908,7 @@ export async function executeRule(
   // isAutonomous-beteende, exakt oförändrat (reduktionen syns nedan: när
   // mandatBypass förblir false körs precis den gamla try/catch-satsen).
   let mandateStamp: { mandate_id: string; mission_id: string } | null = null
-  if (needsApproval && autonomyKey) {
+  if (needsApproval && !forcedByParentReview && autonomyKey) {
     // Etapp W:s uttryckliga scope för den här callern är booking_reminder
     // (tasks/jaunty-pondering-hummingbird.md, Etapp W punkt 1).
     // deriveAutonomyKey mappar ÄVEN threshold-signaturerna
@@ -1382,34 +1388,44 @@ export async function fireEvent(
   eventName: string,
   businessId: string,
   payload: ExecutionContext = {}
-): Promise<void> {
+): Promise<{ matched: number; pending_approval: number; executed: number; skipped: number; failed: number }> {
+  const summary = { matched: 0, pending_approval: 0, executed: 0, skipped: 0, failed: 0 }
   try {
     // Fetch matching event rules
-    const { data: rules } = await supabase
+    const { data: rules, error: rulesError } = await supabase
       .from('v3_automation_rules')
       .select('*')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .eq('trigger_type', 'event')
 
-    if (!rules || rules.length === 0) return
+    if (rulesError) return { ...summary, failed: 1 }
+    if (!rules || rules.length === 0) return summary
 
     // Filter by event_name in trigger_config
     const matchingRules = (rules as AutomationRule[]).filter(r => {
       const configEvent = r.trigger_config?.event_name
       return configEvent === eventName
     })
+    summary.matched = matchingRules.length
 
     // Execute matching rules
     for (const rule of matchingRules) {
       try {
-        await executeRule(supabase, rule.id, payload)
+        const result = await executeRule(supabase, rule.id, payload)
+        if (result.status === 'pending_approval') summary.pending_approval += 1
+        else if (result.status === 'success') summary.executed += 1
+        else if (result.status === 'skipped') summary.skipped += 1
+        else summary.failed += 1
       } catch (err) {
+        summary.failed += 1
         console.error(`[automation-engine] Event rule ${rule.name} failed:`, err)
       }
     }
+    return summary
   } catch (err) {
     console.error(`[automation-engine] fireEvent error for ${eventName}:`, err)
+    return { ...summary, failed: summary.failed + 1 }
   }
 }
 

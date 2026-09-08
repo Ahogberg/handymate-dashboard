@@ -29,7 +29,7 @@ const {chromium}=require('playwright')
   assert.equal(await page.getByRole('button',{name:'Bekräfta och köa'}).isDisabled(),true)
   await page.frameLocator('iframe').getByText('Arbete: 1500 kr').waitFor()
   await check.check();assert.equal(await page.getByRole('button',{name:'Bekräfta och köa'}).isEnabled(),true)
-  await page.keyboard.press('Escape');assert.equal(await page.evaluate(()=>window.result),false)
+  await page.keyboard.press('Escape');assert.deepEqual(await page.evaluate(()=>window.result),{confirmed:false})
   attachmentStatus=403
   await page.evaluate(r=>{window.reviewApi.showApprovalReview(r)},documentReview)
   await page.getByText('Underlaget kunde inte laddas. Beslutet kan inte bekräftas.').waitFor()
@@ -37,6 +37,19 @@ const {chromium}=require('playwright')
   await page.keyboard.press('Escape')
   await page.evaluate(r=>{window.reviewApi.showApprovalReview({...r,messages:[{channel:'E-post',recipients:['test@example.test'],text:'Fallback',html:'<h1>Synlig mejltext</h1><script>parent.unwantedSend=true</script>'}]})},review)
   await page.frameLocator('iframe').getByText('Synlig mejltext').waitFor();assert.equal(await page.evaluate(()=>window.unwantedSend),undefined)
-  console.log('PASS actual Chromium: full text, preview-only first click, cancel, explicit proof submission, rendered document, required review checkbox, forbidden document disables confirmation, sandboxed email HTML.')
+  await page.keyboard.press('Escape')
+  const choiceReview={...review,choices:[
+   {id:'invoice',label:'Skapa fakturautkast',description:'Skapar utkast.',defaultSelected:true},
+   {id:'review',label:'Förbered kunduppföljning',description:'Skapar separat förslag.',defaultSelected:true},
+  ]}
+  await page.evaluate(r=>{window.result=null;window.reviewApi.reviewedApprovalFetch('/api/approvals/a',{method:'POST',body:JSON.stringify({action:'approve'})}).then(r=>window.result=r.status);window.nextReview=r},choiceReview)
+  // Route-mocken lämnar standard-reviewn, så prova det signerade valbeslutet
+  // direkt i samma verkliga dialog och kontrollera dess exakta wire-format.
+  await page.keyboard.press('Escape')
+  await page.evaluate(r=>{window.choiceResult=null;window.reviewApi.showApprovalReview(r).then(x=>window.choiceResult=x)},choiceReview)
+  await page.getByRole('checkbox',{name:'Förbered kunduppföljning'}).uncheck()
+  await page.getByRole('button',{name:'Bekräfta och köa',exact:true}).click()
+  assert.deepEqual(await page.evaluate(()=>window.choiceResult),{confirmed:true,actionOverrides:{invoice:'approved',review:'rejected'}})
+  console.log('PASS actual Chromium: full text, preview-only first click, cancel, explicit proof submission, rendered document, required review checkbox, forbidden document disables confirmation, sandboxed email HTML, and explicit signed sub-action choices.')
  } finally {await browser.close()}
 })().catch(e=>{console.error(e);process.exitCode=1})

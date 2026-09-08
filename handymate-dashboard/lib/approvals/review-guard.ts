@@ -23,8 +23,18 @@ export function requireApprovalReview(input: {
   if (review.open && !review.confirmLabel) return { status: 428, data: { review, code: 'approval_navigation_required' } }
   if (!review.confirmLabel) return { status: 422, data: { error: review.blockedReason, code: 'approval_review_unavailable', review } }
   if (!secret) return { status: 503, data: { error: 'Granskningen kunde inte verifieras. Försök igen senare.' } }
+  let boundOverrides = body.action_overrides ?? null
+  if (review.choices?.length) {
+    const allowed = new Set(review.choices.map(choice => choice.id))
+    const overrides = body.action_overrides
+    if (overrides != null && (typeof overrides !== 'object' || Array.isArray(overrides) ||
+        Object.entries(overrides).some(([key, value]) => !allowed.has(key) || !['approved', 'rejected'].includes(String(value))))) {
+      return { status: 422, data: { error: 'Ett valt delbeslut hör inte till det granskade underlaget.', code: 'approval_review_choice_invalid', review } }
+    }
+    boundOverrides = null
+  }
   const binding = canonical({ id: approval.id, businessId: input.businessId, actorId: input.actorId,
-    type: approval.approval_type, payload, packageData: approval.package_data ?? null, action: body.action, overrides: body.action_overrides ?? null, snapshot: input.prepared?.snapshot ?? null, review })
+    type: approval.approval_type, payload, packageData: approval.package_data ?? null, action: body.action, overrides: boundOverrides, snapshot: input.prepared?.snapshot ?? null, review })
   const sign = (expires: number) => createHmac('sha256', secret).update(`approval-review-v1\n${expires}\n${binding}`).digest('hex')
   const [expiry, signature] = typeof body.review_token === 'string' ? body.review_token.split('.') : []
   const expires = Number(expiry)

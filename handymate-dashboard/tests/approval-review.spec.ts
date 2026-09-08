@@ -43,6 +43,24 @@ test('malformed signatures and missing content fail closed', () => {
   const i = input(); i.approval.payload.sms_text = ' '
   expect(gate(i)?.status).toBe(422)
 })
+test('signed review choices allow only the displayed sub-actions', () => {
+  const i = input()
+  const prepared: any = {
+    review: { title: 'Avslut', effect: 'Valda följder', confirmLabel: 'Avsluta', messages: [], choices: [
+      { id: 'invoice', label: 'Faktura', description: 'Skapa utkast', defaultSelected: true },
+      { id: 'review', label: 'Recension', description: 'Skapa förslag', defaultSelected: true },
+    ] },
+    snapshot: { project: 'p1' },
+  }
+  const first = requireApprovalReview({ ...i, prepared }, secret, 1000)!
+  expect(first.status).toBe(428)
+  expect(requireApprovalReview({ ...i, body: { action: 'approve', review_token: first.data.review_token,
+    action_overrides: { invoice: 'approved', review: 'rejected' } }, prepared }, secret, 1000)).toBeNull()
+  const invalid = requireApprovalReview({ ...i, body: { action: 'approve', review_token: first.data.review_token,
+    action_overrides: { unreviewed_send: 'approved' } }, prepared }, secret, 1000)!
+  expect(invalid.status).toBe(422)
+  expect(invalid.data.code).toBe('approval_review_choice_invalid')
+})
 test('every registered type is covered: information is a receipt, mutations need review or remain pending', () => {
   for (const [type, klass] of Object.entries(ACTION_CONTRACT)) {
     const i = input(); i.approval.approval_type = type

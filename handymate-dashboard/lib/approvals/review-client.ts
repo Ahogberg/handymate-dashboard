@@ -2,8 +2,9 @@
 import type { ApprovalReview } from './review-contract'
 
 let reviewing = false
-export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit): Promise<boolean> {
-  if (reviewing || typeof document === 'undefined') return Promise.resolve(false)
+interface ReviewDecision { confirmed: boolean; actionOverrides?: Record<string, 'approved' | 'rejected'> }
+export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit): Promise<ReviewDecision> {
+  if (reviewing || typeof document === 'undefined') return Promise.resolve({ confirmed: false })
   reviewing = true
   return new Promise(resolve => {
     const previous = document.activeElement as HTMLElement | null
@@ -29,6 +30,14 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
         frame.style.width = '100%'; frame.style.height = '55vh'; dialog.append(frame)
       } else add('p', message.text)
     }
+    const choiceState: Record<string, boolean> = Object.fromEntries((review.choices || []).map(choice => [choice.id, choice.defaultSelected]))
+    for (const choice of review.choices || []) {
+      const label = document.createElement('label')
+      const checkbox = document.createElement('input'); checkbox.type = 'checkbox'; checkbox.checked = choice.defaultSelected
+      checkbox.onchange = () => { choiceState[choice.id] = checkbox.checked }
+      label.append(checkbox, document.createTextNode(` ${choice.label}`)); dialog.append(label)
+      add('p', choice.description)
+    }
     if (review.blockedReason) add('p', review.blockedReason)
     const objectUrls: string[] = []
     const attachmentChecks: HTMLInputElement[] = []
@@ -39,7 +48,7 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
       settled = true; reviewing = false
       window.removeEventListener('pagehide', cancel); window.removeEventListener('popstate', cancel)
       objectUrls.forEach(url => URL.revokeObjectURL(url))
-      dialog.remove(); previous?.focus(); resolve(confirmed)
+      dialog.remove(); previous?.focus(); resolve({ confirmed, ...(review.choices?.length ? { actionOverrides: Object.fromEntries(review.choices.map(choice => [choice.id, choiceState[choice.id] ? 'approved' : 'rejected'])) } : {}) })
     }
     const cancel = () => finish(false)
     const back = add('button', 'Tillbaka') as HTMLButtonElement
@@ -95,10 +104,10 @@ export async function reviewedApprovalFetch(url: string, init: RequestInit): Pro
   const data = await preview.clone().json().catch(() => null)
   if (preview.ok && data?.review_not_required === true) return fetch(url, init)
   if (!data?.review) return preview
-  const confirmed = await showApprovalReview(data.review, init.headers)
-  if (!confirmed || !data.review_token || !data.review.confirmLabel) {
+  const decision = await showApprovalReview(data.review, init.headers)
+  if (!decision.confirmed || !data.review_token || !data.review.confirmLabel) {
     return Response.json({ cancelled: true, error: 'Avbrutet. Ärendet ligger kvar.' }, { status: 499 })
   }
   // Never retry delivery on network error. A new click must start a fresh review.
-  return fetch(url, { ...init, keepalive: false, body: JSON.stringify({ ...body, review_token: data.review_token }) })
+  return fetch(url, { ...init, keepalive: false, body: JSON.stringify({ ...body, ...(decision.actionOverrides ? { action_overrides: { ...(body.action_overrides || {}), ...decision.actionOverrides } } : {}), review_token: data.review_token }) })
 }

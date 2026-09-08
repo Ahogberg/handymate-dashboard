@@ -29,10 +29,9 @@ import { internalPushHeaders } from '@/lib/notifications/push-internal'
 
 export const dynamic = 'force-dynamic'
 
-// completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
-// fakturan på riktigt inline (sendInvoice, Chromium-PDF via
-// buildInvoicePdfBuffer) via four_eyes_project_close-godkännandet — samma
-// anledning som invoices/send/route.ts behöver 30s.
+// completeProject kan skapa fakturautkast och flera verifierade följdförslag
+// via four_eyes_project_close. Kundutskick görs aldrig inline från avslutet;
+// den separata fakturagranskningen ansvarar för PDF/e-faktura/mejl/SMS.
 //
 // 30 → 60 (2026-08-25, Reality Week Pass 2, verkligt repro): ett
 // review_auto_invoice-godkännande fick 504 vid 30s — kall Chromium-start +
@@ -1122,6 +1121,15 @@ async function executeApprovalPayload(
         // Audit-3 Fix A (2026-06-01): sendSmsViaElks direkt istället för
         // internal fetch som failade server-side. Karin/Daniel/Lisa typed
         // actions går via denna case.
+        if (approval_type === 'send_sms' && payload.recipient === 'internal') {
+          const reviewed = reviewedPayload as any
+          if (!reviewed?.to || !reviewed?.message) return { action: 'send_sms', ok: false, error: 'Det granskade interna SMS-underlaget saknas.' }
+          const supabase = await getSupabase()
+          const businessName = await getBusinessName()
+          const result = await sendSmsViaElks({ supabase, businessId, businessName, to: reviewed.to, message: reviewed.message,
+            relatedId: reviewed.relatedId || null, messageType: 'auto_invoice_result', approvalId, recipient: 'internal', purpose: 'internal' })
+          return { action: 'send_sms', sms_sent: result.success, sms_id: result.smsId, error: result.error, recipient: reviewed.to }
+        }
         const to = (payload.to as string | undefined) || (payload.customer_phone as string | undefined)
         const message = payload.message as string | undefined
         if (!to || !message) {
@@ -2339,22 +2347,23 @@ async function executeApprovalPayload(
       }
 
       case 'four_eyes_project_close': {
-        const pl = payload as any
-        if (!pl.project_id) return { action: 'four_eyes_project_close', skipped: 'no project_id' }
+        const reviewed = reviewedPayload as any
+        if (!reviewed?.projectId || !reviewed?.options) return { action: 'four_eyes_project_close', ok: false, error: 'Det granskade projektavslutet saknas.' }
 
         const supabase4p = (await import('@/lib/supabase')).getServerSupabase()
         const closeout = await completeProject({
           supabase: supabase4p,
           businessId,
-          projectId: pl.project_id,
+          projectId: reviewed.projectId,
           authorization: { kind: 'approved', approvalId: approval.id },
+          options: reviewed.options,
         })
 
         return {
           action: 'four_eyes_project_close',
           ok: closeout.ok && closeout.completed,
           error: closeout.ok ? undefined : closeout.error,
-          project_id: pl.project_id,
+          project_id: reviewed.projectId,
           invoice_id: closeout.invoice_created?.invoice_id,
           total: closeout.invoice_created?.total,
           closeout,

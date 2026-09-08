@@ -7,6 +7,7 @@ export interface ApprovalReview {
   details?: { label: string; text: string }[]
   attachments?: { label: string; url: string; kind: 'image' | 'document' }[]
   open?: { label: string; path: string }
+  choices?: { id: string; label: string; description: string; defaultSelected: boolean }[]
   blockedReason?: string
 }
 

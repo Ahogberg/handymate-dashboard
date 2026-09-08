@@ -86,7 +86,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `installation_register` | Kräver separat bekräftelse av installationer rad för rad; köp innebär inte installation. | Hänvisning till webbens specialvy; inget generiskt utförande; mobilresa återstår |
 | `review_auto_invoice` | Skickar faktura trots klassningen REVIEW_REQUIRED. | Stopp – komplett granskning återstår |
 | `four_eyes_quote` | Återställer offerten till utkast efter granskning och skickar intern push till skaparen. Skickar inte offerten till kunden. | Verifierat underlag och granskningsbeslut; slutprov återstår |
-| `four_eyes_project_close` | Avslutar projektet; kan automatiskt skapa och skicka faktura som följd. | Stopp – komplett granskning återstår |
+| `four_eyes_project_close` | Visar aktuellt projekt, kund, ansvarig, ekonomiskt fakturaunderlag och tre uttryckliga val. Avslutar projektet, skapar vid val endast fakturautkast samt separata granskningskort för kunduppföljning, internt fakturabesked och automationshandlingar. | Versionsbundet delval, företagsscope och faktisk delkvittens i webb/app; beständigt återförsök av en enskild misslyckad avslutsföljd återstår |
 | `deal_flow_site_visit` | Granskningskort utan specifik utförandehanterare i denna route. | Hänvisning till webbens specialvy; inget generiskt utförande; mobilresa återstår |
 | `lead_review` | Aktiverar lead, skapar pipelineaffär, kan skicka internt SMS och triggar lead_received-automation. Avvisa markerar lead som lost. | Stopp – komplett granskning återstår |
 | `time_attestation` | Attesterar incheckning och skapar godkänd, fakturerbar tid. Befintliga databasfel ignoreras; flera skrivningar saknar företagsscope. | Verifierat underlag och granskningsbeslut; slutprov återstår |
@@ -223,5 +223,23 @@ Verifiering utan produktionsdata eller riktiga sändare:
 Nästa konkreta fortsättningspunkt:
 
 1. Del 1 är fortfarande prioriterad: fryst offert-/fakturadokumentversion, komplett ekonomisammanställning, To/CC/BCC/kanal, Fortnox/e-faktura och beständig återförsöksjournal.
-2. I del 2 återstår `four_eyes_project_close`, inklusive uttryckliga val och separata utfall för projektavslut, kundbekräftelse och eventuell faktura. Generiska `propose_booking_times`/`reschedule_request` behöver samma verifierade kundscope och beständiga evidens som platsbesöket.
+2. I del 2 har `four_eyes_project_close` nu uttryckliga val och separata utfall. Beständigt återförsök av en misslyckad följd samt generiska `propose_booking_times`/`reschedule_request` med samma verifierade kundscope/evidens som platsbesöket återstår.
 3. Del 3–5 återstår enligt planen: betalning/lead/automationers följder, paketdelar och avstämningsbara återförsök/historik, därefter fullständiga native specialvyer och en ny verkligt provad TestFlight-build.
+
+### Fortsättning 8 september — projektavslut med uttryckliga delval
+
+`four_eyes_project_close` har nu en verklig gransknings- och exekveringsväg i stället för det tidigare generiska stoppet:
+
+- Den läsande previewn verifierar projekt, kund, kopplad affär och ansvarig inom företaget. Den visar status-/affärsföljd, efterkalkyl/debrief, jobbpass/installationsförslag samt fakturans samtliga rader, exklusive moms, moms, ROT/RUT och vad kunden betalar.
+- Beslutet har tre signerade val: skapa fakturautkast, förbered kunduppföljning och kör avslutsautomationer. Endast serverns visade val-id:n accepteras. Ändrat projekt, kund, ansvarig eller fakturaunderlag kräver ny preview.
+- Projektavslutet kan inte längre skicka fakturan direkt även om `auto_invoice_on_complete` är på. Det skapar ett utkast och ett separat `review_auto_invoice`-kort. Ägarens fakturabesked skapas som ett eget `send_sms`-kort med exakt text och verifierat internt nummer. Misslyckad lagring av något av dessa kort redovisas som ett partiellt fakturautfall.
+- `job_completed` tvingar nu varje faktisk regelhandling genom ett nytt approval-kort även om regeln annars har intjänad autonomi. En regel vars egen handling endast är `create_approval` får fortsatt skapa just förslaget. Motorn returnerar antal matchade, väntande, skapade, överhoppade och misslyckade regler; projektkvittensen återger detta och varje annan avslutsföljd separat.
+- Samma delval stöds i webbens riktiga dialog och i den native granskningsmodalen. Appen skickar valt/avvalt per signerad choice-id; bakgrundsläge, kontobyte och avbryt lämnar fortsatt kortet orört.
+
+Verifiering utan produktionsdata eller riktiga sändare:
+
+- Faktisk approval-route i minnesharness provar full projektpreview, aktuell ansvarig, ekonomisammanställning, valt/avvalt, staleness, delkvittens och det efterföljande interna SMS-kortet. Riktig lokal Chromium-dialog provar choice-checkboxar och exakt wire-format.
+- 60 riktade Playwright-prov för review, receipt, kanoniskt projektavslut, fyra ögon och automationsgrindar passerar. Därutöver passerar faktisk route- och Chromium-dialog. `npm run test:approval-economy` passerar 23+12 isolerade scenarier och `npm run test:approval-documents` samtliga fem körbara sviter. Backendens `npx tsc --noEmit` är rent.
+- Mobilens riktiga granskningskomponent och adapter passerar 13 mockade interaktions-/livscykel-/protokollfall; riktad TypeScript-kontroll är ren. Detta är inte ett iPhone- eller TestFlight-slutprov. Build 12 är oförändrad.
+
+Kvar i beställd ordning: färdig versionsbunden offert/faktura/Fortnox-journal; generiska boknings-/ombokningsvarianter och återförsök per avslutsföljd; betalning/lead och återstående automationsåtgärder; paket/kampanjsändare/sammanhängande historik; därefter återstående native specialvyer och en ny verkligt provad TestFlight-build. Inga kundutskick, produktionsskrivningar, merges eller driftsättningar gjordes.
