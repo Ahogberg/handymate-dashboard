@@ -1,0 +1,48 @@
+{
+  "source_project": "pktaqedooyzgvzwipslu",
+  "target_project": "eoodwyfxrdjmlqaealhj",
+  "source_read_only": true,
+  "verified_at": "2026-09-08",
+  "fingerprints": {
+    "constraints": {
+      "count": 808,
+      "md5": "f3a9f37189d20ad374ccc1c3e7dc5a1e"
+    },
+    "grants": {
+      "count": 6282,
+      "md5": "a7c4e4b83be1334ca26aaed12244d1fc"
+    },
+    "indexes": {
+      "count": 608,
+      "md5": "15c0dc473ec1bfa58acdfc0723c766bf"
+    },
+    "policies": {
+      "count": 427,
+      "md5": "6487d1a37e15df1b7c874a498cf02deb"
+    },
+    "routines": {
+      "count": 50,
+      "md5": "4321c9bc3d36b86691b7ac333b41de5f"
+    },
+    "sequences": {
+      "count": 7,
+      "md5": "931c5509e6c389fd1a6e77175537decb"
+    },
+    "tables": {
+      "count": 244,
+      "md5": "6850f244772a1c08c838f4f6274d3e5c"
+    },
+    "triggers": {
+      "count": 17,
+      "md5": "3b8a87c23d6c197dee974c3d456da80e"
+    },
+    "types": {
+      "count": 9,
+      "md5": "bd4bab8ff6c938e731606fd686185ade"
+    },
+    "views": {
+      "count": 12,
+      "md5": "fccf2ad28c35dfe881ba1ba34c9bfbd7"
+    }
+  }
+}
