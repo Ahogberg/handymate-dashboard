@@ -1,7 +1,8 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import Link from 'next/link'
 import { buildValueReceipt } from '@/lib/approvals/value-receipt'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
@@ -786,14 +787,15 @@ export default function JarvisHome({
         const fragment = editedText != null ? buildApprovalEdit(approval, editedText) : null
         if (fragment) body.edited_payload = fragment
       }
-      // Överlever sidlämning (keepalive): flushen vid pagehide/unmount hinner
-      // annars inte få iväg anropet innan sidan rivs. Massutskick stoppas
-      // av servern (428) och bekräftas i postKortbeslut.
-      const res = await postKortbeslut(approval.id, {
-        headers: await authHeaders(),
-        body,
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
+        body: JSON.stringify(body),
+        // Överlever sidlämning: flushen vid pagehide/unmount hinner annars
+        // inte få iväg anropet innan sidan rivs.
         keepalive: true,
       })
+      if (res.status === 499) { setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n }); return }
       if (!res.ok) {
         setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n })
         flash(res.status === 409
@@ -819,11 +821,15 @@ export default function JarvisHome({
       // visade hemmet ingenting alls i det fallet.
       const utfall = (svar?.execution_outcome?.outcome ?? null) as 'success' | 'failed' | 'skipped' | null
       const kvitto = action === 'approve' ? buildValueReceipt(approval, utforande, utfall) : null
-      if (action === 'approve' && utfall === 'failed') {
+      if (svar?.receipt?.text) {
+        flash(svar.receipt.text, ['partial', 'failed', 'needs_action'].includes(svar.receipt.state), svar.receipt.next_url)
+      } else if (action === 'approve' && utfall === 'failed') {
         const orsakRaw = typeof svar?.execution_outcome?.error_text === 'string' ? svar.execution_outcome.error_text.trim() : ''
         // Serverns orsak slutar ofta redan med punkt — ingen ".." i bannern.
         const orsak = orsakRaw.replace(/[.\s]+$/, '')
         flash(`Godkänt — men utförandet misslyckades${orsak ? `: ${orsak}` : ''}. Öppna ärendet för att försöka igen.`, true, '/dashboard/approvals', 'Öppna ärendet')
+      } else if (utforande?.receipt) {
+        flash(String(utforande.receipt), false)
       } else if (kvitto) {
         flash(kvitto.text, false, kvitto.link, kvitto.linkLabel)
       }
@@ -833,7 +839,7 @@ export default function JarvisHome({
         key: `fresh-${approval.id}`,
         time: formatClock(new Date().toISOString()),
         agent: agentForApproval(approval),
-        text: kvitto?.text ?? doneRowText({
+        text: svar?.receipt?.text ?? utforande?.receipt ?? kvitto?.text ?? doneRowText({
           action,
           title: approval.title,
           executed: utforande?.executed,
@@ -865,6 +871,7 @@ export default function JarvisHome({
     if (medlemmar.length === 0) return
     const forsta = medlemmar[0]
 
+    if (action !== 'reject') { void (async () => { for (const item of medlemmar) await executeSend(item, action, editedText) })(); return }
     setEditingId(null)
     setHiddenIds(prev => {
       const n = new Set(prev)
@@ -875,12 +882,12 @@ export default function JarvisHome({
     const flera = medlemmar.length > 1
     setSnack({
       approvalId: forsta.id,
-      // Ångra-rutan sa "Skickar: …" även för kort som inte kan skicka något.
+      // Ångra-rutan sa "Granskar: …" även för kort som inte kan skicka något.
       // Samma lögn som Klart idag-raden, bara några sekunder tidigare.
       text: action === 'reject'
         ? flera ? `${medlemmar.length} förslag avvisas` : 'Förslaget avvisas'
         : mayExecute(forsta.approval_type)
-          ? flera ? `Skickar ${medlemmar.length} st` : `Skickar: ${forsta.title.slice(0, 60)}`
+          ? flera ? `Granskar ${medlemmar.length} st` : `Granskar: ${forsta.title.slice(0, 60)}`
           : flera ? `Behandlar ${medlemmar.length} st` : `Behandlar: ${forsta.title.slice(0, 60)}`,
     })
 

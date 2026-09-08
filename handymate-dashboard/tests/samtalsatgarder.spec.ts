@@ -155,7 +155,7 @@ test.describe('Steg 5 — dagboksrad via godkännande', () => {
 
   test('kortet har svensk etikett och en knapp som säger vad som händer', () => {
     const { approveLabel } = require('../lib/jarvis/approval-view')
-    expect(approveLabel('project_log_note', {})).toBe('Spara i dagboken')
+    expect(approveLabel('project_log_note', {})).toBe('Granska')
     expect(read('lib/jarvis/approval-view.ts')).toContain("project_log_note: 'Dagboksanteckning'")
     expect(read('app/dashboard/approvals/page.tsx')).toContain("project_log_note: { label: 'Dagboksanteckning'")
   })

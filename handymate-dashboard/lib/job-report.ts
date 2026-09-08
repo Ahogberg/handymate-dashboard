@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { createHash } from 'node:crypto'
 import { buildAttribution, loadAttribution, stampAttributionOnPdf, type Attribution } from '@/lib/branding/attribution'
 import { DEFAULT_ACCENT_COLOR } from '@/lib/branding/get-branding'
 import {
@@ -17,7 +18,7 @@ import {
  * Vid godkännande → genererar PDF → skickar till kund.
  */
 
-interface JobReportData {
+export interface JobReportData {
   projectId: string
   projectName: string
   customerName: string
@@ -65,6 +66,7 @@ export async function triggerJobReport(
     .from('project')
     .select('project_id, name, customer_id, completed_at, start_date')
     .eq('project_id', projectId)
+    .eq('business_id', businessId)
     .single()
 
   if (!project) return { success: false, error: 'Projekt hittades inte' }
@@ -72,9 +74,12 @@ export async function triggerJobReport(
   // Fetch customer
   const { data: customer } = await supabase
     .from('customer')
-    .select('name, email, address_line')
+    .select('customer_id, name, email, address_line')
     .eq('customer_id', project.customer_id)
+    .eq('business_id', businessId)
     .single()
+
+  if (!customer) return { success: false, error: 'Kunden kunde inte verifieras för företaget' }
 
   // Fetch business
   const { data: business } = await supabase
@@ -86,7 +91,7 @@ export async function triggerJobReport(
   // Fetch field reports (byggdagbok)
   const { data: reports } = await supabase
     .from('field_reports')
-    .select('title, work_performed, materials_used')
+    .select('id, title, work_performed, materials_used')
     .eq('project_id', projectId)
     .eq('business_id', businessId)
     .order('created_at')
@@ -187,7 +192,7 @@ export async function triggerJobReport(
   const photoCount = allPhotos.length
   const materialCount = (materials || []).length
 
-  await supabase.from('pending_approvals').insert({
+  const { error: approvalError } = await supabase.from('pending_approvals').insert({
     business_id: businessId,
     approval_type: 'job_report',
     title: `📋 Jobbrapport — ${project.name}`,
@@ -196,6 +201,8 @@ export async function triggerJobReport(
     status: 'pending',
     risk_level: 'low',
   })
+
+  if (approvalError) return { success: false, error: 'Jobbrapportens godkännandekort kunde inte sparas' }
 
   // Log
   try {
@@ -234,12 +241,12 @@ export async function triggerJobReport(
  */
 export async function generateJobReportPdf(
   data: JobReportData,
-  opts: { attribution?: Attribution; brand?: PdfBranding } = {},
+  opts: { attribution?: Attribution; brand?: PdfBranding; photos?: Array<{ data: string; format: 'PNG' | 'JPEG'; caption: string | null }> } = {},
 ): Promise<Buffer> {
   // Dynamic import to avoid SSR issues
   const jsPDFModule = await import('jspdf')
   const jsPDF = jsPDFModule.default || jsPDFModule.jsPDF
-  await import('jspdf-autotable')
+  const { autoTable } = await import('jspdf-autotable')
 
   const brand: PdfBranding = opts.brand ?? pdfBrandingFrom({
     businessName: data.businessName,
@@ -252,6 +259,11 @@ export async function generateJobReportPdf(
   const ACCENT = brand.accent
 
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+  // jsPDF otherwise embeds a random file ID and wall-clock timestamp. Identical
+  // reviewed input must produce identical bytes at preview and confirmation.
+  const fingerprint = createHash('sha256').update(JSON.stringify({ data, opts })).digest('hex')
+  doc.setFileId(fingerprint.slice(0, 32))
+  doc.setCreationDate("D:20200101000000+00'00'")
   const pageWidth = doc.internal.pageSize.getWidth()
 
   // Sidhuvud ur brand-lagret (logga, firma, org.nr) + titel/projekt till höger.
@@ -287,9 +299,10 @@ export async function generateJobReportPdf(
   doc.setFont('helvetica', 'normal')
   for (const work of data.workPerformed) {
     const lines = doc.splitTextToSize(`• ${work}`, pageWidth - 30)
-    doc.text(lines, 15, y)
-    y += lines.length * 4.5
-    if (y > 270) { doc.addPage(); y = 15 }
+    for (const line of lines) {
+      if (y > 265) { doc.addPage(); y = 15 }
+      doc.text(line, 15, y); y += 4.5
+    }
   }
   y += 4
 
@@ -307,9 +320,10 @@ export async function generateJobReportPdf(
     doc.setTextColor(180, 83, 9)
     for (const dev of deviations) {
       const lines = doc.splitTextToSize(`• ${dev}`, pageWidth - 30)
-      doc.text(lines, 15, y)
-      y += lines.length * 4.5
-      if (y > 270) { doc.addPage(); y = 15 }
+      for (const line of lines) {
+        if (y > 265) { doc.addPage(); y = 15 }
+        doc.text(line, 15, y); y += 4.5
+      }
     }
     doc.setTextColor(30, 41, 59)
     y += 4
@@ -317,13 +331,14 @@ export async function generateJobReportPdf(
 
   // Material
   if (data.materials.length > 0) {
+    if (y > 245) { doc.addPage(); y = 15 }
     doc.setFontSize(12)
     doc.setFont('helvetica', 'bold')
     doc.text('Material', 15, y)
     y += 2
-    ;(doc as any).autoTable({
+    autoTable(doc, {
       startY: y,
-      margin: { left: 15, right: 15 },
+      margin: { left: 15, right: 15, bottom: 25 },
       head: [['Material', 'Antal', 'Enhet']],
       body: data.materials.map(m => [m.name, String(m.quantity), m.unit]),
       styles: { fontSize: 8, cellPadding: 2 },
@@ -331,6 +346,24 @@ export async function generateJobReportPdf(
       alternateRowStyles: { fillColor: [249, 250, 251] },
     })
     y = (doc as any).lastAutoTable.finalY + 8
+  }
+
+  // Photos must be loaded and validated before review; never fetch new bytes
+  // during rendering or silently omit a promised attachment.
+  for (const photo of opts.photos || []) {
+    doc.addPage(); y = 20
+    doc.setFontSize(12); doc.setFont('helvetica', 'bold')
+    doc.text('Fotodokumentation', 15, y); y += 10
+    const props = doc.getImageProperties(photo.data)
+    const scale = Math.min(180 / props.width, 195 / props.height)
+    const w = props.width * scale, h = props.height * scale
+    doc.addImage(photo.data, photo.format, 15, y, w, h)
+    y += h + 8
+    doc.setFontSize(9); doc.setFont('helvetica', 'normal')
+    for (const line of doc.splitTextToSize(photo.caption || '', 180)) {
+      if (y > 265) { doc.addPage(); y = 15 }
+      doc.text(line, 15, y); y += 4.5
+    }
   }
 
   // Garanti
@@ -361,10 +394,20 @@ export async function approveJobReport(
   businessId: string,
   _projectIdOrApprovalId: string,
   reportData: JobReportData
-): Promise<{ success: boolean; pdfUrl?: string; error?: string }> {
+): Promise<{ success: boolean; pdfUrl?: string; error?: string; email_sent?: boolean; partial?: boolean }> {
   const supabase = getServerSupabase()
 
+  let documentSaved = false
+  let emailSent = false
   try {
+    const { data: project, error: projectError } = await supabase.from('project')
+      .select('project_id, customer_id').eq('project_id', reportData.projectId).eq('business_id', businessId).single()
+    if (projectError || !project) return { success: false, error: 'Projektet kunde inte verifieras för företaget' }
+    const { data: customer, error: customerError } = await supabase.from('customer')
+      .select('customer_id, email').eq('customer_id', project.customer_id).eq('business_id', businessId).single()
+    if (customerError || !customer || !reportData.customerEmail || customer.email !== reportData.customerEmail) {
+      return { success: false, error: 'Rapportens mottagare saknas eller har ändrats. Förbered ett nytt underlag.' }
+    }
     // Generate PDF — stämpeln laddas här (EN query) eftersom rutten bara
     // har businessId, inte business_config-raden. Varumärket (logga, accent,
     // F-skatt) laddas färskt i stället för ur payloaden — den kan vara
@@ -391,17 +434,20 @@ export async function approveJobReport(
 
     // v151: bucketen är privat — pdf_url lagrar PATH (aldrig en publik/
     // signerad URL). Signering sker vid läsning.
-    await supabase.from('generated_document').insert({
+    const { error: documentError } = await supabase.from('generated_document').insert({
       id: `jrep_${Math.random().toString(36).slice(2, 11)}`,
       business_id: businessId,
       project_id: reportData.projectId,
-      customer_id: reportData.customerEmail ? undefined : undefined,
+      customer_id: customer.customer_id,
       title: `Jobbrapport — ${reportData.projectName}`,
       content: [{ type: 'job_report', data: reportData }],
       variables_data: reportData,
       status: 'completed',
       pdf_url: storagePath,
     })
+
+    if (documentError) return { success: false, partial: true, error: 'PDF-filen laddades upp men dokumentet kunde inte registreras. Inget mejl skickades.' }
+    documentSaved = true
 
     // Mejlet länkar (bifogar inte bytes) — kunden kan öppna det dagar
     // senare, så en 1h-TTL räcker inte. 7 dygn är den dokumenterade
@@ -411,6 +457,8 @@ export async function approveJobReport(
     // ALDRIG till databasen — se pdf_url ovan.
     const { signStorageUrl } = await import('@/lib/storage-signing')
     const pdfUrl = (await signStorageUrl(supabase, 'customer-documents', storagePath, 7 * 24 * 3600)) || ''
+
+    if (!pdfUrl) return { success: false, partial: true, error: 'Rapporten är sparad men PDF-länken kunde inte skapas. Inget mejl skickades.' }
 
     // Send email if customer has email
     if (reportData.customerEmail) {
@@ -429,14 +477,18 @@ export async function approveJobReport(
           ${actionBlock({ text: 'Öppna jobbrapporten (PDF)', url: pdfUrl }, branding.accentColor)}
           ${signature(escapeHtml(reportData.businessName), reportData.contactName ? escapeHtml(reportData.contactName) : undefined, { phone: branding.contactPhone ? escapeHtml(branding.contactPhone) : undefined })}
         `
-        await sendEmail({
+        const delivery = await sendEmail({
           businessId,
           to: reportData.customerEmail,
           subject: `Jobbrapport — ${reportData.projectName} från ${reportData.businessName}`,
           html: emailLayout(branding, content, { meta: 'Jobbrapport' }),
           fromName: reportData.businessName,
         })
-      } catch { /* non-blocking */ }
+        if (!delivery.success) return { success: false, partial: true, email_sent: false, pdfUrl, error: delivery.error || 'Rapporten är sparad men mejltjänsten avvisade utskicket.' }
+        emailSent = true
+      } catch (error) {
+        return { success: false, partial: true, email_sent: false, pdfUrl, error: error instanceof Error ? error.message : 'Mejlutskicket kunde inte bekräftas' }
+      }
     }
 
     // Log
@@ -454,10 +506,10 @@ export async function approveJobReport(
         action_taken: `Jobbrapport skickad till ${reportData.customerEmail || 'kund'}`,
       },
     })
-    if (sendLogErr) console.warn('[job-report] v3-logg insert misslyckades:', sendLogErr.message)
+    if (sendLogErr) return { success: false, partial: true, email_sent: emailSent, pdfUrl, error: 'Mejltjänsten accepterade rapporten men historiken kunde inte sparas. Skicka inte igen.' }
 
-    return { success: true, pdfUrl }
+    return { success: true, pdfUrl, email_sent: emailSent }
   } catch (err: any) {
-    return { success: false, error: err.message }
+    return { success: false, partial: documentSaved, email_sent: emailSent, error: err.message }
   }
 }

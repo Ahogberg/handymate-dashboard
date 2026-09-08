@@ -103,6 +103,7 @@ export interface ReminderDeliveryResult {
    * en påminnelse som aldrig lämnade huset (Andreas fynd 2026-08-10).
    */
   orsak?: string
+  errors?: string[]
 }
 
 /**
@@ -120,6 +121,12 @@ export async function deliverInvoiceReminder(
     currentCount, nextReminderAt, reminderFee, interestAmount, penaltyInterest, daysOverdue,
   } = input
 
+  const errors: string[] = []
+  const { data: verified, error: verificationError } = await supabase.from('invoice')
+    .select('invoice_id, status, customer_id, reminder_count').eq('invoice_id', invoiceId).eq('business_id', businessId).maybeSingle()
+  if (verificationError || !verified || !['sent', 'overdue'].includes(verified.status) || (verified.reminder_count || 0) !== currentCount || verified.customer_id !== customerId) {
+    return { smsSent: false, emailSent: false, feeAdded: 0, interestAdded: 0, skipped: true, orsak: 'fakturan har ändrats eller kunde inte verifieras; granska aktuellt underlag' }
+  }
   let smsSent = false
   let emailSent = false
   let smsFel: string | null = null
@@ -161,18 +168,22 @@ export async function deliverInvoiceReminder(
         const branding = await loadBranding(supabase, businessId)
         html = emailLayout(branding, messages.emailBody)
       }
-      await resend.emails.send({
+      const emailResult = await resend.emails.send({
         from: `${businessName} <faktura@${process.env.RESEND_DOMAIN ?? 'handymate.se'}>`,
         to: customerEmail,
         subject: messages.emailSubject,
         html,
       })
-      emailSent = true
+      if (emailResult.error || !emailResult.data?.id) errors.push(emailResult.error?.message || 'E-posttjänsten bekräftade inte utskicket.')
+      else emailSent = true
     } catch (err) {
+      errors.push('E-posttjänsten kunde inte bekräfta utskicket.')
       console.error(`[invoice-reminder-send] Email error ${invoiceNumber}:`, err)
     }
   }
 
+  if (customerPhone && !smsSent) errors.push(smsFel || 'SMS-tjänsten bekräftade inte utskicket.')
+  if (emailToo && customerEmail && !emailSent && !errors.some(e => e.includes('E-post'))) errors.push('E-posttjänsten bekräftade inte utskicket.')
   if (!smsSent && !emailSent) {
     const orsak = smsFel
       ? smsFel.replace(/[.\s]+$/, '')
@@ -190,12 +201,13 @@ export async function deliverInvoiceReminder(
 
   if (currentCount >= 1 && (reminderFee > 0 || interestAmount > 0)) {
     try {
-      const { data: currentInvoice } = await supabase
+      const { data: currentInvoice, error: currentError } = await supabase
         .from('invoice')
         .select('items, total, subtotal, vat_amount, rot_rut_deduction, customer_pays, rot_rut_type, rot_rut_percent')
-        .eq('invoice_id', invoiceId)
+        .eq('invoice_id', invoiceId).eq('business_id', businessId)
         .single()
 
+      if (currentError || !currentInvoice) throw new Error('Fakturans avgifter kunde inte verifieras.')
       if (currentInvoice) {
         const items = Array.isArray(currentInvoice.items) ? [...currentInvoice.items] : []
 
@@ -245,16 +257,19 @@ export async function deliverInvoiceReminder(
           customer_pays: totaler.customer_pays,
         }
 
-        await supabase.from('invoice').update(updateData).eq('invoice_id', invoiceId)
+        const { data: feeRows, error: feeError } = await supabase.from('invoice').update(updateData).eq('invoice_id', invoiceId).eq('business_id', businessId).select('invoice_id')
+        if (feeError || feeRows?.length !== 1) throw new Error('Fakturaavgifterna kunde inte sparas.')
       }
     } catch (feeErr) {
+      feeAdded = 0; interestAdded = 0
+      errors.push('Påminnelsen skickades, men avgift och ränta kunde inte sparas.')
       console.error(`[invoice-reminder-send] Fee/interest error ${invoiceNumber}:`, feeErr)
     }
   }
 
   // ── Uppdatera påminnelse-räknare ──
   const nextCount = currentCount + 1
-  const { error: updErr } = await supabase
+  const { data: reminderRows, error: updErr } = await supabase
     .from('invoice')
     .update({
       status: 'overdue',
@@ -262,13 +277,14 @@ export async function deliverInvoiceReminder(
       last_reminder_at: new Date().toISOString(),
       next_reminder_at: nextReminderAt,
     })
-    .eq('invoice_id', invoiceId)
+    .eq('invoice_id', invoiceId).eq('business_id', businessId).select('invoice_id')
+  if (updErr || reminderRows?.length !== 1) errors.push('Påminnelsen skickades, men nästa påminnelsetid kunde inte sparas.')
   if (updErr) console.error('[invoice-reminder-send] invoice update failed (räknare ej uppdaterad):', invoiceId, updErr)
 
   // ── Logga aktivitet ──
   // Sanering 2026-08-05: tabellen heter customer_activity — gamla namnet
   // activity finns inte, så påminnelser syntes aldrig i kundtidslinjen.
-  await supabase.from('customer_activity').insert({
+  const { error: activityError } = await supabase.from('customer_activity').insert({
     business_id: businessId,
     customer_id: customerId,
     activity_type: 'auto_reminder_sent',
@@ -282,5 +298,6 @@ export async function deliverInvoiceReminder(
     },
   })
 
-  return { smsSent, emailSent, feeAdded, interestAdded, skipped: false }
+  if (activityError) errors.push('Påminnelsen skickades, men kundhistoriken kunde inte uppdateras.')
+  return { smsSent, emailSent, feeAdded, interestAdded, skipped: false, errors }
 }

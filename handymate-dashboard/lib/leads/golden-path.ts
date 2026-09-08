@@ -23,6 +23,7 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
 import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { findCustomerDuplicates } from '@/lib/customer-dedupe'
+import { insertApprovalArtifact } from '@/lib/approvals/artifact-write'
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -319,101 +320,111 @@ export async function createLeadAndDeal(
  * Aktiverar en lead som tidigare skapades i pending_review (av t.ex.
  * email-webhook). Steg:
  *   1. Byt lead.status pending_review → new
- *   2. Skapa deal i pipeline (Golden Path-deal-delen)
- *   3. Skicka SMS till hantverkaren
- *   4. fireEvent('lead_received')
+ *   2. Skapa eller återanvänd deal om det valdes i granskningen
+ *   3. Förbered ett separat granskningskort för internnotisen
+ *   4. Kör lead_received med krav på nya godkännanden
  *
  * Ingen customer skapas — den finns redan från webhook.
  * Returnerar dealId | null + dealError (deal-skapande är non-blocking, men
  * ett tyst fel får aldrig se ut som success — surfas via dealError).
  *
- * Caller måste verifiera att lead.business_id stämmer med session-
- * business innan denna helper kallas — denna funktion gör ingen
- * extra rättighetscheck.
+ * Alla uppslag och skrivningar är företagsskopade även om anroparen redan
+ * har kontrollerat sessionen. Återkörning återanvänder deal och följdkort.
  */
 export async function activatePendingLead(
   leadId: string,
   supabase: SupabaseClient,
-): Promise<{ dealId: string | null; dealError: string | null }> {
+  options: {
+    businessId: string
+    approvalId: string
+    createDeal: boolean
+    prepareInternalSms: boolean
+    runAutomationRules: boolean
+    reviewedInternalPhone: string | null
+    reviewedInternalMessage: string | null
+  },
+): Promise<{ dealId: string | null; dealError: string | null; effects: Array<{ effect: string; status: 'succeeded' | 'skipped' | 'failed'; message?: string; approval_id?: string }> }> {
+  const effects: Array<{ effect: string; status: 'succeeded' | 'skipped' | 'failed'; message?: string; approval_id?: string }> = []
   const { data: lead, error } = await supabase
     .from('leads')
-    .select('lead_id, business_id, customer_id, name, phone, email, notes, source')
+    .select('lead_id, business_id, customer_id, name, phone, email, notes, source, status')
     .eq('lead_id', leadId)
-    .single()
+    .eq('business_id', options.businessId)
+    .maybeSingle()
 
   if (error || !lead) {
     throw new Error(`[activatePendingLead] Lead ${leadId} hittades inte`)
   }
+  if (!['pending_review', 'new'].includes(String(lead.status))) throw new Error('Kundförfrågan väntar inte längre på aktivering')
 
-  // Byt status till 'new' så Golden Path-pipeline tar över
-  await supabase
-    .from('leads')
-    .update({ status: 'new', updated_at: new Date().toISOString() })
-    .eq('lead_id', leadId)
+  // Byt status till 'new' med tenant + tillståndsvakt. En återöppnad körning
+  // kan återanvända en redan aktiverad rad men skapar aldrig dubbletter.
+  if (lead.status === 'pending_review') {
+    const { data: activated, error: activationError } = await supabase.from('leads')
+      .update({ status: 'new', updated_at: new Date().toISOString() })
+      .eq('lead_id', leadId).eq('business_id', options.businessId).eq('status', 'pending_review').select('lead_id')
+    if (activationError || !activated?.length) throw new Error('Kundförfrågan kunde inte aktiveras i sitt aktuella tillstånd')
+    effects.push({ effect: 'lead_status', status: 'succeeded', message: 'Status ändrad till ny' })
+  } else effects.push({ effect: 'lead_status', status: 'skipped', message: 'Kundförfrågan var redan aktiverad' })
 
-  // Hämta business-telefon för SMS-notis
-  const { data: biz } = await supabase
-    .from('business_config')
-    .select('phone_number')
-    .eq('business_id', lead.business_id)
-    .single()
-
-  // Skapa deal i pipeline
-  // Samma fix som createLeadAndDeal: stage_id måste komma från pipeline_stage
-  // (SINGULAR, deals-Kanban) via getStageBySlug('new_inquiry'). Ett id från
-  // pipeline_stages (PLURAL) är ogiltigt mot deal.stage_id-FK:n och gjorde att
-  // inserten rullades tillbaka tyst.
-  let dealId: string | null = null
+  const { data: existingDeal, error: existingDealError } = await supabase.from('deal').select('id')
+    .eq('lead_id', leadId).eq('business_id', options.businessId).maybeSingle()
+  if (existingDealError) throw new Error(`Affärskopplingen kunde inte verifieras: ${existingDealError.message}`)
+  let dealId: string | null = existingDeal?.id || null
   let dealError: string | null = null
-  try {
-    const stage = await getStageBySlug(lead.business_id, 'new_inquiry')
-    if (!stage) {
-      dealError = 'pipeline_stage "new_inquiry" saknas — deal ej skapad (stages ej seedade?)'
-      console.warn(`[activatePendingLead] ${dealError} (business ${lead.business_id})`)
-    } else {
-      const nextNumber = await getNextCaseNumber(supabase, lead.business_id)
-      const message = lead.notes
-      const { data: newDeal, error: insertError } = await supabase
-        .from('deal')
-        .insert({
-          business_id: lead.business_id,
-          title: message ? message.slice(0, 80) : `Förfrågan från ${lead.name || 'kund'}`,
-          customer_id: lead.customer_id,
-          lead_id: lead.lead_id,
-          stage_id: stage.id,
-          source: (lead.source ?? 'email_forward').toLowerCase(),
-          deal_number: nextNumber,
-          priority: 'medium',
-        })
-        .select('id')
-        .maybeSingle()
-      if (insertError) {
-        dealError = insertError.message
-        console.error('[activatePendingLead] Deal-insert misslyckades:', insertError.message)
+  if (!options.createDeal) effects.push({ effect: 'deal', status: 'skipped', message: 'Valdes bort i granskningen' })
+  else if (dealId) effects.push({ effect: 'deal', status: 'skipped', message: `Befintlig affär ${dealId} återanvändes` })
+  else {
+    try {
+      const stage = await getStageBySlug(options.businessId, 'new_inquiry')
+      if (!stage) {
+        dealError = 'pipeline_stage "new_inquiry" saknas — affär skapades inte'
+      } else {
+        const nextNumber = await getNextCaseNumber(supabase, options.businessId)
+        const { data: newDeal, error: insertError } = await supabase.from('deal').insert({
+          business_id: options.businessId,
+          title: lead.notes ? lead.notes.slice(0, 80) : `Förfrågan från ${lead.name || 'kund'}`,
+          customer_id: lead.customer_id, lead_id: lead.lead_id, stage_id: stage.id,
+          source: (lead.source ?? 'email_forward').toLowerCase(), deal_number: nextNumber, priority: 'medium',
+        }).select('id').maybeSingle()
+        if (insertError || !newDeal?.id) dealError = insertError?.message || 'Affären kunde inte verifieras efter skapandet'
+        else dealId = newDeal.id
       }
-      dealId = newDeal?.id ?? null
+    } catch (err) {
+      dealError = err instanceof Error ? err.message : String(err)
     }
-  } catch (err) {
-    dealError = err instanceof Error ? err.message : String(err)
-    console.error('[activatePendingLead] Deal creation failed:', err)
+    effects.push(dealError ? { effect: 'deal', status: 'failed', message: dealError } : { effect: 'deal', status: 'succeeded', message: `Affär ${dealId} skapades` })
   }
 
-  // SMS-notis (non-blocking)
-  if (biz?.phone_number) {
-    const smsText = `🌐 Ny lead!\nNamn: ${lead.name}\nTel: ${lead.phone}${lead.notes ? `\n"${lead.notes.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
-    sendSMS(supabase, lead.business_id, biz.phone_number, smsText, 'Handymate').catch(() => {})
-  }
+  if (options.prepareInternalSms && options.reviewedInternalPhone && options.reviewedInternalMessage) {
+    const { data: config } = await supabase.from('business_config').select('personal_phone, phone_number')
+      .eq('business_id', options.businessId).maybeSingle()
+    const currentPhone = config?.personal_phone || config?.phone_number || null
+    if (currentPhone !== options.reviewedInternalPhone) effects.push({ effect: 'internal_sms', status: 'failed', message: 'Intern mottagare har ändrats; inget SMS-förslag skapades' })
+    else {
+      const saved = await insertApprovalArtifact(supabase, 'pending_approvals', 'id', options.businessId, options.approvalId, 'lead:internal-sms', {
+        approval_type: 'send_sms', title: `Granska intern leadnotis — ${lead.name || 'ny lead'}`,
+        description: 'Förberedd efter leadaktivering; skickas först efter ett nytt beslut.',
+        payload: { recipient: 'internal', source: 'lead_activation', parent_approval_id: options.approvalId, to: currentPhone, message: options.reviewedInternalMessage, related_id: dealId || leadId },
+        status: 'pending', risk_level: 'low', expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+      })
+      effects.push(saved.error || !saved.data ? { effect: 'internal_sms', status: 'failed', message: saved.error?.message || 'SMS-kortet kunde inte sparas' } : { effect: 'internal_sms', status: 'succeeded', message: 'Separat granskningskort skapat', approval_id: saved.data.id })
+    }
+  } else effects.push({ effect: 'internal_sms', status: 'skipped', message: 'Valdes bort eller mottagare saknas' })
 
-  // Automation-event
-  try {
-    const { fireEvent } = await import('@/lib/automation-engine')
-    await fireEvent(supabase, 'lead_received', lead.business_id, {
-      source: lead.source || 'email_forward',
-      lead_id: lead.lead_id,
-      customer_id: lead.customer_id,
-      customer_name: lead.name,
-    })
-  } catch { /* non-blocking */ }
+  if (options.runAutomationRules) {
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      const summary = await fireEvent(supabase, 'lead_received', options.businessId, {
+        source: lead.source || 'email_forward', lead_id: lead.lead_id, entity_id: lead.lead_id,
+        customer_id: lead.customer_id, customer_name: lead.name, require_explicit_approval: true,
+      })
+      effects.push({ effect: 'lead_received_rules', status: summary.failed ? 'failed' : summary.pending_approval || summary.executed ? 'succeeded' : 'skipped',
+        message: `${summary.matched} matchade; ${summary.pending_approval} nya granskningar; ${summary.executed} utförda; ${summary.skipped} överhoppade; ${summary.failed} misslyckade` })
+    } catch (err) {
+      effects.push({ effect: 'lead_received_rules', status: 'failed', message: err instanceof Error ? err.message : String(err) })
+    }
+  } else effects.push({ effect: 'lead_received_rules', status: 'skipped', message: 'Valdes bort i granskningen' })
 
-  return { dealId, dealError }
+  return { dealId, dealError, effects }
 }

@@ -38,12 +38,13 @@ export const DEFAULT_LEAD_STAGES: Omit<LeadPipelineStage, 'id' | 'business_id' |
 export async function getLeadPipelineStages(businessId: string): Promise<LeadPipelineStage[]> {
   const supabase = getServerSupabase()
 
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('pipeline_stages')
     .select('*')
     .eq('business_id', businessId)
     .order('sort_order')
 
+  if (readError) throw new Error('Pipeline-stegen kunde inte läsas. Inga standardsteg har skapats.')
   if (existing && existing.length > 0) return existing
 
   // Seeda default-steg om tabellen är tom
@@ -88,24 +89,27 @@ export async function moveLeadToStage(params: {
   leadId: string
   toStageKey: string
   triggeredBy: 'user' | 'system' | 'automation'
-}): Promise<{ moved: boolean; from_stage?: string; to_stage?: string; reason?: string }> {
+}): Promise<{ moved: boolean; from_stage?: string; to_stage?: string; reason?: string;
+  partial?: boolean; effects?: Array<{ effect: string; status: 'succeeded' | 'failed'; message?: string }> }> {
   const supabase = getServerSupabase()
 
   // Hämta nuvarande lead
-  const { data: lead } = await supabase
+  const { data: lead, error: leadError } = await supabase
     .from('leads')
     .select('lead_id, pipeline_stage_key')
     .eq('lead_id', params.leadId)
     .eq('business_id', params.businessId)
     .single()
 
-  if (!lead) return { moved: false, reason: 'Lead hittades inte' }
+  if (leadError || !lead) return { moved: false, reason: 'Lead kunde inte verifieras i företaget' }
 
   const currentKey = lead.pipeline_stage_key || 'new_lead'
   if (currentKey === params.toStageKey) return { moved: false, reason: 'Lead är redan i detta steg' }
 
   // Hämta steg-ordning
-  const stages = await getLeadPipelineStages(params.businessId)
+  let stages: LeadPipelineStage[]
+  try { stages = await getLeadPipelineStages(params.businessId) }
+  catch { return { moved: false, reason: 'Pipeline-stegen kunde inte verifieras' } }
   const fromStage = stages.find(s => s.key === currentKey)
   const toStage = stages.find(s => s.key === params.toStageKey)
 
@@ -124,7 +128,7 @@ export async function moveLeadToStage(params: {
   }
 
   // Uppdatera lead
-  const { error } = await supabase
+  let update = supabase
     .from('leads')
     .update({
       pipeline_stage_key: params.toStageKey,
@@ -132,33 +136,48 @@ export async function moveLeadToStage(params: {
     })
     .eq('lead_id', params.leadId)
     .eq('business_id', params.businessId)
+  update = lead.pipeline_stage_key == null ? update.is('pipeline_stage_key', null) : update.eq('pipeline_stage_key', lead.pipeline_stage_key)
+  const { data: changed, error } = await update.select('lead_id')
 
   if (error) return { moved: false, reason: error.message }
+  if (!changed?.length) return { moved: false, reason: 'Ingen lead flyttades. Läget kan ha ändrats samtidigt.' }
+  const effects: Array<{ effect: string; status: 'succeeded' | 'failed'; message?: string }> = [
+    { effect: 'pipeline_stage', status: 'succeeded', message: `${currentKey} → ${params.toStageKey}` },
+  ]
 
   // Fire pipeline_stage_changed event for automation rules
   try {
     const { fireEvent } = await import('@/lib/automation-engine')
     const { getServerSupabase: getSupa } = await import('@/lib/supabase')
     const supa = getSupa()
-    await fireEvent(supa, 'pipeline_stage_changed', params.businessId, {
+    const rules = await fireEvent(supa, 'pipeline_stage_changed', params.businessId, {
       lead_id: params.leadId,
+      entity_id: params.leadId,
       from_stage: currentKey,
       to_stage: params.toStageKey,
       triggered_by: params.triggeredBy,
     })
+    effects.push({ effect: 'pipeline_rules', status: rules.failed ? 'failed' : 'succeeded',
+      message: `${rules.matched} matchade; ${rules.pending_approval} väntar på granskning; ${rules.executed} utförda; ${rules.skipped} överhoppade; ${rules.failed} misslyckade` })
   } catch (err) {
     console.error('[moveLeadToStage] fireEvent failed:', err)
+    effects.push({ effect: 'pipeline_rules', status: 'failed', message: 'Pipeline-reglerna kunde inte slutföras' })
   }
 
   // Auto-create project if target stage has creates_project=true
   if (toStage && toStage.creates_project) {
     try {
       const { createProjectFromLead } = await import('@/lib/projects/create-from-lead')
-      await createProjectFromLead(params.businessId, params.leadId)
+      const project = await createProjectFromLead(params.businessId, params.leadId)
+      effects.push({ effect: 'project', status: project.success ? 'succeeded' : 'failed',
+        message: project.success ? `Projekt ${project.project_id} finns. Projektets egna följdhandlingar är inte verifierade här.` : project.error || 'Projektet kunde inte skapas' })
     } catch (err) {
       console.error('[moveLeadToStage] createProjectFromLead failed:', err)
+      effects.push({ effect: 'project', status: 'failed', message: 'Projektskapandet misslyckades' })
     }
   }
 
-  return { moved: true, from_stage: currentKey, to_stage: params.toStageKey }
+  const partial = effects.some(effect => effect.status === 'failed')
+  return { moved: true, from_stage: currentKey, to_stage: params.toStageKey, effects, partial,
+    ...(partial ? { reason: 'Leaden flyttades, men en eller flera följdhandlingar misslyckades.' } : {}) }
 }

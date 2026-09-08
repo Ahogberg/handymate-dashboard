@@ -1,4 +1,5 @@
 import { hasDurableFollowup } from '@/lib/followup/service'
+import { automationSmsText, interpolateApprovalTemplate } from '@/lib/approvals/automation-message'
 /**
  * V3 Automation Engine
  *
@@ -199,13 +200,7 @@ function deriveAgentId(ruleName: string, actionType: string, triggerType: string
  * saknas i kontext, lämnas orörda i stället för att krascha eller radera dem.
  */
 export function interpolateTemplate(template: string, context: ExecutionContext): string {
-  let result = template
-  for (const [key, value] of Object.entries(context)) {
-    if (typeof value === 'string' || typeof value === 'number') {
-      result = result.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), String(value))
-    }
-  }
-  return result
+  return interpolateApprovalTemplate(template, context)
 }
 
 /**
@@ -256,8 +251,6 @@ async function handleSendSms(
   config: Record<string, unknown>,
   context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
-  const template = config.template as string || ''
-  let message = interpolateTemplate(template, context)
 
   // Get business name for template
   const { data: business } = await supabase
@@ -266,7 +259,7 @@ async function handleSendSms(
     .eq('business_id', businessId)
     .single()
 
-  message = message.replace(/\{\{business_name\}\}/g, business?.business_name || 'Handymate')
+  const message = automationSmsText(config, context, business?.business_name || 'Handymate')
 
   let to = (context.phone as string) || (context.customer_phone as string)
   // Många event (lead_received, threshold-regler m.fl.) bär bara customer_id,
@@ -517,13 +510,16 @@ async function handleUpdateStatus(
 
       // Logga övergången i automation_logs context
       return {
-        success: true,
+        success: !result.partial,
+        ...(result.partial ? { error: result.reason } : {}),
         data: {
           entity: 'lead',
           entity_id: leadId,
           from_stage: result.from_stage,
           to_stage: result.to_stage,
           pipeline_move: true,
+          partial: result.partial || false,
+          effects: result.effects || [],
         },
       }
     } catch (err: unknown) {
@@ -543,7 +539,7 @@ async function handleUpdateStatus(
 
   const tableMap: Record<string, { table: string; idCol: string; statusCol: string }> = {
     lead: { table: 'leads', idCol: 'lead_id', statusCol: 'status' },
-    quote: { table: 'quote', idCol: 'quote_id', statusCol: 'status' },
+    quote: { table: 'quotes', idCol: 'quote_id', statusCol: 'status' },
     invoice: { table: 'invoice', idCol: 'invoice_id', statusCol: 'status' },
     booking: { table: 'booking', idCol: 'booking_id', statusCol: 'status' },
     customer: { table: 'customer', idCol: 'customer_id', statusCol: 'job_status' },
@@ -552,41 +548,56 @@ async function handleUpdateStatus(
   const mapping = tableMap[entity]
   if (!mapping) return { success: false, error: `Okänd entitet: ${entity}` }
 
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from(mapping.table)
     .update({ [mapping.statusCol]: newStatus, updated_at: new Date().toISOString() })
     .eq(mapping.idCol, entityId)
     .eq('business_id', businessId)
+    .select(mapping.idCol)
 
   if (error) return { success: false, error: error.message }
+  if (!changed?.length) return { success: false, error: 'Ingen entitet uppdaterades i företaget.' }
   return { success: true, data: { entity, entity_id: entityId, new_status: newStatus } }
 }
 
 async function handleNotifyOwner(
-  _supabase: SupabaseClient,
+  supabase: SupabaseClient,
   businessId: string,
   config: Record<string, unknown>,
   _context: ExecutionContext
 ): Promise<{ success: boolean; data?: Record<string, unknown>; error?: string }> {
   const title = (config.title as string) || 'Notis'
   const body = (config.body as string) || ''
-
-  try {
-    // Etapp 0 (2026-08-27): signerad intern push + ärligt utfall — "0
-    // mottagare" är inte "levererat".
-    const { sendInternalPush } = await import('@/lib/notifications/push-internal')
-    const push = await sendInternalPush({
-      business_id: businessId,
-      title,
-      body,
-      url: (config.url as string) || '/dashboard',
-    })
-    if (!push.delivered) return { success: false, error: `Push nådde ingen mottagare (${push.reason || 'no_recipients'})`, data: { title, sent: push.sent } }
-    return { success: true, data: { title, sent: push.sent } }
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : 'Push failed'
-    return { success: false, error: msg }
+  // notify_owner is not a company-wide broadcast. Resolve active owners to
+  // auth user ids, which both web and Expo push use for targeting.
+  const owners = await supabase.from('business_users').select('id, user_id, name')
+    .eq('business_id', businessId).eq('role', 'owner').eq('is_active', true)
+  if (owners.error || !owners.data?.length) return { success: false, error: 'Aktiv ägare kunde inte verifieras. Ingen push skickades.' }
+  if (owners.data.some(owner => typeof owner.user_id !== 'string' || !owner.user_id.trim())) {
+    return { success: false, error: 'Ägarens användaridentitet saknas. Ingen push skickades.' }
   }
+  const targets = Array.from(new Map(owners.data.map(owner => [owner.user_id, owner])).values())
+  const outcomes: Array<Record<string, unknown>> = []
+  const { sendInternalPush } = await import('@/lib/notifications/push-internal')
+  for (const owner of targets) {
+    try {
+      const push = await sendInternalPush({ business_id: businessId, target_user_id: owner.user_id,
+        title, body, url: (config.url as string) || '/dashboard' })
+      const rejected = (push.channels?.web?.rejected || 0) + (push.channels?.expo?.rejected || 0)
+      // Acceptance is a provider outcome, never proof that a person read it.
+      outcomes.push({ owner_id: owner.id, owner_name: owner.name, accepted: push.sent,
+        ok: push.delivered && push.sent > 0 && rejected === 0, rejected,
+        uncertain: !push.delivered && (push.reason === 'network' || /^http_5/.test(push.reason || '')),
+        channels: push.channels, reason: push.reason || (rejected ? 'partial_channel_failure' : undefined) })
+    } catch (error) {
+      outcomes.push({ owner_id: owner.id, owner_name: owner.name, accepted: 0, ok: false, uncertain: true,
+        reason: error instanceof Error ? error.message : 'Okänt pushutfall' })
+    }
+  }
+  const success = outcomes.every(outcome => outcome.ok)
+  const partial = !success && outcomes.some(outcome => Number(outcome.accepted) > 0 || outcome.uncertain)
+  return { success, data: { title, outcomes, partial, sent: outcomes.reduce((sum, outcome) => sum + Number(outcome.accepted), 0) },
+    ...(success ? {} : { error: partial ? 'Ägarnotisen accepterades delvis eller har osäkert utfall. Skicka inte hela notisen igen utan avstämning.' : 'Push accepterades inte för alla ägare.' }) }
 }
 
 async function handleRejectLead(
@@ -611,12 +622,23 @@ async function handleRejectLead(
     return { success: false, error: `Lead-status kunde inte uppdateras: ${rejectErr.message}` }
   }
 
-  // Send rejection SMS if template provided and phone available
+  // Kund-SMS får inte döljas i statusändringen. Även när själva regeln körs
+  // autonomt skapas ett separat, konkret send_sms-kort i stället för ett
+  // direkt utskick. Approval-routen skickar tom config här och skapar sitt
+  // versionsbundna barnkort med stabilt id efter den granskade statusändringen.
+  let smsApprovalId: string | undefined
   if (config.sms_template && context.phone) {
-    await handleSendSms(supabase, businessId, { template: config.sms_template }, context)
+    const { data: business } = await supabase.from('business_config').select('business_name').eq('business_id', businessId).maybeSingle()
+    const message = automationSmsText({ template: config.sms_template }, context, business?.business_name || 'Handymate')
+    const proposed = await handleCreateApproval(supabase, businessId, {
+      approval_type: 'send_sms', title: `Granska besked till ${context.customer_name || context.name || 'kunden'}`,
+      description: 'Leaden är markerad som förlorad. Granska kundbeskedet separat före sändning.',
+    }, { ...context, entity_id: leadId, rule_action_type: 'send_sms', to: context.phone, message }, 'Förlorad lead — kundbesked')
+    if (!proposed.success) return { success: false, error: `Leaden markerades som förlorad, men SMS-förslaget kunde inte skapas: ${proposed.error}`, data: { lead_id: leadId, status: 'lost' } }
+    smsApprovalId = proposed.data?.approval_id as string | undefined
   }
 
-  return { success: true, data: { lead_id: leadId, status: 'lost' } }
+  return { success: true, data: { lead_id: leadId, status: 'lost', ...(smsApprovalId ? { sms_approval_id: smsApprovalId } : {}) } }
 }
 
 async function handleGenerateQuote(
@@ -669,7 +691,7 @@ async function handleScheduleFollowup(
     related_id: (context.entity_id as string) || (context.lead_id as string) || (context.quote_id as string) || null,
     created_at: new Date().toISOString(),
   })
-  if (insertErr) console.error('[automation-engine] Failed to create followup:', insertErr.message)
+  if (insertErr) return { success: false, error: `Uppföljningen kunde inte sparas: ${insertErr.message}` }
 
   return { success: true, data: { followup_date: followupDate.toISOString(), description } }
 }
@@ -894,7 +916,13 @@ export async function executeRule(
     ((typedRule.action_type === 'send_sms' || typedRule.action_type === 'send_email') && settings.require_approval_send_sms) ||
     (typedRule.action_type === 'generate_quote' && settings.require_approval_send_quote) ||
     (typedRule.action_type === 'create_booking' && settings.require_approval_create_booking)
-  const needsApproval = typedRule.requires_approval || globalApproval
+  // En redan granskad huvudhandling får kräva att varje NY följdhandling
+  // granskas separat. Det gäller även regler som normalt har autonomi: användaren
+  // har godkänt att regeln får föreslå nästa steg, inte ett ännu osynligt
+  // kundutskick. `create_approval` är redan bara ett förslag och undantas i den
+  // befintliga grenen nedan.
+  const forcedByParentReview = context.require_explicit_approval === true
+  const needsApproval = forcedByParentReview || typedRule.requires_approval || globalApproval
 
   // Förtjänad autonomi: om regeln mappar till en allowlistad nyckel OCH
   // hantverkaren beviljat autonomi för den → hoppa över approval-grenen och
@@ -911,7 +939,7 @@ export async function executeRule(
   // isAutonomous-beteende, exakt oförändrat (reduktionen syns nedan: när
   // mandatBypass förblir false körs precis den gamla try/catch-satsen).
   let mandateStamp: { mandate_id: string; mission_id: string } | null = null
-  if (needsApproval && autonomyKey) {
+  if (needsApproval && !forcedByParentReview && autonomyKey) {
     // Etapp W:s uttryckliga scope för den här callern är booking_reminder
     // (tasks/jaunty-pondering-hummingbird.md, Etapp W punkt 1).
     // deriveAutonomyKey mappar ÄVEN threshold-signaturerna
@@ -969,6 +997,7 @@ export async function executeRule(
       ...(autonomyKey ? { autonomy_key: autonomyKey } : {}),
     }, typedRule.name)
 
+    const approvalStatus = approvalResult.success ? 'pending_approval' : 'failed'
     await logExecution(supabase, {
       businessId: typedRule.business_id,
       ruleId: typedRule.id,
@@ -976,14 +1005,15 @@ export async function executeRule(
       triggerType: typedRule.trigger_type,
       actionType: typedRule.action_type,
       agentId: typedRule.agent_id ?? null,
-      status: 'pending_approval',
+      status: approvalStatus,
       context,
       result: approvalResult.data,
+      errorMessage: approvalResult.error,
       approvalId: approvalResult.data?.approval_id as string,
     })
-    await updateRuleStats(supabase, typedRule.id, 'pending_approval')
+    await updateRuleStats(supabase, typedRule.id, approvalStatus)
 
-    return { status: 'pending_approval', data: approvalResult.data }
+    return { status: approvalStatus, data: approvalResult.data, error: approvalResult.error }
   }
 
   // 7. Execute action. Stämpla rule_action_type på en lokal kopia (inte
@@ -1391,34 +1421,44 @@ export async function fireEvent(
   eventName: string,
   businessId: string,
   payload: ExecutionContext = {}
-): Promise<void> {
+): Promise<{ matched: number; pending_approval: number; executed: number; skipped: number; failed: number }> {
+  const summary = { matched: 0, pending_approval: 0, executed: 0, skipped: 0, failed: 0 }
   try {
     // Fetch matching event rules
-    const { data: rules } = await supabase
+    const { data: rules, error: rulesError } = await supabase
       .from('v3_automation_rules')
       .select('*')
       .eq('business_id', businessId)
       .eq('is_active', true)
       .eq('trigger_type', 'event')
 
-    if (!rules || rules.length === 0) return
+    if (rulesError) return { ...summary, failed: 1 }
+    if (!rules || rules.length === 0) return summary
 
     // Filter by event_name in trigger_config
     const matchingRules = (rules as AutomationRule[]).filter(r => {
       const configEvent = r.trigger_config?.event_name
       return configEvent === eventName
     })
+    summary.matched = matchingRules.length
 
     // Execute matching rules
     for (const rule of matchingRules) {
       try {
-        await executeRule(supabase, rule.id, payload)
+        const result = await executeRule(supabase, rule.id, payload)
+        if (result.status === 'pending_approval') summary.pending_approval += 1
+        else if (result.status === 'success') summary.executed += 1
+        else if (result.status === 'skipped') summary.skipped += 1
+        else summary.failed += 1
       } catch (err) {
+        summary.failed += 1
         console.error(`[automation-engine] Event rule ${rule.name} failed:`, err)
       }
     }
+    return summary
   } catch (err) {
     console.error(`[automation-engine] fireEvent error for ${eventName}:`, err)
+    return { ...summary, failed: summary.failed + 1 }
   }
 }
 

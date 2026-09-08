@@ -2,7 +2,10 @@
   "name": "handymate-dashboard",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=22.13.0" },
   "scripts": {
+    "test:approval-economy": "node tests/approvals/quote-send-harness.cjs && node tests/approvals/invoice-send-harness.cjs",
+    "test:approval-documents": "node tests/approvals/document-email-harness.cjs && node tests/approvals/document-delivery-harness.cjs && node tests/approvals/job-report-review-harness.cjs && node tests/approvals/job-report-route-harness.cjs && node tests/approvals/pdf-preview-browser-harness.cjs",
     "dev": "next dev",
     "build": "node --max-old-space-size=6144 node_modules/next/dist/bin/next build",
     "start": "next start",
@@ -28,6 +31,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@googlemaps/google-maps-services-js": "^3.4.2",
     "@mendable/firecrawl-js": "^4.18.0",
+    "@napi-rs/canvas": "1.0.8",
     "@sentry/nextjs": "^10.73.0",
     "@sparticuz/chromium": "^149.0.0",
     "@stripe/react-stripe-js": "^5.6.1",
@@ -44,6 +48,7 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "0.312.0",
     "next": "14.1.0",
+    "pdfjs-dist": "6.3.289",
     "puppeteer-core": "^25.4.0",
     "qrcode": "^1.5.4",
     "react": "18.2.0",
@@ -55,6 +60,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
     "@playwright/test": "^1.58.2",
     "@supabase/supabase-js": "^2.99.3",
     "@types/bcryptjs": "^2.4.6",
@@ -67,7 +73,6 @@
     "pg": "^8.22.0",
     "postcss": "8.4.33",
     "tailwindcss": "3.4.1",
-    "typescript": "5.3.3",
-    "@electric-sql/pglite": "0.5.8"
+    "typescript": "5.3.3"
   }
 }

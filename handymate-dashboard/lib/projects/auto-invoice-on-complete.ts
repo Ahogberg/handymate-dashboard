@@ -2,10 +2,11 @@
  * Auto-faktura vid projektavslut
  *
  * Skapar faktura baserat på offert + godkända ÄTA.
- * - auto_invoice_on_complete = true  → skicka direkt till kund
- * - auto_invoice_on_complete = false → skapa utkast + pending_approval
+ * - allowCustomerDelivery=true och auto_invoice_on_complete=true → kan skicka
+ * - projektavslut skickar allowCustomerDelivery=false → utkast + nytt kort
  *
- * Notifierar alltid hantverkaren via SMS.
+ * Ägarbesked skickas direkt endast för äldre uttryckliga anrop; projektavslut
+ * förbereder det som ett separat granskningskort.
  */
 
 import { getServerSupabase } from '@/lib/supabase'
@@ -21,15 +22,23 @@ interface AutoInvoiceResult {
   total?: number
   status?: 'draft' | 'sent'
   error?: string
+  followup_approval_id?: string
+  internal_notification_approval_id?: string
+  customer_delivery_deferred?: boolean
+  warnings?: string[]
 }
 
 export async function autoInvoiceOnComplete(
   businessId: string,
   projectId: string,
+  options: { allowCustomerDelivery?: boolean; deferInternalNotification?: boolean } = {},
 ): Promise<AutoInvoiceResult> {
   const supabase = getServerSupabase()
 
   try {
+    const warnings: string[] = []
+    let followupApprovalId: string | undefined
+    let internalNotificationApprovalId: string | undefined
     // 1–6. Hela kompositionen (offertrader → ÄTA → totaler → ROT → kunden
     // betalar) bor i lib/invoices/project-invoice-draft.ts sedan Tur 4
     // etapp 2 — samma underlag bygger missad-intäkt-svepets fakturera_projekt-
@@ -56,7 +65,7 @@ export async function autoInvoiceOnComplete(
       .eq('business_id', businessId)
       .single()
 
-    const autoSend = config?.auto_invoice_on_complete === true
+    const autoSend = config?.auto_invoice_on_complete === true && options.allowCustomerDelivery !== false
     const dueDays = config?.default_payment_days || 30
     const invoiceDate = new Date()
     const dueDate = new Date(invoiceDate)
@@ -135,6 +144,7 @@ export async function autoInvoiceOnComplete(
         changeIds: underlag.ataChangeIds,
       })
       if (!markering.ok) {
+        warnings.push(`Fakturan skapades, men källmarkeringen misslyckades: ${markering.errors.join('; ')}`)
         console.error('[auto-invoice] kunde inte markera ÄTA som fakturerade:', markering.errors, {
           project_id: projectId,
           invoice_id: invoice?.invoice_id,
@@ -221,18 +231,43 @@ export async function autoInvoiceOnComplete(
 
         // Etapp 0 (2026-08-27): tidigare fetch mot den sessions-grindade
         // /api/sms/send → 401 (ägaren fick aldrig utfallet). Nu strypunkten.
-        const { sendSmsViaElks } = await import('@/lib/sms-send')
-        const r = await sendSmsViaElks({
-          supabase,
-          businessId,
-          to: config.personal_phone,
-          message: smsMessage,
-          relatedId: invoice.invoice_id,
-          messageType: 'auto_invoice_result',
-          recipient: 'internal',
-          purpose: 'internal',
-        })
-        if (!r.success) console.error('[auto-invoice] ägar-SMS misslyckades (non-blocking):', r.error)
+        if (options.deferInternalNotification) {
+          const notification = await supabase.from('pending_approvals').insert({
+            business_id: businessId,
+            approval_type: 'send_sms',
+            title: `Fakturabesked — ${project.name}`,
+            description: 'Granska det interna fakturabeskedet före utskick.',
+            risk_level: 'low',
+            status: 'pending',
+            payload: {
+              to: config.personal_phone,
+              message: smsMessage,
+              related_id: invoice.invoice_id,
+              message_type: 'auto_invoice_result',
+              recipient: 'internal',
+              purpose: 'internal',
+              source_project_id: projectId,
+            },
+          }).select('id').maybeSingle()
+          if (notification.error || !notification.data?.id) {
+            const message = notification.error?.message || 'Internt SMS-förslag kunde inte verifieras'
+            warnings.push(message)
+            console.error('[auto-invoice] internt SMS-förslag kunde inte sparas:', message)
+          } else internalNotificationApprovalId = notification.data.id
+        } else {
+          const { sendSmsViaElks } = await import('@/lib/sms-send')
+          const r = await sendSmsViaElks({
+            supabase,
+            businessId,
+            to: config.personal_phone,
+            message: smsMessage,
+            relatedId: invoice.invoice_id,
+            messageType: 'auto_invoice_result',
+            recipient: 'internal',
+            purpose: 'internal',
+          })
+          if (!r.success) console.error('[auto-invoice] ägar-SMS misslyckades (non-blocking):', r.error)
+        }
       }
     } catch {
       // Non-blocking
@@ -251,7 +286,7 @@ export async function autoInvoiceOnComplete(
         // PostgREST avvisade raden, men .error lästes aldrig och .insert()
         // kastar inte → silent failure (review_auto_invoice-draften skapades
         // aldrig). Korrekt shape + synlig .error-loggning nedan.
-        const { error: approvalErr } = await supabase.from('pending_approvals').insert({
+        const approval = await supabase.from('pending_approvals').insert({
           business_id: businessId,
           approval_type: 'review_auto_invoice',
           title: `Granska faktura — ${project.name}`,
@@ -291,13 +326,15 @@ export async function autoInvoiceOnComplete(
               customer_pays: customerPays ?? total,
             },
           },
-        })
-        if (approvalErr) {
+        }).select('id').maybeSingle()
+        if (approval.error || !approval.data?.id) {
+          const message = approval.error?.message || 'Fakturans granskningskort kunde inte verifieras'
+          warnings.push(message)
           console.error(
             '[autoInvoiceOnComplete] review_auto_invoice-approval insert failed (non-blocking):',
-            { business_id: businessId, invoice_id: invoice.invoice_id, error: approvalErr.message },
+            { business_id: businessId, invoice_id: invoice.invoice_id, error: message },
           )
-        }
+        } else followupApprovalId = approval.data.id
       } catch (err: any) {
         // Non-blocking — fakturan är redan skapad; approval-kortet är sekundärt.
         // Loggas synligt så framtida schema-/credits-stopp inte göms.
@@ -305,6 +342,7 @@ export async function autoInvoiceOnComplete(
           '[autoInvoiceOnComplete] review_auto_invoice-approval insert threw (non-blocking):',
           { business_id: businessId, invoice_id: invoice.invoice_id, error: err?.message || String(err) },
         )
+        warnings.push(err?.message || 'Fakturans granskningskort kunde inte sparas')
       }
     }
 
@@ -333,6 +371,10 @@ export async function autoInvoiceOnComplete(
       // Returnerar det faktiska sluttillståndet. Anroparen får inte veta "sent"
       // om ingenting lämnat huset — det var precis den lögnen som fanns här.
       status: (levererad ? 'sent' : 'draft') as 'draft' | 'sent',
+      followup_approval_id: followupApprovalId,
+      internal_notification_approval_id: internalNotificationApprovalId,
+      customer_delivery_deferred: !levererad,
+      warnings,
     }
   } catch (err: any) {
     console.error('[autoInvoiceOnComplete] Error:', err)

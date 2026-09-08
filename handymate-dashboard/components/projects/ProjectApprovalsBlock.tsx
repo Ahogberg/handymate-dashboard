@@ -1,7 +1,8 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 import { useCallback, useEffect, useState } from 'react'
-import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import { Check, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -164,14 +165,21 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         const key = getEditableKey(approval)
         if (key && editedText != null) body.edited_payload = { [key]: editedText }
       }
-      const res = await postKortbeslut(approval.id, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-        body,
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(body),
       })
+      if (res.status === 499) return
       if (!res.ok) {
         setError('Kunde inte spara — försök igen')
         return
       }
+      const result = await res.json().catch(() => null)
+      if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed', 'needs_action'].includes(result?.receipt?.state)) { setError(result?.receipt?.text || result.execution_outcome?.error_text || 'Handlingen misslyckades'); return }
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
       setEditingId(null)
     } catch {

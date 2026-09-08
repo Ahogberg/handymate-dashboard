@@ -46,6 +46,7 @@ function kallkod(rel: string): string {
 
 const EXECUTOR_REL = 'app/api/approvals/[id]/route.ts'
 const EXECUTOR = kallkod(EXECUTOR_REL)
+const BOOKING_REVIEW = kallkod('lib/approvals/quote-signing-booking-review.ts')
 
 /** Källan för bara executeQuoteSigningBooking-funktionskroppen. */
 function executorFnKod(): string {
@@ -62,25 +63,21 @@ test.describe('quote_signing-grenen finns och nås', () => {
     expect(i, "case 'new_booking_request' saknas").toBeGreaterThan(-1)
     const gren = EXECUTOR.slice(i, i + 1500)
     expect(gren).toContain("pl.source === 'quote_signing'")
-    expect(gren).toContain('executeQuoteSigningBooking(pl)')
+    expect(gren).toContain('executeQuoteSigningBooking(pl, reviewedPayload')
   })
 
-  test('gissningsvägen (no message or phone) nås ALDRIG för source:quote_signing — grenen ligger textmässigt före', () => {
+  test('den signerade generiska SMS-vägen nås ALDRIG för source:quote_signing — grenen ligger textmässigt före', () => {
     const i = EXECUTOR.indexOf("case 'new_booking_request': {")
     const gren = EXECUTOR.slice(i, i + 1500)
     const guardIdx = gren.indexOf("pl.source === 'quote_signing'")
-    const gissningIdx = gren.indexOf('pl.customer_reply_pending')
-    const skippedIdx = gren.indexOf("skipped: 'no message or phone'")
+    const genericIdx = gren.indexOf("const reviewed = reviewedPayload as any")
     expect(guardIdx).toBeGreaterThan(-1)
-    expect(gissningIdx).toBeGreaterThan(-1)
-    expect(skippedIdx).toBeGreaterThan(-1)
+    expect(genericIdx).toBeGreaterThan(-1)
     // quote_signing-grenen returnerar (return-satsen finns mellan guarden
-    // och gissningsraden) INNAN koden som läser customer_reply_pending/
-    // entity.phone ens exekveras.
+    // och den generiska vägen) innan ett tidsförslags-underlag används.
     const returnIdx = gren.indexOf('return await executeQuoteSigningBooking')
     expect(returnIdx).toBeGreaterThan(guardIdx)
-    expect(returnIdx).toBeLessThan(gissningIdx)
-    expect(gissningIdx).toBeLessThan(skippedIdx)
+    expect(returnIdx).toBeLessThan(genericIdx)
   })
 })
 
@@ -181,16 +178,16 @@ test.describe('pushmall för new_booking_request', () => {
   })
 })
 
-test.describe('approveLabel — "Boka {datum}"', () => {
+test.describe('approveLabel — granska bokning och följdutskick', () => {
   test('med requested_date i payloaden', () => {
     const label = approveLabel('new_booking_request', { requested_date: '2026-09-22' })
-    expect(label.startsWith('Boka ')).toBe(true)
+    expect(label).toBe('Granska')
     expect(label).not.toBe('Godkänn')
   })
 
   test('utan requested_date faller tillbaka snyggt, kraschar aldrig', () => {
     const label = approveLabel('new_booking_request', {})
-    expect(label).toBe('Boka')
+    expect(label).toBe('Granska')
   })
 })
 
@@ -245,8 +242,7 @@ test.describe('idempotens — aldrig två bokningar', () => {
     expect(helper).toContain("ilike('notes'")
     expect(helper).toContain('idempotensMarkorFor(approvalId)')
 
-    const fn = executorFnKod()
-    expect(fn).toContain('idempotensMarkorFor(approvalId)')
+    expect(BOOKING_REVIEW).toContain('`[kort:${approvalId}]`')
   })
 
   test('en befintlig bokning hoppar över POST helt (befintlig-grenen sätter bookingId/scheduledStart utan fetch)', () => {
@@ -262,10 +258,9 @@ test.describe('idempotens — aldrig två bokningar', () => {
 
 test.describe('projektkoppling utan quotes.project_id', () => {
   test('projektet slås upp via project.quote_id, inte quotes.project_id (kolumnen finns inte)', () => {
-    const fn = executorFnKod()
-    expect(fn).toContain(".from('project')")
-    expect(fn).toContain("eq('quote_id', pl.quote_id)")
-    expect(fn).not.toContain('quote.project_id')
+    expect(BOOKING_REVIEW).toContain(".from('project')")
+    expect(BOOKING_REVIEW).toContain(".eq('quote_id', quote.quote_id)")
+    expect(BOOKING_REVIEW).not.toContain('quote.project_id')
   })
 
   test('bookings-routen accepterar och validerar project_id mot businessen (passthrough)', () => {
@@ -281,7 +276,7 @@ test.describe('projektkoppling utan quotes.project_id', () => {
 test.describe('SMS-texten (extraherad, återanvänd, tidszonskorrekt)', () => {
   test('buildBookingConfirmationSms används av både actions/route.ts och executorn', () => {
     expect(kallkod('app/api/actions/route.ts')).toContain('buildBookingConfirmationSms')
-    expect(kallkod('app/api/approvals/[id]/route.ts')).toContain('buildBookingConfirmationSms')
+    expect(BOOKING_REVIEW).toContain('buildBookingConfirmationSms')
   })
 
   test('visar svensk lokaltid explicit (Europe/Stockholm), inte serverns (UTC på Vercel)', () => {

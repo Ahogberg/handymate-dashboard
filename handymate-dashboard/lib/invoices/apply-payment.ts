@@ -1,5 +1,8 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { decidePaymentOutcome, type PaymentTransition } from './payment-decision'
+import { insertApprovalArtifact } from '@/lib/approvals/artifact-write'
+import { halsning } from '@/lib/customers/namn'
+import { buildSmsSuffix } from '@/lib/sms-reply-number'
 
 /**
  * Delad betal-kärna (2026-07-12, utbyggd 2026-08-26 för ROT/RUT-delbetalning).
@@ -40,6 +43,14 @@ export interface ApplyPaymentResult {
   paid_amount?: number
   /** Vad som återstår att få från Skatteverket (0 när inget återstår). */
   remaining_rot_kr?: number
+  effects?: PaymentEffect[]
+}
+
+export interface PaymentEffect {
+  effect: string
+  status: 'succeeded' | 'attempted' | 'skipped' | 'failed'
+  message?: string
+  approval_id?: string
 }
 
 export async function applyInvoicePayment(opts: {
@@ -52,6 +63,14 @@ export async function applyInvoicePayment(opts: {
   paidVia?: string | null
   markedByUserId?: string | null
   source: PaymentSource
+  /** Approval-originated payments must never hide follow-up sends inside the
+   * main decision. Selected customer/rule sends become separate approvals. */
+  approvalFollowUps?: {
+    approvalId: string
+    updateWorkflows: boolean
+    prepareCustomerMessages: boolean
+    runAutomationRules: boolean
+  }
 }): Promise<ApplyPaymentResult> {
   const { businessId, invoiceId, markedByUserId = null, source } = opts
   const paidAt = opts.paidAt || new Date().toISOString()
@@ -101,26 +120,38 @@ export async function applyInvoicePayment(opts: {
 
   const customerJustSettled = decision.transition === 'to_paid' || decision.transition === 'to_customer_paid'
 
+  const effects: PaymentEffect[] = []
   if (customerJustSettled) {
-    await runPostPaymentAutomations(invoiceId, businessId, invoice.customer_id, {
+    const reviewed = opts.approvalFollowUps
+    effects.push(...await runPostPaymentAutomations(invoiceId, businessId, invoice.customer_id, {
       triggeredBy: source === 'fortnox' ? 'system' : 'user',
       reason: source === 'fortnox' ? 'Faktura betald (Fortnox-synk)' : 'Betal-markering',
       logPrefix: `[apply-payment/${source}]`,
-    }).catch(err =>
-      console.error(`[apply-payment/${source}] post-payment automations failed:`, err),
-    )
+      updateWorkflows: reviewed?.updateWorkflows !== false,
+      runCustomerCommunication: !reviewed,
+      runAutomationRules: reviewed?.runAutomationRules !== false,
+      requireExplicitApproval: !!reviewed,
+    }))
 
-    if (invoice.customer_id) {
+    if (reviewed) {
+      if (reviewed.prepareCustomerMessages && invoice.customer_id) {
+        effects.push(...await preparePaymentCustomerMessages(supabase, businessId, reviewed.approvalId, invoice, decision.paid_amount))
+      } else {
+        effects.push({ effect: 'customer_messages', status: 'skipped', message: reviewed.prepareCustomerMessages ? 'Fakturan saknar kund' : 'Valdes bort i granskningen' })
+      }
+    } else if (invoice.customer_id) {
       try {
         const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
-        await sendPortalNotification(businessId, invoice.customer_id, 'invoice_paid', {
+        const notification = await sendPortalNotification(businessId, invoice.customer_id, 'invoice_paid', {
           context: {
             amount: decision.paid_amount,
             invoice_number: invoice.invoice_number || invoice.fortnox_invoice_number || invoiceId,
           },
         })
+        effects.push({ effect: 'portal_message', status: notification.success ? (notification.skipped ? 'skipped' : 'succeeded') : 'failed', message: notification.skipped || notification.error })
       } catch (notifErr) {
         console.error(`[apply-payment/${source}] portal notification invoice_paid failed:`, notifErr)
+        effects.push({ effect: 'portal_message', status: 'failed', message: notifErr instanceof Error ? notifErr.message : String(notifErr) })
       }
     }
   }
@@ -132,7 +163,58 @@ export async function applyInvoicePayment(opts: {
     paid_at: customerJustSettled ? paidAt : (invoice.paid_at || paidAt),
     paid_amount: decision.paid_amount,
     remaining_rot_kr: decision.remaining_rot_kr,
+    effects,
   }
+}
+
+async function preparePaymentCustomerMessages(
+  supabase: ReturnType<typeof getServerSupabase>,
+  businessId: string,
+  approvalId: string,
+  invoice: Record<string, any>,
+  paidAmount: number,
+): Promise<PaymentEffect[]> {
+  const effects: PaymentEffect[] = []
+  const { data: customer, error: customerError } = await supabase.from('customer')
+    .select('customer_id, name, phone_number, email, portal_token, portal_enabled, review_request_sent_at')
+    .eq('customer_id', invoice.customer_id).eq('business_id', businessId).maybeSingle()
+  const { data: config, error: configError } = await supabase.from('business_config')
+    .select('business_name, assigned_phone_number, google_review_url, review_request_enabled')
+    .eq('business_id', businessId).maybeSingle()
+  if (customerError || configError || !customer || !config?.business_name) {
+    return [{ effect: 'customer_messages', status: 'failed', message: 'Kund eller avsändare kunde inte verifieras för följdförslagen' }]
+  }
+  const invoiceNumber = invoice.invoice_number || invoice.fortnox_invoice_number || invoice.invoice_id
+  const amountText = `${Number(paidAmount || 0).toLocaleString('sv-SE')} kr`
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+  if (customer.email && customer.portal_enabled !== false && customer.portal_token) {
+    const subject = `Tack för din betalning — faktura ${invoiceNumber}`
+    const body = `${halsning(customer.name)} Tack för din betalning av ${amountText} för faktura ${invoiceNumber}. Du hittar fakturan och övrig dokumentation i kundportalen: ${appUrl}/portal/${customer.portal_token}`
+    const saved = await insertApprovalArtifact(supabase, 'pending_approvals', 'id', businessId, approvalId, 'payment:portal-email', {
+      approval_type: 'send_email', title: `Granska betalningsbesked till ${customer.name || 'kunden'}`,
+      description: 'Förberett efter registrerad betalning; skickas först efter ett nytt beslut.',
+      payload: { source: 'payment_followup', parent_approval_id: approvalId, customer_id: customer.customer_id, to: customer.email, subject, body, portal_event: 'invoice_paid', invoice_id: invoice.invoice_id },
+      status: 'pending', risk_level: 'medium', expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    })
+    effects.push(saved.error || !saved.data
+      ? { effect: 'portal_message', status: 'failed', message: saved.error?.message || 'Granskningskortet kunde inte sparas' }
+      : { effect: 'portal_message', status: 'succeeded', message: 'Separat granskningskort skapat', approval_id: saved.data.id })
+  } else effects.push({ effect: 'portal_message', status: 'skipped', message: 'Aktiv portal eller kundmejl saknas' })
+
+  if (config.review_request_enabled !== false && customer.phone_number && config.google_review_url && !customer.review_request_sent_at) {
+    const message = `${halsning(customer.name)} Tack för förtroendet! Vill du lämna ett omdöme om vårt arbete? ${config.google_review_url} ${buildSmsSuffix(config.business_name, config.assigned_phone_number)}`
+    const saved = await insertApprovalArtifact(supabase, 'pending_approvals', 'id', businessId, approvalId, 'payment:review-sms', {
+      approval_type: 'review_request', title: `Granska omdömesförfrågan till ${customer.name || 'kunden'}`,
+      description: 'Förberett efter registrerad betalning; skickas först efter ett nytt beslut.',
+      payload: { source: 'payment_followup', parent_approval_id: approvalId, customer_id: customer.customer_id, to: customer.phone_number, message, invoice_id: invoice.invoice_id },
+      status: 'pending', risk_level: 'medium', expires_at: new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString(),
+    })
+    effects.push(saved.error || !saved.data
+      ? { effect: 'review_request', status: 'failed', message: saved.error?.message || 'Granskningskortet kunde inte sparas' }
+      : { effect: 'review_request', status: 'succeeded', message: 'Separat granskningskort skapat', approval_id: saved.data.id })
+  } else effects.push({ effect: 'review_request', status: 'skipped', message: customer.review_request_sent_at ? 'Omdömesförfrågan har redan skickats' : 'Telefon, omdömeslänk eller inställning saknas' })
+  return effects
 }
 
 /**
@@ -146,51 +228,62 @@ export async function runPostPaymentAutomations(
   invoiceId: string,
   businessId: string,
   customerId: string | null,
-  opts: { triggeredBy: 'user' | 'system'; reason: string; logPrefix: string } = {
+  opts: {
+    triggeredBy: 'user' | 'system'; reason: string; logPrefix: string
+    updateWorkflows?: boolean
+    runCustomerCommunication?: boolean
+    runAutomationRules?: boolean
+    requireExplicitApproval?: boolean
+  } = {
     triggeredBy: 'user', reason: 'Betal-markering', logPrefix: '[apply-payment]',
   },
-): Promise<void> {
+): Promise<PaymentEffect[]> {
   const { triggeredBy, reason, logPrefix } = opts
+  const effects: PaymentEffect[] = []
 
-  try {
-    const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
-    const settings = await getAutomationSettings(businessId)
-    if (settings?.auto_move_on_payment) {
-      const deal = await findDealByInvoice(businessId, invoiceId)
-      if (deal) {
-        await moveDeal({
-          dealId: deal.id,
-          businessId,
-          toStageSlug: 'won',
-          triggeredBy,
-          aiReason: reason,
-        })
-      }
+  if (opts.updateWorkflows !== false) {
+    try {
+      const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')
+      const settings = await getAutomationSettings(businessId)
+      if (settings?.auto_move_on_payment) {
+        const deal = await findDealByInvoice(businessId, invoiceId)
+        if (deal) {
+          await moveDeal({ dealId: deal.id, businessId, toStageSlug: 'won', triggeredBy, aiReason: reason })
+          effects.push({ effect: 'pipeline', status: 'succeeded', message: 'Affären flyttades enligt betalningsinställningen' })
+        } else effects.push({ effect: 'pipeline', status: 'skipped', message: 'Ingen kopplad affär hittades' })
+      } else effects.push({ effect: 'pipeline', status: 'skipped', message: 'Automatisk pipelineflytt är avstängd' })
+    } catch (err) {
+      console.error(`${logPrefix} pipeline error:`, err)
+      effects.push({ effect: 'pipeline', status: 'failed', message: err instanceof Error ? err.message : String(err) })
     }
-  } catch (err) {
-    console.error(`${logPrefix} pipeline error:`, err)
-  }
 
-  // AI Projektledare: kontrollera projektavslut (låg tidigare bara i PATCH-rutten)
-  try {
-    const { handleProjectEvent } = await import('@/lib/project-ai-engine')
-    await handleProjectEvent({ type: 'invoice_paid', businessId, invoiceId })
-  } catch (err) {
-    console.error(`${logPrefix} handleProjectEvent invoice_paid failed (non-blocking):`, invoiceId, err)
-  }
+    // AI Projektledare: kontrollera projektavslut (låg tidigare bara i PATCH-rutten)
+    try {
+      const { handleProjectEvent } = await import('@/lib/project-ai-engine')
+      await handleProjectEvent({ type: 'invoice_paid', businessId, invoiceId })
+      effects.push({ effect: 'project_check', status: 'attempted', message: 'Projektets avslutsvillkor kontrollerades' })
+    } catch (err) {
+      console.error(`${logPrefix} handleProjectEvent invoice_paid failed (non-blocking):`, invoiceId, err)
+      effects.push({ effect: 'project_check', status: 'failed', message: err instanceof Error ? err.message : String(err) })
+    }
 
-  // Projektsteg 'Faktura betald' — genom händelsebryggan (Del B, 2026-08-26):
-  // ps-07 först när ALLA projektets fakturor är reglerade (isCustomerSettled).
-  // Ett projekt med tre fakturor är inte betalt för att den första kom in.
-  try {
-    const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
-    const flytt = await bumpProjectStage(businessId, { invoiceId }, 'invoice_settled')
-    if (!flytt.moved && !flytt.skipped) console.error(`${logPrefix} stegflytten misslyckades (non-blocking):`, flytt.error, { projectId: flytt.projectId })
-  } catch (err) {
-    console.error(`${logPrefix} project-stage error:`, err)
-  }
+    // Projektsteg 'Faktura betald' — genom händelsebryggan.
+    try {
+      const { bumpProjectStage } = await import('@/lib/project-stages/event-bridge')
+      const moved = await bumpProjectStage(businessId, { invoiceId }, 'invoice_settled')
+      if (moved.moved) effects.push({ effect: 'project_stage', status: 'succeeded', message: 'Projektsteget flyttades' })
+      else if (moved.skipped) effects.push({ effect: 'project_stage', status: 'skipped', message: moved.error || 'Villkoren för stegflytt var inte uppfyllda' })
+      else {
+        console.error(`${logPrefix} stegflytten misslyckades (non-blocking):`, moved.error, { projectId: moved.projectId })
+        effects.push({ effect: 'project_stage', status: 'failed', message: moved.error || 'Projektsteget kunde inte flyttas' })
+      }
+    } catch (err) {
+      console.error(`${logPrefix} project-stage error:`, err)
+      effects.push({ effect: 'project_stage', status: 'failed', message: err instanceof Error ? err.message : String(err) })
+    }
+  } else effects.push({ effect: 'workflows', status: 'skipped', message: 'Valdes bort i granskningen' })
 
-  if (customerId) {
+  if (opts.runCustomerCommunication !== false && customerId) {
     try {
       const { triggerEventCommunication } = await import('@/lib/smart-communication')
       await triggerEventCommunication({
@@ -199,16 +292,27 @@ export async function runPostPaymentAutomations(
         customerId,
         context: { invoiceId },
       })
+      effects.push({ effect: 'smart_communication', status: 'attempted', message: 'Kommunikationsreglerna kontrollerades' })
     } catch (err) {
       console.error(`${logPrefix} smart-communication error:`, err)
+      effects.push({ effect: 'smart_communication', status: 'failed', message: err instanceof Error ? err.message : String(err) })
     }
-  }
+  } else effects.push({ effect: 'smart_communication', status: 'skipped', message: opts.runCustomerCommunication === false ? 'Direkt kundutskick är avstängt för detta granskade beslut' : 'Kund saknas' })
 
-  try {
-    const { fireEvent } = await import('@/lib/automation-engine')
-    const sb = getServerSupabase()
-    await fireEvent(sb, 'payment_received', businessId, { invoice_id: invoiceId })
-  } catch (err) {
-    console.error(`${logPrefix} fireEvent error:`, err)
-  }
+  if (opts.runAutomationRules !== false) {
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      const sb = getServerSupabase()
+      const summary = await fireEvent(sb, 'payment_received', businessId, {
+        invoice_id: invoiceId, entity_id: invoiceId, customer_id: customerId,
+        ...(opts.requireExplicitApproval ? { require_explicit_approval: true } : {}),
+      })
+      effects.push({ effect: 'payment_received_rules', status: summary.failed ? 'failed' : summary.executed ? 'succeeded' : summary.pending_approval ? 'succeeded' : 'skipped',
+        message: `${summary.matched} matchade; ${summary.pending_approval} nya granskningar; ${summary.executed} utförda; ${summary.skipped} överhoppade; ${summary.failed} misslyckade` })
+    } catch (err) {
+      console.error(`${logPrefix} fireEvent error:`, err)
+      effects.push({ effect: 'payment_received_rules', status: 'failed', message: err instanceof Error ? err.message : String(err) })
+    }
+  } else effects.push({ effect: 'payment_received_rules', status: 'skipped', message: 'Valdes bort i granskningen' })
+  return effects
 }

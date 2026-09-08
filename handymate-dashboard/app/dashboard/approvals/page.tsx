@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
+import { fetchApprovalList } from '@/lib/approvals/list-client'
+import { classify } from '@/lib/approvals/action-contract'
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
+import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
 import {
   Bot,
@@ -200,6 +203,21 @@ function timeUntilExpiry(expiresAt: string): string {
   return `${Math.floor(hours / 24)} dag kvar`
 }
 
+function ApprovalHistoryReceipt({ approval, onRetry, busy }: { approval: Approval; onRetry: (id: string) => void; busy: boolean }) {
+  const execution = approval.payload?.execution_result as { outcome?: string; receipt?: { state: string; text: string } } | undefined
+  const receipt = execution?.receipt
+  if (approval.status === 'pending') return null
+  const retryable = approval.status === 'approved' && ['failed', 'retrying'].includes(execution?.outcome || '')
+  const needsAttention = retryable || ['partial', 'failed', 'needs_action'].includes(receipt?.state || '')
+  return <div className="mt-2">
+    {needsAttention && <p className="text-xs font-semibold text-amber-800">Behöver följas upp</p>}
+    {receipt?.text && <p className={`text-sm whitespace-pre-wrap ${needsAttention ? 'text-amber-800' : 'text-slate-700'}`}>{receipt.text}</p>}
+    {retryable && <button type="button" disabled={busy} onClick={(event) => { event.stopPropagation(); onRetry(approval.id) }} className="mt-2 min-h-[44px] px-3 rounded-lg bg-amber-100 text-amber-900 text-sm font-medium disabled:opacity-50">
+      {busy ? 'Öppnar granskning...' : 'Granska återförsök'}
+    </button>}
+  </div>
+}
+
 function getRecipient(payload: Record<string, unknown>): string {
   if (payload.customer_name) return payload.customer_name as string
   if (payload.to) return payload.to as string
@@ -257,6 +275,8 @@ export default function ApprovalsPage() {
   const business = useBusiness()
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [loading, setLoading] = useState(true)
+  const [listError, setListError] = useState<string | null>(null)
+  const listRequest = useRef(0)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending')
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -277,7 +297,7 @@ export default function ApprovalsPage() {
   // felbesked som står kvar tills det stängs + "Försök igen", och en sektion
   // för misslyckade utföranden (fångar även fel vars HTTP-svar aldrig nådde
   // klienten — mobilkrasch, stängd flik).
-  const [failedFeedback, setFailedFeedback] = useState<{ id: string; text: string } | null>(null)
+  const [failedFeedback, setFailedFeedback] = useState<{ id: string; text: string; reviewAgain?: { action: 'approve' | 'reject'; editedPayload?: Record<string, unknown> } } | null>(null)
   const [failedExecutions, setFailedExecutions] = useState<Approval[]>([])
   const [retryLoading, setRetryLoading] = useState<string | null>(null)
   // Project Debrief Capture (2026-08-12): kortet ska ALDRIG godkännas rakt
@@ -308,46 +328,34 @@ export default function ApprovalsPage() {
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    return () => { listRequest.current++; supabase.removeChannel(channel) }
   }, [business?.business_id, activeTab])
 
   async function fetchApprovals() {
     if (!business?.business_id) return
+    const requestId = ++listRequest.current
     setLoading(true)
+    setListError(null)
     try {
-      // Etapp 3a (multi-employee-parity-plan.md): hämtar via GET
-      // /api/approvals istället för direkt Supabase-query — routing-
-      // filtret (canActOnApproval) körs server-side där. Realtime-
-      // subscriptionen nedan används fortfarande, men bara som "något
-      // ändrades, hämta om"-trigger — inte längre som datakälla.
-      // status='resolved' motsvarar den tidigare
-      // .in('status', ['approved','rejected','expired','auto_approved']).
       const { data: { session } } = await supabase.auth.getSession()
       const status = activeTab === 'pending' ? 'pending' : 'resolved'
       const recordingId = new URLSearchParams(window.location.search).get('recording_id')
       const callFilter = recordingId ? `&recording_id=${encodeURIComponent(recordingId)}` : ''
-      const res = await fetch(`/api/approvals?status=${status}&limit=50${callFilter}`, {
-        headers: {
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      })
-      if (res.ok) {
-        const result = await res.json().catch(() => null)
-        setApprovals(result?.approvals || [])
-      }
-      // Misslyckade utföranden (senaste 7 dagarna) — egen pseudo-status i
-      // GET-routen. Hämtas tyst; ett fel här får aldrig störa huvudkön.
-      const failedRes = await fetch(`/api/approvals?status=execution_failed&limit=20${callFilter}`, {
-        headers: {
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-      }).catch(() => null)
-      if (failedRes?.ok) {
-        const failedResult = await failedRes.json().catch(() => null)
-        setFailedExecutions(failedResult?.approvals || [])
-      }
+      const headers = session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : undefined
+      const [items, failed] = await Promise.all([
+        fetchApprovalList(`/api/approvals?status=${status}&limit=50${callFilter}`, headers),
+        fetchApprovalList(`/api/approvals?status=execution_failed&limit=20${callFilter}`, headers),
+      ])
+      if (requestId !== listRequest.current) return
+      setApprovals(items as Approval[])
+      setFailedExecutions(failed as Approval[])
+    } catch {
+      if (requestId !== listRequest.current) return
+      setApprovals([])
+      setFailedExecutions([])
+      setListError('Godkännanden och uppföljningar kunde inte hämtas. Listan kan vara ofullständig. Försök att uppdatera igen.')
     } finally {
-      setLoading(false)
+      if (requestId === listRequest.current) setLoading(false)
     }
   }
 
@@ -355,7 +363,7 @@ export default function ApprovalsPage() {
     setRetryLoading(id)
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${id}`, {
+      const res = await reviewedApprovalFetch(`/api/approvals/${id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -363,13 +371,15 @@ export default function ApprovalsPage() {
         },
         body: JSON.stringify({ action: 'retry' }),
       })
+      if (res.status === 499) return
       const result = await res.json().catch(() => null)
       if (res.ok && result?.execution_outcome?.outcome === 'success') {
-        const retriedItem = failedExecutions.find(a => a.id === id)
+        const retriedItem = failedExecutions.find(a => a.id === id) || approvals.find(a => a.id === id)
         const receipt = buildValueReceipt(retriedItem, result?.execution, result.execution_outcome.outcome)
         setFailedFeedback(null)
         setFailedExecutions(prev => prev.filter(a => a.id !== id))
-        setFeedbackMsg(receipt?.text || 'Utfört!')
+        await fetchApprovals()
+        setFeedbackMsg(result?.receipt?.text || receipt?.text || 'Beslutet är registrerat.')
         setFeedbackLink(receipt?.link || null)
         setFeedbackLinkLabel(receipt?.linkLabel || 'Öppna utkastet')
         setTimeout(() => {
@@ -405,15 +415,9 @@ export default function ApprovalsPage() {
     return () => clearTimeout(timer)
   }, [approvals])
 
-  // Typer som INTE behöver bekräftelse (rena acknowledgements)
-  const SKIP_CONFIRM = ['time_attestation', 'low_stock_alert', 'profitability_warning', 'dispatch_suggestion', 'quote_nudge', 'egenkontroll_foto', 'egenkontroll_avvikelse', 'checklist_forslag', 'tidrapport_forslag']
-
+  // Shared server-bound review replaces the incomplete type-specific shortcut.
   function requestApprove(approval: Approval, editedPayload?: Record<string, unknown>) {
-    if (SKIP_CONFIRM.includes(approval.approval_type)) {
-      handleAction(approval.id, 'approve', editedPayload)
-    } else {
-      setConfirmModal({ approval, editedPayload })
-    }
+    void handleAction(approval.id, 'approve', editedPayload)
   }
 
   function confirmAndExecute() {
@@ -424,6 +428,7 @@ export default function ApprovalsPage() {
 
   async function handleAction(id: string, action: 'approve' | 'reject', editedPayload?: Record<string, unknown>) {
     setActionLoading(id + action)
+    setFailedFeedback(null)
     try {
       // Servern slår bara ihop edited_payload (och stämplar payload.edited,
       // som streak/approve_rate läser) vid action:'edit' — ett 'approve' med
@@ -432,17 +437,24 @@ export default function ApprovalsPage() {
       if (editedPayload) body.edited_payload = editedPayload
 
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await postKortbeslut(id, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-        body,
+      const res = await reviewedApprovalFetch(`/api/approvals/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(body),
       })
+      if (res.status === 499) return
       if (res.ok) {
-        const result = await res.json().catch(() => null)
+        if (res.status === 499) return
+      const result = await res.json().catch(() => null)
         // Hämta approval-typen innan vi filtrerar bort den
         const approvedItem = approvals.find(a => a.id === id)
         setApprovals(prev => prev.filter(a => a.id !== id))
         setEditingId(null)
 
+        if (action === 'reject' && result?.receipt?.text) setFeedbackMsg(result.receipt.text)
         // Visa feedback baserat på vad som hände
         if (action === 'approve') {
           setFeedbackLink(null)
@@ -462,15 +474,18 @@ export default function ApprovalsPage() {
           // Ärlighets-grenen FÖRST (Fas 0-härdningen): säg aldrig "Godkänt"
           // när utförandet misslyckades. Server-klassningen
           // (classifyExecutionResult) är facit — inte klientens fälttolkning.
-          if (result?.execution_outcome?.outcome === 'failed') {
+          if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed'].includes(result?.receipt?.state)) {
             setFailedFeedback({
               id,
-              text: `Godkänt — men utförandet misslyckades: ${result.execution_outcome.error_text || 'okänt fel'}`,
+              text: result?.receipt?.text || `Utförandet misslyckades: ${result.execution_outcome?.error_text || 'okänt fel'}`,
             })
             fetchApprovals()
             return
           }
-          if (result?.execution_outcome?.outcome === 'skipped') {
+          if (result?.receipt?.text) {
+            setFeedbackMsg(result.receipt.text)
+            if (result.receipt.next_url) setFeedbackLink(result.receipt.next_url)
+          } else if (result?.execution_outcome?.outcome === 'skipped') {
             setFeedbackMsg(result?.execution?.note || 'Noterat — ingen handling utfördes')
           } else if (approvedItem?.approval_type === 'quote_nudge') {
             setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
@@ -512,6 +527,8 @@ export default function ApprovalsPage() {
         setFailedFeedback({
           id,
           text: errData?.error || `Något gick fel (HTTP ${res.status}) — kortet ligger kvar.`,
+          ...(res.status === 428 && errData?.code === 'approval_review_required'
+            ? { reviewAgain: { action, editedPayload } } : {}),
         })
       }
     } catch {
@@ -547,18 +564,24 @@ export default function ApprovalsPage() {
     setActionLoading(id + 'approve')
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await postKortbeslut(id, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-        body: { action: 'edit', edited_payload: { answers } },
+      const res = await reviewedApprovalFetch(`/api/approvals/${id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({ action: 'edit', edited_payload: { answers } }),
       })
+      if (res.status === 499) return
       const result = await res.json().catch(() => null)
+      if (res.status === 499) return
       if (res.ok) {
         setApprovals(prev => prev.filter(a => a.id !== id))
         setDebriefModal(null)
-        if (result?.execution_outcome?.outcome === 'failed') {
+        if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed'].includes(result?.receipt?.state)) {
           setFailedFeedback({
             id,
-            text: `Godkänt — men utförandet misslyckades: ${result.execution_outcome.error_text || 'okänt fel'}`,
+            text: result?.receipt?.text || `Utförandet misslyckades: ${result.execution_outcome?.error_text || 'okänt fel'}`,
           })
           fetchApprovals()
           return
@@ -609,13 +632,18 @@ export default function ApprovalsPage() {
       }
 
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await postKortbeslut(approval.id, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-        body: {
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify({
           action: 'approve',
           action_overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-        },
+        }),
       })
+      if (res.status === 499) return
       if (res.ok) {
         setApprovals(prev => prev.filter(a => a.id !== approval.id))
         setExpandedPackage(null)
@@ -688,11 +716,13 @@ export default function ApprovalsPage() {
               <div className="px-4 py-2 bg-red-50 border border-red-200 rounded-input text-sm text-red-700 font-medium flex items-center gap-3">
                 <span>{failedFeedback.text}</span>
                 <button
-                  onClick={() => handleRetry(failedFeedback.id)}
-                  disabled={retryLoading === failedFeedback.id}
+                  onClick={() => failedFeedback.reviewAgain
+                    ? handleAction(failedFeedback.id, failedFeedback.reviewAgain.action, failedFeedback.reviewAgain.editedPayload)
+                    : handleRetry(failedFeedback.id)}
+                  disabled={retryLoading === failedFeedback.id || actionLoading !== null}
                   className="px-3 py-1 min-h-[32px] rounded-lg bg-red-600 text-white hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
                 >
-                  {retryLoading === failedFeedback.id ? 'Försöker...' : 'Försök igen'}
+                  {retryLoading === failedFeedback.id ? 'Försöker...' : failedFeedback.reviewAgain ? 'Granska på nytt' : 'Försök igen'}
                 </button>
                 <button
                   onClick={() => setFailedFeedback(null)}
@@ -710,7 +740,7 @@ export default function ApprovalsPage() {
             ur samma lista som redan är hämtad. "Avklarade idag" utelämnas
             medvetet: den datan finns bara när "Hanterade"-fliken varit
             aktiv, och kravet är att aldrig fetcha mer för en siffra. */}
-        <div className="mt-4 flex gap-3">
+        {activeTab === 'pending' && !listError && !loading && <div className="mt-4 flex gap-3">
           <div className="bg-white border border-slate-200 rounded-card px-4 py-3 flex-1 sm:flex-none sm:min-w-[140px]">
             <div className="font-heading tabular-nums text-2xl font-bold text-slate-900">{pendingCount}</div>
             <div className="text-xs text-slate-500 mt-0.5">väntar nu</div>
@@ -721,7 +751,7 @@ export default function ApprovalsPage() {
               <div className="text-xs text-slate-500 mt-0.5">äldsta väntande</div>
             </div>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* Tabbar — segmenterad kontroll, offertytornas etablerade idiom
@@ -756,6 +786,11 @@ export default function ApprovalsPage() {
         </div>
       </div>
 
+      {listError && <div role="alert" className="mx-4 sm:mx-8 mb-4 p-4 rounded-xl bg-amber-50 text-amber-900">
+        <p>{listError}</p>
+        <button type="button" onClick={() => fetchApprovals()} className="mt-2 min-h-[44px] font-semibold">Försök hämta igen</button>
+      </div>}
+
       {/* Misslyckade utföranden (Fas 0-härdningen) — godkända rader vars
           exekvering gick fel, oavsett från vilken yta godkännandet gjordes.
           Renderas bara när sådana finns; annars noll visuellt brus. */}
@@ -764,15 +799,15 @@ export default function ApprovalsPage() {
           <div className="bg-white rounded-2xl border border-red-200 overflow-hidden">
             <div className="px-4 py-3 bg-red-50 border-b border-red-200">
               <p className="text-xs font-semibold uppercase tracking-wide text-red-700">
-                Godkända men ej utförda ({failedExecutions.length})
+                Åtgärder som behöver följas upp ({failedExecutions.length})
               </p>
               <p className="text-xs text-red-600 mt-0.5">
-                Du godkände dessa, men handlingen gick inte igenom — inget har skickats till kunden.
+                Dessa åtgärder slutfördes inte helt. Läs kvittensen innan du försöker igen; delar kan redan ha utförts.
               </p>
             </div>
             <div className="divide-y divide-red-100">
               {failedExecutions.map(item => {
-                const execResult = item.payload?.execution_result as { error_text?: string | null; outcome?: string } | undefined
+                const execResult = item.payload?.execution_result as { error_text?: string | null; outcome?: string; receipt?: { text: string; state: string } } | undefined
                 return (
                   <div key={item.id} className="px-4 py-3 flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -780,7 +815,7 @@ export default function ApprovalsPage() {
                       <p className="text-xs text-red-600 truncate">
                         {execResult?.outcome === 'retrying'
                           ? 'Omkörning avbröts — försök igen'
-                          : execResult?.error_text || 'Handlingen kunde inte utföras'}
+                          : execResult?.receipt?.text || execResult?.error_text || 'Handlingen kunde inte utföras'}
                       </p>
                     </div>
                     <button
@@ -804,7 +839,7 @@ export default function ApprovalsPage() {
           <div className="flex items-center justify-center py-16">
             <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
           </div>
-        ) : approvals.length === 0 ? (
+        ) : listError ? null : approvals.length === 0 ? (
           <div className="text-center py-20">
             <div className="w-16 h-16 bg-primary-50 rounded-card flex items-center justify-center mx-auto mb-4">
               <CheckCircle className="w-8 h-8 text-primary-700" />
@@ -852,6 +887,7 @@ export default function ApprovalsPage() {
                             <span className="font-semibold text-gray-900">{approval.title}</span>
                           </div>
                           <p className="text-sm text-gray-500">{approval.package_data.customer_name} · {approval.description}</p>
+                          <ApprovalHistoryReceipt approval={approval} onRetry={handleRetry} busy={retryLoading === approval.id} />
                         </div>
                         {approval.status === 'pending' && (
                           <span className="text-xs bg-primary-100 text-primary-700 px-2 py-1 rounded-full font-medium">
@@ -864,7 +900,7 @@ export default function ApprovalsPage() {
                             approval.status === 'rejected' ? 'bg-red-50 text-red-700' :
                             'bg-gray-100 text-gray-500'
                           }`}>
-                            {approval.status === 'approved' ? 'Godkänd' : approval.status === 'rejected' ? 'Avvisad' : 'Utgången'}
+                            {approval.status === 'approved' ? (classify(approval.approval_type) === 'INFORMATIONAL' ? 'Läst' : classify(approval.approval_type) === 'ACKNOWLEDGEMENT' ? 'Noterad' : 'Godkänd') : approval.status === 'rejected' ? 'Avvisad' : 'Utgången'}
                           </span>
                         )}
                       </div>
@@ -1025,9 +1061,9 @@ export default function ApprovalsPage() {
                                 ? 'bg-blue-50 text-blue-700'
                                 : 'bg-gray-100 text-gray-500'
                             }`}>
-                              {approval.status === 'approved' ? 'Godkänd' :
+                              {approval.status === 'approved' ? (classify(approval.approval_type) === 'INFORMATIONAL' ? 'Läst' : classify(approval.approval_type) === 'ACKNOWLEDGEMENT' ? 'Noterad' : 'Godkänd') :
                                approval.status === 'rejected' ? 'Avvisad' :
-                               approval.status === 'auto_approved' ? 'Auto-utförd' :
+                               approval.status === 'auto_approved' ? 'Automatiskt godkänd' :
                                'Utgången'}
                             </span>
                           )}
@@ -1045,6 +1081,7 @@ export default function ApprovalsPage() {
                         {approval.description && (
                           <p className="text-sm text-slate-500 mt-1">{approval.description}</p>
                         )}
+                        <ApprovalHistoryReceipt approval={approval} onRetry={handleRetry} busy={retryLoading === approval.id} />
                         {/* Visa offert-länk för quote-relaterade approvals */}
                         {QUOTE_RELATED_TYPES.includes(approval.approval_type) && (() => {
                           const quoteId = getQuoteId(approval)
@@ -1434,6 +1471,16 @@ export default function ApprovalsPage() {
                             {actionLoading === approval.id + 'approve' ? 'Markerar...' : 'Markera som läst'}
                           </button>
                         </>
+                      ) : ['INFORMATIONAL', 'ACKNOWLEDGEMENT'].includes(classify(approval.approval_type) || '') ? (
+                        <button
+                          onClick={() => handleAction(approval.id, 'approve')}
+                          disabled={actionLoading !== null}
+                          className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                          {actionLoading === approval.id + 'approve' ? 'Markerar...' :
+                            classify(approval.approval_type) === 'INFORMATIONAL' ? 'Markera som läst' : 'Notera påminnelsen'}
+                        </button>
                       ) : approval.approval_type === 'project_debrief' ? (
                         // Får INTE godkännas rakt av — knappen öppnar modalen
                         // med de korta frågorna. "Hoppa över" i modalen och

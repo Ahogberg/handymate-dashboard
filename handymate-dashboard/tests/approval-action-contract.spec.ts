@@ -199,7 +199,10 @@ test.describe('godkännandet ljuger aldrig om leveransen (2026-08-10)', () => {
     // Självreferensen: kortet skapades AV create_approval — att köra samma
     // action igen födde ett tomt "Godkännande krävs"-kort vid varje klick.
     const i = RUTT.indexOf("case 'automation':")
-    const gren = RUTT.slice(i, i + 2500)
+    const end = RUTT.indexOf("\n      case ", i + 1)
+    expect(i).toBeGreaterThanOrEqual(0)
+    expect(end).toBeGreaterThan(i)
+    const gren = RUTT.slice(i, end)
     expect(gren).toContain("actionType === 'create_approval'")
     const guard = gren.indexOf("actionType === 'create_approval'")
     const kor = gren.indexOf('runApprovedAutomationAction')

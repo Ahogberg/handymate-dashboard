@@ -10,13 +10,15 @@
 export async function fetchQuoteCreator(
   supabase: any,
   createdBy: string | null | undefined,
+  businessId?: string,
 ): Promise<{ name: string | null; phone: string | null; email: string | null } | null> {
   if (!createdBy) return null
-  const { data } = await supabase
+  let query = supabase
     .from('business_users')
     .select('name, phone, email')
     .eq('id', createdBy)
-    .maybeSingle()
+  if (businessId) query = query.eq('business_id', businessId)
+  const { data } = await query.maybeSingle()
   if (!data) return null
   return {
     name: data.name ?? null,

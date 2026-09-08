@@ -107,6 +107,7 @@ export async function sendInvoice(
     .select(`
       *,
       customer:customer_id (
+        business_id,
         name,
         phone_number,
         email,
@@ -122,6 +123,9 @@ export async function sendInvoice(
 
   if (invoiceError || !invoice) {
     return { found: false, errors: [] }
+  }
+  if (invoice.business_id !== businessId || (invoice.customer_id && invoice.customer?.business_id !== businessId)) {
+    return { found: true, errors: ['Fakturan eller kunden kunde inte verifieras i företaget. Ingen leverans eller Fortnox-synk gjordes.'] }
   }
 
   // Enat fakturautskick (2026-08-20): Fortnox-bokföring FÖRE
@@ -180,19 +184,22 @@ export async function sendInvoice(
   // Säkerställ kundportal aktiverad
   const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   let portalUrl = ''
-  if (invoice.customer_id) {
-    const { data: cust } = await supabase
+  if (invoice.customer_id && !results.einvoice) {
+    const { data: cust, error: customerError } = await supabase
       .from('customer')
       .select('portal_token, portal_enabled')
       .eq('customer_id', invoice.customer_id)
+      .eq('business_id', businessId)
       .single()
+    const syncReceipt = fortnoxResult.skipped ? 'Ingen Fortnox-synk gjordes.' : 'Fortnox-synken är klar.'
+    if (customerError || !cust) return { found: true, errors: [`${syncReceipt} Kundportalen kunde inte verifieras. Inget mejl eller SMS skickades.`] }
 
     if (cust?.portal_token && cust?.portal_enabled) {
       portalUrl = `${APP_URL}/portal/${cust.portal_token}?tab=invoices`
     } else {
       // Auto-skapa kundportal
       const newToken = randomUUID()
-      await supabase
+      let portalUpdate = supabase
         .from('customer')
         .update({
           portal_token: newToken,
@@ -200,6 +207,10 @@ export async function sendInvoice(
           portal_enabled: true,
         })
         .eq('customer_id', invoice.customer_id)
+        .eq('business_id', businessId)
+      portalUpdate = cust.portal_token == null ? portalUpdate.is('portal_token', null) : portalUpdate.eq('portal_token', cust.portal_token)
+      const { data: portalRows, error: portalError } = await portalUpdate.select('customer_id')
+      if (portalError || !portalRows?.length) return { found: true, errors: [`${syncReceipt} Portallänken kunde inte sparas. Inget mejl eller SMS skickades.`] }
       portalUrl = `${APP_URL}/portal/${newToken}?tab=invoices`
     }
   }
@@ -334,6 +345,8 @@ export async function sendInvoice(
       if (emailRes.error) {
         console.error('Email send rejected by Resend:', emailRes.error)
         results.errors.push(`Email: ${emailRes.error.message || 'avvisad av e-posttjänsten'}`)
+      } else if (!emailRes.data?.id) {
+        results.errors.push('Email: sändtjänsten gav ingen leveransreferens. Kontrollera leveransen före nytt försök.')
       } else {
         results.email = true
       }
@@ -443,6 +456,7 @@ export async function applyInvoiceDeliveryOutcome(
   params: InvoiceDeliveryOutcomeParams,
 ): Promise<InvoiceDeliveryOutcomeResult> {
   const { businessId, invoiceId, invoice, results, source = 'user' } = params
+  if (invoice.business_id !== businessId) throw new Error('Fakturan tillhör inte det aktuella företaget. Ingen kvittens skrevs.')
 
   if (results.email || results.sms || results.einvoice) {
     // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): sent_at/
@@ -454,14 +468,17 @@ export async function applyInvoiceDeliveryOutcome(
     // einvoice är alltid ensam (send-invoice.ts hoppar över email/sms-
     // blocken när den är satt) — behöver inget eget both-läge.
     const sentMethod = results.einvoice ? 'einvoice' : results.email && results.sms ? 'both' : results.email ? 'email' : 'sms'
-    const { error: statusErr } = await supabase
+    const { data: statusRows, error: statusErr } = await supabase
       .from('invoice')
       .update({ status: 'sent', sent_at: new Date().toISOString(), sent_method: sentMethod, delivery_status: 'delivered' })
       .eq('invoice_id', invoiceId)
+      .eq('business_id', businessId)
+      .select('invoice_id')
 
-    if (statusErr) {
+    if (statusErr || !statusRows?.length) {
       console.error('[invoices/send] Status update failed after send:', statusErr)
-      results.errors.push(`Status: ${statusErr.message}`)
+      const statusMessage = statusErr?.message || 'Ingen fakturarad uppdaterades efter utskicket. Skicka inte igen.'
+      results.errors.push(`Status: ${statusMessage}`)
       // Etapp P-härdning: felet svaldes tidigare (bara loggat till
       // console) trots att kunden FAKTISKT redan fått fakturan (email/sms
       // gick iväg innan detta steget). Gör det högt utan att ändra
@@ -471,7 +488,7 @@ export async function applyInvoiceDeliveryOutcome(
         supabase,
         businessId,
         'invoice-manifest:status-write-failed-after-delivery',
-        statusErr.message,
+        statusMessage,
         { invoiceId },
       )
     }
@@ -479,11 +496,13 @@ export async function applyInvoiceDeliveryOutcome(
     // Manifestet markeras levererat OAVSETT om statusskrivningen ovan
     // lyckades — leveransen (email/sms) skedde, och det är den sanningen
     // manifestet fryser. Best-effort, blockerar aldrig svaret.
-    await markInvoiceDelivered(supabase, {
+    const manifest = await markInvoiceDelivered(supabase, {
       businessId,
       invoiceId,
       method: sentMethod,
     })
+    if (!manifest.ok) results.errors.push(`Leveransunderlag: ${manifest.message}`)
+    else if (manifest.row.status === 'incomplete') results.errors.push('Utskicket är gjort men leveransunderlaget är ofullständigt.')
 
     // Logga aktivitet (customer_activity — gamla namnet activity fanns inte)
     // KÄLLGRANSKAT FYND (Golden Path Fas 2, 2026-08-13): activity_id och
@@ -496,7 +515,7 @@ export async function applyInvoiceDeliveryOutcome(
       .from('customer_activity')
       .insert({
         activity_id: 'act_' + Math.random().toString(36).substr(2, 9),
-        business_id: invoice.business_id,
+        business_id: businessId,
         customer_id: invoice.customer_id,
         activity_type: 'invoice_sent',
         title: `Faktura ${invoice.invoice_number} skickad`,
@@ -508,6 +527,7 @@ export async function applyInvoiceDeliveryOutcome(
       })
     if (activityErr) {
       console.error('[invoices/send] customer_activity insert failed:', activityErr)
+      results.errors.push('Fakturan skickades men kundhistoriken kunde inte sparas.')
     }
 
     return { delivered: true, sentMethod }
@@ -519,13 +539,15 @@ export async function applyInvoiceDeliveryOutcome(
   // delivery_status='delivery_failed' fångar exakt det tillståndet
   // (sql/v163) så en retry vet att bara göra om leveransen, aldrig
   // Fortnox-anropet.
-  const { error: deliveryStatusErr } = await supabase
+  const { data: deliveryRows, error: deliveryStatusErr } = await supabase
     .from('invoice')
     .update({ delivery_status: 'delivery_failed' })
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
-  if (deliveryStatusErr) {
+    .select('invoice_id')
+  if (deliveryStatusErr || !deliveryRows?.length) {
     console.error('[invoices/send] delivery_status write failed:', deliveryStatusErr)
+    results.errors.push('Utskicksförsökets status kunde inte sparas.')
   }
 
   return { delivered: false, sentMethod: null }

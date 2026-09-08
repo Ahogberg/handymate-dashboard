@@ -288,6 +288,12 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
  * Make an authenticated request to Fortnox API.
  * Loggar alla anrop till fortnox_api_log för debugging.
  */
+// Only raised before the resource request reaches fetch. Never use this for
+// network errors or HTTP responses, which may follow a committed mutation.
+export class FortnoxRequestNotSentError extends Error {
+  constructor(message: string) { super(message); this.name = 'FortnoxRequestNotSentError' }
+}
+
 export async function fortnoxRequest<T = unknown>(
   businessId: string,
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -307,7 +313,7 @@ export async function fortnoxRequest<T = unknown>(
       error_message: 'Fortnox not connected or token refresh failed',
       duration_ms: Date.now() - startTime,
     })
-    throw new Error('Fortnox not connected or token refresh failed')
+    throw new FortnoxRequestNotSentError('Fortnox not connected or token refresh failed')
   }
 
   const url = `${FORTNOX_API_BASE}${endpoint}`
@@ -664,7 +670,7 @@ export function fortnoxProjectNumberFor(projectNumber: string | null | undefined
 export async function syncProjectToFortnox(
   businessId: string,
   projectId: string,
-): Promise<{ success: boolean; skipped?: boolean; projectNumber?: string; error?: string }> {
+): Promise<{ success: boolean; skipped?: boolean; partial?: boolean; projectNumber?: string; error?: string }> {
   const supabase = getSupabase()
 
   try {
@@ -675,7 +681,7 @@ export async function syncProjectToFortnox(
 
     const { data: project, error: fetchError } = await supabase
       .from('project')
-      .select('project_id, name, project_number, start_date, end_date, status, fortnox_project_number')
+      .select('project_id, name, project_number, start_date, end_date, status, fortnox_project_number, source_lead_data')
       .eq('project_id', projectId)
       .eq('business_id', businessId)
       .single()
@@ -684,6 +690,10 @@ export async function syncProjectToFortnox(
     }
     if (project.fortnox_project_number) {
       return { success: true, projectNumber: project.fortnox_project_number }
+    }
+
+    if (project.source_lead_data?.created_from === 'reviewed_automation') {
+      return { success: false, skipped: true, error: 'project_requires_approval' }
     }
 
     const projectNumber = fortnoxProjectNumberFor(project.project_number)
@@ -700,7 +710,11 @@ export async function syncProjectToFortnox(
       Status: fortnoxProjectStatus(project.status),
     })
 
-    const { error: updateError } = await supabase
+    if (!created || typeof created.ProjectNumber !== 'string' || created.ProjectNumber !== projectNumber) {
+      return { success: false, partial: true, error: 'Fortnox-svaret saknar det begärda projektnumret. Synken måste stämmas av innan nytt försök.' }
+    }
+
+    const { data: updatedRows, error: persistenceError } = await supabase
       .from('project')
       .update({
         fortnox_project_number: created.ProjectNumber,
@@ -709,6 +723,20 @@ export async function syncProjectToFortnox(
       })
       .eq('project_id', projectId)
       .eq('business_id', businessId)
+      .is('fortnox_project_number', null)
+      .select('project_id, fortnox_project_number')
+
+    // Kontrollera lagrad koppling även när svaret från UPDATE förlorades.
+    let updateError: { message: string } | null = persistenceError
+    if (persistenceError || !updatedRows?.length) {
+      const verified = await supabase.from('project').select('fortnox_project_number')
+        .eq('project_id', projectId).eq('business_id', businessId).maybeSingle()
+      if (!verified.error && verified.data?.fortnox_project_number === created.ProjectNumber) {
+        updateError = null
+      } else {
+        updateError = persistenceError || { message: 'Den lokala projektkopplingen kunde inte verifieras.' }
+      }
+    }
 
     if (updateError) {
       try {
@@ -719,6 +747,7 @@ export async function syncProjectToFortnox(
       } catch { /* driftlarmet får aldrig fälla synken */ }
       return {
         success: false,
+        partial: true,
         projectNumber: created.ProjectNumber,
         error: `Projektet skapades i Fortnox (${created.ProjectNumber}) men numret kunde inte sparas lokalt: ${updateError.message}`,
       }

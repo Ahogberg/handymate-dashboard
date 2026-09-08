@@ -81,10 +81,10 @@ export function approvalPreview(approval: ApprovalLike): ApprovalPreview {
   }
 
   if (typeof pl.message === 'string' && pl.message) {
-    return { text: pl.message.slice(0, MAX_PREVIEW), source: 'message' }
+    return { text: pl.message, source: 'message' }
   }
   if (typeof pl.sms_text === 'string' && pl.sms_text) {
-    return { text: pl.sms_text.slice(0, MAX_PREVIEW), source: 'sms_text' }
+    return { text: pl.sms_text, source: 'sms_text' }
   }
 
   // Fakturapåminnelsen. Kräver att hela delivery-objektet finns — utan
@@ -92,7 +92,7 @@ export function approvalPreview(approval: ApprovalLike): ApprovalPreview {
   // kortet inte låtsas att texten är verksam.
   const sms = pl.delivery?.messages?.sms
   if (typeof sms === 'string' && sms && pl.delivery?.invoiceId) {
-    return { text: sms.slice(0, MAX_PREVIEW), source: 'delivery_sms' }
+    return { text: sms, source: 'delivery_sms' }
   }
 
   return { text: '', source: null }

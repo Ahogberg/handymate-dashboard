@@ -57,6 +57,15 @@ test.describe('sidoeffekter eldas på övergången, inte på statusen', () => {
     expect(eventBlock).toBeGreaterThan(compareAndSet)
   })
 
+  test('nya automationshandlingar blir egna godkännanden även vid intjänad autonomi', () => {
+    const command = kod(COMMAND)
+    const engine = kod('lib/automation-engine.ts')
+    expect(command).toContain('require_explicit_approval: true')
+    expect(engine).toContain('const forcedByParentReview = context.require_explicit_approval === true')
+    expect(engine).toContain('const needsApproval = forcedByParentReview ||')
+    expect(engine).toContain('if (needsApproval && !forcedByParentReview && autonomyKey)')
+  })
+
   test('four-eyes-grinden prövas bara på övergången', () => {
     const route = hanteraren()
     expect(route.indexOf('if (blirKlart)')).toBeLessThan(route.indexOf('completeProject('))

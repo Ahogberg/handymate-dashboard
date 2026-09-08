@@ -82,8 +82,14 @@ export default function CampaignsPage() {
         return <span className="px-2.5 py-1 text-xs rounded-full bg-primary-100 text-primary-600 border border-primary-600/30">Skickar...</span>
       case 'sent':
         return <span className="px-2.5 py-1 text-xs rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200">Skickad</span>
+      case 'partial':
+        return <span className="px-2.5 py-1 text-xs rounded-full bg-amber-100 text-amber-700 border border-amber-300">Delvis skickad</span>
+      case 'needs_reconciliation':
+        return <span className="px-2.5 py-1 text-xs rounded-full bg-red-50 text-red-700 border border-red-200" title="Kontrollera leverantören innan du skickar igen">Leverans måste kontrolleras</span>
+      case 'failed':
+        return <span className="px-2.5 py-1 text-xs rounded-full bg-red-50 text-red-700 border border-red-200">Misslyckad</span>
       default:
-        return null
+        return <span className="px-2.5 py-1 text-xs rounded-full bg-gray-100 text-gray-600 border border-gray-300">{status}</span>
     }
   }
 
