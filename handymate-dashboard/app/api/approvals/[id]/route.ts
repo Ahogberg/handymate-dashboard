@@ -2939,6 +2939,10 @@ async function executeApprovalPayload(
             note: 'Noterat. Ingenting skickades — kortet var en uppmaning till dig.',
           }
         }
+        if (actionType === 'update_status' && !pl.rule_action_config?.stage_key) {
+          const { executeAutomationStatus } = await import('@/lib/approvals/automation-status-review')
+          return await executeAutomationStatus(getServerSupabase(), businessId, reviewedPayload)
+        }
         if (actionType === 'schedule_followup') {
           const { executeAutomationFollowup } = await import('@/lib/approvals/automation-followup-review')
           return await executeAutomationFollowup(getServerSupabase(), businessId, approvalId, reviewedPayload)

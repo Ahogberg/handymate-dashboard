@@ -91,6 +91,9 @@ export function approvalReceipt(type: string, action: string, result: Record<str
   if (type === 'automation' && r.action_type === 'schedule_followup' && r.ok === true && r.inbox_item_id) {
     return { state: 'saved', text: `Uppföljningen finns i inkorgen: ${r.summary}. Ingen tidsstyrd påminnelse eller kundsändning skapades.` }
   }
+  if (type === 'automation' && r.action_type === 'update_status' && r.ok === true) {
+    return { state: 'saved', text: `Status för ${r.entity_id} är verifierad som ${r.new_status}.${r.already_current ? ' Värdet fanns redan; ingen ändring gjordes.' : ''} Inget utskick eller betalningsregistrering utfördes.` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true

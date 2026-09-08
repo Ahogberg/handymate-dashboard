@@ -544,13 +544,15 @@ async function handleUpdateStatus(
   const mapping = tableMap[entity]
   if (!mapping) return { success: false, error: `Okänd entitet: ${entity}` }
 
-  const { error } = await supabase
+  const { data: changed, error } = await supabase
     .from(mapping.table)
     .update({ [mapping.statusCol]: newStatus, updated_at: new Date().toISOString() })
     .eq(mapping.idCol, entityId)
     .eq('business_id', businessId)
+    .select(mapping.idCol)
 
   if (error) return { success: false, error: error.message }
+  if (!changed?.length) return { success: false, error: 'Ingen entitet uppdaterades i företaget.' }
   return { success: true, data: { entity, entity_id: entityId, new_status: newStatus } }
 }
 
@@ -977,6 +979,7 @@ export async function executeRule(
       ...(autonomyKey ? { autonomy_key: autonomyKey } : {}),
     }, typedRule.name)
 
+    const approvalStatus = approvalResult.success ? 'pending_approval' : 'failed'
     await logExecution(supabase, {
       businessId: typedRule.business_id,
       ruleId: typedRule.id,
@@ -984,14 +987,15 @@ export async function executeRule(
       triggerType: typedRule.trigger_type,
       actionType: typedRule.action_type,
       agentId: typedRule.agent_id ?? null,
-      status: 'pending_approval',
+      status: approvalStatus,
       context,
       result: approvalResult.data,
+      errorMessage: approvalResult.error,
       approvalId: approvalResult.data?.approval_id as string,
     })
-    await updateRuleStats(supabase, typedRule.id, 'pending_approval')
+    await updateRuleStats(supabase, typedRule.id, approvalStatus)
 
-    return { status: 'pending_approval', data: approvalResult.data }
+    return { status: approvalStatus, data: approvalResult.data, error: approvalResult.error }
   }
 
   // 7. Execute action. Stämpla rule_action_type på en lokal kopia (inte

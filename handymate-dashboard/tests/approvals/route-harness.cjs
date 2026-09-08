@@ -34,6 +34,10 @@ const db = { from(table) {
       if (table === 'leads') {
         const wanted = filters.find(([key]) => key === 'lead_id')?.[1]
         const wantedBusiness = filters.find(([key]) => key === 'business_id')?.[1]
+        if (operation === 'update') {
+          if (!matches(leadRow)) return resolve({ data: [], error: null })
+          Object.assign(leadRow, structuredClone(values)); return resolve({ data: [{lead_id:leadRow.lead_id}], error:null })
+        }
         return resolve({ data: (!wanted || leadRow?.lead_id === wanted) && (!wantedBusiness || leadRow?.business_id === wantedBusiness) ? structuredClone(leadRow) : null, error:null })
       }
       if (table === 'quotes') return resolve({ data: structuredClone(quoteRow), error:null })
@@ -114,6 +118,12 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal(followupResult.receipt.state,'saved',JSON.stringify(followupResult)); assert.equal(inboxItems.size,1)
   assert(followupResult.receipt.text.includes('Ny kundtext')); assert.equal(automationCalls.length,0)
   assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(followupResult.receipt))
+  reset(); row.approval_type='automation'; row.payload={entity_id:'l-site',rule_action_type:'update_status',rule_action_config:{entity:'lead',new_status:'contacted'}}
+  const statusPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0); assert(statusPreview.review.details.some(d=>d.label==='Önskad status'&&d.text==='contacted'))
+  const statusResult=await (await post({action:'approve',review_token:statusPreview.review_token})).json()
+  assert.equal(statusResult.receipt.state,'saved',JSON.stringify(statusResult)); assert.equal(leadRow.status,'contacted'); assert.equal(automationCalls.length,0)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(statusResult.receipt))
   reset(); row.approval_type='confirm_payment'; row.payload={invoice_id:'inv1',invoice_number:'1001',customer_id:'c-site',total:10000}
   let paymentPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(paymentPreview.review.choices.length,3); assert(paymentPreview.review.details.some(d=>d.label==='Registreras som betalt'&&d.text==='7 000 kr'))
