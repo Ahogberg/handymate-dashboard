@@ -20,19 +20,20 @@ export async function GET(request: NextRequest) {
     if (!doc) return NextResponse.json({ error: 'Dokumentet kunde inte hittas' }, { status: 404 })
     let items = Array.isArray(doc.items) ? doc.items : []
     if (kind === 'quote') {
-      const result = await db.from('quote_items').select('description, quantity, unit, unit_price, total, item_type').eq('business_id', business.business_id).eq('quote_id', id).order('sort_order')
+      const result = await db.from('quote_items').select('description, quantity, unit, unit_price, total, item_type, option_selected, is_hidden').eq('business_id', business.business_id).eq('quote_id', id).order('sort_order')
       if (result.error) return NextResponse.json({ error: 'Kunde inte läsa dokumentraderna' }, { status: 500 })
       items = result.data?.length ? result.data : items
     }
     const customer = doc.customer_id ? await db.from('customer').select('name').eq('business_id', business.business_id).eq('customer_id', doc.customer_id).maybeSingle() : null
     if (customer?.error) return NextResponse.json({ error: 'Kunde inte läsa kunden' }, { status: 500 })
-    const numeric = (value: unknown) => value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value)) ? Number(value) : null
+    const numeric = (value: unknown) => (typeof value === 'number' || (typeof value === 'string' && value.trim() !== '')) && Number.isFinite(Number(value)) ? Number(value) : null
     return NextResponse.json({ document: {
       kind, id, title: kind === 'quote' ? (doc.title || 'Offert') : `Faktura ${doc.invoice_number || ''}`.trim(),
       number: doc[key.replace('_id', '_number')] || null, status: doc.status || null, customer: customer?.data?.name || null,
       date: kind === 'quote' ? doc.valid_until : doc.due_date,
-      amounts: ['subtotal', 'discount_amount', 'vat_amount', 'total', 'rot_rut_deduction', 'rot_deduction', 'rut_deduction', 'customer_pays'].map(name => ({ name, value: numeric(doc[name]) })),
-      items: items.map((item: any) => ({ description: String(item.description || ''), quantity: numeric(item.quantity), unit: item.unit || '', unit_price: numeric(item.unit_price), total: numeric(item.total), type: item.item_type || 'item' })),
+      terms: ['introduction_text', 'conclusion_text', 'payment_terms'].flatMap(name => typeof doc[name] === 'string' && doc[name].trim() ? [{ name, text: doc[name] }] : []),
+      amounts: ['subtotal', 'discount_amount', 'vat_amount', 'total', 'rot_rut_deduction', 'rot_deduction', 'rut_deduction', 'customer_pays', 'reminder_fee', 'penalty_interest'].map(name => ({ name, value: numeric(doc[name]) })),
+      items: items.map((item: any) => ({ description: String(item.description || ''), quantity: numeric(item.quantity), unit: item.unit || '', unit_price: numeric(item.unit_price), total: numeric(item.total), type: item.item_type || 'item', option_selected: item.item_type === 'option' ? item.option_selected === true : null, hidden: item.is_hidden === true })),
     } })
   } catch { return NextResponse.json({ error: 'Kunde inte läsa dokumentet' }, { status: 500 }) }
 }
