@@ -460,3 +460,12 @@ Begränsning: detta är läsvyer av aktuellt sparat underlag, inte full PDF-/ver
 ### Dokumentens specialrader — 8 september
 Native läsvyer skiljer nu rubrik/text från prisrader, markerar ej valda tillval och kunddolda rader samt visar sparade textvillkor, påminnelseavgift och räntesats i procent. Saknade huvudtotaler visas som Saknas; ogiltiga booleska belopp omvandlas inte till 0/1. Summor beräknas inte på nytt.
 Server- och komponentprov täcker tillval/dold rad, villkor, noll/saknat/ogiltigt belopp och procentsats. Det är fortsatt läsning av aktuellt underlag; exakt PDF, mottagarkuvert och versionsbundet utskicksbeslut återstår. Detta steg öppnar ingen tidigare spärrad sändväg och är inget iPhone-slutprov.
+
+### Liveprov 8 september — förberedelse och faktisk blockering
+77 typer registrerade i `docs/audits/approval-live-2026-09-08.md`. Första seedfilen `sql/approval_live_ack_batch_20260908.sql` innehåller 19 syntetiska läskvittenser, inte fullständiga producent-/händelseunderlag. Inga kort är livegodkända.
+
+Färska läskontroller: TEST Rollprov A/B finns i Handymates produktionsprojekt, is_demo_tenant=false, inga telefonnummer/kalendrar och noll aktiva v3-regler. Inga användartriggers på pending_approvals. Supabase har ingen utvecklingsbranch. PR-head 7377b9f8 har grön Vercel-status och previewn öppnar inloggningen; ingen autentiserad testsession finns i webbläsaren.
+
+Försöket att skapa första batchen avvisades av automatisk säkerhetsgranskning eftersom målet är produktionsdatabasen och tidigare uppdrag förbjuder produktionsmutationer. Efterkontroll gav noll rader med test_run=approval-live-20260908. Seedfilen är alltså INTE körd. Byt inte demo-flagga eller exekveringsväg för att kringgå avvisningen. Fortsättning: uttryckligt avgränsat godkännande av testdataskrivningar i biz_rollprov_a, alternativt separat godkänd testdatabas. Därefter säker browserAuth-inloggning och första klickbatchen. Externa handlingskort får inga aktiva mottagare utan verifierad testtransport. Alla 77 kompletta fixtures, varianter och native-prov återstår. Build 12 oförändrad.
+
+PR-kommentar från 8 september beskriver separat massutskicksgrind på main d560adba och kommande kompatibilitetsbehov med confirm_recipients/HTTP 428. Bevara den vid framtida integration; main och preview får inte räknas som samma version.
