@@ -1447,3 +1447,13 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 - [x] Testa stängning, kontobyte, tappat svar, datum och återförsök utan dubbelregistrering.
 - [x] Verifiera integrerad backend samt mobilens fulla typkontroll och Expo-paketering där byggmiljön tillåter.
 - [ ] Publicera draft-underlag med exakt version, flaggor och morgondagens iPhone-/inlämningsgrind.
+
+## Isolerad testmiljö 2026-09-08
+- [x] Kontrollera integrationskandidater och välj isolerad Supabase-gren.
+- [x] Återställ datalös schemabas med 10/10 identiska fingeravtryck.
+- [x] Migrera rapportkedja/uppföljning och verifiera RLS, RPC, kvittenser och riktig cron.
+- [x] Spara granskbara SQL-skript och resultat; inga produktionsändringar eller utskick.
+- [ ] Slutför Vercel-inloggning, koppla testvariabler och skapa Auth-testkonton.
+- [ ] Verifiera HTTP-flödet, EAS/Apple-signering och verkliga iPhone-prov.
+
+Review: docs/handoffs/VISION_TEST_ENVIRONMENT_2026-09-08.md. Databasproven passerade; Vercel nekade GitHub-inloggningen. Native/API-acceptans återstår.
