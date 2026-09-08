@@ -207,6 +207,40 @@ const post = body => POST({ json: async () => body, headers: new Headers() }, { 
   assert.equal((await assignment(db,'b1',dispatchPayload)).ok,false);assert.equal(dispatchWrites,2)
   loseDispatch=false
   console.log('PASS dispatch booking route: signed preview, stale decision denied, persisted original plan, failed write, lost-response retry, durable receipt, no repeated success write or newer assignment overwrite')
+  for (const previous of [null, { name: 'Previous member', id: 'previous' }]) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'active1',member_id:'member1'}
+    bookingRows=[{booking_id:'active1',business_id:'b1',assigned_to:previous?.name??null,assigned_user_id:previous?.id??null,status:'confirmed',job_status:'scheduled',notes:'Active assignment test',scheduled_start:'2026-09-12T10:00:00Z',scheduled_end:'2026-09-12T11:00:00Z'}]
+    const original=structuredClone(bookingRows[0])
+    const preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    assert.equal(preview.review.confirmLabel,'Spara tilldelningen')
+    assert(preview.review.details.some(d=>d.label==='Uppdragets status'&&d.text==='Bekräftad'))
+    assert(preview.review.details.some(d=>d.label==='Nuvarande tilldelning'&&d.text===(previous?.name||'Ingen')))
+    assert.deepEqual(bookingRows[0],original);assert.equal(dispatchWrites,0)
+    const outcome=await (await post({action:'approve',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'saved',JSON.stringify(outcome))
+    assert.equal(dispatchWrites,1);assert.equal(bookingRows[0].assigned_to,'Erik');assert.equal(bookingRows[0].assigned_user_id,'member1')
+    for (const key of ['status','job_status','scheduled_start','scheduled_end']) assert.equal(bookingRows[0][key],original[key])
+    assert.deepEqual(row.payload.execution_result.receipt,outcome.receipt)
+    assert.equal(row.payload.execution_result.review_evidence.dispatchPlan.before.assigned_user_id,previous?.id??null)
+    assert.equal(smsDeliveries.length,0);assert.equal(bookingPosts.length,0);assert.equal(automationCalls.length,0)
+  }
+  for (const change of ['assignment','status','time','role']) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'active1',member_id:'member1'}
+    bookingRows=[{booking_id:'active1',business_id:'b1',assigned_to:null,assigned_user_id:null,status:'confirmed',job_status:'scheduled',notes:'Active assignment test',scheduled_start:'2026-09-12T10:00:00Z',scheduled_end:'2026-09-12T11:00:00Z'}]
+    const preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    if(change==='assignment') Object.assign(bookingRows[0],{assigned_to:'Concurrent member',assigned_user_id:'concurrent'})
+    if(change==='status') bookingRows[0].status='cancelled'
+    if(change==='time') bookingRows[0].scheduled_start='2026-09-12T10:30:00Z'
+    if(change==='role') canAct=false
+    const changed=structuredClone(bookingRows[0])
+    const result=await post({action:'approve',review_token:preview.review_token})
+    assert.equal(result.status,change==='role'?403:428,change)
+    assert.equal(dispatchWrites,0,change);assert.deepEqual(bookingRows[0],changed)
+    assert.equal(row.status,'pending');assert.equal(smsDeliveries.length,0)
+  }
+  console.log('PASS active booking dispatch: new/replaced assignment preserves lifecycle and time; changed assignment/status/time or denied role blocks stale approval without effects (isolated DB)')
   reset();row.approval_type='tidrapport_forslag';row.payload={project_id:'p1',booking_date:'2026-02-31',suggested_minutes:75}
   let timePreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(timeInserts,0);assert(!timePreview.review?.canExecute)
