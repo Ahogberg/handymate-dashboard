@@ -307,7 +307,7 @@ export async function POST(
     // Massutskick (beslut Andreas 2026-09-08): fler än en mottagare kräver
     // bekräftat antal efter att texten visats — före statusändring och
     // exekvering, oavsett klient. Se lib/approvals/massutskick.ts.
-    if (action === 'approve' || action === 'edit') {
+    if (['approve', 'edit'].includes(action)) {
       const mass = massutskickAvKort(approval.approval_type, finalPayload as Record<string, unknown>)
       if (mass && !massutskickBekraftat(body, mass)) {
         return NextResponse.json(massutskickSvar(mass, approval.approval_type), { status: MASSUTSKICK_STATUS })

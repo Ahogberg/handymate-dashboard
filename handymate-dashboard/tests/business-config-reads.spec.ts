@@ -102,6 +102,10 @@ const VISNINGSYTOR = [
   'app/dashboard/settings/phone/page.tsx',
   'app/dashboard/settings/quote-style/page.tsx',
   'app/dashboard/settings/website-widget/page.tsx',
+  // Yta 5 (bokningsflödet i hantverkarens varumärke, 2026-09-07): kundvyns
+  // inställningar och bokningslänkskortet visar firmans branding — ren visning.
+  'app/dashboard/settings/kundvy/page.tsx',
+  'components/settings/kundvy/BookingLinkCard.tsx',
   // Månadsrapportens målblock — ren visning. Om konfigurationen inte kan
   // läsas utelämnas blocket och felet loggas; inget dokument produceras.
   'components/value/MalBlock.tsx',

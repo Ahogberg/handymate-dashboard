@@ -78,8 +78,14 @@ test.describe('Godkännanden — Command Center-reskin', () => {
     // handleAutopilotApprove x1 var). "Avklarade idag" hade krävt ett
     // sjunde — den tilen är därför medvetet UTELÄMNAD (se filhuvudet i
     // page.tsx), och stat-tiles-blocket läser bara redan hämtad `approvals`.
+    // 2026-09-08: handleAction/submitDebrief/handleAutopilotApprove går genom
+    // postKortbeslut (massutskicksgrinden, lib/approvals/klient-bekraftelse.ts)
+    // — kvar som direkta fetchar: fetchApprovals x2 + handleRetry. Fortfarande
+    // ingen fetch för stat-tiles.
     const fetchCalls = source.match(/fetch\(`\/api\/approvals/g) || []
-    expect(fetchCalls.length).toBe(6)
+    const viaHjalparen = source.match(/postKortbeslut\(/g) || []
+    expect(fetchCalls.length).toBe(3)
+    expect(viaHjalparen.length).toBe(3)
     expect(source).toContain('väntar nu')
     expect(source).toContain('äldsta väntande')
     expect(source).not.toContain('avklarade idag')

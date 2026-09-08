@@ -63,7 +63,7 @@ test.describe('rutten grindar före statusändring och exekvering', () => {
     expect(src.slice(grind, grind + 400)).toMatch(/massutskickBekraftat\(body, mass\)/)
   })
   test('grinden gäller approve och edit', () => {
-    expect(src).toMatch(/if \(action === 'approve' \|\| action === 'edit'\) \{\s*const mass = massutskickAvKort/)
+    expect(src).toMatch(/if \(\['approve', 'edit'\]\.includes\(action\)\) \{\s*const mass = massutskickAvKort/)
   })
 })
 

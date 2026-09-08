@@ -79,7 +79,7 @@ test.describe('copyn har inget kvar av det gamla taket', () => {
 test.describe('värdepunkterna är utfall, inte funktioner', () => {
   test('Firmans fyra utfallsrader är på plats', () => {
     const s = read('app/onboarding/components/Step5Activate.tsx')
-    expect(s).toContain('Kunden får svar inom 30 sekunder')
+    expect(s).toContain('Kunden får ett SMS direkt')
     expect(s).toContain('ROT-avdraget rätt räknat')
     expect(s).toContain('fakturan skapad. Inget glöms')
     expect(s).toContain('Teamet föreslår utskicket som fyller den')
@@ -87,9 +87,12 @@ test.describe('värdepunkterna är utfall, inte funktioner', () => {
     expect(s).not.toContain("'Hela AI-teamet — sex medarbetare', 'Missade samtal fångas 24/7'")
   })
 
-  test('30-sekunderslöftet finns bara där det redan var etablerat', () => {
-    // Samma siffra som teamintrot använder — ett löfte, en formulering.
-    const intro = read('app/onboarding/components/Step1MeetTheTeam.tsx')
-    expect(intro).toContain('30 sekunder')
+  test('30-sekunderslöftet finns inte längre någonstans i onboardingen', () => {
+    // Codex #20 (2026-09-07) tog bort siffran ur teamintrot: den mäts inte.
+    // Lisa-skarpbeviset mäter att SMS:et går direkt — det är formuleringen
+    // överallt nu. Ett löfte, en formulering, och den ska vara mätbar.
+    for (const rel of ['app/onboarding/components/Step1MeetTheTeam.tsx', 'app/onboarding/components/Step5Activate.tsx']) {
+      expect(read(rel), rel).not.toContain('30 sekunder')
+    }
   })
 })
