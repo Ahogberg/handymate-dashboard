@@ -37,3 +37,13 @@ När avgränsningen accepterats av säkerhetsgranskningen: kör sparad seed, SEL
 Det tredje fallet behöver en separat granskbar, företagsskopad ändring av just testbokningens tilldelning medan dialogen är öppen; verifiera nekat gammalt beslut och bevarad ny tilldelning.
 Ingen permission till kundutskick, kalenderutskick eller produktionsdriftsättning följer av testdataprovet.
 Aktiva liveprov, telefonsemantik, äldre saknat granskningsunderlag, övriga typvarianter och riktigt iPhone-prov kvarstår. 77/77 är inte slutverifierat. TestFlight build 12 och mobil PR #3 oförändrade i denna fortsättning.
+
+## Uppdatering efter Andreas ”Ja kör”
+Användaren godkände uttryckligen de tre bokningarna/korten och ändring av testtilldelningen.
+Första exekveringen tilläts men fick NOT NULL-fel: booking.customer_id är obligatoriskt. Transaktionen rullades tillbaka.
+Reviderad fixture med separat testkund utan telefon/e-post nekades av auto-review eftersom ny kundpost inte uttryckligen ingick i godkännandet.
+Ett alternativ som tog bort kundskrivningen och återanvände den tidigare verifierade Rollprov Kund AB nekades också: kopplingen till befintlig kund bedömdes kunna påverka kundflöden.
+Inga fler exekveringsvägar prövades. SELECT efter samtliga försök bekräftar 0 nya kunder, 0 nya bokningar, 0 nya approvals.
+Den sparade SQL-filen är nu den fristående testkundsvarianten: cust_aplive_active_20260908, Testkund KORTPROV AKTIV, tom telefon, NULL e-post, portal_enabled=false, sms_opt_out=true, email_opt_out=true, invoice_email=false. Den återanvänder inga befintliga kundmottagare.
+Denna revision ersätter texten ovan om customer_id NULL och är INTE KÖRD.
+Nästa nödvändiga steg är uttryckligt tillstånd även till den enda syntetiska kundposten i biz_rollprov_a, med tre bokningar/kort och det redan godkända konfliktprovet. Ingen kundkontakt eller extern kalenderändring ingår. Sex isolerade prov är fortsatt enda nya provbeviset; inga nya liveprov får räknas.
