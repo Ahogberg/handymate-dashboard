@@ -204,3 +204,173 @@ test.describe('R1/R2 — rutterna grindar innan de läser eller raderar', () => 
     expect(del.slice(grind, grind + 200)).toMatch(/status: 403/)
   })
 })
+
+// Kör den riktiga list-handlern: källskanning ensam missade null-luckan.
+import ts from 'typescript'
+import { NextRequest } from 'next/server'
+import { hasPermission } from '../lib/permissions'
+import * as ekonomiprojektion from '../lib/projects/ekonomiprojektion'
+
+function projektlista(actor: BusinessUser | null, impersonation = false) {
+  const operations: any[] = []
+  const scopes: unknown[] = []
+  const rows = [
+    { project_id: 'p1', business_id: 'biz-a', name: 'Tilldelat', budget_amount: 120000, budget_hours: 40, actual_labor_cost: 4321, actual_material_cost: 8765, profitability_status: 'over_budget' },
+    { project_id: 'p2', business_id: 'biz-a', name: 'Otilldelat', budget_amount: 90000 },
+  ]
+  const db = { from(table: string) {
+    operations.push([table, 'from'])
+    const filters: Array<[string, string, any]> = []
+    const q: any = { then(resolve: any) {
+      let data: any[] = table === 'project' ? rows : table === 'project_assignment' ? [{ project_id: 'p1' }] : []
+      if (table === 'project') for (const [method, column, value] of filters) {
+        if (method === 'eq') data = data.filter(row => row[column] === value)
+        if (method === 'in') data = data.filter(row => value.includes(row[column]))
+      }
+      return Promise.resolve({ data, error: null }).then(resolve)
+    } }
+    for (const method of ['select', 'eq', 'in', 'order', 'not', 'limit', 'lte', 'neq', 'or']) {
+      q[method] = (...args: any[]) => { operations.push([table, method, ...args]); filters.push([method, args[0], args[1]]); return q }
+    }
+    return q
+  } }
+  const mocks: Record<string, any> = {
+    '@/lib/auth': { getAuthenticatedBusiness: async () => ({ business_id: 'biz-a', ...(impersonation ? { _impersonation: { admin_user_id: 'verified-admin', admin_email: 'support@example.com' } } : {}) }) },
+    '@/lib/supabase': { getServerSupabase: () => db },
+    '@/lib/permissions': { getCurrentUser: async (_request: NextRequest, businessId?: string) => { scopes.push(businessId); return actor }, hasPermission },
+    '@/lib/projects/ekonomiprojektion': ekonomiprojektion,
+    '@/lib/projects/derive-lifecycle': { deriveProjectLifecycle: () => ({}) },
+    '@/lib/projects/derive-dates': { deriveProjectDates: () => ({ is_late: false }) },
+    '@/lib/projects/derive-todo': { deriveProjectTodo: () => ({}) },
+    '@/lib/project-stages/stages': { getSystemStage: () => null, PROJECT_SYSTEM_STAGES: [] },
+  }
+  const output = ts.transpileModule(read('app/api/projects/route.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+  const api: Record<string, any> = {}
+  new Function('require', 'exports', output)((id: string) => id in mocks ? mocks[id] : id.startsWith('@/') ? {} : require(id), api)
+  return { api, operations, scopes }
+}
+
+test.describe('Projektlistan — riktiga handlerns identitetsgräns', () => {
+  for (const suffix of ['', '?include=workflow', '?status=active']) {
+    test(`saknad aktiv medlem nekas före dataläsning ${suffix}`, async () => {
+      const { api, operations } = projektlista(null)
+      const res = await api.GET(new NextRequest(`https://test/api/projects${suffix}`))
+      expect(res.status).toBe(403)
+      expect(operations).toEqual([])
+      expect(await res.json()).not.toHaveProperty('projects')
+    })
+  }
+
+  test('förfalskad impersoneringscookie ger inte ett serververifierat undantag', async () => {
+    const { api, operations } = projektlista(null)
+    const res = await api.GET(new NextRequest('https://test/api/projects', { headers: { cookie: 'hm_impersonate=biz-a' } }))
+    expect(res.status).toBe(403)
+    expect(operations).toEqual([])
+  })
+
+  test('serververifierad impersonering kan läsa målföretaget utan medlemsrad', async () => {
+    const { api, operations } = projektlista(null, true)
+    const res = await api.GET(new NextRequest('https://test/api/projects'))
+    expect(res.status).toBe(200)
+    expect((await res.json()).projects[0].budget_amount).toBe(120000)
+    expect(operations).toContainEqual(['project', 'eq', 'business_id', 'biz-a'])
+  })
+
+  for (const role of ['owner', 'admin', 'project_manager']) {
+    test(`${role} med behörighet får alla projekt och ekonomi`, async () => {
+      const { api, scopes } = projektlista(anvandare(role, { can_see_all_projects: true, can_see_financials: true }))
+      const res = await api.GET(new NextRequest('https://test/api/projects'))
+      const body = await res.json()
+      expect(res.status).toBe(200)
+      expect(body.projects).toHaveLength(2)
+      expect(body.projects[0].actual_labor_cost).toBe(4321)
+      expect(scopes).toEqual(['biz-a'])
+    })
+  }
+
+  test('tilldelad anställd ser bara P1 och inga budget-/kostnadsfält', async () => {
+    const { api, operations } = projektlista(anvandare('employee'))
+    const res = await api.GET(new NextRequest('https://test/api/projects?include=workflow'))
+    const body = await res.json()
+    expect(res.status).toBe(200)
+    expect(body.projects.map((p: any) => p.project_id)).toEqual(['p1'])
+    for (const field of [...ekonomiprojektion.PROJEKT_EKONOMIFALT, 'actual_amount']) {
+      expect(body.projects[0]).not.toHaveProperty(field)
+    }
+    expect(body.projects[0].name).toBe('Tilldelat')
+    expect(operations).toContainEqual(['project_assignment', 'eq', 'business_user_id', 'bu-1'])
+    expect(operations).toContainEqual(['project_assignment', 'eq', 'business_id', 'biz-a'])
+  })
+
+  test('projektlistan är dynamisk så auth-svar inte fryses i Full Route Cache', () => {
+    const { api } = projektlista(null)
+    expect(api.dynamic).toBe('force-dynamic')
+  })
+})
+
+// Hela auth-helpern med serverns getUser-svar som gräns. Ger inga konton
+// superadmin i produktion; verifierar hur ett serververifierat svar används.
+function authHelper(serverUser: Record<string, any> | null) {
+  const superCode = ts.transpileModule(read('lib/auth/superadmin.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+  const superExports: Record<string, any> = {}
+  new Function('require', 'exports', superCode)(require, superExports)
+  const db = {
+    auth: { getUser: async () => ({ data: { user: serverUser }, error: serverUser ? null : new Error('invalid token') }) },
+    from(table: string) {
+      const filters: Record<string, any> = {}
+      const q: any = {
+        select: () => q,
+        eq: (key: string, value: any) => { filters[key] = value; return q },
+        single: async () => ({ data: table === 'business_config'
+          ? filters.business_id === 'biz-a' ? { business_id: 'biz-a' }
+            : filters.user_id === 'auth-b' ? { business_id: 'biz-b' } : null
+          : null, error: null }),
+      }
+      return q
+    },
+  }
+  const code = ts.transpileModule(read('lib/auth.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText
+  const api: Record<string, any> = {}
+  const mocks: Record<string, any> = {
+    '@supabase/supabase-js': { createClient: () => db },
+    '@/lib/auth/superadmin': superExports,
+    './feature-gates': {},
+  }
+  new Function('require', 'exports', 'setInterval', code)((id: string) => mocks[id] ?? require(id), api, () => 0)
+  return api
+}
+
+test.describe('Impersonering — verklig auth-helper med isolerad Supabase-gräns', () => {
+  const baseUser = { id: 'auth-b', email: 'roll-test@example.com', app_metadata: {}, user_metadata: {} }
+  const request = () => new NextRequest('https://test/api/projects', {
+    headers: { authorization: 'Bearer synthetic-test-token', cookie: 'hm_impersonate=biz-a' },
+  })
+
+  test('ogiltig session nekas även med impersoneringscookie', async () => {
+    expect(await authHelper(null).getAuthenticatedBusiness(request())).toBeNull()
+  })
+
+  test('vanlig medlem kan inte byta företag med cookie', async () => {
+    const result = await authHelper(baseUser).getAuthenticatedBusiness(request())
+    expect(result.business_id).toBe('biz-b')
+    expect(result._impersonation).toBeUndefined()
+  })
+
+  test('användarredigerbar user_metadata ger aldrig superadmin', async () => {
+    const result = await authHelper({ ...baseUser, user_metadata: { is_superadmin: true } }).getAuthenticatedBusiness(request())
+    expect(result.business_id).toBe('biz-b')
+    expect(result._impersonation).toBeUndefined()
+  })
+
+  test('serververifierad app_metadata krävs för att byta till målföretaget', async () => {
+    const result = await authHelper({ ...baseUser, app_metadata: { is_superadmin: true } }).getAuthenticatedBusiness(request())
+    expect(result.business_id).toBe('biz-a')
+    expect(result._impersonation).toEqual({ admin_user_id: 'auth-b', admin_email: baseUser.email })
+  })
+})

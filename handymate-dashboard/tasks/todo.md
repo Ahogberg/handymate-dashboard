@@ -1,3 +1,24 @@
+## Fortsatta rollprov (Codex 2026-09-07)
+
+- [x] Liveprov med väntande admininbjudningstoken: owner/admin ser token; PM/anställda får null och invite_pending; B ser inte A. Fixture återställd, ingen kommunikation.
+- [x] Förfalskad impersoneringscookie från owner-b ger bara tom egen lista och 404 på A:s P1.
+- [x] Verkliga auth-helpern med isolerad Supabase-gräns: ogiltig session, vanlig cookie, user_metadata-förfalskning och verifierad app_metadata.
+- [x] Rätta CI-fyndet på kundens offertsida: återställ att startveckor är önskemål, inte bokad tid.
+- [x] Hela kontraktssviten: 1 726 godkända, ett sedan tidigare uttryckligen skippat fakturaprov; 17/17 kundunderlagsprov. Typkontroll exit 0.
+- [ ] Preview-liveprov: blockerade av automatisk säkerhetsgranskning (sessioner till separat destination) samt Vercel-inloggningsskydd.
+- [ ] Positiv superadmin-liveimpersonering: tillfällig privilegiehöjning av testkonto blockerades av automatisk säkerhetsgranskning; inga rättigheter sattes.
+- [ ] Webb-/mobilklickprov: kräver säker webbläsarinloggning; den nuvarande webbläsaren står utloggad.
+
+Slutkontroll: sju aktiva rollprovskonton, noll väntande testtoken, owner-b saknar superadminflagga, P3 kvar. Previewanrop eller det nekade höjningsförsöket räknas inte som godkända tester. Rättningen i PR #24 är inte driftsatt i produktion.
+
+## Projektlistans rollgräns (Codex 2026-09-07)
+
+- [x] Regressioner i riktiga GET-handlern: null-identitet, impersonering, roller och ekonomifält.
+- [x] Neka saknad medlem utan serververifierad impersonering, scopea medlemsuppslag och maskera samtliga projektkostnader.
+- [x] Typkontroll, riktade testfall och produktionsbygge; dokumentera kvarvarande live-/UI-prov.
+- [x] Separat branch och granskbar PR, ingen direkt push till main.
+
+Review: 9 röda regressioner före fix; 60/60 riktade handler-/behörighetsprov gröna efter fix. `npx tsc --noEmit` exit 0. `npm run build` exit 0 (varningar och Supabase-konfigurationsfel loggas av andra rutter under statisk generering; ingen produktionskonfiguration användes). Lint saknar konfiguration och öppnar setup, därför ej verifierad. Liveprov av driftsatt rättning, aktiv inbjudningstoken och webb-/mobilvyer återstår.
 # Varumärkeslagret för kundmail — I PROD 2026-09-07 (Claude, abb215fa)
 
 Andreas: "vi hjälper dom också att se mer professionella ut" → Design-

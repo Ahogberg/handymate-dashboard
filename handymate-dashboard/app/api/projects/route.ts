@@ -11,6 +11,7 @@ import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
 import { deriveProjectDates } from '@/lib/projects/derive-dates'
 import { deriveProjectTodo } from '@/lib/projects/derive-todo'
 import { getSystemStage, PROJECT_SYSTEM_STAGES } from '@/lib/project-stages/stages'
+import { PROJEKT_EKONOMIFALT, utanFalt } from '@/lib/projects/ekonomiprojektion'
 
 // completeProject → autoInvoiceOnComplete kan nu (Etapp Q, TD-86) skicka
 // fakturan på riktigt inline (sendInvoice, Chromium-PDF via
@@ -18,6 +19,8 @@ import { getSystemStage, PROJECT_SYSTEM_STAGES } from '@/lib/project-stages/stag
 // påslaget — samma anledning som invoices/send/route.ts behöver 30s.
 export const runtime = 'nodejs'
 export const maxDuration = 30
+// Auth läses i helpers; listan får aldrig frysas över användarsessioner.
+export const dynamic = 'force-dynamic'
 
 /**
  * GET - Lista projekt för ett företag
@@ -34,18 +37,18 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status')
     const customerId = request.nextUrl.searchParams.get('customerId')
 
-    // Behörighetskoll (Etapp 2, tasks/multi-employee-parity-plan.md): en
-    // anställd utan can_see_all_projects ska bara se sina egna tilldelade
-    // projekt, och en anställd utan can_see_financials ska inte få budget/
-    // ekonomifält i svaret. getCurrentUser() returnerar null dels för
-    // superadmin-impersonation, dels om ingen business_users-rad hittas för
-    // auth-användaren (ska i praktiken inte hända för ägare — se
-    // sql/business_users.sql punkt 4 samt app/api/auth/register/route.ts
-    // som båda skapar en owner-rad — men vi failsafe:ar öppet mot null så
-    // ägarens vy ALDRIG blir mer begränsad än idag).
-    const currentUser = await getCurrentUser(request)
-    const canSeeAllProjects = !currentUser || hasPermission(currentUser, 'see_all_projects')
-    const canSeeFinancials = !currentUser || hasPermission(currentUser, 'see_financials')
+    // Null kan betyda saknad/inaktiv medlem eller uppslagsfel. Bara
+    // getAuthenticatedBusiness kan bevisa superadmin-impersonering.
+    const currentUser = await getCurrentUser(request, businessId)
+    if (!currentUser && !business._impersonation) {
+      return NextResponse.json({ error: 'Åtkomst nekad' }, { status: 403 })
+    }
+    const canSeeAllProjects = currentUser
+      ? hasPermission(currentUser, 'see_all_projects')
+      : Boolean(business._impersonation)
+    const canSeeFinancials = currentUser
+      ? hasPermission(currentUser, 'see_financials')
+      : Boolean(business._impersonation)
 
     // include=workflow → joina stage-data per projekt så mobilen slipper N+1
     // mot /api/projects/[id]/workflow. Utan param: bakåtkompatibel respons.
@@ -329,13 +332,11 @@ export async function GET(request: NextRequest) {
       }
     })
 
-    // Strippa budget/ekonomifält för anställda utan can_see_financials
-    // (Etapp 2). budget_amount/budget_hours kommer från project-raden
-    // (`...project` i base ovan), actual_amount räknas fram från
-    // time_entry.hourly_rate — samtliga tre är ekonomikänsliga.
+    // Samma skydd som detaljen, plus listans beräknade intäkt.
+    // select('*') bär även actual_labor_cost/actual_material_cost.
     const responseProjects = canSeeFinancials
       ? enrichedProjects
-      : enrichedProjects.map(({ budget_amount, budget_hours, actual_amount, ...rest }: any) => rest)
+      : enrichedProjects.map((project: any) => utanFalt(project, [...PROJEKT_EKONOMIFALT, 'actual_amount']))
 
     return NextResponse.json({
       projects: responseProjects,
