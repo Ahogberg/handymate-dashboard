@@ -1,3 +1,4 @@
+import { attachMissionFollowups } from '@/lib/followup/mission'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -79,7 +80,7 @@ export async function GET(request: NextRequest) {
     const mandate = await loadActiveMandateForMission(supabase, business.business_id, mission.id)
     const mandateFacit = mandate ? await loadMandateFacit(supabase, business.business_id, mandate) : null
 
-    return NextResponse.json({ mission, progress, decisions, mandate, mandateFacit, handover }, { headers: { 'Cache-Control': 'no-store' } })
+    return NextResponse.json({ mission, progress, decisions, mandate, mandateFacit, handover: await attachMissionFollowups(supabase,business.business_id,mission.id,handover) }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error: any) {
     console.error('GET /api/mission/active error:', error)
     return NextResponse.json({ error: 'Uppdraget kunde inte läsas. Försök igen.' }, { status: 503, headers: { 'Cache-Control': 'no-store' } })

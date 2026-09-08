@@ -1128,6 +1128,13 @@ async function executeApprovalPayload(
         if (!to || !message) {
           return { action: 'send_sms', error: 'payload saknar to eller message' }
         }
+        // A durable followup is revalidated after the normal approval claim.
+        // Claim is never released automatically: unknown provider outcomes require review.
+        if (typeof payload.followup_id === 'string') {
+          const db = await getSupabase()
+          const claim = await db.rpc('claim_agent_followup_send', { p_business: businessId, p_id: payload.followup_id, p_approval: approvalId, p_to: to })
+          if (claim.error || claim.data !== true) return { action: 'send_sms', error: 'Uppföljningen har ändrats, stoppats eller redan påbörjats. Kontrollera utfallet innan ett nytt utskick.' }
+        }
         const r = await sendSms({
           to,
           message,

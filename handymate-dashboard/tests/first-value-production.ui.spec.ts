@@ -14,6 +14,7 @@ async function setup(page:Page) {
   await page.route('**/fixture/save',r=>r.fulfill({json:{ok:true}}))
   await page.route('**/api/quotes/visit-rule**',r=>r.fulfill({json:{rule:r.request().method()==='POST'?JSON.parse(r.request().postData()!):null}}))
   await page.route('**/api/quotes/q/handoff',r=>r.fulfill({json:{checkedAt:'2026-09-08T10:00:00Z',summary:{state:'decision',headline:'Ett förslag väntar på ditt beslut',done:'Offerten är registrerad som skickad.',next:'Granska förslaget.',needsYou:'Godkänn eller avvisa.',link:'/dashboard/approvals?focus=a',linkLabel:'Granska förslaget'}}}))
+  await page.route('**/api/quotes/q/followup',r=>r.fulfill({json:{enabled:false,items:[]}}))
   await page.goto('https://first-value.test/')
   return errors
 }

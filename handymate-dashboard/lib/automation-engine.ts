@@ -1,3 +1,4 @@
+import { hasDurableFollowup } from '@/lib/followup/service'
 /**
  * V3 Automation Engine
  *
@@ -899,6 +900,7 @@ export async function executeRule(
   // hantverkaren beviljat autonomi för den → hoppa över approval-grenen och
   // fall igenom till exekvering (steg 7). Markera i context för logg/digest.
   const autonomyKey = deriveAutonomyKey(typedRule)
+  if (autonomyKey === 'quote_followup_sms' && await hasDurableFollowup(supabase, typedRule.business_id, String(context.entity_id || context.quote_id || context.id || ''))) return { status: 'skipped', data: { reason: 'Explicitly scheduled followup owns this quote' } }
   let autonomousBypass = false
   // Etapp W (Mission Mandates V1): mandatkontrollen körs FÖRE isAutonomous —
   // ett mandat är uppdrags-scopat uttryckligt samtycke, mer specifikt än

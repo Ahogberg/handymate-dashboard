@@ -1,3 +1,4 @@
+import { scheduleFollowup, followupError } from '@/lib/followup/service'
 // Tool router for Next.js runtime
 // Executes tools against Supabase using the server-side client
 
@@ -407,6 +408,13 @@ export async function executeTool(
       // Goal-to-Plan V1 (Etapp B) — Matte-scopat, se tool-definitions.ts.
       case 'propose_mission_plan':
         return await proposeMissionPlanTool(supabase, businessId, input)
+      case 'schedule_quote_followup': {
+        if (context.triggerSource !== 'user' || !context.businessUserId) return { success: false, error: 'Planeringen kräver en inloggad ägare eller administratör.' }
+        try {
+          const item = await scheduleFollowup(supabase, businessId, context.businessUserId, input)
+          return { success: true, data: { followup: item, message: 'Förberedelsen är planerad. Kunden får inget SMS innan du granskar och godkänner kortet.', link: `/dashboard/quotes/${encodeURIComponent(String(input.quote_id))}` } }
+        } catch (e) { return { success: false, error: followupError(e instanceof Error ? e.message : '') } }
+      }
       case 'confirm_mission':
         return await confirmMissionTool(supabase, businessId, input, context)
       default:

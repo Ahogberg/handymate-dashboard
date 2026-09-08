@@ -665,3 +665,8 @@ Codex rollgranskning: 60 behörighetsprov gröna, fyra luckor öppna (docs/secur
 
 ## 2026-09-08 — Lokalt grönt bevisar inget om filen är otrackad; push utan grön CI kostar produktionen
 35fe3db7 importerade lib/portal/review.ts som aldrig lades till i git. Sessionen som pushade hade "tsc 0, build grön" lokalt — sant, filen fanns på disk. Fem körningar i rad röda på main, Vercel byggde inte produktion på flera timmar, och tre senare pushar (yta 5, yta 9, v223, v224) gick ut ovanpå en röd main utan att någon läste grinden. Regler: (1) `git status --short` före varje push, en `??`-rad under app/ eller lib/ är ett stopp. (2) Ingen push till main förrän förra körningen av Kontraktsgrind är grön, eller den egna pushen rättar den. (3) Den som pushar en kommentar som "tsc 0" ska ha kört det mot `git stash -u`-rent träd, inte mot arbetsträdet.
+
+## 2026-09-08 — Skilj ord, navigation, motor och verifiering
+Uppdrag är ett långsiktigt mission-mål, inte samma sak som ett kundjobb.
+Teamets uppgifter får ingen egen navigation. Ett stopp för omdöpning är inte
+ett stopp för beständig exekvering; verifiering hör till leveransen.

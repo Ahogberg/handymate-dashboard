@@ -1,3 +1,4 @@
+import { hasDurableFollowup } from '@/lib/followup/service'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
@@ -139,6 +140,7 @@ export async function GET(request: NextRequest) {
       }
 
       for (const q of expiringQuotes || []) {
+        if (await hasDurableFollowup(supabase, q.business_id, q.quote_id)) continue;
         const customer = q.customer as any
         if (!customer?.phone_number) continue
 
@@ -434,6 +436,7 @@ export async function GET(request: NextRequest) {
     const byBusiness = new Map<string, Array<{ quote: any; daysSinceSent: number; channel: string; quote_id: string }>>()
 
     for (const quote of sentQuotes || []) {
+      if (await hasDurableFollowup(supabase, quote.business_id, quote.quote_id)) continue;
       const customer = quote.customer as any
       if (!customer) continue
 

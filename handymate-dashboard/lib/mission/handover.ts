@@ -11,6 +11,7 @@ export interface MissionHandover {
   pending: number
   executed: number
   unverified: number
+  followups?: Array<{id:string;quoteId:string;dueAt:string;label:string;detail:string}>
   scope: string
 }
 const AGENTS: Record<string, string> = { matte: 'Matte', daniel: 'Daniel', karin: 'Karin', hanna: 'Hanna', lars: 'Lars', lisa: 'Lisa' }

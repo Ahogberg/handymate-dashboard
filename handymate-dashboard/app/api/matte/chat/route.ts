@@ -397,7 +397,7 @@ const CURATED_TOOL_NAMES = [
   'get_project_commercial_readiness',
   // Goal-to-Plan V1 (Etapp B) — Matte-scopat (se isToolAllowedForAgent/
   // getAgentTools nedan; ingen specialist listar dem i personalities.ts).
-  'propose_mission_plan', 'confirm_mission',
+  'propose_mission_plan', 'confirm_mission', 'schedule_quote_followup',
   // Support-agenten (2026-08-21) — se lib/agent/capabilities.ts 'support'.
   'get_account_billing_status', 'escalate_to_handymate_team',
 ]
@@ -634,7 +634,7 @@ async function runAgentTurn(opts: {
   missionToolsAllowed: boolean
 }): Promise<AgentTurnResult> {
   const MAX_TOOL_ITERATIONS = 5
-  const MISSION_TOOL_NAMES = new Set(['propose_mission_plan', 'confirm_mission'])
+  const MISSION_TOOL_NAMES = new Set(['propose_mission_plan', 'confirm_mission', 'schedule_quote_followup'])
   // Agentens allowlist låses för hela turen — byts agenten sker det via en
   // NY runAgentTurn efter handoff, med den nya agentens lista.
   //

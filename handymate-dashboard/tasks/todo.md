@@ -1413,3 +1413,16 @@ Underlag: docs/security/role-audit-2026-09-07/README.md. Fyra reproducerade luck
 - [ ] Publicera draft-PR — push blockerad av automatisk godkännandegranskning; inväntar uttryckligt tillstånd.
 
 Plan: docs/handoffs/CUSTOMER_RELIEF_PROGRAM_2026-09-08.md.
+
+# Beständig offertuppföljning — 2026-09-08
+- [x] Kontrollera tidigare PR och databasens faktiska tabeller.
+- [x] Bygg beständigt nästa steg och atomär körning till granskningskort.
+- [x] Koppla offertens befintliga överlämning och Mattes verktyg till samma väg.
+- [x] Stoppa föråldrade planer både före kort och före utskick.
+- [x] Prova schema, idempotens, avbrott, kundsvar, rollgränser och UI lokalt.
+- [x] Grön lokal typkontroll/build och kontraktsgrind.
+- [ ] Separat draft-PR och PostgreSQL-CI; ingen merge eller aktivering.
+
+Beslut: Jobb=project, Uppdrag=mission; teamuppgifter är innehåll utan egen
+navigation. Omdöpning skjuts upp. Köraren förbereder kort, skickar aldrig själv.
+Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna grindar.

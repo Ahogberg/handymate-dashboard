@@ -88,6 +88,7 @@ const EXTERNAL_DENIED_TOOLS: Record<string, string> = {
   get_project_commercial_readiness: 'internt faktureringsunderlag',
   propose_mission_plan: 'internt, Matte-scopat uppdragsverktyg',
   confirm_mission: 'skrivande, internt uppdragsverktyg',
+  schedule_quote_followup: 'skrivande offertplanering, kräver inloggad ägare/admin; nekas extern aktör',
   send_agent_message: 'internt team-till-team-verktyg',
   get_agent_messages: 'internt team-till-team-verktyg',
   // Klassade 2026-08-25 (launch desk-etappen, commit 7cecac62 införde

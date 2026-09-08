@@ -18,7 +18,8 @@
     "test:first-value-ui": "playwright test tests/first-value-journey.ui.spec.ts --no-deps --project=chromium --reporter=line",
     "test:job-standards-ui": "playwright test tests/job-standards.ui.spec.ts --no-deps --project=chromium --reporter=line",
     "test:onboarding-tour-ui": "playwright test tests/onboarding-tour-mobile.ui.spec.ts --no-deps --project=chromium --reporter=line",
-    "test:customer-relief": "playwright test tests/customer-relief.spec.ts tests/customer-relief.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line"
+    "test:customer-relief": "playwright test tests/customer-relief.spec.ts tests/customer-relief.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line",
+    "test:durable-followup": "playwright test tests/durable-followup.spec.ts tests/durable-followup-route.spec.ts tests/durable-followup.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.17.0",

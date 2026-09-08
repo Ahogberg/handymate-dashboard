@@ -1,3 +1,4 @@
+import { hasDurableFollowup } from '@/lib/followup/service'
 /**
  * Daniels uppföljningskort för en offert som väntar — samma kontrakt som
  * cronens expiry-nudge (app/api/cron/quote-follow-up/route.ts), byggt för
@@ -46,6 +47,8 @@ export async function createQuoteFollowUpCard(
     .contains('payload', { related_id: quote.quote_id })
   if (dedupErr) return { error: dedupErr.message }
   if ((existing ?? 0) > 0) return { duplicate: true }
+
+  if (await hasDurableFollowup(supabase, businessId, quote.quote_id)) return { duplicate: true }
 
   const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const amountLabel = amountKr != null ? amountKr.toLocaleString('sv-SE') : null

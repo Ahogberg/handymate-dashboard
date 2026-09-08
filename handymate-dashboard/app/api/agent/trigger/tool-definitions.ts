@@ -2,6 +2,14 @@
 // (Same definitions as supabase/functions/agent/tool-definitions.ts)
 
 export const toolDefinitions = [
+  {
+    name: "schedule_quote_followup",
+    description: "Planera när Daniel ska kontrollera en skickad offert och förbereda ett granskningskort. Skickar aldrig till kunden. Använd bara efter att ägare/admin bett om uppföljningen och tidpunkten är tydlig. due_at ska innehålla tidszon. Återanvänd request_key vid omförsök. Ange mission_id endast när uppföljningen hör till ett bekräftat aktivt uppdrag. Säg att planeringen är sparad först efter lyckat svar; inga löften vid fel.",
+    input_schema: { type: "object" as const, properties: {
+      quote_id: { type: "string" }, due_at: { type: "string", description: "ISO-tid med Z eller UTC-offset" },
+      request_key: { type: "string", description: "Unik stabil nyckel, 8–100 bokstäver/siffror/bindestreck" }, mission_id: { type: "string" },
+    }, required: ["quote_id", "due_at", "request_key"] },
+  },
   // CRM
   {
     name: "get_customer",

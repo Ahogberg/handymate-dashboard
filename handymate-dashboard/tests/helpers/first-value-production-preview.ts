@@ -6,7 +6,7 @@ import config from '../../tailwind.config'
 
 /** Real React components and CSS. Only API responses and the editor host are fixtures. */
 export async function productionPreview() {
-  const files = ['lib/onboarding/work-sample.ts', 'lib/quotes/visit-rule.ts',
+  const files = ['lib/followup/presentation.ts', 'components/quotes/ScheduledFollowup.tsx', 'lib/onboarding/work-sample.ts', 'lib/quotes/visit-rule.ts',
     'components/onboarding/WorkSampleStart.tsx', 'components/onboarding/WorkSampleResume.tsx',
     'components/quotes/VisitRuleEditor.tsx', 'components/quotes/QuoteHandoff.tsx']
   const css = (await postcss([tailwind({ ...config, content: files })]).process('@tailwind base; @tailwind components; @tailwind utilities;', { from: undefined })).css
