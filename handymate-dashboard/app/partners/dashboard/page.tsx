@@ -12,6 +12,8 @@
 //    fast sats. Aldrig en hårdkodad trappa.
 //  - Avtalsrad ("Avtal X godkänt datum") är datadriven ur payloaden.
 //  - Säljmaterial-sektionen väntar tills materialet finns publicerat.
+//  - Tomma läget visar PortalPreview — märkta EXEMPELsiffror på partnerns
+//    egen sats. Aldrig påhittad data i de riktiga korten.
 //  - Hemligheter (api-nyckel/webhook-secret) hämtas på begäran, aldrig i
 //    standardpayloaden.
 
@@ -24,6 +26,7 @@ import {
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
 import AgreementGate from '../components/AgreementGate'
+import PortalPreview from './components/PortalPreview'
 import StatementSection from './components/StatementSection'
 import BillingProfileCard from './components/BillingProfileCard'
 import SelfBillingSection from './components/SelfBillingSection'
@@ -542,6 +545,14 @@ export default function PartnerDashboardPage() {
             ))}
           </div>
         </section>
+
+        {/* ─── Så ser portalen ut när du har kunder (bara i tomma läget) ─── */}
+        {tomtLage && (
+          <PortalPreview
+            rate={stats.current_tier_rate ?? partner.legacy_commission_rate}
+            ladderMonths={partner.ladder_months}
+          />
+        )}
 
         {/* ─── Kundlista ─── */}
         <section id="kunder" className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
