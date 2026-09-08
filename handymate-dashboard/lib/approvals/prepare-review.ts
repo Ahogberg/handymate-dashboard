@@ -181,6 +181,14 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       return await prepareAutopilotPackageReview(db, businessId, approval, body.action_overrides, action === 'retry')
     }
     switch (type) {
+      case 'project_log_note': {
+        if (!p.project_id || typeof p.recording_id !== 'string' || !p.recording_id || typeof p.summary !== 'string' || !p.summary.trim()) throw new Error('Projekt, samtal och sammanfattning måste anges.')
+        const sourceDate = p.call_date || approval.created_at
+        if (typeof sourceDate !== 'string' || Number.isNaN(Date.parse(sourceDate))) throw new Error('Samtalsdatum saknas eller är ogiltigt. Ange datum före beslut.')
+        const plan = { id: `log_call_${p.recording_id}`, project_id: p.project_id, date: new Date(sourceDate).toISOString().slice(0, 10), summary: p.summary.trim() }
+        detail('Anteckning', plan.summary); detail('Dagboksdatum', plan.date)
+        return { ...complete('Sparar den visade samtalsanteckningen i projektets dagbok. Inget kundmeddelande skickas.', 'Spara i dagboken'), executionPayload: { diaryNote: plan }, executionEvidence: { diaryNote: plan } }
+      }
       case 'customer_fact': {
         if (!p.content || !p.customer_id) throw new Error('Kund och innehåll måste anges.')
         if (p.fact_type === 'commitment' && p.due_date_iso && !normalizeDueDateIso(p.due_date_iso)) throw new Error('Löftet måste ha ett giltigt datum.')

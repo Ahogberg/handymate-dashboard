@@ -9,6 +9,7 @@ const projectSyncLogs = new Map(), fortnoxCalls = []
 let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
 let memoryRow, memoryWrites=0, failMemory=false, loseMemory=false
 let priceRow, priceWrites=0, priceWriteFails=false, losePriceResponse=false
+const diaryRows=new Map();let diaryInserts=0,loseDiary=false,failDiary=false
 const facts = new Map(), factWrites = []; let failedFact = null, lostFact = null
 const inboxItems = new Map()
 const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = [], paymentCalls = [], leadActivationCalls = [], automationCalls = [], artifactCalls = []
@@ -22,6 +23,15 @@ const db = { from(table) {
         if (!matches(row)) return resolve({ data: [], error: null })
         if (operation === 'update') Object.assign(row, structuredClone(values))
         return resolve({ data: operation === 'read' ? structuredClone(row) : [{ id: row.id }], error: null })
+      }
+      if (table === 'project_log') {
+        if (operation === 'insert') {
+          diaryInserts++
+          if (diaryRows.has(values.id)) return resolve({data:null,error:{code:'23505'}})
+          if (!failDiary) diaryRows.set(values.id,structuredClone(values))
+          if (loseDiary || failDiary) return resolve({data:null,error:{message:'Diary response unavailable'}})
+        }
+        return resolve({data:structuredClone([...diaryRows.values()].find(matches)||null),error:null})
       }
       if (table === 'agent_memories') {
         const selected=memoryRow && matches(memoryRow) ? memoryRow : null
@@ -120,6 +130,7 @@ function load(file) {
     if (name === 'next/server') return { NextResponse: { json: (data, init) => Response.json(data, init) } }
     if (name === '@/lib/supabase') return { getServerSupabase: () => db }
     if (name === '@/lib/auth') return { getAuthenticatedBusiness: async () => ({ business_id: 'b1' }), getBusinessPlanFromConfig: () => 'pro' }
+    if (name === '@/lib/diary/write') return load(path.join(root,'lib/diary/write.ts'))
     if (name === '@/lib/permissions') return { getCurrentUser: async () => ({ id: 'u1' }) }
     if (name === '@/lib/fortnox') return { FortnoxRequestNotSentError, fortnoxProjectNumberFor:n=>n.replace(/\D/g,''),fortnoxProjectStatus:()=> 'ONGOING',createFortnoxProject:async(b,p)=>{if(fortnoxNotSent)throw new FortnoxRequestNotSentError('no token');fortnoxCalls.push(structuredClone(p));fortnoxRemote=structuredClone(p);if(loseFortnoxResponse)throw Error('lost response');return {ProjectNumber:p.ProjectNumber}},fortnoxRequest:async(b,method,url)=>{assert.equal(method,'GET');assert.equal(url,'/projects/1042');return {Project:structuredClone(fortnoxRemote)}} }
     if (name === '@/lib/sms-send') return { sendSmsViaElks: async ({supabase,...args}) => { smsDeliveries.push(structuredClone(args)); return smsUnknown ? { success:false, error:'provider response lost', status:null } : smsShouldFail ? { success:false, error:'provider rejected', status:503 } : { success:true, smsId:'sms-site', elksId:'elks-site', status:200 } } }
@@ -147,9 +158,26 @@ function load(file) {
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
-const reset = () => { memoryRow={id:'memory1',business_id:'b1',agent_id:'matte',content:'Reviewed memory',confirmed_at:null,superseded_by:null};memoryWrites=0;failMemory=false;loseMemory=false; priceRow={id:'price1',business_id:'b1',name:'Standard',hourly_rate_normal:800};priceWrites=0;priceWriteFails=false;losePriceResponse=false; facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
+const reset = () => { diaryRows.clear();diaryInserts=0;loseDiary=false;failDiary=false; memoryRow={id:'memory1',business_id:'b1',agent_id:'matte',content:'Reviewed memory',confirmed_at:null,superseded_by:null};memoryWrites=0;failMemory=false;loseMemory=false; priceRow={id:'price1',business_id:'b1',name:'Standard',hourly_rate_normal:800};priceWrites=0;priceWriteFails=false;losePriceResponse=false; facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
+  reset();row.approval_type='project_log_note';row.payload={project_id:'p1',recording_id:'call-test',summary:' Reviewed diary text ',call_date:'2026-09-07'}
+  let diaryPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(diaryPreview.review.confirmLabel,'Spara i dagboken',JSON.stringify(diaryPreview))
+  assert(diaryPreview.review.details.some(d=>d.label==='Dagboksdatum'&&d.text==='2026-09-07'));assert.equal(diaryInserts,0)
+  failDiary=true;let diaryResult=await (await post({action:'approve',review_token:diaryPreview.review_token})).json()
+  assert.equal(diaryResult.receipt.state,'failed',JSON.stringify(diaryResult))
+  diaryPreview=await (await post({action:'preview',decision_action:'retry'})).json();failDiary=false;loseDiary=true
+  diaryResult=await (await post({action:'retry',review_token:diaryPreview.review_token})).json()
+  assert.equal(diaryResult.receipt.state,'saved',JSON.stringify(diaryResult));assert.equal(diaryRows.size,1)
+  assert.equal(diaryRows.get('log_call_call-test').description,'Reviewed diary text')
+  assert.deepEqual(row.payload.execution_result.receipt,diaryResult.receipt)
+  const diaryExecutor=load(path.join(root,'lib/approvals/diary-note.ts')).executeDiaryNote
+  const diaryPlan=row.payload.execution_result.review_evidence.diaryNote
+  assert.equal((await diaryExecutor(db,'b1',null,diaryPlan)).ok,true);assert.equal(diaryInserts,2)
+  diaryRows.get('log_call_call-test').description='Other content'
+  assert.equal((await diaryExecutor(db,'b1',null,diaryPlan)).ok,false);assert.equal(diaryInserts,2)
+  console.log('PASS diary route and real writer: exact date/text, failed insert, reviewed retry, lost insert response, stable row, conflicting duplicate rejected and persisted receipt')
   reset();row.approval_type='agent_memory_confirmation';row.payload={memory_id:'memory1'}
   let memoryPreview=await (await post({action:'preview',decision_action:'approve'})).json()
   assert.equal(memoryPreview.review.confirmLabel,'Bekräfta minnet',JSON.stringify(memoryPreview));assert.equal(memoryWrites,0)

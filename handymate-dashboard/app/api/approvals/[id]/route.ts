@@ -1557,61 +1557,8 @@ async function executeApprovalPayload(
       }
 
       case 'project_log_note': {
-        // Samtalsefterarbete (2026-09-01): samtalet blir en dagboksrad i
-        // project_log NÄR hantverkaren godkänner — intern anteckning, inget
-        // kundutskick. Samma fältlokala, tenant-scopade mönster som
-        // meeting_followup ovan. Skrivningen går via createDiaryEntry
-        // (lib/diary/write.ts) — dagbokens enda väg in i project_log — som
-        // gör projektvakten igen och skriver revisionsloggen.
-        const pl = payload as any
-        if (!pl.project_id || !pl.recording_id || !pl.summary) {
-          return { action: 'project_log_note', ok: false, error: 'Kortet saknar projekt, samtal eller sammanfattning.' }
-        }
-        const supabasePL = await getSupabase()
-        const { data: projektPL, error: projektPLErr } = await supabasePL
-          .from('project')
-          .select('project_id')
-          .eq('business_id', businessId)
-          .eq('project_id', pl.project_id)
-          .maybeSingle()
-        if (projektPLErr) {
-          return { action: 'project_log_note', ok: false, error: `Kunde inte verifiera projektet: ${projektPLErr.message}` }
-        }
-        if (!projektPL) {
-          return { action: 'project_log_note', ok: false, error: 'Projektet finns inte i det här företaget.' }
-        }
-
-        // Datum = samtalsdagen (YYYY-MM-DD), annars idag. Ett ogiltigt
-        // call_date får aldrig stoppa raden — då gäller idag.
-        const samtalsDatum = typeof pl.call_date === 'string' && !Number.isNaN(Date.parse(pl.call_date))
-          ? new Date(pl.call_date)
-          : new Date()
-        const logDate = samtalsDatum.toISOString().slice(0, 10)
-
-        // Deterministiskt id per samtal: godkänns kortet två gånger (retry,
-        // dubbeltryck) blir det ändå EN rad — helpern kvitterar 23505 som
-        // dubblett. Den generella dubblettkontrollen (samma text inom kort
-        // tid) hoppas: id:t är redan samtalets egna nyckel, och två olika
-        // samtal samma dag SKA ge två rader.
-        const logId = `log_call_${pl.recording_id}`
-        const dagbok = await createDiaryEntry(supabasePL, {
-          id: logId,
-          order_id: pl.project_id,
-          business_id: businessId,
-          business_user_id: resolvedByUserId ?? null,
-          date: logDate,
-          work_performed: 'Samtal med kund',
-          description: String(pl.summary),
-          photos: [],
-          skipDuplicateCheck: true,
-        })
-        if (!dagbok.ok) {
-          return { action: 'project_log_note', ok: false, error: dagbok.error || 'Kunde inte spara dagboksraden.' }
-        }
-        if (dagbok.duplicate) {
-          return { action: 'project_log_note', ok: true, log_id: logId, duplicate: true }
-        }
-        return { action: 'project_log_note', ok: true, log_id: logId, project_id: pl.project_id }
+        const { executeDiaryNote } = await import('@/lib/approvals/diary-note')
+        return await executeDiaryNote(getServerSupabase(), businessId, resolvedByUserId ?? null, reviewedPayload?.diaryNote as any)
       }
 
       case 'customer_fact': {
