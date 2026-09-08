@@ -7,6 +7,7 @@ class FortnoxRequestNotSentError extends Error {}
 let ownerPushCalls=[],ownerPushFail=true
 const projectSyncLogs = new Map(), fortnoxCalls = []
 let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
+const facts = new Map(), factWrites = []; let failedFact = null, lostFact = null
 const inboxItems = new Map()
 const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = [], paymentCalls = [], leadActivationCalls = [], automationCalls = [], artifactCalls = []
 const db = { from(table) {
@@ -19,6 +20,18 @@ const db = { from(table) {
         if (!matches(row)) return resolve({ data: [], error: null })
         if (operation === 'update') Object.assign(row, structuredClone(values))
         return resolve({ data: operation === 'read' ? structuredClone(row) : [{ id: row.id }], error: null })
+      }
+      if (table === 'customer_fact') {
+        if (operation === 'insert') {
+          if (facts.has(values.id)) return resolve({data:null,error:{code:'23505'}})
+          facts.set(values.id, structuredClone({...values,superseded_by:null}))
+        }
+        const selected=[...facts.values()].filter(matches).sort((a,b)=>a.id.localeCompare(b.id))
+        if (operation === 'update') {
+          selected.forEach(f=>{factWrites.push(f.id);if(f.id!==failedFact)Object.assign(f,structuredClone(values))})
+          if(selected.some(f=>f.id===lostFact))return resolve({data:null,error:{message:'Lost write response'}})
+        }
+        return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
       }
       if (table === 'inbox_item') {
         if (operation === 'insert') inboxItems.set(values.inbox_item_id, structuredClone(values))
@@ -96,7 +109,7 @@ function load(file) {
     if (name === '@/lib/invoices/apply-payment') return { applyInvoicePayment: async args => { paymentCalls.push(structuredClone(args)); return {ok:true,transition:'to_customer_paid',remaining_rot_kr:3000,effects:[{effect:'workflows',status:args.approvalFollowUps.updateWorkflows?'succeeded':'skipped'},{effect:'customer_messages',status:args.approvalFollowUps.prepareCustomerMessages?'succeeded':'skipped',message:args.approvalFollowUps.prepareCustomerMessages?'Separata granskningskort skapade':'Valdes bort'},{effect:'payment_received_rules',status:args.approvalFollowUps.runAutomationRules?'succeeded':'skipped'}]} } }
     if (name === '@/lib/leads/golden-path') return { activatePendingLead: async (leadId,_db,options) => { leadActivationCalls.push({leadId,options:structuredClone(options)}); return {dealId:options.createDeal?'deal1':null,dealError:null,effects:[{effect:'lead_status',status:'succeeded',message:'Status ändrad till ny'},{effect:'deal',status:options.createDeal?'succeeded':'skipped'},{effect:'internal_sms',status:options.prepareInternalSms?'succeeded':'skipped',approval_id:options.prepareInternalSms?'child-sms':undefined},{effect:'lead_received_rules',status:options.runAutomationRules?'succeeded':'skipped'}]} } }
     if (name === '@/lib/automation-engine') return { runApprovedAutomationAction: async (...args) => { automationCalls.push({businessId:args[1],actionType:args[2],config:structuredClone(args[3]),context:structuredClone(args[4])}); return {success:true,data:{lead_id:args[4].lead_id,status:'lost'}} } }
-    if (name === '@/lib/approvals/artifact-write') return { insertApprovalArtifact: async (...args) => { artifactCalls.push({table:args[1],purpose:args[5],values:structuredClone(args[6])}); return {data:{id:`child-${artifactCalls.length}`},error:null} } }
+    if (name === '@/lib/approvals/artifact-write') return { insertApprovalArtifact: async (...args) => { if(args[1]==='customer_fact')return load(path.join(root,'lib/approvals/artifact-write.ts')).insertApprovalArtifact(...args); artifactCalls.push({table:args[1],purpose:args[5],values:structuredClone(args[6])}); return {data:{id:`child-${artifactCalls.length}`},error:null} } }
     if (name === '@/lib/invoices/payment-decision') return load(path.join(root, name.slice(2)+'.ts'))
     if (name === '@/lib/projects/complete-project') return { completeProject: async args => { completionCalls.push(structuredClone({businessId:args.businessId,projectId:args.projectId,authorization:args.authorization,options:args.options})); const chosen=args.options; return { ok:true,completed:true,transitioned:true,already_completed:false,requires_approval:false,project:{project_id:'p1'},invoice_created:chosen.createInvoiceDraft?{invoice_id:'inv1',invoice_number:'1001',total:10000,status:'draft'}:null,effects:[{effect:'workflow_stage',status:'succeeded'},{effect:'auto_invoice',status:chosen.createInvoiceDraft?'succeeded':'skipped',message:chosen.createInvoiceDraft?undefined:'Fakturautkast valdes bort i granskningen'},{effect:'review_request',status:chosen.createReviewRequest?'succeeded':'skipped',message:chosen.createReviewRequest?undefined:'Kunduppföljning valdes bort i granskningen'},{effect:'job_completed_event',status:chosen.runAutomations?'attempted':'skipped'}],warnings:[] } } }
     if (name === '@/lib/customers/namn') return { halsning: name => `Hej ${String(name || '').split(' ')[0]}!` }
@@ -114,9 +127,35 @@ function load(file) {
   cache[file] = mod.exports; return mod.exports
 }
 const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
-const reset = () => { ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
+const reset = () => { facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
 const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
 ;(async () => {
+  reset();row.approval_type='customer_fact';row.payload={customer_id:'c-site',fact_type:'contact',content:'New reviewed contact'}
+  for(const id of ['old-a','old-b'])facts.set(id,{id,business_id:'b1',customer_id:'c-site',fact_type:'contact',content:`Previous ${id}`,superseded_by:null})
+  let factPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(factPreview.review.confirmLabel,'Spara kunduppgiften',JSON.stringify(factPreview));assert.equal(mutations,0)
+  facts.get('old-a').content='Changed after preview'
+  assert.equal((await post({action:'approve',review_token:factPreview.review_token})).status,428);assert.equal(facts.size,2)
+  facts.get('old-a').content='Previous old-a'
+  factPreview=await (await post({action:'preview',decision_action:'approve'})).json();failedFact='old-b'
+  let factResult=await (await post({action:'approve',review_token:factPreview.review_token})).json()
+  assert.equal(factResult.receipt.state,'partial',JSON.stringify(factResult));assert.match(factResult.receipt.text,/1 av 2/)
+  assert.equal(facts.size,3);assert.equal(row.payload.execution_result.results.length,2)
+  assert.deepEqual(row.payload.execution_result.receipt,factResult.receipt)
+  const savedFactId=row.payload.execution_result.artifacts.fact_id
+  assert.equal(facts.get('old-a').superseded_by,savedFactId)
+  factPreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  assert.equal(factPreview.review.confirmLabel,'Slutför ersättningarna',JSON.stringify(factPreview))
+  canAct=false;assert.equal((await post({action:'retry',review_token:factPreview.review_token})).status,403);canAct=true
+  failedFact=null;lostFact='old-b'
+  factResult=await (await post({action:'retry',review_token:factPreview.review_token})).json()
+  assert.equal(factResult.receipt.state,'saved',JSON.stringify(factResult));assert.match(factResult.receipt.text,/2 av 2/)
+  assert.equal(facts.size,3);assert.equal(factWrites.filter(id=>id==='old-a').length,1);assert.equal(factWrites.filter(id=>id==='old-b').length,2)
+  assert.equal(row.payload.execution_result.artifacts.fact_id,savedFactId)
+  assert.deepEqual(row.payload.execution_result.receipt,factResult.receipt);assert.equal(row.payload.execution_result.results.length,2)
+  assert.equal((await post({action:'retry',review_token:factPreview.review_token})).status,428)
+  assert.equal(facts.size,3)
+  console.log('PASS customer_fact HTTP handlers: signed stale preview, partial receipt/results persisted, permission denial, selective retry, lost write response, stable artifact and duplicate retry denial')
   reset()
   for (const action of ['approve','edit','retry']) { assert.equal((await post({action})).status,428); assert.equal(mutations,0) }
   canAct=false; assert.equal((await post({ action:'preview',decision_action:'approve' })).status,403); assert.equal(mutations,0); canAct=true
