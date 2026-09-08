@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { massutskickAvKort, massutskickBekraftat, massutskickSvar, MASSUTSKICK_STATUS } from '@/lib/approvals/massutskick'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
@@ -302,6 +303,16 @@ export async function POST(
     const finalPayload = action === 'edit'
       ? { ...approval.payload, ...edited_payload, edited: true }
       : approval.payload
+
+    // Massutskick (beslut Andreas 2026-09-08): fler än en mottagare kräver
+    // bekräftat antal efter att texten visats — före statusändring och
+    // exekvering, oavsett klient. Se lib/approvals/massutskick.ts.
+    if (action === 'approve' || action === 'edit') {
+      const mass = massutskickAvKort(approval.approval_type, finalPayload as Record<string, unknown>)
+      if (mass && !massutskickBekraftat(body, mass)) {
+        return NextResponse.json(massutskickSvar(mass, approval.approval_type), { status: MASSUTSKICK_STATUS })
+      }
+    }
 
     // Update status
     const newStatus = action === 'reject' ? 'rejected' : 'approved'

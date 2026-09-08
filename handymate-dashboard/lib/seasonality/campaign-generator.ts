@@ -93,7 +93,9 @@ export async function generateSeasonalCampaign(
     title: `Säsongskampanj: ${theme.theme}`,
     // Kortets underrad läses av kunden: branschen på svenska (branchLabel),
     // aldrig segmentnyckeln ("construction"), och rätt numerus.
-    description: `${validCustomers.length} ${validCustomers.length === 1 ? 'kund' : 'kunder'} · ${branchLabel(branch)} · ${MONTH_NAMES[month]}`,
+    // ...och SMS-texten själv först: den som godkänner ska läsa vad som
+    // går ut, inte bara hur många som får det (beslut Andreas 2026-09-08).
+    description: `"${smsText}"\n\nTill ${validCustomers.length} ${validCustomers.length === 1 ? 'kund' : 'kunder'} · ${branchLabel(branch)} · ${MONTH_NAMES[month]}`,
     risk_level: 'medium',
     status: 'pending',
     payload: {

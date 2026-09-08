@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import { Check, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -163,13 +164,9 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
         const key = getEditableKey(approval)
         if (key && editedText != null) body.edited_payload = { [key]: editedText }
       }
-      const res = await fetch(`/api/approvals/${approval.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify(body),
+      const res = await postKortbeslut(approval.id, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body,
       })
       if (!res.ok) {
         setError('Kunde inte spara — försök igen')

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import Link from 'next/link'
 import { buildValueReceipt } from '@/lib/approvals/value-receipt'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
@@ -785,12 +786,12 @@ export default function JarvisHome({
         const fragment = editedText != null ? buildApprovalEdit(approval, editedText) : null
         if (fragment) body.edited_payload = fragment
       }
-      const res = await fetch(`/api/approvals/${approval.id}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...(await authHeaders()) },
-        body: JSON.stringify(body),
-        // Överlever sidlämning: flushen vid pagehide/unmount hinner annars
-        // inte få iväg anropet innan sidan rivs.
+      // Överlever sidlämning (keepalive): flushen vid pagehide/unmount hinner
+      // annars inte få iväg anropet innan sidan rivs. Massutskick stoppas
+      // av servern (428) och bekräftas i postKortbeslut.
+      const res = await postKortbeslut(approval.id, {
+        headers: await authHeaders(),
+        body,
         keepalive: true,
       })
       if (!res.ok) {

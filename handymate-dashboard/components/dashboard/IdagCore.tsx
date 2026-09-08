@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -293,13 +294,9 @@ export default function IdagCore({
         const fragment = editedText != null ? buildApprovalEdit(approval, editedText) : null
         if (fragment) body.edited_payload = fragment
       }
-      const res = await fetch(`/api/approvals/${approval.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify(body),
+      const res = await postKortbeslut(approval.id, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body,
       })
 
       if (!res.ok) {

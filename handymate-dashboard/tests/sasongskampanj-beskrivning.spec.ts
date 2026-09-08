@@ -13,7 +13,7 @@ import { branchLabel } from '../lib/branch'
 const src = fs.readFileSync(path.join(__dirname, '../lib/seasonality/campaign-generator.ts'), 'utf8')
 
 test('beskrivningen använder branchLabel och rätt numerus, aldrig råa branch-nyckeln', () => {
-  expect(src).toMatch(/description: `\$\{validCustomers\.length\} \$\{validCustomers\.length === 1 \? 'kund' : 'kunder'\} · \$\{branchLabel\(branch\)\} · /)
+  expect(src).toMatch(/Till \$\{validCustomers\.length\} \$\{validCustomers\.length === 1 \? 'kund' : 'kunder'\} · \$\{branchLabel\(branch\)\} · /)
   expect(src).not.toMatch(/kunder · \$\{branch\} ·/)
 })
 

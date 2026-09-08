@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import Link from 'next/link'
 import {
   Bot,
@@ -431,13 +432,9 @@ export default function ApprovalsPage() {
       if (editedPayload) body.edited_payload = editedPayload
 
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify(body),
+      const res = await postKortbeslut(id, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body,
       })
       if (res.ok) {
         const result = await res.json().catch(() => null)
@@ -550,13 +547,9 @@ export default function ApprovalsPage() {
     setActionLoading(id + 'approve')
     try {
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({ action: 'edit', edited_payload: { answers } }),
+      const res = await postKortbeslut(id, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body: { action: 'edit', edited_payload: { answers } },
       })
       const result = await res.json().catch(() => null)
       if (res.ok) {
@@ -616,16 +609,12 @@ export default function ApprovalsPage() {
       }
 
       const { data: { session } } = await supabase.auth.getSession()
-      const res = await fetch(`/api/approvals/${approval.id}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-        },
-        body: JSON.stringify({
+      const res = await postKortbeslut(approval.id, {
+        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
+        body: {
           action: 'approve',
           action_overrides: Object.keys(overrides).length > 0 ? overrides : undefined,
-        }),
+        },
       })
       if (res.ok) {
         setApprovals(prev => prev.filter(a => a.id !== approval.id))
