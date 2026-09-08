@@ -16,7 +16,7 @@ export async function followupDatabase(){
    IF NOT EXISTS(SELECT 1 FROM pg_roles WHERE rolname='service_role') THEN CREATE ROLE service_role; END IF;
   END $$;COMMIT;CREATE SCHEMA ${schema};GRANT USAGE ON SCHEMA ${schema} TO service_role;`)
   const pool=new Pool({connectionString:url,max:4,options:`-c search_path=${schema},public`})
-  const scoped=(sql:string)=>sql.replace(/public\./g,schema+'.').replace(/CREATE ROLE (anon|authenticated|service_role);/g,'')
+  const scoped=(sql:string)=>sql.replace(/public\./g,schema+'.').replace(/\bSCHEMA public\b/g,'SCHEMA '+schema).replace(/CREATE ROLE (anon|authenticated|service_role);/g,'')
   db={exec:sql=>pool.query(scoped(sql)),query:async<T>(sql:string,params?:any[])=>({rows:(await pool.query(scoped(sql),params)).rows as T[]}),close:async()=>{await pool.end();await root.query(`DROP SCHEMA ${schema} CASCADE`);await root.end()}}
  }else db=new PGlite() as FollowupDatabase
  await db.exec(`
