@@ -603,12 +603,23 @@ async function handleRejectLead(
     return { success: false, error: `Lead-status kunde inte uppdateras: ${rejectErr.message}` }
   }
 
-  // Send rejection SMS if template provided and phone available
+  // Kund-SMS får inte döljas i statusändringen. Även när själva regeln körs
+  // autonomt skapas ett separat, konkret send_sms-kort i stället för ett
+  // direkt utskick. Approval-routen skickar tom config här och skapar sitt
+  // versionsbundna barnkort med stabilt id efter den granskade statusändringen.
+  let smsApprovalId: string | undefined
   if (config.sms_template && context.phone) {
-    await handleSendSms(supabase, businessId, { template: config.sms_template }, context)
+    const { data: business } = await supabase.from('business_config').select('business_name').eq('business_id', businessId).maybeSingle()
+    const message = automationSmsText({ template: config.sms_template }, context, business?.business_name || 'Handymate')
+    const proposed = await handleCreateApproval(supabase, businessId, {
+      approval_type: 'send_sms', title: `Granska besked till ${context.customer_name || context.name || 'kunden'}`,
+      description: 'Leaden är markerad som förlorad. Granska kundbeskedet separat före sändning.',
+    }, { ...context, entity_id: leadId, rule_action_type: 'send_sms', to: context.phone, message }, 'Förlorad lead — kundbesked')
+    if (!proposed.success) return { success: false, error: `Leaden markerades som förlorad, men SMS-förslaget kunde inte skapas: ${proposed.error}`, data: { lead_id: leadId, status: 'lost' } }
+    smsApprovalId = proposed.data?.approval_id as string | undefined
   }
 
-  return { success: true, data: { lead_id: leadId, status: 'lost' } }
+  return { success: true, data: { lead_id: leadId, status: 'lost', ...(smsApprovalId ? { sms_approval_id: smsApprovalId } : {}) } }
 }
 
 async function handleGenerateQuote(

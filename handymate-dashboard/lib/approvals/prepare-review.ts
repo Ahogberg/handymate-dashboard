@@ -113,6 +113,10 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       detail('Uppmaning', approval.description)
       return complete('Noterar att du har sett uppmaningen. Detta utför inte uppgiften och skapar inget nytt kort.', 'Jag har läst')
     }
+    if (type === 'automation' && p.rule_action_type === 'reject_lead') {
+      const { prepareAutomationRejectLeadReview } = await import('./automation-reject-lead-review')
+      return await prepareAutomationRejectLeadReview(db, businessId, p, body.action_overrides)
+    }
     if (type === 'automation' && ['send_sms', 'send_email'].includes(p.rule_action_type)) {
       const config = p.rule_action_config || {}
       const sms = p.rule_action_type === 'send_sms'

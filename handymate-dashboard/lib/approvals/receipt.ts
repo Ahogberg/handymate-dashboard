@@ -81,6 +81,13 @@ export function approvalReceipt(type: string, action: string, result: Record<str
     const lines = r.effects.map((effect: any) => `${names[effect.effect] || effect.effect}: ${states[effect.status] || effect.status}${effect.message ? ` — ${effect.message}` : ''}`)
     return { state: incomplete ? 'partial' : 'saved', text: `Kundförfrågan är aktiverad.${lines.length ? `\n${lines.join('\n')}` : ''}` }
   }
+  if (type === 'automation' && r.action_type === 'reject_lead' && Array.isArray(r.effects)) {
+    const names: Record<string, string> = { lead_status: 'Leadstatus', customer_sms: 'Kundbesked' }
+    const states: Record<string, string> = { succeeded: 'klart', skipped: 'inte utfört', failed: 'misslyckades' }
+    const failed = r.effects.some((effect: any) => effect.status === 'failed')
+    const lines = r.effects.map((effect: any) => `${names[effect.effect] || effect.effect}: ${states[effect.status] || effect.status}${effect.message ? ` — ${effect.message}` : ''}`)
+    return { state: failed ? 'partial' : 'saved', text: `Leadbeslutet är registrerat.\n${lines.join('\n')}` }
+  }
   const metadata = r.metadata || {}
   const delivered = r.sms_sent === true || r.email_sent === true || r.einvoice === true || r.sent === true ||
     metadata.sms === true || metadata.email === true || metadata.einvoice === true || r.reply_saved === true

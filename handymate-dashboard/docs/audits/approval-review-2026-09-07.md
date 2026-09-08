@@ -72,7 +72,7 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 | `dispatch_suggestion` | Tilldelar person på bokning/arbetsorder. Befintlig hanterare ignorerar databasfel och saknar företagsscope på uppdateringen. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `publish_microsite` | Publicerar webbsidan, vilket gör innehållet externt tillgängligt. | Stopp – komplett granskning återstår |
 | `invoice_reminder` | Skickar SMS och eventuellt e-post samt uppdaterar påminnelseavgift/ränta och historik. | Granskning av kanaler och avgifter; kontrollerad delutfallskvittens |
-| `automation` | Kör en underliggande automationsåtgärd med konfiguration; kan ge andra externa effekter. | SMS/e-post granskas; create_approval kvitteras; andra varianter återstår |
+| `automation` | Kör en underliggande automationsåtgärd med konfiguration; kan ge andra externa effekter. | SMS/e-post granskas; create_approval kvitteras; reject_lead har aktuell leadpreview, följdval och separat kund-SMS; andra varianter återstår |
 | `price_adjustment` | Ändrar prislistans ordinarie timpris. Ny granskning kräver även identifierande prislistenamn. | Verifierat underlag och granskningsbeslut; slutprov återstår |
 | `fakturera_projekt` | Återskapar fakturaunderlag, jämför med snapshot, skapar och skickar faktura. | Stopp – komplett granskning återstår |
 | `project_debrief` | Sparar bekräftade projektlärdomar från svaren; tomma svar är giltiga. | Verifierat underlag och granskningsbeslut; slutprov återstår |
@@ -302,3 +302,11 @@ Kampanjkedjan efter Hannas köade kort har nu ett isolerat prov av den verkliga 
 Verifiering: `node tests/approvals/campaign-send-harness.cjs` kör den faktiska sändrutten med minnesdatabas och ersatt SMS-leverantör. Det provar blandat accepterat/avvisat utfall, stabila mottagaridentiteter, oförändrat antal sändanrop vid återöppning, förlorat leverantörssvar, beständig avstämningsstatus och omsändningsspärr. `npx tsc --noEmit` passerar. Inget verkligt SMS eller produktionsanrop gjordes.
 
 Del 4 är förbättrad men inte generell: en operatörsvy för att avstämma `unknown` mot 46elks och explicit återställa ett säkert avvisat kampanj-SMS saknas, liksom deljournal för övriga sammansatta typer. Nästa arbete är återstående automationsvarianter och därefter mobilens kompletta specialvyer. Ekonomiflödenas fulla versions-/Fortnox-journal och fristående projektavslutsretry är fortfarande blockerande öppna punkter.
+
+### Fortsättning 8 september — `reject_lead` utan dolt kundutskick
+
+- Previewn verifierar aktuell lead inom företaget och visar nuvarande/ny status, telefon och exakt interpolerad avvisningstext. Ett uttryckligt val styr om ett separat SMS-förslag ska skapas.
+- Huvudbeslutet markerar leaden förlorad men skickar aldrig SMS. Om kundbesked valts skapas ett stabilt separat `send_sms`-kort med exakt mottagare/text; resultatet för status och följdkort visas var för sig i kvittensen.
+- Även en autonom `reject_lead`-regel har ändrats från direkt SMS till ett konkret granskningskort, så produktfunktionen bevaras utan att kundutskicket göms. Ett fel när följdkortet sparas redovisas efter att leadstatusen redan ändrats.
+
+Faktisk approval-route med isolerade handlers provar preview, staleness, valt kundbesked, barnkort och delkvittens. TypeScript-kontrollen passerar. Övriga automationshandlingar (`update_status`, `notify_owner`, `run_agent`, `generate_quote`, `create_booking`, `schedule_followup`, `sync_to_fortnox`, `create_project`) saknar fortfarande fullständiga egna kontrakt och är nästa konkreta fortsättningspunkt.
