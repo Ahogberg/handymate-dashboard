@@ -54,32 +54,32 @@ test.describe('AMBER BARA NÄR DET ÄR SANT', () => {
 })
 
 test.describe('KNAPPEN SÄGER VAD SOM HÄNDER', () => {
-  test('offertutkastet SKAPAR, det skickar inte', () => {
+  test('offertutkastet granskas före skapandet', () => {
     // Exekveraren POST:ar till /api/quotes och returnerar ett quote_id.
     // Något utskick sker aldrig.
     const label = approveLabel('create_quote_draft')
-    expect(label).toBe('Skapa offerten')
+    expect(label).toBe('Granska')
     expect(label.toLowerCase()).not.toContain('skicka')
   })
 
-  test('det som verkligen skickar får säga skicka', () => {
-    expect(approveLabel('send_quote').toLowerCase()).toContain('skicka')
-    expect(approveLabel('invoice_reminder').toLowerCase()).toContain('skicka')
-    expect(approveLabel('send_sms').toLowerCase()).toContain('skicka')
+  test('utskick börjar med granskning', () => {
+    expect(approveLabel('send_quote')).toBe('Granska')
+    expect(approveLabel('invoice_reminder')).toBe('Granska')
+    expect(approveLabel('send_sms')).toBe('Granska')
   })
 
-  test('fakturera_projekt säger skicka OCH beloppet kunden betalar', () => {
+  test('fakturor kräver granskning även när kortet redan visar ett belopp', () => {
     // Kortet bär hela utkastet och Godkänn skickar fakturan (Tur 4 etapp 2).
     // amount_kr sätts till customer_pays när kortet skapas i cronen.
     const label = approveLabel('fakturera_projekt', { amount_kr: 48750 })
-    expect(label).toBe(`Godkänn & skicka — ${(48750).toLocaleString('sv-SE')} kr`)
+    expect(label).toBe('Granska')
     // Utan belopp lovas ingen påhittad siffra — men verbet står kvar.
-    expect(approveLabel('fakturera_projekt', {})).toBe('Godkänn & skicka')
+    expect(approveLabel('fakturera_projekt', {})).toBe('Granska')
   })
 
   test('okänd typ faller tillbaka på ett neutralt ord', () => {
     // Bättre att säga för lite än att lova fel.
-    expect(approveLabel('nagot_helt_nytt')).toBe('Godkänn')
+    expect(approveLabel('nagot_helt_nytt')).toBe('Granska')
   })
 })
 

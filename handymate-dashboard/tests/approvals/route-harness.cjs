@@ -1,0 +1,653 @@
+// Executes the real route with an in-memory database and NO network or credentials.
+const fs = require('node:fs'), path = require('node:path'), vm = require('node:vm')
+const ts = require('typescript'), assert = require('node:assert/strict')
+const root = path.resolve(__dirname, '../..')
+let row, mutations, canAct = true, availableSlots = [], customerRow, leadRow, quoteRow, invoiceRow, projectRow, dealRow, memberRow, bookingRows = [], smsShouldFail = false, smsUnknown = false
+class FortnoxRequestNotSentError extends Error {}
+let ownerPushCalls=[],ownerPushFail=true
+const projectSyncLogs = new Map(), fortnoxCalls = []
+let fortnoxRemote = null, loseFortnoxResponse = false, fortnoxNotSent = false
+let failDispatch=false,loseDispatch=false,dispatchWrites=0
+let workOrderRows=[]
+let memoryRow, memoryWrites=0, failMemory=false, loseMemory=false
+let priceRow, priceWrites=0, priceWriteFails=false, losePriceResponse=false
+const timeEntries=new Map();let timeInserts=0;let timeInsertMode=null,timeReadError=false
+const checklists=new Map();let checklistInserts=0
+const diaryRows=new Map();let diaryInserts=0,loseDiary=false,failDiary=false
+const facts = new Map(), factWrites = []; let failedFact = null, lostFact = null
+const inboxItems = new Map()
+const campaigns = new Map(), deliveries = [], smsDeliveries = [], bookingPosts = [], completionCalls = [], paymentCalls = [], leadActivationCalls = [], automationCalls = [], artifactCalls = []
+const db = { from(table) {
+  let values, operation = 'read', filters = [], single = false
+  const chain = new Proxy({}, { get(_, key) {
+    if (key === 'then') return resolve => {
+      const matches = r => filters.every(([k,v]) => ['payload','package_data'].includes(k) ? JSON.stringify(r[k]) === v : r[k] === v)
+      if (operation !== 'read') mutations++
+      if (table === 'pending_approvals') {
+        if (!matches(row)) return resolve({ data: [], error: null })
+        if (operation === 'update') Object.assign(row, structuredClone(values))
+        return resolve({ data: operation === 'read' ? structuredClone(row) : [{ id: row.id }], error: null })
+      }
+      if (table === 'time_entry') {
+        if(operation==='read'&&timeReadError)return resolve({data:null,error:{message:'Read unavailable'}})
+        if(operation==='insert'){timeInserts++;if(timeInsertMode!=='fail')timeEntries.set(values.time_entry_id,structuredClone(values));if(timeInsertMode==='throw')throw Error('Response lost');if(timeInsertMode)return resolve({data:null,error:{message:'Write response unavailable'}})}
+        const selected=[...timeEntries.values()].filter(matches)
+        return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
+      }
+      if (table === 'project_checklist') {
+        if (operation === 'insert') {
+          checklistInserts++
+          if (checklists.has(values.id)) return resolve({data:null,error:{code:'23505'}})
+          checklists.set(values.id,structuredClone(values))
+        }
+        const selected=[...checklists.values()].filter(matches)
+        return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
+      }
+      if (table === 'project_log') {
+        if (operation === 'insert') {
+          diaryInserts++
+          if (diaryRows.has(values.id)) return resolve({data:null,error:{code:'23505'}})
+          if (!failDiary) diaryRows.set(values.id,structuredClone(values))
+          if (loseDiary || failDiary) return resolve({data:null,error:{message:'Diary response unavailable'}})
+        }
+        return resolve({data:structuredClone([...diaryRows.values()].find(matches)||null),error:null})
+      }
+      if (table === 'agent_memories') {
+        const selected=memoryRow && matches(memoryRow) ? memoryRow : null
+        if (operation === 'update' && selected) {
+          memoryWrites++
+          if (!failMemory) Object.assign(selected,structuredClone(values))
+          if (loseMemory) return resolve({data:null,error:{message:'Lost confirmation response'}})
+        }
+        return resolve({data:structuredClone(single?selected:selected?[selected]:[]),error:null})
+      }
+      if (table === 'price_lists_v2') {
+        const selected=priceRow && matches(priceRow) ? priceRow : null
+        if (operation === 'update' && selected) {
+          priceWrites++
+          if (!priceWriteFails) Object.assign(selected,structuredClone(values))
+          if (losePriceResponse) return resolve({data:null,error:{message:'Lost price response'}})
+        }
+        return resolve({data:structuredClone(single?selected:selected?[selected]:[]),error:null})
+      }
+      if (table === 'customer_fact') {
+        if (operation === 'insert') {
+          if (facts.has(values.id)) return resolve({data:null,error:{code:'23505'}})
+          facts.set(values.id, structuredClone({...values,superseded_by:null}))
+        }
+        const selected=[...facts.values()].filter(matches).sort((a,b)=>a.id.localeCompare(b.id))
+        if (operation === 'update') {
+          selected.forEach(f=>{factWrites.push(f.id);if(f.id!==failedFact)Object.assign(f,structuredClone(values))})
+          if(selected.some(f=>f.id===lostFact))return resolve({data:null,error:{message:'Lost write response'}})
+        }
+        return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
+      }
+      if (table === 'inbox_item') {
+        if (operation === 'insert') inboxItems.set(values.inbox_item_id, structuredClone(values))
+        return resolve({ data: [...inboxItems.values()].find(matches) || null, error: null })
+      }
+      if (table === 'sms_campaign') {
+        if (operation === 'read') return resolve({ data: campaigns.get(filters.find(([k]) => k === 'campaign_id')?.[1]) || null, error: null })
+        if (operation === 'insert') campaigns.set(values.campaign_id, structuredClone(values))
+        if (operation === 'update') Object.assign(campaigns.get(filters.find(([k]) => k === 'campaign_id')[1]), values)
+        return resolve({ data: [{ campaign_id: 'x' }], error: null })
+      }
+      if (table === 'sms_campaign_recipient' && operation === 'insert') deliveries.push(...structuredClone(values))
+      if (table === 'customer') {
+        const wanted = filters.find(([key]) => key === 'customer_id')?.[1]
+        return resolve({ data: !wanted || customerRow?.customer_id === wanted ? structuredClone(customerRow) : null, error:null })
+      }
+      if (table === 'leads') {
+        const wanted = filters.find(([key]) => key === 'lead_id')?.[1]
+        const wantedBusiness = filters.find(([key]) => key === 'business_id')?.[1]
+        if (operation === 'update') {
+          if (!matches(leadRow)) return resolve({ data: [], error: null })
+          Object.assign(leadRow, structuredClone(values)); return resolve({ data: [{lead_id:leadRow.lead_id}], error:null })
+        }
+        return resolve({ data: (!wanted || leadRow?.lead_id === wanted) && (!wantedBusiness || leadRow?.business_id === wantedBusiness) ? structuredClone(leadRow) : null, error:null })
+      }
+      if (table === 'quotes') return resolve({ data: structuredClone(quoteRow), error:null })
+      if (table === 'invoice') return resolve({ data: structuredClone(invoiceRow), error:null })
+      if (table === 'v3_automation_logs') {
+        if (operation === 'insert') {
+          if (projectSyncLogs.has(values.id)) return resolve({data:null,error:{code:'23505'}})
+          projectSyncLogs.set(values.id,structuredClone(values));return resolve({data:structuredClone(values),error:null})
+        }
+        const selected=[...projectSyncLogs.values()].filter(matches)
+        if (operation === 'update') selected.forEach(item=>Object.assign(item,structuredClone(values)))
+        return resolve({data:structuredClone(operation === 'read' ? selected[0] || null : selected),error:null})
+      }
+      if (table === 'project') {
+        if (operation === 'update') { if (!matches(projectRow)) return resolve({data:[],error:null});Object.assign(projectRow,structuredClone(values));return resolve({data:[structuredClone(projectRow)],error:null}) }
+        return resolve({ data: structuredClone(projectRow), error:null })
+      }
+      if (table === 'deal') return resolve({ data: structuredClone(dealRow), error:null })
+      if (table === 'business_users' && filters.some(([key])=>key==='role')) return resolve({data:single?{id:'owner1'}:[{id:'owner1',user_id:'owner-auth',name:'Ägare'}],error:null})
+      if (['push_tokens','push_subscriptions'].includes(table)) { const device=table==='push_tokens'?{id:'expo1',token:'ExponentPushToken[test]'}:{id:'web1',endpoint:'https://push.test/secret',p256dh:'key',auth:'auth'};return resolve({data:single?device:[device],error:null}) }
+      if (table === 'business_users') return resolve({ data: structuredClone(memberRow), error:null })
+      if (table === 'work_orders') {
+        const selected=workOrderRows.filter(matches)
+        if(operation==='update'){
+          dispatchWrites++
+          if(!failDispatch)selected.forEach(item=>Object.assign(item,structuredClone(values)))
+          return resolve({data:loseDispatch?null:structuredClone(selected),error:loseDispatch?{message:'response lost'}:null})
+        }
+        return resolve({data:structuredClone(single?selected[0]||null:selected),error:null})
+      }
+      if (table === 'booking') {
+        if(operation==='update'){
+          const selected=bookingRows.filter(matches);dispatchWrites++
+          if(!failDispatch)selected.forEach(item=>Object.assign(item,structuredClone(values)))
+          return resolve({data:loseDispatch?null:structuredClone(selected),error:loseDispatch?{message:'response lost'}:null})
+        }
+        const notePattern = filters.find(([key]) => key === 'notes')?.[1]
+        if (notePattern) { const needle=String(notePattern).replaceAll('%',''); return resolve({ data: structuredClone(bookingRows.filter(item=>String(item.notes||'').includes(needle))), error:null }) }
+        const wanted = filters.find(([key]) => key === 'booking_id')?.[1]
+        return resolve({ data: wanted ? structuredClone(bookingRows.find(item => item.booking_id === wanted) || null) : structuredClone(bookingRows), error:null })
+      }
+      if (table === 'business_config') return resolve({ data: { business_name:'Testfirman', fortnox_connected:true, assigned_phone_number:'+468100000', personal_phone:'+46708888888', google_review_url:'https://example.test/review', subscription_plan:'pro', working_hours:{monday:{active:true,start:'08:00',end:'17:00'},tuesday:{active:true,start:'08:00',end:'17:00'},wednesday:{active:true,start:'08:00',end:'17:00'},thursday:{active:true,start:'08:00',end:'17:00'},friday:{active:true,start:'08:00',end:'17:00'}} }, error:null })
+      return resolve({ data: null, error: null })
+    }
+    return (...args) => { if (['single','maybeSingle'].includes(key)) single=true; if (['eq','ilike','is'].includes(String(key))) filters.push(args); if (key === 'insert' || key === 'update') { operation = key; values = args[0] }; return chain }
+  } }); return chain
+} }
+const cache = {}
+function load(file) {
+  file = path.resolve(file)
+  if (cache[file]) return cache[file]
+  const mod = { exports: {} }; cache[file] = mod.exports
+  const code = ts.transpileModule(fs.readFileSync(file,'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
+  const req = name => {
+    if (name === './owner-push-send') return {sendReviewedPush:async(table,registration,message)=>{ownerPushCalls.push({table,message});return table==='push_tokens'&&ownerPushFail?{state:'failed',error:'rejected'}:{state:'accepted',reference:'test-ref'}}}
+    if (name.startsWith('node:')) return require(name)
+    if (name === 'next/server') return { NextResponse: { json: (data, init) => Response.json(data, init) } }
+    if (name === '@/lib/supabase') return { getServerSupabase: () => db }
+    if (name === '@/lib/auth') return { getAuthenticatedBusiness: async () => ({ business_id: 'b1' }), getBusinessPlanFromConfig: () => 'pro' }
+    if (name === '@/lib/diary/write') return load(path.join(root,'lib/diary/write.ts'))
+    if (name === '@/lib/permissions') return { getCurrentUser: async () => ({ id: 'u1' }) }
+    if (name === '@/lib/fortnox') return { FortnoxRequestNotSentError, fortnoxProjectNumberFor:n=>n.replace(/\D/g,''),fortnoxProjectStatus:()=> 'ONGOING',createFortnoxProject:async(b,p)=>{if(fortnoxNotSent)throw new FortnoxRequestNotSentError('no token');fortnoxCalls.push(structuredClone(p));fortnoxRemote=structuredClone(p);if(loseFortnoxResponse)throw Error('lost response');return {ProjectNumber:p.ProjectNumber}},fortnoxRequest:async(b,method,url)=>{assert.equal(method,'GET');assert.equal(url,'/projects/1042');return {Project:structuredClone(fortnoxRemote)}} }
+    if (name === '@/lib/sms-send') return { sendSmsViaElks: async ({supabase,...args}) => { smsDeliveries.push(structuredClone(args)); return smsUnknown ? { success:false, error:'provider response lost', status:null } : smsShouldFail ? { success:false, error:'provider rejected', status:503 } : { success:true, smsId:'sms-site', elksId:'elks-site', status:200 } } }
+    if (name === '@/lib/sms-usage') return { checkSmsAllowance: async () => ({ allowed:true }) }
+    if (name === '@/lib/matte/calendar-slots') return { getAvailableSlots: async () => structuredClone(availableSlots) }
+    if (name === '@/lib/invoices/project-invoice-draft') return { byggProjektFakturaUnderlag: async () => ({ ok:true, project:{ project_id:'p1',customer_id:'c-site',quote_id:'q1' }, items:[{description:'Arbete',quantity:10,unit:'tim',unit_price:800,total:8000}], subtotal:8000,vatRate:25,vatAmount:2000,total:10000,rotRutType:'rot',rotRutDeduction:3000,customerPays:7000,hasAta:false,ataChangeIds:[] }) }
+    if (name === '@/lib/invoices/apply-payment') return { applyInvoicePayment: async args => { paymentCalls.push(structuredClone(args)); return {ok:true,transition:'to_customer_paid',remaining_rot_kr:3000,effects:[{effect:'workflows',status:args.approvalFollowUps.updateWorkflows?'succeeded':'skipped'},{effect:'customer_messages',status:args.approvalFollowUps.prepareCustomerMessages?'succeeded':'skipped',message:args.approvalFollowUps.prepareCustomerMessages?'Separata granskningskort skapade':'Valdes bort'},{effect:'payment_received_rules',status:args.approvalFollowUps.runAutomationRules?'succeeded':'skipped'}]} } }
+    if (name === '@/lib/leads/golden-path') return { activatePendingLead: async (leadId,_db,options) => { leadActivationCalls.push({leadId,options:structuredClone(options)}); return {dealId:options.createDeal?'deal1':null,dealError:null,effects:[{effect:'lead_status',status:'succeeded',message:'Status ändrad till ny'},{effect:'deal',status:options.createDeal?'succeeded':'skipped'},{effect:'internal_sms',status:options.prepareInternalSms?'succeeded':'skipped',approval_id:options.prepareInternalSms?'child-sms':undefined},{effect:'lead_received_rules',status:options.runAutomationRules?'succeeded':'skipped'}]} } }
+    if (name === '@/lib/automation-engine') return { runApprovedAutomationAction: async (...args) => { automationCalls.push({businessId:args[1],actionType:args[2],config:structuredClone(args[3]),context:structuredClone(args[4])}); return {success:true,data:{lead_id:args[4].lead_id,status:'lost'}} } }
+    if (name === '@/lib/egenkontroll/suggest-time-entry') return load(path.join(root,'lib/egenkontroll/suggest-time-entry.ts'))
+    if (name === '@/lib/approvals/artifact-write') return { approvalArtifactId: load(path.join(root,'lib/approvals/artifact-write.ts')).approvalArtifactId, insertApprovalArtifact: async (...args) => { if(['customer_fact','project_checklist','time_entry'].includes(args[1]))return load(path.join(root,'lib/approvals/artifact-write.ts')).insertApprovalArtifact(...args); artifactCalls.push({table:args[1],purpose:args[5],values:structuredClone(args[6])}); return {data:{id:`child-${artifactCalls.length}`},error:null} } }
+    if (name === '@/lib/invoices/payment-decision') return load(path.join(root, name.slice(2)+'.ts'))
+    if (name === '@/lib/projects/complete-project') return { completeProject: async args => { completionCalls.push(structuredClone({businessId:args.businessId,projectId:args.projectId,authorization:args.authorization,options:args.options})); const chosen=args.options; return { ok:true,completed:true,transitioned:true,already_completed:false,requires_approval:false,project:{project_id:'p1'},invoice_created:chosen.createInvoiceDraft?{invoice_id:'inv1',invoice_number:'1001',total:10000,status:'draft'}:null,effects:[{effect:'workflow_stage',status:'succeeded'},{effect:'auto_invoice',status:chosen.createInvoiceDraft?'succeeded':'skipped',message:chosen.createInvoiceDraft?undefined:'Fakturautkast valdes bort i granskningen'},{effect:'review_request',status:chosen.createReviewRequest?'succeeded':'skipped',message:chosen.createReviewRequest?undefined:'Kunduppföljning valdes bort i granskningen'},{effect:'job_completed_event',status:chosen.runAutomations?'attempted':'skipped'}],warnings:[] } } }
+    if (name === '@/lib/customers/namn') return { halsning: name => `Hej ${String(name || '').split(' ')[0]}!` }
+    if (name === '@/lib/sms-reply-number') return { buildSmsSuffix: name => `//${name}` }
+    if (name.startsWith('@/lib/bookings/')) return load(path.join(root, name.slice(2)+'.ts'))
+    if (name === '@/lib/approvals/routing') return { canActOnApproval: async () => canAct }
+    if (name === '@/lib/agent/learning-engine') return { recordLearningEvent: async () => ({ success: true }) }
+    if (name === '@/lib/autonomy/earned-autonomy') return { autonomyKeyFromApproval: () => null }
+    if (name.startsWith('@/lib/approvals/')) return load(path.join(root, name.slice(2)+'.ts'))
+    if (name.startsWith('./')) return load(path.resolve(path.dirname(file),name+'.ts'))
+    return new Proxy({}, { get: (_, key) => () => { throw Error(`Unexpected effect: ${name}.${String(key)}`) } })
+  }
+  vm.runInNewContext(code, { module: mod, exports: mod.exports, require: req, process: { env: { SUPABASE_SERVICE_ROLE_KEY: 'test-only' } },
+    console, Buffer, Date, fetch: async (url,init) => { if (!String(url).endsWith('/api/bookings')) throw Error('Network is forbidden in this harness'); const body=JSON.parse(init.body); bookingPosts.push(body); bookingRows.push({...body,booking_id:'book-new'}); return Response.json({ success:true, booking:{booking_id:'book-new'} }) } }, { filename: file })
+  cache[file] = mod.exports; return mod.exports
+}
+const { POST } = load(path.join(root,'app/api/approvals/[id]/route.ts'))
+const reset = () => { checklists.clear();checklistInserts=0; diaryRows.clear();diaryInserts=0;loseDiary=false;failDiary=false; memoryRow={id:'memory1',business_id:'b1',agent_id:'matte',content:'Reviewed memory',confirmed_at:null,superseded_by:null};memoryWrites=0;failMemory=false;loseMemory=false; priceRow={id:'price1',business_id:'b1',name:'Standard',hourly_rate_normal:800};priceWrites=0;priceWriteFails=false;losePriceResponse=false; facts.clear();factWrites.length=0;failedFact=null;lostFact=null; ownerPushCalls=[];ownerPushFail=true; projectSyncLogs.clear();fortnoxCalls.length=0;fortnoxRemote=null;loseFortnoxResponse=false;fortnoxNotSent=false; row = { id: 'a1', business_id: 'b1', approval_type: 'seasonal_campaign', title: 'Höst', status: 'pending', payload: { sms_text: 'Hej kund', customers: [{ customer_id: 'c1', phone_number: '+46701234567' }] } }; mutations = 0; canAct = true; campaigns.clear(); deliveries.length=0; smsDeliveries.length=0; bookingPosts.length=0; completionCalls.length=0; paymentCalls.length=0; leadActivationCalls.length=0; automationCalls.length=0; artifactCalls.length=0; smsShouldFail=false; smsUnknown=false; availableSlots=[]; customerRow={ customer_id:'c-site', name:'Anna Andersson', phone_number:'+46709999999',email:'anna@example.test',portal_token:'portal-1',portal_enabled:true,review_request_sent_at:null }; leadRow={lead_id:'l-site',business_id:'b1',customer_id:'c-site',name:'Leo Lead',phone:'+46707777777',email:'leo@example.test',notes:'Renovera hall',source:'email_forward',status:'pending_review',updated_at:'2026-09-08T01:00:00Z'}; quoteRow={quote_id:'q1',title:'Badrum',status:'accepted',customer_id:'c-site'}; invoiceRow={invoice_id:'inv1',invoice_number:'1001',fortnox_invoice_number:null,status:'sent',customer_id:'c-site',project_id:'p1',total:10000,rot_rut_type:'rot',rot_rut_deduction:3000,customer_pays:7000,paid_amount:null,paid_at:null}; projectRow={project_id:'p1',name:'Badrum hemma',status:'active',customer_id:'c-site',quote_id:'q1',lead_id:'l1'}; dealRow={id:'deal1',title:'Hallrenovering',stage_id:'stage1',assigned_to:'member1'}; memberRow={id:'member1',name:'Erik'}; bookingRows=[] }
+const post = body => POST({ json: async () => body, headers: new Headers() }, { params: { id:'a1' } })
+;(async () => {
+  reset();row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'dispatch1',member_id:'member1'}
+  bookingRows=[{booking_id:'dispatch1',business_id:'b1',assigned_to:null,assigned_user_id:null,status:'cancelled',notes:'Reviewed booking',scheduled_start:'2026-09-08T12:00:00Z'}]
+  let dispatchPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(dispatchPreview.review.confirmLabel,'Spara tilldelningen',JSON.stringify(dispatchPreview));assert(dispatchPreview.review.details.some(d=>d.label==='Uppdragets status'&&d.text==='Avbokad'));assert.equal(dispatchWrites,0)
+  bookingRows[0].assigned_to='Other'
+  assert.equal((await post({action:'approve',review_token:dispatchPreview.review_token})).status,428);assert.equal(dispatchWrites,0)
+  bookingRows[0].assigned_to=null;dispatchPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  failDispatch=true
+  let dispatchResult=await (await post({action:'approve',review_token:dispatchPreview.review_token})).json()
+  assert.equal(dispatchResult.receipt.state,'failed',JSON.stringify(dispatchResult))
+  assert.equal(row.payload.execution_result.review_evidence.dispatchPlan.before.assigned_to,null)
+  dispatchPreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  failDispatch=false;loseDispatch=true
+  dispatchResult=await (await post({action:'retry',review_token:dispatchPreview.review_token})).json()
+  assert.equal(dispatchResult.receipt.state,'saved',JSON.stringify(dispatchResult));assert.equal(bookingRows[0].assigned_user_id,'member1')
+  assert.deepEqual(row.payload.execution_result.receipt,dispatchResult.receipt)
+  const assignment=load(path.join(root,'lib/approvals/internal-writes.ts')).assignApprovalWork
+  const dispatchPayload={...row.payload,dispatchPlan:row.payload.execution_result.review_evidence.dispatchPlan}
+  assert.equal((await assignment(db,'b1',dispatchPayload)).ok,true);assert.equal(dispatchWrites,2)
+  bookingRows[0].assigned_to='Newer';bookingRows[0].assigned_user_id='newer'
+  assert.equal((await assignment(db,'b1',dispatchPayload)).ok,false);assert.equal(dispatchWrites,2)
+  loseDispatch=false
+  console.log('PASS dispatch booking route: signed preview, stale decision denied, persisted original plan, failed write, lost-response retry, durable receipt, no repeated success write or newer assignment overwrite')
+  for (const previous of [null, { name: 'Previous member', id: 'previous' }]) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'active1',member_id:'member1'}
+    bookingRows=[{booking_id:'active1',business_id:'b1',assigned_to:previous?.name??null,assigned_user_id:previous?.id??null,status:'confirmed',job_status:'scheduled',notes:'Active assignment test',scheduled_start:'2026-09-12T10:00:00Z',scheduled_end:'2026-09-12T11:00:00Z'}]
+    const original=structuredClone(bookingRows[0])
+    const preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    assert.equal(preview.review.confirmLabel,'Spara tilldelningen')
+    assert(preview.review.details.some(d=>d.label==='Uppdragets status'&&d.text==='Bekräftad'))
+    assert(preview.review.details.some(d=>d.label==='Nuvarande tilldelning'&&d.text===(previous?.name||'Ingen')))
+    assert.deepEqual(bookingRows[0],original);assert.equal(dispatchWrites,0)
+    const outcome=await (await post({action:'approve',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'saved',JSON.stringify(outcome))
+    assert.equal(dispatchWrites,1);assert.equal(bookingRows[0].assigned_to,'Erik');assert.equal(bookingRows[0].assigned_user_id,'member1')
+    for (const key of ['status','job_status','scheduled_start','scheduled_end']) assert.equal(bookingRows[0][key],original[key])
+    assert.deepEqual(row.payload.execution_result.receipt,outcome.receipt)
+    assert.equal(row.payload.execution_result.review_evidence.dispatchPlan.before.assigned_user_id,previous?.id??null)
+    assert.equal(smsDeliveries.length,0);assert.equal(bookingPosts.length,0);assert.equal(automationCalls.length,0)
+  }
+  for (const change of ['assignment','status','time','role']) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    row.approval_type='dispatch_suggestion';row.payload={context_type:'booking',context_id:'active1',member_id:'member1'}
+    bookingRows=[{booking_id:'active1',business_id:'b1',assigned_to:null,assigned_user_id:null,status:'confirmed',job_status:'scheduled',notes:'Active assignment test',scheduled_start:'2026-09-12T10:00:00Z',scheduled_end:'2026-09-12T11:00:00Z'}]
+    const preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    if(change==='assignment') Object.assign(bookingRows[0],{assigned_to:'Concurrent member',assigned_user_id:'concurrent'})
+    if(change==='status') bookingRows[0].status='cancelled'
+    if(change==='time') bookingRows[0].scheduled_start='2026-09-12T10:30:00Z'
+    if(change==='role') canAct=false
+    const changed=structuredClone(bookingRows[0])
+    const result=await post({action:'approve',review_token:preview.review_token})
+    assert.equal(result.status,change==='role'?403:428,change)
+    assert.equal(dispatchWrites,0,change);assert.deepEqual(bookingRows[0],changed)
+    assert.equal(row.status,'pending');assert.equal(smsDeliveries.length,0)
+  }
+  console.log('PASS active booking dispatch: new/replaced assignment preserves lifecycle and time; changed assignment/status/time or denied role blocks stale approval without effects (isolated DB)')
+  for(const nextPhone of [' +46700000002 ',null]) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    memberRow.phone=nextPhone
+    row.approval_type='dispatch_suggestion';row.payload={context_type:'work_order',context_id:'wo1',member_id:'member1'}
+    workOrderRows=[{id:'wo1',business_id:'b1',title:'Phone reassignment',status:'draft',assigned_to:'Old member',assigned_phone:'+46700000001'}]
+    let preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    assert(preview.review.details.some(d=>d.label==='Nuvarande telefon'&&d.text==='+46700000001'))
+    assert(preview.review.details.some(d=>d.label==='Telefon efter tilldelning'&&d.text.includes(nextPhone?nextPhone.trim():'Saknas')))
+    assert.equal(dispatchWrites,0)
+    // Changing only the source phone invalidates the reviewed decision.
+    memberRow.phone='+46700000003'
+    assert.equal((await post({action:'approve',review_token:preview.review_token})).status,428);assert.equal(dispatchWrites,0)
+    memberRow.phone=nextPhone
+    preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    failDispatch=true
+    let outcome=await (await post({action:'approve',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'failed')
+    assert.equal(workOrderRows[0].assigned_phone,'+46700000001')
+    assert.equal(row.payload.execution_result.review_evidence.dispatchPlan.before.assigned_phone,'+46700000001')
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    failDispatch=false;loseDispatch=true
+    outcome=await (await post({action:'retry',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'saved',JSON.stringify(outcome))
+    assert.equal(workOrderRows[0].assigned_to,'Erik');assert.equal(workOrderRows[0].assigned_phone,nextPhone?nextPhone.trim():null)
+    assert.equal(workOrderRows[0].status,'draft');assert.equal(smsDeliveries.length,0)
+    assert.deepEqual(row.payload.execution_result.receipt,outcome.receipt)
+    const count=dispatchWrites,p={...row.payload,dispatchPlan:row.payload.execution_result.review_evidence.dispatchPlan}
+    assert.equal((await assignment(db,'b1',p)).ok,true);assert.equal(dispatchWrites,count)
+    // A newer phone must be preserved even if the employee name did not change.
+    workOrderRows[0].assigned_phone='+46700000004'
+    assert.equal((await assignment(db,'b1',p)).ok,false);assert.equal(dispatchWrites,count)
+    assert.equal(workOrderRows[0].assigned_phone,'+46700000004')
+  }
+  for(const type of ['booking','work_order']) {
+    reset();dispatchWrites=0;failDispatch=false;loseDispatch=false
+    memberRow.phone='+46700000002'
+    row.approval_type='dispatch_suggestion';row.status='approved'
+    row.payload={context_type:type,context_id:'legacy1',member_id:'member1',execution_result:{outcome:'failed',receipt:{state:'failed',text:'Old failure'}}}
+    const target={id:'legacy1',booking_id:'legacy1',business_id:'b1',status:'draft',assigned_to:'Erik',assigned_user_id:'member1',assigned_phone:memberRow.phone}
+    workOrderRows=[target];bookingRows=[target]
+    let preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert.equal(preview.review.confirmLabel,'Bekräfta befintlig tilldelning',JSON.stringify(preview))
+    assert.equal(dispatchWrites,0)
+    const outcome=await (await post({action:'retry',review_token:preview.review_token})).json()
+    assert.equal(outcome.receipt.state,'saved');assert.equal(dispatchWrites,0)
+    assert.deepEqual(row.payload.execution_result.receipt,outcome.receipt)
+    assert.deepEqual(row.payload.execution_result.review_evidence.dispatchPlan.before,row.payload.execution_result.review_evidence.dispatchPlan.after)
+    if(type==='work_order') {
+      row.payload.execution_result={outcome:'failed',receipt:{state:'failed'},review_evidence:{dispatchPlan:{type,id:'legacy1',memberId:'member1',before:{assigned_to:'Old'},after:{assigned_to:'Erik'}}}}
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert.equal(preview.review.confirmLabel,'Bekräfta befintlig tilldelning')
+      const restored=await (await post({action:'retry',review_token:preview.review_token})).json()
+      assert.equal(restored.receipt.state,'saved');assert.equal(dispatchWrites,0)
+      row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}};target.assigned_phone='+46700000099'
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert(!preview.review.confirmLabel);assert.equal(dispatchWrites,0)
+      target.assigned_phone=memberRow.phone
+    }
+    // Missing evidence cannot authorize overwriting a different saved assignment.
+    row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}};target.assigned_to='Different'
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert(!preview.review.confirmLabel);assert.equal(dispatchWrites,0)
+  }
+  console.log('PASS work-order name/phone pairing, missing-phone clearing, source-phone staleness, failed/lost-response retry and phone-only conflicts; legacy matching assignments recover receipt without writes and conflicts remain blocked')
+  reset();row.approval_type='tidrapport_forslag';row.payload={project_id:'p1',booking_date:'2026-02-31',suggested_minutes:75}
+  let timePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(timeInserts,0);assert(!timePreview.review?.canExecute)
+  row.payload.booking_date='2026-09-08'
+  timePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(timePreview.review.confirmLabel,'Registrera tidrapporten',JSON.stringify(timePreview));assert.equal(timeInserts,0)
+  let timeResult=await (await post({action:'approve',review_token:timePreview.review_token})).json()
+  assert.equal(timeResult.receipt.state,'saved',JSON.stringify(timeResult));assert.equal(timeInserts,1)
+  const savedTime=[...timeEntries.values()][0]
+  assert.equal(savedTime.duration_minutes,75);assert.equal(savedTime.work_date,'2026-09-08')
+  assert.equal(savedTime.business_user_id,null);assert.equal(savedTime.approval_status,'approved');assert.equal(savedTime.is_billable,true)
+  assert.deepEqual(row.payload.execution_result.receipt,timeResult.receipt)
+  await post({action:'approve',review_token:timePreview.review_token});assert.equal(timeInserts,1)
+  console.log('PASS time proposal real route/artifact: invalid date rejected, explicit CTA, exact approved billable row and receipt, duplicate decision denied')
+  for(const mode of ['error','throw','fail']) {
+    reset();timeEntries.clear();timeInserts=0;timeInsertMode=mode;timeReadError=false
+    row.approval_type='tidrapport_forslag';row.payload={project_id:'p1',project_name:'Reviewed project',booking_date:'2026-09-08',suggested_minutes:75,assigned_user_id:'member1'}
+    let preview=await (await post({action:'preview',decision_action:'approve'})).json()
+    assert(preview.review.details.some(d=>d.label==='Beskrivning'&&d.text==='Tidrapport-förslag · Reviewed project'))
+    let result=await (await post({action:'approve',review_token:preview.review_token})).json()
+    assert.equal(result.receipt.state,mode==='fail'?'failed':'saved',JSON.stringify(result))
+    assert.equal(timeInserts,1)
+    if(mode==='fail') {
+      assert.equal(timeEntries.size,0);timeInsertMode=null
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert.equal(preview.review.confirmLabel,'Registrera tidrapporten')
+      result=await (await post({action:'retry',review_token:preview.review_token})).json()
+      assert.equal(result.receipt.state,'saved');assert.equal(timeEntries.size,1)
+    }
+    const entry=[...timeEntries.values()][0],baseline=structuredClone(entry),count=timeInserts
+    row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}}
+    timeInsertMode=null
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert.equal(preview.review.confirmLabel,'Bekräfta registrerad tid')
+    result=await (await post({action:'retry',review_token:preview.review_token})).json()
+    assert.equal(result.receipt.state,'saved');assert.equal(timeInserts,count)
+    assert.deepEqual(entry,baseline);assert.deepEqual(row.payload.execution_result.receipt,result.receipt)
+    for(const change of [{duration_minutes:90},{description:'Later edited note'},{work_date:'2026-09-07'},{business_user_id:'other'},{is_billable:false},{approval_status:'pending'}]) {
+      Object.assign(entry,baseline,change);row.payload.execution_result={outcome:'failed',receipt:{state:'failed'}}
+      preview=await (await post({action:'preview',decision_action:'retry'})).json()
+      assert(!preview.review.confirmLabel,JSON.stringify(change));assert.equal(timeInserts,count)
+    }
+    Object.assign(entry,baseline)
+    timeReadError=true
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    assert(!preview.review.confirmLabel);assert.equal(timeInserts,count)
+    timeReadError=false
+    preview=await (await post({action:'preview',decision_action:'retry'})).json()
+    entry.duration_minutes=80
+    assert.equal((await post({action:'retry',review_token:preview.review_token})).status,422)
+    assert.equal(timeInserts,count);assert.equal(entry.duration_minutes,80)
+  }
+  timeInsertMode=null;timeReadError=false
+  console.log('PASS time proposal lost/error responses read back exact row; real failed insert can retry; existing row is reviewed and not reinserted; edited fields/read error/stale snapshot block without overwriting')
+  reset();row.approval_type='checklist_forslag';row.payload={project_id:'p1',template_name:'Safety check',template_items:[{id:'one',text:'Check fixture',required:true,checked:true},{id:'two',text:'Read note',required:false,checked:false}]}
+  let checklistPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(checklistPreview.review.confirmLabel,'Skapa checklistan',JSON.stringify(checklistPreview));assert.equal(checklistInserts,0)
+  assert(checklistPreview.review.details.some(d=>d.label.includes('obligatorisk')&&d.text==='Check fixture'))
+  const checklistResult=await (await post({action:'approve',review_token:checklistPreview.review_token})).json()
+  assert.equal(checklistResult.receipt.state,'saved',JSON.stringify(checklistResult));assert.equal(checklistInserts,1)
+  const savedChecklist=[...checklists.values()][0];assert(savedChecklist.items.every(i=>i.checked===false));assert.equal(savedChecklist.status,'in_progress')
+  assert.equal(row.payload.execution_result.artifacts.checklist_id,savedChecklist.id)
+  assert.deepEqual(row.payload.execution_result.receipt,checklistResult.receipt)
+  await post({action:'approve',review_token:checklistPreview.review_token});assert.equal(checklistInserts,1)
+  console.log('PASS checklist route and real artifact writer: exact required items, initial unchecked state, one persisted checklist, matching receipt and duplicate decision protection')
+  reset();row.approval_type='project_log_note';row.payload={project_id:'p1',recording_id:'call-test',summary:' Reviewed diary text ',call_date:'2026-09-07'}
+  let diaryPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(diaryPreview.review.confirmLabel,'Spara i dagboken',JSON.stringify(diaryPreview))
+  assert(diaryPreview.review.details.some(d=>d.label==='Dagboksdatum'&&d.text==='2026-09-07'));assert.equal(diaryInserts,0)
+  failDiary=true;let diaryResult=await (await post({action:'approve',review_token:diaryPreview.review_token})).json()
+  assert.equal(diaryResult.receipt.state,'failed',JSON.stringify(diaryResult))
+  diaryPreview=await (await post({action:'preview',decision_action:'retry'})).json();failDiary=false;loseDiary=true
+  diaryResult=await (await post({action:'retry',review_token:diaryPreview.review_token})).json()
+  assert.equal(diaryResult.receipt.state,'saved',JSON.stringify(diaryResult));assert.equal(diaryRows.size,1)
+  assert.equal(diaryRows.get('log_call_call-test').description,'Reviewed diary text')
+  assert.deepEqual(row.payload.execution_result.receipt,diaryResult.receipt)
+  const diaryExecutor=load(path.join(root,'lib/approvals/diary-note.ts')).executeDiaryNote
+  const diaryPlan=row.payload.execution_result.review_evidence.diaryNote
+  assert.equal((await diaryExecutor(db,'b1',null,diaryPlan)).ok,true);assert.equal(diaryInserts,2)
+  diaryRows.get('log_call_call-test').description='Other content'
+  assert.equal((await diaryExecutor(db,'b1',null,diaryPlan)).ok,false);assert.equal(diaryInserts,2)
+  console.log('PASS diary route and real writer: exact date/text, failed insert, reviewed retry, lost insert response, stable row, conflicting duplicate rejected and persisted receipt')
+  reset();row.approval_type='agent_memory_confirmation';row.payload={memory_id:'memory1'}
+  let memoryPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(memoryPreview.review.confirmLabel,'Bekräfta minnet',JSON.stringify(memoryPreview));assert.equal(memoryWrites,0)
+  memoryRow.content='Changed memory'
+  assert.equal((await post({action:'approve',review_token:memoryPreview.review_token})).status,428);assert.equal(memoryWrites,0)
+  memoryRow.content='Reviewed memory';memoryPreview=await (await post({action:'preview',decision_action:'approve'})).json();failMemory=true
+  let memoryResult=await (await post({action:'approve',review_token:memoryPreview.review_token})).json()
+  assert.equal(memoryResult.receipt.state,'failed',JSON.stringify(memoryResult));assert.equal(memoryRow.confirmed_at,null)
+  memoryPreview=await (await post({action:'preview',decision_action:'retry'})).json();failMemory=false;loseMemory=true
+  memoryResult=await (await post({action:'retry',review_token:memoryPreview.review_token})).json()
+  assert.equal(memoryResult.receipt.state,'saved',JSON.stringify(memoryResult));assert(memoryRow.confirmed_at)
+  assert.deepEqual(row.payload.execution_result.receipt,memoryResult.receipt)
+  const memoryExecutor=load(path.join(root,'lib/approvals/memory-confirmation.ts')).executeMemoryConfirmation
+  const memoryPlan={id:'memory1',content:'Reviewed memory',agent_id:'matte'},stamp=memoryRow.confirmed_at
+  assert.equal((await memoryExecutor(db,'b1',memoryPlan)).ok,true);assert.equal(memoryWrites,2);assert.equal(memoryRow.confirmed_at,stamp)
+  assert.equal((await memoryExecutor(db,'foreign',memoryPlan)).ok,false)
+  memoryRow.content='Changed again';assert.equal((await memoryExecutor(db,'b1',memoryPlan)).ok,false)
+  console.log('PASS memory confirmation route: stale review, failed update, reviewed retry, lost response readback, immutable confirmation timestamp, tenant/content guards and durable receipt')
+  reset();row.approval_type='price_adjustment';row.payload={price_list_id:'price1',suggested_rate:950}
+  let pricePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(pricePreview.review.confirmLabel,'Ändra timpriset',JSON.stringify(pricePreview))
+  priceRow.hourly_rate_normal=850
+  assert.equal((await post({action:'approve',review_token:pricePreview.review_token})).status,428);assert.equal(priceWrites,0)
+  priceRow.hourly_rate_normal=800;pricePreview=await (await post({action:'preview',decision_action:'approve'})).json();priceWriteFails=true
+  let priceResult=await (await post({action:'approve',review_token:pricePreview.review_token})).json()
+  assert.equal(priceResult.receipt.state,'failed',JSON.stringify(priceResult));assert.equal(priceRow.hourly_rate_normal,800)
+  pricePreview=await (await post({action:'preview',decision_action:'retry'})).json();priceWriteFails=false;losePriceResponse=true
+  priceResult=await (await post({action:'retry',review_token:pricePreview.review_token})).json()
+  assert.equal(priceResult.receipt.state,'saved',JSON.stringify(priceResult));assert.equal(priceRow.hourly_rate_normal,950)
+  assert.deepEqual(row.payload.execution_result.receipt,priceResult.receipt)
+  const priceExecutor=load(path.join(root,'lib/approvals/price-adjustment.ts')).executePriceAdjustment
+  await priceExecutor(db,'b1',{id:'price1',before:800,after:950});assert.equal(priceWrites,2)
+  assert.equal((await priceExecutor(db,'foreign',{id:'price1',before:800,after:950})).ok,false)
+  priceRow.hourly_rate_normal=1000
+  assert.equal((await priceExecutor(db,'b1',{id:'price1',before:800,after:950})).ok,false);assert.equal(priceWrites,2)
+  console.log('PASS price adjustment route: stale decision denied, failed write, reviewed retry, readback after lost response, stored receipt, no repeated update, tenant/conflict guards')
+  reset();row.approval_type='customer_fact';row.payload={customer_id:'c-site',fact_type:'contact',content:'New reviewed contact'}
+  for(const id of ['old-a','old-b'])facts.set(id,{id,business_id:'b1',customer_id:'c-site',fact_type:'contact',content:`Previous ${id}`,superseded_by:null})
+  let factPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(factPreview.review.confirmLabel,'Spara kunduppgiften',JSON.stringify(factPreview));assert.equal(mutations,0)
+  facts.get('old-a').content='Changed after preview'
+  assert.equal((await post({action:'approve',review_token:factPreview.review_token})).status,428);assert.equal(facts.size,2)
+  facts.get('old-a').content='Previous old-a'
+  factPreview=await (await post({action:'preview',decision_action:'approve'})).json();failedFact='old-b'
+  let factResult=await (await post({action:'approve',review_token:factPreview.review_token})).json()
+  assert.equal(factResult.receipt.state,'partial',JSON.stringify(factResult));assert.match(factResult.receipt.text,/1 av 2/)
+  assert.equal(facts.size,3);assert.equal(row.payload.execution_result.results.length,2)
+  assert.deepEqual(row.payload.execution_result.receipt,factResult.receipt)
+  const savedFactId=row.payload.execution_result.artifacts.fact_id
+  assert.equal(facts.get('old-a').superseded_by,savedFactId)
+  factPreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  assert.equal(factPreview.review.confirmLabel,'Slutför ersättningarna',JSON.stringify(factPreview))
+  canAct=false;assert.equal((await post({action:'retry',review_token:factPreview.review_token})).status,403);canAct=true
+  failedFact=null;lostFact='old-b'
+  factResult=await (await post({action:'retry',review_token:factPreview.review_token})).json()
+  assert.equal(factResult.receipt.state,'saved',JSON.stringify(factResult));assert.match(factResult.receipt.text,/2 av 2/)
+  assert.equal(facts.size,3);assert.equal(factWrites.filter(id=>id==='old-a').length,1);assert.equal(factWrites.filter(id=>id==='old-b').length,2)
+  assert.equal(row.payload.execution_result.artifacts.fact_id,savedFactId)
+  assert.deepEqual(row.payload.execution_result.receipt,factResult.receipt);assert.equal(row.payload.execution_result.results.length,2)
+  assert.equal((await post({action:'retry',review_token:factPreview.review_token})).status,428)
+  assert.equal(facts.size,3)
+  console.log('PASS customer_fact HTTP handlers: signed stale preview, partial receipt/results persisted, permission denial, selective retry, lost write response, stable artifact and duplicate retry denial')
+  reset()
+  for (const action of ['approve','edit','retry']) { assert.equal((await post({action})).status,428); assert.equal(mutations,0) }
+  canAct=false; assert.equal((await post({ action:'preview',decision_action:'approve' })).status,403); assert.equal(mutations,0); canAct=true
+  const preview = await (await post({action:'preview', decision_action:'edit',edited_payload:{sms_text:'Min granskade text'}})).json()
+  assert.equal(mutations,0); assert.equal(preview.review.messages[0].text,'Min granskade text')
+  const body = { action:'edit',edited_payload:{sms_text:'Min granskade text'},review_token:preview.review_token }
+  const response = await post(body); assert.equal(response.status,200)
+  const result = await response.json(); assert.equal(result.execution.queued,true); assert.equal(row.status,'approved')
+  assert.equal([...campaigns.values()][0].message, 'Min granskade text'); assert.equal(deliveries.length,1)
+  assert.equal(deliveries[0].phone_number,preview.review.messages[0].recipients[0])
+  await post(body); assert.equal(deliveries.length,1); assert.equal(campaigns.size,1)
+  reset();row.approval_type='automation';row.payload={project_id:'p1',rule_action_type:'sync_to_fortnox',rule_action_config:{entity_type:'project'}};Object.assign(projectRow,{business_id:'b1',project_number:'P-1042',fortnox_project_number:null})
+  let syncPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0);assert.equal(fortnoxCalls.length,0)
+  projectRow.name='Changed';assert.equal((await post({action:'approve',review_token:syncPreview.review_token})).status,428);assert.equal(fortnoxCalls.length,0)
+  syncPreview=await (await post({action:'preview',decision_action:'approve'})).json();loseFortnoxResponse=true
+  let syncResult=await (await post({action:'approve',review_token:syncPreview.review_token})).json();assert.equal(syncResult.receipt.state,'partial',JSON.stringify(syncResult));assert.equal(fortnoxCalls.length,1)
+  syncPreview=await (await post({action:'preview',decision_action:'retry'})).json();assert.equal(syncPreview.review.confirmLabel,'Koppla det hittade Fortnox-projektet',JSON.stringify(syncPreview))
+  assert.equal(projectRow.fortnox_project_number,null)
+  fortnoxRemote.Description='Another project';assert.equal((await post({action:'retry',review_token:syncPreview.review_token})).status,422);assert.equal(fortnoxCalls.length,1);fortnoxRemote.Description=fortnoxCalls[0].Description
+  syncResult=await (await post({action:'retry',review_token:syncPreview.review_token})).json();assert.equal(syncResult.receipt.state,'saved',JSON.stringify(syncResult));assert.equal(projectRow.fortnox_project_number,'1042');assert.equal(fortnoxCalls.length,1)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(syncResult.receipt))
+  projectSyncLogs.clear();row.payload.execution_result.receipt.state='partial';assert.equal((await post({action:'preview',decision_action:'retry'})).status,422);assert.equal(fortnoxCalls.length,1)
+  reset();row.approval_type='automation';row.payload={project_id:'p1',rule_action_type:'sync_to_fortnox',rule_action_config:{entity_type:'project'}};Object.assign(projectRow,{business_id:'b1',project_number:'P-1042',fortnox_project_number:null})
+  syncPreview=await (await post({action:'preview',decision_action:'approve'})).json();fortnoxNotSent=true
+  syncResult=await (await post({action:'approve',review_token:syncPreview.review_token})).json();assert.equal(syncResult.receipt.state,'failed');assert.equal(fortnoxCalls.length,0)
+  fortnoxNotSent=false;syncPreview=await (await post({action:'preview',decision_action:'retry'})).json();syncResult=await (await post({action:'retry',review_token:syncPreview.review_token})).json();assert.equal(syncResult.receipt.state,'saved',JSON.stringify(syncResult));assert.equal(fortnoxCalls.length,1)
+  reset();row.approval_type='automation';row.payload={project_id:'p1',rule_action_type:'sync_to_fortnox',rule_action_config:{entity_type:'project'}};Object.assign(projectRow,{business_id:'b1',project_number:'P-1042',fortnox_project_number:null})
+  syncPreview=await (await post({action:'preview',decision_action:'approve'})).json();loseFortnoxResponse=true;await post({action:'approve',review_token:syncPreview.review_token});fortnoxRemote.Description='Verified renamed project'
+  syncPreview=await (await post({action:'preview',decision_action:'retry'})).json();assert.equal(syncPreview.review.choices[0].required,true);const beforeConflictDecision=mutations
+  assert.equal((await post({action:'retry',review_token:syncPreview.review_token})).status,422);assert.equal(mutations,beforeConflictDecision);assert.equal(projectRow.fortnox_project_number,null)
+  syncResult=await (await post({action:'retry',review_token:syncPreview.review_token,action_overrides:{confirm_project_identity:'approved'}})).json();assert.equal(syncResult.receipt.state,'saved',JSON.stringify(syncResult));assert.equal(fortnoxCalls.length,1);assert.equal(fortnoxRemote.Description,'Verified renamed project');assert.equal(projectRow.fortnox_project_number,'1042')
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(syncResult.receipt))
+  reset();row.approval_type='automation';row.payload={rule_action_type:'notify_owner',rule_action_config:{title:'Granskad ägarnotis',body:'Exakt text',url:'/dashboard'}}
+  let pushPreview=await (await post({action:'preview',decision_action:'approve'})).json();assert.equal(mutations,0);assert.equal(pushPreview.review.details[0].text,'Granskad ägarnotis')
+  let pushResult=await (await post({action:'approve',review_token:pushPreview.review_token})).json();assert.equal(pushResult.receipt.state,'partial',JSON.stringify(pushResult));assert.equal(ownerPushCalls.length,2)
+  ownerPushFail=false;pushPreview=await (await post({action:'preview',decision_action:'retry'})).json();pushResult=await (await post({action:'retry',review_token:pushPreview.review_token})).json();assert.equal(pushResult.receipt.state,'sent',JSON.stringify(pushResult));assert.equal(ownerPushCalls.length,3);assert.equal(ownerPushCalls.filter(c=>c.table==='push_subscriptions').length,1)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(pushResult.receipt));assert(ownerPushCalls.every(c=>c.message.body==='Exakt text'))
+  reset();row.approval_type='automation';row.payload={rule_action_type:'create_approval',rule_action_config:{title:'Ring kunden'}}
+  const instructionPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  const instructionResult=await (await post({action:'approve',review_token:instructionPreview.review_token})).json()
+  assert.equal(instructionResult.execution.executed,false,JSON.stringify(instructionResult));assert.equal(automationCalls.length,0);assert.equal(artifactCalls.length,0);assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='automation'; row.created_at='2026-09-08T12:00:00Z'; row.payload={customer_id:'c-site',rule_action_type:'schedule_followup',rule_action_config:{days_until:2,description:'Ring {{customer_name}}'}}
+  const followupPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0); assert(followupPreview.review.details.some(d=>d.text==='Ring Anna Andersson (senast 2026-09-10)'))
+  customerRow.name='Ny kundtext'; assert.equal((await post({action:'approve',review_token:followupPreview.review_token})).status,428)
+  assert.equal(automationCalls.length,0)
+  const updatedFollowup=await (await post({action:'preview',decision_action:'approve'})).json()
+  const followupResult=await (await post({action:'approve',review_token:updatedFollowup.review_token})).json()
+  assert.equal(followupResult.receipt.state,'saved',JSON.stringify(followupResult)); assert.equal(inboxItems.size,1)
+  assert(followupResult.receipt.text.includes('Ny kundtext')); assert.equal(automationCalls.length,0)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(followupResult.receipt))
+  reset(); row.approval_type='automation'; row.payload={entity_id:'l-site',rule_action_type:'update_status',rule_action_config:{entity:'lead',new_status:'contacted'}}
+  const statusPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0); assert(statusPreview.review.details.some(d=>d.label==='Önskad status'&&d.text==='contacted'))
+  const statusResult=await (await post({action:'approve',review_token:statusPreview.review_token})).json()
+  assert.equal(statusResult.receipt.state,'saved',JSON.stringify(statusResult)); assert.equal(leadRow.status,'contacted'); assert.equal(automationCalls.length,0)
+  assert.equal(JSON.stringify(row.payload.execution_result.receipt),JSON.stringify(statusResult.receipt))
+  reset(); row.approval_type='confirm_payment'; row.payload={invoice_id:'inv1',invoice_number:'1001',customer_id:'c-site',total:10000}
+  let paymentPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(paymentPreview.review.choices.length,3); assert(paymentPreview.review.details.some(d=>d.label==='Registreras som betalt'&&d.text==='7 000 kr'))
+  assert(paymentPreview.review.details.some(d=>d.label==='Återstår från Skatteverket'&&d.text==='3 000 kr')); assert(paymentPreview.review.effect.includes('Inget kundmeddelande skickas'))
+  invoiceRow.total=11000
+  assert.equal((await post({action:'approve',review_token:paymentPreview.review_token})).status,422); assert.equal(paymentCalls.length,0)
+  invoiceRow.total=10000; paymentPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  const paymentResponse=await post({action:'approve',review_token:paymentPreview.review_token,action_overrides:{update_workflows:'approved',prepare_customer_messages:'approved',run_automation_rules:'rejected'}})
+  const paymentResult=await paymentResponse.json(); assert.equal(paymentResponse.status,200,JSON.stringify(paymentResult)); assert.equal(paymentCalls.length,1)
+  assert.deepEqual(paymentCalls[0].approvalFollowUps,{approvalId:'a1',updateWorkflows:true,prepareCustomerMessages:true,runAutomationRules:false})
+  assert.equal(paymentResult.receipt.state,'saved'); assert(paymentResult.receipt.text.includes('Kundbesked: klart')); assert(paymentResult.receipt.text.includes('Betalningsregler: inte utfört'))
+  reset(); row.approval_type='lead_review'; row.payload={lead_id:'l-site'}
+  let activationPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(activationPreview.review.choices.length,3); assert.equal(leadActivationCalls.length,0)
+  assert(activationPreview.review.details.some(d=>d.label==='Kund'&&d.text==='Anna Andersson'))
+  assert(activationPreview.review.details.some(d=>d.label==='Internt SMS'&&d.text.includes('Ny lead')))
+  assert(activationPreview.review.effect.includes('SMS:et skickas inte'),activationPreview.review.effect)
+  leadRow.notes='Ändrat underlag'
+  assert.equal((await post({action:'approve',review_token:activationPreview.review_token})).status,428); assert.equal(leadActivationCalls.length,0)
+  leadRow.notes='Renovera hall'; activationPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  const activationResponse=await post({action:'approve',review_token:activationPreview.review_token,action_overrides:{create_deal:'approved',prepare_internal_sms:'approved',run_automation_rules:'rejected'}})
+  const activationResult=await activationResponse.json(); assert.equal(activationResponse.status,200,JSON.stringify(activationResult)); assert.equal(leadActivationCalls.length,1)
+  assert.deepEqual(leadActivationCalls[0].options,{businessId:'b1',approvalId:'a1',createDeal:true,prepareInternalSms:true,runAutomationRules:false,reviewedInternalPhone:'+46708888888',reviewedInternalMessage:activationPreview.review.details.find(d=>d.label==='Internt SMS').text})
+  assert.equal(activationResult.receipt.state,'saved'); assert(activationResult.receipt.text.includes('Internnotis: klart')); assert(activationResult.receipt.text.includes('Leadregler: inte utfört'))
+  reset(); row.approval_type='lead_review'; row.payload={lead_id:'l-site'}; leadRow.business_id='foreign'
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(leadActivationCalls.length,0)
+  reset(); row.approval_type='automation'; row.payload={lead_id:'l-site',entity_id:'l-site',customer_name:'Leo Lead',rule_action_type:'reject_lead',rule_action_config:{sms_template:'Hej {{customer_name}}, vi går inte vidare just nu.'}}
+  let rejectLeadPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(rejectLeadPreview.review.choices.length,1); assert.equal(rejectLeadPreview.review.messages.length,0); assert(rejectLeadPreview.review.details.some(d=>d.label==='Kund-SMS'&&d.text.includes('Hej Leo Lead'))); assert(rejectLeadPreview.review.effect.includes('skickas inte'))
+  leadRow.status='contacted'; assert.equal((await post({action:'approve',review_token:rejectLeadPreview.review_token})).status,428); assert.equal(automationCalls.length,0)
+  leadRow.status='pending_review'; rejectLeadPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  const rejectLeadResponse=await post({action:'approve',review_token:rejectLeadPreview.review_token,action_overrides:{prepare_rejection_sms:'approved'}}); const rejectLeadResult=await rejectLeadResponse.json()
+  assert.equal(rejectLeadResponse.status,200,JSON.stringify(rejectLeadResult)); assert.equal(automationCalls.length,1); assert.equal(automationCalls[0].actionType,'reject_lead'); assert.equal(artifactCalls.length,1); assert.equal(artifactCalls[0].values.approval_type,'send_sms'); assert.equal(artifactCalls[0].values.payload.to,leadRow.phone)
+  assert.equal(rejectLeadResult.receipt.state,'saved'); assert(rejectLeadResult.receipt.text.includes('Kundbesked: klart'))
+  reset(); row.approval_type='autopilot_package'; row.payload={}; row.package_data={actions:[
+    {id:'sms-part',type:'customer_sms',title:'Kundbesked',data:{customer_id:'c-site',to:'+46700000000',message:'Exakt paketmeddelande'}},
+    {id:'booking-part',type:'booking_suggestion',title:'Boka besök',data:{customer_id:'c-site',scheduled_start:'2026-09-20T08:00:00Z',scheduled_end:'2026-09-20T09:00:00Z',notes:'Paketbokning'}},
+  ]}
+  let packagePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(packagePreview.review.messages[0].recipients[0],customerRow.phone_number); assert(packagePreview.review.details.some(d=>d.label==='Boka besök'&&d.text.includes('2026-09-20')))
+  smsShouldFail=true; let packageResponse=await post({action:'approve',review_token:packagePreview.review_token}); let packageResult=await packageResponse.json()
+  assert.equal(packageResponse.status,200,JSON.stringify(packageResult)); assert.equal(packageResult.receipt.state,'partial'); assert.equal(bookingPosts.length,1); assert.equal(smsDeliveries.length,1)
+  assert.equal(row.payload.execution_result.results.find(r=>r.id==='booking-part').ok,true); assert.equal(row.payload.execution_result.results.find(r=>r.id==='sms-part').delivery_state,'rejected')
+  smsShouldFail=false; packagePreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  assert.equal(packagePreview.review.messages.length,1); assert(packagePreview.review.effect.includes('endast om')); assert(packagePreview.review.details.some(d=>d.label==='Boka besök'&&d.text.includes('körs inte igen')))
+  packageResponse=await post({action:'retry',review_token:packagePreview.review_token}); packageResult=await packageResponse.json()
+  assert.equal(packageResponse.status,200,JSON.stringify(packageResult)); assert.equal(packageResult.receipt.state,'saved'); assert.equal(bookingPosts.length,1,'successful booking part must not run again'); assert.equal(smsDeliveries.length,2)
+  reset(); row.approval_type='autopilot_package'; row.payload={}; row.package_data={actions:[{id:'sms-only',type:'customer_sms',title:'SMS',data:{customer_id:'c-site',message:'Osäkert SMS'}}]}
+  packagePreview=await (await post({action:'preview',decision_action:'approve'})).json(); smsUnknown=true
+  packageResult=await (await post({action:'approve',review_token:packagePreview.review_token})).json(); assert.equal(packageResult.receipt.state,'partial'); assert(packageResult.receipt.text.includes('skicka inte igen'))
+  assert.equal((await post({action:'preview',decision_action:'retry'})).status,422); assert.equal(smsDeliveries.length,1)
+  reset(); row.approval_type='four_eyes_project_close'; row.payload={project_id:'p1',responsible_name:'Erik'}
+  const closePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(mutations,0); assert.equal(closePreview.review.choices.length,3); assert(closePreview.review.details.some(d=>d.label==='Kunden betalar'&&d.text==='7 000 kr'))
+  assert(closePreview.review.details.some(d=>d.label==='Ansvarig'&&d.text==='Erik'))
+  assert(closePreview.review.effect.includes('skickas aldrig direkt'))
+  const closeResponse=await post({action:'approve',review_token:closePreview.review_token,action_overrides:{create_invoice_draft:'rejected',create_review_request:'approved',run_automations:'rejected'}})
+  const closeResult=await closeResponse.json(); assert.equal(closeResponse.status,200,JSON.stringify(closeResult))
+  assert.equal(completionCalls.length,1,JSON.stringify(closeResult)); assert.deepEqual(completionCalls[0].options,{createInvoiceDraft:false,createReviewRequest:true,runAutomations:false})
+  assert.equal(closeResult.receipt.state,'saved'); assert(closeResult.receipt.text.includes('Fakturautkast: inte utfört')); assert(closeResult.receipt.text.includes('Kunduppföljning: klart'))
+  reset(); row.approval_type='four_eyes_project_close'; row.payload={project_id:'p1'}
+  const stalePreview=await (await post({action:'preview',decision_action:'approve'})).json(); projectRow.name='Ändrat projekt'
+  assert.equal((await post({action:'approve',review_token:stalePreview.review_token})).status,428); assert.equal(completionCalls.length,0)
+  reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',customerName:'Fel namn',phone:'+46709999999'},duration_hours:1,responsible_name:'Erik'}
+  availableSlots=[{start:'2026-09-09T08:00:00Z',end:'2026-09-09T09:00:00Z',label:'onsdag 9 sep kl 10:00–11:00'}]
+  let sitePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert(sitePreview.review?.messages?.[0],JSON.stringify(sitePreview)); assert.equal(smsDeliveries.length,0); assert.equal(sitePreview.review.messages[0].recipients[0],'+46709999999'); assert(sitePreview.review.messages[0].text.includes('onsdag 9 sep'))
+  assert(sitePreview.review.details.some(d=>d.label==='Ansvarig'&&d.text==='Erik')); assert(sitePreview.review.effect.includes('Ingen kalender'))
+  availableSlots=[{start:'2026-09-10T12:00:00Z',end:'2026-09-10T13:00:00Z',label:'torsdag 10 sep kl 14:00–15:00'}]
+  assert.equal((await post({action:'approve',review_token:sitePreview.review_token})).status,428); assert.equal(smsDeliveries.length,0)
+  sitePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  const siteResult=await (await post({action:'approve',review_token:sitePreview.review_token})).json()
+  assert.equal(smsDeliveries.length,1,JSON.stringify(siteResult)); assert.equal(smsDeliveries[0].message,sitePreview.review.messages[0].text); assert.equal(smsDeliveries[0].to,sitePreview.review.messages[0].recipients[0])
+  assert.deepEqual(row.payload.execution_result.review_evidence.slots,availableSlots); assert.equal(siteResult.receipt.state,'sent')
+  reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',phone:'+46701111111'},customer_reply_pending:'Färdig text'}
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'}}; customerRow=null
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='propose_site_visit'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'}}
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='reschedule_request'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'},booking_id:'book-current',available_slots:[{label:'gammal tid'}]}
+  bookingRows=[{booking_id:'book-current',customer_id:'c-site',project_id:'p1',scheduled_start:'2026-09-09T08:00:00Z',scheduled_end:'2026-09-09T09:00:00Z',status:'confirmed',assigned_to:'Erik',assigned_user_id:'member1'}]
+  availableSlots=[{start:'2026-09-11T08:00:00Z',end:'2026-09-11T09:00:00Z',label:'fredag 11 sep kl 10:00–11:00'}]
+  let reschedulePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert(reschedulePreview.review.messages[0].text.includes('fredag 11 sep')); assert(!reschedulePreview.review.messages[0].text.includes('gammal tid'))
+  assert(reschedulePreview.review.details.some(d=>d.label==='Befintlig bokning'&&d.text.includes('2026-09-09')))
+  assert(reschedulePreview.review.details.some(d=>d.label==='Ansvarig'&&d.text==='Erik'))
+  assert(reschedulePreview.review.details.some(d=>d.label==='Projektföljd'&&d.text.includes('Badrum hemma')))
+  assert(reschedulePreview.review.effect.includes('Ingen bokning skapas eller flyttas')); assert.equal(smsDeliveries.length,0)
+  availableSlots=[{start:'2026-09-12T08:00:00Z',end:'2026-09-12T09:00:00Z',label:'lördag 12 sep kl 10:00–11:00'}]
+  assert.equal((await post({action:'approve',review_token:reschedulePreview.review_token})).status,428); assert.equal(smsDeliveries.length,0)
+  reschedulePreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  smsShouldFail=true
+  let rescheduleResponse=await post({action:'approve',review_token:reschedulePreview.review_token})
+  let rescheduleResult=await rescheduleResponse.json(); assert.equal(rescheduleResponse.status,200,JSON.stringify(rescheduleResult)); assert.equal(rescheduleResult.receipt.state,'failed')
+  const failedText=reschedulePreview.review.messages[0].text; const failedSlots=structuredClone(row.payload.execution_result.review_evidence.slots)
+  availableSlots=[{start:'2026-09-14T08:00:00Z',end:'2026-09-14T09:00:00Z',label:'måndag 14 sep kl 10:00–11:00'}]; smsShouldFail=false
+  const retryPreview=await (await post({action:'preview',decision_action:'retry'})).json()
+  assert.equal(retryPreview.review.messages[0].text,failedText); assert.deepEqual(row.payload.execution_result.review_evidence.slots,failedSlots)
+  rescheduleResponse=await post({action:'retry',review_token:retryPreview.review_token}); rescheduleResult=await rescheduleResponse.json()
+  assert.equal(rescheduleResponse.status,200,JSON.stringify(rescheduleResult)); assert.equal(rescheduleResult.receipt.state,'sent'); assert.equal(smsDeliveries.at(-1).message,failedText)
+  reset(); row.approval_type='propose_booking_times'; row.payload={entity:{customerId:'c-site',phone:'+46709999999'}}
+  availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T09:00:00Z',label:'tisdag 15 sep kl 10:00–11:00'}]
+  const unknownPreview=await (await post({action:'preview',decision_action:'approve'})).json(); smsUnknown=true
+  const unknownResponse=await (await post({action:'approve',review_token:unknownPreview.review_token})).json()
+  assert.equal(unknownResponse.receipt.state,'partial'); assert(unknownResponse.receipt.text.includes('Skicka inte igen'))
+  assert.equal((await post({action:'preview',decision_action:'retry'})).status,422); assert.equal(smsDeliveries.length,1)
+  reset(); row.approval_type='propose_booking_times'; row.payload={entity:{leadId:'l-site',phone:'+46707777777'},duration_hours:2}
+  availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T10:00:00Z',label:'tisdag 15 sep kl 10:00–12:00'}]
+  const leadPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(leadPreview.review.messages[0].recipients[0],leadRow.phone); assert(leadPreview.review.details.some(d=>d.label==='Kundförfrågan'&&d.text==='Leo Lead'))
+  reset(); row.approval_type='new_booking_request'; row.payload={entity:{phone:'+46709999999'}}; availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T09:00:00Z',label:'tisdag'}]
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='propose_booking_times'; row.payload={entity:{customerId:'foreign',phone:'+46709999999'}}; availableSlots=[{start:'2026-09-15T08:00:00Z',end:'2026-09-15T09:00:00Z',label:'tisdag'}]
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(smsDeliveries.length,0)
+  reset(); row.approval_type='new_booking_request'; row.payload={source:'quote_signing',quote_id:'q1',customer_id:'c-site',customer_phone:'+46709999999',requested_date:'2030-09-10'}
+  bookingRows=[{scheduled_start:'2030-09-10T06:00:00.000Z',scheduled_end:'2030-09-10T07:00:00.000Z',status:null}]
+  let bookingPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert(bookingPreview.review?.messages?.[0],JSON.stringify(bookingPreview)); assert.equal(bookingPosts.length,0); assert(bookingPreview.review.effect.includes('Ingen faktura'))
+  assert(bookingPreview.review.details.some(d=>d.label==='Bokad start'&&d.text==='2030-09-10T07:00:00.000Z'))
+  const evidence=bookingPreview.review.details; assert(evidence.some(d=>d.label==='Projektföljd'&&d.text.includes('Badrum hemma'))); assert(evidence.some(d=>d.label==='Kundbekräftelse'))
+  const bookingResult=await (await post({action:'approve',review_token:bookingPreview.review_token})).json()
+  assert.equal(bookingPosts.length,1,JSON.stringify(bookingResult)); assert.equal(bookingPosts[0].scheduled_start,row.payload.execution_result.review_evidence.scheduledStart); assert.equal(bookingPosts[0].scheduled_end,row.payload.execution_result.review_evidence.scheduledEnd)
+  assert.equal(smsDeliveries.at(-1).message,bookingPreview.review.messages[0].text); assert.equal(bookingResult.receipt.state,'saved')
+  reset(); row.approval_type='new_booking_request'; row.payload={source:'quote_signing',quote_id:'q1',customer_id:'c-site',customer_phone:'+46709999999',requested_date:'2030-09-10'}; quoteRow.status='draft'
+  assert.equal((await post({action:'preview',decision_action:'approve'})).status,422); assert.equal(bookingPosts.length,0)
+  reset(); row.approval_type='send_sms'; row.payload={recipient:'internal',to:'+46708888888',message:'Faktura 1001 skapades som utkast.',related_id:'inv1'}
+  const internalPreview=await (await post({action:'preview',decision_action:'approve'})).json()
+  assert.equal(internalPreview.review.messages[0].recipients[0],'+46708888888'); assert.equal(internalPreview.review.messages[0].text,row.payload.message); assert.equal(smsDeliveries.length,0)
+  const internalResult=await (await post({action:'approve',review_token:internalPreview.review_token})).json()
+  assert.equal(smsDeliveries.length,1); assert.equal(smsDeliveries[0].recipient,'internal'); assert.equal(smsDeliveries[0].message,internalPreview.review.messages[0].text); assert.equal(internalResult.receipt.state,'sent')
+  console.log('PASS route integration: campaign, payment, lead, package retry, project close and booking variants are review-bound with durable per-action evidence.')
+})().catch(e => { console.error(e); process.exitCode=1 })

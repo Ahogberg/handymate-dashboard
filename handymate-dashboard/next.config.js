@@ -6,7 +6,10 @@ const nextConfig = {
     // Chromium-PDF (app/api/quotes/pdf): puppeteer-core + @sparticuz/chromium
     // måste lämnas utanför webpack-bundlingen — binär-uppackningen och
     // dynamiska require:s går sönder om de bundlas.
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium'],
+    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfjs-dist', '@napi-rs/canvas'],
+    outputFileTracingIncludes: {
+      '/api/approvals/*/document': ['./node_modules/pdfjs-dist/legacy/build/*', './node_modules/pdfjs-dist/standard_fonts/*', './node_modules/pdfjs-dist/wasm/*', './node_modules/@napi-rs/canvas*/**/*'],
+    },
     // Krävs på Next 14 för att instrumentation.ts (Sentry server/edge-init)
     // ska köras. Utan DSN är initieringen en no-op.
     instrumentationHook: true,

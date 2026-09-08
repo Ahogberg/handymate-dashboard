@@ -1,38 +1,15 @@
 'use client'
 
+import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
+import type { MissionHandover } from './handover'
 import { createContext, useContext, useEffect, useState } from 'react'
 import type { MissionRow, MissionProgress, MissionDecision } from './mission-progress'
 import type { MandateRow } from '@/lib/mandates/mission-mandate'
 import type { MandateFacitResult } from '@/lib/mandates/mandate-facit'
 
-/**
- * Den globala kanalen för det aktiva uppdraget — Goal-to-Plan V1 (Etapp C,
- * tasks/jaunty-pondering-hummingbird.md; utökad i Etapp G:
- * expansionspanelen).
- *
- * Speglar MomentsProvider.tsx/FuelProvider.tsx:s idiom rakt av: hämtar
- * `/api/mission/active` EN gång vid mount, exponerar en `refresh()` som
- * andra ytor (MissionPlanCard efter "Starta uppdraget", Uppdragsrad,
- * Jobbkompisens bubbelpillar, MissionPanel efter avsluta/klarmarkera) kan
- * anropa. Ingen intervallpollning — bubblan är monterad på varje
- * dashboardsida ändå, så en `visibilitychange`-omhämtning (flik/app
- * tillbaka i fokus) räcker för att inte visa gammal status en hel session.
- *
- * Fail-soft: rutten själv svarar redan { mission: null } på varje fel
- * (mission-tabellen kan saknas innan sql/v144 körts) — providern lägger
- * bara till att ETT nätverksfel inte kraschar konsumenterna.
- *
- * Etapp G: `decisions` kommer ur SAMMA /api/mission/active-svar som
- * mission/progress (fetch-semantiken är oförändrad — bara ytterligare ett
- * fält ur samma JSON läses av). `panelOpen`/`setPanelOpen` är expansions-
- * panelens (components/mission/MissionPanel.tsx) egna öppna/stängd-state —
- * samma delade-context-mönster som Jobbkompisens isOpen, fast för panelen
- * i stället för chattbubblan.
- *
- * Etapp X (Mission Mandates V1, ägarens upplevelse): `mandate`/`mandateFacit`
- * kommer likaså ur SAMMA svar (nollor bara flyttades ut till ett eget fält
- * i stället för att läggas till en tredje fetch) — `refresh()` uppdaterar
- * alltså redan mandatets läge tillsammans med mission/progress/decisions.
+/** Shared, account-scoped mission read. Failures are visible, never empty success.
+ * Refresh on return to the app; this is not a background execution scheduler.
  */
 
 interface MissionState {
@@ -41,6 +18,8 @@ interface MissionState {
   decisions: MissionDecision[]
   mandate: MandateRow | null
   mandateFacit: MandateFacitResult | null
+  handover: MissionHandover | null
+  error: string | null
   loading: boolean
   refresh: () => void
   panelOpen: boolean
@@ -53,6 +32,7 @@ const MissionContext = createContext<MissionState>({
   decisions: [],
   mandate: null,
   mandateFacit: null,
+  handover: null, error: null,
   loading: true,
   refresh: () => {},
   panelOpen: false,
@@ -64,6 +44,12 @@ export function useMission(): MissionState {
 }
 
 export function MissionProvider({ children }: { children: React.ReactNode }) {
+  const business = useBusiness()
+  const { user } = useCurrentUser()
+  const scope = `${business.business_id}:${user?.id || ''}`
+  const [loadedScope, setLoadedScope] = useState('')
+  const [handover, setHandover] = useState<MissionHandover | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [mission, setMission] = useState<MissionRow | null>(null)
   const [progress, setProgress] = useState<MissionProgress | null>(null)
   const [decisions, setDecisions] = useState<MissionDecision[]>([])
@@ -76,24 +62,33 @@ export function MissionProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let aktiv = true
     setLoading(true)
-    fetch('/api/mission/active')
-      .then(r => (r.ok ? r.json() : null))
+    setError(null)
+    setMission(null); setProgress(null); setDecisions([]); setMandate(null); setMandateFacit(null); setHandover(null)
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 15000)
+    fetch('/api/mission/active', { signal: controller.signal, cache: 'no-store' })
+      .then(r => { if (r.status === 401 || r.status === 403) return null; if (!r.ok) throw new Error('Uppdraget kunde inte kontrolleras. Försök igen.'); return r.json() })
       .then(d => {
         if (!aktiv) return
+        if (d && (!Object.prototype.hasOwnProperty.call(d, 'mission') || d.mission && d.mission.business_id !== business.business_id)) throw new Error('invalid mission scope')
+        setLoadedScope(scope)
+        setHandover(d?.handover ?? null)
         setMission(d?.mission ?? null)
         setProgress(d?.progress ?? null)
         setDecisions(Array.isArray(d?.decisions) ? d.decisions : [])
         setMandate(d?.mandate ?? null)
         setMandateFacit(d?.mandateFacit ?? null)
       })
-      .catch(err => console.error('[mission] kunde inte hämtas:', err))
+      .catch(() => { if (aktiv) { setLoadedScope(scope); setError('Uppdraget kunde inte kontrolleras. Försök igen.') } })
       .finally(() => {
+        clearTimeout(timeout)
         if (aktiv) setLoading(false)
       })
     return () => {
       aktiv = false
+      clearTimeout(timeout); controller.abort()
     }
-  }, [tick])
+  }, [tick, business.business_id, user?.id, scope])
 
   useEffect(() => {
     function onVisibility() {
@@ -106,7 +101,14 @@ export function MissionProvider({ children }: { children: React.ReactNode }) {
   return (
     <MissionContext.Provider
       value={{
-        mission, progress, decisions, mandate, mandateFacit, loading,
+        mission: loadedScope === scope ? mission : null,
+        progress: loadedScope === scope ? progress : null,
+        decisions: loadedScope === scope ? decisions : [],
+        mandate: loadedScope === scope ? mandate : null,
+        mandateFacit: loadedScope === scope ? mandateFacit : null,
+        handover: loadedScope === scope ? handover : null,
+        error: loadedScope === scope ? error : null,
+        loading: loading || loadedScope !== scope,
         refresh: () => setTick(t => t + 1), panelOpen, setPanelOpen,
       }}
     >

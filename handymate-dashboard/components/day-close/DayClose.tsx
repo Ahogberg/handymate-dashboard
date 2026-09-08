@@ -2,17 +2,21 @@
 import { useEffect, useRef, useState } from 'react'
 import { svDateStr } from '@/lib/dates'
 import { REPORT_LABELS, readReportConfirmation, confirmedReportResult, type ReportConfirmation } from '@/lib/matte/day-close-client'
+import { ReportSessions } from './ReportSessions'
+import { DaySummaryCard } from './DaySummaryCard'
 import { useReportDictation } from './useReportDictation'
 interface Receipt { token: string; label: string; summary: string; duplicate: boolean; tool: ReportConfirmation['tool_name'] }
-export default function DayClose({ projectId, projectName, onSaved }: { projectId: string; projectName: string; onSaved?: () => void | Promise<void> }) {
-  const [open, setOpen] = useState(false)
+function DayCloseSession({ projectId, projectName, onSaved, initialText = '', initiallyOpen = false }: { projectId: string; projectName: string; onSaved?: () => void | Promise<void>; initialText?: string; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen)
   const [date, setDate] = useState(svDateStr())
-  const [text, setText] = useState('')
+  const [text, setText] = useState(initialText)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
   const [reply, setReply] = useState('')
   const [pending, setPending] = useState<ReportConfirmation | null>(null)
   const [receipts, setReceipts] = useState<Receipt[]>([])
+  const [continuation, setContinuation] = useState<'idle' | 'finished' | 'blocked' | 'discarded'>('idle')
+  const [revision, setRevision] = useState(0)
   const [history, setHistory] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([])
   const [thread, setThread] = useState<string | null>(null)
   const inFlight = useRef(false)
@@ -40,6 +44,8 @@ export default function DayClose({ projectId, projectName, onSaved }: { projectI
         setReceipts(previous => previous.some(row => row.token === current!.token) ? previous : [...previous, { token: current!.token, label: REPORT_LABELS[current!.tool_name], summary: current!.summary, duplicate: status === 'already_saved', tool: current!.tool_name }])
         // A saved step stays saved even when the following proposal is malformed.
         setPending(null)
+        setRevision(n => n + 1)
+        setContinuation(body.report_continuation?.state === 'blocked' ? 'blocked' : body.report_continuation?.state === 'finished' ? 'finished' : 'idle')
         // Refresh failures must never turn a confirmed write into a failed-write receipt.
         try { await onSaved?.() } catch { setError('Uppgiften är sparad, men projektvyn kunde inte uppdateras. Läs in projektet igen.') }
       }
@@ -47,21 +53,46 @@ export default function DayClose({ projectId, projectName, onSaved }: { projectI
       const next = readReportConfirmation(body.pending_confirmation, projectId, date)
       setPending(next)
       if (confirm && !next) { setHistory([]); setThread(null) }
+      if (!confirm) {setContinuation('idle');setRevision(n=>n+1)}
       if (!confirm) { setHistory([...messages, ...(replyText ? [{ role: 'assistant' as const, content: replyText }] : [])]); setText('') }
       if ((!confirm || next) && typeof body.thread_id === 'string') setThread(body.thread_id)
     } catch (err) { if (alive.current) setError(err instanceof Error ? err.message : 'Kunde inte nå företagskontoret. Dina uppgifter finns kvar här; försök igen.') }
     finally { inFlight.current = false; if (alive.current) setBusy(false) }
   }
-  function reset() { setPending(null); setReceipts([]); setHistory([]); setThread(null); setReply(''); setError(''); setText('') }
+  function restoreReport(body: any) {
+    const next = readReportConfirmation(body.pending_confirmation, projectId, date)
+    setPending(next); setThread(body.thread_id || null); setHistory([]); setReply(''); setError('')
+    setReceipts(body.report.parts.filter((p:any)=>p.saved).map((p:any,i:number)=>({token:`${body.report.id}:${i}`,label:REPORT_LABELS[p.tool as ReportConfirmation['tool_name']],summary:p.summary,duplicate:true,tool:p.tool})))
+    setContinuation(body.report.state==='finished'?'finished':body.report.state==='discarded'?'discarded':body.report.uncertain?'blocked':'idle')
+  }
+  async function discard() {
+    if (locked || inFlight.current) return
+    if (pending?.report_id) {
+      setBusy(true); setError('')
+      try {
+        const res=await fetch('/api/day-close',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'discard',id:pending.report_id})})
+        const body=await res.json()
+        if(!res.ok)throw Error(body.error||'Rapporten kunde inte avbrytas.')
+        if(!alive.current)return
+      } catch(e) { if(alive.current)setError(e instanceof Error?e.message:'Rapporten kunde inte avbrytas.');return }
+      finally {if(alive.current)setBusy(false)}
+    }
+    setContinuation('discarded');setPending(null);setHistory([]);setThread(null);setReply('De återstående förslagen har lagts åt sidan. Tidigare sparade delar finns kvar.');setError('');setRevision(n=>n+1)
+  }
+  function reset() { setPending(null); setReceipts([]); setHistory([]); setThread(null); setReply(''); setError(''); setText(''); setContinuation('idle') }
   return <section className="rounded-xl border border-teal-200 bg-white p-4">
     <button type="button" disabled={locked} aria-expanded={open} onClick={() => setOpen(!open)} className="min-h-[44px] w-full text-left font-semibold text-teal-800">Avsluta arbetsdagen <span className="float-right text-sm">{open ? 'Stäng' : 'Öppna'}</span></button>
     <div className={open ? 'mt-3 space-y-4' : 'hidden'}>
       <p className="text-sm text-slate-600">{projectName} · Din egen tid, intern anteckning, material och ÄTA-förslag. Beskriv vad du vill registrera och granska varje del innan den sparas.</p>
       <label className="block text-sm font-medium">Rapportdatum<input type="date" value={date} disabled={locked || !!pending || history.length > 0 || receipts.length > 0} onChange={event => setDate(event.target.value)} className="mt-1 block min-h-[44px] rounded-lg border p-2" /></label>
+      {open && <><DaySummaryCard key={`${projectId}:${date}`} projectId={projectId} date={date} revision={revision} /><ReportSessions key={`reports:${projectId}:${date}`} projectId={projectId} date={date} revision={revision} disabled={locked} onResume={restoreReport} /></>}
       {receipts.length > 0 && <div className="rounded-lg bg-teal-50 p-3"><h3 className="font-medium text-teal-900">Sparat i den här rapporten</h3>{receipts.map(row => <details key={row.token} className="mt-2 text-sm"><summary>{row.label} — {row.duplicate ? 'redan sparat, ingen dubblett' : 'sparat'}</summary><p className="mt-2 whitespace-pre-wrap">{row.summary}</p></details>)}{receipts.some(row => row.tool === 'create_ata_draft') && <p className="mt-3 text-sm">ÄTA-förslaget behöver granskas innan ett ÄTA-utkast skapas. <a href="/dashboard/approvals" className="underline">Öppna godkännandekön</a>. Ägare och administratörer kan också <a href="/dashboard/pengar" className="underline">följa intäktsärendet i Pengar</a>.</p>}</div>}
+      {continuation === 'finished' && <div role="status" className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm"><strong>De granskade delarna i den här rapporten är sparade.</strong><p className="mt-1">Kontrollera sammanställningen ovan. Eventuella ÄTA-förslag behöver fortfarande eget beslut. Ingen kunduppföljning har startats av rapporten.</p></div>}
+      {continuation === 'blocked' && <p role="alert" className="rounded-lg bg-amber-50 p-3 text-sm">En del är sparad, men nästa del kunde inte förberedas. Rapporten är inte färdig. Kontrollera sparade uppgifter innan du beskriver de återstående delarna igen.</p>}
+      {continuation === 'discarded' && <p role="status" className="text-sm text-slate-600">Du avstod från återstående förslag. Redan sparade uppgifter finns kvar; de återstående delarna är inte gjorda.</p>}
       {reply && <p className="whitespace-pre-wrap rounded-lg bg-slate-50 p-3 text-sm">{reply}</p>}
       {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-      {pending ? <div className="rounded-lg border border-teal-300 p-3"><h3 className="font-semibold">Kontrollera nästa del</h3><p className="my-3 whitespace-pre-wrap text-sm">{pending.summary}</p><button type="button" disabled={locked} onClick={() => void send(true)} className="min-h-[44px] rounded-lg bg-teal-700 px-4 py-2 font-medium text-white disabled:opacity-50">{busy ? 'Kontrollerar sparningen…' : pending.confirm_label}</button><button type="button" disabled={locked} onClick={() => { setPending(null); setHistory([]); setThread(null); setReply('De återstående förslagen har lagts åt sidan. Tidigare sparade delar finns kvar.'); setError('') }} className="ml-3 min-h-[44px] text-sm text-slate-600 underline">Avstå från återstående delar</button></div> : <form onSubmit={event => { event.preventDefault(); void send() }} className="space-y-3">
+      {pending ? <div className="rounded-lg border border-teal-300 p-3"><h3 className="font-semibold">Kontrollera nästa del</h3>{pending.plan && <details className="my-3 text-sm"><summary>Rapportens {pending.plan.length} återstående delar — granska hela underlaget</summary><ol className="mt-2 list-decimal space-y-3 pl-5">{pending.plan.map((part, i) => <li key={i}><strong>{REPORT_LABELS[part.tool_name]}</strong><p className="whitespace-pre-wrap">{part.summary}</p></li>)}</ol><p className="mt-2">Varje del sparas först när du bekräftar just den delen.</p></details>}<p className="my-3 whitespace-pre-wrap text-sm">{pending.summary}</p><button type="button" disabled={locked} onClick={() => void send(true)} className="min-h-[44px] rounded-lg bg-teal-700 px-4 py-2 font-medium text-white disabled:opacity-50">{busy ? 'Kontrollerar sparningen…' : pending.confirm_label}</button><button type="button" disabled={locked} onClick={() => void discard()} className="ml-3 min-h-[44px] text-sm text-slate-600 underline">Avstå från återstående delar</button></div> : <form onSubmit={event => { event.preventDefault(); void send() }} className="space-y-3">
         <label className="block text-sm font-medium">Vad vill du registrera?<textarea value={text} maxLength={6000} rows={4} disabled={locked} onChange={event => setText(event.target.value)} className="mt-2 block w-full rounded-lg border p-3 font-normal" placeholder="Registrera tre timmar på mig för montering. Spara också en intern anteckning om att vi behöver återkomma för målningen." /></label>
         <div className="flex flex-wrap gap-3"><button type="button" disabled={busy || dictation.busy} onClick={() => dictation.recording ? dictation.stop() : void dictation.start()} className="min-h-[44px] rounded-lg border border-teal-700 px-4 py-2 text-sm text-teal-800 disabled:opacity-50">{dictation.recording ? 'Stoppa diktering' : dictation.busy ? 'Tolkar inspelningen…' : 'Diktera (högst en minut)'}</button><button disabled={locked || !text.trim() || !date} className="min-h-[44px] rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{busy ? 'Tar fram förslag…' : 'Ta fram förslag'}</button></div>
         <p className="text-xs text-slate-500">Dikteringen fyller bara i texten. Kontrollera den innan du går vidare. Inget kundmeddelande skickas och projektet avslutas inte.</p>
@@ -69,4 +100,8 @@ export default function DayClose({ projectId, projectName, onSaved }: { projectI
       {!pending && (history.length > 0 || receipts.length > 0) && <button type="button" disabled={locked} onClick={reset} className="min-h-[44px] text-sm text-slate-500 underline">Börja en ny rapport (sparade uppgifter finns kvar)</button>}
     </div>
   </section>
+}
+
+export default function DayClose(props: { projectId: string; projectName: string; onSaved?: () => void | Promise<void>; initialText?: string; initiallyOpen?: boolean }) {
+  return <DayCloseSession key={props.projectId} {...props} />
 }

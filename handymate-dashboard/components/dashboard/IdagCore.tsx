@@ -1,7 +1,8 @@
 'use client'
 
+import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { postKortbeslut } from '@/lib/approvals/klient-bekraftelse'
 import Link from 'next/link'
 import {
   ArrowRight,
@@ -294,11 +295,16 @@ export default function IdagCore({
         const fragment = editedText != null ? buildApprovalEdit(approval, editedText) : null
         if (fragment) body.edited_payload = fragment
       }
-      const res = await postKortbeslut(approval.id, {
-        headers: session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {},
-        body,
+      const res = await reviewedApprovalFetch(`/api/approvals/${approval.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
+        },
+        body: JSON.stringify(body),
       })
 
+      if (res.status === 499) { setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n }); return }
       if (!res.ok) {
         // Återställ kortet — ärendet är orört i DB (eller redan hanterat någon annanstans).
         setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n })
@@ -312,7 +318,9 @@ export default function IdagCore({
       }
 
       const result = await res.json().catch(() => null) as {
+        receipt?: { state: string; text: string }
         execution?: {
+          receipt?: string
           action?: string
           granted?: boolean
           error?: string
@@ -328,6 +336,11 @@ export default function IdagCore({
       // Ärendet är avgjort i DB — plocka bort från kö-listan på riktigt.
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
 
+      if (result?.receipt?.text) {
+        showFeedback(result.receipt.text, ['partial', 'failed', 'needs_action'].includes(result.receipt.state), 7000)
+        setDoneRows(prev => [{ key: `local-${approval.id}`, time: 'nyss', agent: agentKey, text: result.receipt!.text, auto: false, fresh: true }, ...prev])
+        return
+      }
       if (action === 'reject') {
         if (approval.approval_type !== 'autonomy_offer') {
           setDoneRows(prev => [{
@@ -383,7 +396,7 @@ export default function IdagCore({
           key: `local-${approval.id}`,
           time: 'nyss',
           agent: agentKey,
-          text: `skickade: ${approval.title}${action === 'edit' ? ' (med din ändring)' : ''}`,
+          text: execution?.receipt || `Beslut registrerat: ${approval.title}`,
           auto: false,
           fresh: true,
         }, ...prev])
@@ -396,6 +409,7 @@ export default function IdagCore({
 
   // Startar ångra-fönstret: kortet lämnar kön visuellt, POST:en går efter 5 s.
   function queueAction(approval: Approval, action: 'approve' | 'reject' | 'edit', editedText?: string) {
+    if (action !== 'reject') { void executeSend(approval, action, editedText); return }
     setEditingId(null)
     setHiddenIds(prev => new Set(prev).add(approval.id))
     const isAutonomy = approval.approval_type === 'autonomy_offer'
@@ -403,7 +417,7 @@ export default function IdagCore({
       ? (isAutonomy ? 'Ok — teamet fortsätter fråga dig' : 'Förslaget avvisas')
       : isAutonomy
         ? 'Förtroende beviljas'
-        : `Skickar: ${approval.title.slice(0, 60)}`
+        : `Granskar: ${approval.title.slice(0, 60)}`
     setSnack({ approvalId: approval.id, text: snackText })
     const timer = setTimeout(() => {
       setSnack(prev => (prev?.approvalId === approval.id ? null : prev))

@@ -5,6 +5,14 @@ import { checkSmsRateLimitDb } from '@/lib/rate-limit-db'
 import { sendSmsViaElks } from '@/lib/sms-send'
 import { checkSmsAllowance } from '@/lib/sms-usage'
 
+function summarize(rows: Array<{ status?: string | null }>) {
+  const delivered = rows.filter(row => row.status === 'sent').length
+  const failed = rows.filter(row => ['failed', 'rate_limited'].includes(row.status || '')).length
+  const uncertain = rows.filter(row => row.status === 'unknown').length
+  const in_flight = rows.filter(row => row.status === 'sending').length
+  const pending = rows.filter(row => row.status === 'pending').length
+  return { delivered, failed, uncertain, in_flight, pending, total: rows.length }
+}
 
 
 export async function POST(request: NextRequest) {
@@ -52,7 +60,6 @@ export async function POST(request: NextRequest) {
       .from('sms_campaign_recipient')
       .select('*')
       .eq('campaign_id', campaignId)
-      .eq('status', 'pending')
 
     if (recipientsError || !recipients || recipients.length === 0) {
       return NextResponse.json({ error: 'Inga mottagare hittades' }, { status: 404 })
@@ -80,17 +87,26 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'SMS-kvoten är slut för månaden — uppgradera planen för fler SMS.' }, { status: 429 })
     }
 
-    let deliveredCount = 0
-    let failedCount = 0
+    const pendingRecipients = recipients.filter(recipient => recipient.status === 'pending')
+    if (pendingRecipients.length === 0) {
+      const counts = summarize(recipients)
+      return NextResponse.json({ success: counts.failed === 0 && counts.uncertain === 0 && counts.in_flight === 0 && counts.pending === 0, idempotent: true, ...counts })
+    }
 
     // Mark campaign as sending
     await supabase
       .from('sms_campaign')
       .update({ status: 'sending' })
       .eq('campaign_id', campaignId)
+      .eq('business_id', businessId)
 
     // Skicka SMS till varje mottagare
-    for (const recipient of recipients) {
+    for (const recipient of pendingRecipients) {
+      // Per-recipient CAS: två cron-/webbanrop kan läsa samma pending-lista,
+      // men bara ett får gå vidare till den externa effekten.
+      const { data: claimed, error: claimError } = await supabase.from('sms_campaign_recipient')
+        .update({ status: 'sending', error_message: null }).eq('id', recipient.id).eq('campaign_id', campaignId).eq('status', 'pending').select('id')
+      if (claimError || !claimed?.length) continue
       const smsRateLimit = await checkSmsRateLimitDb(businessId)
       if (!smsRateLimit.allowed) {
         // Sluta skicka om rate limit nås
@@ -101,27 +117,29 @@ export async function POST(request: NextRequest) {
             error_message: 'Rate limit exceeded'
           })
           .eq('id', recipient.id)
-        failedCount++
+          .eq('campaign_id', campaignId)
+          .eq('status', 'sending')
         continue
       }
 
       // Använd kanoniska sändaren → loggar till sms_log (kampanjer var osynliga
       // för analytics/audit förut då lokala sendSMS inte loggade).
-      const result = await sendSmsViaElks({
-        supabase,
-        businessId,
-        businessName: senderName,
-        to: recipient.phone_number,
-        message: campaign.message,
-        customerId: recipient.customer_id || null,
-        relatedId: campaignId,
-        messageType: 'campaign',
-        recipient: 'customer',
-        purpose: 'proactive',
-      })
+      let result
+      try {
+        result = await sendSmsViaElks({
+          supabase, businessId, businessName: senderName, to: recipient.phone_number,
+          message: campaign.message, customerId: recipient.customer_id || null,
+          relatedId: campaignId, messageType: 'campaign',
+          approvalId: `campaign:${campaignId}:${recipient.id}`,
+          recipient: 'customer', purpose: 'proactive',
+        })
+      } catch (sendError) {
+        await supabase.from('sms_campaign_recipient').update({ status: 'unknown', error_message: sendError instanceof Error ? sendError.message : String(sendError) })
+          .eq('id', recipient.id).eq('campaign_id', campaignId).eq('status', 'sending')
+        continue
+      }
 
       if (result.success) {
-        deliveredCount++
         // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks
         // räknar nu upp kvoten själv per SMS — och kollar den fail-closed
         // FÖR VARJE mottagare, inte bara en gång vid kampanjstart. Träffar
@@ -136,36 +154,43 @@ export async function POST(request: NextRequest) {
             elks_id: result.elksId
           })
           .eq('id', recipient.id)
+          .eq('campaign_id', campaignId)
+          .eq('status', 'sending')
       } else {
-        failedCount++
         await supabase
           .from('sms_campaign_recipient')
           .update({
-            status: 'failed',
+            status: typeof result.status === 'number' ? 'failed' : 'unknown',
             error_message: result.error
           })
           .eq('id', recipient.id)
+          .eq('campaign_id', campaignId)
+          .eq('status', 'sending')
       }
 
       // Liten paus för att inte överbelasta API:et
       await new Promise(resolve => setTimeout(resolve, 100))
     }
 
-    // Uppdatera kampanjstatus
-    await supabase
-      .from('sms_campaign')
-      .update({
-        status: 'sent',
-        sent_at: new Date().toISOString(),
-        delivered_count: deliveredCount,
-        failed_count: failedCount
-      })
-      .eq('campaign_id', campaignId)
+    // Slutstatus härleds från beständiga mottagarrader, inte lokala räknare.
+    const { data: finalRows, error: finalError } = await supabase.from('sms_campaign_recipient')
+      .select('id, status').eq('campaign_id', campaignId)
+    if (finalError || !finalRows) return NextResponse.json({ error: 'Mottagarutfallet kunde inte verifieras. Skicka inte kampanjen igen innan status har kontrollerats.' }, { status: 500 })
+    const counts = summarize(finalRows)
+    const finalStatus = counts.uncertain > 0 ? 'needs_reconciliation' : counts.pending > 0 ? 'scheduled' : counts.in_flight > 0 ? 'sending' : counts.failed > 0 ? 'partial' : 'sent'
+    const finalUpdate = counts.in_flight > 0 ? { error: null, data: [{ campaign_id: campaignId }] } : await supabase.from('sms_campaign').update({
+        status: finalStatus,
+        sent_at: finalStatus === 'sent' ? new Date().toISOString() : null,
+        delivered_count: counts.delivered,
+        failed_count: counts.failed
+      }).eq('campaign_id', campaignId).eq('business_id', businessId).select('campaign_id')
+    if (finalUpdate.error || !finalUpdate.data?.length) return NextResponse.json({ error: 'Kampanjens slutstatus kunde inte sparas. Kontrollera mottagarraderna innan ett nytt försök.' }, { status: 500 })
 
     return NextResponse.json({
-      success: true,
-      delivered: deliveredCount,
-      failed: failedCount
+      success: finalStatus === 'sent',
+      status: finalStatus,
+      ...counts,
+      ...(counts.uncertain ? { warning: 'Minst ett SMS har osäkert leveransläge. Skicka inte igen innan leverantören har kontrollerats.' } : {})
     })
 
   } catch (error: any) {

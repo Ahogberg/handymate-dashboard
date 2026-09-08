@@ -100,7 +100,12 @@ test.describe('F01 — checklistor per projekt', () => {
   test('skrivvägarna i approvals sätter project_id, aldrig order_id', () => {
     const src = utanKommentarer(read('app/api/approvals/[id]/route.ts'))
     const inserts = src.split(".from('project_checklist').insert(").slice(1)
-    expect(inserts.length).toBeGreaterThanOrEqual(2)
+    expect(inserts.length).toBeGreaterThanOrEqual(1)
+    const artifact = src.indexOf("insertApprovalArtifact(supabaseCf, 'project_checklist'")
+    expect(artifact).toBeGreaterThan(0)
+    const artifactPayload = src.slice(artifact, src.indexOf('})', artifact))
+    expect(artifactPayload).toContain('project_id:')
+    expect(artifactPayload).not.toContain('order_id')
     for (const block of inserts) {
       const payload = block.slice(0, block.indexOf('})'))
       expect(payload).toContain('project_id:')

@@ -96,5 +96,5 @@ export function doneRowText(opts: {
     return opts.note ? `${opts.title} — ${opts.note}` : `öppnade: ${opts.title}`
   }
 
-  return `skickade: ${opts.title}${opts.action === 'edit' ? ' (med din ändring)' : ''}`
+  return `Beslut registrerat: ${opts.title}${opts.action === 'edit' ? ' (med din ändring)' : ''}`
 }

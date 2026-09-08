@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
         .limit(100),
       supabase
         .from('v3_automation_logs')
-        .select('id, rule_name, created_at')
+        .select('id, rule_name, status, created_at')
         .eq('business_id', businessId)
         .gte('created_at', senasteKvallsgrans(nu).toISOString())
         .order('created_at', { ascending: false })
@@ -123,7 +123,7 @@ export async function GET(request: NextRequest) {
       night: {
         since: senasteKvallsgrans(nu).toISOString(),
         count: nattRader.length,
-        latest: nattRader.slice(0, 3).map(r => ({ id: r.id, rule_name: r.rule_name, created_at: r.created_at })),
+        latest: nattRader.map(r => ({ id: r.id, rule_name: r.rule_name, status: r.status, created_at: r.created_at })),
       },
       active_missions: missionRes.count ?? 0,
     })

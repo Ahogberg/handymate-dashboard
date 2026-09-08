@@ -36,6 +36,21 @@ function makeUser(overrides: Partial<BusinessUser> = {}): BusinessUser {
   }
 }
 
+test('job report customer delivery cannot inherit legacy any routing', async () => {
+  const approval: ApprovalRoutingRow = { approval_type: 'job_report', business_id: 'biz_1', routing_role: 'any' }
+  expect(await canActOnApproval(null as any, makeUser(), approval)).toBe(false)
+  expect(await canActOnApproval(null as any, makeUser({ can_create_invoices: true }), approval)).toBe(true)
+  expect(await canActOnApproval(null as any, makeUser({ role: 'owner' }), approval)).toBe(true)
+})
+
+test('project Fortnox sync requires a same-business owner/admin even on legacy any cards', async () => {
+  const approval: ApprovalRoutingRow = { approval_type: 'automation', business_id: 'biz_1', routing_role: 'any', payload: { rule_action_type: 'sync_to_fortnox', rule_action_config: { entity_type: 'project' } } }
+  expect(await canActOnApproval(null as any, makeUser(), approval)).toBe(false)
+  expect(await canActOnApproval(null as any, makeUser({ can_create_invoices: true, can_see_all_projects: true }), approval)).toBe(false)
+  for (const role of ['owner', 'admin'] as const) expect(await canActOnApproval(null as any, makeUser({ role }), approval)).toBe(true)
+  expect(await canActOnApproval(null as any, makeUser({ role: 'owner', business_id: 'foreign' }), approval)).toBe(false)
+})
+
 test.describe('getRoutingBucket', () => {
   test("okänd/ej listad approval_type → 'any'", () => {
     expect(getRoutingBucket('send_sms')).toBe('any')
@@ -233,4 +248,11 @@ test.describe("canActOnApproval — 'project_team' med project_assignment-uppsla
     const supabase = fakeSupabase({ data: null, error: { message: 'boom' } })
     return canActOnApproval(supabase, user, approval).then((r) => expect(r).toBe(false))
   })
+})
+
+test('owner push approval requires a same-business owner/admin', async () => {
+  const approval: ApprovalRoutingRow = { approval_type:'automation', business_id:'biz_1', routing_role:'any', payload:{rule_action_type:'notify_owner'} }
+  expect(await canActOnApproval(null as any, makeUser(), approval)).toBe(false)
+  expect(await canActOnApproval(null as any, makeUser({role:'admin'}), approval)).toBe(true)
+  expect(await canActOnApproval(null as any, makeUser({role:'owner',business_id:'foreign'}), approval)).toBe(false)
 })

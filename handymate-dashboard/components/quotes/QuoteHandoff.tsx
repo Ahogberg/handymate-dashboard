@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { ScheduledFollowup } from './ScheduledFollowup'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import type { HandoffSummary } from '@/lib/quotes/handoff'
 
@@ -42,5 +43,6 @@ export function QuoteHandoff({ quoteId, revision }: { quoteId: string; revision:
       <p className="mt-3 text-xs text-slate-500">Uppgifterna kontrollerade {date(data.checkedAt)}.{summary.lastRunAt ? ` Regelns senaste körning: ${date(summary.lastRunAt)}.` : summary.state === 'configured' ? ' Ingen körningstid är bekräftad här.' : ''}</p>
     </> : !error && <p role="status" className="mt-3 text-sm text-slate-500">Läser offert, inställningar och väntande beslut…</p>}
     <button type="button" className="min-h-[44px] text-sm text-teal-800 underline" onClick={() => setAttempt(n => n + 1)}>{error ? 'Försök igen' : 'Kontrollera igen'}</button>
+    <ScheduledFollowup key={quoteId} quoteId={quoteId} />
   </section>
 }

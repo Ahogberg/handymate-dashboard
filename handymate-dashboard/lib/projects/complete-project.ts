@@ -33,7 +33,7 @@ export type CloseoutEffectName =
   | 'deal_stage'
   | 'completion_batch'
 
-export type CloseoutEffectStatus = 'succeeded' | 'failed' | 'skipped' | 'dispatched' | 'attempted'
+export type CloseoutEffectStatus = 'succeeded' | 'partial' | 'failed' | 'skipped' | 'dispatched' | 'attempted'
 
 export interface CloseoutEffectResult {
   effect: CloseoutEffectName
@@ -209,6 +209,11 @@ export async function completeProject(params: {
   businessId: string
   projectId: string
   authorization: ProjectCompletionAuthorization
+  options?: {
+    createInvoiceDraft?: boolean
+    createReviewRequest?: boolean
+    runAutomations?: boolean
+  }
 }): Promise<CompleteProjectResult> {
   const { supabase, businessId, projectId, authorization } = params
 
@@ -321,6 +326,11 @@ export async function completeProject(params: {
     businessId,
     project: transition.project,
     completionBatchId,
+    options: {
+      createInvoiceDraft: params.options?.createInvoiceDraft !== false,
+      createReviewRequest: params.options?.createReviewRequest !== false,
+      runAutomations: params.options?.runAutomations !== false,
+    },
   })
 
   return {
@@ -334,7 +344,7 @@ export async function completeProject(params: {
     completion_batch_id: completionBatchId,
     effects: effectResult.effects,
     warnings: effectResult.effects
-      .filter((effect) => effect.status === 'failed')
+      .filter((effect) => effect.status === 'failed' || effect.status === 'partial')
       .map((effect) => userWarningForEffect(effect.effect)),
   }
 }
@@ -361,8 +371,9 @@ async function runCompletionEffects(params: {
   businessId: string
   project: CompletedProjectRow
   completionBatchId: string
+  options: { createInvoiceDraft: boolean; createReviewRequest: boolean; runAutomations: boolean }
 }): Promise<{ effects: CloseoutEffectResult[]; invoice: CloseoutInvoice | null }> {
-  const { supabase, businessId, project, completionBatchId } = params
+  const { supabase, businessId, project, completionBatchId, options } = params
   const effects: CloseoutEffectResult[] = []
   let invoice: CloseoutInvoice | null = null
 
@@ -383,24 +394,39 @@ async function runCompletionEffects(params: {
     effects.push(effectFailure('workflow_stage', error))
   }
 
-  // 2. Befintliga automationer. fireEvent är själv fail-safe och saknar
-  // resultatkontrakt, därför säger vi ärligt "attempted" — inte succeeded.
-  try {
+  // 2. Befintliga automationer. Projektavslutet får bara skapa separata
+  // granskningskort för nya handlingar; varken autonomi eller en avstängd
+  // regelgrind får göra ett ännu osynligt kundutskick här.
+  if (!options.runAutomations) {
+    effects.push({ effect: 'job_completed_event', status: 'skipped', message: 'Avslutsautomationer valdes bort i granskningen' })
+  } else try {
     const { fireEvent } = await import('@/lib/automation-engine')
-    await fireEvent(supabase, 'job_completed', businessId, {
+    const automationResult = await fireEvent(supabase, 'job_completed', businessId, {
       project_id: project.project_id,
       customer_id: project.customer_id,
       project_name: project.name,
+      require_explicit_approval: true,
     })
-    effects.push({ effect: 'job_completed_event', status: 'attempted' })
+    effects.push({
+      effect: 'job_completed_event',
+      status: automationResult.failed > 0
+        ? (automationResult.pending_approval + automationResult.executed > 0 ? 'partial' : 'failed')
+        : 'succeeded',
+      message: `${automationResult.matched} regler · ${automationResult.pending_approval} separata granskningskort · ${automationResult.executed} förslag skapade · ${automationResult.skipped} hoppades över${automationResult.failed ? ` · ${automationResult.failed} misslyckades` : ''}`,
+    })
   } catch (error) {
     effects.push(effectFailure('job_completed_event', error))
   }
 
-  // 3. Fakturautkast/sändförsök enligt exakt befintlig fakturapolicy.
-  try {
+  // 3. Fakturautkast. Kundleverans och internt besked blir egna kort.
+  if (!options.createInvoiceDraft) {
+    effects.push({ effect: 'auto_invoice', status: 'skipped', message: 'Fakturautkast valdes bort i granskningen' })
+  } else try {
     const { autoInvoiceOnComplete } = await import('@/lib/projects/auto-invoice-on-complete')
-    const result = await autoInvoiceOnComplete(businessId, project.project_id)
+    const result = await autoInvoiceOnComplete(businessId, project.project_id, {
+      allowCustomerDelivery: false,
+      deferInternalNotification: true,
+    })
     if (result.success && result.invoice_id) {
       invoice = {
         invoice_id: result.invoice_id,
@@ -410,8 +436,8 @@ async function runCompletionEffects(params: {
       }
       effects.push({
         effect: 'auto_invoice',
-        status: result.error ? 'skipped' : 'succeeded',
-        message: result.error,
+        status: result.warnings?.length ? 'partial' : result.error ? 'skipped' : 'succeeded',
+        message: result.warnings?.join('; ') || result.error,
         artifact_id: result.invoice_id,
       })
     } else if (result.success) {
@@ -562,7 +588,9 @@ async function runCompletionEffects(params: {
 
   // 7. Schemalagd recension. Samma payload och 180-dagarsspärr som förut,
   // nu med felfacit och projekt-dedupe.
-  effects.push(await createReviewRequest(supabase, businessId, project))
+  effects.push(options.createReviewRequest
+    ? await createReviewRequest(supabase, businessId, project)
+    : { effect: 'review_request', status: 'skipped', message: 'Kunduppföljning valdes bort i granskningen' })
 
   // 7b. Jobbpass (Etapp Ä, sql/v154_jobbpass.sql): Lars föreslår ett
   // digitalt jobbpass åt kunden. Skapar bara FÖRSLAGSKORTET + en tom

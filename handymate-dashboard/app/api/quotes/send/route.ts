@@ -7,9 +7,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getOrCreatePortalLink } from '@/lib/portal-link'
 import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
-import { buildQuoteSmsText } from '@/lib/quotes/quote-sms'
-import { brandingFromConfig, type Branding } from '@/lib/branding/get-branding'
-import { buildQuoteEmailHtml } from '@/lib/quotes/quote-email'
+import { quoteRecipients, validateQuoteDeliveryData, buildQuoteDeliveryEnvelope, quoteSendReceipt } from '@/lib/quotes/delivery-envelope'
 
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -95,59 +93,12 @@ async function sendEmail(
       return false
     }
 
-    return true
+    const result = await response.json()
+    return typeof result?.id === 'string' && result.id.length > 0
   } catch (error) {
     console.error('Email send error:', error)
     return false
   }
-}
-
-/**
- * Offertmailet — företagets varumärke via masterlayouten (lib/email-templates.ts).
- *
- * Varumärkeslagret 2026-09-07: den här funktionen löser bara VEM som står
- * som avsändare (skaparen före företaget) och lämnar sedan över till
- * buildQuoteEmailHtml. "Du betalar"-logiken bor i byggaren.
- */
-function generateEmailHTML(
-  quote: any,
-  business: any,
-  signUrl?: string,
-  trackingPixelUrl?: string,
-  creator?: { name?: string | null; phone?: string | null; email?: string | null } | null,
-  pdfUrl?: string
-): string {
-  // business är hela business_config-raden (select('*')) → varumärke +
-  // stämpel utan extra query. Kontaktuppgifter = offertens SKAPARE när den
-  // finns (samma identitet som kunddokumentet visar), annars företagets.
-  // `??` — en skapare med tomt telefonfält faller ändå tillbaka på företagets.
-  // Layouten escapar varumärkesfälten själv — ingen förescapning här.
-  const base = brandingFromConfig(business)
-  const branding: Branding = {
-    ...base,
-    contactName: creator?.name || base.contactName,
-    contactPhone: (creator?.phone ?? base.contactPhone) || undefined,
-    contactEmail: (creator?.email ?? base.contactEmail) || undefined,
-  }
-
-  // Själva innehållet byggs av den rena byggaren (lib/quotes/quote-email.ts)
-  // — samma funktion som inställningssidan "Så ser dina kunder dig"
-  // förhandsvisar med, så det kunden får och det ägaren ser är ett och samma.
-  return buildQuoteEmailHtml({
-    branding,
-    customerName: quote.customer?.name,
-    quoteNumber: quote.quote_number,
-    title: quote.title,
-    description: quote.description,
-    total: Number(quote.total),
-    customerPays: quote.customer_pays,
-    rotRutType: quote.rot_rut_type,
-    validUntil: quote.valid_until,
-    signUrl,
-    pdfUrl,
-    contactName: creator?.name,
-    trackingPixelUrl,
-  })
 }
 
 export async function POST(request: NextRequest) {
@@ -190,6 +141,7 @@ export async function POST(request: NextRequest) {
       .from('quotes')
       .select('*, sign_token')
       .eq('quote_id', quoteId)
+      .eq('business_id', business.business_id)
       .single()
 
     if (quoteError || !quote) {
@@ -197,36 +149,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
-    // Verifiera ägarskap: kolla att offertens business tillhör inloggad användare
-    const { data: ownerCheck } = await supabase
-      .from('business_config')
-      .select('business_id')
-      .eq('business_id', quote.business_id)
-      .eq('user_id', business.user_id)
-      .maybeSingle()
-
-    if (!ownerCheck) {
-      // Fallback: kolla om det är samma e-post (multi-account scenario)
-      const { data: emailCheck } = await supabase
-        .from('business_config')
-        .select('business_id')
-        .eq('business_id', quote.business_id)
-        .eq('contact_email', business.contact_email)
-        .maybeSingle()
-
-      if (!emailCheck) {
-        return NextResponse.json({ error: 'Ingen behörighet för denna offert' }, { status: 403 })
-      }
-    }
+    // A shared contact email is not authority over another business's quote.
+    if (quote.business_id !== business.business_id) return NextResponse.json({ error: 'Offerten hittades inte' }, { status: 404 })
+    const { data: customer, error: customerError } = await supabase.from('customer').select('*')
+      .eq('customer_id', quote.customer_id).eq('business_id', business.business_id).single()
+    if (customerError || !customer) return NextResponse.json({ error: 'Kunden kunde inte verifieras i företaget' }, { status: 400 })
+    ;(quote as any).customer = customer
+    let recipients
+    try { recipients = quoteRecipients(customer, method, extraEmails, bccEmails) }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Ogiltiga mottagare' }, { status: 400 }) }
 
     // 4-eyes check: kräv admin-godkännande för stora offerter
-    const { data: fourEyesConfig } = await supabase
+    const { data: bizConfig, error: businessError } = await supabase
       .from('business_config')
-      .select('four_eyes_enabled, four_eyes_threshold_sek')
-      .eq('business_id', quote.business_id)
+      .select('*')
+      .eq('business_id', business.business_id)
       .single()
+    if (businessError || !bizConfig) return NextResponse.json({ error: 'Företagets avsändaruppgifter och godkännanderegler kunde inte verifieras' }, { status: 500 })
+    const fourEyesConfig = bizConfig
+    let quoteTotal: number
+    try { quoteTotal = validateQuoteDeliveryData(quote, bizConfig).total }
+    catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : 'Ogiltigt offertunderlag' }, { status: 400 }) }
 
-    const quoteTotal = quote.total || quote.subtotal || 0
     if (
       fourEyesConfig?.four_eyes_enabled &&
       quoteTotal >= (fourEyesConfig.four_eyes_threshold_sek || 50000) &&
@@ -254,8 +198,8 @@ export async function POST(request: NextRequest) {
           // visningsnamn, inte ett id att jämföra mot.
           requested_by_user_id: currentUser?.id || null,
           send_method: method,
-          extra_emails: extraEmails,
-          bcc_emails: bccEmails,
+          extra_emails: recipients.emailTo.slice(1),
+          bcc_emails: recipients.bcc,
         },
         status: 'pending',
         risk_level: 'high',
@@ -272,6 +216,7 @@ export async function POST(request: NextRequest) {
         .from('quotes')
         .update({ status: 'pending_approval' })
         .eq('quote_id', quoteId)
+        .eq('business_id', business.business_id)
 
       if (statusErr) {
         console.error('[quotes/send] Failed to update quote status:', statusErr)
@@ -299,46 +244,24 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Hämta kund separat (FK-relation osäker)
-    let customer: any = null
-    if (quote.customer_id) {
-      const { data: c } = await supabase
-        .from('customer')
-        .select('*')
-        .eq('customer_id', quote.customer_id)
-        .single()
-      // Sanering 2026-08-05: den gamla fallbacken mot "customers" var död —
-      // tabellen finns inte (heter customer) — och slukade bara det riktiga
-      // felmeddelandet när kunduppslaget misslyckades.
-      customer = c
-    }
-    // Sätt customer på quote-objektet för bakåtkompatibilitet
-    ;(quote as any).customer = customer
-
-    if (!customer) {
-      return NextResponse.json({ error: 'Ingen kund kopplad till offerten' }, { status: 400 })
-    }
-
-    // Hämta logo_url, swish_number och accent_color (varumärkesfärg för mejlet)
-    const { data: bizConfig } = await supabase
-      .from('business_config')
-      .select('logo_url, swish_number, accent_color')
-      .eq('business_id', business.business_id)
-      .single()
-    const businessWithLogo = { ...business, logo_url: bizConfig?.logo_url, swish_number: bizConfig?.swish_number, accent_color: bizConfig?.accent_color }
+    const businessWithLogo = bizConfig
 
     // Offertens skapare (business_users) → mejlets kontaktuppgifter visar rätt
     // person, samma identitet som kunddokumentet. Null för gamla offerter.
-    const emailCreator = await fetchQuoteCreator(supabase, quote.created_by)
+    const emailCreator = await fetchQuoteCreator(supabase, quote.created_by, business.business_id)
 
     // Generate/get sign_token and build signing URL
     let signToken = quote.sign_token
     if (!signToken) {
       signToken = crypto.randomUUID()
-      await supabase
+      const { data: tokenRows, error: tokenError } = await supabase
         .from('quotes')
         .update({ sign_token: signToken })
         .eq('quote_id', quoteId)
+        .eq('business_id', business.business_id)
+        .is('sign_token', null)
+        .select('quote_id')
+      if (tokenError || !tokenRows?.length) return NextResponse.json({ error: 'Signeringslänken kunde inte sparas. Inget utskick gjordes.' }, { status: 409 })
     }
 
     const trackingSessionId = crypto.randomUUID()
@@ -347,15 +270,18 @@ export async function POST(request: NextRequest) {
     if (!portalUrl) {
       return NextResponse.json({ error: 'Kunde inte skapa portal-länk' }, { status: 500 })
     }
-    const signUrl = portalUrl
     // t=sign_token krävs av /api/quotes/track sedan tenant-svepet 2026-09-01.
     const trackingPixelUrl = `${APP_URL}/api/quotes/track?q=${quoteId}&t=${encodeURIComponent(signToken)}&e=opened&s=${trackingSessionId}`
+    const envelope = buildQuoteDeliveryEnvelope({ quote, business: businessWithLogo, recipients, portalUrl,
+      pdfUrl: `${APP_URL}/api/quotes/pdf?token=${signToken}&format=pdf`, trackingPixelUrl, creator: emailCreator })
 
     let smsSent = false
     let emailSent = false
     let sentVia = ''
     let gmailError = ''
     let smsError = ''
+    const followupErrors: string[] = []
+    let gmailAttempted = false
 
     // SMS
     if (method === 'sms' || method === 'both') {
@@ -363,19 +289,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: 'Kunden saknar telefonnummer' }, { status: 400 })
       }
 
-      // Texten bor i lib/quotes/quote-sms.ts — demo-offerten på handymate.se
-      // (api/public/demo-quote) skickar EXAKT samma SMS (yta 9, 2026-09-07).
-      const smsMessage = buildQuoteSmsText({
-        customerName: quote.customer.name,
-        businessName: business.business_name,
-        businessPhone: business.phone_number,
-        assignedPhoneNumber: business.assigned_phone_number,
-        total: quote.total,
-        customerPays: quote.customer_pays,
-        rotRutType: quote.rot_rut_type,
-        validUntil: quote.valid_until,
-        portalUrl,
-      })
+      const smsMessage = envelope.sms!.text
 
       const smsResult = await sendSMS(supabase, business.business_id, quote.customer.phone_number, smsMessage, business.business_name, quote.customer_id, quoteId)
       smsSent = smsResult.sent
@@ -383,7 +297,7 @@ export async function POST(request: NextRequest) {
 
       if (smsSent) {
         // Logga SMS-aktivitet
-        await supabase.from('customer_activity').insert({
+        const { error: activityError } = await supabase.from('customer_activity').insert({
           activity_id: 'act_' + Math.random().toString(36).substr(2, 9),
           customer_id: quote.customer_id,
           business_id: quote.business_id,
@@ -392,6 +306,7 @@ export async function POST(request: NextRequest) {
           description: `Offert "${quote.title}" skickad till ${quote.customer.phone_number}`,
           created_by: 'user'
         })
+        if (activityError) followupErrors.push('SMS accepterades men kundhistoriken kunde inte sparas.')
       }
     }
 
@@ -403,54 +318,58 @@ export async function POST(request: NextRequest) {
         }
         // Om both och ingen email, fortsätt med bara SMS
       } else {
-        const emailSubject = `Offert från ${business.business_name} — ${quote.title || 'Offert'}`
-        const pdfUrl = `${APP_URL}/api/quotes/pdf?token=${signToken}&format=pdf`
-        const emailHTML = generateEmailHTML(quote, businessWithLogo, signUrl, trackingPixelUrl, emailCreator, pdfUrl)
-        const allRecipients = [quote.customer.email, ...(extraEmails || [])].filter(Boolean)
+        const emailSubject = envelope.email!.subject
+        const emailHTML = envelope.email!.html
+        const allRecipients = envelope.email!.to
 
-        // Försök Gmail först, fallback till Resend
+        // Resend is only an alternative when Gmail is disabled, never a retry
+        // after an uncertain Gmail delivery.
         try {
           const { sendViaGmail, isGmailSendEnabled } = await import('@/lib/gmail-send')
           const gmailStatus = await isGmailSendEnabled(business.business_id)
           if (gmailStatus.enabled && gmailStatus.email) {
+            gmailAttempted = true
             emailSent = await sendViaGmail(business.business_id, {
               to: allRecipients,
               subject: emailSubject,
               html: emailHTML,
               fromName: business.business_name,
               fromEmail: gmailStatus.email,
-              replyTo: business.contact_email || undefined,
-              bcc: bccEmails?.length > 0 ? bccEmails : undefined,
+              replyTo: envelope.email!.replyTo,
+              bcc: envelope.email!.bcc.length ? envelope.email!.bcc : undefined,
             })
             if (emailSent) {
               sentVia = gmailStatus.email
             } else {
-              gmailError = 'Gmail-token kan ha gått ut — återanslut Gmail i Inställningar'
+              gmailError = 'Gmail-utskicket kunde inte bekräftas. Inget reservutskick görs; kontrollera Gmail innan du försöker igen.'
             }
           }
         } catch (gmailErr: any) {
-          console.error('Gmail send error (falling back to Resend):', gmailErr)
-          gmailError = gmailErr?.message || 'Gmail-fel'
+          gmailAttempted = true
+          console.error('Gmail send error (no automatic resend):', gmailErr)
+          gmailError = 'Gmail-utskicket kunde inte bekräftas. Inget reservutskick görs; kontrollera Gmail innan du försöker igen.'
         }
 
         // Fallback: Resend
-        if (!emailSent) {
+        if (!emailSent && !gmailAttempted) {
           emailSent = await sendEmail(
             allRecipients,
             emailSubject,
             emailHTML,
             business.business_name,
-            business.contact_email || undefined,
-            bccEmails?.length > 0 ? bccEmails : undefined,
+            envelope.email!.replyTo,
+            envelope.email!.bcc.length ? envelope.email!.bcc : undefined,
           )
           if (emailSent) {
             sentVia = `offert@${process.env.RESEND_DOMAIN || 'handymate.se'}`
+          } else {
+            gmailError = 'E-postutskicket kunde inte bekräftas av Resend. Kontrollera sändtjänsten innan du försöker igen.'
           }
         }
 
         if (emailSent) {
           // Logga email-aktivitet
-          await supabase.from('customer_activity').insert({
+          const { error: activityError } = await supabase.from('customer_activity').insert({
             activity_id: 'act_' + Math.random().toString(36).substr(2, 9),
             customer_id: quote.customer_id,
             business_id: quote.business_id,
@@ -459,37 +378,38 @@ export async function POST(request: NextRequest) {
             description: `Offert "${quote.title}" skickad till ${quote.customer.email}`,
             created_by: 'user'
           })
+          if (activityError) followupErrors.push('E-post accepterades men kundhistoriken kunde inte sparas.')
         }
       }
     }
 
     // Kontrollera att minst en metod lyckades
     if (!smsSent && !emailSent) {
-      const hint = [
-        smsError ? `SMS misslyckades: ${smsError}.` : '',
-        gmailError ? `Gmail misslyckades: ${gmailError}.` : '',
-      ].filter(Boolean).join(' ')
+      const receipt = quoteSendReceipt(smsSent, emailSent, recipients, [smsError, gmailError, ...followupErrors].filter(Boolean), Boolean(gmailError))
       return NextResponse.json({
-        error: `${hint ? hint + ' ' : ''}Kunde inte skicka offerten. Kontrollera att Gmail är kopplad i Inställningar eller att kundens mailadress stämmer.`
+        error: receipt.text, smsSent, emailSent, receipt,
       }, { status: 500 })
     }
 
     // Uppdatera offert-status
-    const { error: statusUpdateErr } = await supabase
+    const { data: statusRows, error: statusUpdateErr } = await supabase
       .from('quotes')
       .update({
         status: 'sent',
         sent_at: new Date().toISOString()
       })
       .eq('quote_id', quoteId)
+      .eq('business_id', business.business_id)
+      .select('quote_id')
 
-    if (statusUpdateErr) {
+    if (statusUpdateErr || !statusRows?.length) {
       // Kritiskt: offert skickades via SMS/mail men status sparades inte
       console.error('[quotes/send] CRITICAL: Status-update failed after send:', statusUpdateErr)
       return NextResponse.json({
         success: true,
         smsSent, emailSent,
         warning: 'Offerten skickades men status kunde inte uppdateras. Ladda om sidan.',
+        receipt: quoteSendReceipt(smsSent, emailSent, recipients, [smsError, gmailError, ...followupErrors, 'Offertstatus kunde inte sparas. Skicka inte igen.'].filter(Boolean)),
       })
     }
 
@@ -510,6 +430,7 @@ export async function POST(request: NextRequest) {
       }
     } catch (pipelineErr) {
       console.error('Pipeline trigger error (non-blocking):', pipelineErr)
+      followupErrors.push('Utskicket är gjort men en pipelineändring kunde inte bekräftas.')
     }
 
     // Smart Communication-triggern för quote_sent är BORTTAGEN (Etapp 0,
@@ -530,10 +451,11 @@ export async function POST(request: NextRequest) {
       })
     } catch (eventErr) {
       console.error('fireEvent quote_sent error (non-blocking):', eventErr)
+      followupErrors.push('Utskicket är gjort men efterföljande automation kunde inte bekräftas.')
     }
 
     // OBS: portal-notisen för 'quote_sent' är BORTTAGEN här med flit. Den skickade
-    // ett andra, minimalt mejl utöver den rika generateEmailHTML ovan → kunden fick
+    // ett andra, minimalt mejl utöver det rika offertmejlet ovan → kunden fick
     // två mejl per offert. quote_sent-notisen anropades enbart härifrån, så den
     // rika mejlen är nu den enda offert-mejlen (on-brand + PDF-länk).
 
@@ -562,19 +484,20 @@ export async function POST(request: NextRequest) {
       }
     } catch (err) {
       console.error('[quotes/send] ensureDealForQuote/moveDeal failed (non-blocking):', quoteId, err)
+      followupErrors.push('Utskicket är gjort men affärens uppdatering kunde inte bekräftas.')
     }
 
     // Bygg svar
-    const sentMethods = []
-    if (smsSent) sentMethods.push('SMS')
-    if (emailSent) sentMethods.push('email')
+    const receipt = quoteSendReceipt(smsSent, emailSent, recipients, [smsError, gmailError, ...followupErrors].filter(Boolean))
 
     return NextResponse.json({
       success: true,
-      message: `Offert skickad via ${sentMethods.join(' och ')}!`,
+      message: receipt.text,
+      warning: receipt.state === 'partial' ? receipt.text : undefined,
       smsSent,
       emailSent,
       sentVia: sentVia || undefined,
+      receipt,
     })
 
   } catch (error: any) {

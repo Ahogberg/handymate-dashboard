@@ -361,7 +361,7 @@ test.describe('regel 1: kortet bär ett färdigt resultat', () => {
     // sv-SE formaterar med HÅRT mellanslag (U+00A0) — jämför mot samma
     // formaterare i stället för mot en literal med vanligt mellanslag.
     expect(approveLabel('invoice_reminder', payload))
-      .toContain((3813).toLocaleString('sv-SE'))
+      .toBe('Granska')
     expect(cardContext(payload)).toContain('Andreas')
   })
 

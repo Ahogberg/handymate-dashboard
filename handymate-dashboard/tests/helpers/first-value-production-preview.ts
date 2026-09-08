@@ -6,7 +6,7 @@ import config from '../../tailwind.config'
 
 /** Real React components and CSS. Only API responses and the editor host are fixtures. */
 export async function productionPreview() {
-  const files = ['lib/onboarding/work-sample.ts', 'lib/quotes/visit-rule.ts',
+  const files = ['lib/followup/presentation.ts', 'components/quotes/ScheduledFollowup.tsx', 'lib/onboarding/work-sample.ts', 'lib/quotes/visit-rule.ts',
     'components/onboarding/WorkSampleStart.tsx', 'components/onboarding/WorkSampleResume.tsx',
     'components/quotes/VisitRuleEditor.tsx', 'components/quotes/QuoteHandoff.tsx']
   const css = (await postcss([tailwind({ ...config, content: files })]).process('@tailwind base; @tailwind components; @tailwind utilities;', { from: undefined })).css
@@ -35,5 +35,5 @@ export async function productionPreview() {
     }
     ReactDOM.createRoot(document.getElementById('root')).render(h(Host));`
   const safe = (s:string)=>s.replace(/<\/script/gi,'<\\/script')
-  return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}\n${readFileSync('app/onboarding/onboarding.css','utf8')}\nbody{background:#f8fafc;font-family:Arial,sans-serif}main{max-width:1000px;margin:24px auto;padding:0 16px}.ob-screen{min-height:0;height:auto}.ob-body{overflow:visible}output{display:block}</style></head><body><main><div id="root"></div></main><script>${safe(readFileSync('node_modules/react/umd/react.production.min.js','utf8'))}</script><script>${safe(readFileSync('node_modules/react-dom/umd/react-dom.production.min.js','utf8'))}</script><script>${safe(script)}</script></body></html>`
+  return `<!doctype html><html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><style>${css}\n${readFileSync('app/onboarding/onboarding.css','utf8')}\nbody{background:#f8fafc;font-family:Arial,sans-serif}main{max-width:1000px;margin:24px auto;padding:0 16px}.ob-screen{min-height:0;height:auto}.ob-body{overflow:visible}output{display:block;overflow-wrap:anywhere}</style></head><body><main><div id="root"></div></main><script>${safe(readFileSync('node_modules/react/umd/react.production.min.js','utf8'))}</script><script>${safe(readFileSync('node_modules/react-dom/umd/react-dom.production.min.js','utf8'))}</script><script>${safe(script)}</script></body></html>`
 }

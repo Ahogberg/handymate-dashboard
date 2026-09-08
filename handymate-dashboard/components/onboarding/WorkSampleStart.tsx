@@ -51,6 +51,7 @@ export function WorkSampleStart({ businessId, source: initialSource = '', sample
           <h2 className="font-semibold text-teal-900">{sample ? sample.title : 'Ditt förberedda underlag'}</h2>
           {sample ? <><p className="whitespace-pre-wrap text-sm mt-3">{sample.description}</p>
             <ul className="mt-4 space-y-3">{sample.items.map((row, i) => <li key={i} className="border-t pt-2 text-sm"><strong>{row.description}</strong><span className="block text-slate-500">Mängdförslag: {row.quantity} {row.unit} · Pris saknas</span></li>)}</ul>
+            <div className="mt-4 rounded-lg bg-teal-50 p-3 text-sm"><strong>Daniel har förberett ditt underlag.</strong><p className="mt-1">Nästa steg: behåll underlaget, slutför starten och öppna offertbyggaren. Där granskar du kund, mängder och priser. Du behöver inte beskriva jobbet igen.</p></div>
             <p className="mt-4 text-xs text-amber-800">Granska omfattning och mängder. Dina priser och eventuella avdrag lägger du till i offertbyggaren. Inget är skickat.</p>
           </> : <p className="text-sm text-slate-500 mt-3">Daniel förbereder arbetsmomenten från din text. När något saknas får du komplettera det.</p>}
         </div>

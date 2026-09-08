@@ -19,6 +19,11 @@ jobs:
           node-version: '22'
       - run: npm install
       - run: npx playwright install --with-deps chromium
+      - run: npm run test:durable-followup
+      - run: npm run test:approval-integration
+      - run: npm run test:report-continuity
+      - run: npm run test:my-day
+      - run: npm run test:customer-relief
       - run: npm run test:first-value-ui
       - run: npx playwright test tests/first-value-production.ui.spec.ts --no-deps --project=chromium --workers=1 --reporter=line
       - uses: actions/upload-artifact@v4
@@ -26,3 +31,32 @@ jobs:
         with:
           name: first-value-review
           path: handymate-dashboard/test-results/
+
+  durable-followup-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: followup_ci_only
+          POSTGRES_DB: followup_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    defaults:
+      run:
+        working-directory: handymate-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright test tests/durable-followup.spec.ts tests/report-continuity.spec.ts tests/report-recovery.spec.ts --no-deps --project=chromium --workers=1 --reporter=line
+        env:
+          FOLLOWUP_TEST_DATABASE_URL: postgres://postgres:followup_ci_only@localhost:5432/followup_ci

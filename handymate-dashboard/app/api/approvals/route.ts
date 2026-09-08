@@ -43,12 +43,16 @@ export async function GET(request: NextRequest) {
     const limitParam = request.nextUrl.searchParams.get('limit')
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 0, 1), 200) : 100
 
+    const offset = Number(request.nextUrl.searchParams.get('offset') || 0)
+    if (!Number.isSafeInteger(offset) || offset < 0) return NextResponse.json({ error: 'Ogiltig sidposition.' }, { status: 400 })
+
     let query = supabase
       .from('pending_approvals')
       .select('*')
       .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
-      .limit(limit)
+      .order('id', { ascending: false })
+      .range(offset, offset + limit - 1)
 
     // status=resolved är en samlingsterm för "inte längre pending" — samma
     // statusuppsättning som approvals/page.tsx tidigare frågade direkt mot
@@ -62,11 +66,10 @@ export async function GET(request: NextRequest) {
       // 'approved' och syns inte i någon kö. 'retrying' tas med: en
       // strandad omkörning (server dog) ska också gå att se och köra om
       // (retry-endpointen släpper igenom den efter 10 min).
-      const sevenDaysAgoIso = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      // Unresolved actions do not expire merely because seven days passed.
       query = query
         .eq('status', 'approved')
         .in('payload->execution_result->>outcome', ['failed', 'retrying'])
-        .gte('resolved_at', sevenDaysAgoIso)
     } else {
       query = query.eq('status', status)
       // Snoozade kort (v181, "Skjut upp") göms ur pending-kön tills tiden
@@ -105,7 +108,7 @@ export async function GET(request: NextRequest) {
       display: approvalDisplay(row as unknown as { approval_type: string; payload?: Record<string, unknown> | null }),
     }))
 
-    return NextResponse.json({ approvals })
+    return NextResponse.json({ approvals, next_offset: (data || []).length === limit ? offset + limit : null })
   } catch (error: any) {
     console.error('GET /api/approvals error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
