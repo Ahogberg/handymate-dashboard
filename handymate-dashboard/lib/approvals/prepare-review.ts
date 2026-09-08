@@ -1,4 +1,5 @@
 import { approvalArtifactId } from './artifact-write'
+import { timeProposalFields, timeProposalMatches } from './time-proposal'
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 import { automationSmsText } from './automation-message'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -289,12 +290,17 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
         return complete('Attesterar incheckningen och registrerar tiden som godkänd och fakturerbar.', 'Attestera och registrera tiden')
       }
       case 'tidrapport_forslag': {
-        if (!p.project_id || !p.booking_date || !Number.isSafeInteger(p.suggested_minutes) || p.suggested_minutes <= 0) throw new Error('Projekt, arbetsdatum och positiv tidsåtgång måste anges.')
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(p.booking_date) || !Number.isFinite(Date.parse(p.booking_date)) || new Date(p.booking_date).toISOString().slice(0, 10) !== p.booking_date) throw new Error('Arbetsdatumet måste vara ett giltigt kalenderdatum.')
+        const expected = timeProposalFields(p)
+        const entryId = approvalArtifactId(businessId, approval.id, 'time_proposal')
+        const existing = await db.from('time_entry').select('*').eq('time_entry_id', entryId).eq('business_id', businessId).maybeSingle()
+        if (existing.error) throw new Error('Tidigare tidrapport kunde inte kontrolleras. Försök igen senare.')
+        snapshot[`time_entry:${entryId}`] = existing.data || null
+        if (existing.data && !timeProposalMatches(existing.data, expected)) throw new Error('Den befintliga tidraden har ändrats och avviker från förslaget. Granska tidrapporten innan du försöker igen. Ingen tid ändras här.')
         if (p.assigned_user_id) { const user = await row('business_users', 'id', p.assigned_user_id, 'Medarbetaren'); detail('Medarbetare', user.name || user.full_name) }
         else detail('Medarbetare', 'Ingen person knuten till tidraden')
         detail('Datum', p.booking_date); detail('Minuter', p.suggested_minutes)
-        return complete('Skapar en godkänd och fakturerbar tidrapport med uppgifterna ovan.', 'Registrera tidrapporten')
+        detail('Beskrivning', expected.description)
+        return complete(existing.data ? 'Verifierar den redan registrerade och godkända tidrapporten. Ingen ny tid registreras.' : 'Skapar en godkänd och fakturerbar tidrapport med uppgifterna ovan.', existing.data ? 'Bekräfta registrerad tid' : 'Registrera tidrapporten')
       }
       case 'checklist_forslag': {
         if (!p.project_id || !Array.isArray(p.template_items) || !p.template_items.length) throw new Error('Checklistan saknar projekt eller punkter.')
