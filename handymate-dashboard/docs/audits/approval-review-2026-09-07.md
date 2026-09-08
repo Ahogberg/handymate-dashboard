@@ -137,3 +137,11 @@ Denna genomgång täcker samtliga **77 registrerade korttyper i pending_approval
 4. Bekräfta med isolerad testsändare. Jämför mottagare och text i granskning, kö och utgående meddelande.
 5. Upprepa med lång text, många mottagare, dålig uppkoppling, bakgrundsläge och kontobyte.
 6. Kör varje återstående typ från matrisen när dess fulla granskning är byggd, inklusive Avvisa och misslyckad/delvis lyckad handling.
+
+### Direktstart 8 september — jobbrapportens felkvittens
+
+Jobbrapporten verifierar nu projekt och aktuell kundadress inom företaget före PDF-uppladdning. Ett fel vid registrering av kort/dokument, signering av PDF-länk eller mejl accepteras inte längre som ett lyckat utskick. Ett accepterat mejl vars historik inte kunde sparas redovisas som delvis utfört med uttrycklig information att inte skicka igen. Projekt/kunduppslag vid förberedelse är företagsskopade; fältrapporternas id hämtas så fotoassociationen kan fungera.
+
+Verifiering: nio isolerade scenarier i `node tests/approvals/job-report-harness.cjs` testar faktisk hjälpkod med mockad databas, PDF och mejltjänst. Befintligt route-harness godkänt. TypeScript har samma tre tidigare portal/review-fel, inga nya. Ingen verklig leverans eller iPhone-verifiering.
+
+Återstår: exakt dokument- och mejlförhandsvisning, versionsbindning, foton i PDF och idempotent leverans med återupptagning. Kortets befintliga spärr kvarstår tills hela flödet är verifierat. Övriga delar i nattplanen är fortfarande öppna.
