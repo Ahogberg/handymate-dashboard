@@ -185,6 +185,7 @@ jobs:
           tests/massutskick-bekraftelse.spec.ts
           tests/kundtext-utan-interna-namn.spec.ts
           tests/kortgrindar-per-behorighet.spec.ts
+          tests/missat-samtal-dygnet-runt.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

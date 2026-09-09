@@ -83,6 +83,9 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
     action_type: string
     action_config: Record<string, unknown>
     requires_approval: boolean
+    /** Utelämnad = ärver true. Sätts bara där dygnet-runt-löftet gäller. */
+    respects_work_hours?: boolean
+    respects_night_mode?: boolean
   }> = [
     {
       name: 'Snabbsvar på ny lead',
@@ -101,6 +104,16 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
       action_type: 'send_sms',
       action_config: { template: 'Hej! Vi missade tyvärr ditt samtal till {{business_name}}. Svara på detta SMS med vad du behöver hjälp med, så återkommer vi direkt — eller ringer upp så snart vi kan.' },
       requires_approval: false,
+      // Beslut (Andreas 2026-09-09): svaret på ett missat samtal är själva
+      // löftet — "missade samtal fångas 24/7". Utan de här två raderna ärver
+      // regeln kolumndefaulten true/true, och automation-engine hoppar över
+      // sändningen utanför 07-17 (lib/automation-engine.ts:879) respektive
+      // under nattläget. Alla 14 konton som fanns när detta upptäcktes hade
+      // grinden på: löftet hade aldrig hållit för någon, och just de samtal
+      // som kommer när hantverkaren inte kan svara är de som betyder mest.
+      // Övriga seedade regler behåller sina grindar med flit.
+      respects_work_hours: false,
+      respects_night_mode: false,
     },
     {
       name: 'Följ upp skickad offert',
@@ -161,8 +174,11 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
       action_type: r.action_type,
       action_config: r.action_config,
       requires_approval: r.requires_approval,
-      respects_work_hours: true,
-      respects_night_mode: true,
+      // Läser regelns egna värden. Hårdkodat true/true här gjorde att
+      // per-regel-flaggor ovan tyst ignorerades — det var så
+      // "missade samtal fångas 24/7" kunde vara osant på alla konton.
+      respects_work_hours: r.respects_work_hours ?? true,
+      respects_night_mode: r.respects_night_mode ?? true,
     }))
   )
 }
