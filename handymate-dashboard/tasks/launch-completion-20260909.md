@@ -82,3 +82,13 @@ Migration sql/v2_gmail_sync_start.sql + CLI-genererad migration körd på isoler
 - Riktigt OAuth-/Gmail-prov, provideravbrott och användarens synkvy återstår. Ingen produktion aktiverad.
 
 Nästa körbara del efter grön CI: spara releasebevis och fortsätt med rapportkedjans oskickade utkast/återupptagning, alternativt den beständiga mottagningen för kvarvarande inflöden. Gmail-blockets ovanstående öppna delar får inte räknas som kundgodkända.
+
+
+## Checkpoint: rapportutkast i mobilen 2026-09-09
+Mobile draft-PR7: https://github.com/Ahogberg/handymate-mobile/pull/7
+Exakt kod-HEAD: fe433e3a8f3a01eff8eed72182e6c8b8d455e53b. Bas PR6 cc8fd5c4e43a6b5ccefa31933a0d441fb9d16d6d. Lokal commit f37756f.
+Rapportarket och fullchatten delar beständiga textutkast per miljö, Auth-användare, företag, medlem, projekt och datum. Återöppning skickar inte; nätfel behåller text, lagringsfel stoppar skick och en sen kvittens rensar endast originalrevisionen. Återställning i röstläge startar inte över befintlig text.
+Verifierat lokalt: typkontroll, 12 nya utkastprov, totalt 222 Jest-prov i 30 sviter, separat scripts/check-contracts.cjs. Tre äldre sviter kan inte starta eftersom lokala snapshoten saknar assets/ai-team-bilder; blobbarna finns på GitHub. Full check:readiness är INTE godkänd lokalt. EAS, Expo-export och telefonprov inte utförda. CI ska avläsas på ovanstående SHA.
+Begränsning: endast text på samma enhet; ingen ljud-/bildbackup. Dödas processen innan sparad-markeringen kan senaste ändringen gå förlorad. Tappat serversvar är inte löst av utkast: beständig inskickningsnyckel och avstämning återstår innan retry kan kallas dublettsäker. Block 4 är fortfarande pågående, inte kundgodkänt.
+Öppna kundprov: tvångsstäng efter sparad-markering, återöppna samma projekt/datum, konto- och datumbyte, avbrutet skick, därefter separat verkligt rapport→ÄTA→faktura-/Fortnoxprov. Ingen main-merge, produktionsmigration eller kundkommunikation.
+Nästa körbara steg: kontrollera PR7-CI; undersök sedan rapportchattens /api/matte/chat och sendToMatte för beständig inskickningsidentitet och avstämning vid tappat svar. Reproducera mottaget serverskick + förlorad HTTP-kvittens innan implementation. Inventera samtidigt rapportens koppling till godkänd ÄTA/fakturakällor; telefon-/providerprov hålls öppna. Portalens anslutning är redan genomförd, inte en ny startuppgift.
