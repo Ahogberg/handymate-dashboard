@@ -187,6 +187,7 @@ jobs:
           tests/kortgrindar-per-behorighet.spec.ts
           tests/missat-samtal-dygnet-runt.spec.ts
           tests/elks-webhook-grind.spec.ts
+          tests/elks-ljudfalt.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

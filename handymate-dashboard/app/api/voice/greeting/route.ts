@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
+import { halsningsljud } from '@/lib/voice/halsning'
 import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 
 export const dynamic = 'force-dynamic'
@@ -34,11 +35,7 @@ async function handle(to: string): Promise<NextResponse> {
     businessName = (biz as any)?.business_name || ''
   }
 
-  const message =
-    `Hej och välkommen till ${businessName || 'oss'}. Vi kan tyvärr inte svara just nu. ` +
-    `Lämna ett meddelande så hör vi av oss så snart vi kan.`
-
-  return NextResponse.json({ play: `tts:sv-SE:${message}` })
+  return NextResponse.json({ play: halsningsljud(businessName) })
 }
 
 export async function POST(request: NextRequest) {

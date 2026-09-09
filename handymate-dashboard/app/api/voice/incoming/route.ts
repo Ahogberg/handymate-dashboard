@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { callRecordingId } from '@/lib/voice/call-processing'
 import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
 import { getServerSupabase } from '@/lib/supabase'
+import { halsningsljud } from '@/lib/voice/halsning'
+import { recordingNoticeUrl } from '@/lib/voice/retention'
 import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -134,7 +136,7 @@ export async function POST(request: NextRequest) {
 
         // 4. Lisas hälsning + handled=1 (ingen dubbel call_missed)
         return NextResponse.json({
-          play: medElksHemlighet(`${APP_URL}/api/voice/greeting?business_id=${business.business_id}`),
+          play: halsningsljud(business.business_name),
           whenhangup: medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`),
         })
       }
@@ -241,9 +243,22 @@ export async function POST(request: NextRequest) {
         // hoppade över båda och gjorde att just de samtal hantverkaren svarade
         // på aldrig kunde transkriberas.
         if (business.call_recording_enabled) {
-          return NextResponse.json({
-            ivr: medElksHemlighet(`${APP_URL}/api/voice/consent`),
-          })
+          // 46elks `ivr` är ett LJUD att spela, inte en webhook som svarar med
+          // call actions. Den gamla raden pekade `ivr` på /api/voice/consent, och
+          // 46elks svarade `badurl` / "Could not reach the specified URL". Rätt
+          // form: spela inspelningsmeddelandet och lämna över med `next`, alltså
+          // exakt consents egen första åtgärd (voice/consent/route.ts:82).
+          const noticeUrl = recordingNoticeUrl()
+          if (noticeUrl) {
+            return NextResponse.json({
+              play: noticeUrl,
+              skippable: false,
+              next: medElksHemlighet(`${APP_URL}/api/voice/consent?step=connect`),
+            })
+          }
+          // Utan godkänt inspelningsmeddelande kopplar vi UTAN inspelning — samma
+          // val som consent gör (route.ts:76). En kund får aldrig tappas för att
+          // en policyflagga inte är satt.
         }
 
         return NextResponse.json({
@@ -287,7 +302,7 @@ export async function POST(request: NextRequest) {
 
       // 46elks: spela meddelande och lägg på (agenten hanterar via webhook)
       return NextResponse.json({
-        play: medElksHemlighet(`${APP_URL}/api/voice/greeting?business_id=${business.business_id}`),
+        play: halsningsljud(business.business_name),
         // handled=1: call_missed redan fyrat ovan → voice/missed ska INTE dubbla det.
         whenhangup: medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`),
       })
@@ -297,9 +312,22 @@ export async function POST(request: NextRequest) {
     console.log('[Voice] agent_with_transfer: connecting to', transferPhone)
 
     if (business.call_recording_enabled) {
-      return NextResponse.json({
-        ivr: medElksHemlighet(`${APP_URL}/api/voice/consent`),
-      })
+      // 46elks `ivr` är ett LJUD att spela, inte en webhook som svarar med
+      // call actions. Den gamla raden pekade `ivr` på /api/voice/consent, och
+      // 46elks svarade `badurl` / "Could not reach the specified URL". Rätt
+      // form: spela inspelningsmeddelandet och lämna över med `next`, alltså
+      // exakt consents egen första åtgärd (voice/consent/route.ts:82).
+      const noticeUrl = recordingNoticeUrl()
+      if (noticeUrl) {
+        return NextResponse.json({
+          play: noticeUrl,
+          skippable: false,
+          next: medElksHemlighet(`${APP_URL}/api/voice/consent?step=connect`),
+        })
+      }
+      // Utan godkänt inspelningsmeddelande kopplar vi UTAN inspelning — samma
+      // val som consent gör (route.ts:76). En kund får aldrig tappas för att
+      // en policyflagga inte är satt.
     }
 
     // Connect direkt med timeout — om ingen svarar, ta meddelande
