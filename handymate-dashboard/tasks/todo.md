@@ -1,4 +1,8 @@
 # Aktiv sprint 2026-09-09
+Aktuell fortsättning: [lanseringsmålet](launch-completion-20260909.md).
+- [x] Portal: beständig mottagning inklusive kategori, belopp och adress.
+- [x] Portal: behåll inskick vid avbrott; skilj mottaget från färdigställt.
+- [ ] Route-/SQL-/UI-prov, tsc, build och checkpoint i PR36.
 
 Se [sex kundutfall](six-outcomes-20260909.md). Egen gren; tidigare punkter nedan bevaras.
 

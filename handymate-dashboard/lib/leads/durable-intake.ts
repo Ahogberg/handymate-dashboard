@@ -8,6 +8,9 @@ export interface IntakeInput {
   message: string | null
   source_ref: string | null
   lead_source_id: string | null
+  category?: string | null
+  estimated_value?: number | null
+  address_line?: string | null
 }
 export interface IntakeReceipt {
   id: string
@@ -36,9 +39,9 @@ export function intakeInput(body: unknown, sourceId: string | null): IntakeInput
   return { name: text('name', 200, true)!, phone: text('phone', 80, true)!, email: text('email', 320), message: text('message', 10000), source_ref: text('source_ref', 1000), lead_source_id: sourceId }
 }
 
-export async function receiveIntake(db: SupabaseClient, businessId: string, sourceScope: string, requestKey: string, input: IntakeInput): Promise<IntakeReceipt> {
+export async function receiveIntake(db: SupabaseClient, businessId: string, sourceScope: string, requestKey: string, input: IntakeInput, rpcName: 'receive_lead_intake' | 'receive_portal_lead_intake' = 'receive_lead_intake'): Promise<IntakeReceipt> {
   if (!/^[A-Za-z0-9._:-]{8,100}$/.test(requestKey)) throw new IntakeError('Förfrågans återförsöksnyckel är ogiltig.', 400)
-  const { data, error } = await db.rpc('receive_lead_intake', { p_business: businessId, p_scope: sourceScope, p_key: requestKey, p_input: input })
+  const { data, error } = await db.rpc(rpcName, { p_business: businessId, p_scope: sourceScope, p_key: requestKey, p_input: input })
   if (error || !data?.id) {
     if (error?.message?.includes('intake_request_changed')) throw new IntakeError('Samma återförsöksnyckel har använts för en ändrad förfrågan.', 409)
     throw new IntakeError('Förfrågan kunde inte tas emot. Försök igen med samma återförsöksnyckel.', 503)

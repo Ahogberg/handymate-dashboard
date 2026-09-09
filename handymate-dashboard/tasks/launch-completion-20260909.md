@@ -18,7 +18,7 @@ Status: planerad → pågår → tekniskt verifierad → kundgodkänd. Externt b
 |---|---|---|
 | 1 Säker fakturering | Tekniskt verifierad i PR35, kundprov öppet | Bevara atomiska källmarkeringar och replay-skydd. Kontrollera klientnyckel för fria fakturor; testa verklig provider separat. |
 | 2 Fullständig offertaccept | Tekniskt verifierad i PR35, kundprov öppet | Bevara beständig completion/recovery. Osäkert bekräftelsemejl kräver avstämning; ingen blind omsändning. |
-| 3 Tillförlitligt inflöde och uppföljning | Nästa | Kartlägg samtliga skapare; anslut först lead-portal till beständig mottagning. Bevisa sparat mottagande före sidoeffekter, samma ID vid retry och synlig återhämtning. Därefter verifiera uppföljningens aktivering, heartbeat och stopp vid svar/nej/signering. |
+| 3 Tillförlitligt inflöde och uppföljning | Pågår: portal implementerad, releasegrind pågår | Kartlägg samtliga skapare; anslut först lead-portal till beständig mottagning. Bevisa sparat mottagande före sidoeffekter, samma ID vid retry och synlig återhämtning. Därefter verifiera uppföljningens aktivering, heartbeat och stopp vid svar/nej/signering. |
 | 4 Rapport till ekonomisystem | Planerad | Kontrollera befintlig mobilåterupptagning, spara oskickade utkast där det saknas, bevisa rapport→ÄTA→fakturakällor och avstämning. Separera internt godkänd rapport från kundgodkänd ÄTA. Riktigt telefon-/Fortnoxprov öppet. |
 | 5 Företagsstart och mejl | Planerad | Rätta Gmail opt-out, pagination och cursor vid partiella fel innan aktivering. Verifiera faktisk OAuth-onboarding och Bolagsverkets kontrakt; bekräftad företagsprofil ska nå offert/agent. Microsoft kräver separat verifierad appregistrering och samtycke; redovisa vad som faktiskt fungerar. |
 | 6 Sammanhängande release | Planerad | Samla exakta backend-/mobil-SHA, migrationer, flaggor, miljö, EAS-profil och testbevis. Kör gemensamma roll-/tenant-/kedjeprov. Lista återstående kundprov och externa blockerare innan releasebeslut. |
@@ -45,7 +45,18 @@ Ingen merge/push till main, produktionsmigration eller skarp kundkommunikation u
 Kundgodkännande kräver Andreas/Christopher; externa OAuth-/leverantörsbeslut får inte antas vara klara.
 
 ## Nästa körbara steg
-Läs app/api/lead-portal/[code]/route.ts och lib för durable lead intake. Återge lead-sparat/deal-fel samt dubbelinskick i routeprov och koppla portalen till beständig mottagning med kompatibel återförsöksnyckel.
+Kontrollera senaste PR36-grindarna. Fortsätt sedan inventeringen av storefront/contact, widget/chat, public/book och email/inbound: identifiera vilka som saknar beständig mottagning och hur stabil händelsenyckel kan fås utan att slå ihop två legitima förfrågningar. Gmail cursor/opt-out kan rättas oberoende om inflödeskoppling kräver produktbeslut. Uppföljningens målmiljö och körprov återstår.
 
 ## Checkpoint
 2026-09-09: planen etablerad; block 3–6 inte slutförda. Nattpassen ska prioritera kod och lokala/CI-bevis och lämna en exakt lista över telefonprov och externa beroenden.
+
+
+## Checkpoint: portal genomförd 2026-09-09
+- Portal använder beständig mottagning före kund/lead/affär, inklusive kategori, nollvärde och adress. Extrafälten delar transaktion med affären; gamla kundadresser skrivs inte över.
+- Versionerad receive_portal_lead_intake stoppar ny kod mot omigrerad DB. Inga legacy-fallbackinserts. Äldre externa portalklienter måste skicka Idempotency-Key (annars 428); aktuell portal gör det.
+- Klienten sparar originalinskick och nyckel i sessionStorage före nätverk. Samma flik/omladdning kan återuppta; stängd flik/rensad lagring/annan enhet omfattas INTE. Inte generell offline-utkastfunktion.
+- Blockerat/mottaget 202 visas som ej färdigställt. Osäkra svar får inte skapa nytt inskick. Ingen ny förfrågan kan startas i samma flik innan originalet är kontrollerat.
+- 18 nya route/submission/render-prov + två nya SQL-prov. Sprintsviten 188 prov passerade; tsc passerade före sista storleksvalideringen. Slutlig CI/build kontrolleras separat.
+- SQL v2_portal_durable_intake körd ENDAST på eoodwyfxrdjmlqaealhj. Live SQL-prov verifierade metadata, identiska replay-ID:n, ändrad payload och företag B nekas; samtliga provrader rullades tillbaka. Ingen SMS-/Fortnox-effekt kördes av provet.
+- Reproducerbart DB-prov: sql/proof_portal_intake_test_only.sql. Lokala prov: npm run test:six-outcomes.
+- Kvar: övriga inflöden, riktiga portal-klickprov och kundprov, uppföljning, block 4–6. SQL-provet bevisar inte HTTP eller extern leverans.

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import {
   Plus,
@@ -19,6 +19,7 @@ import {
 import { LEAD_CATEGORIES, getLeadCategory } from '@/lib/lead-categories'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
 import type { Attribution } from '@/lib/branding/attribution'
+import { readPortalSubmission, preparePortalSubmission, clearPortalSubmission, sendPortalSubmission, type PortalSubmission } from '@/lib/leads/portal-submission'
 import AttributionStamp from '@/components/branding/AttributionStamp'
 
 interface PortalData {
@@ -60,6 +61,11 @@ const serviceOptions = [
 
 export default function LeadPortalPage() {
   const params = useParams()
+  return <LeadPortalContent key={params?.code as string} />
+}
+
+function LeadPortalContent() {
+  const params = useParams()
   const searchParams = useSearchParams()
   const code = params?.code as string
   const urlCategory = searchParams?.get('kategori') || searchParams?.get('category') || ''
@@ -70,6 +76,10 @@ export default function LeadPortalPage() {
   const [showForm, setShowForm] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState<{ lead_id: string; lead_number: string | null } | null>(null)
+  const sending = useRef(false)
+  const [pending, setPending] = useState<PortalSubmission | null>(null)
+  const [submitMessage, setSubmitMessage] = useState<string | null>(null)
+  const [storageReady, setStorageReady] = useState(false)
   const [tab, setTab] = useState<'form' | 'leads'>('leads')
 
   // Formulärfält
@@ -83,6 +93,17 @@ export default function LeadPortalPage() {
   const [formValue, setFormValue] = useState('')
   const [formDate, setFormDate] = useState('')
   const [formRef, setFormRef] = useState('')
+
+  useEffect(() => {
+    try {
+      const saved = readPortalSubmission(sessionStorage, code)
+      setPending(saved)
+      if (saved) setSubmitMessage('Ett tidigare inskick behöver kontrolleras. Fortsätt med samma förfrågan nedan.')
+      setStorageReady(true)
+    } catch {
+      setSubmitMessage('Det tidigare inskicket kunde inte kontrolleras. Tillåt lagring i webbläsaren eller kontakta företaget innan du skickar igen.')
+    }
+  }, [code])
 
   const fetchData = useCallback(async () => {
     try {
@@ -123,32 +144,33 @@ export default function LeadPortalPage() {
     return () => clearInterval(interval)
   }, [data?.source?.id, fetchData])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!formName.trim() || !formPhone.trim()) return
-
+  const handleSubmit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (sending.current || !storageReady || (!pending && (!formName.trim() || !formPhone.trim()))) return
+    sending.current = true
     setSubmitting(true)
+    setSubmitMessage(null)
     try {
-      const res = await fetch(`/api/lead-portal/${code}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: formName.trim(),
-          phone: formPhone.trim(),
-          email: formEmail.trim() || null,
-          service: formService || null,
-          category: formCategory || null,
-          description: formDescription.trim() || null,
-          address: formAddress.trim() || null,
-          estimated_value: formValue ? parseInt(formValue) : null,
-          desired_date: formDate || null,
-          source_ref: formRef.trim() || null,
-        }),
-      })
-
-      if (!res.ok) throw new Error('Submit failed')
-
-      const result = await res.json()
+      const submission = preparePortalSubmission(sessionStorage, code, {
+        name: formName.trim(), phone: formPhone.trim(), email: formEmail.trim() || null,
+        service: formService || null, category: formCategory || null,
+        description: formDescription.trim() || null, address: formAddress.trim() || null,
+        estimated_value: formValue || null, desired_date: formDate || null, source_ref: formRef.trim() || null,
+      }, () => crypto.randomUUID())
+      setPending(submission)
+      const { completed, status, result } = await sendPortalSubmission(code, submission, fetch)
+      if (!completed) {
+        // Validation errors are guaranteed to precede receipt creation. Other
+        // failures retain the original body/key even when the response is lost.
+        if (status === 400 || status === 428) {
+          clearPortalSubmission(sessionStorage, code)
+          setPending(null)
+        }
+        setSubmitMessage(result.message || result.error || 'Resultatet kunde inte kontrolleras. Försök igen med samma förfrågan.')
+        return
+      }
+      clearPortalSubmission(sessionStorage, code)
+      setPending(null)
       setSubmitted({ lead_id: result.lead_id, lead_number: result.lead_number })
 
       // Reset form (behåll kategori — fortsatt relevant för samma källa)
@@ -167,8 +189,9 @@ export default function LeadPortalPage() {
       // Refresh data
       setTimeout(() => fetchData(), 1000)
     } catch {
-      alert('Kunde inte skicka leadet. Försök igen.')
+      setSubmitMessage('Resultatet kunde inte kontrolleras. Försök igen med samma förfrågan; den skickas inte som en ny.')
     } finally {
+      sending.current = false
       setSubmitting(false)
     }
   }
@@ -223,6 +246,7 @@ export default function LeadPortalPage() {
         {/* Tabs */}
         <div className="flex gap-3 mb-6">
           <button
+            disabled={!!pending || submitting || !storageReady}
             onClick={() => { setShowForm(true); setTab('form'); setSubmitted(null) }}
             className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium"
           >
@@ -258,8 +282,18 @@ export default function LeadPortalPage() {
           </div>
         )}
 
+        {submitMessage && <p role="status" className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-gray-800">{submitMessage}</p>}
+        {pending && (
+          <div className="mb-6 rounded-xl border border-gray-200 bg-white p-4">
+            <p className="text-sm mb-3">Pågående förfrågan: {String(pending.body.name || '')}. Originaluppgifterna finns kvar för återförsöket.</p>
+            <button type="button" disabled={submitting} onClick={() => handleSubmit()} className="rounded-lg bg-primary-700 px-4 py-2 text-white text-sm disabled:opacity-50">
+              {submitting ? 'Kontrollerar…' : 'Kontrollera och slutför samma förfrågan'}
+            </button>
+          </div>
+        )}
+
         {/* Formulär */}
-        {showForm && (
+        {showForm && !pending && (
           <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
             <h2 className="font-semibold text-gray-900 mb-4">Skicka nytt lead</h2>
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -402,7 +436,7 @@ export default function LeadPortalPage() {
                 </button>
                 <button
                   type="submit"
-                  disabled={!formName.trim() || !formPhone.trim() || submitting}
+                  disabled={!formName.trim() || !formPhone.trim() || submitting || !storageReady}
                   className="flex items-center gap-2 px-5 py-2.5 bg-primary-700 text-white rounded-lg hover:bg-primary-700 transition-colors text-sm font-medium disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}

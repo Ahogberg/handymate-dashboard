@@ -65,6 +65,25 @@ test('anon and authenticated cannot read receipts or execute intake functions',a
   try{await assert.rejects(()=>db.query('SELECT * FROM lead_intake_request'),/permission denied/);await assert.rejects(()=>receive(),/permission denied/)}finally{await db.exec('RESET ROLE')}
  }
 })
+test('portal metadata commits with entities, preserves existing address, and survives retry',async()=>{
+ await db.exec("INSERT INTO customer(customer_id,business_id,name,phone_number,address_line) VALUES('existing','a','Test','0701234567','Original address')")
+ const body={...input,category:'test-category',estimated_value:0,address_line:'New address'}
+ const r=await receive('portal-0001',body);const done=await complete(r.id);await complete(r.id)
+ assert.equal(done.receipt.state,'completed')
+ const lead=(await db.query('select * from leads')).rows[0];assert.equal(lead.category,'test-category');assert.equal(lead.estimated_value,0)
+ assert.equal((await db.query('select address_line from customer')).rows[0].address_line,'Original address')
+ assert.equal(await count('deal'),1)
+ await assert.rejects(()=>receive('portal-0001',{...body,estimated_value:42}),/intake_request_changed/)
+})
+test('metadata failure rolls back address and all entities, then recovery uses saved input',async()=>{
+ await db.exec("INSERT INTO customer(customer_id,business_id,name,phone_number) VALUES('existing','a','Test','0701234567'); ALTER TABLE leads ADD CONSTRAINT reject_category CHECK(category IS NULL)")
+ const r=await receive('portal-0001',{...input,category:'test-category',estimated_value:12000,address_line:'Saved address'})
+ assert.equal((await complete(r.id)).receipt.state,'blocked');assert.equal(await count('leads'),0)
+ assert.equal((await db.query('select address_line from customer')).rows[0].address_line,null)
+ await db.exec('ALTER TABLE leads DROP CONSTRAINT reject_category')
+ assert.equal((await complete(r.id)).receipt.state,'completed')
+ assert.equal((await db.query('select address_line from customer')).rows[0].address_line,'Saved address')
+})
 ;(async()=>{
  db=new PGlite()
  await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;
@@ -79,6 +98,8 @@ test('anon and authenticated cannot read receipts or execute intake functions',a
  CREATE FUNCTION increment_counter(p_business_id text,p_counter_type text) RETURNS integer LANGUAGE sql AS $$ INSERT INTO counters VALUES(p_business_id,p_counter_type,1) ON CONFLICT(business_id,kind) DO UPDATE SET n=counters.n+1 RETURNING n $$;
  GRANT ALL ON ALL TABLES IN SCHEMA public TO service_role;`)
  await db.exec(fs.readFileSync('sql/v2_durable_lead_intake.sql','utf8'))
+ await db.exec('ALTER TABLE customer ADD COLUMN address_line text; ALTER TABLE leads ADD COLUMN category text, ADD COLUMN estimated_value integer; ALTER TABLE lead_sources ADD COLUMN default_category text;')
+ await db.exec(fs.readFileSync('sql/v2_portal_durable_intake.sql','utf8'))
  let failed=0
  for(const [name,fn]of cases){await seed();try{await fn();console.log('PASS',name)}catch(e){failed++;console.error('FAIL',name,e)}}
  await db.close();assert.equal(failed,0);console.log(`PASS ${cases.length} actual SQL intake contracts (isolated PGlite)`)
