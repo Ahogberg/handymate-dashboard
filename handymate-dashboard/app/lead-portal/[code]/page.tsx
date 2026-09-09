@@ -98,7 +98,13 @@ function LeadPortalContent() {
     try {
       const saved = readPortalSubmission(sessionStorage, code)
       setPending(saved)
-      if (saved) setSubmitMessage('Ett tidigare inskick behöver kontrolleras. Fortsätt med samma förfrågan nedan.')
+      if (saved) {
+        const value = (key: string) => saved.body[key] == null ? '' : String(saved.body[key])
+        setFormName(value('name')); setFormPhone(value('phone')); setFormEmail(value('email'))
+        setFormService(value('service')); setFormCategory(value('category')); setFormDescription(value('description'))
+        setFormAddress(value('address')); setFormValue(value('estimated_value')); setFormDate(value('desired_date')); setFormRef(value('source_ref'))
+        setSubmitMessage('Ett tidigare inskick behöver kontrolleras. Fortsätt med samma förfrågan nedan.')
+      }
       setStorageReady(true)
     } catch {
       setSubmitMessage('Det tidigare inskicket kunde inte kontrolleras. Tillåt lagring i webbläsaren eller kontakta företaget innan du skickar igen.')
@@ -165,6 +171,7 @@ function LeadPortalContent() {
         if (status === 400 || status === 428) {
           clearPortalSubmission(sessionStorage, code)
           setPending(null)
+          setShowForm(true)
         }
         setSubmitMessage(result.message || result.error || 'Resultatet kunde inte kontrolleras. Försök igen med samma förfrågan.')
         return

@@ -60,3 +60,9 @@ Kontrollera senaste PR36-grindarna. Fortsätt sedan inventeringen av storefront/
 - SQL v2_portal_durable_intake körd ENDAST på eoodwyfxrdjmlqaealhj. Live SQL-prov verifierade metadata, identiska replay-ID:n, ändrad payload och företag B nekas; samtliga provrader rullades tillbaka. Ingen SMS-/Fortnox-effekt kördes av provet.
 - Reproducerbart DB-prov: sql/proof_portal_intake_test_only.sql. Lokala prov: npm run test:six-outcomes.
 - Kvar: övriga inflöden, riktiga portal-klickprov och kundprov, uppföljning, block 4–6. SQL-provet bevisar inte HTTP eller extern leverans.
+
+### Verifieringsnotering efter första kodpush
+Första kod-HEAD remote: ea84a174f4f0538871097eec6125375fb6e4e710. Uppföljande ändring återställer även formulärfälten ur sparat original efter omladdning; 18 portalprov fortsatt gröna efter ändringen lokalt.
+Lokal next build kompilerade men typkontrollens Node-process kraschade med heap out of memory; detta är INTE en godkänd lokal full build (trots launcher exit 0). GitHub/Vercel-resultat måste avläsas på senaste HEAD.
+Första breda lokala kontraktskörningen träffade en gammal Playwright-cache med försvunnen absolut importsökväg; ny körning med egen cache påbörjades. Slutresultat ännu inte verifierat: den lokala exec-servern blev otillgänglig innan loggen kunde avläsas. Fortsätt från GitHub om scratch inte återkommer; håll test/build sekventiella och begränsa workers/minne.
+Nästa Gmail-pass måste även läsa processor.ts: stored:false kan vara ett lagringsfel, inte bara duplicate. Deduplikationsläsningarna saknar business_id. Ett cursor-fix som endast fångar kastade undantag är otillräckligt. Inga Gmail-ändringar utförda i portalpasset.
