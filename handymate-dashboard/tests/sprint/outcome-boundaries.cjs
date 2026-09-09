@@ -36,7 +36,7 @@ for(const state of ['draft','cancelled','credited','sent','overdue','paid','cust
  })
  const {getManadsLedger}=load('lib/value/ledger.ts');const result=await getManadsLedger(db,'b','2026-09')
  assert.equal(result.fakturerat.antal,['sent','overdue','paid','customer_paid'].includes(state)?1:0)
- assert.equal(result.betalt.antal,['paid','customer_paid'].includes(state)?1:0)
+ assert.equal(result.betalt.antal,state==='paid'?1:0)
 })
 for(const mode of ['accounting','einvoice','einvoice-failed'])test(`Fortnox: ${mode} does not invent customer delivery`,async()=>{
  let delivered=0
@@ -82,5 +82,52 @@ for(const mode of ['claim-error','claim-lost','stale-pending','receipt-error','p
   stored.fortnox_sync_attempted_at='2020-01-01T00:00:00Z'
   const retry=await syncInvoiceToFortnox(db,{businessId:'b',invoiceId:'i'});assert.equal(retry.success,false);assert.equal(creates,1)
  }else assert.equal(creates,0)
+})
+
+for (const field of ['phone', 'email', 'name_address']) test(`dedupe: ${field} read error is not an empty customer list`, async () => {
+ const {findCustomerDuplicates}=load('lib/customer-dedupe.ts')
+ const db=database(()=>({data:null,error:{message:'read failed'}}))
+ const fields=field==='phone'?{phone:'0701234567'}:field==='email'?{email:'test@example.invalid'}:{name:'Test',address:'Testgatan 1'}
+ await assert.rejects(()=>findCustomerDuplicates(db,{business_id:'b',...fields}))
+})
+for (const field of ['email', 'name_address']) test(`dedupe: ${field} wildcard candidates must match literally`, async () => {
+ const {findCustomerDuplicates}=load('lib/customer-dedupe.ts')
+ const db=database(({filters})=>{
+  assert(filters.some(f=>f[1]==='business_id'&&f[2]==='b'))
+  return {data:[{customer_id:'wrong',name:'TestX',address_line:'GataX',email:'testX@example.invalid'},{customer_id:'right',name:'Test_',address_line:'Gata%',email:'TEST_@example.invalid'}],error:null}
+ })
+ const fields=field==='email'?{email:'test_@example.invalid'}:{name:'Test_',address:'Gata%'}
+ const rows=await findCustomerDuplicates(db,{business_id:'b',...fields})
+ assert.deepEqual(Array.from(rows,r=>r.customer_id),['right'])
+})
+for (const mode of ['ambiguous','update-error','update-empty','deal-empty']) test(`lead: ${mode} cannot invent a verified result`, async () => {
+ let leadWrites=0,customerWrites=0
+ const match={customer_id:'c',phone_number:null,email:null,match_type:'phone'}
+ const db=database(({table,op})=>{
+  if(table==='customer'&&op==='update')return {data:null,error:mode==='update-error'?{message:'offline'}:null}
+  if(table==='customer'&&op==='insert')customerWrites++
+  if(table==='leads'&&op==='insert')leadWrites++
+  if(table==='deal'&&op==='insert')return {data:null,error:null}
+  return {data:{key:'new_lead'},error:null}
+ })
+ const {createLeadAndDeal}=load('lib/leads/golden-path.ts',{
+  '@/lib/numbering':{getNextLeadNumber:async()=>1,getNextCaseNumber:async()=>1},
+  '@/lib/customer-dedupe':{findCustomerDuplicates:async()=>mode==='ambiguous'?[match,{...match,customer_id:'other'}]:[{...match,...(mode==='deal-empty'?{phone_number:'+46701234567'}:{})}]},
+  '@/lib/pipeline':{getStageBySlug:async()=>({id:'stage'})},'@/lib/approvals/artifact-write':{},
+ })
+ const run=()=>createLeadAndDeal({businessId:'b',businessPhoneNumber:null,name:'Test',phone:'0701234567',email:null,message:null,source:'website_form',notify:false},db)
+ if(mode==='deal-empty'){const result=await run();assert.equal(result.dealId,null);assert.ok(result.dealError)}
+ else {await assert.rejects(run);assert.equal(leadWrites,0)}
+ assert.equal(customerWrites,0)
+})
+for(const type of ['missad_intakt','invoice_reminder']) for(const [status,paidAmount,expected] of [
+ ['customer_paid',1000,1000],['customer_paid',null,0],['customer_paid',0,0],['paid',null,1500],['paid',1499.5,1500],['customer_paid',Infinity,0],['customer_paid',-10,0],['paid',2000,1500],
+]) test(`ledger: ${type} ${status} paid amount ${paidAmount} counts ${expected}`,async()=>{
+ const db=database(({table})=>table==='pending_approvals'?{data:[{id:'a',approval_type:type,status:'approved',created_at:'2026-09-02T00:00:00Z',resolved_at:'2026-09-03T00:00:00Z',payload:type==='missad_intakt'?{draft_invoice_id:'i',amount_kr:1200}:{invoice_id:'i',amount_kr:1200}}],error:null}:{data:[{invoice_id:'i',status,total:1500,paid_amount:paidAmount,paid_at:'2026-09-04T00:00:00Z'}],error:null})
+ const {getManadsLedger}=load('lib/value/ledger.ts');const result=await getManadsLedger(db,'b','2026-09')
+ assert.equal(result.betalt.kr,expected)
+ assert.equal(result.betalt.antal,expected>0?1:0)
+ if(expected>0)assert.equal(result.items[0].kr,expected)
+ if(type==='missad_intakt')assert.equal(result.fakturerat.kr,1500)
 })
 ;(async()=>{let failed=0;for(const c of cases){try{await c.fn();console.log('PASS',c.name)}catch(e){failed++;console.error('FAIL',c.name,e.message)}}assert.equal(failed,0,`${failed} outcome regressions`);console.log(`PASS ${cases.length} actual helper / I-O boundary cases; database and providers mocked`)})().catch(()=>process.exitCode=1)

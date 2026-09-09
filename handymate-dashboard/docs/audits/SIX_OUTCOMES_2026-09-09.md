@@ -3,18 +3,18 @@
 Status: pågående, inte produktcertifiering. 2026-09-09.
 Backendbas 647793c6c7380a32cd9f06545ff641c1a9ce38bd; mobilbas d797ccb.
 Arbetet ligger på egen gren codex/six-outcomes-20260909 ovanpå integrationen.
-Ingen ny produktionssättning eller migration. Mobilkandidaten under telefonbygge ändras inte här.
+Ingen ny produktionssättning eller migration. Mobilens fyra telefonfynd är rättade separat i mobil-PR #6 (grön grind och iOS-export). Den här sprinten gäller hela produktkedjan.
 
 ## Kartläggning och bevisläge
 
 | Område | Implementerad grund och kod | Tekniskt bevis | Kvar före slutgodkännande |
 |---|---|---|---|
-| 1 Förfrågan | lib/leads/golden-path.ts, app/api/leads/intake/route.ts, Lisa-inflöden | Nytt verkligt helperprov stoppar fortsättning vid fel/utebliven kundrad; befintliga Lisa-kontrakt | Verkligt samtal/SMS, formulär och email. Lead/deal är inte en atomisk transaktion; upprepade publika förfrågningar saknar generell request-idempotens. Kundmatchningens läsfel behöver eget facit. |
+| 1 Förfrågan | lib/leads/golden-path.ts, app/api/leads/intake/route.ts, Lisa-inflöden | Nytt verkligt helperprov stoppar fortsättning vid fel/utebliven kundrad; befintliga Lisa-kontrakt | Verkligt samtal/SMS, formulär och email. Lead/deal är inte en atomisk transaktion; upprepade publika förfrågningar saknar generell request-idempotens. Kundmatchningens läsfel, tvetydiga träffar och kvittenser är nu facit-låsta; full request-idempotens/återhämtning återstår. |
 | 2 Offert | lib/quotes/generated-price-truth.ts, job-type-setup/start, buildQuotePayload | first-quote-reality-harness: prislista → reservation → sparning → återöppning. first-job-acceptance ingår i breda grinden | Christophers verkliga prislista och två representativa jobb; mäta kompletteringar, rättningar och nettotid |
 | 3 Uppföljning | lib/followup/service.ts, sql/v2_durable_quote_followup.sql | Faktisk SQL: plan/idempotens, konkurrerande körningar, inkommande SMS/email/portal/samtal, signering, paus, ändrad kund/underlag; route-prov | Verkligt leverantörssvar, svar efter förberett beslut, handläggarens nästa steg när planen stoppats |
 | 4 Fakturaunderlag | lib/matte/report-session.ts, work-report.ts, lib/invoices/mark-sources.ts | report-continuity/recovery med SQL, befintliga fakturakällor/ÄTA/betalplan-prov | Riktigt jobb med tid, material, signerad ÄTA, delfaktura/slutfaktura och faktisk ekonomisystemavstämning |
 | 5 Administration | import/onboarding + lib/invoices/sync-to-fortnox.ts och lib/fortnox/sync.ts | Nytt körbart helperfacit för leverans och osäkra försök | Automatisk avstämning av osäkra Fortnox-anrop, verklig import, dubbelinmatningsmätning och bokföringsprov |
-| 6 Nytta | lib/value/ledger.ts och recovered-revenue.ts | Verkligt I/O-prov med fakturastatus, plus befintliga 4-stegs-prov | Nettotid saknar här uppmätt före/efter-baslinje. Kopplade utfall är inte bevis på kausalt skapad merintäkt. Kundbetalt ROT-belopp vs hela fakturabeloppet behöver fortsatt granskning. |
+| 6 Nytta | lib/value/ledger.ts och recovered-revenue.ts | Verkligt I/O-prov med fakturastatus, plus befintliga 4-stegs-prov | Nettotid saknar här uppmätt före/efter-baslinje. Kopplade utfall är inte bevis på kausalt skapad merintäkt. Nyttovyn använder nu registrerat paid_amount för kundbetalda fakturor; verklig avstämning av betalningskedjan återstår. |
 
 ## Första rättningar: fel före, grönt efter
 
@@ -64,14 +64,43 @@ vad ni väntade er + ungefärlig tid räcker. Inga lösenord i protokollet.
 - 108 riktade befintliga prov gröna, inklusive faktisk SQL för beständig
   uppföljning och rapportkontinuitet. Lokal isolerad testdatabas, inte produktion.
 - Bred kontraktsgrind: 1772 passerade, 1 befintligt överhoppat, 17 Node-prov.
-- Full TypeScript och Next-build: resultat inväntas; inte markerade gröna.
+- Första omgångens fulla TypeScript och samtliga fem GitHub-grindar gröna. Next-build saknar ännu dokumenterad fullständig slutkvittens.
 - Inget faktiskt SMS/email/e-faktura skickat i denna leverans.
 
 ## Fortsatt ordning
 
 - [ ] S1: inmatningsidempotens/återhämtning lead→deal och synliga kvarstående fel.
 - [ ] S2: osäkra Fortnox-resultat ska kunna avstämmas utan ny faktura-POST.
-- [ ] S3: kundbetalt/skattereduktion och kausalitet i värdevisning.
+- [ ] S3: kundbetalt/skattereduktion rättat i ledger-metod 2; kausalitet och faktisk betalningsavstämning återstår.
 - [ ] S4: Christophers underlag och uppmätt offert-/rapportarbete.
 - [ ] S5: gemensamma acceptansprov över båda arbetskedjorna med rätt mobilbuild.
 - [ ] Alla sex utfall slutgodkända med bevis. Aldrig enbart på grund av gröna enhetstester.
+
+
+## Andra omgången: kundmatchning och registrerad betalning
+
+- Dubblettuppslag kastar vid databasfel i telefon, e-post eller namn/adress.
+  Ett läsfel får inte leda till att en ny kund skapas.
+- LIKE-specialtecken behandlas bokstavligt. Svar verifieras dessutom med
+  faktisk likhet, så t.ex. understreck i e-post inte matchar annan kund.
+- Flera starka telefon-/e-postträffar stoppar automatisk kundkoppling.
+  Kundkompletteringen är företagsskopad och kräver sparad rad; affär utan
+  returnerat ID får tydligt dealError.
+- Ledger-metod 2 använder registrerat paid_amount för betalsteget och dess
+  detaljrad. Fakturerat behåller fakturans total. Äldre helt betalda fakturor
+  utan paid_amount använder total; customer_paid utan beloppsbevis räknas
+  inte som bekräftade kronor. Negativa/ogiltiga belopp utesluts; överbetalning
+  räknas högst till den direktkopplade fakturans belopp. Påminnelser följer
+  samma betalningsregel och behåller sitt befintliga tidsfönster.
+
+Bevis: 42 helper-/I/O-prov, varav 25 nya; 20 fel reproducerade mot föregående
+helpers. 76 befintliga ledger-/betalstatus-/kundsynkprov gröna. Kolumner och
+literal ILIKE-matchning verifierade läsande mot isolerade testdatabasen
+(eoodwyfxrdjmlqaealhj), inga kunddata ändrade. Full grind/tsc/build för denna
+omgång redovisas i PR #34 när körningarna är klara.
+
+Avsiktlig kvarstående gräns: detta är inte generell request-idempotens eller
+atomiskt lead→deal. Saknad kundkoppling stoppar fortfarande anropet; en
+beständig mottagningskö med återhämtning behövs för att slippa tappa ett
+inflöde när ett sådant fel inträffar. Nästa S1-arbete ska täcka det hela vägen
+från inkommande request, inte bara lägga till en lookup före INSERT.

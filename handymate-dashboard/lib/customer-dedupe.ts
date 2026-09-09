@@ -22,6 +22,15 @@ interface FindDuplicatesArgs {
   exclude_id?: string | null
 }
 
+// ILIKE uses patterns, but identity fields require literal equality.
+function literalPattern(value: string): string {
+  return value.replace(/[\\%_]/g, '\\$&')
+}
+
+function sameText(value: unknown, expected: string): boolean {
+  return typeof value === 'string' && value.trim().toLowerCase() === expected.trim().toLowerCase()
+}
+
 /**
  * Letar potentiella dubbletter i `customer`-tabellen baserat på telefon,
  * e-post och namn+adress. Används vid create/update för att förhindra att
@@ -54,7 +63,8 @@ export async function findCustomerDuplicates(
       query = query.neq('customer_id', args.exclude_id)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) throw new Error('Kundmatchningen kunde inte kontrolleras. Försök igen.')
     for (const row of data || []) {
       if (normalizeSwedishPhone(row.phone_number || '') === normalizedPhone) {
         matchesById.set(row.customer_id, { ...row, match_type: 'phone' })
@@ -69,15 +79,16 @@ export async function findCustomerDuplicates(
       .from('customer')
       .select('customer_id, name, phone_number, email, address_line, created_at')
       .eq('business_id', args.business_id)
-      .ilike('email', normalizedEmail)
+      .ilike('email', literalPattern(normalizedEmail))
 
     if (args.exclude_id) {
       query = query.neq('customer_id', args.exclude_id)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) throw new Error('Kundmatchningen kunde inte kontrolleras. Försök igen.')
     for (const row of data || []) {
-      if (!matchesById.has(row.customer_id)) {
+      if (sameText(row.email, normalizedEmail) && !matchesById.has(row.customer_id)) {
         matchesById.set(row.customer_id, { ...row, match_type: 'email' })
       }
     }
@@ -92,16 +103,17 @@ export async function findCustomerDuplicates(
       .from('customer')
       .select('customer_id, name, phone_number, email, address_line, created_at')
       .eq('business_id', args.business_id)
-      .ilike('name', trimmedName)
-      .ilike('address_line', trimmedAddress)
+      .ilike('name', literalPattern(trimmedName))
+      .ilike('address_line', literalPattern(trimmedAddress))
 
     if (args.exclude_id) {
       query = query.neq('customer_id', args.exclude_id)
     }
 
-    const { data } = await query
+    const { data, error } = await query
+    if (error) throw new Error('Kundmatchningen kunde inte kontrolleras. Försök igen.')
     for (const row of data || []) {
-      if (!matchesById.has(row.customer_id)) {
+      if (sameText(row.name, trimmedName) && sameText(row.address_line, trimmedAddress) && !matchesById.has(row.customer_id)) {
         matchesById.set(row.customer_id, { ...row, match_type: 'name_address' })
       }
     }

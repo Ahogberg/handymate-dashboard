@@ -14,3 +14,11 @@ Egen gren codex/six-outcomes-20260909. Ingen main/release utan befintliga grinda
 Arbetsgång: läs existerande implementation/facit, återge fel med verklig helper/route,
 rätta grundorsak, kör kontraktsgrind/tsc/build, dokumentera bevis och öppna pilotprov.
 De sex områdena är inte slutgodkända förrän relevant verkligt flöde har provats.
+
+## Nästa omgång: förfrågan och belagd nytta
+
+- [x] Stoppa kundskapande vid fel i kundmatchning och tvetydig identitet.
+- [x] Exakta e-post/namn/adress-matchningar även med LIKE-specialtecken.
+- [x] Kundkomplettering och affärssparning måste ha kvittens.
+- [x] Betalt i nyttovyn använder registrerat belopp, inte obetald skattereduktion.
+- [ ] Regressionsprov, typkontroll, build och grön GitHub-grind.
