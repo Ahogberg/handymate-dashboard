@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,11 +10,15 @@ export const dynamic = 'force-dynamic'
  * hälsningsmeddelande via svensk TTS. Routen saknades → 46elks fick 404 och
  * inget meddelande spelades. Företaget härleds från det uppringda numret (`to`).
  *
- * Tenant-svepet 2026-09-01: rutten saknade signaturkontroll (syskonen
- * voice/incoming, voice/missed, voice/recording, voice/consent har den) och
- * svarade även på GET. Vem som helst kunde slå upp vilket företag som äger
- * ett 46elks-nummer. Nu: samma verifyElksSignature som resten, POST only;
- * GET bara med ELKS_SKIP_SIGNATURE=true (lokal test).
+ * Tenant-svepet 2026-09-01: rutten saknade kontroll (syskonen voice/incoming,
+ * voice/missed, voice/recording, voice/consent hade den) och svarade även på
+ * GET. Vem som helst kunde slå upp vilket företag som äger ett 46elks-nummer.
+ *
+ * 2026-09-10: kontrollen var en HMAC över headern X-46elks-Signature, som
+ * 46elks aldrig skickar — den avvisade alltså allt. Nu samma
+ * verifieraElksWebhook som resten (delad hemlighet i URL:en, se
+ * lib/elks-webhook-auth.ts). GET är kvar eftersom 46elks hämtar ett
+ * `play`-mål med GET, men kräver nu samma hemlighet som POST.
  */
 async function handle(to: string): Promise<NextResponse> {
   const supabase = getServerSupabase()
@@ -39,19 +43,22 @@ async function handle(to: string): Promise<NextResponse> {
 
 export async function POST(request: NextRequest) {
   const text = await request.text()
-  if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-    const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: text })
-    if (!verifyElksSignature(req, text)) {
-      console.error('[voice/greeting] Ogiltig 46elks-signatur, avvisar')
-      return new NextResponse('Unauthorized', { status: 401 })
-    }
+  const elksVerdikt = verifieraElksWebhook(request)
+  if (!elksVerdikt.ok) {
+    larmaAvvisadElksWebhook('voice/greeting', elksVerdikt)
+    return new NextResponse('Unauthorized', { status: 401 })
   }
   const params = new URLSearchParams(text)
   return handle(params.get('to') || '')
 }
 
 export async function GET(request: NextRequest) {
-  if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
+  // 46elks hämtar ett `play`-mål med GET. Tidigare var GET öppen bara med
+  // skip-flaggan, alltså i praktiken aldrig i produktion; nu duger samma
+  // hemlighet som POST-vägen kräver.
+  const elksVerdikt = verifieraElksWebhook(request)
+  if (!elksVerdikt.ok) {
+    larmaAvvisadElksWebhook('voice/greeting[GET]', elksVerdikt)
     return new NextResponse('Unauthorized', { status: 401 })
   }
   return handle(request.nextUrl.searchParams.get('to') || '')

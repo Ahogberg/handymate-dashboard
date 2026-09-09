@@ -55,8 +55,10 @@ test.describe('1. voice/missed — bara signerad POST får utlösa något', () =
     expect(fire).toBeGreaterThan(vakt)
   })
 
-  test('signaturen kontrolleras fortfarande på POST', () => {
-    expect(s).toContain('verifyElksSignature')
+  test('webhookgrinden kontrolleras fortfarande på POST', () => {
+    expect(s).toContain('verifieraElksWebhook')
+    expect(s, 'ett avvisat samtalsanrop är ett tappat kundsamtal och får inte vara tyst')
+      .toContain('larmaAvvisadElksWebhook')
   })
 })
 
@@ -99,10 +101,17 @@ test.describe('3. voice/analyze — inloggad någonstans ≠ rätt till raden', 
 test.describe('4. voice/recording — webhooken verifieras', () => {
   const s = kod('app/api/voice/recording/route.ts')
 
-  test('46elks-signaturen kontrolleras före allt annat', () => {
-    const sig = s.indexOf('verifyElksSignature')
-    expect(sig, 'ingen signaturkontroll').toBeGreaterThan(-1)
+  // 2026-09-10: hette tidigare "46elks-signaturen kontrolleras före allt
+  // annat" och kontrollerade verifyElksSignature. Den mekanismen fanns inte
+  // hos 46elks och avvisade all verklig trafik i elva dagar — facit vaktade
+  // alltså buggen. Nu: grinden ska fortfarande komma först, men det är den
+  // grind som faktiskt kan släppa igenom ett riktigt anrop.
+  test('webhookgrinden kontrolleras före allt annat', () => {
+    const sig = s.indexOf('verifieraElksWebhook')
+    expect(sig, 'ingen webhookkontroll').toBeGreaterThan(-1)
     expect(s.indexOf(".from('call_recording')")).toBeGreaterThan(sig)
+    expect(s, 'ett avvisat anrop måste larma, aldrig bara console.error')
+      .toContain('larmaAvvisadElksWebhook')
   })
 
   test('body:n läses en gång — formData() efter text() hade gett tom ström', () => {
@@ -113,13 +122,14 @@ test.describe('4. voice/recording — webhooken verifieras', () => {
 
 test.describe('4b. voice/outbound — "Ring via Handymate"-webhookarna verifieras likadant', () => {
   // Två nya 46elks-webhookar (voice_start + whenhangup) för utgående
-  // inspelade samtal. Samma tre regler som voice/recording: HMAC före
+  // inspelade samtal. Samma tre regler som voice/recording: grinden före
   // databasen, body:n läses en gång, ingen formData().
   for (const file of ['app/api/voice/outbound/route.ts', 'app/api/voice/outbound/hangup/route.ts']) {
-    test(`${file}: 46elks-signaturen kontrolleras före call_recording`, () => {
+    test(`${file}: webhookgrinden kontrolleras före call_recording`, () => {
       const s = kod(file)
-      const sig = s.indexOf('verifyElksSignature')
-      expect(sig, 'ingen signaturkontroll').toBeGreaterThan(-1)
+      const sig = s.indexOf('verifieraElksWebhook')
+      expect(sig, 'ingen webhookkontroll').toBeGreaterThan(-1)
+      expect(s, 'avvisat anrop måste larma').toContain('larmaAvvisadElksWebhook')
       const db = s.indexOf(".from('call_recording')")
       expect(db, 'läser aldrig call_recording?').toBeGreaterThan(-1)
       expect(db).toBeGreaterThan(sig)

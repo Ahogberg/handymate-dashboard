@@ -222,10 +222,13 @@ test.describe('engångs- och atomicitetsguarder', () => {
     expect(src).toContain('SWISH_MESSAGE_RE.test(message)')
   })
 
-  test('voice/greeting kräver 46elks-signatur och svarar inte på oskyddad GET', () => {
+  test('voice/greeting kräver webhookhemlighet och svarar inte på oskyddad GET', () => {
     const src = read('app/api/voice/greeting/route.ts')
-    expect(src).toContain('verifyElksSignature(req, text)')
-    expect(src).toMatch(/export async function GET[\s\S]*ELKS_SKIP_SIGNATURE[\s\S]*status: 401/)
+    expect(src).toContain('verifieraElksWebhook(request)')
+    // GET är kvar eftersom 46elks hämtar ett `play`-mål med GET, men kräver
+    // sedan 2026-09-10 samma hemlighet som POST — tidigare var den öppen bara
+    // med skip-flaggan, alltså aldrig i produktion.
+    expect(src).toMatch(/export async function GET[\s\S]*verifieraElksWebhook\(request\)[\s\S]*status: 401/)
   })
 
   test('portalen filtrerar customer_message och projektbarn på business_id', () => {

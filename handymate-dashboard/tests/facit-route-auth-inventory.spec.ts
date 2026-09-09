@@ -43,7 +43,10 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
   aktuell_anvandare: /getCurrentUser\(/,
   agare_admin: /isOwnerOrAdmin\(/,
   partner_token: /getPartnerTokenFromRequest|verifyApproveToken|PARTNER_API_KEY|signApproveToken|partner_token|lib\/partners\/auth/i,
-  elks_signatur: /verifyElksSignature\(/,
+  // 2026-09-10: den gamla HMAC-grinden verifierade en header 46elks aldrig
+  // skickar och avvisade all trafik i elva dagar. Ersatt av en delad
+  // hemlighet i URL:en, se lib/elks-webhook-auth.ts.
+  elks_webhook: /verifieraElksWebhook\(/,
   stripe_signatur: /constructEvent\(/,
   postmark_basic_auth: /verifyPostmarkBasicAuth\(/,
   supabase_session: /auth\.getUser\(|auth\.getSession\(|createRouteHandlerClient/,
@@ -100,7 +103,7 @@ const PUBLIC_BY_DESIGN: Record<string, string> = {
   'widget/chat': 'business_id (publikt, i snippet) + widget_enabled — IP-tak, samtalstak, bränslegrind',
   'leads/intake': 'api_key / portal_code → källa/företag, IP-tak',
   'email/inbound': 'Postmark Basic Auth (fail-closed), tenant ur mottagaradress',
-  'voice/greeting': '46elks-signatur sedan 2026-09-01',
+  'voice/greeting': '46elks webhookhemlighet, POST och GET, sedan 2026-09-10',
   'webhooks/google-calendar': 'kanaltoken (HMAC av kanal-id) eller resource-id för legacykanaler',
   'google/callback': 'HMAC-signerad state + sessionsmatchning sedan 2026-09-01',
   'integrations/fortnox/callback': 'httpOnly state-cookie (16 slumpbytes) jämförs med state-parametern',

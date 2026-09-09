@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
 import { createHash } from 'crypto'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { sendSmsViaElks, parseOptOutCommand } from '@/lib/sms-send'
 import { resolveSmsCustomer } from '@/lib/outbound/sms-gate'
 import { isTeamPhone } from '@/lib/matte/owner-sender'
@@ -34,13 +34,10 @@ export async function POST(request: NextRequest) {
     const text = await request.text()
 
     // Verifiera 46elks-signatur (kan inaktiveras via ELKS_SKIP_SIGNATURE i dev)
-    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-      // Skapa en klon med body för signaturvalidering
-      const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: text })
-      if (!verifyElksSignature(req, text)) {
-        console.error('[SMS Incoming] Ogiltig 46elks-signatur, avvisar webhook')
-        return new NextResponse('Unauthorized', { status: 401 })
-      }
+    const elksVerdikt = verifieraElksWebhook(request)
+    if (!elksVerdikt.ok) {
+      larmaAvvisadElksWebhook('sms/incoming', elksVerdikt)
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const params = new URLSearchParams(text)

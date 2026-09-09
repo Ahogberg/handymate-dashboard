@@ -1,3 +1,4 @@
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { randomBytes } from 'crypto'
 import { getServerSupabase } from '@/lib/supabase'
@@ -187,8 +188,8 @@ export async function POST(request: NextRequest) {
         body: new URLSearchParams({
           from: fromNumber,
           to: customerPhone,
-          voice_start: `${webhookBase}?${q}`,
-          whenhangup: `${webhookBase}/hangup?${q}`,
+          voice_start: medElksHemlighet(`${webhookBase}?${q}`),
+          whenhangup: medElksHemlighet(`${webhookBase}/hangup?${q}`),
           timeout: '30',
         }),
       })

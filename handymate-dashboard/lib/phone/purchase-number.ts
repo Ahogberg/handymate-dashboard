@@ -4,6 +4,7 @@
  * Idempotent: har företaget redan assigned_phone_number returneras det.
  * Sätter voice_start-webhooken VID KÖPET → numret är aktivt direkt.
  */
+import { medElksHemlighet } from '@/lib/elks-webhook-auth'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 export interface PurchaseResult {
@@ -55,8 +56,8 @@ export async function purchaseAndAssignNumber(
     },
     body: new URLSearchParams({
       country: 'se',
-      voice_start: `${APP_URL}/api/voice/incoming`,
-      sms_url: `${APP_URL}/api/sms/incoming`
+      voice_start: medElksHemlighet(`${APP_URL}/api/voice/incoming`),
+      sms_url: medElksHemlighet(`${APP_URL}/api/sms/incoming`)
     }).toString()
   })
 

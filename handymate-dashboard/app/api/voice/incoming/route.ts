@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { callRecordingId } from '@/lib/voice/call-processing'
 import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
 import { getServerSupabase } from '@/lib/supabase'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
@@ -43,12 +43,10 @@ export async function POST(request: NextRequest) {
     const text = await request.text()
 
     // Verifiera 46elks-signatur (kan inaktiveras via ELKS_SKIP_SIGNATURE i dev)
-    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-      const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: text })
-      if (!verifyElksSignature(req, text)) {
-        console.error('[Voice Incoming] Ogiltig 46elks-signatur, avvisar webhook')
-        return new NextResponse('Unauthorized', { status: 401 })
-      }
+    const elksVerdikt = verifieraElksWebhook(request)
+    if (!elksVerdikt.ok) {
+      larmaAvvisadElksWebhook('voice/incoming', elksVerdikt)
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const params = new URLSearchParams(text)
@@ -136,8 +134,8 @@ export async function POST(request: NextRequest) {
 
         // 4. Lisas hälsning + handled=1 (ingen dubbel call_missed)
         return NextResponse.json({
-          play: `${APP_URL}/api/voice/greeting?business_id=${business.business_id}`,
-          whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`,
+          play: medElksHemlighet(`${APP_URL}/api/voice/greeting?business_id=${business.business_id}`),
+          whenhangup: medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`),
         })
       }
     } catch (testErr) {
@@ -244,7 +242,7 @@ export async function POST(request: NextRequest) {
         // på aldrig kunde transkriberas.
         if (business.call_recording_enabled) {
           return NextResponse.json({
-            ivr: `${APP_URL}/api/voice/consent`,
+            ivr: medElksHemlighet(`${APP_URL}/api/voice/consent`),
           })
         }
 
@@ -252,7 +250,7 @@ export async function POST(request: NextRequest) {
           connect: transferPhone,
           callerid: to,
           timeout: 20,
-          whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`,
+          whenhangup: medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`),
         })
       }
       // Utanför arbetstid → fall through till agent-hantering nedan
@@ -289,9 +287,9 @@ export async function POST(request: NextRequest) {
 
       // 46elks: spela meddelande och lägg på (agenten hanterar via webhook)
       return NextResponse.json({
-        play: `${APP_URL}/api/voice/greeting?business_id=${business.business_id}`,
+        play: medElksHemlighet(`${APP_URL}/api/voice/greeting?business_id=${business.business_id}`),
         // handled=1: call_missed redan fyrat ovan → voice/missed ska INTE dubbla det.
-        whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`,
+        whenhangup: medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}&handled=1`),
       })
     }
 
@@ -300,7 +298,7 @@ export async function POST(request: NextRequest) {
 
     if (business.call_recording_enabled) {
       return NextResponse.json({
-        ivr: `${APP_URL}/api/voice/consent`,
+        ivr: medElksHemlighet(`${APP_URL}/api/voice/consent`),
       })
     }
 
@@ -309,7 +307,7 @@ export async function POST(request: NextRequest) {
       connect: transferPhone,
       callerid: to,
       timeout: 20,
-      whenhangup: `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`,
+      whenhangup: medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${callId}`),
     })
 
   } catch (error) {

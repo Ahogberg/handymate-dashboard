@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { recordCost } from '@/lib/costs/record'
 import { billableMinutes, callCostOre, classifySwedishNumber } from '@/lib/costs/meter'
 import { loadOutboundBusinessConfig, resolveCraftsmanPhone } from '../_shared'
@@ -23,12 +23,10 @@ export const dynamic = 'force-dynamic'
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text()
-    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-      const signed = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: rawBody })
-      if (!verifyElksSignature(signed, rawBody)) {
-        console.error('[voice/outbound/hangup] Ogiltig 46elks-signatur, avvisar webhook')
-        return new NextResponse('Unauthorized', { status: 401 })
-      }
+    const elksVerdikt = verifieraElksWebhook(request)
+    if (!elksVerdikt.ok) {
+      larmaAvvisadElksWebhook('voice/outbound/hangup', elksVerdikt)
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     console.log('[voice/outbound/hangup] RÅ PAYLOAD för kostnadsmätning:', rawBody)

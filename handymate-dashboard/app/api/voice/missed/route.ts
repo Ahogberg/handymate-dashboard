@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 
 /**
  * GET/POST /api/voice/missed
@@ -38,12 +38,10 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       // Verifiera 46elks-signatur (whenhangup-callbacken signeras med samma
       // HMAC som övriga webhooks). Utan detta kan call_missed → catch-SMS
       // triggas av en förfalskad POST. Kan inaktiveras via ELKS_SKIP_SIGNATURE.
-      if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-        const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: rawBody })
-        if (!verifyElksSignature(req, rawBody)) {
-          console.error('[voice/missed] Ogiltig 46elks-signatur, avvisar webhook')
-          return new NextResponse('Unauthorized', { status: 401 })
-        }
+      const elksVerdikt = verifieraElksWebhook(request)
+      if (!elksVerdikt.ok) {
+        larmaAvvisadElksWebhook('voice/missed', elksVerdikt)
+        return new NextResponse('Unauthorized', { status: 401 })
       }
     }
 

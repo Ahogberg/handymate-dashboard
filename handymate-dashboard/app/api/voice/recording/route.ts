@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { callRecordingId } from '@/lib/voice/call-processing'
 
 export const maxDuration = 300
@@ -31,12 +31,10 @@ export async function POST(request: NextRequest) {
     // recording → transcribe → Lisa-agentkörning utifrån. Samma HMAC som
     // voice/incoming och sms/incoming redan använde.
     const rawBody = await request.text()
-    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-      const req = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: rawBody })
-      if (!verifyElksSignature(req, rawBody)) {
-        console.error('[voice/recording] Ogiltig 46elks-signatur, avvisar webhook')
-        return new NextResponse('Unauthorized', { status: 401 })
-      }
+    const elksVerdikt = verifieraElksWebhook(request)
+    if (!elksVerdikt.ok) {
+      larmaAvvisadElksWebhook('voice/recording', elksVerdikt)
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     // Body:n är redan läst för signaturen — parsa samma sträng i stället för

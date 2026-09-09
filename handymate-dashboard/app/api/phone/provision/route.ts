@@ -1,3 +1,4 @@
+import { medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness, checkPhoneApiRateLimit } from '@/lib/auth'
@@ -80,8 +81,8 @@ export async function POST(request: NextRequest) {
       },
       body: new URLSearchParams({
         country: country,
-        voice_start: `${APP_URL}/api/voice/incoming`,
-        sms_url: `${APP_URL}/api/sms/incoming`
+        voice_start: medElksHemlighet(`${APP_URL}/api/voice/incoming`),
+        sms_url: medElksHemlighet(`${APP_URL}/api/sms/incoming`)
       }).toString()
     })
 

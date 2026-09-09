@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { recordingNoticeUrl } from '@/lib/voice/retention'
 
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
@@ -14,16 +14,10 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
 
     const rawBody = await request.text()
-    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-      const signedRequest = new NextRequest(request.url, {
-        method: 'POST',
-        headers: request.headers,
-        body: rawBody,
-      })
-      if (!verifyElksSignature(signedRequest, rawBody)) {
-        console.error('[voice/consent] Ogiltig 46elks-signatur, avvisar webhook')
-        return new NextResponse('Unauthorized', { status: 401 })
-      }
+    const elksVerdikt = verifieraElksWebhook(request)
+    if (!elksVerdikt.ok) {
+      larmaAvvisadElksWebhook('voice/consent', elksVerdikt)
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const formData = new URLSearchParams(rawBody)
@@ -69,7 +63,7 @@ export async function POST(request: NextRequest) {
         // Samma missat-samtal-räls som den oinspelade connect-vägen. 46elks
         // avgör via answered/state om Lisa ska skicka catch-SMS; ett besvarat
         // samtal skapar aldrig den händelsen.
-        "whenhangup": `${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${encodeURIComponent(callId)}`,
+        "whenhangup": medElksHemlighet(`${APP_URL}/api/voice/missed?business_id=${business.business_id}&from=${encodeURIComponent(from)}&callid=${encodeURIComponent(callId)}`),
     }
     const noticeUrl = recordingNoticeUrl()
     // Missing approval/notice never disconnects the customer: forward without recording.
@@ -77,10 +71,10 @@ export async function POST(request: NextRequest) {
     if (request.nextUrl.searchParams.get('step') === 'connect') {
       // 'next' also runs after failed playback. Only explicit success may record.
       if (formData.get('result') !== 'ok') return NextResponse.json(connect)
-      return NextResponse.json({ ...connect, recordcall: `${APP_URL}/api/voice/recording` })
+      return NextResponse.json({ ...connect, recordcall: medElksHemlighet(`${APP_URL}/api/voice/recording`) })
     }
     return NextResponse.json({ play: noticeUrl, skippable: false,
-      next: `${APP_URL}/api/voice/consent?step=connect` })
+      next: medElksHemlighet(`${APP_URL}/api/voice/consent?step=connect`) })
 
   } catch (error) {
     console.error('Consent IVR error:', error)

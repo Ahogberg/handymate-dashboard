@@ -58,7 +58,7 @@ test('notice failure forwards without recording; successful playback records', a
   const business = { business_id:'b',personal_phone:'+46701',assigned_phone_number:'+46702',call_recording_enabled:true }
   const db = {from: () => {const q:any={select:()=>q,eq:()=>q,single:async()=>({data:business,error:null})};return q}}
   const api = loadRoute('app/api/voice/consent/route.ts',{
-    '@/lib/supabase':{getServerSupabase:()=>db}, '@/lib/elks-signature':{verifyElksSignature:()=>true},
+    '@/lib/supabase':{getServerSupabase:()=>db}, '@/lib/elks-webhook-auth':{verifieraElksWebhook:()=>({ok:true,via:'skip_flagga'}),larmaAvvisadElksWebhook:()=>{},medElksHemlighet:(u:string)=>u},
     '@/lib/voice/retention':{recordingNoticeUrl:()=> 'https://test/notice.mp3'},
   })
   for (const result of ['failed','ok']) {

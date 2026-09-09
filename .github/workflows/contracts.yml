@@ -186,6 +186,7 @@ jobs:
           tests/kundtext-utan-interna-namn.spec.ts
           tests/kortgrindar-per-behorighet.spec.ts
           tests/missat-samtal-dygnet-runt.spec.ts
+          tests/elks-webhook-grind.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { verifyElksSignature } from '@/lib/elks-signature'
+import { verifieraElksWebhook, larmaAvvisadElksWebhook, medElksHemlighet } from '@/lib/elks-webhook-auth'
 import { recordingNoticeUrl } from '@/lib/voice/retention'
 import { loadOutboundBusinessConfig, resolveCraftsmanPhone } from './_shared'
 
@@ -27,12 +27,10 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 export async function POST(request: NextRequest) {
   try {
     const rawBody = await request.text()
-    if (process.env.ELKS_SKIP_SIGNATURE !== 'true') {
-      const signed = new NextRequest(request.url, { method: 'POST', headers: request.headers, body: rawBody })
-      if (!verifyElksSignature(signed, rawBody)) {
-        console.error('[voice/outbound] Ogiltig 46elks-signatur, avvisar webhook')
-        return new NextResponse('Unauthorized', { status: 401 })
-      }
+    const elksVerdikt = verifieraElksWebhook(request)
+    if (!elksVerdikt.ok) {
+      larmaAvvisadElksWebhook('voice/outbound', elksVerdikt)
+      return new NextResponse('Unauthorized', { status: 401 })
     }
 
     const params = new URLSearchParams(rawBody)
@@ -79,7 +77,7 @@ export async function POST(request: NextRequest) {
         .eq('business_id', row.business_id)
     }
 
-    const stepUrl = (s: string) => `${APP_URL}/api/voice/outbound?recording_id=${encodeURIComponent(recordingId)}&step=${s}`
+    const stepUrl = (s: string) => medElksHemlighet(`${APP_URL}/api/voice/outbound?recording_id=${encodeURIComponent(recordingId)}&step=${s}`)
     const buildConnect = () => connectAction(supabase, config, row.initiated_by_user_id || null, stepUrl('after'))
 
     // ── (a) kunden svarade → inspelningsmeddelandet FÖRE kopplingen ──
@@ -105,7 +103,7 @@ export async function POST(request: NextRequest) {
       if (!connect) return NextResponse.json({ hangup: 'no_forward_number' })
       // 'next' körs även efter misslyckad uppspelning. Bara uttrycklig framgång får spela in.
       if (result === 'ok') {
-        return NextResponse.json({ ...connect, recordcall: `${APP_URL}/api/voice/recording` })
+        return NextResponse.json({ ...connect, recordcall: medElksHemlighet(`${APP_URL}/api/voice/recording`) })
       }
       return NextResponse.json(connect)
     }
