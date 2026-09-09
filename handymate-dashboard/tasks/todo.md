@@ -1465,3 +1465,16 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 - [ ] Beständig offertaccept med separata kvittenser och återhämtningsvy.
 - [ ] Riktade SQL-/HTTP-/UI-prov, kontraktsgrind, TypeScript och build.
 - [ ] Granskbar gren/PR med migrationsordning och kvarstående externa prov.
+
+# Tre hela värderesor — nattgranskning 2026-09-09
+
+- [x] Läs beständig plan, verifiera aktiva PR-huvuden och identifiera Matte-onboardingens gren.
+- [x] Kartlägg företagsstart → första användbara resultat, med manuell/automatisk övergång och sparat bevis.
+- [x] Kartlägg förfrågan → offert → uppföljning → beslut/projekt och prova läsande i Nordström El.
+- [x] Kartlägg utfört jobb → rapport → ÄTA → fakturaunderlag → ekonomisystem och prova läsande i Nordström El.
+- [x] Rätta första reproducerade intäkts-/administrationsavbrottet och kör riktade samt breda prov.
+- [ ] Spara exakt SHA, preview/CI, klickbevis och öppna kund-/providerprov i egen draft-PR.
+
+Färdig betyder att varje steg har en synlig nästa handling och en sparad kvittens.
+Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
+utskick, fakturasändning, main-merge eller produktionsmigration ingår.

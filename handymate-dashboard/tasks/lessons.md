@@ -670,3 +670,10 @@ Codex rollgranskning: 60 behörighetsprov gröna, fyra luckor öppna (docs/secur
 Uppdrag är ett långsiktigt mission-mål, inte samma sak som ett kundjobb.
 Teamets uppgifter får ingen egen navigation. Ett stopp för omdöpning är inte
 ett stopp för beständig exekvering; verifiering hör till leveransen.
+
+## 2026-09-09 — Kundvärderesan styr sprinten, inte mängden skyddsräcken
+Infrastruktur och idempotens är bara värdefulla när de stänger ett konkret avbrott
+i företagsstart, vunnet jobb eller fakturerbart arbete. Börja varje pass med den
+synliga resan och ett faktiskt resultat: vilket manuellt moment försvinner, vilken
+intäkt skyddas och var finns kvittot? En grön hjälpfunktion får aldrig ersätta ett
+sammanhängande kod- och klickprov av övergången.
