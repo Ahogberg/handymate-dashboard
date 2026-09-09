@@ -56,33 +56,22 @@ async function matchSender(
   fromName: string
 ): Promise<MatchResult> {
   // 1. Match by email
-  const { data: byEmail } = await supabase
+  const { data: byEmail, error: emailError } = await supabase
     .from('customer')
     .select('customer_id')
     .eq('business_id', businessId)
     .eq('email', fromEmail)
     .maybeSingle()
 
+  if (emailError) throw new Error('Kundens e-postadress kunde inte matchas säkert.')
   if (byEmail) {
     return { customer_id: byEmail.customer_id, lead_id: null, matched_by: 'email' }
   }
 
-  // 2. Match by name (if we have a name)
-  if (fromName && fromName.length >= 3) {
-    const { data: byName } = await supabase
-      .from('customer')
-      .select('customer_id')
-      .eq('business_id', businessId)
-      .ilike('name', fromName)
-      .maybeSingle()
-
-    if (byName) {
-      return { customer_id: byName.customer_id, lead_id: null, matched_by: 'name' }
-    }
-  }
+  // A display name alone is not proof of identity; different senders may share it.
 
   // 3. Match against open leads by email
-  const { data: leadByEmail } = await supabase
+  const { data: leadByEmail, error: leadError } = await supabase
     .from('leads')
     .select('lead_id')
     .eq('business_id', businessId)
@@ -90,6 +79,7 @@ async function matchSender(
     .in('status', ['new', 'contacted', 'qualified'])
     .maybeSingle()
 
+  if (leadError) throw new Error('Förfrågans e-postadress kunde inte matchas säkert.')
   if (leadByEmail) {
     return { customer_id: null, lead_id: leadByEmail.lead_id, matched_by: 'email' }
   }
@@ -129,16 +119,16 @@ async function autoCreateCustomer(
     let customerNumber: string | undefined
     try { customerNumber = await getNextCustomerNumber(supabase, businessId) } catch { /* non-blocking */ }
 
-    const { error } = await supabase.from('customer').insert({
+    const { data: created, error } = await supabase.from('customer').insert({
       customer_id: customerId,
       business_id: businessId,
       name: name || email,
       email,
       phone_number: phone,
       ...(customerNumber ? { customer_number: customerNumber } : {}),
-    })
-    if (error) {
-      console.error('[gmail-processor] Auto-create customer error:', error.message)
+    }).select('customer_id').single()
+    if (error || !created?.customer_id) {
+      console.error('[gmail-processor] Auto-create customer error:', error?.message || 'Missing receipt')
       return null
     }
     return customerId
@@ -168,11 +158,13 @@ export async function processInboundEmail(
   // komplett för både agentkontext och ett framtida revisionsspår. Inga
   // events triggas för utgående — automationer ska reagera på KUNDENS mejl.
   if (isFromOwner(message, ownerEmail)) {
-    const { data: existingOut } = await supabase
+    const { data: existingOut, error: duplicateError } = await supabase
       .from('email_conversations')
       .select('id')
+      .eq('business_id', businessId)
       .eq('gmail_message_id', message.messageId)
       .maybeSingle()
+    if (duplicateError) throw new Error('Tidigare mejl kunde inte kontrolleras.')
     if (existingOut) return { stored: false, reason: 'duplicate' }
 
     const toEmail = extractEmail(message.to || '')
@@ -180,7 +172,7 @@ export async function processInboundEmail(
       ? await matchSender(supabase, businessId, toEmail, '')
       : { customer_id: null, lead_id: null, matched_by: 'unmatched' as const }
 
-    const { error: outErr } = await supabase.from('email_conversations').insert({
+    const { data: savedOut, error: outErr } = await supabase.from('email_conversations').insert({
       business_id: businessId,
       gmail_thread_id: message.threadId,
       gmail_message_id: message.messageId,
@@ -193,21 +185,23 @@ export async function processInboundEmail(
       received_at: message.date ? new Date(message.date).toISOString() : new Date().toISOString(),
       direction: 'outbound',
       status: 'read',
-    })
-    if (outErr) {
-      console.error('[gmail-processor] outbound insert error:', outErr.message)
-      return { stored: false, reason: outErr.message }
+    }).select('id').single()
+    if (outErr || !savedOut?.id) {
+      console.error('[gmail-processor] outbound insert error:', outErr?.message || 'Missing receipt')
+      return { stored: false, reason: outErr?.message || 'missing_receipt' }
     }
     return { stored: true, reason: 'outbound' }
   }
 
   // 2. Dedup check
-  const { data: existing } = await supabase
+  const { data: existing, error: duplicateError } = await supabase
     .from('email_conversations')
     .select('id')
-    .eq('gmail_message_id', message.messageId)
+    .eq('business_id', businessId)
+      .eq('gmail_message_id', message.messageId)
     .maybeSingle()
 
+  if (duplicateError) throw new Error('Tidigare mejl kunde inte kontrolleras.')
   if (existing) {
     return { stored: false, reason: 'duplicate' }
   }
@@ -224,6 +218,8 @@ export async function processInboundEmail(
     if (newCustomerId) {
       match.customer_id = newCustomerId
       match.matched_by = 'email'
+    } else {
+      return { stored: false, reason: 'customer_not_saved' }
     }
   }
 
@@ -255,9 +251,9 @@ export async function processInboundEmail(
     .select('id')
     .single()
 
-  if (error) {
-    console.error('[gmail-processor] Insert error:', error.message)
-    return { stored: false, reason: error.message }
+  if (error || !insertedEmail?.id) {
+    console.error('[gmail-processor] Insert error:', error?.message || 'Missing receipt')
+    return { stored: false, reason: error?.message || 'missing_receipt' }
   }
 
   // 6. Fire events

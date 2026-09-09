@@ -25,9 +25,9 @@ export async function GET(request: NextRequest) {
     )
 
     return NextResponse.json({
-      success: true,
+      success: result.errors.length === 0,
       ...result,
-    })
+    }, { status: result.errors.length ? 503 : 200 })
   } catch (error) {
     const msg = error instanceof Error ? error.message : 'Unknown error'
     console.error('[gmail-poll] Fatal error:', msg)

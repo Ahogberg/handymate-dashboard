@@ -5,6 +5,8 @@ import { portalIntakeInput } from '@/lib/leads/portal-intake'
 import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { loadAttribution } from '@/lib/branding/attribution'
 
+export const dynamic = 'force-dynamic'
+
 const LEAD_PORTAL_HISTORY_DAYS = 180
 const LEAD_PORTAL_MAX_ROWS = 200
 const LEAD_PORTAL_MAX_POSTS_PER_HOUR = 30

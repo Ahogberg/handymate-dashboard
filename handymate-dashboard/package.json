@@ -28,7 +28,7 @@
     "test:my-day": "playwright test tests/my-day.spec.ts tests/my-day.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line",
     "test:report-continuity": "playwright test tests/report-continuity.spec.ts tests/report-recovery.spec.ts tests/report-continuity.ui.spec.ts --no-deps --project=chromium --workers=2 --reporter=line",
     "test:approval-integration": "node tests/approvals/all-harnesses.cjs",
-    "test:six-outcomes": "node tests/sprint/outcome-boundaries.cjs && node tests/sprint/durable-intake.cjs && node tests/sprint/intake-service.cjs && node tests/sprint/fortnox-reconciliation.cjs && node tests/sprint/invoice-acceptance-sql.cjs && node tests/sprint/invoice-acceptance-service.cjs && node tests/sprint/portal-intake.cjs"
+    "test:six-outcomes": "node tests/sprint/outcome-boundaries.cjs && node tests/sprint/durable-intake.cjs && node tests/sprint/intake-service.cjs && node tests/sprint/fortnox-reconciliation.cjs && node tests/sprint/invoice-acceptance-sql.cjs && node tests/sprint/invoice-acceptance-service.cjs && node tests/sprint/portal-intake.cjs && node tests/sprint/gmail-polling.cjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "0.17.0",

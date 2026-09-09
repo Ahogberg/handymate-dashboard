@@ -1,4 +1,7 @@
 # Aktiv sprint 2026-09-09
+- [x] Gmail: avstängning, full sidläsning, stabil startpunkt och ingen cursor vid fel.
+- [x] Gmail: säkra dubblett-/kunduppslag och verifiera fel/återförsök i faktiska helpers.
+- [ ] Verifiera PR36:s cache-rättelse och Gmail-leverans med sekventiella grindar.
 Aktuell fortsättning: [lanseringsmålet](launch-completion-20260909.md).
 - [x] Portal: beständig mottagning inklusive kategori, belopp och adress.
 - [x] Portal: behåll inskick vid avbrott; skilj mottaget från färdigställt.

@@ -66,3 +66,19 @@ Första kod-HEAD remote: ea84a174f4f0538871097eec6125375fb6e4e710. Uppföljande 
 Lokal next build kompilerade men typkontrollens Node-process kraschade med heap out of memory; detta är INTE en godkänd lokal full build (trots launcher exit 0). GitHub/Vercel-resultat måste avläsas på senaste HEAD.
 Första breda lokala kontraktskörningen träffade en gammal Playwright-cache med försvunnen absolut importsökväg; ny körning med egen cache påbörjades. Slutresultat ännu inte verifierat: den lokala exec-servern blev otillgänglig innan loggen kunde avläsas. Fortsätt från GitHub om scratch inte återkommer; håll test/build sekventiella och begränsa workers/minne.
 Nästa Gmail-pass måste även läsa processor.ts: stored:false kan vara ett lagringsfel, inte bara duplicate. Deduplikationsläsningarna saknar business_id. Ett cursor-fix som endast fångar kastade undantag är otillräckligt. Inga Gmail-ändringar utförda i portalpasset.
+
+## Checkpoint: Gmail-datasynk 2026-09-09
+Implementerat: opt-out filtreras i cron och kontrolleras igen vid direktanrop och mellan meddelanden; kontobyte/återanslutning stoppar gamla skrivningar. Alla historiesidor/listningssidor läses, första dygnets startpunkt sparas beständigt och profilens baseline hämtas före listning. Lagringsfel, tomma svar, sidfel och missad cursor-kvittens håller tillbaka läspositionen. CAS skyddar nyare cursor mot en äldre körning. Cron rapporterar delvis fel som 503/success:false.
+Kund- och dubblettuppslag är företagsskopade och stoppar vid queryfel/tvetydighet. Namn ensamt länkar inte en avsändare till kund. Sparad kund/mejl kräver returnerad rad. Befintliga mejl hoppas över på återförsök utan ny Google-/AI-bearbetning.
+Migration sql/v2_gmail_sync_start.sql + CLI-genererad migration körd på isolerade testprojektet, inte produktion. SQL-provet sql/proof_gmail_sync_test_only.sql verifierade startankare, cursor-CAS, opt-out och tenantfilter och rullade tillbaka syntetisk anslutning. Inga riktiga Gmail-konton användes.
+30 nya körbara prov i tests/sprint/gmail-polling.cjs. Bred kontraktsgrind grön lokalt: 1772 pass +1 befintlig skip, 17 Node-prov. Portalens force-dynamic-rättelse ingår. Typkontroll/slutlig CI/build avläses separat på aktuell commit.
+
+### Fortsatt öppet i mejlkedjan
+- Historik-404 stoppar med uttryckligt behov av återläsning. En säker, användarstyrd backfill och återhämtningsyta är INTE byggd; ingen tyst fallback som tappar äldre mejl.
+- Första importen avser inkorg från dygnet före sparad startpunkt, INTE hela inkorgen eller Skickat. Gmail-OAuth i onboarding och Microsoft kvarstår.
+- Tidsbudget stoppar utan framflyttad cursor; sparade mejl gör nästa försök billigare. Mycket stora listningar kan behöva beständig sidkö; ännu inte byggd.
+- Ingen mailbox-lease eller atomisk kund+mejl+agent-outbox i detta pass. Samtidiga processorer och sidoeffekter efter lagrat mejl behöver separat genomgång innan kedjan kallas komplett.
+- Historiskt globalt UNIQUE(gmail_message_id) kvarstår. Företagsskopade kontroller ger nu synligt sparfel i stället för falsk duplicate vid annan tenants rad; korrekt kontonamnsrymd/migration återstår.
+- Riktigt OAuth-/Gmail-prov, provideravbrott och användarens synkvy återstår. Ingen produktion aktiverad.
+
+Nästa körbara del efter grön CI: spara releasebevis och fortsätt med rapportkedjans oskickade utkast/återupptagning, alternativt den beständiga mottagningen för kvarvarande inflöden. Gmail-blockets ovanstående öppna delar får inte räknas som kundgodkända.
