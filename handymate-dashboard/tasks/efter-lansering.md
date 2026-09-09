@@ -7,6 +7,10 @@ här och en annan lista säger olika gäller den här.
 Inget nedan byggs före 14 september. Före dess bara sådant som gör
 befintliga löften sanna.
 
+**Ordningen efter lansering:** punkt 17 först, sedan tabellens ordning från 1.
+Punkt 17 ligger sist i tabellen bara för att inte tvinga fram en omnumrering
+som skulle bryta hänvisningarna i detaljavsnitten nedan.
+
 | # | Satsning | Dagar | Varför här | Byggstenar som finns |
 |---|---|---|---|---|
 | 1 | **Jobbet går att utföra** — tillträde, kundval, leverans bekräftade innan bilen åker | 3–4 | Värde varje arbetsdag, wow för den anställde, färre bomkörningar | `lib/job-preparation/load.ts` (laddar omfattning + checklistor, kontrollerar inget), utgående SMS-grind, godkännandekort. Saknas: tillstånd för de tre bekräftelserna; obesvarat = okänt, aldrig klart |
@@ -25,6 +29,7 @@ befintliga löften sanna.
 | 14 | **Karins marginalnotis** — "kunden bad om X på platsbesöket, det finns inte i offerten", fäst vid raden | 4–6 | Skiss från Andreas 2026-09-06 (`docs/design/skisser-2026-09-06/agentnarvaro-offert.dc.html`, mönster 2). Kräver en jämförelsemotor och stabila rad-id som inte finns. Placering avgör Andreas | `customer_fact` (v122, `evidence_quote` ordagrant ur mötet), `assemble-transcript.ts` (tidsstämplad tidslinje), `lib/reservations/match.ts` (mönster för radmatchning), `learning_events` |
 | 15 | **Kundstart som hänger ihop** — kundens mål → första verkliga resultat → gemensam uppföljning | 4–6 | Codex genomlysning 2026-09-07 mot main ce00347: byggstenarna finns men bildar ingen kedja. Startkvitto knutet till valt mål ("ÄTA-utkastet är sparat på jobbet Solvägen, kundens godkännande återstår"), olika första uppdrag per mål (idag får fyra mål samma offertstart utan importerad data), en kort kundstartssammanfattning som support, partner och mejl läser (mål, valt första jobb, bekräftat resultat, öppet hinder, ansvarig, nästa kontakt), partnerns "Aktiv kund" på uppnådd nytta i stället för betalning. Prövas med tre nya kundtyper: utan historik, med import, via partner | `lib/onboarding/kom-igang-tasks.ts` (klar = något finns, inte att kunden lyckats), `app/api/onboarding/company-scan`, `app/api/cron/onboarding-followup/route.ts`, `lib/partners/activity.ts`, supportens ärendevy, `lib/weekly-value.ts`. De tre små rättningarna före lansering (läsfel ≠ tom firma i genomgången, "uppskattningsvis" i dag 2/7-mejlen, samma prioritering i mejl och startsida) bygger Codex 2026-09-07 |
 | 16 | **Storfirman blir en egen produkt** — skillnaden mot Firman är inte volym utan att ägaren slutar vara närvarande | 6–9 | Beslut Andreas 2026-09-08: dagens prisplaner skiljs bara av kvoter (SMS 300/1000, samtal 400/obegränsat, projekt 50/obegränsat). Båda får alla sex agenter och obegränsat med användare, så det finns inget att sälja på. Byggs andra halvan av september, se avsnittet nedan | Rollgränserna (`lib/permissions.ts`, `resolved_by` som aktör, `canActOnApproval`) landade 2026-09-07; `lib/projects/compute-person-profitability.ts` finns med rutt men ingen yta; kunskapsbasen är punkt 4 |
+| 17 | **Samtalet blir kundkontext** — inkommande samtal transkriberas, matchas mot rätt kund eller skapar en ny, och det som sades fästs på kunden | 2–3 | **Först av allt efter den 14:e** (beslut Andreas 2026-09-09). Kedjan är redan byggd och automatiskt länkad — den är bara oåtkomlig, se avsnittet nedan | `app/api/voice/recording/route.ts:159` anropar transcribe automatiskt; `app/api/voice/transcribe/route.ts:79` anropar analyze automatiskt; `lib/voice/find-customer-by-phone.ts`; `lib/voice/analysis-scope.ts` (allowlist `quote \| follow_up \| callback \| reminder \| reschedule \| customer_fact \| ata`); `createLeadAndDeal` i `lib/leads/golden-path.ts` |
 
 ## Punkt 4 i detalj — Firmans kunskapsbas (beslut Andreas 2026-09-06)
 
@@ -112,6 +117,52 @@ Bygg:
    (`tests/quote-document-parity.spec.ts`). Knappar: Lägg till rad, Visa
    varför (citatet med tidsstämpel, offerten saknar raden, prislistans
    uppskattning), Ingår redan. Beslut skrivs till `learning_events`.
+
+## Punkt 17 i detalj — Samtalet blir kundkontext (beslut Andreas 2026-09-09)
+
+Kartlagt under telefonprovet natten till 10 september, när kärnlöftet mättes
+för första gången.
+
+**Det som redan finns och körs automatiskt.** Kedjan inspelning → transkribering
+→ analys är hopkopplad utan mänskligt steg: `app/api/voice/recording/route.ts:159`
+postar vidare till `/api/voice/transcribe`, som på rad 79 postar vidare till
+`/api/voice/analyze`. Analysen klassificerar mot en allowlist i
+`lib/voice/analysis-scope.ts`. Kundmatchning på telefonnummer finns i
+`lib/voice/find-customer-by-phone.ts` och används redan av `voice/incoming`
+och `lib/voice/fangat-samtal.ts`.
+
+**Det som saknas — tre saker, alla små.**
+
+1. **Okänt nummer blir ingen kund.** `createLeadAndDeal` är inkopplad i
+   `app/api/voice/incoming/route.ts:98`, men hela blocket ligger inuti
+   `isTestCallArmed(...)` (rad 91) — onboardingens armerade ringtest-fönster.
+   Ett vanligt samtal från ett okänt nummer skapar alltså varken lead eller
+   kund. Lyft ut anropet till den generella vägen, med dedup på telefon som
+   golden path redan gör, och utan testmärkningen i namn och meddelande.
+
+2. **Analysen fästs inte på kunden.** `customer_fact` finns i allowlisten och
+   som korttyp (v122, med `evidence_quote` ordagrant), men samtalsanalysen
+   kopplar den inte till kundkortet. Det är det som gör att "spara kontexten
+   för kunden om vad man samtalar om" inte händer.
+
+3. **Förutsättningen: inspelningen måste gå att slå på.** Hela kedjan hänger
+   på `call_recording_enabled`, och den vägen är trasig —
+   `app/api/voice/incoming/route.ts` lämnar över till consent med `ivr:`, men
+   i 46elks är `ivr` platsen för ett ljud, inte för en webhook som returnerar
+   call actions. 46elks svarar `badurl`. Samma fel finns på `play:` mot
+   `/api/voice/greeting` (`badaudio`). Båda rättas före lansering; utan dem
+   är punkt 17 inte påbörjbar.
+
+**Varför den ligger först.** Den kostar minst av allt på listan i förhållande
+till vad den ger, eftersom fyra femtedelar redan är byggt. Och den gör det
+fångade samtalet till något mer än ett SMS: firman får veta vem som ringde
+och vad de ville, utan att någon skriver in det.
+
+**Att inte göra här.** Ingen agent som svarar och för ett samtal. Lisa som
+samtalspartner är ett senare bygge (beslut Andreas 2026-09-09). Lanseringens
+löfte är smalare och ärligare: ringde någon och hantverkaren inte svarade,
+så hörs vi av.
+
 
 ## Punkt 16 i detalj — Storfirman som egen produkt (beslut Andreas 2026-09-08)
 
