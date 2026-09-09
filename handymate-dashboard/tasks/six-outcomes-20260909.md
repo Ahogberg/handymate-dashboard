@@ -22,3 +22,13 @@ De sex områdena är inte slutgodkända förrän relevant verkligt flöde har pr
 - [x] Kundkomplettering och affärssparning måste ha kvittens.
 - [x] Betalt i nyttovyn använder registrerat belopp, inte obetald skattereduktion.
 - [ ] Regressionsprov, typkontroll, build och grön GitHub-grind.
+
+## Fortsättning: beständig mottagning
+
+- [x] Lägg kund- och betalningsfallen A2–A5/F2–F5 i testningslistan.
+- [x] Spara mottagen förfrågan före kundmatchning; samma nyckel återanvänder samma förfrågan.
+- [x] Återförsök återanvänder sparade kund-/lead-/affärs-ID:n och stoppar ändrat innehåll.
+- [x] Separera mottaget, färdigställt och osäker status; verifiera krascher och samtidighet.
+- [ ] Fortnox-avstämning kvarstår som nästa separat steg.
+
+Nästa: koppla fler inflöden till samma beständiga gräns, prova recovery-vyn visuellt och genomför Fortnox-avstämning. S1/S5 och pilotkedjor är fortsatt öppna.

@@ -136,6 +136,7 @@ export const BEHALLS: string[] = [
 // scopad ordning (se header för varför en enda naiv ordning inte räcker).
 // ─────────────────────────────────────────────────────────────────────────
 export const RADERAS: string[] = [
+  'lead_intake_request', // mottagna förfrågningar innehåller kundens kontaktuppgifter
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.
   'work_report_session', 'agent_followup_event', 'agent_followup',
   // ── Kundregister, offerter, bokningar, leads, affärer — kärnan ──

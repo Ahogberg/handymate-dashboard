@@ -104,3 +104,66 @@ atomiskt lead→deal. Saknad kundkoppling stoppar fortfarande anropet; en
 beständig mottagningskö med återhämtning behövs för att slippa tappa ett
 inflöde när ett sådant fel inträffar. Nästa S1-arbete ska täcka det hela vägen
 från inkommande request, inte bara lägga till en lookup före INSERT.
+
+## Tillagda testfall för Andreas och Christopher
+
+Kör i testföretaget. Databasfel och samtidighet injiceras av Codex i de
+tekniska proven; ni behöver inte manipulera databasen.
+
+| ID | Test | Förväntat resultat |
+|---|---|---|
+| A2 | Samma kund med 070-format och +46-format | Befintlig kund återanvänds; ingen ny kund på grund av formatet. |
+| A3 | E-post med understreck, t.ex. test_kund@example.invalid | Får inte kopplas till testXkund@example.invalid. |
+| A4 | Flera kunder med samma kontaktuppgift | Ingen godtycklig sammanslagning; förfrågan behöver granskning. |
+| A5 | Avbruten hämtning/sparning och nytt försök | Ingen falsk sparbekräftelse. Kontrollera kund-, förfrågnings- och affärs-ID samt antal rader. För det beständiga intake-flödet återanvänds samma Idempotency-Key; kund, förfrågan och affär ska finnas exakt en gång. |
+| F2 | Faktura 1 500 kr, registrerat betalt 1 000 kr, status kundens del betald | Fakturerat 1 500 kr; bekräftat betalt 1 000 kr, även i detaljraden. |
+| F3 | Kundens del betald men registrerat belopp saknas | Hela fakturabeloppet får inte visas som bekräftat betalt. |
+| F4 | Utkast, makulerad eller krediterad faktura med kopplat agentkort | Ska inte räknas som fakturerat eller betalt i nyttovyn. |
+| F5 | Samma faktura länkad från flera kort | Beloppet räknas en gång. Påminnelse skapar inte ny fakturerad intäkt. |
+
+Anteckna vad ni gjorde, förväntat/faktiskt resultat, berörda ID:n och en
+skärmbild. A4/A5 som ännu behöver återhämtning är inte slutgodkända av att
+systemet bara stoppar en felaktig skrivning.
+
+
+## Tredje omgången: beständig formulärmottagning
+
+`POST /api/leads/intake` med `Idempotency-Key` sparar först en beständig
+mottagningskvittens. Därefter sparas kund, lead, affär och räknare atomiskt.
+Samma företag/källa/nyckel återanvänder kvittensen; ändrat innehåll ger 409.
+Ett lagringsfel lämnar mottagningen som blockerad med möjlighet att försöka
+igen. Ett osäkert RPC-svar får aldrig falla tillbaka till gamla INSERT-flödet.
+
+Ägare/admin kan granska och återuppta i dashboardens pipeline, under
+"Mottagna förfrågningar att kontrollera". Anställda nekas av servern och
+panelen monteras bara för aktiv ägare/admin i aktuellt företag. Aviseringar
+har en separat atomisk claim: försökt/osäkert återutskick görs inte automatiskt.
+Sparade entiteter betyder inte att SMS/event eller Fortnox kundsynk är bekräftade.
+Den senare är fortfarande best-effort och har inte en egen återhämtningskö.
+
+Migration: `sql/v2_durable_lead_intake.sql`, tillämpad **endast** på isolerade
+`eoodwyfxrdjmlqaealhj`. Tabellen är RLS-skyddad och funktioner/tabell saknar
+anon/authenticated-åtkomst; API använder service-klient efter autentisering.
+Kvittensen innehåller kontaktuppgifter och ingår därför i kontoradering.
+Inga nya säkerhetsadvisors nämner dessa objekt.
+
+Bevis: 42 tidigare helperprov + 11 verkliga SQL-prov i PGlite + 35
+service/API-prov med mockade externa effekter. SQL-proven täcker fel i sista
+INSERT, rollback inklusive räknare, saknat steg, tvetydig kund, ändrat innehåll,
+normalisering och behörighet. Tre parallella anrop mot riktiga isolerade
+Postgres gav samma kund-/lead-/affärs-ID, en rad av varje och attempts=1.
+Det syntetiska testföretaget med alla provrader är borttaget efter kontrollen.
+Inga SMS, mejl eller Fortnox-anrop utfördes i databasprovet.
+
+Bred lokal grind: 1771 passerade och en befintlig skip; den nya tabellen
+utlöste kontoraderingsvakten. Efter att tabellen lagts i RADERAS passerade
+hela den berörda sviten (29/29), samt 17 Node-prov. TypeScript och full
+Next-build passerade före den sista UI-behörighetsavgränsningen; slutkontroll
+redovisas i PR. Build använder syntetisk konfiguration, inte externa tjänster.
+
+Avgränsning: opt-in för anrop med stabil nyckel. Befintliga formulär utan
+header, widget, Lisa och e-postvägar har ännu inte generell beständig
+mottagning. Låsningen serialiserar denna väg per företag, inte andra äldre
+kundskrivare. Det går inte att garantera dubblettfrihet mellan dessa vägar.
+Pilotprov A4/A5 och visuell granskning av återhämtningspanelen återstår.
+Nästa tekniska steg är Fortnox-avstämning av osäkra och historiska failed-resultat.

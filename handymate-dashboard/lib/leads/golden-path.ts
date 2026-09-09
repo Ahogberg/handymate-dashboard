@@ -13,7 +13,7 @@
  *
  * Beslut 2026-05-28: helpern tar `business_id` + `business_phone_number`
  * separat istället för hela business-objektet — tunnare gränssnitt så
- * call-sites slipper bygga full business-row. SMS skickas non-blocking;
+ * call-sites slipper bygga full business-row. SMS inväntas utan att fel stoppar det sparade resultatet;
  * helpern returnerar även om SMS-throws.
  */
 
@@ -306,26 +306,37 @@ export async function createLeadAndDeal(
     // Non-blocking — lead skapas ändå, men felet surfas via dealError.
   }
 
-  // ── 5. SMS till hantverkaren (non-blocking) ──────────────────
+  await notifyReceivedLead(input, leadId, customerId, supabase)
+  return { leadId, dealId, customerId, dealError }
+}
+
+/** Shared notice effects. Durable callers claim the attempt before calling;
+ * a lost provider acknowledgement must never cause automatic resend. */
+export async function notifyReceivedLead(input: CreateLeadAndDealInput, leadId: string, customerId: string, supabase: SupabaseClient): Promise<boolean> {
+  const { businessId, businessPhoneNumber, name, phone, message, source, notify = true } = input
+  const cleanPhone = phone.replace(/\s/g, '')
+  let confirmed = true
+  // ── 5. SMS till hantverkaren (fel påverkar inte sparade entiteter) ──────────────────
   if (notify && businessPhoneNumber) {
     const smsText = `🌐 Ny lead från ${source}!\nNamn: ${name}\nTel: ${cleanPhone}${message ? `\n"${message.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
-    sendSMS(supabase, businessId, businessPhoneNumber, smsText, 'Handymate').catch(() => {})
+    if (!await sendSMS(supabase, businessId, businessPhoneNumber, smsText, 'Handymate')) confirmed = false
   }
 
   // ── 6. Automation-event ──────────────────────────────────────
   if (notify) {
     try {
       const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(supabase, 'lead_received', businessId, {
+      const result = await fireEvent(supabase, 'lead_received', businessId, {
         source,
         lead_id: leadId,
         customer_id: customerId,
         customer_name: name,
       })
-    } catch { /* non-blocking */ }
+      if (result.failed) confirmed = false
+    } catch { confirmed = false }
   }
 
-  return { leadId, dealId, customerId, dealError }
+  return confirmed
 }
 
 /**

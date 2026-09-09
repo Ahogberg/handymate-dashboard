@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { createHash } from 'crypto'
+import { receiveIntake, completeIntake, intakeInput, intakeReply, IntakeError } from '@/lib/leads/durable-intake'
 
 /**
  * /api/leads/intake — Golden Path-route för lead-skapande.
@@ -16,7 +17,7 @@ import { createHash } from 'crypto'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, x-api-key',
+  'Access-Control-Allow-Headers': 'Content-Type, x-api-key, Idempotency-Key',
 }
 
 // Privacy: hash IP istället för att lagra raw — samma mönster som
@@ -71,7 +72,6 @@ export async function POST(request: NextRequest) {
 
     let business: { business_id: string; business_name: string; phone_number: string | null } | null = null
     let leadSourceId: string | null = null
-    let sourceName: string | null = null
 
     if (portalCode) {
       // Portal-kod autentisering via lead_sources
@@ -84,7 +84,6 @@ export async function POST(request: NextRequest) {
 
       if (source) {
         leadSourceId = source.id
-        sourceName = source.name
         const { data: biz } = await supabase
           .from('business_config')
           .select('business_id, business_name, phone_number')
@@ -105,7 +104,6 @@ export async function POST(request: NextRequest) {
 
       if (source) {
         leadSourceId = source.id
-        sourceName = source.name
         const { data: biz } = await supabase
           .from('business_config')
           .select('business_id, business_name, phone_number')
@@ -129,7 +127,15 @@ export async function POST(request: NextRequest) {
       return Response.json({ error: 'Invalid API key' }, { status: 401, headers: corsHeaders })
     }
 
-    const { name, phone, email, message, source_ref } = await request.json()
+    const body = await request.json()
+    const normalized = intakeInput(body, leadSourceId)
+    const requestKey = request.headers.get('Idempotency-Key')
+    if (requestKey !== null) {
+      const received = await receiveIntake(supabase, business.business_id, leadSourceId || 'website', requestKey, normalized)
+      const receipt = await completeIntake(supabase, business.business_id, received.id)
+      return Response.json(intakeReply(receipt), { status: receipt.state === 'completed' ? 200 : 202, headers: corsHeaders })
+    }
+    const { name, phone, email, message, source_ref } = normalized
 
     if (!name || !phone) {
       return Response.json({ error: 'name and phone required' }, { status: 400, headers: corsHeaders })
@@ -143,7 +149,7 @@ export async function POST(request: NextRequest) {
         phone,
         email: email || null,
         message: message || null,
-        source: sourceName || 'website_form',
+        source: 'website_form',
         leadSourceId,
         sourceRef: source_ref || null,
       },
@@ -160,6 +166,7 @@ export async function POST(request: NextRequest) {
       { headers: corsHeaders },
     )
   } catch (error: any) {
+    if (error instanceof IntakeError) return Response.json({ error: error.message }, { status: error.status, headers: corsHeaders })
     console.error('Leads intake error:', error)
     return Response.json({ error: 'Internal error' }, { status: 500, headers: corsHeaders })
   }
