@@ -134,6 +134,7 @@ export async function moveDeal(params: {
     .from('deal')
     .select('id, stage_id, business_id')
     .eq('id', params.dealId)
+    .eq('business_id', params.businessId)
     .single()
 
   if (!deal) throw new Error('Deal not found')
@@ -172,9 +173,9 @@ export async function moveDeal(params: {
     updateData.closed_at = new Date().toISOString()
   }
 
-  const { error: updateError } = await supabase.from('deal').update(updateData).eq('id', params.dealId)
-  if (updateError) {
-    throw new Error(`Deal-update misslyckades: ${updateError.message}`)
+  const { data: updatedDeal, error: updateError } = await supabase.from('deal').update(updateData).eq('id', params.dealId).eq('business_id', params.businessId).select('id, stage_id').single()
+  if (updateError || !updatedDeal || updatedDeal.stage_id !== toStage.id) {
+    throw new Error(`Deal-update misslyckades: ${updateError?.message || 'sparbekräftelse saknas'}`)
   }
 
   // Log activity

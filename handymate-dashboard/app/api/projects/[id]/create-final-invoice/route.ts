@@ -1,6 +1,5 @@
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { NextRequest, NextResponse } from 'next/server'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -382,6 +381,7 @@ export async function POST(
     try {
       const created = await createInvoice(supabase, {
         businessId: business.business_id,
+      sources: { changeIds: signedAtas.map(a => a.change_id) },
         customerId: project.customer_id,
         items,
         subtotal,
@@ -445,38 +445,12 @@ export async function POST(
       )
     }
 
-    // ── 11. UPDATE project_change → status='invoiced' ───────────
-    // TD-29: detta är inte atomic med INSERT invoice. Om denna UPDATE
-    // failar är vi i half-state — fakturan finns men ÄTA är inte
-    // markerade invoiced. Loggar error så Andreas kan kompensera
-    // manuellt (manuell UPDATE i Supabase SQL Editor).
-    let ataUpdateWarning: string | undefined
-    if (signedAtas.length > 0) {
-      const changeIds = signedAtas.map(a => a.change_id)
-      // Delade vägen (P0-4): atomisk via RPC:n när v104 är körd; annars
-      // samma per-tabell-fallback som förut, men aldrig tyst.
-      const markering = await markInvoiceSources(supabase, {
-        businessId: business.business_id,
-        invoiceId: invoice.invoice_id,
-        changeIds,
-      })
-
-      if (!markering.ok) {
-        console.error('[create-final-invoice] CRITICAL: källmarkeringen misslyckades efter fakturaskapandet:', {
-          invoice_id: invoice.invoice_id,
-          invoice_number: invoice.invoice_number,
-          change_ids: changeIds,
-          errors: markering.errors,
-        })
-        ataUpdateWarning = `Fakturan skapades (${invoice.invoice_number}) men ÄTA-status kunde inte uppdateras. Kontakta support — change_ids: ${changeIds.join(', ')}`
-      }
-    }
+    // Faktura och godkända ÄTA-källor har sparats tillsammans.
 
     // ── 12. Response ────────────────────────────────────────────
     return NextResponse.json({
       invoice_id: invoice.invoice_id,
       invoice_number: invoice.invoice_number,
-      ...(ataUpdateWarning ? { warning: ataUpdateWarning } : {}),
     })
   } catch (error: any) {
     console.error('[create-final-invoice] unexpected error:', error)

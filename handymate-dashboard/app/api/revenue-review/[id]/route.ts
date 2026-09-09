@@ -3,7 +3,6 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { createInvoice } from '@/lib/invoices/create-invoice'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 
 /**
  * Revenue Review V1 — granskningen av ett intäktsfynd (X1b, 2026-08-09).
@@ -196,6 +195,7 @@ export async function POST(
     // och det är sändrutten som sätter den statusen (N3).
     const { invoice, invoiceNumber } = await createInvoice(supabase, {
       businessId: business.business_id,
+      sources: { changeIds: farska.map(a => a.change_id) },
       customerId: projekt.customer_id,
       items,
       subtotal,
@@ -210,16 +210,6 @@ export async function POST(
 
     // Atomisk källmarkering (v104) — ÄTA:n går till invoiced och kan aldrig
     // plockas upp av svepet eller en annan faktura igen.
-    const markering = await markInvoiceSources(supabase, {
-      businessId: business.business_id,
-      invoiceId: invoice.invoice_id,
-      changeIds: farska.map(a => a.change_id),
-    })
-    if (!markering.ok) {
-      console.error('[revenue-review] källmarkeringen misslyckades:', markering.errors, {
-        invoice_id: invoice.invoice_id,
-      })
-    }
 
     // Utfallet stämplas på kortet — granskad → utkast, spårbart.
     await supabase

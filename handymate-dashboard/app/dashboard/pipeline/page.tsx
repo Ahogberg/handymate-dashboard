@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import AcceptanceRecoveryPanel from '@/components/AcceptanceRecoveryPanel'
 import IntakeRecoveryPanel from '@/components/IntakeRecoveryPanel'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
@@ -1822,6 +1823,7 @@ export default function PipelinePage() {
         />
 
         {intakeUser?.is_active && intakeUser.business_id === business.business_id && ['owner', 'admin'].includes(intakeUser.role) && <IntakeRecoveryPanel key={`${business.business_id}:${intakeUser.id}:${intakeUser.role}`} onRecovered={fetchPipeline} />}
+        {intakeUser?.is_active && intakeUser.business_id === business.business_id && ['owner', 'admin'].includes(intakeUser.role) && <AcceptanceRecoveryPanel key={`${business.business_id}:${intakeUser.id}:${intakeUser.role}`} onRecovered={fetchPipeline} />}
         {/* Översikt / Kanban / Tidslinje */}
         <div className="flex-1 overflow-hidden">
           {pipelineView === 'flow' ? (

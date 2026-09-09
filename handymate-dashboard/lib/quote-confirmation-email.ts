@@ -16,7 +16,7 @@ import {
 export async function sendQuoteSignedConfirmation(
   businessId: string,
   quoteId: string
-): Promise<{ success: boolean; error?: string }> {
+): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
   const supabase = getServerSupabase()
 
   // Check if feature is enabled
@@ -27,7 +27,7 @@ export async function sendQuoteSignedConfirmation(
     .single()
 
   if (settings && settings.quote_signed_email_enabled === false) {
-    return { success: true } // Disabled, skip silently
+    return { success: true, skipped: true } // No customer delivery occurred
   }
 
   // Fetch quote with customer + business
@@ -40,6 +40,7 @@ export async function sendQuoteSignedConfirmation(
       customer_id
     `)
     .eq('quote_id', quoteId)
+    .eq('business_id', businessId)
     .single()
 
   if (!quote) return { success: false, error: 'Quote not found' }
@@ -49,6 +50,7 @@ export async function sendQuoteSignedConfirmation(
     .from('customer')
     .select('name, email, address_line, phone_number, personal_number, property_designation, portal_token, portal_enabled')
     .eq('customer_id', quote.customer_id)
+    .eq('business_id', businessId)
     .single()
 
   if (!customer?.email) {

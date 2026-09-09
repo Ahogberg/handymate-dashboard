@@ -1451,3 +1451,10 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 - [x] Testa stängning, kontobyte, tappat svar, datum och återförsök utan dubbelregistrering.
 - [x] Verifiera integrerad backend samt mobilens fulla typkontroll och Expo-paketering där byggmiljön tillåter.
 - [ ] Publicera draft-underlag med exakt version, flaggor och morgondagens iPhone-/inlämningsgrind.
+# Fakturering och offertaccept – 2026-09-09
+
+- [ ] Reproducera källkonflikt, falsk mejlkvittens och tappat återhämtningskort.
+- [ ] Faktura och explicita källor i samma transaktion; säkra återförsök.
+- [ ] Beständig offertaccept med separata kvittenser och återhämtningsvy.
+- [ ] Riktade SQL-/HTTP-/UI-prov, kontraktsgrind, TypeScript och build.
+- [ ] Granskbar gren/PR med migrationsordning och kvarstående externa prov.

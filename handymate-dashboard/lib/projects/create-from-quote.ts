@@ -32,7 +32,7 @@ export async function createProjectFromQuote(
 
   try {
     // 1. Dedup: kolla om projekt redan finns för denna offert
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('project')
       .select('project_id')
       .eq('quote_id', quoteId)
@@ -40,6 +40,7 @@ export async function createProjectFromQuote(
       .limit(1)
       .maybeSingle()
 
+    if (existingError) return { success: false, error: existingError.message }
     if (existing) {
       // Offerten signerades för ett projekt som REDAN finns (lead-/bokningsfött,
       // startat utan steg): nu är kontraktet signerat på riktigt → ps-01.

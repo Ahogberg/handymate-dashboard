@@ -73,7 +73,7 @@ export async function markInvoiceSources(
   if (!error && data) {
     const d = data as Record<string, number>
     return {
-      ok: true,
+      ok: (d.time_entries_requested || 0) === (d.time_entries_marked || 0) && (d.materials_requested || 0) === (d.materials_marked || 0) && (d.atas_requested || 0) === (d.atas_marked || 0),
       atomic: true,
       marked: {
         timeEntries: d.time_entries_marked || 0,
@@ -85,7 +85,7 @@ export async function markInvoiceSources(
         materials: (d.materials_requested || 0) - (d.materials_marked || 0),
         atas: (d.atas_requested || 0) - (d.atas_marked || 0),
       },
-      errors: [],
+      errors: ['time_entries', 'materials', 'atas'].some(k => (d[k + '_requested'] || 0) !== (d[k + '_marked'] || 0)) ? ['Fakturakällorna kunde inte reserveras fullständigt.'] : [],
     }
   }
 

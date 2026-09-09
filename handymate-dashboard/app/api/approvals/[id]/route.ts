@@ -2448,6 +2448,8 @@ async function executeApprovalPayload(
         try {
           const created = await createInvoice(supabaseFP, {
             businessId,
+      sources: { changeIds: underlag.ataChangeIds },
+      requestKey: `project-completion:${projectId}`,
             customerId: underlag.project.customer_id,
             items: underlag.items,
             subtotal: underlag.subtotal,
@@ -2469,21 +2471,6 @@ async function executeApprovalPayload(
           fakturaFP = created.invoice
         } catch (createErr: any) {
           return { action: 'fakturera_projekt', error: `Fakturan kunde inte skapas: ${createErr.message}` }
-        }
-
-        if (underlag.ataChangeIds.length > 0) {
-          const { markInvoiceSources } = await import('@/lib/invoices/mark-sources')
-          const markering = await markInvoiceSources(supabaseFP, {
-            businessId,
-            invoiceId: fakturaFP.invoice_id,
-            changeIds: underlag.ataChangeIds,
-          })
-          if (!markering.ok) {
-            console.error('[approvals/fakturera_projekt] kunde inte källmarkera ÄTA:', markering.errors, {
-              project_id: projectId,
-              invoice_id: fakturaFP.invoice_id,
-            })
-          }
         }
 
         const sendResFP = await fetch(`${appUrl}/api/invoices/send`, {
