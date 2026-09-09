@@ -50,7 +50,7 @@ export interface SyncToFortnoxResult {
 
 export async function syncInvoiceToFortnox(
   supabase: SupabaseClient,
-  params: { businessId: string; invoiceId: string },
+  params: { businessId: string; invoiceId: string; allowEInvoice?: boolean },
 ): Promise<SyncToFortnoxResult> {
   const { businessId, invoiceId } = params
 
@@ -100,6 +100,9 @@ export async function syncInvoiceToFortnox(
       fortnoxDocumentNumber: invoice.fortnox_document_number,
       eInvoiceSent: !!invoice.fortnox_einvoice_sent_at,
     }
+  }
+  if (syncStatus === 'failed' || (invoice.fortnox_document_number && syncStatus !== 'synced')) {
+    return { success: false, error: 'Tidigare synk behöver stämmas av mot Fortnox. Kontrollera kopplingen innan du fortsätter.' }
   }
   if (syncStatus === 'pending') {
     const ageMs = lastAttempt ? Date.now() - new Date(lastAttempt).getTime() : NaN
@@ -246,7 +249,7 @@ export async function syncInvoiceToFortnox(
     .update({ fortnox_sync_status: 'pending', fortnox_sync_attempted_at: startedAt })
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
-    .or('fortnox_sync_status.is.null,fortnox_sync_status.eq.failed')
+    .is('fortnox_sync_status', null).is('fortnox_document_number', null).is('fortnox_invoice_number', null)
     .select('invoice_id')
     .maybeSingle()
   if (claimError || !claimed) {
@@ -310,7 +313,7 @@ export async function syncInvoiceToFortnox(
   // sendInvoice() tillbaka till sin egen leverans — se eInvoiceSent i
   // returvärdet. Bokföringen ovan är redan klar oavsett utfall här.
   let eInvoiceSent = false
-  if (fortnoxDocumentNumber && invoice.customer?.org_number) {
+  if (params.allowEInvoice !== false && fortnoxDocumentNumber && invoice.customer?.org_number) {
     try {
       await fortnoxRequest(businessId, 'GET', `/invoices/${fortnoxDocumentNumber}/einvoice`)
       eInvoiceSent = true
@@ -406,23 +409,26 @@ export async function syncInvoiceToFortnox(
     updateData.fortnox_einvoice_sent_at = now
   }
 
-  const { error: finalUpdateError } = await supabase
+  const { data: savedReceipt, error: finalUpdateError } = await supabase
     .from('invoice')
     .update(updateData)
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
+    .eq('fortnox_sync_status', 'pending')
+    .eq('fortnox_sync_attempted_at', startedAt)
+    .select('invoice_id').maybeSingle()
 
-  if (finalUpdateError) {
+  if (finalUpdateError || !savedReceipt) {
     // Fortnox HAR redan bokfört fakturan korrekt vid det här laget — det
     // som misslyckades är vår lokala kvittens. Behåll pending-låset även
     // efter timeout och rapportera felet synligt; ett nytt skapandeanrop
     // är inte säkert förrän utfallet har stämts av mot Fortnox.
-    console.error('[sync-to-fortnox] Kunde inte skriva synced-status efter lyckad Fortnox-bokning:', finalUpdateError.message)
+    console.error('[sync-to-fortnox] Kunde inte skriva synced-status efter lyckad Fortnox-bokning:', (finalUpdateError?.message || 'Sparad kvittens saknas'))
     await rapporteraTystFel(
       supabase,
       businessId,
       'sync-to-fortnox:final-update-failed-after-fortnox-success',
-      finalUpdateError.message,
+      (finalUpdateError?.message || 'Sparad kvittens saknas'),
       { invoiceId, fortnoxDocumentNumber },
     )
     return { success: false, fortnoxDocumentNumber, eInvoiceSent,

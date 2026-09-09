@@ -167,3 +167,51 @@ mottagning. Låsningen serialiserar denna väg per företag, inte andra äldre
 kundskrivare. Det går inte att garantera dubblettfrihet mellan dessa vägar.
 Pilotprov A4/A5 och visuell granskning av återhämtningspanelen återstår.
 Nästa tekniska steg är Fortnox-avstämning av osäkra och historiska failed-resultat.
+
+## Fjärde omgången: avstämning av osäkra Fortnox-resultat
+
+Ägare/admin får **Kontrollera i Fortnox** på fakturor med pending/failed.
+Kontrollen söker med ExternalInvoiceReference1 och verifierar detaljens
+exakta referens, kundnummer, belopp, SEK, fakturatyp och att den inte är
+makulerad. Sökningen är begränsad till tre sidor om 20 kandidater; ofullständig
+eller förändrad sidindelning får aldrig räknas som bevis på en unik träff.
+
+Vid exakt träff sparas Fortnox-numren med jämförelse mot läst status,
+försökstidpunkt, kund, belopp och tidigare nummer. **Status förblir pending**.
+Att fakturan finns bevisar inte kundens leverans eller en ROT/RUT-begäran.
+Kontrollen återställer därför kopplingen men låser inte automatiskt upp
+sändflödet. Noll träffar är inte heller bevis på att ett tidigare POST misslyckats.
+Alla avstämningens Fortnox-anrop läser fakturor; ingen faktura, leverans eller
+skattereduktionsbegäran skapas av kontrollen.
+
+Äldre failed-rader kan inte längre starta ett nytt blint skapande. Endast
+fakturor utan tidigare synkstatus och Fortnox-nummer kan få en ny claim.
+Synkens slutkvittens kräver nu en returnerad rad med rätt claim/försökstidpunkt;
+ett tomt lyckat databassvar räknas inte som bekräftelse.
+Den fristående **Bokför i Fortnox**-rutten kräver fakturabehörighet, skickar
+inte e-faktura och ändrar inte lokal leveransstatus till sent.
+
+Kontrakt verifierat mot [Fortnox officiella API-specifikation](https://api.fortnox.se/apidocs)
+2026-09-09 (GET /3/invoices och /3/invoices/{DocumentNumber}) samt
+[Fortnox sök-/sidindelningsregler](https://www.fortnox.se/developer/guides-and-good-to-know/parameters).
+Kolumner kontrollerade läsande mot isolerade testdatabasen. Ingen migration
+eller produktionsändring behövs i denna omgång.
+
+45 nya körbara prov täcker avstämningshelper, sparfel/tom kvittens, historisk
+failed, fristående bokföring, roller samt rendering och montering av kontrollen.
+Databas och Fortnox är mockade i dessa prov; inget verkligt Fortnox-konto har
+anropats. De tidigare 88 sprintproven passerar också. Full tsc passerade;
+slutlig build och CI-status redovisas i PR #34.
+
+| ID | Pilotprov | Förväntat resultat |
+|---|---|---|
+| E2 | Osäkert försök där Fortnox redan har fakturan | Kontroll hittar rätt nummer och sparar kopplingen; ingen ny faktura eller kundkommunikation. |
+| E3 | Ingen exakt träff, avvikande kund/belopp eller flera träffar | Ingen koppling gissas och inget nytt skapande tillåts. Tekniska felvarianter injiceras av Codex. |
+| E4 | Äldre failed-faktura: försök bokföra/skicka igen | Spärr med hänvisning till avstämning; inget blint POST. |
+| E5 | Bara Bokför i Fortnox på nytt utkast | Ingen e-faktura och ingen lokal sent-status utan kundens sändflöde. |
+| E6 | Anställd eller annan firma försöker stämma av | Nekad åtkomst; inga Fortnox-anrop för främmande faktura. |
+| E7 | Träffen återfunnen men leverans/ROT oklart | pending ligger kvar; återfunnen faktura får inte framstå som färdig leverans. |
+
+Kvar: verkligt Fortnox-pilotprov, verifierad hantering av leverans och ROT/RUT
+före upplåsning samt ett separat säkert beslut för saknad träff. Detta är en
+återhämtningskontroll, inte en fullt automatisk slutavstämning av alla sidoeffekter.

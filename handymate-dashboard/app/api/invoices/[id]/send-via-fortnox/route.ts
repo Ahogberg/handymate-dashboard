@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
 
@@ -15,12 +16,8 @@ import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
  * app/dashboard/invoices/[id]/components/InvoiceHeader.tsx, "Bokför i
  * Fortnox" i "…"-menyn).
  *
- * status='sent' sätts HÄR (till skillnad från syncInvoiceToFortnox, som
- * inte rör kundleverans-status) — historiskt beteende bevarat för denna
- * fristående knapp: en faktura som medvetet bara bokförs via den här
- * vägen (utan att gå via "Skicka faktura") räknas ändå som "sent" i
- * Handymates mening, eftersom det är den enda bekräftelsen som finns
- * att någon tog en aktiv handling på fakturan.
+ * Bokföring ändrar inte leveransstatus och denna fristående väg skickar
+ * ingen e-faktura. Kundleverans hanteras av det separata sändflödet.
  */
 export async function POST(
   request: NextRequest,
@@ -32,31 +29,27 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const user = await getCurrentUser(request, business.business_id)
+    if (!user?.is_active || !hasPermission(user, 'create_invoices')) return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
+
     const invoiceId = params.id
     const supabase = getServerSupabase()
 
     const result = await syncInvoiceToFortnox(supabase, {
       businessId: business.business_id,
       invoiceId,
+      allowEInvoice: false,
     })
 
     if (!result.success) {
       return NextResponse.json(
-        { success: false, error: result.error, message: 'Fortnox-synk misslyckades. Försök igen — vi skapar ingen dubblett.' },
+        { success: false, error: result.error, message: result.error || 'Fortnox-synken kunde inte bekräftas. Kontrollera läget innan du fortsätter.' },
         { status: 502 },
       )
     }
 
     if (result.skipped) {
       return NextResponse.json({ error: 'Fortnox är inte kopplad. Gå till Inställningar → Integrationer.' }, { status: 400 })
-    }
-
-    if (!result.idempotent) {
-      await supabase
-        .from('invoice')
-        .update({ status: 'sent', sent_at: new Date().toISOString() })
-        .eq('invoice_id', invoiceId)
-        .eq('business_id', business.business_id)
     }
 
     return NextResponse.json({

@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { buildInvoiceTemplateData } from '@/lib/invoice-templates/data-builder'
 import type { InvoiceTemplateData } from '@/lib/invoice-templates/types'
+import { FortnoxReconciliation } from './components/FortnoxReconciliation'
 import { InvoiceHeader } from './components/InvoiceHeader'
 import { InvoiceDocumentPanel } from './components/InvoiceDocumentPanel'
 import { InvoiceStatusTimeline } from './components/InvoiceStatusTimeline'
@@ -370,6 +371,8 @@ export default function InvoiceDetailPage() {
           onOpenCreditModal={() => setShowCreditModal(true)}
           onSendViaFortnox={handleSendViaFortnox}
         />
+
+        <FortnoxReconciliation invoice={invoice} onChecked={fetchInvoice} />
 
         {/* Banderoller — bevarade oförändrade ur den gamla sidan, bara
             flyttade hit (ovanför dokumentet snarare än actions). Inte

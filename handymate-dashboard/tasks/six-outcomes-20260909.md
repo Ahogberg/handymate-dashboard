@@ -32,3 +32,14 @@ De sex områdena är inte slutgodkända förrän relevant verkligt flöde har pr
 - [ ] Fortnox-avstämning kvarstår som nästa separat steg.
 
 Nästa: koppla fler inflöden till samma beständiga gräns, prova recovery-vyn visuellt och genomför Fortnox-avstämning. S1/S5 och pilotkedjor är fortsatt öppna.
+
+## Fortnox-avstämning
+
+- [x] Läsande sökning med extern referens, exakt verifiering av detalj och kund/belopp.
+- [x] Noll träff/okänt/flera träffar får inte släppa spärren eller skapa ny faktura.
+- [x] Historiska failed-rader kräver avstämning, inte blind POST.
+- [x] Separera återfunnen faktura från leverans/ROT/e-faktura; ingen automatisk kundkommunikation vid kontroll.
+- [x] Ägare/admin-kontroll från fakturavyn, företagsskopat API och CAS-kvittens.
+- [ ] Körbara provider-/routeprov, tsc/build, grön CI och uppdaterad testlista.
+
+Avstämningen sparar kopplingen men lämnar pending. Automatisk upplåsning efter verifierad leverans/ROT och riktiga Fortnox-pilotprov återstår. Ingen avsaknad av sökträff får automatiskt tillåta POST.

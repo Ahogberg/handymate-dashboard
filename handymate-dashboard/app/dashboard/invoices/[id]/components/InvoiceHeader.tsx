@@ -103,7 +103,7 @@ export function InvoiceHeader({
   const primaryIsMarkPaid = isActive && alreadyReminded
   const primaryIsRemind = isActive && !alreadyReminded
   const canCredit = !invoice.is_credit_note && invoice.status !== 'credited' && invoice.status !== 'draft' && invoice.status !== 'cancelled'
-  const canSendViaFortnox = fortnoxConnected && invoice.status === 'draft' && invoice.fortnox_sync_status !== 'synced'
+  const canSendViaFortnox = fortnoxConnected && invoice.status === 'draft' && !invoice.fortnox_sync_status && !invoice.fortnox_document_number && !invoice.fortnox_invoice_number
 
   return (
     <>
