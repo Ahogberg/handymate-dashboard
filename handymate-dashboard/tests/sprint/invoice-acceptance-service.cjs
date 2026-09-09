@@ -44,11 +44,11 @@ for(const mode of ['conflict','missing-rpc','empty','saved','replay'])test(`atom
   request=p
   if(['conflict','missing-rpc'].includes(mode))return {error:{message:mode},data:null}
   if(mode==='empty')return {error:null,data:null}
-  return {error:null,data:{invoice_id:mode==='replay'?'original':'new',business_id:'b',invoice_number:'FV-1',ocr_number:'1'}}
+  return {error:null,data:{invoice_id:mode==='replay'?'original':p.p_row.invoice_id,business_id:'b',invoice_number:'FV-1',ocr_number:'1'}}
  }}
  const {createInvoice}=load('lib/invoices/create-invoice.ts')
  const input={businessId:'b',customerId:'c',projectId:'p',items:[{id:'generated',quantity:1,total:100}],subtotal:100,vatAmount:25,total:125,sources:{timeEntryIds:['t']},extraFields:{invoice_id:'candidate'}}
- if(['saved','replay'].includes(mode))assert.equal((await createInvoice(db,input)).invoice.invoice_id,mode==='replay'?'original':'new')
+ if(['saved','replay'].includes(mode)){const r=await createInvoice(db,input);assert.equal(r.invoice.invoice_id,mode==='replay'?'original':'candidate');assert.equal(r.replayed,mode==='replay')}
  else await assert.rejects(()=>createInvoice(db,input))
  assert.equal(inserts,0);assert.equal(request.p_times[0],'t');assert.equal(request.p_intent.items[0].id,undefined);assert.equal(request.p_intent.extraFields.invoice_id,undefined)
 })

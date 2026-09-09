@@ -92,8 +92,8 @@ export async function autoInvoiceOnComplete(
     try {
       const created = await createInvoice(supabase, {
         businessId,
-      sources: { changeIds: underlag.ataChangeIds },
-      requestKey: `project-completion:${projectId}`,
+        sources: { changeIds: underlag.ataChangeIds },
+        requestKey: `project-completion:${projectId}`,
         customerId: project.customer_id,
         items: allItems,
         subtotal,
@@ -115,6 +115,11 @@ export async function autoInvoiceOnComplete(
       })
       invoice = created.invoice
       invoiceNumber = created.invoiceNumber
+      if (created.replayed) return {
+        success: true, invoice_id: invoice.invoice_id, invoice_number: invoiceNumber,
+        total: invoice.total, customer_delivery_deferred: true,
+        warnings: ['Fakturan finns redan. Kontrollera dess leveransstatus innan något skickas.'],
+      }
     } catch (insertErr: any) {
       return { success: false, error: insertErr.message }
     }

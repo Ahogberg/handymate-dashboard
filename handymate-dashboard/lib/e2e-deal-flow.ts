@@ -732,6 +732,7 @@ async function executeInvoiceGeneration(
     const { createInvoice } = await import('@/lib/invoices/create-invoice')
     let invoiceId: string
     let invoiceNumber: string
+    let replayed = false
     try {
       const created = await createInvoice(supabase, {
         businessId, customerId: deal.customer_id, projectId: project.project_id,
@@ -742,12 +743,15 @@ async function executeInvoiceGeneration(
       })
       invoiceId = created.invoice.invoice_id
       invoiceNumber = created.invoiceNumber
+      replayed = created.replayed === true
     } catch (error: any) {
       return { executed: false, reason: `Fakturagenerering misslyckades: ${error.message}` }
     }
 
     // Länka faktura till deal
     await supabase.from('deal').update({ invoice_id: invoiceId }).eq('id', dealId)
+
+    if (replayed) return { executed: true, data: { invoice_id: invoiceId, already_exists: true, review_required: true } }
 
     // Skapa godkännande för att skicka fakturan
     await createDealFlowApproval(businessId, dealId, {

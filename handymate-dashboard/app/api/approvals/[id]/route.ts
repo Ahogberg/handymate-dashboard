@@ -2448,8 +2448,8 @@ async function executeApprovalPayload(
         try {
           const created = await createInvoice(supabaseFP, {
             businessId,
-      sources: { changeIds: underlag.ataChangeIds },
-      requestKey: `project-completion:${projectId}`,
+            sources: { changeIds: underlag.ataChangeIds },
+            requestKey: `project-completion:${projectId}`,
             customerId: underlag.project.customer_id,
             items: underlag.items,
             subtotal: underlag.subtotal,

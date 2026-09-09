@@ -240,7 +240,7 @@ async function generateInvoicesForBusiness(params: {
       try {
         const created = await createInvoice(supabase, {
           businessId: params.businessId,
-      sources: { timeEntryIds: pricedEntries.map((e: any) => e.time_entry_id) },
+          sources: { timeEntryIds: pricedEntries.map((e: any) => e.time_entry_id) },
           customerId,
           items,
           subtotal,
@@ -254,6 +254,10 @@ async function generateInvoicesForBusiness(params: {
         })
         invoiceId = created.invoice.invoice_id
         invoiceNumber = created.invoiceNumber
+        if (created.replayed) {
+          result.skipped.push({ customer_name: customerName, reason: `Faktura ${invoiceNumber} finns redan. Kontrollera den sparade fakturan.` })
+          continue
+        }
       } catch (insertError: any) {
         result.errors.push(`${customerName}: ${insertError.message}`)
         continue

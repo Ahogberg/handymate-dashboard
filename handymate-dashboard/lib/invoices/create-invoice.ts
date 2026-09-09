@@ -96,6 +96,8 @@ export interface CreateInvoiceInput {
 }
 
 export interface CreateInvoiceResult {
+  /** Reusing an existing invoice must not emit another invoice_created event. */
+  replayed?: boolean
   invoice: any
   invoiceNumber: string
   ocrNumber: string
@@ -229,6 +231,7 @@ export async function createInvoice(
   if (input.extraFields) Object.assign(row, input.extraFields)
 
   if (input.sources || input.requestKey) {
+    row.invoice_id = row.invoice_id || `inv_${randomUUID()}`
     const sources = {
       times: Array.from(new Set(input.sources?.timeEntryIds || [])).sort(),
       materials: Array.from(new Set(input.sources?.materialIds || [])).sort(),
@@ -254,7 +257,7 @@ export async function createInvoice(
       if (readback.error || !readback.data) throw readback.error || new Error('Fakturan sparades men kunde inte läsas tillbaka. Försök igen med samma underlag.')
       invoice = readback.data
     }
-    return { invoice, invoiceNumber: saved.invoice_number, ocrNumber: saved.ocr_number, usedNumberFallback }
+    return { invoice, invoiceNumber: saved.invoice_number, ocrNumber: saved.ocr_number, usedNumberFallback, replayed: saved.invoice_id !== row.invoice_id }
   }
 
   const { data: invoice, error } = await supabase
