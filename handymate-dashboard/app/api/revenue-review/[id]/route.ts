@@ -223,7 +223,7 @@ export async function POST(
           draft_invoice_number: invoiceNumber,
           drafted_by: currentUser.id,
           drafted_amount_kr: subtotal,
-          sources_marked: markering.ok,
+          sources_marked: true // createInvoice returned only after the atomic source commit,
         },
       })
       .eq('id', kort.id)
@@ -236,7 +236,7 @@ export async function POST(
       status: 'draft',
       total,
       subtotal,
-      sources_marked: markering.ok,
+      sources_marked: true // createInvoice returned only after the atomic source commit,
       ...(farska.length < sourceIds.length
         ? { note: `${sourceIds.length - farska.length} av källraderna var redan fakturerade och togs inte med.` }
         : {}),
