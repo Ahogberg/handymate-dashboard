@@ -63,7 +63,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { manadsfonster } from '@/lib/value/vardekvitto'
 import { mapApprovalRowToCard, isWithinAttributionWindow } from '@/lib/value/recovered-revenue'
-import { isCustomerSettled } from '@/lib/invoices/status'
+import { isCustomerSettled, PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
 export const MANADS_LEDGER_METHOD_VERSION = 1
 
@@ -425,6 +425,9 @@ export async function getManadsLedger(
       .in('invoice_id', invoiceIds)
     if (invErr) throw new Error(`invoice-uppslag misslyckades: ${invErr.message}`)
     for (const inv of invRows || []) {
+      // A direct reference proves identity, not issuance: recovered work starts as a draft.
+      // Withdrawn/credited invoices must not remain in the billed or paid totals.
+      if (!(PORTAL_VISIBLE_STATUSES as readonly string[]).includes(inv.status)) continue
       invoices.set(String(inv.invoice_id), {
         total_kr: Number(inv.total) || 0,
         paid: isCustomerSettled(inv.status),

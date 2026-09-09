@@ -190,3 +190,6 @@ jobs:
 
       - name: Kundunderlag — API-kontrakt med isolerade beroenden
         run: node --test tests/customer-preparation/contract.test.mjs
+
+      - name: Sex kundutfall — sparning och leveranssanning
+        run: npm run test:six-outcomes

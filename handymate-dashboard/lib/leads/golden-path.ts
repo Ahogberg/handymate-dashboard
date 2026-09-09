@@ -170,7 +170,7 @@ export async function createLeadAndDeal(
     }
   } else {
     const newId = 'cust_' + Math.random().toString(36).substr(2, 9)
-    const { data: newCustomer } = await supabase
+    const { data: newCustomer, error: customerInsertError } = await supabase
       .from('customer')
       .insert({
         customer_id: newId,
@@ -181,7 +181,11 @@ export async function createLeadAndDeal(
       })
       .select('customer_id')
       .single()
-    customerId = newCustomer?.customer_id || newId
+    // Never create a lead or start downstream sync with an unpersisted customer ID.
+    if (customerInsertError || !newCustomer?.customer_id) {
+      throw new Error('Kunduppgifterna kunde inte sparas. Försök igen.')
+    }
+    customerId = newCustomer.customer_id
 
     // Fortnox-kundnummer vid SKAPANDET (2026-08-26, Andreas-beslut: även
     // lead-vägen, så Fortnox löpnummer följer sann skapandeordning mellan

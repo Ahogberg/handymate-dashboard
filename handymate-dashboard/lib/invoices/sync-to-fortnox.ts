@@ -75,6 +75,7 @@ export async function syncInvoiceToFortnox(
       .from('customer')
       .select('*')
       .eq('customer_id', invoice.customer_id)
+      .eq('business_id', businessId)
       .maybeSingle()
     if (customerErr) {
       console.error('[sync-to-fortnox] customer fetch error:', customerErr)
@@ -100,14 +101,11 @@ export async function syncInvoiceToFortnox(
       eInvoiceSent: !!invoice.fortnox_einvoice_sent_at,
     }
   }
-  if (syncStatus === 'pending' && lastAttempt) {
-    const ageMs = Date.now() - new Date(lastAttempt).getTime()
-    if (ageMs < FORTNOX_PENDING_TIMEOUT_MS) {
-      return { success: false, error: 'Sync pågår redan. Vänta ett par minuter innan du försöker igen.' }
-    }
-    console.warn(
-      `[sync-to-fortnox] invoice ${invoiceId} pending för ${Math.round(ageMs / 1000)}s — antar in-flight-dödad, tillåter retry`,
-    )
+  if (syncStatus === 'pending') {
+    const ageMs = lastAttempt ? Date.now() - new Date(lastAttempt).getTime() : NaN
+    return { success: false, error: Number.isFinite(ageMs) && ageMs < FORTNOX_PENDING_TIMEOUT_MS
+      ? 'Synk pågår redan. Vänta innan du kontrollerar läget igen.'
+      : 'Tidigare synk saknar bekräftelse. Kontrollera fakturan i Fortnox innan ett nytt försök kan göras.' }
   }
 
   let customerNumber = invoice.customer?.fortnox_customer_number as string | null
@@ -242,11 +240,18 @@ export async function syncInvoiceToFortnox(
   })
 
   const startedAt = new Date().toISOString()
-  await supabase
+  // Compare-and-set before external writes: only one sender can claim the invoice.
+  const { data: claimed, error: claimError } = await supabase
     .from('invoice')
     .update({ fortnox_sync_status: 'pending', fortnox_sync_attempted_at: startedAt })
     .eq('invoice_id', invoiceId)
     .eq('business_id', businessId)
+    .or('fortnox_sync_status.is.null,fortnox_sync_status.eq.failed')
+    .select('invoice_id')
+    .maybeSingle()
+  if (claimError || !claimed) {
+    return { success: false, error: 'Synken kunde inte påbörjas eller hanteras redan. Kontrollera läget igen.' }
+  }
 
   let fortnoxInvoiceNumber: string | null = null
   let fortnoxDocumentNumber: string | null = null
@@ -317,11 +322,14 @@ export async function syncInvoiceToFortnox(
   if (fortnoxError || !fortnoxInvoiceNumber) {
     await supabase
       .from('invoice')
-      .update({ fortnox_sync_status: 'failed', fortnox_sync_error: fortnoxError || 'No invoice number returned' })
+      .update({ fortnox_sync_status: 'pending', fortnox_sync_error: fortnoxError || 'Svar utan fakturanummer' })
       .eq('invoice_id', invoiceId)
       .eq('business_id', businessId)
 
-    return { success: false, error: fortnoxError || 'No invoice number returned' }
+    // A lost response does not prove the remote POST failed. Keep the claim.
+    await rapporteraTystFel(supabase, businessId, 'fortnox:invoice-result-uncertain',
+      fortnoxError || 'Svar utan fakturanummer', { invoiceId })
+    return { success: false, error: 'Synkens resultat kunde inte bekräftas. Kontrollera fakturan i Fortnox innan ett nytt försök görs.' }
   }
 
   // fortnoxDocumentNumber sätts alltid tillsammans med fortnoxInvoiceNumber
@@ -406,13 +414,9 @@ export async function syncInvoiceToFortnox(
 
   if (finalUpdateError) {
     // Fortnox HAR redan bokfört fakturan korrekt vid det här laget — det
-    // som misslyckades är bara vår egen lokala bokföring av att det
-    // lyckades. Kritiskt att larma synligt: utan detta blir raden kvar på
-    // fortnox_sync_status='pending', och ett omförsök efter timeouten
-    // (FORTNOX_PENDING_TIMEOUT_MS) skulle då POSTa ÄNNU en gång och skapa
-    // en riktig dubblett i Fortnox — trots att den första bokföringen
-    // redan var korrekt. console.error försvinner i Vercel-loggarna;
-    // rapporteraTystFel gör felet synligt i automation_activity.
+    // som misslyckades är vår lokala kvittens. Behåll pending-låset även
+    // efter timeout och rapportera felet synligt; ett nytt skapandeanrop
+    // är inte säkert förrän utfallet har stämts av mot Fortnox.
     console.error('[sync-to-fortnox] Kunde inte skriva synced-status efter lyckad Fortnox-bokning:', finalUpdateError.message)
     await rapporteraTystFel(
       supabase,
@@ -421,9 +425,15 @@ export async function syncInvoiceToFortnox(
       finalUpdateError.message,
       { invoiceId, fortnoxDocumentNumber },
     )
+    return { success: false, fortnoxDocumentNumber, eInvoiceSent,
+      error: 'Fakturan skapades i Fortnox men bekräftelsen kunde inte sparas. Kontrollera synken innan du fortsätter.' }
   }
 
-  await markInvoiceDelivered(supabase, { businessId, invoiceId, method: 'fortnox' })
+  // Accounting sync alone is not customer delivery. PDF/email/SMS delivery is
+  // recorded by sendInvoice; only a successful e-invoice belongs here.
+  if (eInvoiceSent) {
+    await markInvoiceDelivered(supabase, { businessId, invoiceId, method: 'fortnox' })
+  }
 
   return {
     success: true,
