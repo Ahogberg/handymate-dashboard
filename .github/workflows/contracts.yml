@@ -188,6 +188,7 @@ jobs:
           tests/missat-samtal-dygnet-runt.spec.ts
           tests/elks-webhook-grind.spec.ts
           tests/elks-ljudfalt.spec.ts
+          tests/nummerverifiering.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

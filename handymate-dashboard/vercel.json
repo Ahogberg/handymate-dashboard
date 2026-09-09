@@ -190,6 +190,10 @@
       "schedule": "20 7 * * *"
     },
     {
+      "path": "/api/cron/phone-number-verify",
+      "schedule": "17 5 * * *"
+    },
+    {
       "path": "/api/cron/phone-provision-retry",
       "schedule": "42 6 * * *"
     },

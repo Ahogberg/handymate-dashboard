@@ -207,5 +207,7 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // public/demo-quote/[token]/status — ingen tenant, skriver bara i det
   // hårdkodade demo-företaget, fail-closed tak → 153.
   expect(alla.length).toBeGreaterThanOrEqual(550)
-  expect(utanStandard.length).toBeLessThanOrEqual(153)
+  // 2026-09-10 (nummerverifieringen): cron/phone-number-verify — cron-hemlighet,
+  // ingen tenant-kontext. Svepet kontrollerar alla konton, inte ett → 154.
+  expect(utanStandard.length).toBeLessThanOrEqual(154)
 })
