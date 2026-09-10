@@ -197,6 +197,7 @@ jobs:
           tests/push-nar-ingen-nas.spec.ts
           tests/project-derive-todo.spec.ts
           tests/facit-project-list-next-todo.spec.ts
+          tests/project-approval-visibility.spec.ts
           tests/facit-webbinflode-block-a.spec.ts
           tests/onboarding-setup-studio.spec.ts
           tests/demo-onboarding-utgang.spec.ts

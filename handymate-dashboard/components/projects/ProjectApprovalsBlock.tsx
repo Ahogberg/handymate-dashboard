@@ -2,12 +2,13 @@
 
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Check, Loader2, X } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
+import { createProjectApprovalReadGuard, loadProjectApprovalPage } from '@/lib/projects/load-project-approvals'
 
 /**
  * ProjectApprovalsBlock (Projektvy Fas 1, 2026-07-31).
@@ -45,8 +46,12 @@ interface Approval {
 
 interface ProjectApprovalsBlockProps {
   projectId: string
-  /** Rapporterar aktuellt antal väntande ärenden till parent (badge + tomt-läge). */
-  onCountChange?: (count: number) => void
+  onReadStateChange?: (state: ProjectApprovalsReadState) => void
+}
+
+export type ProjectApprovalsReadState = {
+  status: 'loading' | 'error' | 'partial' | 'complete'
+  count: number
 }
 
 function getAgentKey(approval: Approval): string {
@@ -100,43 +105,69 @@ const TYPE_LABEL: Record<string, string> = {
   playbook_kickoff_suggestion: 'Kontrollpunkt',
 }
 
-export default function ProjectApprovalsBlock({ projectId, onCountChange }: ProjectApprovalsBlockProps) {
+export default function ProjectApprovalsBlock({ projectId, onReadStateChange }: ProjectApprovalsBlockProps) {
   const business = useBusiness()
   const [approvals, setApprovals] = useState<Approval[]>([])
-  const [loaded, setLoaded] = useState(false)
+  const [readState, setReadState] = useState<ProjectApprovalsReadState>({ status: 'loading', count: 0 })
+  const [nextOffset, setNextOffset] = useState<number | null>(null)
+  const [loadedScope, setLoadedScope] = useState<string | null>(null)
+  const [readingMore, setReadingMore] = useState(false)
   const [busyId, setBusyId] = useState<string | null>(null)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const readGuard = useRef(createProjectApprovalReadGuard())
+  const approvalsRef = useRef<Approval[]>([])
+  const scope = `${business?.business_id || ''}:${projectId}`
+  const scopeRef = useRef(scope)
+  scopeRef.current = scope
 
-  const fetchApprovals = useCallback(async () => {
+  const fetchApprovals = useCallback(async (offset = 0) => {
     if (!business?.business_id) return
-    // Etapp 3a (multi-employee-parity-plan.md): hämtar via GET
-    // /api/approvals istället för direkt Supabase-query — routing-filtret
-    // (canActOnApproval) körs server-side där. Realtime-subscriptionen
-    // nedan används fortfarande, men bara som "något ändrades, hämta
-    // om"-trigger — inte längre som datakälla. project_id-filtreringen
-    // sker fortsatt client-side (samma som tidigare — API:t har ingen
-    // project_id-queryparam).
-    const { data: { session } } = await supabase.auth.getSession()
-    const res = await fetch('/api/approvals?status=pending&limit=50', {
-      headers: {
-        ...(session?.access_token ? { Authorization: `Bearer ${session.access_token}` } : {}),
-      },
-    })
-    if (res.ok) {
-      const result = await res.json().catch(() => null)
-      const filtered = ((result?.approvals || []) as Approval[]).filter(
-        (a: Approval) => (a.payload as any)?.project_id === projectId,
-      )
-      setApprovals(filtered)
+    const sequence = readGuard.current.begin()
+    const controller = new AbortController()
+    setError(null)
+    if (offset === 0) {
+      approvalsRef.current = []
+      setApprovals([])
+      setNextOffset(null)
+      setLoadedScope(null)
+      setReadState({ status: 'loading', count: 0 })
+      setError(null)
+      setBusyId(null)
+      setEditingId(null)
+    } else {
+      setReadingMore(true)
     }
-    setLoaded(true)
-  }, [business?.business_id, projectId])
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const page = await loadProjectApprovalPage<Approval>(projectId, session?.access_token, offset, controller.signal)
+      if (!readGuard.current.isCurrent(sequence)) return
+      const combined = offset === 0 ? page.approvals : [...approvalsRef.current, ...page.approvals]
+      const unique = Array.from(new Map(combined.map(approval => [approval.id, approval] as const)).values())
+      approvalsRef.current = unique
+      setApprovals(unique)
+      setReadState({ status: page.nextOffset === null ? 'complete' : 'partial', count: unique.length })
+      setNextOffset(page.nextOffset)
+      setLoadedScope(scope)
+    } catch (readError) {
+      if (!readGuard.current.isCurrent(sequence) || (readError instanceof DOMException && readError.name === 'AbortError')) return
+      setError('Kunde inte läsa besluten — försök igen')
+      setReadState(previous => ({ status: 'error', count: previous.count }))
+      setLoadedScope(scope)
+    } finally {
+      if (readGuard.current.isCurrent(sequence)) setReadingMore(false)
+    }
+  }, [business?.business_id, projectId, scope])
 
   useEffect(() => {
-    fetchApprovals()
-  }, [fetchApprovals])
+    approvalsRef.current = []
+    setApprovals([])
+    setLoadedScope(null)
+    setReadState({ status: 'loading', count: 0 })
+    if (business?.business_id) fetchApprovals(0)
+    return () => { readGuard.current.invalidate() }
+  }, [business?.business_id, fetchApprovals])
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -145,17 +176,16 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'pending_approvals', filter: `business_id=eq.${business.business_id}` },
-        () => fetchApprovals(),
+        () => fetchApprovals(0),
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [business?.business_id, projectId, fetchApprovals])
 
-  useEffect(() => {
-    if (loaded) onCountChange?.(approvals.length)
-  }, [approvals.length, loaded, onCountChange])
+  useEffect(() => { onReadStateChange?.(readState) }, [onReadStateChange, readState])
 
   async function act(approval: Approval, action: 'approve' | 'reject' | 'edit', editedText?: string) {
+    const actionScope = scope
     setBusyId(approval.id)
     setError(null)
     try {
@@ -175,21 +205,27 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
       })
       if (res.status === 499) return
       if (!res.ok) {
+        if (scopeRef.current !== actionScope) return
         setError('Kunde inte spara — försök igen')
         return
       }
       const result = await res.json().catch(() => null)
+      if (scopeRef.current !== actionScope) return
       if (result?.execution_outcome?.outcome === 'failed' || ['partial', 'failed', 'needs_action'].includes(result?.receipt?.state)) { setError(result?.receipt?.text || result.execution_outcome?.error_text || 'Handlingen misslyckades'); return }
-      setApprovals(prev => prev.filter(a => a.id !== approval.id))
       setEditingId(null)
+      // A pending row disappeared from the server-side result set. Reload
+      // offset zero so a previously returned next_offset cannot skip the row
+      // that shifted into the earlier page.
+      await fetchApprovals(0)
     } catch {
+      if (scopeRef.current !== actionScope) return
       setError('Kunde inte spara — försök igen')
     } finally {
-      setBusyId(null)
+      if (scopeRef.current === actionScope) setBusyId(null)
     }
   }
 
-  if (!loaded) {
+  if (readState.status === 'loading' || loadedScope !== scope) {
     return (
       <div className="bg-white border border-[#E2E8F0] rounded-card p-4 flex items-center justify-center min-h-[72px]">
         <Loader2 className="w-4 h-4 text-gray-300 animate-spin" />
@@ -197,13 +233,26 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
     )
   }
 
-  if (approvals.length === 0) return null
+  if (approvals.length === 0) {
+    if (readState.status === 'complete') return null
+    return (
+      <div className="bg-white border border-amber-300 rounded-card p-4 text-sm text-amber-800">
+        <p>{error || 'Det kan finnas fler beslut för projektet.'}</p>
+        <button type="button" onClick={() => fetchApprovals(readState.status === 'error' ? 0 : (nextOffset || 0))} className="mt-2 font-semibold text-primary-700 hover:text-primary-800">
+          {readState.status === 'error' ? 'Försök igen' : 'Visa fler beslut'}
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-2">
       {error && (
         <div className="px-3 py-2 bg-amber-50 border border-amber-300 rounded-lg text-sm text-amber-800">
-          {error}
+          <span>{error}</span>
+          {readState.status === 'error' && (
+            <button type="button" onClick={() => fetchApprovals(0)} className="ml-2 font-semibold text-primary-700 hover:text-primary-800">Försök igen</button>
+          )}
         </div>
       )}
       {approvals.map(approval => {
@@ -310,6 +359,11 @@ export default function ProjectApprovalsBlock({ projectId, onCountChange }: Proj
           </div>
         )
       })}
+      {nextOffset !== null && (
+        <button type="button" disabled={readingMore} onClick={() => fetchApprovals(nextOffset)} className="w-full h-11 rounded-lg border border-primary-300 bg-white text-sm font-semibold text-primary-700 hover:bg-primary-50 disabled:opacity-50">
+          {readingMore ? 'Läser fler…' : 'Visa fler beslut'}
+        </button>
+      )}
     </div>
   )
 }

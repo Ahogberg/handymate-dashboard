@@ -1478,3 +1478,12 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 Färdig betyder att varje steg har en synlig nästa handling och en sparad kvittens.
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
 utskick, fakturasändning, main-merge eller produktionsmigration ingår.
+
+## Brain Visibility — projektbeslut 2026-09-10
+
+- [x] Inventera ProjectApprovalsBlock, ProjectTodoBlock och befintlig approvals-GET.
+- [x] Filtrera projekt före paginering med tenant/routing kvar.
+- [x] Visa laddning, läsfel, delvis lista och verifierat tomt läge sanningsenligt.
+- [ ] Verifiera route, pagination, scope-byte, CI och inloggad preview.
+
+Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabeller, inga verkliga godkännanden eller utskick i testet.

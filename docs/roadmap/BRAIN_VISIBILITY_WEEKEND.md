@@ -1593,6 +1593,14 @@ Project är inspekterad inför nästa brief, inte nybyggd: återanvänd `project
 
 **KVAR / NÄSTA STEG:** fortsätt Project-granskningen av vad Handymate bevakar, vad användaren behöver göra och vilket underlag som saknas; återanvänd befintliga komponenter och motorer. Slice 3 är inte stängd: detta rättar tidrapportbeviset, inte hela projektets administrativa läsmodell eller fullständig fakturaberedskap. Övriga slice 1/2-, provider- och mobilgrindar kvarstår. Inga capability-statusar uppgraderade.
 
+### PROJECT — BESLUT OCH NÄSTA STEG
+
+**OBSERVERAT:** ProjectApprovalsBlock läste företagets första 50 väntande beslut och filtrerade först därefter på projekt, vilket kunde dölja äldre projektbeslut. Läsfel kunde bli ett tomt block. Inloggad preview visade dessutom badge 4 för två beslutsförslag plus två vanliga nästa steg.
+
+**AVGRÄNSNING:** behåll `/api/approvals`, tenantfilter, `canActOnApproval` och befintlig gransknings-/godkännandeväg. Filtrera projektets payload före paginering, visa delvis lista med fortsatt läsning och skilj okänt/fel från verifierat tomt. Beslutsantal ska avse beslut; vanliga åtgärdsrader visas som nästa steg. Ingen ny motor eller tabell, inga verkliga beslut/utskick i regressionerna.
+
+**STATUS:** implementerat med projektfilter i befintlig GET, tydlig fortsatt läsning, synliga fel/återförsök, skydd mot äldre svar och omläsning från sida ett efter beslut. Badge räknar beslut; åtgärdsrader ligger under Nästa steg. Typkontroll och 18 riktade tester gröna, inklusive faktisk GET och asynkron läscallback. Nya regressioner är inkopplade i både lokal kontraktslista och workflow; separat körning av ny spec och paritetsgrind är grön (8/8). Uppdaterad CI och inloggad preview återstår vid denna checkpoint. Detta stänger inte hela Project-slicen.
+
 ### REPRODUCERA LOKALA KONTROLLER
 
 Kör från `handymate-dashboard/` efter `npm ci`:

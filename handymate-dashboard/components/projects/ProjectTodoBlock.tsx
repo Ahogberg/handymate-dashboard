@@ -1,10 +1,11 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useCallback, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, Check } from 'lucide-react'
 import { formatSEK } from '@/lib/format-price'
 import ProjectApprovalsBlock from '@/components/projects/ProjectApprovalsBlock'
+import type { ProjectApprovalsReadState } from '@/components/projects/ProjectApprovalsBlock'
 
 /**
  * ProjectTodoBlock — "Att göra" (Projektvy Fas 1, 2026-07-31).
@@ -63,10 +64,15 @@ export default function ProjectTodoBlock({
   hidePrimary = false,
 }: ProjectTodoBlockProps) {
   const [approvalsCount, setApprovalsCount] = useState(0)
-  const [approvalsReady, setApprovalsReady] = useState(false)
+  const [approvalsStatus, setApprovalsStatus] = useState<ProjectApprovalsReadState['status']>('loading')
 
   const totalCount = approvalsCount + actionRows.length
-  const showEmpty = approvalsReady && totalCount === 0 && !overBudgetAlert
+  const showEmpty = approvalsStatus === 'complete' && totalCount === 0 && !overBudgetAlert
+  const handleApprovalsState = useCallback((state: ProjectApprovalsReadState) => {
+    setApprovalsCount(state.count)
+    setApprovalsStatus(state.status)
+    if (state.status === 'complete') onApprovalsCount?.(state.count)
+  }, [onApprovalsCount])
 
   const primaryLabel = TODO_PRIMARY_LABEL[mode]
   const primaryButtonCls =
@@ -78,9 +84,9 @@ export default function ProjectTodoBlock({
         {/* 2026-08-27: "Att göra" är nu hantverkarens uppgifter (ProjectTasksBlock);
             det här blocket är agenternas förslag + nästa steg som väntar på ägaren. */}
         <h2 className="text-[15px] font-semibold text-gray-900">Väntar på ditt OK</h2>
-        {totalCount > 0 && (
+        {approvalsCount > 0 && approvalsStatus === 'complete' && (
           <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
-            {totalCount}
+            {approvalsCount}
           </span>
         )}
       </div>
@@ -117,13 +123,12 @@ export default function ProjectTodoBlock({
 
       <ProjectApprovalsBlock
         projectId={projectId}
-        onCountChange={count => {
-          setApprovalsCount(count)
-          setApprovalsReady(true)
-          onApprovalsCount?.(count)
-        }}
+        onReadStateChange={handleApprovalsState}
       />
 
+      {actionRows.length > 0 && (
+        <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Nästa steg</h3>
+      )}
       {actionRows.map(row => (
         <div
           key={row.id}
