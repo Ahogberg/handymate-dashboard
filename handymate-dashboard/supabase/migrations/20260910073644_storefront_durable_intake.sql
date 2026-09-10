@@ -8,16 +8,7 @@ BEGIN
    OR p_input IS NULL OR jsonb_typeof(p_input)<>'object'
    OR coalesce(jsonb_typeof(p_input->'name'),'null')<>'string' OR length(btrim(p_input->>'name')) NOT BETWEEN 1 AND 200
    OR coalesce(jsonb_typeof(p_input->'phone'),'null')<>'string' OR length(btrim(p_input->>'phone')) NOT BETWEEN 0 AND 80
-   OR (nullif(btrim(p_input->>'email'),'') IS NOT NULL AND (jsonb_typeof(p_input->'email')<>'string' OR length(p_input->>'email')>320 OR (p_input->>'email') !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+
- THEN RAISE EXCEPTION 'intake_invalid'; END IF;
- INSERT INTO public.lead_intake_request(business_id,source_scope,request_key,input)
- VALUES(p_business,p_scope,p_key,p_input) ON CONFLICT(business_id,source_scope,request_key) DO NOTHING;
- SELECT * INTO STRICT r FROM public.lead_intake_request WHERE business_id=p_business AND source_scope=p_scope AND request_key=p_key;
- IF r.input IS DISTINCT FROM p_input THEN RAISE EXCEPTION 'intake_request_changed'; END IF;
- RETURN r;
-END $$;
-
-))
+   OR (nullif(btrim(p_input->>'email'),'') IS NOT NULL AND (jsonb_typeof(p_input->'email')<>'string' OR length(p_input->>'email')>320 OR (p_input->>'email') !~ '^[^[:space:]@]+@[^[:space:]@]+[.][^[:space:]@]+$'))
    OR (public.lead_intake_phone(p_input->>'phone')='' AND nullif(btrim(p_input->>'email'),'') IS NULL)
  THEN RAISE EXCEPTION 'intake_invalid'; END IF;
  INSERT INTO public.lead_intake_request(business_id,source_scope,request_key,input)
