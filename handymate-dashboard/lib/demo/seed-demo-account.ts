@@ -3,8 +3,9 @@ import { createClient } from '@supabase/supabase-js'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { generateOCR } from '@/lib/ocr'
-import { getNextCustomerNumber, getNextCaseNumber } from '@/lib/numbering'
+import { getNextCustomerNumber, getNextCaseNumber, getNextLeadNumber } from '@/lib/numbering'
 import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
+import { seedAllDefaults } from '@/lib/seed-defaults'
 import type { QuoteItem } from '@/lib/types/quote'
 import { buildDemoManifest, type DemoManifest } from '@/lib/demo/manifest'
 import { captureExpectedMarginSnapshot } from '@/lib/quotes/margin-snapshot'
@@ -35,8 +36,19 @@ import type { ExperimentMeasureKey } from '@/lib/experiment/types'
  *
  * Tabeller som seedas (samma set som raderas, i beroendeordning vid radering):
  *   pending_approvals, agent_runs, pipeline_activity, quote_items, invoice,
- *   project_checklist, project, quotes, deal, customer, booking,
+ *   project_checklist, project, quotes, deal, LEADS, customer, booking,
  *   schedule_entry, time_entry, project_change, project_material
+ *
+ * 2026-09-10: leads tillkom (Golden Paths start — demot hade 11 affärer och
+ * noll leads, så hela vägen in var osynlig) och seedAllDefaults körs nu, så
+ * demot får samma grundinställningar som ett riktigt konto vid finalize.
+ * v3_automation_rules stod på NOLL, alltså inga agentautomationer alls på
+ * det konto som ska visa att agenterna gör saker. De nio defaults-tabellerna
+ * ligger medvetet utanför raderingsmanifestet: de är idempotenta (varje
+ * delseeder returnerar tidigt om rader finns) och en demoreset ska inte
+ * radera regler ett riktigt konto också hade haft. leads DÄREMOT raderas av
+ * RPC:n, som den alltid gjort. Facit: tests/demo-seedning-tackning.spec.ts.
+ * Läsningen av business_config utökades med branch — fortfarande read-only.
  *
  * Sedan 2026-08-12 seedas även: project_outcome (via freezeProjectOutcome),
  * project_lesson, customer_fact och (seedas dock av det separata Meeting
@@ -64,6 +76,7 @@ import type { ExperimentMeasureKey } from '@/lib/experiment/types'
 
 export interface DemoResetSummary {
   customers: number
+  leads: number
   deals: number
   quotes: number
   invoices: number
@@ -113,7 +126,9 @@ export async function resetDemoAccount(
   // ── 0. Läs ägarens mobilnummer + företagsnamn (READ-ONLY — rör aldrig business_config) ──
   const { data: biz, error: bizErr } = await supabase
     .from('business_config')
-    .select('personal_phone, business_name, contact_name')
+    // branch tillkom 2026-09-10 för seedAllDefaults nedan. Fortfarande
+    // enbart LÄSNING av business_config — se filhuvudet.
+    .select('personal_phone, business_name, contact_name, branch')
     .eq('business_id', businessId)
     .single()
 
@@ -188,6 +203,39 @@ export async function resetDemoAccount(
 
   // ── 2. Pipeline-steg måste finnas (no-op om redan seedade) ──
   await ensureDefaultStages(businessId)
+
+  // ── 2b. Grundinställningarna en RIKTIG kund får vid finalize ──
+  //
+  // 2026-09-10 (Andreas: "allt som finns byggt behöver finnas där med
+  // demodatan"). Mot produktionsdatan hade demokontot NOLL rader i
+  // v3_automation_rules — alltså inga agentautomationer alls. Lisa, Daniel
+  // och Karin hade ingenting att köra, på det konto som ska visa att de gör
+  // saker. Samma tomhet i quote_templates, checklist_template,
+  // lead_scoring_rules, quote_standard_texts, reservation_texts och
+  // reservation_triggers.
+  //
+  // Lösningen är inte demospecifika regler, utan att köra EXAKT det en
+  // riktig kund får vid finalize (POST /api/onboarding). Då visar demon
+  // produkten, inte en uppsättning attrapper som kan glida isär från den.
+  //
+  // Säkert att köra vid varje reset: seedAllDefaults är verifierat idempotent
+  // — varje delseeder läser efter befintliga rader och returnerar tidigt
+  // (seedV3AutomationRules på is_system, seedProducts på förekomst OCH med
+  // deterministiska id:n). Därför ligger de nio tabellerna medvetet UTANFÖR
+  // RPC:ns raderingsmanifest: de ackumulerar inte, och en demoreset ska inte
+  // radera regler som ett riktigt konto också hade haft.
+  //
+  // hourlyRate är null: kolumnen finns inte på business_config (kontrollerat
+  // mot information_schema), och artikelbanken är ändå grindad på förekomst.
+  const defaultsResultat = await seedAllDefaults(supabase, businessId, biz.branch || 'construction', [], null)
+  if (defaultsResultat.failed > 0) {
+    // Ett halvt seedat demokonto är värre än ett tomt: presentatören ser en
+    // yta som saknar hälften av det den lovar, utan att veta vilken hälft.
+    return failReset(
+      `Grundinställningarna kunde inte seedas (${defaultsResultat.failed} av ${defaultsResultat.total} misslyckades).`,
+      'defaults_seed_failed',
+    )
+  }
 
   // ══════════════════════════════════════════════════════════
   // 3. KUNDER (6 st) — alla telefonnummer = ägarens personal_phone
@@ -293,6 +341,98 @@ export async function resetDemoAccount(
   }
 
   // ══════════════════════════════════════════════════════════
+  // 3b. LEADS (3 st) — Golden Paths start
+  // ══════════════════════════════════════════════════════════
+  //
+  // 2026-09-10. Demot hade 11 affärer men NOLL leads. Golden Path
+  // (lib/leads/golden-path.ts) skapar lead → affär, så en riktig
+  // webbförfrågan bär alltid ett lead_id på sin affär. På demot fanns bara
+  // affärer, och hela vägen in — förfrågan, poängsättning, det första steget
+  // i pipen — var osynlig.
+  //
+  // Varför INTE createLeadAndDeal, som vore den ärligaste vägen: dess
+  // kunddedupe matchar på telefon, och ALLA sex demokunder delar avsiktligt
+  // ägarens personal_phone (så demons SMS går till presentatörens egen
+  // telefon). Sex starka träffar är per definition tvetydigt, och funktionen
+  // vägrar då med rätta. Raderna nedan speglar därför dess insert kolumn för
+  // kolumn i stället: samma fält, samma 'new_lead'-fallback på
+  // pipeline_stage_key, samma lead_number ur samma räknare.
+  //
+  // Två av dem hör till de webbkällade affärerna och länkas via deal.lead_id
+  // nedan — det är formen en konverterad lead faktiskt har. Den tredje står
+  // kvar obesvarad i första steget, vilket är det tillstånd demon behöver
+  // mest: en färsk förfrågan som väntar på hantverkaren.
+  const leadSeeds: Array<{
+    key: string
+    customerKey: string
+    notes: string
+    source: string
+    status: string
+    created_at: string
+  }> = [
+    {
+      key: 'mikael',
+      customerKey: 'mikael',
+      notes: 'Vill bygga altan på baksidan, ca 25 kvm. Har ritning.',
+      source: 'website',
+      status: 'qualified',
+      created_at: isoAt(-16, 8, 12),
+    },
+    {
+      key: 'anna',
+      customerKey: 'anna',
+      notes: 'Badrum från 1978, vill renovera helt. Bor kvar under arbetet.',
+      source: 'website',
+      status: 'qualified',
+      created_at: isoAt(-14, 19, 41),
+    },
+    {
+      key: 'kristina_ny',
+      customerKey: 'kristina',
+      notes: 'Byta ytterdörr och två fönster. Undrar vad det kostar.',
+      source: 'website',
+      status: 'new',
+      created_at: isoAt(0, 7, 25),
+    },
+  ]
+
+  // Samma fallback som Golden Path: pipeline_stages (plural) är en annan
+  // tabell än de steg ensureDefaultStages skriver, och den är tom även på
+  // riktiga konton — därför 'new_lead'.
+  const { data: forstaSteget } = await supabase
+    .from('pipeline_stages')
+    .select('key')
+    .eq('business_id', businessId)
+    .order('sort_order', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  const leads: Record<string, { lead_id: string }> = {}
+  for (const l of leadSeeds) {
+    const kund = customers[l.customerKey]
+    const leadId = genId('lead')
+    let leadNumber: string | undefined
+    try { leadNumber = await getNextLeadNumber(supabase, businessId) } catch { /* non-blocking, som i Golden Path */ }
+    const { error } = await supabase.from('leads').insert({
+      lead_id: leadId,
+      business_id: businessId,
+      customer_id: kund.customer_id,
+      name: kund.name,
+      phone: kund.phone_number,
+      email: kund.email,
+      notes: l.notes,
+      source: l.source,
+      status: l.status,
+      pipeline_stage_key: forstaSteget?.key || 'new_lead',
+      score: 0,
+      created_at: l.created_at,
+      ...(leadNumber ? { lead_number: leadNumber } : {}),
+    })
+    if (error) return failReset(`Kunde inte skapa lead ${l.key}: ${error.message}`, 'lead_insert_failed')
+    leads[l.key] = { lead_id: leadId }
+  }
+
+  // ══════════════════════════════════════════════════════════
   // 4. DEALS (4 st, olika pipeline-steg, värden exkl. moms)
   // ══════════════════════════════════════════════════════════
   const stageNewInquiry = await getStageBySlug(businessId, 'new_inquiry')
@@ -315,6 +455,9 @@ export async function resetDemoAccount(
     source: string
     job_type: string
     created_at: string
+    /** Sätts på webbkällade affärer — se leadSeeds ovan. En affär som kom
+     *  från en förfrågan bär ett lead_id, precis som Golden Path skriver den. */
+    leadKey?: string
   }
 
   const dealSeeds: SeedDeal[] = [
@@ -343,6 +486,7 @@ export async function resetDemoAccount(
     {
       key: 'mikael_altan',
       customerKey: 'mikael',
+      leadKey: 'mikael',
       title: 'Altanbygge – Furuvägen 8',
       value: 95000,
       stage: stageQuoteSent,
@@ -358,6 +502,7 @@ export async function resetDemoAccount(
     {
       key: 'anna_badrum',
       customerKey: 'anna',
+      leadKey: 'anna',
       title: 'Badrumsrenovering – Björkvägen 14',
       value: 185000,
       stage: stageWon,
@@ -384,6 +529,7 @@ export async function resetDemoAccount(
         deal_number: dealNumber,
         job_type: d.job_type,
         created_at: d.created_at,
+        ...(d.leadKey ? { lead_id: leads[d.leadKey].lead_id } : {}),
       })
       .select('id, title')
       .single()
@@ -1968,6 +2114,7 @@ export async function resetDemoAccount(
 
   return {
     customers: customerSeeds.length,
+    leads: leadSeeds.length,
     deals: dealSeeds.length,
     quotes: quoteSeeds.length,
     invoices: 4,

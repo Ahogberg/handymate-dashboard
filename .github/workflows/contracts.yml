@@ -197,6 +197,7 @@ jobs:
           tests/facit-webbinflode-block-a.spec.ts
           tests/onboarding-setup-studio.spec.ts
           tests/demo-onboarding-utgang.spec.ts
+          tests/demo-seedning-tackning.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
