@@ -79,9 +79,13 @@ test('failed final save can retry without changing original completion time',asy
 test('explicit company edits override saved defaults',async()=>{
   const h=await route();assert.equal((await h.post({branch:'construction',secondary_branches:[],default_hourly_rate:700})).status,200)
   assert.deepEqual(h.state.seedArgs,{branch:'construction',extra:[],rate:700})
+  assert.deepEqual(h.state.company.secondary_branches,[])
 })
 test('authentication and payment gates stop before effects',async()=>{
   for(const [options,status] of [[{denied:true},401],[{unpaid:true},402]]){const h=await route(options);assert.equal((await h.post()).status,status);assert.equal(h.state.events.length,0)}
+})
+test('progress cannot bypass completion with step 9 or 10',async()=>{
+  for(const step of [9,10]) { const h=await route(); await h.put({step,data:{saved:'keep'}}); assert.notEqual(h.state.company.onboarding_step,step); assert.equal(h.state.company.onboarding_completed_at,null) }
 })
 test('progress read failure cannot overwrite previously saved answers',async()=>{
   const h=await route({readError:true});assert.equal((await h.put({step:3,data:{new:'value'}})).status,503);assert.equal(h.state.writes.length,0)

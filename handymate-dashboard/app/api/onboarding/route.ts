@@ -326,7 +326,7 @@ export async function POST(request: NextRequest) {
     const extraBranches: string[] = Array.isArray(secondary_branches)
       ? secondary_branches.filter((b: unknown): b is string => typeof b === 'string' && !!b && b !== branch)
       : []
-    if (extraBranches.length > 0) updates.secondary_branches = extraBranches
+    if (Array.isArray(secondary_branches)) updates.secondary_branches = extraBranches
     if (org_number !== undefined) updates.org_number = org_number
     if (address !== undefined) updates.address = address
     if (service_area !== undefined) updates.service_area = service_area
