@@ -289,6 +289,7 @@ async function handleSendSms(
   // Den lokala formatPhone() var dessutom en fjärde variant av samma
   // E.164-logik. Nu en väg.
   const { sendSmsViaElks } = await import('@/lib/sms-send')
+  const { smsSyfteForHandelse } = await import('@/lib/outbound/sms-syfte')
   const r = await sendSmsViaElks({
     supabase,
     businessId,
@@ -298,7 +299,10 @@ async function handleSendSms(
     customerId: (context.customer_id as string) || null,
     messageType: 'automation_rule',
     recipient: 'customer',
-    purpose: 'proactive',
+    // Ett svar på något kunden just gjort får inte hållas tillbaka av
+    // sjudagarsspärren; kampanjer och omvårdnad ska det. Se
+    // lib/outbound/sms-syfte.ts — hela bakgrunden ligger i filhuvudet där.
+    purpose: smsSyfteForHandelse(context.rule_event_name as string | undefined),
   })
 
   if (!r.success) {
@@ -983,6 +987,15 @@ export async function executeRule(
   // regler i loopen) — härled en lokal kopia för den autonoma vägen.
   const execContext = autonomousBypass ? { ...context, earned_autonomy: true } : context
 
+  // Vilken händelse som utlöste regeln. Följer med ner till åtgärden eftersom
+  // send_sms behöver den för att välja syfte — ett svar på inkommande
+  // kundkontakt ligger inte under frekvensspärren (lib/outbound/sms-syfte.ts).
+  // Stämplas på BÅDA vägarna nedan: går kortet till godkännande först ska
+  // syftet vara detsamma när ägaren trycker.
+  const handelseNamn = typedRule.trigger_type === 'event'
+    ? (typedRule.trigger_config?.event_name as string | undefined)
+    : undefined
+
   if (needsApproval && !autonomousBypass && typedRule.action_type !== 'create_approval') {
     const approvalResult = await handleCreateApproval(supabase, typedRule.business_id, {
       title: typedRule.name,
@@ -993,6 +1006,7 @@ export async function executeRule(
       rule_id: ruleId,
       rule_action_type: typedRule.action_type,
       rule_action_config: typedRule.action_config,
+      ...(handelseNamn ? { rule_event_name: handelseNamn } : {}),
       // Stämpla nyckeln → streak-räkning kan mappa raden (autonomyKeyFromApproval)
       ...(autonomyKey ? { autonomy_key: autonomyKey } : {}),
     }, typedRule.name)
@@ -1025,7 +1039,7 @@ export async function executeRule(
     typedRule.business_id,
     typedRule.action_type,
     typedRule.action_config,
-    { ...execContext, rule_action_type: typedRule.action_type },
+    { ...execContext, rule_action_type: typedRule.action_type, ...(handelseNamn ? { rule_event_name: handelseNamn } : {}) },
     typedRule.name
   )
 

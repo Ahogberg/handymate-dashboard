@@ -113,21 +113,28 @@ async function handle(request: NextRequest): Promise<NextResponse> {
       // In-app-notis + push till ägaren — samma helper som röstbrevlådegrenen
       // i voice/incoming. Fail-soft, kastar aldrig.
       const { meddelaFangatSamtal } = await import('@/lib/voice/fangat-samtal')
-      await meddelaFangatSamtal({ supabase, businessId, phone: from, callId, sedanIso })
+      const utfall = await meddelaFangatSamtal({ supabase, businessId, phone: from, callId, sedanIso })
 
+      // ═══ NOTISEN FÅR INTE PÅSTÅ MER ÄN VAD SOM HÄNDE (2026-09-10) ═══
+      //
       // Touchpoint 3 (onboarding-följeskrift): första-händelse-SMS till ägaren.
-      // Icke-blockerande — fångar aldrig upp huvudflödet om det failar.
+      //
+      // Provsamtalet den morgonen: fångst-SMS:et till kunden blockerades av en
+      // spärr, men notisen till hantverkaren gick ut och sa "och skickade ett
+      // svar-SMS". Kunden hade inte fått något. Utfallet fanns redan här —
+      // meddelaFangatSamtal har just kontrollerat sms_log — men returvärdet
+      // kastades bort och texten gissade. Nu bär den utfallet.
+      //
+      // Kundnamnet kommer från samma anrop (findCustomerByPhone med
+      // nummervarianter) i stället för ett andra, snävare uppslag på exakt
+      // phone_number som missade kunder vars nummer lagrats i annan form.
       try {
-        const { data: customer } = await supabase
-          .from('customer')
-          .select('name')
-          .eq('business_id', businessId)
-          .eq('phone_number', from)
-          .maybeSingle()
         const { sendFirstEventSms } = await import('@/lib/onboarding/first-event-sms')
-        await sendFirstEventSms(businessId, 'missed_call', customer?.name || '')
+        await sendFirstEventSms(businessId, 'missed_call', utfall.customer_name || '', {
+          svarSkickat: utfall.sms_sent,
+        })
       } catch (err) {
-        console.error('[voice/missed] first-event-sms lookup error (non-blocking):', err)
+        console.error('[voice/missed] first-event-sms error (non-blocking):', err)
       }
     }
   } catch (err) {

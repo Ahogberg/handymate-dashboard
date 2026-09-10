@@ -22,17 +22,46 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 
 export type FirstEventVariant = 'missed_call' | 'quote_followup' | 'invoice_reminder'
 
+/**
+ * Vad som FAKTISKT hände. För missed_call är `svarSkickat` obligatoriskt —
+ * texten får inte kunna påstå att kunden fått svar utan att någon vet det.
+ */
+export interface FirstEventUtfall {
+  svarSkickat?: boolean
+}
+
 const FLAG_KEY = 'onboarding_first_event_sms'
 const MAX_SMS_LENGTH = 160
 
-function buildMessage(variant: FirstEventVariant, customerName: string): string {
+/**
+ * 2026-09-10: texten för missed_call påstod villkorslöst "och skickade ett
+ * svar-SMS". Vid provet den morgonen blockerades kundens svar av
+ * sjudagarsspärren (`Kunden har redan fått ett SMS de senaste sju dagarna`)
+ * medan notisen ändå gick ut och sa att svaret skickats. Kunden fick
+ * ingenting; hantverkaren fick beskedet att hon fått svar.
+ *
+ * Grinden fanns redan och var korrekt — `svarSmsSkickat` i
+ * lib/voice/fangat-samtal.ts kollar `.eq('status','sent')`. Felet var att den
+ * här texten aldrig fick veta utfallet. Nu KRÄVS det för missed_call.
+ *
+ * Samma pass: quote_followup sa "följde just upp offerten" när det som faktiskt
+ * hänt är att ett kort väntar på ägarens godkännande. Agenter föreslår, ägaren
+ * godkänner — texten säger nu det.
+ */
+function buildMessage(
+  variant: FirstEventVariant,
+  customerName: string,
+  utfall: FirstEventUtfall,
+): string {
   const kund = customerName?.trim() || 'en kund'
 
   switch (variant) {
     case 'missed_call':
-      return `Handymate: Lisa fångade precis ett samtal du missade från ${kund} och skickade ett svar-SMS. Ligger i appen — kolla när du kan. 💪`
+      return utfall.svarSkickat
+        ? `Handymate: Lisa fångade precis ett samtal du missade från ${kund} och skickade ett svar-SMS. Ligger i appen — kolla när du kan. 💪`
+        : `Handymate: Lisa fångade precis ett samtal du missade från ${kund}, men svaret gick inte fram. Ring upp när du kan — allt ligger i appen.`
     case 'quote_followup':
-      return `Handymate: Daniel följde just upp offerten till ${kund} åt dig. Godkänn eller ändra i appen.`
+      return `Handymate: Daniel har en uppföljning redo till ${kund} på offerten. Godkänn eller ändra i appen.`
     case 'invoice_reminder':
       return `Handymate: Karin har en påminnelse redo till ${kund} om en förfallen faktura. Ett tryck i appen så går den.`
   }
@@ -42,11 +71,28 @@ function buildMessage(variant: FirstEventVariant, customerName: string): string 
  * Skickar första-händelse-SMS:et till ägaren om det inte redan skickats.
  * Icke-blockerande — anropas fire-and-forget (eller awaitas, spelar ingen
  * roll: den kastar aldrig).
+ *
+ * För `missed_call` är utfallet OBLIGATORISKT i typen. Det är avsiktligt: felet
+ * 2026-09-10 var just ett anrop utan utfall, och en valfri parameter hade
+ * tillåtit det igen. Nu är det ett kompileringsfel.
  */
 export async function sendFirstEventSms(
   businessId: string,
+  variant: 'missed_call',
+  customerName: string,
+  utfall: { svarSkickat: boolean },
+): Promise<void>
+export async function sendFirstEventSms(
+  businessId: string,
+  variant: 'quote_followup' | 'invoice_reminder',
+  customerName: string,
+  utfall?: FirstEventUtfall,
+): Promise<void>
+export async function sendFirstEventSms(
+  businessId: string,
   variant: FirstEventVariant,
-  customerName: string
+  customerName: string,
+  utfall: FirstEventUtfall = {},
 ): Promise<void> {
   try {
     const prefs = await getBusinessPreferences(businessId)
@@ -71,7 +117,7 @@ export async function sendFirstEventSms(
       return
     }
 
-    let message = buildMessage(variant, customerName)
+    let message = buildMessage(variant, customerName, utfall)
     if (message.length > MAX_SMS_LENGTH) message = message.slice(0, MAX_SMS_LENGTH)
 
     const result = await sendSmsViaElks({

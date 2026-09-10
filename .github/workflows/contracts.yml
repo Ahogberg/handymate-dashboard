@@ -190,6 +190,7 @@ jobs:
           tests/elks-ljudfalt.spec.ts
           tests/nummerverifiering.spec.ts
           tests/sms-inkommande.spec.ts
+          tests/sms-syfte-och-arlighet.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
