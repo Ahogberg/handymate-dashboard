@@ -2,6 +2,7 @@ import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-ite
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 // Force-dynamic — preview-data är realtidssnap av signerade ÄTA +
@@ -65,6 +66,32 @@ export async function GET(
     }
     if (!project) {
       return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+    }
+
+    // Samma medlems- och tilldelningsgräns som projektdetaljen, före
+    // kundens personuppgifter, offertpriser och fakturaunderlag läses.
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser && !business._impersonation) {
+      return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+    }
+    if (currentUser && !hasPermission(currentUser, 'see_all_projects')) {
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_assignment')
+        .select('project_id')
+        .eq('business_id', business.business_id)
+        .eq('project_id', params.id)
+        .eq('business_user_id', currentUser.id)
+        .limit(1)
+        .maybeSingle()
+      if (assignmentError) {
+        return NextResponse.json({ error: 'Projektåtkomsten kunde inte kontrolleras. Försök igen.' }, { status: 503 })
+      }
+      if (!assignment) {
+        return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+      }
+    }
+    if (currentUser && !hasPermission(currentUser, 'see_financials')) {
+      return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
 
     // ── 2. Customer ──────────────────────────────────────────────
@@ -374,13 +401,20 @@ export async function GET(
     // Förhandsgranskningen visade "nästa nummer" och grundofferten trots att
     // utkastet redan fanns (Codex liveprov 2026-09-07). Sidan visar då
     // fakturan som finns i stället för en knapp som inte skapar något.
-    const { data: existingInvoice } = await supabase
+    const { data: existingInvoice, error: existingInvoiceError } = await supabase
       .from('invoice')
       .select('invoice_id, invoice_number, status')
       .eq('business_id', business.business_id)
       .eq('project_id', project.project_id)
       .limit(1)
       .maybeSingle()
+
+    if (existingInvoiceError) {
+      return NextResponse.json(
+        { error: 'Tidigare fakturor kunde inte kontrolleras. Försök igen.', stage: 'existing_invoice' },
+        { status: 503 },
+      )
+    }
 
     // ── 10. Response ────────────────────────────────────────────
     // _deployVersion: deploy-marker så vi kan verifiera VILKEN commit

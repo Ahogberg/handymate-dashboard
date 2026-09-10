@@ -135,6 +135,7 @@ export default function InvoicePreviewPage() {
   const [data, setData] = useState<InvoicePreviewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
   const [pendingDismissed, setPendingDismissed] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null)
   const [sending, setSending] = useState(false)
@@ -190,8 +191,14 @@ export default function InvoicePreviewPage() {
     if (!projectId) return
     let cancelled = false
     setLoading(true)
+    setError(null)
+    setData(null)
     fetch(`/api/projects/${projectId}/invoice-preview`)
-      .then(r => r.json())
+      .then(async r => {
+        const body = await r.json()
+        if (!r.ok) throw new Error(body.error || 'Kunde inte ladda förhandsgranskning')
+        return body
+      })
       .then(d => {
         if (cancelled) return
         if (d.error) {
@@ -209,7 +216,7 @@ export default function InvoicePreviewPage() {
     return () => {
       cancelled = true
     }
-  }, [projectId])
+  }, [projectId, retryCount])
 
   if (loading) {
     return (
@@ -233,6 +240,12 @@ export default function InvoicePreviewPage() {
           <p className="text-sm text-slate-600 mb-4">
             {error || 'Okänt fel'}
           </p>
+          <button
+            onClick={() => setRetryCount(count => count + 1)}
+            className="mr-4 text-sm font-medium text-primary-700 hover:text-primary-800"
+          >
+            Försök igen
+          </button>
           <button
             onClick={() => router.back()}
             className="text-sm font-medium text-primary-700 hover:text-primary-800"

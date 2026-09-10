@@ -40,7 +40,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const currentUser = await getCurrentUser(request)
+    const currentUser = await getCurrentUser(request, business.business_id)
     if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
       return NextResponse.json(
         { error: 'Otillräckliga behörigheter' },
@@ -74,6 +74,22 @@ export async function POST(
     }
     if (!project) {
       return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+    }
+    if (!hasPermission(currentUser, 'see_all_projects')) {
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_assignment')
+        .select('project_id')
+        .eq('business_id', business.business_id)
+        .eq('project_id', projectId)
+        .eq('business_user_id', currentUser.id)
+        .limit(1)
+        .maybeSingle()
+      if (assignmentError) {
+        return NextResponse.json({ error: 'Projektåtkomsten kunde inte kontrolleras. Försök igen.' }, { status: 503 })
+      }
+      if (!assignment) {
+        return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+      }
     }
     if (!project.customer_id) {
       return NextResponse.json(

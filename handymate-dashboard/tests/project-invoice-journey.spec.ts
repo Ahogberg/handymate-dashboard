@@ -76,8 +76,16 @@ for (const route of ['preview','final'] as const) {
 }
 test('preview denies financial data even for assigned members lacking financial permission',async()=>{
  const h=harness();h.state.permissions.see_financials=false
+ h.state.permissions.see_all_projects=false
+ h.tables.project_assignment=[{project_id:'p',business_id:'b',business_user_id:'u'}]
  expect((await h.preview()).status).toBe(403)
- expect(h.state.reads).toEqual(['project'])
+ expect(h.state.reads).toEqual(['project','project_assignment'])
+})
+test('financial read permission never grants invoice creation',async()=>{
+ const h=harness();h.state.permissions.create_invoices=false
+ expect((await h.preview()).status).toBe(200)
+ expect((await h.final()).status).toBe(403)
+ expect(h.state.created).toHaveLength(0)
 })
 test('missing member is not an impersonation proof',async()=>{
  const h=harness();h.state.user=null
