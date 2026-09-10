@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test'
 import fs from 'fs'
 import ts from 'typescript'
 import {reportDatabase,reportClient} from './helpers/report-database'
-import {createReportSession,resumeReportSession,discardReportSession,listReportSessions} from '../lib/matte/report-session'
+import {createReportSession,resumeReportSession,discardReportSession,listReportSessions,recoverReportSessionForRequest,reportRequestId} from '../lib/matte/report-session'
 import {confirmWorkReport} from '../lib/matte/work-report-confirmation'
 import {verifyPendingExternalAction} from '../lib/agent/external-confirm'
 import type {FollowupDatabase} from './helpers/followup-database'
@@ -22,6 +22,18 @@ test('another client resumes the immutable next part with a fresh signature and 
  const second=await confirmWorkReport(verifyPendingExternalAction(resumed.pending_confirmation!.token,'b')!,other,'b',user,writers());expect(second.confirmed,second.reply).toBe(true)
  const list=await listReportSessions(other,'b',user,'p',ctx.date);expect(list.reports[0]).toMatchObject({state:'finished',completed:2})
  expect((await db.query('SELECT * FROM project_material')).rows).toHaveLength(1);expect((await db.query('SELECT * FROM pending_approvals')).rows).toHaveLength(1)
+})
+test('lost first HTTP receipt reuses the client request identity and never creates a second report plan',async()=>{
+ const id='01990da8-6c24-4d52-8b2f-530f68f632aa'
+ expect(reportRequestId(id.toUpperCase())).toBe(id);expect(reportRequestId('predictable')).toBeNull()
+ const first=await createReportSession(client,'b',ctx,null,actions,id)
+ expect(first.report_id).toBe(id)
+ const recovered=await recoverReportSessionForRequest(reportClient(db),'b',ctx,id)
+ expect(recovered?.pending_confirmation?.report_id).toBe(id)
+ const replay=await createReportSession(reportClient(db),'b',ctx,null,actions,id)
+ expect(replay.report_id).toBe(id)
+ expect((await db.query('SELECT * FROM work_report_session')).rows).toHaveLength(1)
+ expect(await recoverReportSessionForRequest(client,'b',{...ctx,projectId:'other'},id)).toBeNull()
 })
 test('lost receipt after real material insert retries SAME identity, never a second material row',async()=>{
  const first=await createReportSession(client,'b',ctx,null,actions);client.failNextFinish()
