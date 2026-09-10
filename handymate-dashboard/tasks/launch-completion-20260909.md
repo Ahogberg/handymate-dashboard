@@ -192,3 +192,24 @@ Kod-HEAD i draft-PR37: `ac52c8e7bf4d94e699d1383bbcb442deb74eee9e`. Lokal motsvar
 - Browserkontroll: befintlig flik visar Vercels vanliga inloggningssida före preview. Ingen giltig preview-session; inga inloggade kundklick utförda i detta pass. Ingen kringgång av skyddet.
 
 Nästa körbara kodsteg: rätta återstående osäkerhet i faktureringsvalet utan att anta att project_type bevisar ett avtal; granska även previewns befintlig-faktura-kvittens och felhantering. Nya Matte-guidningen behöver jämföras mot befintliga SetupStudioShell/MatteSetupGuide och beslutad design innan portning; byggflaggan NEXT_PUBLIC_SETUP_STUDIO_ENABLED är inte i sig designgodkännande. Kundprov kvarstår för fastpris/löpande/blandavtal, rätt onboarding-version, portal/uppföljning, tappad mobilkvittens och rapport → ÄTA → faktura → verkligt Fortnox. PR7/mobil är oförändrad i detta pass.
+
+
+## Checkpoint: fakturakedjans åtkomst, felåterhämtning och uttryckliga källval 2026-09-10
+
+Senaste verifierade kod-HEAD i draft-PR37: `462d3da0e9010a46eaad2f4e131e5c9e4e8da032`. Åtkomstkod `63da25c1ef650dc869c70417b4fd42988ef911cc`; källval `91af57d8636a7a783bd2682d348e432e2d80ae0f`; sista commit rättar endast renderprovets JSX-laddning. Lokala commits: `4a83365e`, `c203c6bc`, `ceac4d9a`.
+
+### Reproduktion och rättning
+- Nio nya prov föll på originalet `4cbae6500b00c1c7106c6df1b82ea0ffde3434b1`, Kontraktsgrind run 467/job 102775470853. Preview saknade medlems-/tilldelnings-/ekonomigrind; slutfaktura saknade projekttilldelningsgrind; läsfel vid befintlig faktura såg ut som ingen faktura.
+- Preview använder nu getCurrentUser med verifierat business_id, samma tilldelningsfilter som projektdetaljen och see_financials före kund-/prisdata. Saknad medlem är inte impersoneringsbevis; befintligt serververifierat _impersonation-undantag för läsning bevaras.
+- Slutfakturans medlemsuppslag är företagsskopat och kräver projekttilldelning när see_all_projects saknas. create_invoices kvarstår som separat skrivbehörighet; läsbehörighet ger inte skapanderätt.
+- Tilldelnings-/fakturauppslagsfel stoppar med 503. Preview visar fel och erbjuder Försök igen som endast hämtar underlaget; gamla data/fel rensas före ny läsning. Inga fakturor skickas av detta.
+- Alla generiska fakturastarter på projektdetaljen använder en gemensam ingång. Projekt med offert kräver val mellan offert + fakturerbara ÄTA respektive faktisk tid + material. Projekt utan offert går till tid/material. Valet navigerar, det ändrar inte avtalet och skapar inget. Blandade upplägg slås inte ihop automatiskt. Den uttryckliga menylänken till offertens fakturapreview finns kvar.
+- project_type används fortfarande i tidigare belopps-/arbetsköprognoser. Det är INTE ett explicit billing_model och detta pass påstår inte att all automatisk fakturering eller blandfakturering är löst. Den tysta navigeringsgissningen är borttagen; belopps-/avtalsprov kvarstår.
+
+### Verifiering
+På exakt kod-HEAD ovan: fem GitHub Actions gröna; Kontraktsgrind run 473/job 102779466083: TypeScript utan fel, 1822 browserlösa prov godkända + en befintlig skip, kundunderlagskontrakt och sex-kundutfall-sviten gröna. Båda Vercel-previewbyggena gröna. Åtkomsträttningen separat gav 1819 godkända på run 469 innan källvalet tillkom. SSR-provet renderar riktiga komponenten med standard React-JSX; första försöket föll på Playwrights __pw_type-transform och räknas inte som produktfel eller godkänt prov. Ändrade fjärrfiler verifierades mot lokala Git-blobbar.
+
+Ingen ny inloggad klickverifiering: preview kräver fortfarande giltig Vercel-session. Källvalets fokus, Escape, mobil layout och bägge navigeringarna måste klickprovas på rätt preview. Ingen main-merge/push, produktionsmigration, fakturasändning eller riktig providerkommunikation. Mobil PR7 oförändrad.
+
+### Nästa körbara steg
+Prioritera nu förfrågan → agent → offert/uppföljning: storefront/contact använder fortfarande legacy createLeadAndDeal utan beständig inskickningsnyckel. Befintlig intakeInput kräver telefon, men storefront tillåter endast e-post; anslut inte genom att hitta på telefonnummer eller bryta befintliga formulär. Inventera den publicerade klientens nyckel/återförsök och SQL-kontraktets kontaktkrav; bygg email-only-kompatibel beständig mottagning med prov innan integration. Därefter kvarvarande widget/public-book/email-inbound, uppföljningens verkliga aktivering och stoppvillkor. Fortsätt jämförelsen av nya Matte-designen med aktuell guidning. Kund-/telefon-/Fortnoxprov och alla tre hela kundresornas slutgodkännande är fortfarande öppna.
