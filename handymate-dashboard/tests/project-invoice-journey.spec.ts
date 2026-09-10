@@ -84,7 +84,28 @@ test('automatic draft still prefers actual ATA rows over a stale saved total', a
  const result = await h.draft()
  expect(result.subtotal).toBe(1400)
  expect(result.ataChangeIds).toEqual(['a'])
+ const preview = await (await h.preview()).json()
+ expect(preview.totalExclVat).toBe(result.subtotal)
+ expect((await h.final()).status).toBe(200)
+ expect(h.state.created[0].subtotal).toBe(result.subtotal)
 })
+
+for (const changeType of ['addition', 'removal']) {
+ for (const quantity of [0, 2]) {
+  test(`ATA ${changeType} with quantity ${quantity}: preview and both draft paths agree despite stale total`, async () => {
+   const h = harness()
+   Object.assign(h.tables.project_change[0], {
+    change_type: changeType, total: 99999,
+    items: [{ description: 'Uttag', quantity, unit_price: 300 }],
+   })
+   const expected = 1100 + (changeType === 'removal' ? -1 : 1) * quantity * 300
+   expect((await (await h.preview()).json()).totalExclVat).toBe(expected)
+   expect((await h.draft()).subtotal).toBe(expected)
+   expect((await h.final()).status).toBe(200)
+   expect(h.state.created[0].subtotal).toBe(expected)
+  })
+ }
+}
 
 for (const status of ['draft', 'pending', 'sent', 'declined', 'rejected', 'invoiced']) {
  test(`automatic draft never falls back to a total-only ATA in ${status}`, async () => {
