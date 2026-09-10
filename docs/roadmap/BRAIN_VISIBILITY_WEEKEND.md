@@ -1496,7 +1496,8 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
-| Slice 4–10 | Inte påbörjade i denna session | Respektive leverans och testgrind |
+| Slice 4 — Customer | Första kundminnesvertikal implementerad och lokalt verifierad | Preview, öppna administrativa steg och relationens samlade läsmodell kvar |
+| Slice 5–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
@@ -1611,7 +1612,19 @@ Användaren har uttryckligen begärt korrekt struktur för alla korttyper och yt
 
 ### LIVE-CHECKPOINT — GEMENSAM KORTPRESENTATION
 
-Dashboard-kod `29f778bad29a3b1f4186ceea96314c557952d778`: alla 13 CI-checkar och båda Vercelbyggen gröna. Inloggad Project-preview visar två Granska-knappar; första SMS-kortet öppnar serverns dialog och Tillbaka lämnar båda korten kvar. Ingen slutlig bekräftelse eller sändning utfördes. Mobil-PR #8 har grön fokuserad Jest-CI; faktisk mobilbuild kvarstår. En missvisande konsekvenstext i webbgranskningen (”skickas nu” före bekräftelse) identifierades och har rättats till villkorad formulering för meddelanden, kampanjer och interna handlingar. Nio befintliga granskningsregressioner passerar; denna textuppföljnings preview återstår. Godkännandesidan visar också korrekt Granska på sina tre väntande effektkort. Ett historiskt checklistfel syns i kvittensen; read-only schemakontroll visar att order_id numera är nullable. Det gamla felet är därför inte bevis för en kvarvarande NOT NULL-blocker och ingen automatisk retry utförs.
+Dashboard-kod `29f778bad29a3b1f4186ceea96314c557952d778`: alla 13 CI-checkar och båda Vercelbyggen gröna. Inloggad Project-preview visar två Granska-knappar; första SMS-kortet öppnar serverns dialog och Tillbaka lämnar båda korten kvar. Ingen slutlig bekräftelse eller sändning utfördes. Mobil-PR #8 har grön fokuserad Jest-CI; faktisk mobilbuild kvarstår. En missvisande konsekvenstext i webbgranskningen (”skickas nu” före bekräftelse) identifierades och har rättats till villkorad formulering för meddelanden, kampanjer och interna handlingar. Nio befintliga granskningsregressioner passerar; textuppföljningen `463ab7b7fa4c76312584f7cc0acd993887c78803` har samtliga 13 CI-checkar och båda Vercelbyggen gröna. Inloggad dialog visar nu ”När du bekräftar skickas meddelandet via SMS.” Tillbaka lämnar båda korten kvar. Godkännandesidan visar också korrekt Granska på sina tre väntande effektkort. Ett historiskt checklistfel syns i kvittensen; read-only schemakontroll visar att order_id numera är nullable. Det gamla felet är därför inte bevis för en kvarvarande NOT NULL-blocker och ingen automatisk retry utförs.
+
+### SLICE 4 — FÖRSTA VERTIKAL: SANNINGSENLIGT KUNDMINNE
+
+**OBSERVATION:** inloggad kundvy har historik och statistik men saknar samlad öppen/nästa-status. Befintlig facts-route svarar 200/tom lista vid DB-fel och kundsidan döljer då minnet. Deadline och uppfyllandestatus finns i customer_fact men visas inte.
+
+**BESLUT/AVGRÄNSNING:** börja med befintligt kundminne: skilj laddning, läsfel med återförsök och verifierat tomt; visa bekräftade aktiva fakta, källcitat/datum och lagrad löftesstatus. Separera kund-/företagssessioner så sena svar inte visar föregående kund. Återanvänd facts-route och befintlig borttagning. Ingen ny motor/tabell eller bred kundmodell med fem nya läskällor. Ingen slutsats om personlighet eller att ett passerat datum betyder brutet löfte.
+
+**RUNTIMEUNDERLAG:** read-only schema bekräftar due_at, promise_status, fulfilled_at, confirmed_at, evidence_quote och källreferenser. Aktiva fakta är två kontaktfakta och en preferens, samtliga bekräftade; inga aktiva löften finns att verifiera live. Löftesgrenar provas isolerat. Legacy-kundsidans övriga läsningar och tidslinjens ofullständighetsrisk kvarstår; denna vertikal stänger inte slice 4.
+
+**LOKAL STATUS:** första kundminnesvertikalen implementerad. Fyra nya route-/loader-/löftesstatusregressioner samt CI-paritet passerar; typkontroll och diffkontroll gröna. Den äldre customer-facts-specens API-assertion har uppdaterats för synliga fel. Fyra andra äldre assertions om approval-write-kodens textfönster faller efter tidigare refaktorering; dessa är inte en del av nya minnesgrinden och lämnas som separat testskuld. Projektvyns separata minneskonsument döljer fortsatt läsfel. Ingen faktisk löftesuppfyllelse eller borttagning testad i produktion.
+
+**PUBLICERINGSBLOCKER:** automatisk säkerhetsgranskning avvisade uppladdning av kundminnespaketet till publika `Ahogberg/handymate-dashboard`, eftersom senaste uttryckliga godkännandet bedömdes gälla föregående kortpaket. Kundminneskoden är lokalt committad som `845abf6` och inga branchändringar för den har publicerats. Ny uttrycklig bekräftelse för kundminneskod, arbetsplan och tester krävs enligt granskningsbeslutet. Befintlig publicerad head är `463ab7b7fa4c76312584f7cc0acd993887c78803`, alla 13 CI-checkar/båda previews gröna; mobil-PR #8 är grön i fokuserad Jest-CI. Användaren har därefter uttryckligen godkänt publicering av kundminnesändringen inklusive styrdokument och tester i PR #38. Publicering och preview-kontroll återupptas.
 
 ### REPRODUCERA LOKALA KONTROLLER
 

@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -47,6 +47,7 @@ import { sendSiteVisitSms } from '@/lib/sms/site-visit-confirm'
 import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
 import CustomerPreparations from '@/components/customer-preparation/CustomerPreparations'
+import CustomerMemory from '@/components/customers/CustomerMemory'
 import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
@@ -79,16 +80,6 @@ interface Customer {
   sms_opt_out?: boolean
   sms_opt_out_at?: string | null
   sms_opt_out_source?: string | null
-}
-
-interface CustomerFact {
-  id: string
-  fact_type: 'preference' | 'constraint' | 'commitment' | 'contact'
-  content: string
-  evidence_quote: string | null
-  confidence: number | null
-  created_at: string
-  confirmed_at: string | null
 }
 
 interface CustomerDocument {
@@ -216,14 +207,6 @@ interface AgreementType {
   is_active: boolean
 }
 
-// Customer Facts V1 — svenska badge-etiketter per fact_type, teal-tema.
-const FACT_TYPE_BADGE: Record<string, { label: string; className: string }> = {
-  preference: { label: 'Preferens', className: 'bg-teal-50 text-teal-700' },
-  constraint: { label: 'Förutsättning', className: 'bg-amber-50 text-amber-700' },
-  commitment: { label: 'Löfte', className: 'bg-primary-50 text-primary-700' },
-  contact: { label: 'Kontakt', className: 'bg-gray-100 text-gray-700' },
-}
-
 export default function CustomerDetailPage() {
   const { openFilePreview } = useFilePreview()
   const params = useParams()
@@ -249,7 +232,6 @@ export default function CustomerDetailPage() {
   const [deals, setDeals] = useState<Deal[]>([])
   const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([])
   const [referrals, setReferrals] = useState<{ leadsCount: number; wonDealsCount: number; wonValueSum: number } | null>(null)
-  const [customerFacts, setCustomerFacts] = useState<CustomerFact[]>([])
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -441,20 +423,6 @@ export default function CustomerDetailPage() {
       setReferrals(null)
     }
 
-    // Customer Facts V1 (2026-08-12): fail-soft precis som referrals — en
-    // tom lista döljer bara sektionen, kraschar aldrig kundkortet.
-    try {
-      const factsRes = await fetch(`/api/customers/${customerId}/facts`)
-      if (factsRes.ok) {
-        const factsData = await factsRes.json()
-        setCustomerFacts(factsData.facts || [])
-      } else {
-        setCustomerFacts([])
-      }
-    } catch {
-      setCustomerFacts([])
-    }
-
     await fetchServiceAgreements()
 
     setLoading(false)
@@ -642,25 +610,6 @@ export default function CustomerDetailPage() {
       alert('Kunde inte ladda upp filen. Försök igen.')
     }
     fetchData()
-  }
-
-  // Customer Facts V1 — "ta bort"-vägen (2026-08-12). Optimistisk borttagning
-  // ur listan direkt vid klick; misslyckas anropet rullas listan tillbaka och
-  // ett toast-fel visas. Servern sätter superseded_by till radens eget id
-  // (app/api/customers/[id]/facts/route.ts) — ingen hård DELETE.
-  async function deleteFact(factId: string) {
-    const tidigare = customerFacts
-    setCustomerFacts(tidigare.filter(f => f.id !== factId))
-    try {
-      const res = await fetch(`/api/customers/${customerId}/facts?factId=${factId}`, { method: 'DELETE' })
-      if (!res.ok) {
-        setCustomerFacts(tidigare)
-        mainToast.error('Kunde inte ta bort faktumet')
-      }
-    } catch {
-      setCustomerFacts(tidigare)
-      mainToast.error('Kunde inte ta bort faktumet')
-    }
   }
 
   async function deleteDocument(docId: string) {
@@ -874,58 +823,7 @@ export default function CustomerDetailPage() {
               </div>
             )}
 
-            {/* Det här vet Handymate — Customer Facts V1 (2026-08-12).
-                Explicit sagda kundfakta godkända via kort i Inkorgen.
-                Sektionen renderas inte alls när listan är tom. */}
-            {customerFacts.length > 0 && (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Det här vet Handymate</h2>
-                <div className="space-y-3">
-                  {customerFacts.map(fact => {
-                    const badge = FACT_TYPE_BADGE[fact.fact_type] || FACT_TYPE_BADGE.preference
-                    const datum = fact.confirmed_at || fact.created_at
-                    return (
-                      <div key={fact.id} className="p-3 bg-gray-50 rounded-xl group">
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
-                              {badge.label}
-                            </span>
-                            {datum && (
-                              <span className="text-xs text-gray-400">
-                                {new Date(datum).toLocaleDateString('sv-SE')}
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteFact(fact.id)}
-                            className="p-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[28px] min-h-[28px] flex items-center justify-center"
-                            title="Ta bort"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <p className="text-sm text-gray-900">{fact.content}</p>
-                        {fact.evidence_quote && (
-                          // Explainability (2026-08-13): samma citat som redan visades,
-                          // bara tydligt märkt som BEVIS istället för en bar kursiv rad.
-                          // Visas fortfarande alltid — att gömma bakom ett expand/collapse
-                          // hade varit en transparens-regression, inte en förbättring.
-                          <div className="mt-2 pl-3 border-l-2 border-primary-200 bg-primary-50/40 rounded-r-lg py-1.5 pr-2">
-                            <p className="flex items-center gap-1 text-[10px] font-medium text-primary-700 uppercase tracking-wide mb-0.5">
-                              <MessageSquare className="w-3 h-3" />
-                              Varför vet Handymate detta?
-                            </p>
-                            <p className="text-xs text-gray-600 italic">"{fact.evidence_quote}"</p>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            <CustomerMemory key={`${business?.business_id || ''}:${customerId}`} customerId={customerId} />
 
             {/* Kundinfo */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">

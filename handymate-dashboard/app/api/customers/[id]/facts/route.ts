@@ -14,8 +14,8 @@ export const dynamic = 'force-dynamic'
  * kundfakta (customer_fact, superseded_by IS NULL) för kundkortets
  * "Det här vet Handymate"-sektion.
  *
- * Fail-safe: en saknad tabell (sql/v122 körs senare) eller ett DB-fel ger
- * tom lista i stället för en trasig sida — samma mönster som referrals.
+ * Läsfel är synliga som 500 så att klienten kan skilja ett okänt läge från
+ * ett verifierat tomt kundminne.
  */
 export async function GET(
   request: NextRequest,
@@ -39,7 +39,7 @@ export async function GET(
 
   if (customerError) {
     console.error('[customer facts] customer lookup error:', customerError)
-    return NextResponse.json({ facts: [] })
+    return NextResponse.json({ error: 'Kundminnet kunde inte läsas.' }, { status: 500 })
   }
 
   if (!customerRow) {
@@ -49,23 +49,24 @@ export async function GET(
   try {
     const { data, error } = await supabase
       .from('customer_fact')
-      .select('id, fact_type, content, evidence_quote, confidence, created_at, confirmed_at')
+      .select('id, fact_type, content, evidence_quote, confidence, source_type, source_id, created_at, confirmed_at, due_at, promise_status, fulfilled_at')
       .eq('business_id', business.business_id)
       .eq('customer_id', customerId)
       .is('superseded_by', null)
+      .not('confirmed_at', 'is', null)
       .order('confirmed_at', { ascending: false, nullsFirst: false })
       .limit(20)
 
     if (error) {
-      // Tabellen kan sakna (v122 körs senare) — logga och svara tomt.
+      // Ett databasfel får aldrig presenteras som ett verifierat tomt minne.
       console.error('[customer facts] query error:', error)
-      return NextResponse.json({ facts: [] })
+      return NextResponse.json({ error: 'Kundminnet kunde inte läsas.' }, { status: 500 })
     }
 
-    return NextResponse.json({ facts: data || [] })
+    return NextResponse.json({ facts: data || [], limited_to: 20 })
   } catch (error) {
     console.error('[customer facts] unexpected error:', error)
-    return NextResponse.json({ facts: [] })
+    return NextResponse.json({ error: 'Kundminnet kunde inte läsas.' }, { status: 500 })
   }
 }
 
