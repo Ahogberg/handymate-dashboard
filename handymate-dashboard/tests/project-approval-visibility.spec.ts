@@ -4,6 +4,8 @@ import ts from 'typescript'
 import { NextRequest, NextResponse } from 'next/server'
 import vm from 'node:vm'
 import { createProjectApprovalReadGuard, loadProjectApprovalPage } from '../lib/projects/load-project-approvals'
+import { projectApprovalPresentation } from '../lib/projects/project-approval-presentation'
+import { APPROVAL_EDIT_REVIEW_LABEL, AUTONOMY_REVIEW_LABEL, approvalGroupReviewLabel, approvalPackageReviewLabel } from '../lib/approvals/presentation'
 
 type Row = { id: string; business_id: string; status: string; created_at: string; approval_type: string; payload: Record<string, unknown> }
 
@@ -137,4 +139,67 @@ test('a resolved decision reloads page zero instead of continuing with an offset
   const action = source.slice(source.indexOf('async function act('), source.indexOf('\n  if (readState.status', source.indexOf('async function act(')))
   expect(action).toContain('await fetchApprovals(0)')
   expect(action).not.toContain('prev.filter')
+})
+
+test('project cards reuse canonical labels and actions across effectful, informational and unknown approvals', () => {
+  expect(projectApprovalPresentation({ approval_type: 'send_sms', payload: {} })).toEqual({ type_label: 'SMS', agent: 'lisa', approve_label: 'Granska', action_class: 'EXECUTABLE_ACTION' })
+  expect(projectApprovalPresentation({ approval_type: 'tidrapport_forslag', payload: {} })).toMatchObject({ type_label: 'Tidrapport', approve_label: 'Granska' })
+  expect(projectApprovalPresentation({ approval_type: 'checklist_forslag', payload: {} })).toMatchObject({ type_label: 'Checklista', approve_label: 'Granska' })
+  expect(projectApprovalPresentation({ approval_type: 'team_intro', payload: {} })).toEqual({ type_label: 'Ditt team', agent: 'matte', approve_label: 'Jag har läst det', action_class: 'INFORMATIONAL' })
+  expect(projectApprovalPresentation({ approval_type: 'future_internal_kind', payload: {} })).toEqual({ type_label: 'Förslag', agent: 'matte', approve_label: 'Granska', action_class: null })
+})
+
+test('project card presentation honors API display and canonical explicit-agent fallback', () => {
+  const apiDisplay = { type_label: 'Tidrapport', agent: 'lars', approve_label: 'Granska' }
+  expect(projectApprovalPresentation({ approval_type: 'tidrapport_forslag', payload: {}, display: apiDisplay })).toBe(apiDisplay)
+  expect(projectApprovalPresentation({ approval_type: 'warranty_followup', payload: { agent: 'hanna' } }).agent).toBe('hanna')
+  expect(projectApprovalPresentation({ approval_type: 'send_sms', payload: { routed_agent: 'daniel' } }).agent).toBe('daniel')
+})
+
+test('current pending families retain the existing canonical classes and truthful first-step labels', () => {
+  const expected = {
+    installation_register: ['REVIEW_REQUIRED', 'Granska'], jobbpass_proposal: ['REVIEW_REQUIRED', 'Granska'],
+    karin_deadline: ['ACKNOWLEDGEMENT', 'Jag har läst det'], project_debrief: ['EXECUTABLE_ACTION', 'Granska'],
+    quote_nudge: ['EXECUTABLE_ACTION', 'Granska'], seasonal_campaign: ['EXECUTABLE_ACTION', 'Granska'],
+    send_sms: ['EXECUTABLE_ACTION', 'Granska'], team_intro: ['INFORMATIONAL', 'Jag har läst det'],
+  } as const
+  for (const [approval_type, [action_class, approve_label]] of Object.entries(expected)) {
+    expect(projectApprovalPresentation({ approval_type, payload: {} })).toMatchObject({ action_class, approve_label })
+  }
+})
+
+test('shared accessor rejects blank or unknown API presentation and shared review-step labels render exact copy', () => {
+  expect(projectApprovalPresentation({ approval_type: 'send_sms', payload: {}, display: { type_label: '', agent: 'lisa', approve_label: '', action_class: null } })).toMatchObject({ type_label: 'SMS', approve_label: 'Granska', action_class: 'EXECUTABLE_ACTION' })
+  expect(projectApprovalPresentation({ approval_type: 'send_sms', payload: {}, display: { type_label: 'Fel', agent: 'unknown', approve_label: 'Fel' } })).toMatchObject({ type_label: 'SMS', agent: 'lisa' })
+  expect(APPROVAL_EDIT_REVIEW_LABEL).toBe('Granska ändring')
+  expect(AUTONOMY_REVIEW_LABEL).toBe('Granska förtroende')
+  expect(approvalGroupReviewLabel(3, 'EXECUTABLE_ACTION')).toBe('Granska grupp (3)')
+  expect(approvalGroupReviewLabel(2, 'INFORMATIONAL')).toBe('Markera grupp som läst (2)')
+  expect(approvalGroupReviewLabel(2, 'ACKNOWLEDGEMENT')).toBe('Notera grupp (2)')
+  expect(approvalGroupReviewLabel(1, null)).toBe('Granska grupp (1)')
+  expect(approvalPackageReviewLabel(4)).toBe('Granska paket (4)')
+})
+
+test('project card copy never promises immediate sending or final approval on the review-opening click', () => {
+  const source = readFileSync('components/projects/ProjectApprovalsBlock.tsx', 'utf8')
+  expect(source).not.toContain('Skickas efter ditt OK')
+  expect(source).not.toContain('Spara &amp; godkänn')
+  expect(source).not.toMatch(/>\s*Godkänn\s*</)
+  expect(source).toContain('{presentation.approve_label}')
+  expect(source).toContain('{APPROVAL_EDIT_REVIEW_LABEL}')
+})
+
+test('all generic dashboard cards consume canonical primary and review-step labels while preserving reviewed submission', () => {
+  const idag = readFileSync('components/dashboard/IdagCore.tsx', 'utf8')
+  const home = readFileSync('components/jarvis/JarvisHome.tsx', 'utf8')
+  const approvals = readFileSync('app/dashboard/approvals/page.tsx', 'utf8')
+  for (const source of [idag, home, approvals]) expect(source).toContain('reviewedApprovalFetch(')
+  expect(idag).toContain('{presentation.approve_label}')
+  expect(idag).toContain('{AUTONOMY_REVIEW_LABEL}')
+  expect(idag).toContain('{APPROVAL_EDIT_REVIEW_LABEL}')
+  expect(home).toContain('approvalGroupReviewLabel(group!.length, classify(approval.approval_type))')
+  expect(home).toContain('{APPROVAL_EDIT_REVIEW_LABEL}')
+  expect(approvals).toContain('presentation.approve_label')
+  expect(approvals).toContain('approvalPackageReviewLabel(activeCount)')
+  expect(approvals).toContain('{APPROVAL_EDIT_REVIEW_LABEL}')
 })

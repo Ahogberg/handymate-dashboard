@@ -1487,3 +1487,10 @@ utskick, fakturasändning, main-merge eller produktionsmigration ingår.
 - [x] Verifiera route, pagination och sena svar i isolerade regressioner, samt CI och inloggad preview med reload. Verkligt företagsbyte/mobil återstår.
 
 Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabeller, inga verkliga godkännanden eller utskick i testet.
+
+## Brain Visibility — projektkortens handlingar 2026-09-10
+
+- [x] Bekräfta gemensam approvalDisplay och faktisk review-preflight.
+- [x] Återanvänd gemensam presentation och ta bort obestyrkt sändningslöfte.
+- [x] Verifiera typetiketter/knappar med isolerade presentationsprov och typkontroll.
+- [ ] Publicera i PR38 och kontrollera verklig granskningsdialog utan att bekräfta sändning.

@@ -44,17 +44,19 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
-import { agentForApproval, ringUppmaning } from '@/lib/jarvis/approval-view'
+import { ringUppmaning } from '@/lib/jarvis/approval-view'
 import { MandagskortCard } from '@/components/jarvis/MandagskortCard'
 import { GuardianOrsaker } from '@/components/projects/GuardianOrsaker'
 import { DispatchReasoning } from '@/components/dispatch/DispatchReasoning'
 import { buildValueReceipt } from '@/lib/approvals/value-receipt'
 import ProjectCloseoutModal from '@/components/projects/ProjectCloseoutModal'
+import { APPROVAL_EDIT_REVIEW_LABEL, approvalPackageReviewLabel, approvalPresentation } from '@/lib/approvals/presentation'
+import type { ApprovalDisplay } from '@/lib/jarvis/approval-view'
 
 // Reskin 2026-08-18 (Command Center-språket, docs/HANDYMATE_DESIGN_SYSTEM.md):
 // den lokala agent-kartan (SPÅR D1:s fjärde kopia, nämnd i
 // agentPersonas.ts:s filhuvud) är borttagen — agenten härleds nu genom
-// samma agentForApproval() som hemskärmen/GorDettaForst redan använder,
+// samma kanoniska approvalPresentation som övriga beslutsytor använder,
 // och ritas med <AgentAvatar>. Ren visuell konsolidering, ingen ändrad
 // routing (samma explicit-payload-först-regel, bara med 'matte' som
 // ärligt fallback i stället för att tyst falla tillbaka på typ-ikonen).
@@ -73,6 +75,7 @@ interface Approval {
   resolved_at: string | null
   package_id?: string | null
   package_type?: string | null
+  display?: ApprovalDisplay
   package_data?: {
     quote_id?: string
     customer_id?: string
@@ -938,7 +941,7 @@ export default function ApprovalsPage() {
                             disabled={actionLoading !== null || activeCount === 0}
                             className="flex-1 bg-primary-700 text-white py-3 min-h-[44px] rounded-xl font-semibold text-sm hover:bg-primary-800 disabled:opacity-50 transition-all"
                           >
-                            {actionLoading === approval.id + 'approve' ? 'Godkänner...' : `✅ Godkänn allt (${activeCount})`}
+                            {actionLoading === approval.id + 'approve' ? 'Öppnar granskning...' : approvalPackageReviewLabel(activeCount)}
                           </button>
                           <button
                             onClick={() => setExpandedPackage(isExpanded ? null : approval.id)}
@@ -1014,7 +1017,8 @@ export default function ApprovalsPage() {
 
               // Standard approval card
               const config = TYPE_CONFIG[approval.approval_type] || TYPE_CONFIG.other
-              const agentKey = agentForApproval(approval)
+              const presentation = approvalPresentation(approval)
+              const agentKey = presentation.agent
               const agent = AGENT_INFO[agentKey]
               const primaryAmount = getPrimaryAmount(approval)
               const isExpiringSoon =
@@ -1382,7 +1386,7 @@ export default function ApprovalsPage() {
                             className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
                             <CheckCircle className="w-4 h-4" />
-                            Godkänn med ändringar
+                            {APPROVAL_EDIT_REVIEW_LABEL}
                           </button>
                           <button
                             onClick={() => setEditingId(null)}
@@ -1523,7 +1527,7 @@ export default function ApprovalsPage() {
                             ) : (
                               <>
                                 <CheckCircle className="w-4 h-4" />
-                                {actionLoading === approval.id + 'approve' ? 'Godkänner...' : 'Godkänn'}
+                                {actionLoading === approval.id + 'approve' ? 'Öppnar granskning...' : presentation.approve_label}
                               </>
                             )}
                           </button>

@@ -9,6 +9,9 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { createProjectApprovalReadGuard, loadProjectApprovalPage } from '@/lib/projects/load-project-approvals'
+import type { ApprovalDisplay } from '@/lib/jarvis/approval-view'
+import { projectApprovalPresentation } from '@/lib/projects/project-approval-presentation'
+import { APPROVAL_EDIT_REVIEW_LABEL } from '@/lib/approvals/presentation'
 
 /**
  * ProjectApprovalsBlock (Projektvy Fas 1, 2026-07-31).
@@ -42,6 +45,7 @@ interface Approval {
   risk_level: string | null
   created_at: string
   expires_at: string
+  display?: ApprovalDisplay
 }
 
 interface ProjectApprovalsBlockProps {
@@ -52,18 +56,6 @@ interface ProjectApprovalsBlockProps {
 export type ProjectApprovalsReadState = {
   status: 'loading' | 'error' | 'partial' | 'complete'
   count: number
-}
-
-function getAgentKey(approval: Approval): string {
-  const routed = (approval.payload?.routed_agent as string) || (approval.payload?.agent_id as string) || null
-  if (routed && AGENT_INFO[routed]) return routed
-  const t = approval.approval_type
-  if (t.includes('invoice') || t.includes('payment') || t === 'profitability_warning') return 'karin'
-  if (t.includes('campaign') || t.includes('neighbour') || t.includes('reactivat') || t.includes('review')) return 'hanna'
-  if (t.includes('quote') || t.includes('lead') || t.includes('pipeline')) return 'daniel'
-  if (t.includes('booking') || t.includes('project') || t.includes('dispatch') || t.includes('job_report') || t.includes('warranty')) return 'lars'
-  if (t.includes('call') || t.includes('sms')) return 'lisa'
-  return 'matte'
 }
 
 function getPreview(approval: Approval): string {
@@ -77,32 +69,6 @@ function getEditableKey(approval: Approval): 'message' | 'sms_text' | null {
   if (typeof approval.payload?.message === 'string') return 'message'
   if (typeof approval.payload?.sms_text === 'string') return 'sms_text'
   return null
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  send_sms: 'SMS',
-  send_quote: 'Offert',
-  send_invoice: 'Faktura',
-  create_booking: 'Bokning',
-  quote_nudge: 'Manuell åtgärd',
-  review_request: 'Recension',
-  confirm_payment: 'Betalning',
-  review_auto_invoice: 'Faktura',
-  // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md).
-  egenkontroll_foto: 'Egenkontroll',
-  egenkontroll_avvikelse: 'Egenkontroll-avvikelse',
-  // Checklistförslag vid projektskapande (etapp 1d, tasks/easoft-gap-plan.md).
-  checklist_forslag: 'Checklista',
-  // Tidrapport-förslag (etapp 2a, tasks/easoft-gap-plan.md) — projektnivå,
-  // inte person (se lib/egenkontroll/suggest-time-entry.ts).
-  tidrapport_forslag: 'Tidrapport',
-  // Auto-offertutkast från kvalificerad lead (etapp 2a, tasks/value-chain-plan.md).
-  create_quote_draft: 'Offertutkast',
-  // ÄTA-kedjan (etapp 2b, tasks/value-chain-plan.md).
-  create_ata_draft: 'ÄTA-förslag',
-  // Playbook Kickoff Copilot V1 (2026-08-17) — kontrollpunktsförslag ur
-  // ägarbekräftade mönster, se lib/playbook/propose-kickoff.ts.
-  playbook_kickoff_suggestion: 'Kontrollpunkt',
 }
 
 export default function ProjectApprovalsBlock({ projectId, onReadStateChange }: ProjectApprovalsBlockProps) {
@@ -256,11 +222,12 @@ export default function ProjectApprovalsBlock({ projectId, onReadStateChange }: 
         </div>
       )}
       {approvals.map(approval => {
-        const agentKey = getAgentKey(approval)
+        const presentation = projectApprovalPresentation(approval)
+        const agentKey = presentation.agent
         const agent = AGENT_INFO[agentKey]
         const preview = getPreview(approval)
         const editable = getEditableKey(approval) != null
-        const label = TYPE_LABEL[approval.approval_type] || approval.approval_type
+        const label = presentation.type_label
         const editing = editingId === approval.id
         const busy = busyId === approval.id
 
@@ -278,10 +245,10 @@ export default function ProjectApprovalsBlock({ projectId, onReadStateChange }: 
                   Verbet bär rösten: berättar / föreslår / frågar. */}
               <AgentAvatar agentKey={agentKey} />
               <span className="text-xs text-gray-500 flex-1 min-w-0 truncate">
-                <b className="font-semibold text-gray-900">{agent.name}</b> · {agent.role} föreslår
+                <b className="font-semibold text-gray-900">{agent.name}</b> · {agent.role}
               </span>
               <span className="text-[10.5px] font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-700 whitespace-nowrap">
-                Skickas efter ditt OK
+                Väntar på dig
               </span>
             </div>
 
@@ -317,7 +284,7 @@ export default function ProjectApprovalsBlock({ projectId, onReadStateChange }: 
                     className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
                   >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Spara &amp; godkänn
+                    {APPROVAL_EDIT_REVIEW_LABEL}
                   </button>
                   <button
                     onClick={() => setEditingId(null)}
@@ -334,7 +301,7 @@ export default function ProjectApprovalsBlock({ projectId, onReadStateChange }: 
                     className="flex-1 inline-flex items-center justify-center gap-1.5 h-11 px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50"
                   >
                     {busy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Godkänn
+                    {presentation.approve_label}
                   </button>
                   {editable && (
                     <button

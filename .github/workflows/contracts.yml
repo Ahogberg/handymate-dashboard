@@ -75,6 +75,7 @@ jobs:
           tests/home-brain.spec.ts
           tests/agent-team.spec.ts
           tests/approval-action-contract.spec.ts
+          tests/approval-display.spec.ts
           tests/column-contract.spec.ts
           tests/cron-auth.spec.ts
           tests/dead-code-paths.spec.ts

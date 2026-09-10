@@ -1,6 +1,7 @@
 'use client'
 
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+import { APPROVAL_EDIT_REVIEW_LABEL, approvalGroupReviewLabel } from '@/lib/approvals/presentation'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -54,7 +55,7 @@ import { quoteDraftSummary } from '@/lib/jarvis/quote-preview-summary'
 import { cardContext } from '@/lib/jarvis/card-context'
 import type { CardAction } from '@/lib/jarvis/voice'
 import { voiceFor, reviewAlternatives, doneRowText } from '@/lib/jarvis/card-voice'
-import { mayExecute } from '@/lib/approvals/action-contract'
+import { classify, mayExecute } from '@/lib/approvals/action-contract'
 import { groupApprovals, groupTitle, groupTotalKr } from '@/lib/jarvis/group-approvals'
 import { grindaNyheter, entityFrom } from '@/lib/jarvis/news-gates'
 import { pengaFynd } from '@/lib/jarvis/moment-rows'
@@ -1913,7 +1914,7 @@ function ApprovalCard({
       attention={needsAttention(approval)}
       approveLabel={
         arGrupp
-          ? `Skicka alla ${group!.length}`
+          ? approvalGroupReviewLabel(group!.length, classify(approval.approval_type))
           : approveLabel(approval.approval_type, approval.payload)
       }
       editable={isEditable(approval)}
@@ -2076,7 +2077,7 @@ function ApprovalCard({
           />
           <div className="flex items-center gap-2 mt-2">
             <button type="button" onClick={onSaveEdit} className="inline-flex items-center gap-1.5 h-[38px] px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-xl transition-colors">
-              <Check className="w-4 h-4" /> Spara &amp; godkänn
+              <Check className="w-4 h-4" /> {APPROVAL_EDIT_REVIEW_LABEL}
             </button>
             <button type="button" onClick={onCancelEdit} className="h-[38px] px-3 text-sm font-medium text-slate-400 hover:text-slate-600 rounded-xl">
               Avbryt

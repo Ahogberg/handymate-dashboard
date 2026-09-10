@@ -1601,6 +1601,14 @@ Project är inspekterad inför nästa brief, inte nybyggd: återanvänd `project
 
 **STATUS:** implementerat med projektfilter i befintlig GET, tydlig fortsatt läsning, synliga fel/återförsök, skydd mot äldre svar och omläsning från sida ett efter beslut. Badge räknar beslut; åtgärdsrader ligger under Nästa steg. Typkontroll och 18 riktade tester gröna, inklusive faktisk GET och asynkron läscallback. Nya regressioner är inkopplade i både lokal kontraktslista och workflow; separat körning av ny spec och paritetsgrind är grön (8/8). GitHub-kodcommit `3ca682f63c07f6b34a9fc2bde9f7ee3b94ec0464` har samtliga 13 CI-checkar och båda previewbyggen gröna. Inloggad kontroll av samma testprojekt visar två beslut (tidigare badge fyra), separat Nästa steg och samma resultat efter full omladdning. Tidrapportens tidigare falska klarstatus är fortsatt borta. Förberedelsevyn verifierades också: inget kommande bokat besök ger tydligt besked och kalenderlänk. Inga beslut eller utskick genomfördes. Live-företagsbyte, mobil och verklig kö med fler än 50 projektbeslut är inte bevisade; paginering och sena svar har isolerade regressioner. Detta stänger inte hela Project-slicen.
 
+### PROJECT — TYDLIG GRANSKNING
+
+Projektkorten återanvänder nu API:ets gemensamma `approvalDisplay` med samma kanoniska fallback, i stället för egna agent-/typkartor. Effektfulla ärenden öppnas med ”Granska”, informationskort med ”Jag har läst det”, och redigerat innehåll med ”Granska ändring”. Det ovillkorliga ”Skickas efter ditt OK” är ersatt av neutral väntansstatus. Befintlig granskningsdialog och servergrind är oförändrade. Tio riktade presentation-/läsregressioner och typkontroll är gröna; publicerad preview och avbruten granskning återstår vid denna checkpoint. Inga capability-statusar uppgraderade.
+
+### UTÖKAT SCOPE — ALLA GODKÄNNANDEKORT
+
+Användaren har uttryckligen begärt korrekt struktur för alla korttyper och ytor, inklusive informationskort utan Godkänn. Se `docs/brain-visibility/APPROVAL_CARD_SURFACE_AUDIT.md`. Samma befintliga klassificering/granskningsväg ska styra webb och mobil. Webbpaketet är lokalt implementerat över de kartlagda kortytorna: kanoniska primär-/redigerings-/paketetiketter och klassmedvetna gruppetiketter, med 16 riktade tester och typkontroll gröna. Den isolerade Project-ändringen publiceras tillsammans med detta paket. Separat mobilbrygga mot befintlig webbgranskning är under implementation. Native mobilgranskning ersätts inte med ogrundad direktgodkänning.
+
 ### REPRODUCERA LOKALA KONTROLLER
 
 Kör från `handymate-dashboard/` efter `npm ci`:
