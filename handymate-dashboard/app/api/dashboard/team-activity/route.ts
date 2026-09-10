@@ -224,19 +224,35 @@ export async function GET(request: NextRequest) {
       .eq('business_id', businessId)
       .eq('status', 'pending')
       .neq('approval_type', 'team_intro'),
-    // Lisas aktiveringsgrind, del 2: ett RIKTIGT samtal som Lisa fångat
-    // någonsin är starkare bevis än ett provsamtal. Mot databasen 2026-09-04
-    // hade inget av de åtta kontona med nummer ett provsamtal registrerat
-    // (onboarding_data.test_call.called_at) — inte demokontot med ett riktigt
-    // samtal, inte de betalande. Grindad enbart på provsamtalet hade Lisa
+    // ═══ LISAS AKTIVERINGSGRIND, DEL 2: ETT RIKTIGT SAMTAL ═══
+    //
+    // Ett samtal som faktiskt kommit in är starkare bevis än ett provsamtal.
+    // Mot databasen 2026-09-04 hade inget av de åtta kontona med nummer ett
+    // provsamtal registrerat (onboarding_data.test_call.called_at) — inte
+    // demokontot, inte de betalande. Grindad enbart på provsamtalet hade Lisa
     // visat "Verifiera telefonen" överallt, även där hon bevisligen jobbat.
+    //
+    // 2026-09-10: den här räkningen gick först mot agent_runs med
+    // trigger_type 'phone_call'. Den var DÖD. Efter två fångade samtal på
+    // Nordström El samma förmiddag stod agent_runs på noll för Lisa — noll
+    // någonsin — medan call_recording hade båda raderna. Enda stället i hela
+    // koden som skriver agent_runs('lisa','phone_call') är demoseedaren
+    // (lib/demo/seed-demo-account.ts:1367). Grinden gick alltså bara att
+    // uppfylla på ett påhittat konto, vilket är precis motsatsen till vad den
+    // var till för.
+    //
+    // Rätt signal är den rad samtalsvägen faktiskt skriver:
+    // app/api/voice/incoming/route.ts upsertar call_recording med
+    // source='phone' och direction='inbound' för varje inkommande samtal,
+    // före vidarekoppling och oavsett om någon svarar.
+    //
     // Utan tidsfönster med avsikt: agentRunsRes ovan är bara senaste dygnet.
     supabase
-      .from('agent_runs')
-      .select('run_id', { count: 'exact', head: true })
+      .from('call_recording')
+      .select('recording_id', { count: 'exact', head: true })
       .eq('business_id', businessId)
-      .eq('agent_id', 'lisa')
-      .eq('trigger_type', 'phone_call'),
+      .eq('source', 'phone')
+      .eq('direction', 'inbound'),
   ])
 
   const nastaBokningRad = (nastaBokningRes.data || [])[0] || null

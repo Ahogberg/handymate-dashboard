@@ -21,6 +21,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import { execSync } from 'child_process'
 import {
   harledAgentTillstand,
   type AgentId,
@@ -241,13 +242,52 @@ test.describe('källskanning — team-activity-rutten', () => {
     // jobbat. Ett riktigt samtal är starkare bevis än ett provsamtal.
     expect(ren).toMatch(/telefonVerifierad = Boolean\(testCall\?\.called_at\) \|\| lisaSamtalNagonsin > 0/)
     // Räkningen måste vara UTAN tidsfönster — agentRuns-selecten är bara 24 h.
-    const start = ren.indexOf("from('agent_runs')", ren.indexOf('lisaSamtalNagonsinRes'))
+    const start = ren.indexOf("from('call_recording')", ren.indexOf('lisaSamtalNagonsinRes'))
     const block = ren.slice(start, ren.indexOf('])', start))
-    expect(block).toContain("eq('agent_id', 'lisa')")
-    expect(block).toContain("eq('trigger_type', 'phone_call')")
+    expect(block).toContain("eq('source', 'phone')")
+    expect(block).toContain("eq('direction', 'inbound')")
     expect(block).toContain("count: 'exact', head: true")
     expect(block).not.toContain('sinceIso')
     expect(block).not.toContain('.gte(')
+  })
+
+  test('beviset räknas i en tabell som samtalsvägen FAKTISKT skriver', () => {
+    // 2026-09-10, provsamtalet. Grinden räknade agent_runs med trigger_type
+    // 'phone_call'. Efter två fångade samtal på Nordström El samma förmiddag:
+    // noll rader i agent_runs för Lisa — noll någonsin — men båda samtalen låg
+    // i call_recording. Enda skrivaren av agent_runs('lisa','phone_call') i
+    // hela koden är demoseedaren. Grinden gick alltså bara att uppfylla på ett
+    // påhittat konto.
+    //
+    // Det här provet är lärdomen, inte bara rättningen: signalen en
+    // aktiveringsgrind vilar på måste ha en skrivare i produktionskod. Annars
+    // är grinden död oavsett hur rimlig den ser ut i en kodgranskning.
+    const rutt = read('app/api/dashboard/team-activity/route.ts')
+    const grindStart = rutt.indexOf('LISAS AKTIVERINGSGRIND')
+    expect(grindStart, 'hittade inte aktiveringsgrindens block').toBeGreaterThan(-1)
+    const tabell = /from\('([a-z_]+)'\)/.exec(rutt.slice(grindStart))
+    expect(tabell, 'hittade inte vilken tabell beviset räknas i').toBeTruthy()
+    const namn = tabell![1]
+
+    // Vem skriver den? Sök i hela app/ och lib/, kräv insert/upsert efter
+    // from(), och räkna bort demo-, seed- och fixturvägar — de bevisar
+    // ingenting om ett riktigt kundkonto.
+    const kandidater = execSync(
+      `grep -rl "from('${namn}')" --include=*.ts app lib || true`,
+      { cwd: ROOT, encoding: 'utf8' },
+    ).split('\n').filter(Boolean)
+
+    const skrivare = kandidater.filter(f => {
+      if (/demo|seed|fixture/i.test(f)) return false
+      const src = fs.readFileSync(path.join(ROOT, f), 'utf8')
+      // insert/upsert ska stå i samma kedja som from('<tabell>')
+      return new RegExp(`from\\('${namn}'\\)[\\s\\S]{0,400}?\\.(insert|upsert)\\(`).test(src)
+    })
+
+    expect(skrivare.length, `ingen produktionsväg skriver ${namn} — grinden kan aldrig uppfyllas på ett riktigt konto`)
+      .toBeGreaterThan(0)
+    // Och den vägen ska vara samtalsvägen, inte något annat som råkar skriva.
+    expect(skrivare.some(f => f.includes('api/voice')), `${namn} skrivs inte av samtalsvägen: ${skrivare.join(', ')}`).toBe(true)
   })
 
   test('automation_settings selectas med de tre verifierade kolumnerna', () => {
