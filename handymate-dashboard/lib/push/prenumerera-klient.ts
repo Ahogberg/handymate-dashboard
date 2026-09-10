@@ -38,6 +38,37 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 export type PushStatus = 'pa' | 'av' | 'blockerad'
 
 /**
+ * Varför en prenumeration inte gick igenom.
+ *
+ * 2026-09-10: `prenumereraPaPush` returnerade ett naket `false` för sex
+ * genuint olika skäl, och båda ytorna sa samma sak för alla — "Kunde inte
+ * aktivera notiser — försök igen". Är skälet att VAPID-nyckeln saknas i
+ * bygget är det rådet falskt: knappen kan aldrig lyckas hur många gånger den
+ * än trycks, och felet är vårt, inte kundens. Mot databasen samma dag hade
+ * push_subscriptions noll rader i hela historien — vilket är precis vad ett
+ * tyst, oåtgärdbart fel ser ut som.
+ */
+export type PushMisslyckande =
+  | 'stods_ej'           // webbläsaren kan inte push alls
+  | 'ej_konfigurerad'    // VAPID-nyckeln saknas i bygget — VÅRT fel
+  | 'nekad'              // personen sa nej i webbläsarens dialog
+  | 'servern_nekade'     // POST /api/push/subscribe svarade fel
+  | 'ovantat_fel'
+
+export type PushPrenumeration =
+  | { ok: true }
+  | { ok: false; skal: PushMisslyckande; detalj?: string }
+
+/** Text att visa för kunden. Aldrig "försök igen" när ett nytt försök är omöjligt. */
+export const PUSH_MISSLYCKANDE_TEXT: Record<PushMisslyckande, string> = {
+  stods_ej: 'Den här webbläsaren stödjer inte notiser. Installera appen på hemskärmen och försök därifrån.',
+  ej_konfigurerad: 'Notiser är inte påslagna hos oss ännu — det är inget du kan göra åt. Vi har fått larmet och hör av oss.',
+  nekad: 'Du avvisade notiser i webbläsarens dialog. Tillåt dem i webbläsarens inställningar för den här sidan och försök igen.',
+  servern_nekade: 'Vi kunde inte spara din enhet. Försök igen om en stund.',
+  ovantat_fel: 'Något gick fel när notiser skulle slås på. Försök igen.',
+}
+
+/**
  * Läser nuvarande push-status utan att be om tillstånd eller prenumerera.
  * Används av "Notiser"-kortet i inställningarna för att visa "På" / "Av" /
  * "Blockerad i webbläsaren" innan kunden trycker på något.
@@ -67,10 +98,14 @@ export async function hamtaPushStatus(): Promise<PushStatus> {
  * sedan alla framtida försök. Vid fel: `console.warn`, flaggan lämnas orörd
  * så nästa besök försöker igen.
  */
-export async function prenumereraPaPush(): Promise<boolean> {
-  if (typeof window === 'undefined') return false
-  if (!('PushManager' in window) || !('serviceWorker' in navigator)) return false
-  if (!PUBLIC_VAPID_KEY) return false
+export async function prenumereraPaPush(): Promise<PushPrenumeration> {
+  if (typeof window === 'undefined') return { ok: false, skal: 'stods_ej' }
+  if (!('PushManager' in window) || !('serviceWorker' in navigator)) return { ok: false, skal: 'stods_ej' }
+  // VÅRT fel, inte kundens — och ett nytt försök hjälper aldrig.
+  if (!PUBLIC_VAPID_KEY) {
+    console.warn('Push subscription omöjlig: NEXT_PUBLIC_VAPID_PUBLIC_KEY saknas i bygget')
+    return { ok: false, skal: 'ej_konfigurerad' }
+  }
 
   try {
     const reg = await navigator.serviceWorker.ready
@@ -88,7 +123,7 @@ export async function prenumereraPaPush(): Promise<boolean> {
     let subscription = existing
     if (!subscription) {
       const permission = await Notification.requestPermission()
-      if (permission !== 'granted') return false
+      if (permission !== 'granted') return { ok: false, skal: 'nekad' }
       subscription = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: urlBase64ToUint8Array(PUBLIC_VAPID_KEY),
@@ -108,13 +143,13 @@ export async function prenumereraPaPush(): Promise<boolean> {
 
     if (res.ok) {
       localStorage.setItem(PUSH_SUBSCRIBED_KEY, '1')
-      return true
+      return { ok: true }
     }
 
     console.warn('Push subscription failed: servern svarade', res.status)
-    return false
+    return { ok: false, skal: 'servern_nekade', detalj: String(res.status) }
   } catch (err) {
     console.warn('Push subscription failed:', err)
-    return false
+    return { ok: false, skal: 'ovantat_fel', detalj: err instanceof Error ? err.message : undefined }
   }
 }

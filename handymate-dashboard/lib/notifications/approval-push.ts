@@ -24,6 +24,13 @@ import { bokforPush, nyligenSkickad } from '@/lib/notifications/push-dispatch-lo
 import { skaHallasUnderTystTid } from '@/lib/notifications/tyst-tid'
 import { hallPush } from '@/lib/notifications/push-held'
 import { formatRequestedDateShort } from '@/lib/quotes/booking-suggestions'
+import {
+  bedomMottagarlage,
+  larmaPushUtanMottagare,
+  utanMottagare,
+  type PushMottagarlage,
+  type PushSandSvar,
+} from '@/lib/notifications/push-utan-mottagare'
 
 interface ApprovalLike {
   /** pending_approvals.id om anroparen har raden — blir dedupe-objektet. */
@@ -435,7 +442,7 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
     })
 
     let delivered = false
-    let ingenMottagare = false
+    let lage: PushMottagarlage = 'har_mottagare'
     if (!res.ok) {
       const errBody = await res.text().catch(() => '')
       console.error('[approval-push] /api/push/send failed:', {
@@ -445,9 +452,9 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
         body: errBody.slice(0, 200),
       })
     } else {
-      const data = await res.json().catch(() => ({})) as { delivered?: boolean; reason?: string }
+      const data = await res.json().catch(() => ({})) as PushSandSvar
       delivered = data.delivered === true
-      ingenMottagare = data.reason === 'no_recipients' || data.reason === 'no_matching_token'
+      lage = bedomMottagarlage(data)
     }
 
     // Bokförs när ett försök faktiskt nådde en provider (levererat ELLER
@@ -455,7 +462,22 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
     // "Ingen mottagare" bokförs INTE: registrerar personen sin telefon
     // senare samma dag ska nästa signal kunna nå fram. delivered visar
     // sanningen, aldrig ett antagande.
-    if (ingenMottagare) return
+    //
+    // 2026-09-10: men den ska LARMA. Att inte bokföra är rätt (dedupenyckeln
+    // ska inte brännas), att tiga är det inte — mot databasen samma dag hade
+    // push_subscriptions noll rader i hela historien, och de enda spåren av
+    // att någon push aldrig nått fram var två push_held-rader med
+    // release_outcome 'ingen_mottagare'. Ingen fick veta. Se
+    // lib/notifications/push-utan-mottagare.ts.
+    if (utanMottagare(lage)) {
+      await larmaPushUtanMottagare(supabase, lage, {
+        businessId: approval.business_id,
+        approvalType: approval.approval_type,
+        pushClass: policy.klass,
+        titel: template.title,
+      })
+      return
+    }
     await bokforPush(supabase, {
       business_id: approval.business_id,
       dedupe_key: dedupeKey,

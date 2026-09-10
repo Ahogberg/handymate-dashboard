@@ -191,6 +191,7 @@ jobs:
           tests/nummerverifiering.spec.ts
           tests/sms-inkommande.spec.ts
           tests/sms-syfte-och-arlighet.spec.ts
+          tests/push-nar-ingen-nas.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

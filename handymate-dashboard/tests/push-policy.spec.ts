@@ -130,8 +130,23 @@ test.describe('källskanning — inkopplingen', () => {
     expect(src).toContain("delivered = data.delivered === true")
     // "Ingen mottagare" bokförs inte — annars blockeras dagens första riktiga push
     // för den som registrerar sin telefon senare samma dag.
-    expect(src).toContain("data.reason === 'no_recipients' || data.reason === 'no_matching_token'")
-    expect(src).toMatch(/if \(ingenMottagare\) return\s*\n\s*await bokforPush\(/)
+    //
+    // 2026-09-10: bedömningen flyttade till lib/notifications/push-utan-mottagare.ts
+    // (samma två skäl, plus att VÅR saknade VAPID-konfiguration skiljs från
+    // kundens saknade enhet, och att fallet nu LARMAR i stället för att tiga).
+    // De två assertionerna nedan låste den gamla raden ordagrant — det är att
+    // vakta implementationen, inte invarianten. Nu vaktas invarianten:
+    // grenen ska returnera FÖRE bokföringen, och skälen ska stå i modulen som
+    // faktiskt dömer. Larmet i sig har eget facit i
+    // tests/push-nar-ingen-nas.spec.ts.
+    expect(src).toContain('bedomMottagarlage(data)')
+    const utan = src.indexOf('if (utanMottagare(')
+    expect(utan, 'grenen för "ingen mottagare" saknas').toBeGreaterThan(0)
+    expect(bokfor, 'bokföringen ligger före grenen — då bokförs försök som aldrig nådde någon')
+      .toBeGreaterThan(utan)
+    const modul = read('lib/notifications/push-utan-mottagare.ts')
+    expect(modul).toContain("'no_recipients'")
+    expect(modul).toContain("'no_matching_token'")
   })
 
   test('agent-observationens kort-id skickas med som dedupe-objekt', () => {

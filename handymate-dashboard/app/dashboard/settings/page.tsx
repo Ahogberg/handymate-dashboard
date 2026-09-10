@@ -51,7 +51,7 @@ import { isLaunchHidden, launchGateForPath } from '@/lib/launch-visibility'
 import { visibleAreas, allEntries } from '@/lib/settings/areas'
 import { SettingsHub, SettingsAreaView } from '@/components/settings/SettingsHub'
 import UpgradePrompt from '@/components/UpgradePrompt'
-import { hamtaPushStatus, prenumereraPaPush, arIOS, type PushStatus } from '@/lib/push/prenumerera-klient'
+import { hamtaPushStatus, prenumereraPaPush, arIOS, PUSH_MISSLYCKANDE_TEXT, type PushStatus } from '@/lib/push/prenumerera-klient'
 
 interface BusinessConfig {
   business_id: string
@@ -502,10 +502,13 @@ export default function SettingsPage() {
   async function aktiveraNotiser() {
     setPushBusy(true)
     try {
-      const ok = await prenumereraPaPush()
+      const utfall = await prenumereraPaPush()
       setPushStatus(await hamtaPushStatus())
-      if (!ok) {
-        setToast({ show: true, message: 'Kunde inte aktivera notiser — försök igen', type: 'error' })
+      if (!utfall.ok) {
+        // Säg VARFÖR. "Försök igen" är ett falskt råd när skälet är att
+        // VAPID-nyckeln saknas i bygget — då kan knappen aldrig lyckas, och
+        // felet är vårt, inte kundens (lib/push/prenumerera-klient.ts).
+        setToast({ show: true, message: PUSH_MISSLYCKANDE_TEXT[utfall.skal], type: 'error' })
       }
     } finally {
       setPushBusy(false)

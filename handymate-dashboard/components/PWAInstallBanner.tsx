@@ -49,8 +49,13 @@ export default function PWAInstallBanner() {
   // Delad med "Notiser"-kortet i inställningarna (lib/push/prenumerera-klient.ts)
   // — exakt samma kod, ingen dubblerad pushManager.subscribe.
   async function subscribeToPush() {
-    const ok = await prenumereraPaPush()
-    if (ok) setPushGranted(true)
+    // 2026-09-10: prenumereraPaPush returnerar ett utfall med skäl, inte ett
+    // naket false. Bannern frågar tyst i bakgrunden och har ingen yta att visa
+    // ett fel i — men skälet ska ändå nå konsolen, för det tysta felet var
+    // hela orsaken till att push_subscriptions stod på noll rader.
+    const utfall = await prenumereraPaPush()
+    if (utfall.ok) setPushGranted(true)
+    else console.warn('[pwa-banner] notiser kunde inte slås på:', utfall.skal, utfall.detalj || '')
   }
 
   async function handleInstall() {
