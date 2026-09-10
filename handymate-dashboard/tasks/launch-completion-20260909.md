@@ -164,3 +164,8 @@ Verifieringsläge: tre deterministiska käll-/beloppsfall är tillagda, inklusiv
 Öppen datarisk: `project_type` härleds i dag heuristiskt ur offertens radslag (arbete/material), inte ur ett uttryckligt kundvalt avtalsvillkor. Rättningen följer den befintliga modellens `fixed_price/hourly/mixed`, men ett nytt kontrollerat byggscenario måste verifiera att valt avtal blir rätt typ. Ett framtida explicit `billing_model` är en separat modelländring och ska inte smygas in före kundbeslut.
 
 Nästa körbara steg: invänta och avläs PR37-grindarna; klickprova sedan ett fastpris-, löpande- och blandprojekt på samma preview-HEAD och jämför projektets belopp, valda källrader, ÄTA, fakturautkast och ekonomisystemskvitto. Preview är fortfarande spärrad av Vercels deployment protection utan giltig session. Ingen produktion, migration, fakturasändning eller providerkommunikation har utförts.
+
+
+### Uppföljning: samma fakturakälla i projektlistan
+
+Slutlig fakturakälleskod för detta pass ligger i `ff4549a6cda47c5fa961fe386150750710d63ad1` före plansynk. Projektlistan använder nu samma källval som detaljsidan, hittar fastprisprojekt utan tid samt löpande projekt med enbart ofakturerat material, och stoppar nytt avtalsutkast när en projektfaktura redan finns. Två ytterligare källfall och ett statiskt kopplingsfacit är tillagda. Grön status inväntas på plansynkad PR-HEAD; kundklick och providerprov är oförändrat öppna.
