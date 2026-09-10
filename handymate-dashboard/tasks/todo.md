@@ -1484,6 +1484,6 @@ utskick, fakturasändning, main-merge eller produktionsmigration ingår.
 - [x] Inventera ProjectApprovalsBlock, ProjectTodoBlock och befintlig approvals-GET.
 - [x] Filtrera projekt före paginering med tenant/routing kvar.
 - [x] Visa laddning, läsfel, delvis lista och verifierat tomt läge sanningsenligt.
-- [ ] Verifiera route, pagination, scope-byte, CI och inloggad preview.
+- [x] Verifiera route, pagination och sena svar i isolerade regressioner, samt CI och inloggad preview med reload. Verkligt företagsbyte/mobil återstår.
 
 Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabeller, inga verkliga godkännanden eller utskick i testet.
