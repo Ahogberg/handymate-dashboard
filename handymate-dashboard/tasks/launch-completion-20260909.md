@@ -178,3 +178,17 @@ Draft-PR37 HEAD `7fc9c45c374dfc24a14d7f04791b79fa41798b93` är tekniskt grön: f
 En kapad filöverföring till PR-grenen upptäcktes av grinden, återställdes till exakt lokalt Git-blob-ID och omprovades. Ett därefter synligt typfel och fem saknade route-harness-mockar rättades; endast den sista gröna SHA:n ovan gäller.
 
 Nästa körbara steg är oförändrat kundprov på samma preview: skapa eller välj ett kontrollerat fastpris-, löpande- och blandprojekt, verifiera källval och belopp hela vägen till fakturautkast utan att skicka. Därefter samordnat mobilprov för rapportkvittens och separat Fortnox/providerprov. `project_type`-heuristiken och Matte-onboardingens portning är fortfarande öppna produktfrågor; inget av dem är kundgodkänt.
+
+
+## Checkpoint: ÄTA-beloppsparitet och robust företagsstart 2026-09-10
+
+Kod-HEAD i draft-PR37: `ac52c8e7bf4d94e699d1383bbcb442deb74eee9e`. Lokal motsvarighet `e8173a62`. Ingen main-merge, migration eller skarp kommunikation.
+
+- Felreproduktion på `34ec5ac41e49b7dfd0bd9fc96281aab6b9d2c66a`: GitHub Kontraktsgrind run 459/job 102771972703 gav exakt fem väntade ÄTA-paritetsfel, 1797 godkända och en befintlig skip. En gammal sparad ÄTA-total kunde styra preview trots att utkastet räknade raderna.
+- Rättat: signerad/godkänd ÄTA med rader räknas från raderna i preview. Legacy utan rader behåller total-fallback. Noll i antal bevaras i båda fakturabyggarna och ROT/RUT-underlag; radvisningen använder samma legacy-default för saknat antal. Prov täcker tillägg/avgående, noll/två i antal och gammal total genom preview → båda utkastvägarna. Providers är isolerade/mockade, inte liveprov.
+- Setup Studio: blockerad sessionStorage kunde kasta vid start och hindra byte till klassisk guide. Felet reproducerades mot originalkoden med Node; ändrade riktiga funktioner klarar samma prov. Läsning ger nu null och nekad skrivning stoppar inte lokalt lägesbyte. Detta är en robusthetsrättning i befintlig guidning, INTE portning eller godkännande av den efterfrågade nya Matte-designen.
+- Upptäckt verifieringslucka: project-derive-todo och facit-project-list-next-todo ingick inte i tidigare breda grindens 1772 prov. Nu ingår båda samt onboarding-setup-studio i GitHub-grinden och npm test:contracts, med ett facit som kräver inkopplingen.
+- Slutbevis på kod-HEAD ovan: fem GitHub Actions gröna, Kontraktsgrind run 461/job 102773183241: TypeScript utan fel, 1809 browserlösa prov godkända + en befintlig skip, kundunderlagskontrakt och sex-kundutfall-sviten godkända. Båda Vercel-byggena gröna. Alla nio överförda ändringsfiler verifierade mot lokala Git-blobbar. Lokal full svit kunde inte köras eftersom beroenden saknas och offlinecache saknar TypeScript; CI är det fulla körbeviset.
+- Browserkontroll: befintlig flik visar Vercels vanliga inloggningssida före preview. Ingen giltig preview-session; inga inloggade kundklick utförda i detta pass. Ingen kringgång av skyddet.
+
+Nästa körbara kodsteg: rätta återstående osäkerhet i faktureringsvalet utan att anta att project_type bevisar ett avtal; granska även previewns befintlig-faktura-kvittens och felhantering. Nya Matte-guidningen behöver jämföras mot befintliga SetupStudioShell/MatteSetupGuide och beslutad design innan portning; byggflaggan NEXT_PUBLIC_SETUP_STUDIO_ENABLED är inte i sig designgodkännande. Kundprov kvarstår för fastpris/löpande/blandavtal, rätt onboarding-version, portal/uppföljning, tappad mobilkvittens och rapport → ÄTA → faktura → verkligt Fortnox. PR7/mobil är oförändrad i detta pass.
