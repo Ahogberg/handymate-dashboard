@@ -1495,7 +1495,7 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | CONNECT före Home | Veckorapportskod och lokala tester klara; driftblocker kvar | Nummer/saldo, avstämning av fyra äldre rapportfel, verifierad leverans |
 | Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
-| Slice 3 — Project | Befintlig vy inspekterad; avgränsad sanningsrättning pågår | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
+| Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
 | Slice 4–10 | Inte påbörjade i denna session | Respektive leverans och testgrind |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
@@ -1589,7 +1589,9 @@ Project är inspekterad inför nästa brief, inte nybyggd: återanvänd `project
 
 **VERIFIERING:** 57 fokuserade tester gröna, inklusive faktisk asynkron callback med läsfel, tomt svar, ogiltigt null-svar och äldre svar efter ny läsning. Typkontroll grön före testkompletteringen. De två befintliga rapportspecifikationerna är tillagda i både lokal kontraktslista och CI-lista; paritetsgrinden är grön. Ombokningscommit `f14390c` är grön i samtliga 13 CI-checkar. Project-rättningen är ännu inte bevisad i uppdaterad preview. Publiceringsförsöket via GitHub create_tree/create_blob gav ett serialiseringsfel för den stora projektfilen; önskat träd kunde inte hämtas efteråt. Överföringen återhämtades efter uttryckligt användargodkännande via GitHubs webbeditor till `codex/project-time-transfer-20260910`. Filens blob-SHA `39fcccbff649212b4091388f7db45a3b3d7496b0` matchar den testade lokala filen exakt. Komplett paket sammanförs i PR #38; efterföljande CI och previewkontroll återstår. Lokal implementation är committad som `f625ad6`.
 
-**KVAR / NÄSTA STEG:** verifiera samma projekt efter publicering och reload. Slice 3 är inte stängd: detta rättar tidrapportbeviset, inte hela projektets administrativa läsmodell eller fullständig fakturaberedskap. Övriga slice 1/2-, provider- och mobilgrindar kvarstår. Inga capability-statusar uppgraderade.
+**LIVE-CHECKPOINT:** komplett kod på GitHub `ffb29cf3d471d93a22636533593dd56114fd56ef`, samtliga 13 CI-checkar gröna och båda Vercelbyggena gröna. Samma inloggade testprojekt visar nu ingen falsk ”Tidrapport i går — Klar”, även efter full omladdning. Befintlig blockerare ”Nej — 1 delmoment kvar” och nästa steg ”Rapportera tid” kvarstår. Inga godkännanden, utskick eller produktionsskrivningar genomfördes.
+
+**KVAR / NÄSTA STEG:** fortsätt Project-granskningen av vad Handymate bevakar, vad användaren behöver göra och vilket underlag som saknas; återanvänd befintliga komponenter och motorer. Slice 3 är inte stängd: detta rättar tidrapportbeviset, inte hela projektets administrativa läsmodell eller fullständig fakturaberedskap. Övriga slice 1/2-, provider- och mobilgrindar kvarstår. Inga capability-statusar uppgraderade.
 
 ### REPRODUCERA LOKALA KONTROLLER
 
