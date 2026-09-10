@@ -1473,7 +1473,7 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 - [x] Kartlägg förfrågan → offert → uppföljning → beslut/projekt och prova läsande i Nordström El.
 - [x] Kartlägg utfört jobb → rapport → ÄTA → fakturaunderlag → ekonomisystem och prova läsande i Nordström El.
 - [x] Rätta första reproducerade intäkts-/administrationsavbrottet och kör riktade samt breda prov.
-- [ ] Spara exakt SHA, preview/CI, klickbevis och öppna kund-/providerprov i egen draft-PR.
+- [x] Spara exakt SHA, klickbevis och öppna kund-/providerprov i egen draft-PR; preview/CI avläses på remote HEAD.
 
 Färdig betyder att varje steg har en synlig nästa handling och en sparad kvittens.
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt

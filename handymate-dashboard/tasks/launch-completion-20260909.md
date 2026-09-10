@@ -92,3 +92,31 @@ Verifierat lokalt: typkontroll, 12 nya utkastprov, totalt 222 Jest-prov i 30 svi
 Begränsning: endast text på samma enhet; ingen ljud-/bildbackup. Dödas processen innan sparad-markeringen kan senaste ändringen gå förlorad. Tappat serversvar är inte löst av utkast: beständig inskickningsnyckel och avstämning återstår innan retry kan kallas dublettsäker. Block 4 är fortfarande pågående, inte kundgodkänt.
 Öppna kundprov: tvångsstäng efter sparad-markering, återöppna samma projekt/datum, konto- och datumbyte, avbrutet skick, därefter separat verkligt rapport→ÄTA→faktura-/Fortnoxprov. Ingen main-merge, produktionsmigration eller kundkommunikation.
 Nästa körbara steg: kontrollera PR7-CI; undersök sedan rapportchattens /api/matte/chat och sendToMatte för beständig inskickningsidentitet och avstämning vid tappat svar. Reproducera mottaget serverskick + förlorad HTTP-kvittens innan implementation. Inventera samtidigt rapportens koppling till godkänd ÄTA/fakturakällor; telefon-/providerprov hålls öppna. Portalens anslutning är redan genomförd, inte en ny startuppgift.
+
+## Checkpoint: tre hela värderesor och två synliga avbrott 2026-09-09
+
+Draft-PR37: https://github.com/Ahogberg/handymate-dashboard/pull/37. Kodcommit: `a7de2778c5cc79f890ad5d9f8ef561f8ecec5689` på egen gren. Full karta med manuella steg, automation, sparade resultat, bevisnivå och öppna prov: `tasks/three-value-journeys-20260909.md`.
+
+Rättat efter reproduktion:
+
+- Hemsidan dolde ett verkligt fakturagranskningsbehov när arbetet saknade säkert belopp, eftersom `PengarBand` behandlade `totalKr === 0` som tomt. Nu avgör faktiska kategorier tomläget, okända belopp visas i antal och ingen `0 kr` uppfinns.
+- `/dashboard/quotes?status=sent`, som är mål för uppföljningslänken, ignorerade queryn och visade hela offertlistan. Nu läses URL-filtret, skickat+öppnat delar arbetskö och flikvalet skrivs tillbaka till en delbar URL.
+
+Verifiering på kodcommitten:
+
+- 314 riktade Playwright-prov för Bolagsverket/onboarding/företagsskanning/första offert, Pengar-bandet, offertfiltret och projekt→ÄTA→faktura: godkända på desktop + mobilkonfiguration.
+- `npm run test:six-outcomes`: godkänd (42 boundary, 13 SQL-intake, 35 intake/HTTP, 45 Fortnox-avstämning, 15 faktura/accept-SQL, 20 faktura/accept-service, 18 portal, 30 Gmail).
+- `tsc --noEmit` med 8 GB heap: exit 0. Första körningen med standardheap dog av OOM och räknades inte som godkänd.
+- Next-produktionsbygge: avslutat med `.next/BUILD_ID=RACW2sK8VDYob6H3kgEBY`; de befintliga Sentry-deprecationsvarningarna kvarstår.
+- `git diff --check`: exit 0 före commit.
+
+Läsande produktionsklick, Nordström El AB, utan sändning eller skrivning:
+
+- Accepterad offert visade signatur, händelselogg, överlämning och sparad projektlänk.
+- Klart projekt visade rapportstart, separat ÄTA-livscykel och fakturautkast. Samma projekt visade samtidigt 85 500 kr kvar att fakturera och 2 017 kr redo/ofakturerat på andra ytor; beloppsparitet måste provas med ett nytt kontrollerat scenario.
+- En äldre testfaktura innehöll offertformuleringar i intro/avslut. Det kan vara legacydata och är ännu inte reproducerat i dagens generator.
+- Produktion bevisar inte PR35/PR36 eller denna nya kod.
+
+Matte-onboarding: den namngivna grenen `feat/matte-onboarding-v3` är SHA `e33a8db58f18632f0d6edb50505f377baa87f2e5`, 17 egna commits men 1 448 commits efter main. Vercel-statusen är historiskt grön men ingen aktuell publik preview är verifierad. Den är designkälla, inte lanseringskandidat. Nästa implementation ska porta beslutad guidning till aktuell motor och bevara Bolagsverket, återupptagning, betalverifiering, company scan och första-offert-handoff.
+
+Nästa körbara steg: öppna draft-PR och invänta CI/preview för de två rättningarna. Klicka därefter om offertfiltret på preview. Parallellt i kod: reproducera mobilens första rapportanrop där servern skapat `work_report_session` men HTTP-svaret tappas, och säkerställ att klienten hittar/resumerar serverkvittot innan den får erbjuda ett nytt inskick. Kund-/providerprov för ny onboarding, portal, uppföljning, rapport→ÄTA→faktura och Fortnox är fortsatt öppna och får inte kallas godkända.
