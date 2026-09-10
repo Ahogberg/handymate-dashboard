@@ -120,3 +120,28 @@ Läsande produktionsklick, Nordström El AB, utan sändning eller skrivning:
 Matte-onboarding: den namngivna grenen `feat/matte-onboarding-v3` är SHA `e33a8db58f18632f0d6edb50505f377baa87f2e5`, 17 egna commits men 1 448 commits efter main. Vercel-statusen är historiskt grön men ingen aktuell publik preview är verifierad. Den är designkälla, inte lanseringskandidat. Nästa implementation ska porta beslutad guidning till aktuell motor och bevara Bolagsverket, återupptagning, betalverifiering, company scan och första-offert-handoff.
 
 Nästa körbara steg: öppna draft-PR och invänta CI/preview för de två rättningarna. Klicka därefter om offertfiltret på preview. Parallellt i kod: reproducera mobilens första rapportanrop där servern skapat `work_report_session` men HTTP-svaret tappas, och säkerställ att klienten hittar/resumerar serverkvittot innan den får erbjuda ett nytt inskick. Kund-/providerprov för ny onboarding, portal, uppföljning, rapport→ÄTA→faktura och Fortnox är fortsatt öppna och får inte kallas godkända.
+
+
+## Checkpoint: tappad första rapportkvittens 2026-09-10
+
+Dashboard draft-PR37 innehåller backenddelen på exakt HEAD `80aadfba383f440a247f6868a716e8652d4a91b6`. Mobile draft-PR7 innehåller klientdelen på exakt HEAD `4a4252157e0247f0a40e52bb59d8bf685d8f3fc9`.
+
+Reproducerat avbrott: servern kunde ha skapat `work_report_session` medan mobilens första HTTP-svar försvann. Det lokala textutkastet blev kvar, men ”Försök igen” saknade beständig inskickningsidentitet och kunde köra en ny AI-tur.
+
+Rättat:
+
+- Rapportutkastet bär nu en beständig v4-UUID. Oförändrad text och manuellt återförsök återanvänder nyckeln; redigerad text får en ny. Nyckeln sparas med samma konto-/företag-/medlem-/projekt-/datumavgränsning som texten.
+- `/api/matte/chat` kontrollerar autentiserat företag, aktiv medlem, projektbehörighet och datum innan återhämtning. Samma UUID returnerar den redan lagrade planen före bränslegrind och nytt AI-arbete. Konfliktreplay skapar inte en andra rapport.
+- Vid osäkert transportsvar anropar mobilen `/api/day-close` med exakt UUID. Hittas rapporten installeras en ny kortlivad granskningssignatur; annars behålls text och UUID. Ingen del utförs automatiskt.
+- Befintlig `work_report_session.id text` används; ingen schemaändring eller migration tillkommer.
+
+Verifierat:
+
+- Dashboard: 17 PGlite-baserade rapportkontinuitets-/återhämtningsprov godkända, inklusive tappad första kvittens, tenant-/medlem-/projekt-/datumscope och exakt en rapportplan. `npm run test:six-outcomes` godkänd. TypeScript exit 0. Next-produktionsbygge klart med `.next/BUILD_ID=lcVv-xxPHM6oFUYYsiKYJ`; befintliga env-/Sentry-varningar kvarstod.
+- Mobil: typkontroll godkänd; 224 Jest-prov i 30 sviter godkända; separat `scripts/check-contracts.cjs` godkänd. Två nya prov täcker beständig/roterad nyckel och mottaget serverskick med förlorad HTTP-kvittens.
+- Lokal full `check:readiness` är fortfarande INTE helt grön: tre äldre sviter kan inte starta i scratch eftersom agentbilder saknas lokalt. Remote-branchens bilder är orörda; GitHub-CI ska avläsas på mobil-HEAD ovan.
+- Supabasegranskning: servern använder service-roll endast på servern och varje återhämtningsläsning filtrerar `business_id`, `business_user_id`, `project_id`, `work_date` och UUID. Befintlig RLS/revoke-modell ändrades inte.
+
+Öppet före komplett-/kundgodkännande: samordnad backend-preview och mobilbuild, verkligt felprov där HTTP-kvittensen kapas efter DB-commit, telefonprov, rapport→ÄTA→fakturaunderlag→Fortnox med kontrollerade belopp samt kundklick av Andreas/Christopher. Ingen produktion, migration, main-merge eller extern leverantör användes i detta pass.
+
+Nästa körbara steg: avläs CI/preview på båda HEAD, klickprova PR37:s offertfilter på preview och kör därefter samordnat mobilprov mot samma backend-HEAD. Fortsätt sedan med beloppsparitet i rapport→fakturaunderlag och portning av Matte-onboardingens godkända guidning till aktuell motor.
