@@ -212,7 +212,12 @@ export async function GET(
         change_type: c.change_type,
         signed_at: c.signed_at,
         signed_by_name: c.signed_by_name,
-        total: Number(c.total) || 0,
+        // Samma källrader som slutfakturan. Sparad total kan vara äldre
+        // än raderna; använd den bara för legacy-ÄTA utan rader.
+        total: Array.isArray(c.items) && c.items.length > 0
+          ? c.items.reduce((sum: number, item: any) =>
+              sum + (Number(item.quantity ?? 1) || 0) * (Number(item.unit_price) || 0), 0)
+          : Number(c.total) || 0,
         items: Array.isArray(c.items) ? c.items : [],
       }))
 
@@ -306,7 +311,7 @@ export async function GET(
               ? (it.is_rot_eligible ?? (it.rot_rut_type === 'rot'))
               : (it.is_rut_eligible ?? (it.rot_rut_type === 'rut'))
           if (berattigad) {
-            s += sign * Math.abs((Number(it.quantity) || 1) * (Number(it.unit_price) || 0))
+            s += sign * Math.abs((Number(it.quantity ?? 1) || 0) * (Number(it.unit_price) || 0))
           }
         }
         return s

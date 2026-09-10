@@ -257,7 +257,7 @@ export async function POST(
 
       if (ataItems.length > 0) {
         for (const ai of ataItems) {
-          const qty = Number(ai.quantity) || 1
+          const qty = Number(ai.quantity ?? 1) || 0
           const rawPrice = Number(ai.unit_price) || 0
           // Removal-ÄTA: negativ unit_price så subtotal-summering kan
           // tas rakt över alla rader utan filter på change_type.

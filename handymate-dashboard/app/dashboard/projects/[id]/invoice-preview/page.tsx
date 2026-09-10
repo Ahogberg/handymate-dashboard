@@ -472,7 +472,7 @@ function AtaSection({ atas, total }: { atas: SignedAta[]; total: number }) {
             {ata.items.length > 0 ? (
               <div className="divide-y divide-slate-100 pl-2 border-l-2 border-primary-100">
                 {ata.items.map((item, idx) => {
-                  const qty = Number(item.quantity) || 0
+                  const qty = Number(item.quantity ?? 1) || 0
                   const price = Number(item.unit_price) || 0
                   return (
                     <InvoiceLine
