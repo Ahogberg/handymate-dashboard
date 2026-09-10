@@ -35,3 +35,21 @@ export function invoiceableProjectAmount(input: {
   }
   return Math.max(0, input.uninvoicedTimeRevenue + input.uninvoicedMaterialRevenue)
 }
+
+/**
+ * Listvyn har inte hela ekonomikalkylen. Där avgör vi därför om en säker
+ * källrad finns, utan att kräva känt pris (en prislös timrad måste fortfarande
+ * kunna nå fakturagranskningen för att användaren ska kunna sätta pris).
+ */
+export function hasInvoiceableProjectSources(input: {
+  path: ProjectInvoicePath
+  contractValue: number
+  linkedInvoiceCount: number
+  uninvoicedTimeEntryCount: number
+  uninvoicedMaterialCount: number
+}): boolean {
+  if (input.path === 'contract') {
+    return input.contractValue > 0 && input.linkedInvoiceCount === 0
+  }
+  return input.uninvoicedTimeEntryCount > 0 || input.uninvoicedMaterialCount > 0
+}

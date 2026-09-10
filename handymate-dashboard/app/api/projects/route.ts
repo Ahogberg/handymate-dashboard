@@ -10,6 +10,7 @@ import { completeProject, type CompleteProjectResult } from '@/lib/projects/comp
 import { deriveProjectLifecycle } from '@/lib/projects/derive-lifecycle'
 import { deriveProjectDates } from '@/lib/projects/derive-dates'
 import { deriveProjectTodo } from '@/lib/projects/derive-todo'
+import { hasInvoiceableProjectSources, projectInvoicePath } from '@/lib/projects/invoice-path'
 import { getSystemStage, PROJECT_SYSTEM_STAGES } from '@/lib/project-stages/stages'
 import { PROJEKT_EKONOMIFALT, utanFalt } from '@/lib/projects/ekonomiprojektion'
 
@@ -113,6 +114,23 @@ export async function GET(request: NextRequest) {
         .in('project_id', projectIds)
 
       timeData = data || []
+    }
+
+    // Ofakturerat material är en lika verklig fakturakälla som tid. Listan
+    // missade tidigare projekt som bara hade material kvar, trots att
+    // detaljsidans fakturabyggare tog med samma rader.
+    let materialData: any[] = []
+    if (projectIds.length > 0) {
+      const { data, error: materialError } = await supabase
+        .from('project_material')
+        .select('project_id, material_id, invoiced')
+        .eq('business_id', businessId)
+        .in('project_id', projectIds)
+      if (materialError) {
+        console.error('[projects] materialuppslag för nästa steg misslyckades:', materialError.message)
+      } else {
+        materialData = data || []
+      }
     }
 
     // Faktisk start (Del A, 2026-08-26): första arbetsdagen = min(första
@@ -250,6 +268,15 @@ export async function GET(request: NextRequest) {
       const uninvoiced_minutes = entries
         .filter((e: any) => !e.invoiced && e.is_billable)
         .reduce((sum: number, e: any) => sum + (e.duration_minutes || 0), 0)
+      const uninvoicedTimeEntryCount = entries.filter((e: any) => !e.invoiced && e.is_billable).length
+      const uninvoicedMaterialCount = materialData.filter(
+        (m: any) => m.project_id === project.project_id && !m.invoiced,
+      ).length
+      const projectInvoices = invoiceData.filter((i: any) => i.project_id === project.project_id)
+      const invoicePath = projectInvoicePath({
+        projectType: project.project_type,
+        quoteId: project.quote_id,
+      })
 
       const nextDeadline = milestoneData.find((m: any) => m.project_id === project.project_id)
 
@@ -265,7 +292,7 @@ export async function GET(request: NextRequest) {
         lifecycle: deriveProjectLifecycle({
           status: project.status,
           completed_at: project.completed_at,
-          invoices: invoiceData.filter((i: any) => i.project_id === project.project_id),
+          invoices: projectInvoices,
         }),
         // Datumraden (Del A): planerat spann, faktisk start, försening — EN
         // härledning som listan och detaljsidan delar.
@@ -292,8 +319,14 @@ export async function GET(request: NextRequest) {
             || (Number(project.budget_hours) > 0 && actual_minutes / 60 > Number(project.budget_hours))
           ),
           canSeeFinancials,
-          hasUninvoicedWork: uninvoiced_minutes > 0,
-          noWorkYet: actual_minutes === 0 && actual_amount === 0,
+          hasUninvoicedWork: hasInvoiceableProjectSources({
+            path: invoicePath,
+            contractValue: Number(project.budget_amount) || 0,
+            linkedInvoiceCount: projectInvoices.length,
+            uninvoicedTimeEntryCount,
+            uninvoicedMaterialCount,
+          }),
+          noWorkYet: actual_minutes === 0 && actual_amount === 0 && uninvoicedMaterialCount === 0,
           pending: pendingByProject.get(project.project_id) || [],
         }),
       }
