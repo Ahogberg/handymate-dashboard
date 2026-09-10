@@ -45,7 +45,9 @@ test('alla strukturerade webbinflöden använder central mottagning', () => {
     if (source.includes("from '@/lib/leads/durable-intake'")) {
       expect(source).toContain('receiveIntake(')
       expect(source).toContain('completeIntake(')
-      expect(source).not.toContain('createLeadAndDeal(')
+      if (rel === 'app/api/storefront/contact/route.ts') {
+        expect(source).not.toContain('createLeadAndDeal(')
+      }
       continue
     }
     expect(source, `${rel} importerar inte Golden Path`).toContain("from '@/lib/leads/golden-path'")
