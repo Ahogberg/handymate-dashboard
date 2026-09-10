@@ -25,7 +25,7 @@ export const dynamic = 'force-dynamic'
  * `tillstand` (tasks/plan-sann-agentstatus.md) är den grindade sanningen —
  * `stat`/`action`/`idle` finns kvar för bakåtkompatibilitet men en agent utan
  * en uppfylld förutsättning (nummer, verifierat provsamtal, påslagna
- * automationer, fakturadata, kundsegment) eller under den globala pausen
+ * automationer, fakturadata, tidigare kunder) eller under den globala pausen
  * visas ALDRIG som samma gröna "bevakar" som en riktigt aktiverad agent —
  * se lib/agents/agent-tillstand.ts.
  */
@@ -146,7 +146,7 @@ export async function GET(request: NextRequest) {
   //
   // Flyttad HIT (före agentobjekten byggs, inte efter) eftersom varje agents
   // tillstånd nu behöver kill-switchen, automationsinställningarna och
-  // fakturadata/kundsegment-signalerna innan action-texten skrivs.
+  // fakturadata/tidigare-kund-signalerna innan action-texten skrivs.
   const nu = new Date().toISOString()
   const [
     obetaldaRes,
@@ -156,7 +156,7 @@ export async function GET(request: NextRequest) {
     nastaBokningRes,
     automationSettingsRes,
     invoiceAnyRes,
-    segmenteradeKunderRes,
+    tidigareKunderRes,
     vantandeKortRes,
     lisaSamtalNagonsinRes,
   ] = await Promise.all([
@@ -209,12 +209,25 @@ export async function GET(request: NextRequest) {
       .from('invoice')
       .select('invoice_id', { count: 'exact', head: true })
       .eq('business_id', businessId),
-    // Hannas aktiveringsgrind: minst en kund har ett kundsegment.
+    // ═══ HANNAS AKTIVERINGSGRIND: EN BEKRÄFTAD TIDIGARE KUND ═══
+    //
+    // Rättad 2026-09-10. Grinden räknade kunder med `segment_id` satt.
+    // customer_segments är en PRISLISTE-funktion (app/api/pricing/segments) —
+    // ingen av Hannas vägar läser den för att välja kandidater, och
+    // ingenting seedar segment. Mot databasen hade 28 av 29 konton noll, så
+    // Hanna stod permanent på "Behöver aktiveras" medan hanna-outbound körde
+    // varje dygn och skapade riktiga återaktiveringskort.
+    //
+    // Rätt signal är poolen hon FAKTISKT arbetar ur: kunder med
+    // last_job_date satt (lib/customers/quiet-customer.ts:fetchQuietCustomers,
+    // anropad av lib/agents/hanna-outbound.ts). Kolumnen sätts av
+    // LTV-motorn ur senaste betalda fakturan — alltså en bekräftad tidigare
+    // kund, precis det Hanna kräver innan hon får kontakta någon.
     supabase
       .from('customer')
       .select('customer_id', { count: 'exact', head: true })
       .eq('business_id', businessId)
-      .not('segment_id', 'is', null),
+      .not('last_job_date', 'is', null),
     // "behöver dig" per agent — samma routing som resten av godkännande-ytan
     // (lib/jarvis/approval-view.ts agentForApproval), ingen ny kartläggning.
     // team_intro är ett informationskort, inte ett väntande beslut.
@@ -304,7 +317,7 @@ export async function GET(request: NextRequest) {
   const smsDayBeforeReminder = autoSettings?.sms_day_before_reminder !== false
 
   const karinHasInvoiceData = (invoiceAnyRes.count ?? 0) > 0
-  const hannaHasSegment = (segmenteradeKunderRes.count ?? 0) > 0
+  const hannaHarTidigareKunder = (tidigareKunderRes.count ?? 0) > 0
 
   const pendingByAgent = new Map<string, number>()
   for (const row of vantandeKortRes.data || []) {
@@ -320,7 +333,11 @@ export async function GET(request: NextRequest) {
     agentsGloballyPaused,
     lisa: { harNummer, telefonVerifierad, handelser24h: lisaTotal, vantandeKort: vantandeKort('lisa') },
     daniel: {
-      harNummer,
+      // Rättat 2026-09-10: INGET harNummer här. quote-follow-up-cronen läser
+      // assigned_phone_number bara för SMS-signaturen (buildSmsSuffix tål
+      // null) och skickar uppföljningar även utan tilldelat nummer. Kravet
+      // gjorde att remsan sa "koppla telefonnumret" på 25 av 29 konton medan
+      // uppföljningarna faktiskt gick ut. Se lib/agents/agent-tillstand.ts.
       smsAutoEnabled,
       smsQuoteFollowup,
       handelser24h: danielHandelser24h,
@@ -329,7 +346,7 @@ export async function GET(request: NextRequest) {
     karin: { harFakturadata: karinHasInvoiceData, handelser24h: karinHandelser24h, vantandeKort: vantandeKort('karin') },
     lars: { handelser24h: larsHandelser24h, vantandeKort: vantandeKort('lars') },
     hanna: {
-      harKundsegment: hannaHasSegment,
+      harTidigareKunder: hannaHarTidigareKunder,
       smsAutoEnabled,
       handelser24h: hannaHandelser24h,
       vantandeKort: vantandeKort('hanna'),

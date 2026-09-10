@@ -43,10 +43,10 @@ function baslinje(): AgentTillstandIndata {
   return {
     agentsGloballyPaused: false,
     lisa: { harNummer: true, telefonVerifierad: true, handelser24h: 0, vantandeKort: 0 },
-    daniel: { harNummer: true, smsAutoEnabled: true, smsQuoteFollowup: true, handelser24h: 0, vantandeKort: 0 },
+    daniel: { smsAutoEnabled: true, smsQuoteFollowup: true, handelser24h: 0, vantandeKort: 0 },
     karin: { harFakturadata: true, handelser24h: 0, vantandeKort: 0 },
     lars: { handelser24h: 0, vantandeKort: 0 },
-    hanna: { harKundsegment: true, smsAutoEnabled: true, handelser24h: 0, vantandeKort: 0 },
+    hanna: { harTidigareKunder: true, smsAutoEnabled: true, handelser24h: 0, vantandeKort: 0 },
   }
 }
 
@@ -111,8 +111,21 @@ test.describe('Lisa — nummer + verifierat provsamtal', () => {
   })
 })
 
-test.describe('Daniel — automatiska uppföljningar + nummer', () => {
-  for (const [falt, varde] of [['harNummer', false], ['smsAutoEnabled', false], ['smsQuoteFollowup', false]] as const) {
+test.describe('Daniel — automatiska uppföljningar (INGET nummerkrav)', () => {
+  test('ett tomt assigned_phone_number får ALDRIG göra Daniel oaktiverad', () => {
+    // Rättning 2026-09-10. Grinden krävde ett tilldelat nummer. Men
+    // app/api/cron/quote-follow-up läser assigned_phone_number BARA för
+    // SMS-signaturen (buildSmsSuffix tål null) och skickar uppföljningar
+    // ändå. Mot databasen hade 25 av 29 konton inget nummer — inklusive
+    // båda de betalande — så remsan sa "koppla telefonnumret" medan
+    // uppföljningarna faktiskt gick ut. Indata bär därför inte ens fältet:
+    // en framtida hand kan inte råka grinda på det igen.
+    const daniel = baslinje().daniel as unknown as Record<string, unknown>
+    expect(Object.keys(daniel), 'harNummer finns kvar i Daniels indata').not.toContain('harNummer')
+    expect(harledAgentTillstand(baslinje()).daniel.tillstand).toBe('bevakar')
+  })
+
+  for (const [falt, varde] of [['smsAutoEnabled', false], ['smsQuoteFollowup', false]] as const) {
     test(`saknar ${falt} → behover_aktiveras`, () => {
       const indata = baslinje()
       ;(indata.daniel as any)[falt] = varde
@@ -171,16 +184,27 @@ test.describe('Lars — ingen aktiveringsgrind', () => {
   })
 })
 
-test.describe('Hanna — kundsegment + automatiska SMS', () => {
-  test('inget kundsegment → behover_aktiveras', () => {
+test.describe('Hanna — tidigare kunder + automatiska SMS', () => {
+  test('ingen bekräftad tidigare kund → behover_aktiveras', () => {
     const indata = baslinje()
-    indata.hanna.harKundsegment = false
+    indata.hanna.harTidigareKunder = false
     const rad = harledAgentTillstand(indata).hanna
     expect(rad.tillstand).toBe('behover_aktiveras')
     expect(rad.rad).toMatch(/^Hanna är redo\./)
   })
 
-  test('sms_auto_enabled av → behover_aktiveras trots kundsegment', () => {
+  test('grinden vilar inte på kundsegment — det är en prislistefunktion', () => {
+    // Rättning 2026-09-10. Grinden krävde kunder med segment_id. Ingen av
+    // Hannas vägar (hanna-outbound, kapacitet-fyllnad, proactive-care) läser
+    // segment_id för att välja kandidater, och ingenting seedar segment: 28
+    // av 29 konton hade noll, så Hanna var permanent oaktiverad medan
+    // cronen skapade riktiga återaktiveringskort. Fältet är borta ur indata
+    // så grinden inte kan återuppstå av misstag.
+    const hanna = baslinje().hanna as unknown as Record<string, unknown>
+    expect(Object.keys(hanna), 'harKundsegment finns kvar i Hannas indata').not.toContain('harKundsegment')
+  })
+
+  test('sms_auto_enabled av → behover_aktiveras trots tidigare kunder', () => {
     const indata = baslinje()
     indata.hanna.smsAutoEnabled = false
     expect(harledAgentTillstand(indata).hanna.tillstand).toBe('behover_aktiveras')
@@ -288,6 +312,44 @@ test.describe('källskanning — team-activity-rutten', () => {
       .toBeGreaterThan(0)
     // Och den vägen ska vara samtalsvägen, inte något annat som råkar skriva.
     expect(skrivare.some(f => f.includes('api/voice')), `${namn} skrivs inte av samtalsvägen: ${skrivare.join(', ')}`).toBe(true)
+  })
+
+  test('Hannas grind räknar kunder med last_job_date — samma kolumn hon arbetar ur', () => {
+    // Rättning 2026-09-10, den GENERALISERADE lärdomen. Facit vaktade redan
+    // att en grinds signal måste ha en SKRIVARE i produktionskod (se provet
+    // om call_recording ovan). Hanna visade att det inte räcker: segment_id
+    // har en skrivare (prislistesidan), men ingen av Hannas vägar LÄSER den
+    // för att välja kandidater. En grind måste vila på en signal agentens
+    // eget arbete faktiskt läser.
+    expect(ren, 'Hannas grind räknar inte last_job_date').toMatch(
+      /from\('customer'\)[\s\S]{0,400}?not\('last_job_date', 'is', null\)/,
+    )
+    expect(ren, 'segment_id används fortfarande som Hannas signal').not.toContain("'segment_id'")
+
+    // Och kolumnen ska vara den Hannas egen väg läser.
+    const pool = read('lib/customers/quiet-customer.ts')
+    expect(pool, 'quiet-customer läser inte last_job_date — grinden pekar fel').toContain('last_job_date')
+    const hanna = read('lib/agents/hanna-outbound.ts')
+    expect(hanna, 'hanna-outbound hämtar inte sina kandidater ur quiet-customer').toContain('fetchQuietCustomers')
+  })
+
+  test('Daniels indata bär inget nummerfält — cronen kräver inget nummer', () => {
+    // Rättning 2026-09-10. quote-follow-up läser assigned_phone_number bara
+    // för SMS-signaturen (buildSmsSuffix tål null). Kravet gjorde att remsan
+    // sa "koppla telefonnumret" på 25 av 29 konton medan uppföljningarna gick
+    // ut. Provet läser BÅDE indatablocket här och cronen: skulle cronen en
+    // dag faktiskt kräva ett nummer spricker det senare påståendet i stället.
+    const danielBlock = ren.slice(ren.indexOf('daniel: {'), ren.indexOf("karin: { harFakturadata"))
+    expect(danielBlock, 'harNummer skickas fortfarande in för Daniel').not.toContain('harNummer')
+
+    const cron = read('app/api/cron/quote-follow-up/route.ts')
+    const nummerRader = cron.split('\n').filter(r => r.includes('assigned_phone_number'))
+    expect(nummerRader.length, 'cronen läser inte numret alls längre — provet är inaktuellt').toBeGreaterThan(0)
+    // Varje förekomst ska vara select:en eller signaturbygget — aldrig ett
+    // villkor som hoppar över företaget.
+    for (const rad of nummerRader) {
+      expect(rad, `cronen grindar på numret: ${rad.trim()}`).toMatch(/\.select\(|buildSmsSuffix/)
+    }
   })
 
   test('automation_settings selectas med de tre verifierade kolumnerna', () => {

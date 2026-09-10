@@ -24,14 +24,20 @@
  *      - Lisa: tilldelat nummer OCH ett verifierat provsamtal
  *        (`onboarding_data.test_call.called_at` — en aktiverad flagga utan
  *        bevis räcker inte, se channel-health.ts-mönstret).
- *      - Daniel: `sms_auto_enabled && sms_quote_followup` OCH nummer.
+ *      - Daniel: `sms_auto_enabled && sms_quote_followup`. INGET nummerkrav —
+        quote-follow-up-cronen läser `assigned_phone_number` bara för SMS-
+        signaturen (buildSmsSuffix tål null) och skickar uppföljningar även
+        utan tilldelat nummer. Se rättningen 2026-09-10 nedan.
  *      - Karin: fakturadata finns (samma signal som
  *        lib/onboarding/kom-igang-tasks.ts, "Koppla Fortnox eller skicka din
  *        första faktura"). Denna modul har bara verifierade
  *        `business_config`-kolumner tillgängliga och kollar därför enbart
  *        faktureradata (fortnox_connected är inte en av dem) — se
  *        anroparens kommentar i team-activity/route.ts för avvikelsen.
- *      - Hanna: minst en kund har ett kundsegment OCH `sms_auto_enabled`.
+ *      - Hanna: minst en TIDIGARE KUND (`customer.last_job_date` satt) OCH
+        `sms_auto_enabled`. Det är exakt poolen hon arbetar ur
+        (lib/customers/quiet-customer.ts:fetchQuietCustomers, som
+        lib/agents/hanna-outbound.ts hämtar sina kandidater från).
  *      - Lars har INGEN aktiveringsgrind — bokningar och schema kräver
  *        ingen automationsflagga för att existera, så Lars bevakar alltid.
  * 3. `behover_dig` — minst ETT väntande kort är routat till agenten
@@ -44,6 +50,28 @@
  *    signal. Härleds INTE av dagens regler (se tests/agent-tillstand.spec.ts)
  *    men finns i unionen och COPY-tabellen så typen är komplett från början
  *    och UI:t aldrig möter ett tillstånd utan text.
+ *
+ * ═══ RÄTTNING 2026-09-10: TVÅ GRINDAR VILADE PÅ FEL SIGNAL ═══
+ *
+ * Passet som skrev den här modulen (2026-09-04) gav Daniel ett nummerkrav och
+ * Hanna ett kundsegmentkrav. Båda mättes mot produktionen 2026-09-10 och båda
+ * var fel — samma felklass som facit redan vaktade för Lisa, fast en nivå upp:
+ * signalen hade en skrivare, men den styrde inte agentens arbete.
+ *
+ *   - Daniel: `quote-follow-up`-cronen kräver inget `assigned_phone_number`.
+ *     Numret används bara i `buildSmsSuffix`, som tål null. Med nummerkravet
+ *     sa remsan "Daniel är redo, koppla telefonnumret" på 25 av 29 konton —
+ *     inklusive båda de betalande — medan cronen samtidigt skickade
+ *     uppföljningar.
+ *   - Hanna: `customer_segments` är en PRISLISTE-funktion (app/api/pricing/
+ *     segments). Ingen av Hannas vägar (`hanna-outbound`, `kapacitet-fyllnad`,
+ *     `proactive-care`) läser `segment_id` för att välja kandidater — de utgår
+ *     från `customer.last_job_date`. Dessutom seedar ingenting segment: 28 av
+ *     29 konton hade noll, så Hanna var permanent "Behöver aktiveras".
+ *
+ * Lärdomen som facit nu vaktar: en aktiveringsgrind måste vila på en signal
+ * agentens EGET produktionsarbete faktiskt läser — inte på en signal som bara
+ * ser rimlig ut i en kodgranskning.
  *
  * Lisa FÅNGAR samtal hon annars hade missat — hon svarar aldrig i denna
  * kopia (facit: tests/agent-tillstand.spec.ts). Inga tekniska termer
@@ -82,7 +110,6 @@ export interface AgentTillstandIndata {
     telefonVerifierad: boolean
   }
   daniel: Aktivitetssignaler & {
-    harNummer: boolean
     smsAutoEnabled: boolean
     smsQuoteFollowup: boolean
   }
@@ -91,7 +118,12 @@ export interface AgentTillstandIndata {
   }
   lars: Aktivitetssignaler
   hanna: Aktivitetssignaler & {
-    harKundsegment: boolean
+    /**
+     * Minst en kund med `last_job_date` — en bekräftad tidigare kund. Exakt
+     * poolen lib/agents/hanna-outbound.ts arbetar ur (fetchQuietCustomers).
+     * Ersatte `harKundsegment` 2026-09-10, se filhuvudet.
+     */
+    harTidigareKunder: boolean
     smsAutoEnabled: boolean
   }
 }
@@ -115,12 +147,12 @@ const PAUSAD_RAD: Record<AgentId, string> = {
 
 const BEHOVER_AKTIVERAS_RAD: Record<AgentId, string> = {
   lisa: 'Lisa är redo. Verifiera telefonen så kan hon börja fånga missade samtal.',
-  daniel: 'Daniel är redo. Slå på automatiska uppföljningar och koppla telefonnumret så kan han börja påminna kunder om öppna offerter.',
+  daniel: 'Daniel är redo. Slå på automatiska uppföljningar så kan han börja påminna kunder om öppna offerter.',
   karin: 'Karin är redo. Koppla in fakturadata så kan hon börja bevaka betalningarna.',
   // Aldrig härledd idag (Lars har ingen aktiveringsgrind) — text finns ändå
   // så unionen och COPY-tabellen är kompletta, se filhuvudet.
   lars: 'Lars är redo. Boka in ditt första jobb så kan han börja hålla koll på schemat.',
-  hanna: 'Hanna är redo. Sortera kunderna i segment och slå på automatiska utskick så kan hon börja föreslå återaktivering.',
+  hanna: 'Hanna är redo. När du har avslutat och fakturerat dina första jobb kan hon börja väcka gamla kunder.',
 }
 
 const BEVAKAR_RAD: Record<AgentId, string> = {
@@ -198,7 +230,7 @@ export function harledAgentTillstand(
     daniel: harledEnAgent(
       'daniel',
       paused,
-      indata.daniel.harNummer && indata.daniel.smsAutoEnabled && indata.daniel.smsQuoteFollowup,
+      indata.daniel.smsAutoEnabled && indata.daniel.smsQuoteFollowup,
       indata.daniel,
     ),
     karin: harledEnAgent('karin', paused, indata.karin.harFakturadata, indata.karin),
@@ -207,7 +239,7 @@ export function harledAgentTillstand(
     hanna: harledEnAgent(
       'hanna',
       paused,
-      indata.hanna.harKundsegment && indata.hanna.smsAutoEnabled,
+      indata.hanna.harTidigareKunder && indata.hanna.smsAutoEnabled,
       indata.hanna,
     ),
   }
