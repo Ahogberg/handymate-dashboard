@@ -10,9 +10,35 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import React from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { InvoiceSourceChoice } from '../components/projects/InvoiceSourceChoice'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
+
+test('fakturakällan visas som två val utan att renderingen skapar eller väljer något', () => {
+  const choices: string[] = []
+  const html = renderToStaticMarkup(React.createElement(InvoiceSourceChoice, {
+    onChoose: (source: string) => choices.push(source), onClose: () => {},
+  }))
+  expect(html).toContain('Offert och godkända ÄTA')
+  expect(html).toContain('Registrerad tid och material')
+  expect(html).toContain('Inget skapas eller skickas')
+  expect(html).toContain('Avbryt')
+  expect(choices).toEqual([])
+})
+
+test('alla generiska fakturastarter använder valgrinden, inte project_type', () => {
+  const page = read('app/dashboard/projects/[id]/page.tsx')
+  expect(page).toContain("invoiceReviewEntry(project.quote_id) === 'choose'")
+  expect(page).toContain('onAction: openInvoiceReview')
+  expect(page).toContain('onInvoiceProject={openInvoiceReview}')
+  expect(page).toContain('onClick={openInvoiceReview}')
+  expect(page).toContain('? openInvoiceReview')
+  expect(page).toContain('<InvoiceSourceChoice')
+  expect(page).not.toContain("? invoicePath === 'contract'")
+})
 
 test.describe('en beräkning, två ytor', () => {
   test('TODO_PRIMARY_LABEL + getStageBucket bor i lib/projects/derive-todo.ts; komponenterna re-exporterar', () => {

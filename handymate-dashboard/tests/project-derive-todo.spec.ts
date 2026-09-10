@@ -5,11 +5,16 @@
  */
 import { test, expect } from '@playwright/test'
 import { deriveProjectTodo, deriveTodoMode, getStageBucket, pickTopCard, TODO_PRIMARY_LABEL } from '../lib/projects/derive-todo'
-import { hasInvoiceableProjectSources, invoiceableProjectAmount, projectInvoicePath } from '../lib/projects/invoice-path'
+import { hasInvoiceableProjectSources, invoiceableProjectAmount, invoiceReviewEntry, projectInvoicePath } from '../lib/projects/invoice-path'
 
 const BASE = { stageId: 'ps-03', isOverBudget: false, canSeeFinancials: true, hasUninvoicedWork: false, noWorkYet: false }
 
 test.describe('projektets fakturakälla', () => {
+  test('en offert kräver uttryckligt val och bevisar inte fastpris', () => {
+    expect(invoiceReviewEntry('q1')).toBe('choose')
+    expect(invoiceReviewEntry(null)).toBe('actuals')
+    expect(invoiceReviewEntry(undefined)).toBe('actuals')
+  })
   test('fastpris och blandavtal med offert använder avtalsrader + ÄTA', () => {
     expect(projectInvoicePath({ projectType: 'fixed_price', quoteId: 'q1' })).toBe('contract')
     expect(projectInvoicePath({ projectType: 'mixed', quoteId: 'q1' })).toBe('contract')

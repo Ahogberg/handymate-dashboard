@@ -111,7 +111,8 @@ import { ProjectStatusBand } from '@/components/projects/ProjectStatusBand'
 import { ProjectDatesInline } from '@/components/projects/ProjectDatesInline'
 import { deriveProjectLifecycle, type LifecyclePhase } from '@/lib/projects/derive-lifecycle'
 import { beraknaFakturaberedskap } from '@/lib/projects/fakturaberedskap'
-import { invoiceableProjectAmount, projectInvoicePath } from '@/lib/projects/invoice-path'
+import { invoiceableProjectAmount, invoiceReviewEntry, projectInvoicePath } from '@/lib/projects/invoice-path'
+import { InvoiceSourceChoice } from '@/components/projects/InvoiceSourceChoice'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
@@ -749,6 +750,7 @@ export default function ProjectDetailPage() {
   const [savingStatus, setSavingStatus] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showInvoiceSourceChoice, setShowInvoiceSourceChoice] = useState(false)
   const [showCloseoutModal, setShowCloseoutModal] = useState(false)
   const [closeoutWarnings, setCloseoutWarnings] = useState<string[]>([])
 
@@ -1887,6 +1889,12 @@ export default function ProjectDetailPage() {
     projectType: project.project_type,
     quoteId: project.quote_id,
   })
+  // project_type is inferred from quote rows, not an agreed billing model.
+  // All generic invoice entry points require an explicit source choice.
+  const openInvoiceReview = () => {
+    if (invoiceReviewEntry(project.quote_id) === 'choose') setShowInvoiceSourceChoice(true)
+    else setShowInvoiceModal(true)
+  }
   const invoiceableAmount = canSeeFinancials
     ? invoiceableProjectAmount({
         path: invoicePath,
@@ -1962,12 +1970,10 @@ export default function ProjectDetailPage() {
       id: 'ofakturerat',
       dotClass: 'bg-amber-500',
       text: invoicePath === 'contract'
-        ? `Avtalat värde kvar: ${formatSEK(invoiceableAmount)}`
+        ? `Offert-/ÄTA-värde kvar: ${formatSEK(invoiceableAmount)}`
         : `Ofakturerad tid och material: ${formatSEK(invoiceableAmount)}`,
-      actionLabel: invoicePath === 'contract' ? 'Granska slutfaktura' : 'Förbered faktura',
-      onAction: invoicePath === 'contract'
-        ? () => router.push(`/dashboard/projects/${project.project_id}/invoice-preview`)
-        : () => setShowInvoiceModal(true),
+      actionLabel: 'Granska fakturaunderlag',
+      onAction: openInvoiceReview,
     })
   }
   // Egenkontroll (Etapp 1c, tasks/easoft-gap-plan.md, copy.projektvy.sv.json
@@ -2120,9 +2126,7 @@ export default function ProjectDetailPage() {
     todoMode === 'nystartat'
       ? undefined
       : todoMode === 'klart_ofakturerat'
-        ? invoicePath === 'contract'
-          ? () => router.push(`/dashboard/projects/${project.project_id}/invoice-preview`)
-          : () => setShowInvoiceModal(true)
+        ? openInvoiceReview
         : todoMode === 'over_budget'
           ? () => setChangeModal({ open: true, editing: null })
           : () => openTimeModal()
@@ -2581,10 +2585,10 @@ export default function ProjectDetailPage() {
                 Ny ÄTA
               </button>
               <button
-                onClick={() => setShowInvoiceModal(true)}
+                onClick={openInvoiceReview}
                 className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
-                Fakturera
+                Granska fakturaunderlag
               </button>
             </div>
           </div>
@@ -3997,9 +4001,7 @@ export default function ProjectDetailPage() {
             <ProjectEconomicsCard
               projectId={projectId}
               refreshKey={economicsRefreshKey}
-              onInvoiceProject={invoicePath === 'contract'
-                ? () => router.push(`/dashboard/projects/${project.project_id}/invoice-preview`)
-                : () => setShowInvoiceModal(true)}
+              onInvoiceProject={openInvoiceReview}
               onNewAta={() => setChangeModal({ open: true, editing: null })}
             />
           </>
@@ -4581,6 +4583,16 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Fakturera projekt-modal */}
+      {showInvoiceSourceChoice && (
+        <InvoiceSourceChoice
+          onClose={() => setShowInvoiceSourceChoice(false)}
+          onChoose={source => {
+            setShowInvoiceSourceChoice(false)
+            if (source === 'contract') router.push(`/dashboard/projects/${project.project_id}/invoice-preview`)
+            else setShowInvoiceModal(true)
+          }}
+        />
+      )}
       {showInvoiceModal && project && (
         <ProjectInvoiceModal
           projectId={project.project_id}

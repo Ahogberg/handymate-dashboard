@@ -10,6 +10,11 @@
  */
 export type ProjectInvoicePath = 'contract' | 'actuals'
 
+/** A quote is not proof of fixed-price billing; require a choice at navigation. */
+export function invoiceReviewEntry(quoteId: string | null | undefined): 'choose' | 'actuals' {
+  return quoteId ? 'choose' : 'actuals'
+}
+
 export function projectInvoicePath(input: {
   projectType: string | null | undefined
   quoteId: string | null | undefined
