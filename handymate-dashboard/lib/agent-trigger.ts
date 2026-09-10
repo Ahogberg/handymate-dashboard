@@ -26,6 +26,8 @@ interface AgentResult {
   duration_ms?: number
   final_response?: string
   duplicate?: boolean
+  skipped?: string
+  status?: string
   error?: string
 }
 
@@ -56,10 +58,20 @@ export async function triggerAgentInternal(
     })
 
     const data = await res.json()
-    if (!res.ok) {
-      return { success: false, error: data.error || `HTTP ${res.status}` }
+    if (!data || typeof data !== 'object' || Array.isArray(data)) {
+      return { success: false, error: 'Agenten returnerade ingen giltig körningskvittens.' }
     }
-    return { success: true, ...data }
+    if (!res.ok) return { ...data, success: false, error: data.error || `HTTP ${res.status}` }
+    // A 200 can mean paused, out of fuel, or an unfinished duplicate run.
+    // Callers must not advance a workflow just because transport succeeded.
+    if (data.skipped || data.agent_paused || data.fuel_stopped || data.success === false || data.error
+      || (data.status != null && data.status !== 'completed')
+      || (data.duplicate && data.status !== 'completed')
+      || typeof data.run_id !== 'string' || !data.run_id.trim()) {
+      return { ...data, success: false, error: data.error || data.skipped || 'Agentens genomförda körning kunde inte bekräftas.' }
+    }
+    // This confirms a run, not delivery of an SMS, email, quote or invoice.
+    return { ...data, success: true }
   } catch (err: any) {
     console.error('[triggerAgentInternal] Error:', err.message)
     return { success: false, error: err.message }
