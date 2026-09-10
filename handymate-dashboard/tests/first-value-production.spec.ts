@@ -7,6 +7,7 @@ import * as sample from '../lib/onboarding/work-sample'
 import * as visits from '../lib/quotes/visit-rule'
 import { quoteFollowupStep } from '../lib/quotes/followup-cadence'
 import * as handoff from '../lib/quotes/handoff'
+import * as followupRound from '../lib/quotes/followup-round'
 
 const prepared = { version: 1, source: 'Byt sex innerdörrar.', title: 'Byte av dörrar', description: 'Montering och bortforsling.', createdAt: '2026-09-08T10:00:00Z', items: [{ description: 'Montera dörrar', quantity: 6, unit: 'st', type: 'labor' }] }
 const rule: visits.VisitRule = { version: 1, kind: 'planned_visits', visits: 2, jobType: 'dorrar' }
@@ -84,6 +85,7 @@ function route(file: string, extra: Record<string, unknown>) {
   const exports: Record<string, any> = {}
   const modules: Record<string, unknown> = { 'next/server': { NextResponse }, crypto: { createHash },
     '@/lib/quotes/visit-rule': visits, '@/lib/onboarding/work-sample': sample, '@/lib/quotes/handoff': handoff,
+    '@/lib/quotes/followup-round': followupRound,
     '@/lib/billing/aktiva-konton': { harAktivtTeam: () => true }, '@/lib/dates': { svDateStr: () => '2026-09-08' }, ...extra }
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
   new Function('require', 'exports', code)((name: string) => { if (!(name in modules)) throw new Error(`Unexpected dependency ${name}`); return modules[name] }, exports)
@@ -93,13 +95,14 @@ function fixtures(options: { signedIn?: boolean; admin?: boolean; denied?: boole
   const calls: Array<{ table: string; filters: Array<[string, unknown]>; write?: unknown }> = []
   let generated = 0
   const db = { from(table: string) {
+    let singleton = false
     const call = { table, filters: [] as Array<[string, unknown]>, write: undefined as unknown }; calls.push(call)
     const rows: Record<string, unknown> = { quotes: options.noQuote ? null : { ...input.quote, quote_id: 'q', customer_id: 'c' }, business_config: { business_id: 'firm-a' },
       job_types: options.noJob ? null : { slug: 'dorrar', name: 'Dörrar' }, business_knowledge: { id: 'id', data_basis: rule }, v3_automation_rules: [], pending_approvals: [], v3_automation_logs: [], customer: { phone_number: 'test' }, v3_automation_settings: { quote_followup_days: 5 } }
     const chain: any = { select: () => chain, eq: (key: string, value: unknown) => { call.filters.push([key,value]); return chain },
       is: (key: string, value: unknown) => { call.filters.push([key,value]); return chain }, contains: (key: string,value: unknown) => { call.filters.push([key,value]); return chain },
-      order: () => chain, limit: () => chain, maybeSingle: () => chain, single: () => chain, upsert: (value: unknown) => { call.write = value; return chain },
-      then: (resolve: (r: unknown) => void) => resolve({ data: rows[table], error: options.fail === table ? { message: 'unavailable' } : null }) }
+      order: () => chain, limit: () => chain, maybeSingle: () => { singleton = true; return chain }, single: () => { singleton = true; return chain }, upsert: (value: unknown) => { call.write = value; return chain },
+      then: (resolve: (r: unknown) => void) => { const value = rows[table]; return resolve({ data: singleton && Array.isArray(value) ? (value[0] || null) : value, error: options.fail === table ? { message: 'unavailable' } : null }) } }
     return chain
   } }
   const modules = { '@/lib/auth': { getAuthenticatedBusiness: async () => options.signedIn === false ? null : { business_id: 'firm-a' } },
@@ -133,7 +136,7 @@ test('regel: behörighet, aktiv jobbtyp, databasfel och stabil identitet vid ret
   }
 })
 test('överlämning: företagsgräns på varje läsning och inget positivt kvitto vid delfel', async () => {
-  for (const [options, expected] of [[{ signedIn:false },401],[{ admin:false },403],[{ noQuote:true },404],[{ fail:'v3_automation_logs' },503],[{},200]] as const) {
+  for (const [options, expected] of [[{ signedIn:false },401],[{ admin:false },403],[{ noQuote:true },404],[{ fail:'v3_automation_logs' },503],[{ fail:'pending_approvals' },503],[{},200]] as const) {
     const f = fixtures(options); const api = route('app/api/quotes/[id]/handoff/route.ts', f.modules)
     const response = await api.GET(request('/api/quotes/q/handoff'), { params:{ id:'q' } })
     expect(response.status).toBe(expected)
