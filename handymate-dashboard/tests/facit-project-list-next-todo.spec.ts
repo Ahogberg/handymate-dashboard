@@ -55,6 +55,18 @@ test.describe('GET /api/projects — steg + nästa att göra per rad', () => {
   test('över budget i listan kräver ekonomibehörighet', () => {
     expect(s).toContain('isOverBudget: canSeeFinancials && (')
   })
+
+  test('listan använder samma fakturakälla som detaljen och räknar material utan tid', () => {
+    expect(s).toContain("from '@/lib/projects/invoice-path'")
+    expect(s).toContain(".from('project_material')")
+    expect(s).toContain('hasInvoiceableProjectSources({')
+    expect(s).toContain('uninvoicedMaterialCount')
+
+    const detail = read('app/dashboard/projects/[id]/page.tsx')
+    expect(detail).toContain('const invoicePath = projectInvoicePath({')
+    expect(detail).toContain("router.push(`/dashboard/projects/${project.project_id}/invoice-preview`)")
+    expect(detail).toContain('uninvoicedMaterialRevenue')
+  })
 })
 
 test.describe('projektlistan renderar steg + nästa', () => {
