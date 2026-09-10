@@ -1496,7 +1496,7 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
-| Slice 4 — Customer | Första kundminnesvertikal implementerad och lokalt verifierad | Preview, öppna administrativa steg och relationens samlade läsmodell kvar |
+| Slice 4 — Customer | Kundminne, synliga öppna uppgifter och nästa aktiva bokning implementerade | Samlad offert-/beslutsbild, fyllda löften/uppgifter och verkligt företagsbyte kvar |
 | Slice 5–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
@@ -1639,6 +1639,10 @@ Read-only audit genomförd efter kundminnets publicering. Återanvänd task-API 
 ### RUNTIMERÄTTNING — BOKNINGSSTATUS
 
 Read-only produktionskontroll efter publicering av tvåkällorspaketet `7ee588bf2e9361c3adb94111f1e5fe79ec8bf5c3` upptäckte att lokal testdubbel tillät ogiltiga booking_status-värden. Faktisk enum är confirmed/cancelled/completed/no_show; next_active använder nu enbart confirmed och behåller completed_at/job_status-grindarna. Route-harness avvisar nu ogiltiga enumvärden. Korrigerad SELECT fungerar och identifierar en befintlig kommande bokning i testföretaget. 13 riktade tester, typkontroll och diffkontroll gröna efter rättningen. Fyllda öppna kunduppgifter saknas i testföretagets icke-privata data; inget skapas för test. Slutlig preview-kontroll väntar på det rättade bygget.
+
+### LIVE-CHECKPOINT — ÖPPET OCH NÄSTA
+
+Den föregående previewversionens enumfel gav synligt ”Bokningarna kunde inte läsas” med återförsök, medan uppgifterna fortfarande visade sitt separata verifierade tomläge. Felet blev inte ”ingen bokning”. Rättad kod är publicerad som `55cb3ac2912d7fb7fd0d712bb5246e1164bf1eff`. Båda Vercelbyggen är gröna. Inloggad kundvy visar befintlig kommande bokning 11 september kl. 12:00; Öppna bokningen går till rätt bokningsdetaljer med samma tid och innehåll. Alla 13 CI-checkar är gröna. Den andra testkunden visar separata verifierade tomlägen för uppgifter och kommande bokning. Fylld bokning, rätt navigering och tomma lägen är därmed liveprovade; projekt-only-bokning, fyllda uppgifter/privatsynlighet och sena svar har isolerade regressioner. Verkligt roll-/företagsbyte och hela slice 4 är fortsatt öppna. Inga bokningar eller uppgifter skapades eller ändrades.
 
 ### REPRODUCERA LOKALA KONTROLLER
 
