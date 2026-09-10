@@ -12,14 +12,24 @@ import fs from 'fs'
 import path from 'path'
 import React from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
-import { InvoiceSourceChoice } from '../components/projects/InvoiceSourceChoice'
+import ts from 'typescript'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 test('fakturakällan visas som två val utan att renderingen skapar eller väljer något', () => {
   const choices: string[] = []
-  const html = renderToStaticMarkup(React.createElement(InvoiceSourceChoice, {
+  // Playwrights komponenttransform ger __pw_type-objekt, inte React-noder.
+  // Kompilera den riktiga komponenten med vanlig React-JSX för SSR-provet.
+  const code = ts.transpileModule(read('components/projects/InvoiceSourceChoice.tsx'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, esModuleInterop: true },
+  }).outputText
+  const module = { exports: {} as any }
+  new Function('require', 'module', 'exports', code)((name: string) => {
+    if (name !== 'react') throw new Error(`Unexpected dependency: ${name}`)
+    return React
+  }, module, module.exports)
+  const html = renderToStaticMarkup(React.createElement(module.exports.InvoiceSourceChoice, {
     onChoose: (source: string) => choices.push(source), onClose: () => {},
   }))
   expect(html).toContain('Offert och godkända ÄTA')
