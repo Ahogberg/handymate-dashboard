@@ -35,7 +35,49 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   return Uint8Array.from(Array.from(rawData).map(c => c.charCodeAt(0)))
 }
 
-export type PushStatus = 'pa' | 'av' | 'blockerad'
+/**
+ * 'pa'        — webbläsaren HAR en prenumeration och servern känner till den.
+ * 'ur_synk'   — webbläsaren har en, servern har ingen. Ingen push når fram.
+ * 'av'        — ingen prenumeration.
+ * 'blockerad' — personen har nekat notiser i webbläsaren.
+ *
+ * 'ur_synk' finns för att "Notiser var redan på" och "noll rader i
+ * push_subscriptions" båda var sanna samtidigt 2026-09-10. Statusen läste
+ * `reg.pushManager.getSubscription()` — webbläsaren — och frågade aldrig
+ * servern. En webbläsare kan bära en fullt giltig prenumeration som servern
+ * inte känner till, och då skickas ingen push, eftersom avsändaren läser sin
+ * egen databas. Två vägar dit har hänt här: prenumerationen postades till en
+ * annan instans (repot bygger två Vercel-projekt mot olika databaser), eller
+ * POST:en misslyckades tyst (tabellen saknades före v198).
+ *
+ * Läget är läkbart utan att personen gör något: `prenumereraPaPush` postar om
+ * även en BEFINTLIG prenumeration, och rutten upsertar.
+ */
+export type PushStatus = 'pa' | 'ur_synk' | 'av' | 'blockerad'
+
+/** Serverns svar från GET /api/push/status. */
+export interface PushServerStatus {
+  registrerad: boolean
+  enheter: number
+  pa_kontot: number
+  osaker?: boolean
+}
+
+/**
+ * Frågar servern om DEN känner till en prenumeration för den inloggade.
+ * Nätfel eller ett oväntat svar räknas som "inte registrerad" — en falsk
+ * "på" är precis felet den här funktionen finns för att avskaffa.
+ */
+export async function hamtaServerStatus(): Promise<PushServerStatus> {
+  try {
+    const res = await fetch('/api/push/status')
+    if (!res.ok) return { registrerad: false, enheter: 0, pa_kontot: 0, osaker: true }
+    const data = (await res.json()) as PushServerStatus
+    return { ...data, registrerad: data.registrerad === true }
+  } catch {
+    return { registrerad: false, enheter: 0, pa_kontot: 0, osaker: true }
+  }
+}
 
 /**
  * Varför en prenumeration inte gick igenom.
@@ -81,7 +123,11 @@ export async function hamtaPushStatus(): Promise<PushStatus> {
   try {
     const reg = await navigator.serviceWorker.ready
     const existing = await reg.pushManager.getSubscription()
-    return existing ? 'pa' : 'av'
+    if (!existing) return 'av'
+    // Webbläsaren räcker INTE. Servern skickar från sin egen databas, så det
+    // är den som avgör om en push kan nå fram. Se PushStatus ovan.
+    const server = await hamtaServerStatus()
+    return server.registrerad ? 'pa' : 'ur_synk'
   } catch {
     return 'av'
   }

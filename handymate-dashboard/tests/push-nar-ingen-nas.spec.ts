@@ -152,3 +152,59 @@ test('båda ytorna läser utfallet — ett objekt är alltid sant, så !ok tysta
     expect(efter, `${fil} har kvar ett !ok på ett objekt`).not.toMatch(/if \(!ok\)/)
   }
 })
+
+// ── 4. Statusen får inte säga "På" när servern inte har någon rad ──────
+
+test('statusen frågar servern, inte bara webbläsaren', () => {
+  // 2026-09-10, Andreas: "Notiser var redan på." Samtidigt: noll rader i
+  // push_subscriptions, i hela produktionsdatabasens historia. Båda sanna —
+  // hamtaPushStatus läste reg.pushManager.getSubscription() och frågade aldrig
+  // servern. En webbläsare kan bära en fullt giltig prenumeration som servern
+  // inte känner till, och då når ingen push fram: avsändaren läser sin EGEN
+  // databas. Repot bygger två Vercel-projekt mot olika databaser, så det är
+  // inte ett kantfall utan det normala när appen ligger kvar från ett annat
+  // bygge.
+  const src = readFileSync(join(ROT, 'lib/push/prenumerera-klient.ts'), 'utf8')
+  const fn = src.slice(src.indexOf('export async function hamtaPushStatus'))
+  const kropp = fn.slice(0, fn.indexOf('\n}'))
+  expect(kropp, 'statusen frågar aldrig servern').toContain('hamtaServerStatus')
+  // Och den får inte gå från "webbläsaren har en" direkt till 'pa'.
+  expect(kropp, 'en webbläsarprenumeration räknas fortfarande som På på egen hand')
+    .not.toMatch(/existing \?\s*'pa'/)
+  expect(kropp).toContain("'ur_synk'")
+})
+
+test('serverstatusen faller till "inte registrerad", aldrig till "på"', () => {
+  const src = readFileSync(join(ROT, 'lib/push/prenumerera-klient.ts'), 'utf8')
+  const fn = src.slice(src.indexOf('export async function hamtaServerStatus'))
+  const kropp = fn.slice(0, fn.indexOf('\n}'))
+  // Nätfel, 4xx, trasig JSON — allt ska ge registrerad: false.
+  expect((kropp.match(/registrerad: false/g) || []).length,
+    'något felfall saknar registrerad: false — en falsk "på" är hela felet').toBeGreaterThanOrEqual(2)
+  expect(kropp, 'svaret litas på utan att kontrolleras').toContain('data.registrerad === true')
+})
+
+test('rutten som svarar är tenantbunden och aldrig statisk', () => {
+  const src = readFileSync(join(ROT, 'app/api/push/status/route.ts'), 'utf8')
+  // Utan force-dynamic kan första svaret efter deploy serveras till ALLA
+  // företag (CLAUDE.md, svepet 2026-08-22).
+  expect(src, 'saknar force-dynamic').toContain("export const dynamic = 'force-dynamic'")
+  expect(src, 'ogrindad rutt').toContain('getAuthenticatedBusiness')
+  expect(src, 'filtrerar inte på business_id').toContain("eq('business_id'")
+  // Ett DB-fel får inte bli "registrerad: true".
+  const felgren = src.slice(src.indexOf('if (minaRes.error'))
+  expect(felgren.slice(0, 400)).toContain('registrerad: false')
+})
+
+test('ytan säger inte "På" i ur_synk, och erbjuder en väg ut', () => {
+  const src = readFileSync(join(ROT, 'app/dashboard/settings/page.tsx'), 'utf8')
+  const kort = src.slice(src.indexOf("activeTab === 'notiser'"))
+  expect(kort, 'ur_synk renderas inte alls').toContain("'ur_synk'")
+  // Knappen måste vara nåbar i ur_synk — annars är läget en återvändsgränd.
+  const knapp = kort.slice(kort.indexOf('onClick={aktiveraNotiser}') - 400, kort.indexOf('onClick={aktiveraNotiser}') + 400)
+  expect(knapp, 'knappen visas inte i ur_synk — läget blir en återvändsgränd')
+    .toMatch(/pushStatus !== 'pa'|pushStatus === 'ur_synk'/)
+  // Och testnotis-kortet får inte påstå att allt är klart i ur_synk.
+  const testkort = kort.slice(kort.indexOf('Skicka testnotis') - 300, kort.indexOf('Skicka testnotis'))
+  expect(testkort, 'testnotisen erbjuds i ett läge där ingen push kan nå fram').toContain("pushStatus === 'pa'")
+})

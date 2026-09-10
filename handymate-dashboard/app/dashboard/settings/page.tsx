@@ -4337,9 +4337,14 @@ export default function SettingsPage() {
                 <span className={`text-xs font-medium px-2.5 py-1 rounded-full ${
                   pushStatus === 'pa' ? 'bg-emerald-100 text-emerald-700'
                     : pushStatus === 'blockerad' ? 'bg-red-100 text-red-700'
+                    : pushStatus === 'ur_synk' ? 'bg-amber-100 text-amber-700'
                     : 'bg-gray-100 text-gray-500'
                 }`}>
-                  {pushStatus === 'pa' ? 'På' : pushStatus === 'blockerad' ? 'Blockerad i webbläsaren' : pushStatus === 'av' ? 'Av' : 'Läser status…'}
+                  {pushStatus === 'pa' ? 'På'
+                    : pushStatus === 'blockerad' ? 'Blockerad i webbläsaren'
+                    : pushStatus === 'ur_synk' ? 'Når inte fram'
+                    : pushStatus === 'av' ? 'Av'
+                    : 'Läser status…'}
                 </span>
               </div>
               <p className="text-gray-500 text-sm mb-4">
@@ -4350,6 +4355,24 @@ export default function SettingsPage() {
                 <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-4">
                   Webbläsaren blockerar notiser för Handymate. Slå på dem i webbläsarens
                   eller telefonens inställningar för app.handymate.se, ladda om sidan och försök igen.
+                </p>
+              )}
+
+              {/*
+                'ur_synk' (2026-09-10): telefonen bär en giltig prenumeration
+                men DEN HÄR servern har ingen rad, så ingen push kan nå fram.
+                Statusen sa tidigare "På" i exakt det läget, eftersom den bara
+                frågade webbläsaren. Vanligaste orsaken: appen på hemskärmen är
+                installerad från ett annat bygge (repot bygger två
+                Vercel-projekt mot olika databaser). Knappen nedan läker det —
+                prenumerationen postas om och rutten upsertar.
+              */}
+              {pushStatus === 'ur_synk' && (
+                <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4">
+                  Din telefon har notiser påslagna, men den är registrerad någon annanstans
+                  än här — därför kommer inget fram. Ligger appen på hemskärmen sedan en
+                  tidigare version kan det vara ett annat bygge. Tryck på
+                  &quot;Koppla den här enheten&quot; nedan, det räcker.
                 </p>
               )}
 
@@ -4368,7 +4391,7 @@ export default function SettingsPage() {
                   className="flex items-center gap-2 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 text-white text-sm font-medium rounded-xl transition-all disabled:opacity-50"
                 >
                   {pushBusy ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bell className="w-4 h-4" />}
-                  Aktivera notiser
+                  {pushStatus === 'ur_synk' ? 'Koppla den här enheten' : 'Aktivera notiser'}
                 </button>
               )}
             </div>
