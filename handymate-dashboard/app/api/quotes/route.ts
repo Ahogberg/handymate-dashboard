@@ -49,16 +49,25 @@ export async function GET(request: NextRequest) {
         .eq('business_id', businessId)
         .single()
 
-      if (error || !quote) {
+      if (error && error.code !== 'PGRST116') {
+        return NextResponse.json({ error: 'Kunde inte läsa offerten. Försök igen.' }, { status: 503 })
+      }
+      if (!quote) {
         return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
       }
 
       // Fetch structured items from quote_items table
-      const { data: quoteItems } = await supabase
+      const { data: quoteItems, error: itemsError } = await supabase
         .from('quote_items')
         .select('*')
         .eq('quote_id', quoteId)
         .order('sort_order', { ascending: true })
+
+      // An unreadable set of rows is not an empty quote. Otherwise the
+      // editor can autosave the apparent empty result over the saved work.
+      if (itemsError) {
+        return NextResponse.json({ error: 'Kunde inte läsa offertens rader. Försök igen.' }, { status: 503 })
+      }
 
       // Fetch customer separately
       let customer = null
