@@ -234,3 +234,7 @@ Kvar: generic intake:s legacyväg, email-inbound, uppföljningens aktivering/sto
 
 ### Verifierat på exakt kod-HEAD
 Fem GitHub Actions och båda Vercel-byggen gröna på `141e89c3c761d4ec2b4f2605b2a1819e3189a19d`. Kontraktsgrind run 486/job 102791077254: TypeScript utan fel, 1827 browserlösa prov godkända + en befintlig skip. Sex-kundutfall-sviten grön: 17 riktiga SQL-intakeprov i PGlite (fyra nya), 12 storefront route/klientprov med isolerad browser/network samt befintliga 42 boundary, 35 intake/HTTP, 45 Fortnox, 15 faktura/accept-SQL, 20 faktura/accept-service, 18 portal och 30 Gmail. Inga providerprov är liveprov. Lokal full körning saknar beroenden; CI är det fulla körbeviset. Alla tio ändrade fjärrfiler jämförda med lokala Git-blobbar.
+
+
+## Styrande prioriteringsändring från Andreas 2026-09-10
+Kontaktformulär och widget skjuts efter lansering; tidigare nästa-steg-anvisningar om dessa är ersatta. Nästa arbete ska verifiera och rätta de tre HELA huvudresorna: (1) rätt nya Matte-onboarding till första användbara resultat, (2) förfrågan till agentarbete/offert/godkännande/uppföljning/kundbeslut/projekt, (3) rapport till tid/material/ÄTA/fakturaunderlag/ekonomisystem. Prioritera faktiska överlämningar, automatisk fortsättning och sparade användbara slutresultat. Gröna isolerade prov är inte kundrese- eller livegodkännande. Börja med offertuppföljningens aktivering och stoppvillkor. Befintliga skydds- och produktionsgränser kvarstår.
