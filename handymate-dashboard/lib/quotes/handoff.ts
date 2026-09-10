@@ -16,6 +16,7 @@ export interface HandoffInput {
   quote: { status: string; sent_at: string | null; valid_until: string | null; follow_up_count: number | null }
   paused: boolean; teamActive: boolean; hasPhone: boolean; hasEmail: boolean
   historyIncomplete?: boolean
+  followupRound?: { id: string; status: string; sendClaimed: boolean; providerAccepted: boolean; expired: boolean } | null
   rules: HandoffRule[]; logs: HandoffLog[]; pendingId: string | null
   intervalDays: number | null; today: string; now: number
 }
@@ -31,6 +32,17 @@ export function deriveQuoteHandoff(input: HandoffInput): HandoffSummary {
   if (!(OPEN_QUOTE_STATUSES as readonly string[]).includes(quote.status) || (quote.valid_until && quote.valid_until < input.today)) return {
     state: 'closed', headline: 'Den här offertuppföljningen är avslutad', done,
     next: 'Ingen fortsatt uppföljning visas för den här offerten.', needsYou: 'Ta ställning till ett nytt erbjudande om jobbet fortfarande är aktuellt.' }
+  const round = input.followupRound
+  if (round && (round.status !== 'pending' || round.sendClaimed || round.expired)) return {
+    state: 'attention',
+    headline: round.providerAccepted ? 'Uppföljningens sändkvittens finns'
+      : round.status === 'rejected' ? 'Uppföljningsförslaget är avvisat'
+      : round.expired && !round.sendClaimed ? 'Uppföljningsförslaget har löpt ut' : 'Uppföljningens utfall behöver kontrolleras',
+    done: round.providerAccepted ? 'Sändningen har en sparad kvittens. Det bevisar inte att kunden har läst meddelandet.' : done,
+    next: round.providerAccepted ? 'Nästa omgång kan fastställas när kvittensen har stämts av.' : 'Denna omgång hålls kvar. Inget nytt uppföljningskort skapas automatiskt.',
+    needsYou: round.providerAccepted ? 'Kontrollera kundens eventuella svar.' : 'Kontrollera kortets beslut och leveranskvittens innan kunden kontaktas igen.',
+    link: `/dashboard/approvals?focus=${encodeURIComponent(round.id)}`, linkLabel: 'Visa uppföljningen',
+  }
   if (input.pendingId) return { state: 'decision', headline: 'Ett förslag väntar på ditt beslut', done,
     next: 'Granska teamets förslag. Ett väntande kort är inte ett skickat meddelande.',
     needsYou: 'Godkänn eller avvisa förslaget i godkännandekön.', link: `/dashboard/approvals?focus=${encodeURIComponent(input.pendingId)}`, linkLabel: 'Granska förslaget' }

@@ -122,5 +122,11 @@ test('approval preview and both actual execution cases revalidate and claim befo
   for(const name of ['send_sms','send_email']){const part=src.split(`case '${name}': {`)[1].split('\n      case ')[0];assert(part.indexOf('verifyQuoteFollowupSource')<part.indexOf('claimQuoteFollowupSend'));assert(part.includes('payload.quote_followup_source'))}
   assert(review.includes('await verifyQuoteFollowupSource'));assert(review.includes('if (p.quote_followup_send_claimed_at)'))
 })
+test('customer-facing handoff does not promise a next round after rejection or an unknown send',async()=>{
+  const cadence=await load('lib/quotes/followup-cadence.ts',{}),h=await load('lib/quotes/handoff.ts',{'./followup-cadence':cadence,'./statuses':{OPEN_QUOTE_STATUSES:['sent','opened'],WON_QUOTE_STATUSES:['accepted','signed']}})
+  const s=setup(),input={quote:s.tables.quotes[0],paused:false,teamActive:true,hasPhone:true,hasEmail:true,rules:[],logs:[],pendingId:null,intervalDays:5,today:new Date().toISOString().slice(0,10),now:Date.now()}
+  for(const status of ['rejected','approved','expired']){const value=h.deriveQuoteHandoff({...input,followupRound:{id:'card',status,sendClaimed:status==='approved',providerAccepted:false,expired:status==='expired'}})
+    assert.equal(value.state,'attention');assert.equal(value.eligibleAt,undefined);assert(value.next.includes('Inget nytt uppföljningskort'))}
+})
 module.exports={modules,setup,cron}
 if(require.main===module)(async()=>{const m=await modules();for(const [name,fn] of tests){await fn(m);console.log('PASS',name)}console.log(`PASS ${tests.length} followup round contracts; actual helpers/cron, isolated DB and agent/provider`)})().catch(e=>{console.error(e);process.exitCode=1})
