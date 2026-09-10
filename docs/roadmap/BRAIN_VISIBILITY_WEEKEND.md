@@ -1574,6 +1574,12 @@ Två konkreta fel hittades och har rättats i nästa avgränsade ändring:
 
 Rättningarna har fokuserade regressioner i befintlig CI: faktisk aktivitetsrutt mot verifierat kolumnkontrakt, Home laddning/tomt/fel och UI-prov för laddning → tomt samt offertkvitto. Aktivitetsruttharnessen och sju Home-tester är lokalt gröna. Efterkontroll av preview-commit `e18199e`: Home laddar aktivitetsläget utan fel, visar känt tomt uppdragsläge och två synliga beslut. Reload visar först laddningstext och sedan aktuellt läge. Nya UI-proven för Home och offertkvitto är gröna i CI. Kontraktsgrinden fångade en skillnad mellan lokal testlista och workflow-lista; listorna synkas och aktivitetsruttharnessen läggs även i workflowen. Slice 1 och 2 är fortfarande öppna: positiv sändkvittens med verklig provider, komplett kundresa, byte mellan två företag och mobilapp är inte bevisade här.
 
+### CHECKPOINT — OMBOKNING OCH NÄSTA SLICE
+
+Alla 13 rapporterade CI-checkar för `1d0e22b` är gröna, inklusive den synkade kontraktsgrinden. Därefter har legacy-ombokningen fått företagsfilter både vid läsning och uppdatering av uttryckligt booking_id. Läsfel, saknad bokning, skrivfel och noll uppdaterade rader ger misslyckat resultat utan SMS. Bekräftelse kan skickas först när uppdateringen returnerat en bokning inom samma företag. Fem isolerade regressioner kör faktisk POST-hanterare och är gröna; harnessen ingår i befintlig `test:six-outcomes`. Inget verkligt SMS skickat; detta bevisar den avgränsade tenantgrinden, inte hela legacy-flödets samtidighet eller leverans.
+
+Project är inspekterad inför nästa brief, inte nybyggd: återanvänd `project-reality.ts`, `derive-todo.ts`, befintliga status-/ekonomikomponenter och projektets nästa steg. Ingen parallell ekonomimodell eller ny motor. Större visuell designöversyn kommer efter kärnflödena; begriplig status, nästa steg och mobil användbarhet tillhör varje slice. Slice 1/2 och provider-/företagsbyte-/mobilgrindarna ovan är fortfarande öppna.
+
 ### REPRODUCERA LOKALA KONTROLLER
 
 Kör från `handymate-dashboard/` efter `npm ci`:
@@ -1591,7 +1597,7 @@ Den uppräknade testsamlingen startar inte någon browser och använder inte pro
 
 1. ROT: egen XML är vald ansökningsriktning inför launch. Ingen snabb avstängning av Fortnox `taxreductions`: dess betydelse för fakturans avdrag/saldo är ännu obevisad. Exklusivitet per faktura och idempotent XML-återhämtning kräver avgränsad Money-slice med providerbevis. Två vägar finns alltså fortfarande i kod; ROT kvarstår PROVE/blockerad. Home/Quote tillför ingen ansöknings-CTA. `generated` betyder XML-underlag skapat; Fortnox `submitted` bevisar inte mottagning hos Skatteverket.
 2. Auto-approval: legacy `tryAutoApprove` saknar runtime-anropare och får inte återaktiveras. Mänskliga beslut går via approvals/[id] och `canActOnApproval`; systembeslut via befintlig earned-autonomy/mandat. Statistik/learning confidence är inte mandat. Ingen bred approval-refactor i läsmodellerna.
-3. Separat launch-fynd: legacy `/api/suggestions/approve` reschedule-handler saknar tenantfilter för uttryckligt booking_id; kräver avgränsad fix och regression före launch.
+3. Separat launch-fynd: legacy `/api/suggestions/approve` reschedule-handler hade inget tenantfilter för uttryckligt booking_id. Avgränsad fix och fem regressioner är nu implementerade, se checkpoint ovan; ingen bred återaktivering/refactor av legacy-flödet.
 
 ### IMPLEMENTATIONSBRIEF — ASTRA → SOL
 
