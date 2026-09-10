@@ -72,6 +72,7 @@ jobs:
         # prod-sviten, inte här.
         run: >-
           npx playwright test
+          tests/home-brain.spec.ts
           tests/agent-team.spec.ts
           tests/approval-action-contract.spec.ts
           tests/column-contract.spec.ts
@@ -208,3 +209,6 @@ jobs:
 
       - name: Sex kundutfall — sparning och leveranssanning
         run: npm run test:six-outcomes
+
+      - name: Aktivitetsläsning — verifierat kolumnkontrakt
+        run: node tests/sprint/activity-route.cjs

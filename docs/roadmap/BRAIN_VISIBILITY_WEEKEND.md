@@ -1572,7 +1572,7 @@ Två konkreta fel hittades och har rättats i nästa avgränsade ändring:
 - Aktivitetsrutten väljer `communication_log.ai_reason`, som inte finns i verifierat prod-schema. Läs befintliga meddelandefält i stället; ingen migration.
 - Home blandar laddning med läsfel och visar läsfel för väntansläget även när avsaknad av aktivt uppdrag är känd. Skilj laddning, känt tomt uppdragsläge och fel utan att påstå att hela firman saknar väntande saker.
 
-Rättningarna har fokuserade regressioner i befintlig CI: faktisk aktivitetsrutt mot verifierat kolumnkontrakt, Home laddning/tomt/fel och UI-prov för laddning → tomt samt offertkvitto. Aktivitetsruttharnessen och sju Home-tester är lokalt gröna. Ny previewkontroll återstår efter publicering. Slice 1 och 2 är fortfarande öppna: positiv sändkvittens med verklig provider, komplett kundresa, byte mellan två företag och mobilapp är inte bevisade här.
+Rättningarna har fokuserade regressioner i befintlig CI: faktisk aktivitetsrutt mot verifierat kolumnkontrakt, Home laddning/tomt/fel och UI-prov för laddning → tomt samt offertkvitto. Aktivitetsruttharnessen och sju Home-tester är lokalt gröna. Efterkontroll av preview-commit `e18199e`: Home laddar aktivitetsläget utan fel, visar känt tomt uppdragsläge och två synliga beslut. Reload visar först laddningstext och sedan aktuellt läge. Nya UI-proven för Home och offertkvitto är gröna i CI. Kontraktsgrinden fångade en skillnad mellan lokal testlista och workflow-lista; listorna synkas och aktivitetsruttharnessen läggs även i workflowen. Slice 1 och 2 är fortfarande öppna: positiv sändkvittens med verklig provider, komplett kundresa, byte mellan två företag och mobilapp är inte bevisade här.
 
 ### REPRODUCERA LOKALA KONTROLLER
 
