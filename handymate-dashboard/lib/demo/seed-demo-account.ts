@@ -11,6 +11,7 @@ import { buildDemoManifest, type DemoManifest } from '@/lib/demo/manifest'
 import { captureExpectedMarginSnapshot } from '@/lib/quotes/margin-snapshot'
 import { freezeProjectOutcome } from '@/lib/efterkalkyl/freeze-outcome'
 import { getProjectOutcome } from '@/lib/efterkalkyl/get-project-outcome'
+import { calculateCustomerLTV } from '@/lib/customer-ltv'
 import { skapaDebriefKort } from '@/lib/debrief/create-debrief-card'
 import { halsning } from '@/lib/customers/namn'
 import { getOrCreateDraftJobbpass } from '@/lib/jobbpass/jobbpass'
@@ -85,6 +86,10 @@ export interface DemoResetSummary {
   agentRuns: number
   bookings: number
   scheduleEntries: number
+  /** Kunder vars härledda LTV-fält räknades om av lib/customer-ltv.ts. */
+  ltvKunder: number
+  /** Riktiga customer_reactivation-kort LTV-motorn skapade (Hannas underlag). */
+  ltvAteraktiveringar: number
   manifest: DemoManifest
 }
 
@@ -1053,6 +1058,48 @@ export async function resetDemoAccount(
     .select('invoice_id, invoice_number')
     .single()
   if (fastighetsInvErr || !fastighetsInvoice) return failReset(`Kunde inte skapa faktura (Fastighets): ${fastighetsInvErr?.message}`, 'invoice_insert_failed')
+
+  // 7a-bis. BETALD FÖR TIO MÅNADER SEDAN — BRF Lönnen. HANNAS UNDERLAG.
+  //
+  // 2026-09-10. Hanna hade ingenting att arbeta med på demot. Hennes pool är
+  // TIDIGARE kunder: lib/agents/hanna-outbound.ts hämtar kandidater ur
+  // lib/customers/quiet-customer.ts:fetchQuietCustomers, som kräver
+  // customer.last_job_date satt OCH äldre än 180 dagar. Demons enda betalda
+  // faktura var 40 dagar gammal, så noll kunder var "tysta" och Hanna stod
+  // still på det konto som ska visa att hon jobbar.
+  //
+  // Beloppet är valt med avsikt: 68 750 kr passerar LTV-motorns
+  // VIP-tröskel (50 000 kr, lib/customer-ltv.ts) så att motorn — samma kod
+  // som nattcronen kör — skapar ett RIKTIGT customer_reactivation-kort
+  // routat till Hanna när den körs i slutet av seedningen. Ingenting av
+  // Hannas status eller kort är påhittat här; bara den historik hon läser.
+  const brfItems = [invoiceItem('Byte av trapphusbelysning, 3 trapphus', 55000, 'labor', false, 0)]
+  const brfSubtotal = 55000
+  const brfVat = brfSubtotal * 0.25
+  const brfTotal = brfSubtotal + brfVat // 68 750
+  const brfInvoiceNumber = `FV-${new Date().getFullYear()}-D00`
+  const { error: brfInvErr } = await supabase
+    .from('invoice')
+    .insert({
+      business_id: businessId,
+      customer_id: customers.brf.customer_id,
+      invoice_number: brfInvoiceNumber,
+      invoice_type: 'standard',
+      status: 'paid',
+      items: brfItems,
+      subtotal: brfSubtotal,
+      vat_rate: 25,
+      vat_amount: brfVat,
+      total: brfTotal,
+      customer_pays: brfTotal,
+      invoice_date: dateOnly(-300),
+      due_date: dateOnly(-270),
+      paid_at: isoAt(-268, 9, 0),
+      ocr_number: generateOCR(brfInvoiceNumber),
+      our_reference: contactName || null,
+      created_at: isoAt(-300, 9, 0),
+    })
+  if (brfInvErr) return failReset(`Kunde inte skapa faktura (BRF): ${brfInvErr.message}`, 'invoice_insert_failed')
 
   // 7b. Skickad, ej förfallen — Johan Ek, äldre jobb med ROT
   const johanInvItems = [invoiceItem('Byte av 4 element', 9600, 'labor', true, 0)]
@@ -2097,6 +2144,55 @@ export async function resetDemoAccount(
     return failReset(`Kunde inte spara demomanifestet: ${manifestError.message}`, 'demo_manifest_upsert_failed')
   }
 
+  // ══════════════════════════════════════════════════════════
+  // KUNDLIVSTIDSVÄRDEN — den RIKTIGA motorn, inte handskrivna fält
+  // ══════════════════════════════════════════════════════════
+  //
+  // customer.last_job_date, lifetime_value, job_count, avg_job_value och
+  // avg_payment_days är HÄRLEDDA fält. Att skriva dem för hand i seedaren
+  // hade betytt två sanningar om samma sak, och demot hade glidit isär från
+  // produkten så fort beräkningen ändrades. I stället körs samma funktion som
+  // nattcronen (app/api/cron/agent-context) kör: lib/customer-ltv.ts.
+  //
+  // Den gör två saker för demot:
+  //   1. Sätter last_job_date på de kunder som har betalda fakturor — vilket
+  //      är Hannas aktiveringsgrind (lib/agents/agent-tillstand.ts) och
+  //      poolen hon hämtar kandidater ur (fetchQuietCustomers).
+  //   2. Skapar ett riktigt customer_reactivation-kort för BRF Lönnen, som
+  //      passerar VIP-tröskeln och varit tyst i tio månader (se 7a-bis).
+  //
+  // IDEMPOTENS — läs det här innan raden nedan ändras.
+  //
+  // Invarianten för demoseedningen (tests/demo-seedning-tackning.spec.ts):
+  // allt som seedas måste antingen raderas av RPC:n ELLER vara bevisat
+  // idempotent. LTV-motorns reaktiveringskort dedupas mot v3_automation_logs
+  // (rule_name 'customer_lifetime_reactivation', 60 dagars fönster) — en
+  // tabell RPC:ns delete-manifest inte innehåller. Utan städningen här hade
+  // kortet skapats vid FÖRSTA resetten och sedan tyst uteblivit vid varje
+  // reset i två månader; presentatören hade sett en Hanna utan underlag utan
+  // att kunna se varför.
+  //
+  // Städningen görs HÄR och inte i RPC:n med avsikt: reset_demo_tenant är en
+  // SECURITY DEFINER-funktion på 300 rader som var trasig i en månad efter
+  // en ändring (v227), och en demo-dedupmarkör är inte värd att röra den för.
+  // Raderingen är hårt avgränsad till demokontots egna rader OCH till den
+  // enda regel seedningen själv skapar.
+  const { error: dedupErr } = await supabase
+    .from('v3_automation_logs')
+    .delete()
+    .eq('business_id', businessId)
+    .eq('rule_name', 'customer_lifetime_reactivation')
+  if (dedupErr) {
+    console.error('[demo-reset] kunde inte rensa LTV-dedupen:', dedupErr.message)
+  }
+
+  // Fail-soft: ett misslyckande loggas men fäller inte återställningen —
+  // demot är fortfarande fullt seedat, bara utan de härledda fälten.
+  const ltvResultat = await calculateCustomerLTV(businessId)
+  if (!ltvResultat.success) {
+    console.error('[demo-reset] LTV-beräkningen misslyckades:', ltvResultat.error)
+  }
+
   const { error: auditFinishError } = await supabase
     .from('demo_reset_audit')
     .update({
@@ -2117,12 +2213,14 @@ export async function resetDemoAccount(
     leads: leadSeeds.length,
     deals: dealSeeds.length,
     quotes: quoteSeeds.length,
-    invoices: 4,
+    invoices: 5,
     projects: 3,
     approvals: approvalSeeds.length,
     agentRuns: agentRunSeeds.length,
     bookings: bookingsCreated,
     scheduleEntries: scheduleEntriesCreated,
+    ltvKunder: ltvResultat.updated,
+    ltvAteraktiveringar: ltvResultat.reactivations,
     manifest,
   }
   } catch (error: any) {

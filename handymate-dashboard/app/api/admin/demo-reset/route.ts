@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { resetDemoAccount, isError } from '@/lib/demo/seed-demo-account'
+import { simuleraDemotelefoni } from '@/lib/demo/simulerad-telefoni'
+import { getServerSupabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +83,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: result.error }, { status: 400 })
     }
 
-    return NextResponse.json({ success: true, ...result })
+    // Simulerad telefoni (2026-09-10). Ligger HÄR och inte i seedaren:
+    // numret bor i business_config, som seedaren medvetet aldrig skriver till
+    // (tests/demo-seedning-tackning.spec.ts). Seedaren äger demons DATA,
+    // resetten äger dess KONFIGURATION. Se lib/demo/simulerad-telefoni.ts
+    // för varför demot behöver ett påhittat nummer och varför nattsvepet
+    // måste känna igen det.
+    //
+    // Fail-soft: en misslyckad telefonisimulering får inte fälla en i övrigt
+    // lyckad återställning. Presentatören ser då Lisa som "Behöver aktiveras",
+    // vilket är sant, i stället för ett rött fel på hela demon.
+    const telefoni = await simuleraDemotelefoni(getServerSupabase(), business.business_id)
+
+    return NextResponse.json({ success: true, ...result, telefoni })
   } catch (error: any) {
     console.error('[demo-reset] Error:', error)
     return NextResponse.json({ error: error.message || 'Kunde inte återställa demon' }, { status: 500 })

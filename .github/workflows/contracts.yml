@@ -198,6 +198,7 @@ jobs:
           tests/onboarding-setup-studio.spec.ts
           tests/demo-onboarding-utgang.spec.ts
           tests/demo-seedning-tackning.spec.ts
+          tests/demo-undantaget.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

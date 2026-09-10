@@ -4,6 +4,12 @@ import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { mapFortnoxInvoice } from '@/lib/fortnox/map-invoice'
 import { logFortnoxOperation } from '@/lib/fortnox/api-log'
+import {
+  composeReminderStep,
+  createInvoiceReminderCard,
+  loadReminderConfig,
+  type ReminderInvoiceRow,
+} from '@/lib/invoice-reminder-card'
 import type { FortnoxInvoiceListItem } from '@/lib/fortnox'
 
 export const dynamic = 'force-dynamic'
@@ -80,8 +86,9 @@ const SIM_INVOICES: Array<{
  * ska aldrig behöva en riktig Fortnox-inloggning för att visa importflödet.
  *
  * Skapar ~8 påhittade "Fortnox-importerade" kunder + ~12 fakturor (mix
- * betalda/obetalda/förfallna) och svarar i EXAKT samma form som de två
- * riktiga import-rutterna (app/api/integrations/fortnox/import/customers
+ * betalda/obetalda/förfallna), låter Karin bygga sina riktiga
+ * påminnelsekort för de förfallna (avsnitt 4), och svarar i EXAKT samma
+ * form som de två riktiga import-rutterna (app/api/integrations/fortnox/import/customers
  * och .../invoices), så StepImportData kan rendera sin befintliga
  * fortnox-done-vy oförändrad med riktiga-utseende siffror.
  *
@@ -246,6 +253,12 @@ export async function POST(request: NextRequest) {
       errors: [] as { documentNumber: string; error: string }[],
     }
     const today = dateOnly(0)
+    /**
+     * De förfallna, obetalda fakturor Karin ska få arbeta med efter importen
+     * (se avsnitt 4 nedan). Samlas här i loopen eftersom det är enda stället
+     * både den mappade raden och det nya invoice_id finns i samma scope.
+     */
+    const forfallnaForKarin: Array<{ inv: ReminderInvoiceRow; customerNumber: string | null }> = []
 
     for (const item of SIM_INVOICES) {
       if (existingDocNumbers.has(item.doc)) {
@@ -289,6 +302,20 @@ export async function POST(request: NextRequest) {
       }
 
       existingDocNumbers.add(item.doc)
+      if (mapped.row.status === 'overdue') {
+        forfallnaForKarin.push({
+          inv: {
+            invoice_id: insertedInvoice.invoice_id,
+            invoice_number: mapped.row.invoice_number,
+            due_date: mapped.row.due_date as string,
+            business_id: businessId,
+            customer_id: customerId,
+            total: mapped.row.total,
+            reminder_count: 0,
+          },
+          customerNumber: item.customerNumber,
+        })
+      }
       invoiceResults.imported++
       invoiceResults.total_outstanding_kr += mapped.outstanding
       syncRows.push({
@@ -370,8 +397,64 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Kunde inte markera Fortnox som anslutet.' }, { status: 500 })
     }
 
+    // ══════════════════════════════════════════════════════════
+    // 4. KARIN FÅR ARBETA MED DET IMPORTERADE
+    // ══════════════════════════════════════════════════════════
+    //
+    // Andreas 2026-09-10: kunder och fakturor skulle bli "hämtade OCH
+    // BEARBETADE av agenterna". Före det här steget var bara första halvan
+    // sann: importen skrev rader och lämnade dem. Fem av de tolv simulerade
+    // fakturorna är förfallna och obetalda — exakt det underlag Karin
+    // arbetar med — men ingenting rörde dem, så demot visade en full
+    // fakturalista och en Karin som inte gjort något med den.
+    //
+    // Korten byggs av SAMMA funktioner som morgoncronen
+    // (app/api/cron/send-reminders) och onboardingens första handling
+    // använder: loadReminderConfig → composeReminderStep →
+    // createInvoiceReminderCard (lib/invoice-reminder-card.ts). Inget eget
+    // demokort, ingen egen text, ingen egen dedup — därför visar demot
+    // Karins riktiga arbete, inte en attrapp av det.
+    //
+    // INGET SKICKAS. Korten får status 'pending' och väntar på ett klick,
+    // och mapFortnoxInvoice har redan satt reminder_count = 0 utan
+    // next_reminder_at, så send-reminders-cronen kan inte plocka upp dem.
+    const karinResults = { created: 0, duplicates: 0, errors: [] as string[] }
+    if (forfallnaForKarin.length > 0) {
+      const reminderCfg = await loadReminderConfig(supabase, businessId)
+      const nu = new Date()
+      for (const { inv, customerNumber } of forfallnaForKarin) {
+        const simKund = customerNumber ? SIM_CUSTOMERS.find(c => c.number === customerNumber) : undefined
+        const step = composeReminderStep({
+          inv,
+          // Kundens kontaktväg är densamma som fakturan importerades med:
+          // ägarens mobil (se DEDUP-noten i filhuvudet) och sim-e-posten.
+          customer: simKund
+            ? { name: simKund.name, phone_number: ownerPhone, email: `demo+${simKund.emailSuffix}@handymate.se` }
+            : null,
+          cfg: reminderCfg,
+          today: nu,
+        })
+        const utfall = await createInvoiceReminderCard(supabase, {
+          businessId,
+          inv,
+          customer: simKund ? { name: simKund.name, phone_number: ownerPhone } : null,
+          step,
+        })
+        if ('id' in utfall) karinResults.created++
+        else if ('duplicate' in utfall) karinResults.duplicates++
+        else karinResults.errors.push(`${inv.invoice_number}: ${utfall.error}`)
+      }
+      // Ett kort som inte kunde skapas är inte ett fel som ska fälla
+      // importen — kunderna och fakturorna ligger redan inne, och svaret
+      // redovisar utfallet så presentatören ser vad som faktiskt hände.
+      if (karinResults.errors.length > 0) {
+        console.error('[demo-fortnox-sim] Karin-kort misslyckades:', karinResults.errors.join('; '))
+      }
+    }
+
     return NextResponse.json({
       success: true,
+      karin: karinResults,
       customers: {
         success: true,
         imported: customerResults.imported,
