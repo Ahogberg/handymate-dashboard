@@ -351,6 +351,10 @@ export async function POST(request: NextRequest) {
     }
 
     // New quote creation - support both legacy items and structured quote_items.
+    // Creation cannot attest customer delivery. Only the send endpoint can.
+    if (body.status != null && body.status !== 'draft') {
+      return NextResponse.json({ error: 'Spara offerten som utkast och använd skicka-vyn för att skicka den.' }, { status: 400 })
+    }
     // Id, nummer, sign_token, valid_until och radskrivningen ägs numera av den
     // kanoniska byggaren (lib/quotes/create-quote.ts) — samma golv som agenten,
     // Matte och rösten går genom. Den här vägen behåller sin rikedom via extra.
@@ -455,7 +459,7 @@ export async function POST(request: NextRequest) {
       // sql/quote_overhaul.sql) fanns, men POST skrev aldrig till den, så
       // ALLA bilagor tappades tyst redan vid skapande, oavsett foto-fixen.
       attachments: body.attachments || [],
-      sent_at: body.status === 'sent' ? new Date().toISOString() : null,
+      sent_at: null,
       ai_generated: body.ai_generated || false,
       ai_confidence: body.ai_confidence || null,
       source_transcript: body.source_transcript || null,
@@ -507,7 +511,7 @@ export async function POST(request: NextRequest) {
       customerId: body.customer_id || null,
       title: body.title || '',
       description: body.description || null,
-      status: body.status === 'sent' ? 'sent' : 'draft',
+      status: 'draft',
       vatRate,
       rotRutType: body.rot_rut_type || null,
       rotRutDeduction,

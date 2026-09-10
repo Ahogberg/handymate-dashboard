@@ -98,4 +98,8 @@ test('missing login or create permission cannot save the first quote',async m=>{
   for(const [field,status] of [['denied',401],['noPermission',403]]) {const h=await harness(m);h.state[field]=true
     assert.equal((await h.post(m.payload.buildQuotePayload(context()))).status,status);assert.deepEqual(h.state.tables,{})}
 })
+test('creation cannot claim sent or accepted without actual delivery/decision',async m=>{
+  for(const status of ['sent','accepted']) {const h=await harness(m)
+    assert.equal((await h.post({...m.payload.buildQuotePayload(context()),status})).status,400);assert.deepEqual(h.state.tables,{})}
+})
 ;(async()=>{const m=await modules();for(const [name,fn] of tests){await fn(m);console.log('PASS',name)}console.log(`PASS ${tests.length} first-quote persistence contracts; database isolated, no live/browser proof`)})().catch(e=>{console.error(e);process.exitCode=1})
