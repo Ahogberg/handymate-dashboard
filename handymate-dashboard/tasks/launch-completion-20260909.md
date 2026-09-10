@@ -238,3 +238,30 @@ Fem GitHub Actions och båda Vercel-byggen gröna på `141e89c3c761d4ec2b4f2605b
 
 ## Styrande prioriteringsändring från Andreas 2026-09-10
 Kontaktformulär och widget skjuts efter lansering; tidigare nästa-steg-anvisningar om dessa är ersatta. Nästa arbete ska verifiera och rätta de tre HELA huvudresorna: (1) rätt nya Matte-onboarding till första användbara resultat, (2) förfrågan till agentarbete/offert/godkännande/uppföljning/kundbeslut/projekt, (3) rapport till tid/material/ÄTA/fakturaunderlag/ekonomisystem. Prioritera faktiska överlämningar, automatisk fortsättning och sparade användbara slutresultat. Gröna isolerade prov är inte kundrese- eller livegodkännande. Börja med offertuppföljningens aktivering och stoppvillkor. Befintliga skydds- och produktionsgränser kvarstår.
+
+## Checkpoint: huvudresornas agentöverlämning 2026-09-10
+
+Kod-HEAD `65a4a37f7383eeb52cb9a3c4d5d647a2857ad92d` i draft-PR37; lokal commit `9193e538`. Prioriteringsändringen ovan gäller: formulär/widget efter lansering.
+
+### Reproducerat och rättat
+Den riktiga triggerAgentInternal-funktionen returnerade success:true för HTTP 200 med skipped:fuel_exhausted. Reproduktion med Node 24:s direkta TS-laddning och isolerad fetch gav exit 1 på originalet; exakt samma fall ger success:false och exit 0 efter rättning. Detta kunde låta offertcronen förbruka en omgång fast agenten inte ens kördes.
+
+Den gemensamma helpern skiljer nu lyckad transport från bekräftad körning: paus/bränslestopp/kostnadstak, explicit fel, ofärdig eller misslyckad dublett och saknat run_id får success:false med orsak bevarad. Fullbordad dublett kan återläsas; ingen automatisk omsändning införs. Bekräftad körning är uttryckligen INTE bevis på skickat kundmeddelande.
+
+22 nya prov kör riktiga funktionen med isolerad HTTP: stoppvarianter, dublettstatus, felaktiga kvittenser, 503, tappat svar och ogiltig JSON. Alla 22 passerar lokalt och i CI. Fem Actions gröna på kod-HEAD: Kontraktsgrind run 500/job 102810960897 med tsc rent, 1827 browserlösa prov + en befintlig skip, kundunderlag och hela sex-kundutfall-sviten gröna. Tre fjärrfiler matchar lokala Git-blobbar. Dashboard-Vercel grön; vision-test-Vercel fortfarande pending vid avläsning (inte godkänt som klart bygge här).
+
+### Kritisk kvarvarande lucka i offertresan
+app/api/cron/quote-follow-up/route.ts grupperar offerter och stegar ALLA kandidaters follow_up_count när en agentkörning returnerar success. En körning med inget relevant verktyg, delvis arbete eller bara ett köat kort bevisar inte utskick för varje offert. Rättningen ovan löser uttryckligen utebliven körning, INTE denna återstående objekt-/leveranskvittens.
+
+Dessutom skickar sendSms/sendEmail i tool-router.ts vid systemkälla approval-payload med mottagare/text men utan offertkoppling. Cronens konfliktfilter och offertens handoff-vy söker related_id/quote_id/entity_id och kan då missa kortet. Det är ett kärnflödesproblem, inte en presentationsdetalj.
+
+Nästa körbara koduppgift: reproducera TVÅ offerter där agenten bara förbereder en, där alla verktyg misslyckas och där ett godkännande väntar när kunden accepterar. Bygg därefter beständig koppling mellan varje offert, uppföljningsomgång och godkännande/resultat; räkna förberett, väntande, avvisat och provideraccepterat separat. Stabil nyckel och kvitto ska styra återförsök. Kontrollera status/giltighet/kundsvar vid godkännandet, inte bara vid cronens urval. Ändra inte enbart räknaren till att kräva mer bevis utan att samtidigt hindra dubbla kort vid nästa körning.
+
+### Aktuell klickåtkomst
+Färsk browserkontroll: preview visar Log in to Vercel. Ny läsande navigation till app.handymate.se/dashboard omdirigerar till Handymates Logga in; tidigare Nordström-session är inte längre giltig. Inga nya inloggade klickprov genomförda och inga inloggningsuppgifter hanterade. Detta blockerar livekundproven men inte fortsatt kodarbete. Ingen kringgång eller produktionsskrivning.
+
+### De tre resornas kvarvarande slutbevis
+1. Nya Matte-designen på aktuell onboardingmotor och rätt preview, företagsdata/mejlanslutning till verkligt sparat första offertutkast.
+2. Per-offert-uppföljning enligt ovan, godkännande/stopp vid kundbeslut och projektkvittens.
+3. Samordnat mobilrapport→ÄTA→fakturaunderlag→verkligt ekonomisystem med samma kontrollerade belopp och kundprov.
+Inget av detta är slutgodkänt. Ingen main-merge/push, schemaändring, kundkommunikation eller providerkörning i detta pass.
