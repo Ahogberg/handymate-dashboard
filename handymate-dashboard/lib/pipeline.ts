@@ -67,30 +67,33 @@ export const DEFAULT_STAGES = [
 export async function ensureDefaultStages(businessId: string): Promise<PipelineStage[]> {
   const supabase = getServerSupabase()
 
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('pipeline_stage')
     .select('*')
     .eq('business_id', businessId)
     .order('sort_order')
 
+  if (readError) throw readError
   if (existing && existing.length > 0) {
     // Check if stages need migration (old 8-stage setup → new 6-stage)
     const hasCurrent = existing.some((s: any) => s.slug === 'contacted' || s.slug === 'negotiation' || s.slug === 'won')
     if (hasCurrent) return existing
 
     // Check if any deals exist with old stages before migrating
-    const { count } = await supabase
+    const { count, error: countError } = await supabase
       .from('deal')
       .select('*', { count: 'exact', head: true })
       .eq('business_id', businessId)
 
+    if (countError) throw countError
     if (count && count > 0) {
       // Deals exist — don't migrate, keep old stages
       return existing
     }
 
     // No deals — safe to replace stages
-    await supabase.from('pipeline_stage').delete().eq('business_id', businessId)
+    const { error: deleteError } = await supabase.from('pipeline_stage').delete().eq('business_id', businessId)
+    if (deleteError) throw deleteError
   }
 
   const stages = DEFAULT_STAGES.map(s => ({

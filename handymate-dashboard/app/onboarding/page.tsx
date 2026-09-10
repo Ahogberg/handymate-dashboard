@@ -103,6 +103,8 @@ export default function OnboardingPage() {
   const [step, setStep] = useState(0)
   const [data, setData] = useState<OnboardingFormData>({ fSkatt: true })
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
+  const [loadRetry, setLoadRetry] = useState(0)
   const [launchRequested, setLaunchRequested] = useState(false)
   const [quoteSetup, setQuoteSetup] = useState<QuoteSetupData | null>(null)
   const [quoteSetupError, setQuoteSetupError] = useState(false)
@@ -147,9 +149,11 @@ export default function OnboardingPage() {
   useEffect(() => {
     let cancelled = false
     async function load() {
+      setLoading(true); setLoadError(false)
       try {
         const res = await fetch('/api/onboarding')
         if (!res.ok) {
+          if (res.status !== 401) throw new Error('Saved onboarding unavailable')
           // Ny användare — börja från Step 1 (intro). UNDANTAG (Fynd 3): om
           // ett sparat Step2-utkast finns i sessionStorage (kunden hann
           // fylla i innan en refresh/401 tog bort sessionen) hoppar vi rakt
@@ -265,7 +269,7 @@ export default function OnboardingPage() {
         setLoading(false)
       } catch {
         if (!cancelled) {
-          setStep(0)
+          setLoadError(true)
           setLoading(false)
         }
       }
@@ -274,7 +278,7 @@ export default function OnboardingPage() {
     return () => {
       cancelled = true
     }
-  }, [router])
+  }, [router, loadRetry])
 
   // Save progress till DB (bara om vi har businessId).
   // Server-side via /api/onboarding PUT (service-role bypassar RLS).
@@ -298,10 +302,8 @@ export default function OnboardingPage() {
 
   const next = useCallback(async () => {
     const newStep = Math.min(step + 1, TOTAL_STEPS - 1)
-    if (step === 2) {
-      if (jobStepLock.current) return
-      jobStepLock.current = true; setSavingJobs(true); setJobSaveError('')
-    } else setStep(newStep)
+    if (jobStepLock.current) return
+    jobStepLock.current = true; setSavingJobs(true); setJobSaveError('')
     try {
 
     if ((data.businessId || step === 2) && newStep > 0) {
@@ -339,15 +341,16 @@ export default function OnboardingPage() {
         config.phone_setup_type = data.phoneMode === 'forward' ? 'keep_existing' : 'new_number'
       }
 
-      await saveProgress(newStep, sanitizeForSave(data), config, step === 2)
+      await saveProgress(newStep, sanitizeForSave(data), config, true)
     }
-      if (step === 2) setStep(newStep)
+      setStep(newStep)
     } catch (error) {
-      setJobSaveError(error instanceof Error ? error.message : 'Kunde inte spara dina jobbval. Försök igen.')
-    } finally { if (step === 2) { jobStepLock.current = false; setSavingJobs(false) } }
+      setJobSaveError(error instanceof Error ? error.message : 'Kunde inte spara dina svar. Försök igen.')
+    } finally { jobStepLock.current = false; setSavingJobs(false) }
   }, [step, data, saveProgress])
 
   const back = useCallback(() => {
+    if (jobStepLock.current) return
     setStep(s => Math.max(0, s - 1))
   }, [])
 
@@ -362,9 +365,8 @@ export default function OnboardingPage() {
     if (finalizeLock.current) return
     finalizeLock.current = true
     if (!data.businessId) {
-      // Inget konto att finalisera (edge case) — inget att fela på.
       finalizeLock.current = false
-      router.push('/dashboard')
+      setFinishError(true)
       return
     }
     setFinishing(true)
@@ -426,6 +428,8 @@ export default function OnboardingPage() {
 
   const onboardingStep = (
     <div className="ob-card-wrap" data-wide={step === 0 ? 'true' : undefined}>
+      {step !== 2 && jobSaveError && <div role="alert"><p>{jobSaveError}</p><button type="button" onClick={() => void next()}>Försök spara igen</button></div>}
+      <fieldset disabled={savingJobs} aria-busy={savingJobs} style={{ display: 'contents', border: 0, margin: 0, padding: 0, minWidth: 0 }}>
       {step === 0 && <Step1MeetTheTeam onNext={next} />}
       {step === 1 && (
         <Step2Business onNext={next} onBack={back} data={data} setData={setDataUpdater} />
@@ -472,6 +476,7 @@ export default function OnboardingPage() {
           </> : <p role="status">Kontrollerar din jobbtyp och mall…</p>}
           <button type="button" className="first-quote-skip" disabled={finishing} onClick={finish}>Till översikten i stället</button>
         </section>)}
+      </fieldset>
     </div>
   )
 
@@ -502,6 +507,12 @@ export default function OnboardingPage() {
       </div>
     )
   }
+
+  if (loadError) return <div className="ob-page"><section className="ob-card-wrap" role="alert">
+    <h1>Vi kunde inte hämta dina sparade svar</h1>
+    <p>Försök igen för att fortsätta där du slutade.</p>
+    <button type="button" onClick={() => setLoadRetry(n => n + 1)}>Försök igen</button>
+  </section></div>
 
   return (
     <div className="ob-page">

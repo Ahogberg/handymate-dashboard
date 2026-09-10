@@ -66,13 +66,14 @@ export async function seedAllDefaults(
  * (fakturapåminnelse) kräver godkännande. Alla respekterar arbetstider/nattläge.
  */
 async function seedV3AutomationRules(supabase: SupabaseClient, businessId: string) {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('v3_automation_rules')
     .select('id')
     .eq('business_id', businessId)
     .eq('is_system', true)
     .limit(1)
 
+  if (readError) throw readError
   if (existing && existing.length > 0) return
 
   const rules: Array<{
@@ -148,7 +149,7 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
     },
   ]
 
-  await supabase.from('v3_automation_rules').insert(
+  const { error: writeError } = await supabase.from('v3_automation_rules').insert(
     rules.map((r, i) => ({
       id: `v3r_${businessId}_${i}`,
       business_id: businessId,
@@ -165,10 +166,11 @@ async function seedV3AutomationRules(supabase: SupabaseClient, businessId: strin
       respects_night_mode: true,
     }))
   )
+  if (writeError) throw writeError
 }
 
 async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string) {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('lead_scoring_rules')
     // PK heter `rule_id` (sql/leads_pipeline.sql:112). Med `id` gav frågan
     // 42703, data blev null, och kontrollen "finns redan regler?" svarade
@@ -177,9 +179,11 @@ async function seedLeadScoringRules(supabase: SupabaseClient, businessId: string
     .eq('business_id', businessId)
     .limit(1)
 
+  if (readError) throw readError
   if (existing && existing.length > 0) return
 
-  await supabase.rpc('seed_lead_scoring_rules', { p_business_id: businessId })
+  const { error: writeError } = await supabase.rpc('seed_lead_scoring_rules', { p_business_id: businessId })
+  if (writeError) throw writeError
 }
 
 /**
@@ -202,16 +206,17 @@ async function seedPipelineStages(_supabase: SupabaseClient, businessId: string)
 }
 
 async function seedQuoteStandardTexts(supabase: SupabaseClient, businessId: string, branch: string) {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('quote_standard_texts')
     .select('id')
     .eq('business_id', businessId)
     .limit(1)
 
+  if (readError) throw readError
   if (existing && existing.length > 0) return
 
   const texts = getDefaultStandardTexts(branch)
-  await supabase.from('quote_standard_texts').insert(
+  const { error: writeError } = await supabase.from('quote_standard_texts').insert(
     texts.map((t, i) => ({
       id: `qst_${businessId}_${i}`,
       business_id: businessId,
@@ -221,19 +226,21 @@ async function seedQuoteStandardTexts(supabase: SupabaseClient, businessId: stri
       is_default: true,
     }))
   )
+  if (writeError) throw writeError
 }
 
 async function seedChecklistTemplates(supabase: SupabaseClient, businessId: string, branch: string) {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('checklist_template')
     .select('id')
     .eq('business_id', businessId)
     .limit(1)
 
+  if (readError) throw readError
   if (existing && existing.length > 0) return
 
   const templates = getChecklistsForBranch(branch)
-  await supabase.from('checklist_template').insert(
+  const { error: writeError } = await supabase.from('checklist_template').insert(
     templates.map((t, i) => ({
       id: `ct_${businessId}_${i}`,
       business_id: businessId,
@@ -243,6 +250,7 @@ async function seedChecklistTemplates(supabase: SupabaseClient, businessId: stri
       is_default: true,
     }))
   )
+  if (writeError) throw writeError
 }
 
 /**
@@ -257,12 +265,13 @@ async function seedChecklistTemplates(supabase: SupabaseClient, businessId: stri
  * hunnit lägga upp eget sortiment aldrig får seed-rader ovanpå.
  */
 export async function seedProducts(supabase: SupabaseClient, businessId: string, branch: string | string[], hourlyRate?: number | null) {
-  const { data: existing } = await supabase
+  const { data: existing, error: readError } = await supabase
     .from('products')
     .select('id')
     .eq('business_id', businessId)
     .limit(1)
 
+  if (readError) throw readError
   if (existing && existing.length > 0) return
 
   // UX1f: hantverkarens EGET timpris (onboarding steg 3) läggs på de
@@ -377,13 +386,14 @@ async function seedReservations(supabase: SupabaseClient, businessId: string, br
 async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, branch: string) {
   const normalizedBranch = normalizeTemplateBranch(branch)
 
-  const { data: existingRows } = await supabase
+  const { data: existingRows, error: readError } = await supabase
     .from('quote_templates')
     .select('name')
     .eq('business_id', businessId)
 
+  if (readError) throw readError
   const existingNames = new Set((existingRows || []).map((r: { name: string }) => r.name))
-  const defaultTemplates = getDefaultQuoteTemplates(normalizedBranch).filter(t => !existingNames.has(t.name))
+  const defaultTemplates = getDefaultQuoteTemplates(normalizedBranch).map((t, index) => ({ ...t, seedIndex: index })).filter(t => !existingNames.has(t.name))
 
   if (defaultTemplates.length === 0) return
 
@@ -391,9 +401,9 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
   const texts: Record<string, string> = {}
   for (const t of defaultTexts) texts[t.text_type] = t.content
 
-  await supabase.from('quote_templates').insert(
+  const { error: writeError } = await supabase.from('quote_templates').insert(
     defaultTemplates.map((t, i) => ({
-      id: `qtpl_${businessId}_${i}`,
+      id: `qtpl_${businessId}_${t.seedIndex}`,
       business_id: businessId,
       branch: normalizedBranch,
       name: t.name,
@@ -411,6 +421,7 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       rut_enabled: t.rut_enabled,
     }))
   )
+  if (writeError) throw writeError
 }
 
 /**
