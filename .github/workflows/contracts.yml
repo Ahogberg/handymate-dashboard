@@ -192,9 +192,16 @@ jobs:
           tests/sms-inkommande.spec.ts
           tests/sms-syfte-och-arlighet.spec.ts
           tests/push-nar-ingen-nas.spec.ts
+          tests/project-derive-todo.spec.ts
+          tests/facit-project-list-next-todo.spec.ts
+          tests/facit-webbinflode-block-a.spec.ts
+          tests/onboarding-setup-studio.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
 
       - name: Kundunderlag — API-kontrakt med isolerade beroenden
         run: node --test tests/customer-preparation/contract.test.mjs
+
+      - name: Sex kundutfall — sparning och leveranssanning
+        run: npm run test:six-outcomes

@@ -24,13 +24,13 @@ function harness(){
   project_change:[{change_id:'a',business_id:'b',project_id:'p',ata_number:1,description:'Godkänt uttag',change_type:'addition',status:'signed',total:300,items:[{description:'Uttag',quantity:1,unit_price:300}]},{change_id:'pending',business_id:'b',project_id:'p',status:'draft',total:9000,items:[]}],
   invoice:[],customer:[{customer_id:'c',business_id:'b',name:'Demokund'}],business_config:[{business_id:'b',business_name:'Demo',org_number:'TEST',bankgiro:'TEST',next_invoice_number:1}],
  }
- const state={failTable:'',created:[] as any[],marks:[] as any[]}
- const db:any={from(table:string){let fields='*',one=false;const filters:((r:any)=>boolean)[]=[];const q:any={select:(s:string)=>{fields=s;return q},eq:(k:string,v:any)=>{filters.push(r=>r[k]===v);return q},in:(k:string,v:any[])=>{filters.push(r=>v.includes(r[k]));return q},limit:()=>q,order:()=>q,or:()=>q,single:()=>{one=true;return q},maybeSingle:()=>{one=true;return q},then:(ok:any,bad:any)=>Promise.resolve().then(()=>{
+ const state={failTable:'',created:[] as any[],marks:[] as any[],user:{id:'u'} as any,permissions:{} as Record<string,boolean>,reads:[] as string[],memberScopes:[] as (string|undefined)[]}
+ const db:any={from(table:string){state.reads.push(table);let fields='*',one=false;const filters:((r:any)=>boolean)[]=[];const q:any={select:(s:string)=>{fields=s;return q},eq:(k:string,v:any)=>{filters.push(r=>r[k]===v);return q},in:(k:string,v:any[])=>{filters.push(r=>v.includes(r[k]));return q},limit:()=>q,order:()=>q,or:()=>q,single:()=>{one=true;return q},maybeSingle:()=>{one=true;return q},then:(ok:any,bad:any)=>Promise.resolve().then(()=>{
  if(state.failTable===table)return {data:null,error:{code:'TEST',message:'Simulerat läsfel'}}
  const rows=(tables[table]||[]).filter(r=>filters.every(f=>f(r))).map(r=>fields==='*'?{...r}:Object.fromEntries(fields.split(',').map(k=>[k.trim(),r[k.trim()]])))
  return {data:one?(rows[0]||null):rows,error:null}
  }).then(ok,bad)};return q}}
- const deps:any={'@/lib/observability/driftlarm':{rapporteraTystFel:async()=>{}},'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>({business_id:'b'})},'@/lib/permissions':{getCurrentUser:async()=>({}),hasPermission:()=>true},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/invoices/quote-to-invoice-items':mapper,'@/lib/ata/lifecycle':lifecycle,'@/lib/rot-rut':rot,'@/lib/rot-rut-limits':{calculateCappedDeduction:async()=>({deduction:0})},'@/lib/invoices/create-invoice':{createInvoice:async(_:any,input:any)=>{if(input.invoiceType==='final'&&tables.invoice.some(i=>i.business_id===input.businessId&&i.project_id===input.projectId&&i.invoice_type==='final'))throw Object.assign(new Error('duplicate key value violates unique constraint "invoice_en_slutfaktura_per_projekt"'),{code:'23505'}) /* v219 */;state.created.push(input);tables.invoice.push({invoice_id:'i'+state.created.length,invoice_number:'TEST',business_id:input.businessId,project_id:input.projectId,invoice_type:input.invoiceType});return {invoice:{invoice_id:'i'+state.created.length,invoice_number:'TEST'}}}},'@/lib/invoices/mark-sources':{markInvoiceSources:async(_:any,input:any)=>{state.marks.push(input);return {ok:true}}}}
+ const deps:any={'@/lib/observability/driftlarm':{rapporteraTystFel:async()=>{}},'next/server':{NextResponse},'@/lib/auth':{getAuthenticatedBusiness:async()=>({business_id:'b'})},'@/lib/permissions':{getCurrentUser:async(_:any,businessId?:string)=>{state.memberScopes.push(businessId);return state.user},hasPermission:(_:any,p:string)=>state.permissions[p] ?? true},'@/lib/supabase':{getServerSupabase:()=>db},'@/lib/invoices/quote-to-invoice-items':mapper,'@/lib/ata/lifecycle':lifecycle,'@/lib/rot-rut':rot,'@/lib/rot-rut-limits':{calculateCappedDeduction:async()=>({deduction:0})},'@/lib/invoices/create-invoice':{createInvoice:async(_:any,input:any)=>{if(input.invoiceType==='final'&&tables.invoice.some(i=>i.business_id===input.businessId&&i.project_id===input.projectId&&i.invoice_type==='final'))throw Object.assign(new Error('duplicate key value violates unique constraint "invoice_en_slutfaktura_per_projekt"'),{code:'23505'}) /* v219 */;state.created.push(input);if(input.sources)state.marks.push({changeIds:input.sources.changeIds||[]});tables.invoice.push({invoice_id:'i'+state.created.length,invoice_number:'TEST',business_id:input.businessId,project_id:input.projectId,invoice_type:input.invoiceType});return {invoice:{invoice_id:'i'+state.created.length,invoice_number:'TEST'}}}},'@/lib/invoices/mark-sources':{markInvoiceSources:async(_:any,input:any)=>{state.marks.push(input);return {ok:true}}}}
  const preview=compile('app/api/projects/[id]/invoice-preview/route.ts',deps)
  const final=compile('app/api/projects/[id]/create-final-invoice/route.ts',deps)
  const hourly=compile('app/api/invoices/from-project/route.ts',deps)
@@ -38,6 +38,62 @@ function harness(){
  const draft=compile('lib/invoices/project-invoice-draft.ts',deps)
  return {tables,state,budget:()=>budget.getQuoteBudgetDerivation(db,'q','b'),hourlyGet:()=>hourly.GET(new NextRequest('https://test/from-project?project_id=p')),hourlyPost:(customer='c')=>hourly.POST(new NextRequest('https://test/from-project',{method:'POST',body:JSON.stringify({project_id:'p',customer_id:customer,items:[{description:'Tid',quantity:1,unit_price:100,total:100}]})})),preview:()=>preview.GET(new NextRequest('https://test/preview'),{params:{id:'p'}}),final:()=>final.POST(new NextRequest('https://test/final',{method:'POST'}),{params:{id:'p'}}),draft:()=>draft.byggProjektFakturaUnderlag(db,'b','p')}
 }
+test('invoice preview fails closed if existing invoice lookup fails and succeeds after retry', async () => {
+ const h=harness();h.state.failTable='invoice'
+ const failed=await h.preview();expect(failed.status).toBe(503)
+ expect(await failed.json()).toMatchObject({stage:'existing_invoice'})
+ h.state.failTable=''
+ h.tables.invoice=[{invoice_id:'saved',invoice_number:'TEST-1',status:'draft',business_id:'b',project_id:'p'}]
+ expect((await (await h.preview()).json()).existingInvoice).toMatchObject({invoice_id:'saved'})
+ expect(h.state.created).toHaveLength(0)
+})
+
+for (const route of ['preview','final'] as const) {
+ test(`${route}: unassigned member is denied before reading child records or writing`, async () => {
+  const h=harness();h.state.permissions.see_all_projects=false
+  expect((await h[route]()).status).toBe(404)
+  expect(h.state.reads).toEqual(['project','project_assignment'])
+  expect(h.state.memberScopes).toEqual(['b'])
+  expect(h.state.created).toHaveLength(0)
+ })
+ test(`${route}: assignment errors fail closed`, async () => {
+  const h=harness();h.state.permissions.see_all_projects=false;h.state.failTable='project_assignment'
+  expect((await h[route]()).status).toBe(503)
+  expect(h.state.reads).toEqual(['project','project_assignment'])
+  expect(h.state.created).toHaveLength(0)
+ })
+ test(`${route}: assignment must match member, project and business`, async () => {
+  const h=harness();h.state.permissions.see_all_projects=false
+  h.tables.project_assignment=[
+   {project_id:'p',business_id:'other',business_user_id:'u'},
+   {project_id:'other',business_id:'b',business_user_id:'u'},
+   {project_id:'p',business_id:'b',business_user_id:'other'},
+  ]
+  expect((await h[route]()).status).toBe(404)
+  h.tables.project_assignment.push({project_id:'p',business_id:'b',business_user_id:'u'})
+  expect((await h[route]()).status).toBe(200)
+ })
+}
+test('preview denies financial data even for assigned members lacking financial permission',async()=>{
+ const h=harness();h.state.permissions.see_financials=false
+ h.state.permissions.see_all_projects=false
+ h.tables.project_assignment=[{project_id:'p',business_id:'b',business_user_id:'u'}]
+ expect((await h.preview()).status).toBe(403)
+ expect(h.state.reads).toEqual(['project','project_assignment'])
+})
+test('financial read permission never grants invoice creation',async()=>{
+ const h=harness();h.state.permissions.create_invoices=false
+ expect((await h.preview()).status).toBe(200)
+ expect((await h.final()).status).toBe(403)
+ expect(h.state.created).toHaveLength(0)
+})
+test('missing member is not an impersonation proof',async()=>{
+ const h=harness();h.state.user=null
+ expect((await h.preview()).status).toBe(404)
+ expect((await h.final()).status).toBe(403)
+ expect(h.state.reads).toEqual(['project'])
+})
+
 test('accepted options and discount survive project preview → final invoice, with only approved ATA',async()=>{
  const h=harness();expect((await h.budget()).budget_amount).toBe(1100);const preview=await (await h.preview()).json();expect(preview.quoteTotal).toBe(1100);expect(preview.totalExclVat).toBe(1400)
  expect((await h.final()).status).toBe(200);const invoice=h.state.created[0]
@@ -84,7 +140,28 @@ test('automatic draft still prefers actual ATA rows over a stale saved total', a
  const result = await h.draft()
  expect(result.subtotal).toBe(1400)
  expect(result.ataChangeIds).toEqual(['a'])
+ const preview = await (await h.preview()).json()
+ expect(preview.totalExclVat).toBe(result.subtotal)
+ expect((await h.final()).status).toBe(200)
+ expect(h.state.created[0].subtotal).toBe(result.subtotal)
 })
+
+for (const changeType of ['addition', 'removal']) {
+ for (const quantity of [0, 2]) {
+  test(`ATA ${changeType} with quantity ${quantity}: preview and both draft paths agree despite stale total`, async () => {
+   const h = harness()
+   Object.assign(h.tables.project_change[0], {
+    change_type: changeType, total: 99999,
+    items: [{ description: 'Uttag', quantity, unit_price: 300 }],
+   })
+   const expected = 1100 + (changeType === 'removal' ? -1 : 1) * quantity * 300
+   expect((await (await h.preview()).json()).totalExclVat).toBe(expected)
+   expect((await h.draft()).subtotal).toBe(expected)
+   expect((await h.final()).status).toBe(200)
+   expect(h.state.created[0].subtotal).toBe(expected)
+  })
+ }
+}
 
 for (const status of ['draft', 'pending', 'sent', 'declined', 'rejected', 'invoiced']) {
  test(`automatic draft never falls back to a total-only ATA in ${status}`, async () => {

@@ -111,6 +111,8 @@ import { ProjectStatusBand } from '@/components/projects/ProjectStatusBand'
 import { ProjectDatesInline } from '@/components/projects/ProjectDatesInline'
 import { deriveProjectLifecycle, type LifecyclePhase } from '@/lib/projects/derive-lifecycle'
 import { beraknaFakturaberedskap } from '@/lib/projects/fakturaberedskap'
+import { invoiceableProjectAmount, invoiceReviewEntry, projectInvoicePath } from '@/lib/projects/invoice-path'
+import { InvoiceSourceChoice } from '@/components/projects/InvoiceSourceChoice'
 import { formatSEK } from '@/lib/format-price'
 import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
@@ -245,6 +247,7 @@ interface Summary {
   total_revenue: number
   uninvoiced_hours: number
   uninvoiced_revenue: number
+  uninvoiced_material_sell: number
   ata_additions: number
   ata_removals: number
   ata_net: number
@@ -747,6 +750,7 @@ export default function ProjectDetailPage() {
   const [savingStatus, setSavingStatus] = useState(false)
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [showInvoiceModal, setShowInvoiceModal] = useState(false)
+  const [showInvoiceSourceChoice, setShowInvoiceSourceChoice] = useState(false)
   const [showCloseoutModal, setShowCloseoutModal] = useState(false)
   const [closeoutWarnings, setCloseoutWarnings] = useState<string[]>([])
 
@@ -1877,6 +1881,31 @@ export default function ProjectDetailPage() {
   const offereratKr = statusEconomics?.intakter.forvantad_intakt_kr ?? 0
   const isOverBudget = canSeeFinancials && nedlagtKr != null && offereratKr > 0 && nedlagtKr > offereratKr
   const uninvoicedRevenue = canSeeFinancials ? (summary?.uninvoiced_revenue ?? 0) : 0
+  const uninvoicedMaterialRevenue = canSeeFinancials ? (summary?.uninvoiced_material_sell ?? 0) : 0
+  // Två fakturakällor får inte blandas. Fastpris/blandavtal med offert går
+  // via accepterade offertrader + signerad ÄTA; löpande/utan offert går via
+  // faktiskt registrerad tid + material.
+  const invoicePath = projectInvoicePath({
+    projectType: project.project_type,
+    quoteId: project.quote_id,
+  })
+  // project_type is inferred from quote rows, not an agreed billing model.
+  // All generic invoice entry points require an explicit source choice.
+  const openInvoiceReview = () => {
+    if (invoiceReviewEntry(project.quote_id) === 'choose') setShowInvoiceSourceChoice(true)
+    else setShowInvoiceModal(true)
+  }
+  const invoiceableAmount = canSeeFinancials
+    ? invoiceableProjectAmount({
+        path: invoicePath,
+        expectedRevenue: statusEconomics?.intakter.forvantad_intakt_kr ?? 0,
+        invoicedRevenue: statusEconomics?.intakter.fakturerat_ex_moms_kr
+          ?? statusEconomics?.intakter.fakturerat_kr
+          ?? 0,
+        uninvoicedTimeRevenue: uninvoicedRevenue,
+        uninvoicedMaterialRevenue,
+      })
+    : 0
   const noWorkYet = (summary?.total_hours ?? 0) === 0 && materials.length === 0
 
   // EN beräkning, två ytor (Del C, 2026-08-26): samma deriveTodoMode som
@@ -1885,7 +1914,7 @@ export default function ProjectDetailPage() {
     stageId: project.current_workflow_stage_id,
     isOverBudget,
     canSeeFinancials,
-    hasUninvoicedWork: uninvoicedRevenue > 0,
+    hasUninvoicedWork: invoiceableAmount > 0,
     noWorkYet,
   })
 
@@ -1936,13 +1965,15 @@ export default function ProjectDetailPage() {
       onAction: () => { setActiveTab('milestones'); setMilestoneModal({ open: true, editing: null }) },
     })
   }
-  if (canSeeFinancials && uninvoicedRevenue > 0) {
+  if (canSeeFinancials && invoiceableAmount > 0) {
     todoActionRows.push({
       id: 'ofakturerat',
       dotClass: 'bg-amber-500',
-      text: `Ofakturerat: ${formatSEK(uninvoicedRevenue)}`,
-      actionLabel: 'Förbered faktura',
-      onAction: () => setShowInvoiceModal(true),
+      text: invoicePath === 'contract'
+        ? `Offert-/ÄTA-värde kvar: ${formatSEK(invoiceableAmount)}`
+        : `Ofakturerad tid och material: ${formatSEK(invoiceableAmount)}`,
+      actionLabel: 'Granska fakturaunderlag',
+      onAction: openInvoiceReview,
     })
   }
   // Egenkontroll (Etapp 1c, tasks/easoft-gap-plan.md, copy.projektvy.sv.json
@@ -1995,7 +2026,7 @@ export default function ProjectDetailPage() {
     tidrapportGap: yesterdayTimeGap,
     milestones,
     checklists,
-    uninvoicedKr: canSeeFinancials && summary ? summary.uninvoiced_revenue : null,
+    uninvoicedKr: canSeeFinancials && summary ? invoiceableAmount : null,
   })
 
   // Accordion/flikrad-subrader (Del 3a, copy.accordion_subs) — bara med
@@ -2095,7 +2126,7 @@ export default function ProjectDetailPage() {
     todoMode === 'nystartat'
       ? undefined
       : todoMode === 'klart_ofakturerat'
-        ? () => setShowInvoiceModal(true)
+        ? openInvoiceReview
         : todoMode === 'over_budget'
           ? () => setChangeModal({ open: true, editing: null })
           : () => openTimeModal()
@@ -2330,7 +2361,7 @@ export default function ProjectDetailPage() {
           economics={statusEconomics}
           economicsLoading={statusEconomicsLoading}
           beredskap={fakturaberedskap}
-          uninvoicedKr={canSeeFinancials && summary ? summary.uninvoiced_revenue : null}
+          uninvoicedKr={canSeeFinancials && summary ? invoiceableAmount : null}
           onShowAllStages={() => setStageModalOpen(true)}
         />
 
@@ -2554,10 +2585,10 @@ export default function ProjectDetailPage() {
                 Ny ÄTA
               </button>
               <button
-                onClick={() => setShowInvoiceModal(true)}
+                onClick={openInvoiceReview}
                 className="h-11 bg-white rounded-xl border border-[#E2E8F0] text-[13.5px] font-medium text-slate-700 hover:bg-slate-50 hover:border-primary-300 active:scale-[0.98] transition"
               >
-                Fakturera
+                Granska fakturaunderlag
               </button>
             </div>
           </div>
@@ -3970,7 +4001,7 @@ export default function ProjectDetailPage() {
             <ProjectEconomicsCard
               projectId={projectId}
               refreshKey={economicsRefreshKey}
-              onInvoiceProject={() => setShowInvoiceModal(true)}
+              onInvoiceProject={openInvoiceReview}
               onNewAta={() => setChangeModal({ open: true, editing: null })}
             />
           </>
@@ -4552,6 +4583,16 @@ export default function ProjectDetailPage() {
       )}
 
       {/* Fakturera projekt-modal */}
+      {showInvoiceSourceChoice && (
+        <InvoiceSourceChoice
+          onClose={() => setShowInvoiceSourceChoice(false)}
+          onChoose={source => {
+            setShowInvoiceSourceChoice(false)
+            if (source === 'contract') router.push(`/dashboard/projects/${project.project_id}/invoice-preview`)
+            else setShowInvoiceModal(true)
+          }}
+        />
+      )}
       {showInvoiceModal && project && (
         <ProjectInvoiceModal
           projectId={project.project_id}

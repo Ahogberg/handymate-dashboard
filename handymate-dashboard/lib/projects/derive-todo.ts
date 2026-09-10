@@ -10,7 +10,7 @@
  *      — högst risk_level först, sedan äldst. Det är en konkret sak som väntar
  *      på ägaren och slår alltid en härledd primäråtgärd.
  *   2. Annars den härledda primäråtgärden (TODO_PRIMARY_LABEL[mode]):
- *      över budget → "Skapa ÄTA"; klart men ofakturerat → "Godkänn & skicka";
+ *      över budget → "Skapa ÄTA"; klart men ofakturerat → granska underlaget;
  *      planering utan arbete → "Boka första besök"; annars "Rapportera tid".
  *
  * Dedup-regeln (jfr lib/jarvis/project-case.ts): listan säger EN sak per
@@ -25,7 +25,8 @@ export type TodoMode = 'nystartat' | 'pagaende' | 'klart_ofakturerat' | 'over_bu
 export const TODO_PRIMARY_LABEL: Record<TodoMode, string> = {
   nystartat: 'Boka första besök',
   pagaende: 'Rapportera tid',
-  klart_ofakturerat: 'Godkänn & skicka',
+  // Knappen öppnar ett utkast för granskning. Den skickar aldrig fakturan.
+  klart_ofakturerat: 'Granska fakturaunderlag',
   over_budget: 'Skapa ÄTA',
 }
 

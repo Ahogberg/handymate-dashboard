@@ -43,7 +43,8 @@ export async function GET(request: NextRequest) {
       .eq('business_id', business.business_id)
       .single()
 
-    if (error || !data) {
+    if (error) return NextResponse.json({ error: 'Kunde inte läsa ditt sparade företagskonto. Försök igen.' }, { status: 503 })
+    if (!data) {
       return NextResponse.json({ error: 'Business not found' }, { status: 404 })
     }
 
@@ -120,12 +121,13 @@ export async function PUT(request: NextRequest) {
     const harStegdata = stepData && typeof stepData === 'object'
     if (harStegdata || harSteg) {
       // Merge with existing onboarding_data
-      const { data: current } = await supabase
+      const { data: current, error: currentError } = await supabase
         .from('business_config')
         .select('onboarding_data')
         .eq('business_id', business.business_id)
         .single()
 
+      if (currentError || !current) return NextResponse.json({ error: 'Kunde inte läsa dina sparade svar. Ingenting skrevs över.' }, { status: 503 })
       const existing = (current?.onboarding_data as Record<string, unknown>) || {}
       // Onboardingtratten (lib/onboarding/funnel.ts, 2026-09-01): servern
       // stämplar FÖRSTA gången varje steg nås under onboarding_data._funnel.
@@ -199,11 +201,12 @@ export async function PUT(request: NextRequest) {
         const raw = Number((config as Record<string, unknown>).material_markup_pct)
         const paslag = Number.isFinite(raw) ? Math.max(0, Math.min(100, raw)) : null
         if (paslag != null) {
-          const { data: psRow } = await supabase
+          const { data: psRow, error: pricingError } = await supabase
             .from('business_config')
             .select('pricing_settings')
             .eq('business_id', business.business_id)
             .single()
+          if (pricingError || !psRow) return NextResponse.json({ error: 'Kunde inte läsa prisinställningarna. Ingenting skrevs över.' }, { status: 503 })
           const befintliga = (psRow?.pricing_settings as Record<string, unknown>) || {}
           updates.pricing_settings = { ...befintliga, material_markup_pct: paslag }
         }
@@ -291,26 +294,20 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const updates: Record<string, unknown> = {
-      onboarding_step: 10, // Mark fully complete (compat with both V1 and V2 flows)
-      onboarding_completed_at: new Date().toISOString(),
-    }
+    const { data: savedCompany, error: companyError } = await supabase
+      .from('business_config')
+      .select('branch, secondary_branches, default_hourly_rate, onboarding_data, onboarding_completed_at')
+      .eq('business_id', business.business_id).single()
+    if (companyError || !savedCompany) return NextResponse.json({ error: 'Kunde inte läsa företagets inställningar. Försök igen.' }, { status: 503 })
+    const updates: Record<string, unknown> = {}
 
     // Onboardingtratten: stämpla finalize (första gången) under _funnel.
-    // Best-effort — en misslyckad läsning får aldrig stoppa finalize.
-    try {
-      const { data: current } = await supabase
-        .from('business_config')
-        .select('onboarding_data')
-        .eq('business_id', business.business_id)
-        .single()
-      const existing = (current?.onboarding_data as Record<string, unknown>) || {}
+    {
+      const existing = (savedCompany.onboarding_data as Record<string, unknown>) || {}
       updates.onboarding_data = {
         ...existing,
         [FUNNEL_KEY]: markFinalized(readFunnel(existing), new Date().toISOString()),
       }
-    } catch (err) {
-      console.warn('[onboarding finalize] kunde inte stämpla tratten (icke-blockerande):', err)
     }
 
     // Only set non-undefined values
@@ -329,7 +326,7 @@ export async function POST(request: NextRequest) {
     const extraBranches: string[] = Array.isArray(secondary_branches)
       ? secondary_branches.filter((b: unknown): b is string => typeof b === 'string' && !!b && b !== branch)
       : []
-    if (extraBranches.length > 0) updates.secondary_branches = extraBranches
+    if (Array.isArray(secondary_branches)) updates.secondary_branches = extraBranches
     if (org_number !== undefined) updates.org_number = org_number
     if (address !== undefined) updates.address = address
     if (service_area !== undefined) updates.service_area = service_area
@@ -341,6 +338,18 @@ export async function POST(request: NextRequest) {
     if (lead_sources) updates.lead_sources = lead_sources
     if (knowledge_base) updates.knowledge_base = knowledge_base
 
+    // The saved company is the source when the client finalizes with {}.
+    const effectiveBranch = branch || savedCompany.branch || 'other'
+    const effectiveExtras = Array.isArray(secondary_branches) ? extraBranches
+      : (Array.isArray(savedCompany.secondary_branches) ? savedCompany.secondary_branches : [])
+    const effectiveRate = default_hourly_rate !== undefined ? default_hourly_rate : savedCompany.default_hourly_rate
+    const seedResult = await seedAllDefaults(supabase, business.business_id,
+      effectiveBranch, effectiveExtras, Number(effectiveRate) || null)
+    if (!seedResult || seedResult.failed !== 0) {
+      return NextResponse.json({ error: 'Teamets grundinställningar kunde inte bli klara. Dina svar finns kvar; försök igen.', seeded: seedResult }, { status: 503 })
+    }
+    updates.onboarding_step = 10
+    updates.onboarding_completed_at = savedCompany.onboarding_completed_at || new Date().toISOString()
     const { error } = await supabase
       .from('business_config')
       .update(updates)
@@ -350,23 +359,6 @@ export async function POST(request: NextRequest) {
       console.error('POST /api/onboarding error:', error)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
-
-    // Seed all defaults (idempotent — safe to run multiple times)
-    // UX1f: timpriset (steg 3) läses ur config så även den som hoppade över
-    // produktsteget (och därmed den tidiga seedningen) får sina timartiklar
-    // med eget pris. Redan seedade konton: no-op som förut.
-    const { data: rateRow } = await supabase
-      .from('business_config')
-      .select('default_hourly_rate')
-      .eq('business_id', business.business_id)
-      .single()
-    const seedResult = await seedAllDefaults(
-      supabase,
-      business.business_id,
-      branch || 'other',
-      extraBranches,
-      Number(rateRow?.default_hourly_rate) || null
-    )
 
     // Lead-adressen (<firma>@leads.handymate.se): provisioneras automatiskt
     // här i stället för att en grundare skapar raden manuellt per kund.

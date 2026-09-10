@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -289,8 +288,9 @@ export async function POST(request: NextRequest) {
     // ETAPP 6a (offert-masterplan.md): gemensam kärna för nummer/OCR/
     // datum/insert/bump — se lib/invoices/create-invoice.ts. Totals-/ROT-
     // beräkningen ovan är OFÖRÄNDRAD (kärnan tar bara emot färdiga värden).
-    const { invoice } = await createInvoice(supabase, {
+    const { invoice, replayed } = await createInvoice(supabase, {
       businessId: business_id,
+      sources: { timeEntryIds: time_entry_ids || [], materialIds: project_material_ids || [] },
       customerId: customer_id,
       items,
       subtotal,
@@ -317,18 +317,9 @@ export async function POST(request: NextRequest) {
     })
 
     // Källorna markeras atomiskt via den delade vägen (P0-4).
-    const markering = await markInvoiceSources(supabase, {
-      businessId: business_id,
-      invoiceId: invoice.invoice_id,
-      timeEntryIds: time_entry_ids || [],
-      materialIds: project_material_ids || [],
-    })
-    if (!markering.ok) {
-      console.error('[invoices POST] källmarkeringen misslyckades:', markering.errors)
-    }
 
     // V3 Automation Engine: fire invoice_created event
-    try {
+    if (!replayed) try {
       const { fireEvent } = await import('@/lib/automation-engine')
       await fireEvent(supabase, 'invoice_created', business_id, {
         invoice_id: invoice.invoice_id, customer_id, total: invoice.total,

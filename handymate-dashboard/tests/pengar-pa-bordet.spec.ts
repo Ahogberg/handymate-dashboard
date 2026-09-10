@@ -13,7 +13,12 @@
  *   npx playwright test tests/pengar-pa-bordet.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
-import { buildPengarSummary, invoiceAmount } from '../lib/value/pengar-pa-bordet'
+import {
+  buildPengarSummary,
+  invoiceAmount,
+  pengarBandPresentation,
+  pengarKategoriAntal,
+} from '../lib/value/pengar-pa-bordet'
 import type { MissedRevenueFinding } from '../lib/value/missed-revenue'
 
 function fynd(
@@ -64,6 +69,26 @@ test.describe('summan hittas aldrig på', () => {
     expect(kat.antalUtanBelopp).toBe(1)
     expect(s.totalKr).toBe(0)
     expect(kat.titel).toBe('Fakturaunderlag att granska')
+  })
+
+  test('hemskärmen döljer inte ofakturerat arbete bara för att beloppet är okänt', () => {
+    const summary = buildPengarSummary({
+      ...TOMT,
+      missedRevenue: [fynd('projekt_utan_faktura', 0, 'NEEDS_REVIEW')],
+    })
+    const presentation = pengarBandPresentation(summary)
+    expect(presentation.tomt).toBe(false)
+    expect(presentation.harKantBelopp).toBe(false)
+    expect(presentation.grupper.map(g => g.key)).toEqual(['hamta_nu'])
+    expect(pengarKategoriAntal(presentation.grupper[0].kategorier[0])).toBe(1)
+  })
+
+  test('hemskärmen visar fortsatt ett ärligt tomläge när inga kategorier finns', () => {
+    expect(pengarBandPresentation(buildPengarSummary(TOMT))).toMatchObject({
+      grupper: [],
+      tomt: true,
+      harKantBelopp: false,
+    })
   })
 
   test('ROT-faktura bidrar med det kunden betalar, inte totalen', () => {

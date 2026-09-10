@@ -1,4 +1,4 @@
-import { createReportSession, reportContinuityEnabled } from '@/lib/matte/report-session'
+import { createReportSession, recoverReportSessionForRequest, reportContinuityEnabled, reportRequestId } from '@/lib/matte/report-session'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { loadWorkReportContext, workReportPrompt, prepareWorkReportAction, isWorkReportTool, WorkReportError, type WorkReportContext, type WorkReportAction } from '@/lib/matte/work-report'
@@ -957,6 +957,11 @@ export async function POST(request: NextRequest) {
     const rawProjectId: string | null = safeContextId(context?.projectId)
     const explicitThreadId: string | null = context?.threadId || null
     const reportRequested = context?.workReport === true
+    const rawReportRequestId = context?.reportRequestId
+    const stableReportRequestId = rawReportRequestId == null ? null : reportRequestId(rawReportRequestId)
+    if (reportRequested && rawReportRequestId != null && !stableReportRequestId) {
+      throw new WorkReportError(400, 'Rapportens inskickningsnyckel är ogiltig. Inget förslag har skapats.')
+    }
 
     // ── Bilder: normalisera + validera ─────────────────────────────────
     // Klienten kan skicka antingen array av strängar (base64) eller array
@@ -996,12 +1001,29 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const supabase = getServerSupabase()
+    const currentBusinessUser = await getCurrentUser(request, businessId)
+    const workReport = reportRequested ? await loadWorkReportContext(supabase, businessId, currentBusinessUser, rawProjectId, context?.workDate) : null
+
+    // Ett tappat HTTP-svar får inte starta om AI-turen. Mobilen återanvänder
+    // samma beständiga UUID; om servern redan tog emot rapporten returneras
+    // exakt den lagrade planen och en ny kortlivad granskningssignatur.
+    if (workReport && stableReportRequestId && reportContinuityEnabled()) {
+      const recovered = await recoverReportSessionForRequest(supabase,businessId,workReport,stableReportRequestId)
+      if (recovered) {
+        const pending = recovered.pending_confirmation
+        const reply = pending?.summary || (recovered.report.state === 'finished'
+          ? 'Rapporten är redan färdigsparad.'
+          : 'Rapporten är redan mottagen. Läs de sparade delarna innan du fortsätter.')
+        return NextResponse.json({messages:[],current_agent:'lars',thread_id:recovered.thread_id||null,reply,action:null,pending_confirmation:pending})
+      }
+    }
+
     // Bränsle är ett verkligt periodtak för NYTT AI-arbete. Bekräftelsevägen
     // ovan innehåller ingen ny Claude-runda och går därför vidare till
     // respektive verktygs egen strypunkt (SMS har sin grind i sms-send).
     // Vanlig chatt stoppas däremot här FÖRE trådskapande, kontextladdning och
     // första modellanrop. Ett läsfel failar stängt — inga tokens i blindo.
-    const supabase = getServerSupabase()
     const fuel = await checkFuelGate(supabase, businessId)
     if (!fuel.allowed) {
       const reply = fuel.reason === 'fuel_exhausted'
@@ -1026,8 +1048,6 @@ export async function POST(request: NextRequest) {
 
     // Serverägd sidkontext: bara ID:n som bevisligen tillhör tenanten går
     // vidare — se verifyPageContextOwnership ovan.
-    const currentBusinessUser = await getCurrentUser(request, businessId)
-    const workReport = reportRequested ? await loadWorkReportContext(supabase, businessId, currentBusinessUser, rawProjectId, context?.workDate) : null
     const sidkontext = workReport ? { projectId: workReport.projectId, customerId: null, quoteId: null, invoiceId: null } : await verifyPageContextOwnership(supabase, businessId, {
       customerId: rawCustomerId,
       projectId: rawProjectId,
@@ -1434,7 +1454,7 @@ export async function POST(request: NextRequest) {
           const action = prepareWorkReportAction(turn.pendingExternal.toolName, turn.pendingExternal.toolInput, workReport)
           await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
           const pending = reportContinuityEnabled()
-            ? await createReportSession(supabase,businessId,workReport,thread?.id || null,[action,...(turn.pendingExternal.remaining || [])])
+            ? await createReportSession(supabase,businessId,workReport,thread?.id || null,[action,...(turn.pendingExternal.remaining || [])],stableReportRequestId)
             : pendingWorkReport(action, workReport, businessId, thread?.id || null, turn.pendingExternal.remaining || [])
           return NextResponse.json({ messages: [], current_agent: 'lars', thread_id: thread?.id || null, reply: pending.summary, action: null, pending_confirmation: pending })
         }

@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
@@ -225,7 +224,7 @@ export async function POST(request: NextRequest) {
     .eq('business_id', business.business_id)
     .single()
 
-  const invoiceId = `inv_${Date.now().toString(36)}${Math.random().toString(36).substr(2, 6)}`
+  let invoiceId = `inv_${Date.now().toString(36)}${Math.random().toString(36).substr(2, 6)}`
 
   // Beräkna summor
   const subtotal = items.reduce((s: number, i: any) => s + (i.total || 0), 0)
@@ -295,6 +294,7 @@ export async function POST(request: NextRequest) {
   try {
     const created = await createInvoice(supabase, {
       businessId: business.business_id,
+      sources: { timeEntryIds: source_time_entry_ids, materialIds: source_material_ids },
       customerId: customer_id || null,
       items: invoiceItems,
       subtotal,
@@ -330,6 +330,7 @@ export async function POST(request: NextRequest) {
       },
     })
     invoiceNumber = created.invoiceNumber
+    invoiceId = created.invoice.invoice_id
   } catch (err: any) {
     console.error('Create invoice error:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -337,16 +338,9 @@ export async function POST(request: NextRequest) {
 
   // Källorna markeras atomiskt via den delade vägen (P0-4) — tidigare två
   // separata anrop utan felkontroll OCH utan tenantfilter.
-  const markering = await markInvoiceSources(supabase, {
-    businessId: business.business_id,
-    invoiceId,
-    timeEntryIds: source_time_entry_ids,
-    materialIds: source_material_ids,
-  })
 
   return NextResponse.json({
     invoice_id: invoiceId,
     invoice_number: invoiceNumber,
-    ...(markering.ok ? {} : { warning: `Fakturan skapades men källmarkeringen misslyckades: ${markering.errors.join('; ')}` }),
   })
 }

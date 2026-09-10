@@ -1,4 +1,5 @@
 import { generateOCR } from '@/lib/ocr'
+import { createHash, randomUUID } from 'node:crypto'
 import { svDateStr } from '@/lib/dates'
 import type { InvoiceType, InvoiceStatus } from '@/lib/types/invoice'
 
@@ -33,6 +34,9 @@ export interface CreateInvoiceExtraFields {
 }
 
 export interface CreateInvoiceInput {
+  /** Explicit source ownership is committed with the invoice, never afterwards. */
+  sources?: { timeEntryIds?: string[]; materialIds?: string[]; changeIds?: string[] }
+  requestKey?: string
   businessId: string
   customerId?: string | null
   /** JSONB — de åtta vägarna bygger sina rader med sinsemellan olika
@@ -92,6 +96,8 @@ export interface CreateInvoiceInput {
 }
 
 export interface CreateInvoiceResult {
+  /** Reusing an existing invoice must not emit another invoice_created event. */
+  replayed?: boolean
   invoice: any
   invoiceNumber: string
   ocrNumber: string
@@ -159,6 +165,7 @@ export async function createInvoice(
       invoiceNumber = formatInvoiceNumber(rpcRow.prefix || 'FV', year, rpcRow.num)
       ocrNumber = computeInvoiceOcr(rpcRow.num)
     } else {
+      if (input.sources || input.requestKey) throw rpcError || new Error('Fakturanumret kunde inte reserveras säkert.')
       // Fallback: RPC:n (sql/v81_invoice_number_rpc.sql) är inte körd ännu,
       // eller businessen saknar en business_config-rad. Gamla read-then-
       // write-kedjan — samma dubblettrisk som INNAN denna etapp, men appen
@@ -223,6 +230,36 @@ export async function createInvoice(
   if (input.bookingId !== undefined) row.booking_id = input.bookingId
   if (input.extraFields) Object.assign(row, input.extraFields)
 
+  if (input.sources || input.requestKey) {
+    row.invoice_id = row.invoice_id || `inv_${randomUUID()}`
+    const sources = {
+      times: Array.from(new Set(input.sources?.timeEntryIds || [])).sort(),
+      materials: Array.from(new Set(input.sources?.materialIds || [])).sort(),
+      changes: Array.from(new Set(input.sources?.changeIds || [])).sort(),
+    }
+    if (Object.values(sources).some(ids => ids.some(id => typeof id !== 'string' || !id))) throw new Error('Ogiltiga fakturakällor.')
+    const { extraFields, invoiceDate: _date, selectClause: _select, sources: _sources, requestKey: _key, ...intentInput } = input
+    const { invoice_id: _id, ...extra } = extraFields || {}
+    const intent = { ...intentInput, extraFields: extra, sources,
+      items: input.items.map(({ id: _itemId, ...item }: any) => item) }
+    const hasSources = Object.values(sources).some(ids => ids.length)
+    const key = input.requestKey || (hasSources ? `sources:${createHash('sha256').update(JSON.stringify(sources)).digest('hex')}` : `request:${randomUUID()}`)
+    const { data, error } = await supabase.rpc('create_invoice_with_sources', {
+      p_row: row, p_key: key, p_intent: intent,
+      p_times: sources.times, p_materials: sources.materials, p_changes: sources.changes,
+    })
+    if (error) throw error
+    const saved = Array.isArray(data) ? data[0] : data
+    if (!saved?.invoice_id || saved.business_id !== input.businessId) throw new Error('Fakturan saknar sparbekräftelse. Försök igen med samma underlag.')
+    let invoice = saved
+    if (input.selectClause?.includes('customer:')) {
+      const readback = await supabase.from('invoice').select(input.selectClause).eq('business_id', input.businessId).eq('invoice_id', saved.invoice_id).single()
+      if (readback.error || !readback.data) throw readback.error || new Error('Fakturan sparades men kunde inte läsas tillbaka. Försök igen med samma underlag.')
+      invoice = readback.data
+    }
+    return { invoice, invoiceNumber: saved.invoice_number, ocrNumber: saved.ocr_number, usedNumberFallback, replayed: saved.invoice_id !== row.invoice_id }
+  }
+
   const { data: invoice, error } = await supabase
     .from('invoice')
     .insert(row)
@@ -230,6 +267,7 @@ export async function createInvoice(
     .single()
 
   if (error) throw error
+  if (!invoice) throw new Error('Fakturan saknar sparbekräftelse.')
 
   return { invoice, invoiceNumber, ocrNumber, usedNumberFallback }
 }

@@ -36,8 +36,8 @@
  * 3. Inga korrelationsantaganden. Bara direktreferenser (samma regel som
  *    DIRECT_ONLY_APPROVAL_TYPES i attributionskärnan) — en faktura som
  *    råkar tillhöra samma kund räknas aldrig som bevis här.
- * 4. Fakturerat/Betalt kronor är FAKTURANS belopp, aldrig kortets
- *    uppskattning (payload.amount_kr/amount_estimate/projected_overrun).
+ * 4. Fakturerat är fakturans total. Betalt är registrerad betalning
+ *    (metod 2), aldrig obetald skattereduktion eller kortets uppskattning.
  * 5. Samma faktura räknas aldrig två gånger, även om två kort råkar peka
  *    på den.
  *
@@ -63,9 +63,9 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { manadsfonster } from '@/lib/value/vardekvitto'
 import { mapApprovalRowToCard, isWithinAttributionWindow } from '@/lib/value/recovered-revenue'
-import { isCustomerSettled } from '@/lib/invoices/status'
+import { isCustomerSettled, PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
-export const MANADS_LEDGER_METHOD_VERSION = 1
+export const MANADS_LEDGER_METHOD_VERSION = 2
 
 /** De fem korttyperna som bär ett belopp värt att spåra genom ledgern.
     Medvetet skild från RECOVERY_APPROVAL_TYPES — profitability_warning är
@@ -168,6 +168,9 @@ export interface LedgerCard {
 
 export interface LedgerInvoiceFacit {
   total_kr: number
+  /** Registered payment, capped to the invoice amount. Older pure callers
+      without this field model a fully paid invoice. I/O always supplies it. */
+  paid_kr?: number
   paid: boolean
   paid_at_ms: number | null
 }
@@ -260,7 +263,7 @@ export function byggManadsLedger(input: {
     if (!faktura.paid) continue
     if (raknadeBetalda.has(kort.invoice_id as string)) continue
     raknadeBetalda.add(kort.invoice_id as string)
-    betaltKr += faktura.total_kr
+    betaltKr += faktura.paid_kr ?? faktura.total_kr
     betaltAntal += 1
     stegPerKort.set(kort.id, 'betalt')
   }
@@ -272,7 +275,7 @@ export function byggManadsLedger(input: {
     if (!faktura || !faktura.paid || faktura.paid_at_ms === null) continue
     if (!isWithinAttributionWindow(c.resolved_at_ms, faktura.paid_at_ms, 'invoice_paid')) continue
     raknadeBetalda.add(c.invoice_id)
-    betaltKr += faktura.total_kr
+    betaltKr += faktura.paid_kr ?? faktura.total_kr
     betaltAntal += 1
     stegPerKort.set(c.id, 'betalt')
   }
@@ -299,7 +302,7 @@ export function byggManadsLedger(input: {
         approval_type: c.approval_type,
         created_at: new Date(c.created_at_ms).toISOString(),
         steg,
-        kr: Math.round(faktura ? faktura.total_kr : c.amount_kr),
+        kr: Math.round(faktura ? (steg === 'betalt' ? faktura.paid_kr ?? faktura.total_kr : faktura.total_kr) : c.amount_kr),
         invoice_id: fakturaBevisad ? c.invoice_id : null,
         paid_at:
           steg === 'betalt' && faktura && faktura.paid_at_ms !== null
@@ -420,15 +423,29 @@ export async function getManadsLedger(
   if (invoiceIds.length > 0) {
     const { data: invRows, error: invErr } = await supabase
       .from('invoice')
-      .select('invoice_id, total, status, paid_at')
+      .select('invoice_id, total, status, paid_amount, paid_at')
       .eq('business_id', businessId)
       .in('invoice_id', invoiceIds)
     if (invErr) throw new Error(`invoice-uppslag misslyckades: ${invErr.message}`)
     for (const inv of invRows || []) {
+      // A direct reference proves identity, not issuance: recovered work starts as a draft.
+      // Withdrawn/credited invoices must not remain in the billed or paid totals.
+      if (!(PORTAL_VISIBLE_STATUSES as readonly string[]).includes(inv.status)) continue
+      const total = Number(inv.total)
+      if (!Number.isFinite(total) || total < 0) continue
+      // customer_paid says the customer is settled, not that the remaining
+      // tax reduction has arrived. Missing payment evidence is never total.
+      const rawPaid = inv.paid_amount == null
+        ? (inv.status === 'paid' ? total : null)
+        : Number(inv.paid_amount)
+      const paidKr = rawPaid !== null && Number.isFinite(rawPaid) && rawPaid > 0
+        ? Math.min(total, rawPaid) : 0
+      const paidAtMs = inv.paid_at ? new Date(inv.paid_at).getTime() : NaN
       invoices.set(String(inv.invoice_id), {
-        total_kr: Number(inv.total) || 0,
-        paid: isCustomerSettled(inv.status),
-        paid_at_ms: inv.paid_at ? new Date(inv.paid_at).getTime() : null,
+        total_kr: total,
+        paid_kr: paidKr,
+        paid: isCustomerSettled(inv.status) && paidKr > 0,
+        paid_at_ms: Number.isFinite(paidAtMs) ? paidAtMs : null,
       })
     }
   }

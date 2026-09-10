@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState, useRef, useCallback } from 'react'
+import AcceptanceRecoveryPanel from '@/components/AcceptanceRecoveryPanel'
+import IntakeRecoveryPanel from '@/components/IntakeRecoveryPanel'
 import { useRouter, useSearchParams } from 'next/navigation'
 import {
   FolderKanban,
@@ -56,6 +58,7 @@ import { sendSiteVisitSms } from '@/lib/sms/site-visit-confirm'
 import { useRealtimeRefresh } from '@/lib/useRealtimeRefresh'
 import { getLeadCategory } from '@/lib/lead-categories'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { SCORE_FACTOR_LABELS, getTemperatureLabel, getTemperatureColor, LOSS_REASONS } from '@/lib/lead-scoring'
@@ -120,6 +123,7 @@ const ProjectCanvas = dynamic(() => import('@/components/project/ProjectCanvas')
 
 export default function PipelinePage() {
   const business = useBusiness()
+  const { user: intakeUser } = useCurrentUser()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -1818,6 +1822,8 @@ export default function PipelinePage() {
           setMobileStageIndex={setMobileStageIndex}
         />
 
+        {intakeUser?.is_active && intakeUser.business_id === business.business_id && ['owner', 'admin'].includes(intakeUser.role) && <IntakeRecoveryPanel key={`${business.business_id}:${intakeUser.id}:${intakeUser.role}`} onRecovered={fetchPipeline} />}
+        {intakeUser?.is_active && intakeUser.business_id === business.business_id && ['owner', 'admin'].includes(intakeUser.role) && <AcceptanceRecoveryPanel key={`${business.business_id}:${intakeUser.id}:${intakeUser.role}`} onRecovered={fetchPipeline} />}
         {/* Översikt / Kanban / Tidslinje */}
         <div className="flex-1 overflow-hidden">
           {pipelineView === 'flow' ? (

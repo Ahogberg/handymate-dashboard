@@ -49,6 +49,13 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     const journaledOwnerPush = type === 'automation' && p.rule_action_type === 'notify_owner'
     if (!journaledProjectSync && !journaledOwnerPush && action === 'retry' && p.execution_result?.receipt?.state === 'partial' && !['time_attestation', 'job_report', 'autopilot_package', 'customer_fact'].includes(type)) throw new Error(`Tidigare försök utfördes delvis: ${p.execution_result.receipt.text} Kontrollera det befintliga resultatet innan en ny handling skapas.`)
     if (action === 'reject') return complete(rejectionEffect(type), 'Bekräfta avvisningen')
+    if (p.quote_followup_round && ['send_sms', 'send_email'].includes(type)) {
+      if (p.quote_followup_send_claimed_at) throw new Error('Uppföljningens utskick har redan påbörjats. Kontrollera leveranskvittensen innan ett nytt meddelande skickas.')
+      const { parseQuoteFollowupRound, verifyQuoteFollowupSource } = await import('@/lib/quotes/followup-round')
+      const scope = parseQuoteFollowupRound(p.quote_followup_round)
+      if (!scope || type !== `send_${scope.channel}` || typeof p.quote_followup_source !== 'string') throw new Error('Uppföljningens underlag saknas.')
+      await verifyQuoteFollowupSource(db, businessId, scope, p.to, p.quote_followup_source)
+    }
     if (classify(type) === 'INFORMATIONAL' || classify(type) === 'ACKNOWLEDGEMENT') return
     if (type === 'job_report') {
       if (action === 'retry' && !p.execution_result?.artifacts?.document_id) throw new Error('Det äldre försöket saknar en verifierbar leveransjournal. Kontrollera tidigare utskick innan ett nytt rapportbeslut skapas.')

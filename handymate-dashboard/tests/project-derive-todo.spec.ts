@@ -5,8 +5,55 @@
  */
 import { test, expect } from '@playwright/test'
 import { deriveProjectTodo, deriveTodoMode, getStageBucket, pickTopCard, TODO_PRIMARY_LABEL } from '../lib/projects/derive-todo'
+import { hasInvoiceableProjectSources, invoiceableProjectAmount, invoiceReviewEntry, projectInvoicePath } from '../lib/projects/invoice-path'
 
 const BASE = { stageId: 'ps-03', isOverBudget: false, canSeeFinancials: true, hasUninvoicedWork: false, noWorkYet: false }
+
+test.describe('projektets fakturakälla', () => {
+  test('en offert kräver uttryckligt val och bevisar inte fastpris', () => {
+    expect(invoiceReviewEntry('q1')).toBe('choose')
+    expect(invoiceReviewEntry(null)).toBe('actuals')
+    expect(invoiceReviewEntry(undefined)).toBe('actuals')
+  })
+  test('fastpris och blandavtal med offert använder avtalsrader + ÄTA', () => {
+    expect(projectInvoicePath({ projectType: 'fixed_price', quoteId: 'q1' })).toBe('contract')
+    expect(projectInvoicePath({ projectType: 'mixed', quoteId: 'q1' })).toBe('contract')
+  })
+
+  test('löpande eller projekt utan offert använder faktisk tid och material', () => {
+    expect(projectInvoicePath({ projectType: 'hourly', quoteId: 'q1' })).toBe('actuals')
+    expect(projectInvoicePath({ projectType: 'mixed', quoteId: null })).toBe('actuals')
+  })
+
+  test('beloppet följer vald källa och dubbelräknar dem aldrig', () => {
+    const common = {
+      expectedRevenue: 85_500,
+      invoicedRevenue: 0,
+      uninvoicedTimeRevenue: 2_017,
+      uninvoicedMaterialRevenue: 1_000,
+    }
+    expect(invoiceableProjectAmount({ ...common, path: 'contract' })).toBe(85_500)
+    expect(invoiceableProjectAmount({ ...common, path: 'actuals' })).toBe(3_017)
+  })
+
+  test('listan hittar fastpris utan tid och löpande material utan tid', () => {
+    expect(hasInvoiceableProjectSources({
+      path: 'contract', contractValue: 85_500, linkedInvoiceCount: 0,
+      uninvoicedTimeEntryCount: 0, uninvoicedMaterialCount: 0,
+    })).toBe(true)
+    expect(hasInvoiceableProjectSources({
+      path: 'actuals', contractValue: 0, linkedInvoiceCount: 0,
+      uninvoicedTimeEntryCount: 0, uninvoicedMaterialCount: 1,
+    })).toBe(true)
+  })
+
+  test('listan föreslår inte en andra avtalsfaktura', () => {
+    expect(hasInvoiceableProjectSources({
+      path: 'contract', contractValue: 85_500, linkedInvoiceCount: 1,
+      uninvoicedTimeEntryCount: 0, uninvoicedMaterialCount: 0,
+    })).toBe(false)
+  })
+})
 
 test.describe('getStageBucket', () => {
   test('null/okänt → planering; ps-01–02 planering; ps-03–04 pågående; ps-05+ klart', () => {

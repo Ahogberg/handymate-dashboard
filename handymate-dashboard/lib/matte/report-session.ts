@@ -5,17 +5,38 @@ import { loadWorkReportContext, workReportSummary, WorkReportError, type WorkRep
 import { pendingWorkReport } from './work-report-confirmation'
 export const reportContinuityEnabled = () => process.env.WORK_REPORT_CONTINUITY_ENABLED === 'true'
 export const REPORT_SESSION_FIELDS = 'id,project_id,work_date,thread_id,parts,completed,receipts,state,claimed_at,last_error,created_at,expires_at'
+export function reportRequestId(value: unknown): string | null {
+ const text=typeof value==='string'?value.trim().toLowerCase():''
+ return /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(text)?text:null
+}
 export function reportSessionView(row:any) {
  return {id:row.id,date:row.work_date,projectId:row.project_id,createdAt:row.created_at,state:row.state,
   busy:!!row.claimed_at&&Date.parse(row.claimed_at)>Date.now()-120000,uncertain:!!row.claimed_at||row.last_error,
   expired:Date.parse(row.expires_at)<=Date.now(),completed:row.completed,
   parts:row.parts.map((p:any,i:number)=>({tool:p.toolName,summary:p.summary,saved:i<row.completed})),receipts:row.receipts}
 }
-export async function createReportSession(db:SupabaseClient,businessId:string,ctx:WorkReportContext,threadId:string|null,actions:WorkReportAction[]) {
- const id=crypto.randomUUID()
+export async function recoverReportSessionForRequest(db:SupabaseClient,businessId:string,ctx:WorkReportContext,id:string) {
+ const {data,error}=await db.from('work_report_session').select(REPORT_SESSION_FIELDS).eq('business_id',businessId).eq('business_user_id',ctx.userId).eq('project_id',ctx.projectId).eq('work_date',ctx.date).eq('id',id).maybeSingle()
+ if(error)throw new WorkReportError(503,'Rapportens tidigare mottagning kunde inte kontrolleras. Inget nytt förslag skapades.')
+ if(!data)return null
+ const view=reportSessionView(data)
+ const current=data.parts[data.completed]
+ const pending=data.state==='open'&&!view.expired&&!view.busy&&current
+  ? pendingWorkReport(current,ctx,businessId,data.thread_id,data.parts.slice(data.completed+1),data.id,true)
+  : null
+ return {report:view,thread_id:data.thread_id,pending_confirmation:pending}
+}
+export async function createReportSession(db:SupabaseClient,businessId:string,ctx:WorkReportContext,threadId:string|null,actions:WorkReportAction[],requestId?:string|null) {
+ const id=requestId||crypto.randomUUID()
  const parts=actions.map(action=>({...action,summary:workReportSummary(action,ctx)}))
  const {error}=await db.from('work_report_session').insert({id,business_id:businessId,business_user_id:ctx.userId,project_id:ctx.projectId,work_date:ctx.date,thread_id:threadId,parts})
- if(error)throw new WorkReportError(503,error.code==='23505'?'Du har redan en öppen rapport för jobbet och datumet. Återuppta eller avstå från den innan du börjar en ny.':'Rapportens delar kunde inte sparas för återupptagning. Inget förslag har utförts.')
+ if(error){
+  if(error.code==='23505'&&requestId){
+   const existing=await recoverReportSessionForRequest(db,businessId,ctx,id)
+   if(existing?.pending_confirmation)return existing.pending_confirmation
+  }
+  throw new WorkReportError(503,error.code==='23505'?'Du har redan en öppen rapport för jobbet och datumet. Återuppta eller avstå från den innan du börjar en ny.':'Rapportens delar kunde inte sparas för återupptagning. Inget förslag har utförts.')
+ }
  return pendingWorkReport(actions[0],ctx,businessId,threadId,actions.slice(1),id,true)
 }
 export async function loadReportSession(db:SupabaseClient,businessId:string,user:BusinessUser|null,id:unknown) {

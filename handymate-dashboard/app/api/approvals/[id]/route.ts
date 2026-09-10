@@ -25,6 +25,7 @@ import { rapporteraTystFel, arSchemaSaknas } from '@/lib/observability/driftlarm
 import { completeProject } from '@/lib/projects/complete-project'
 import { normalizeDueDateIso } from '@/lib/customer-facts/build-card'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
+import { parseQuoteFollowupRound, verifyQuoteFollowupSource, claimQuoteFollowupSend } from '@/lib/quotes/followup-round'
 
 export const dynamic = 'force-dynamic'
 
@@ -1128,6 +1129,12 @@ async function executeApprovalPayload(
     switch (approval_type) {
       case 'quote_nudge':
       case 'send_sms': {
+        if (payload.quote_followup_round) {
+          const scope = parseQuoteFollowupRound(payload.quote_followup_round)
+          if (!scope || scope.channel !== 'sms' || typeof payload.quote_followup_source !== 'string') return { action: 'send_sms', ok: false, error: 'Uppföljningens underlag saknas.' }
+          await verifyQuoteFollowupSource(await getSupabase(), businessId, scope, payload.to, payload.quote_followup_source)
+          await claimQuoteFollowupSend(await getSupabase(), businessId, approvalId, payload)
+        }
         // Audit-3 Fix A (2026-06-01): sendSmsViaElks direkt istället för
         // internal fetch som failade server-side. Karin/Daniel/Lisa typed
         // actions går via denna case.
@@ -1158,7 +1165,7 @@ async function executeApprovalPayload(
           customerId: (payload.customer_id as string | undefined) || null,
           relatedId: (payload.related_id as string | undefined) || null,
           messageType: approval_type,
-          purpose: approval_type === 'quote_nudge' ? 'proactive' : 'conversational',
+          purpose: approval_type === 'quote_nudge' || payload.quote_followup_round ? 'proactive' : 'conversational',
         })
 
         // Hanna v2 spel 4 (bärande princip #6): denna case delas av MÅNGA
@@ -1196,6 +1203,12 @@ async function executeApprovalPayload(
       }
 
       case 'send_email': {
+        if (payload.quote_followup_round) {
+          const scope = parseQuoteFollowupRound(payload.quote_followup_round)
+          if (!scope || scope.channel !== 'email' || typeof payload.quote_followup_source !== 'string') return { action: 'send_email', ok: false, error: 'Uppföljningens underlag saknas.' }
+          await verifyQuoteFollowupSource(await getSupabase(), businessId, scope, payload.to, payload.quote_followup_source)
+          await claimQuoteFollowupSend(await getSupabase(), businessId, approvalId, payload)
+        }
         // TD-52: motsvarighet till 'send_sms' ovan för agentens send_email-
         // verktyg när det köats för godkännande (system-triggerad, ej
         // förtjänad autonomi). Minimal — Resend direkt (lib/email.ts), ingen
@@ -2448,6 +2461,8 @@ async function executeApprovalPayload(
         try {
           const created = await createInvoice(supabaseFP, {
             businessId,
+            sources: { changeIds: underlag.ataChangeIds },
+            requestKey: `project-completion:${projectId}`,
             customerId: underlag.project.customer_id,
             items: underlag.items,
             subtotal: underlag.subtotal,
@@ -2469,21 +2484,6 @@ async function executeApprovalPayload(
           fakturaFP = created.invoice
         } catch (createErr: any) {
           return { action: 'fakturera_projekt', error: `Fakturan kunde inte skapas: ${createErr.message}` }
-        }
-
-        if (underlag.ataChangeIds.length > 0) {
-          const { markInvoiceSources } = await import('@/lib/invoices/mark-sources')
-          const markering = await markInvoiceSources(supabaseFP, {
-            businessId,
-            invoiceId: fakturaFP.invoice_id,
-            changeIds: underlag.ataChangeIds,
-          })
-          if (!markering.ok) {
-            console.error('[approvals/fakturera_projekt] kunde inte källmarkera ÄTA:', markering.errors, {
-              project_id: projectId,
-              invoice_id: fakturaFP.invoice_id,
-            })
-          }
         }
 
         const sendResFP = await fetch(`${appUrl}/api/invoices/send`, {

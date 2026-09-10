@@ -1,10 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Clock, Eye, FileText, Loader2, Plus, Search, Send, XCircle } from 'lucide-react'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import QuotePerformanceCard from '@/components/dashboard/QuotePerformanceCard'
+import { quoteListHref, readQuoteListFilter, type QuoteListFilter } from '@/lib/quotes/list-filter'
 
 interface Quote {
   quote_id: string
@@ -22,8 +24,6 @@ interface Quote {
     phone_number: string
   }
 }
-
-type FilterKey = 'all' | 'draft' | 'sent' | 'accepted'
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 
@@ -82,9 +82,11 @@ function getStatusIcon(status: string) {
 
 export default function QuotesPage() {
   const business = useBusiness()
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [quotes, setQuotes] = useState<Quote[]>([])
   const [loading, setLoading] = useState(true)
-  const [filter, setFilter] = useState<FilterKey>('all')
+  const [filter, setFilter] = useState<QuoteListFilter>(() => readQuoteListFilter(searchParams))
   const [searchQuery, setSearchQuery] = useState('')
   const [acceptingId, setAcceptingId] = useState<string | null>(null)
 
@@ -108,6 +110,17 @@ export default function QuotesPage() {
     fetchQuotes()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [business.business_id])
+
+  // Länkar från "Pengar just nu" och webbläsarens framåt/bakåt ska
+  // landa i samma arbetskö som fliken visar, inte tyst falla tillbaka till Alla.
+  useEffect(() => {
+    setFilter(readQuoteListFilter(searchParams))
+  }, [searchParams])
+
+  function selectFilter(nextFilter: QuoteListFilter) {
+    setFilter(nextFilter)
+    router.replace(quoteListHref(nextFilter, searchParams.toString()), { scroll: false })
+  }
 
   async function fetchQuotes() {
     try {
@@ -150,7 +163,7 @@ export default function QuotesPage() {
         : 0,
   }
 
-  const filters: Array<{ key: FilterKey; label: string; count: number }> = [
+  const filters: Array<{ key: QuoteListFilter; label: string; count: number }> = [
     { key: 'all', label: 'Alla', count: stats.total },
     { key: 'draft', label: 'Utkast', count: stats.draft },
     { key: 'sent', label: 'Skickade', count: stats.sent },
@@ -230,7 +243,7 @@ export default function QuotesPage() {
             {filters.map(f => (
               <button
                 key={f.key}
-                onClick={() => setFilter(f.key)}
+                onClick={() => selectFilter(f.key)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium whitespace-nowrap border-b-2 -mb-px transition-colors ${
                   filter === f.key
                     ? 'border-primary-700 text-primary-700'

@@ -1,12 +1,27 @@
 import { expect, test } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
-import { resolveSetupStudioMode } from '../lib/onboarding/setup-studio'
+import { readSetupStudioPreference, resolveSetupStudioMode, writeSetupStudioPreference } from '../lib/onboarding/setup-studio'
 
 const ROOT = path.resolve(__dirname, '..')
 const source = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
 
 test.describe('Setup Studio V1.5 — flaggad presentation ovanpå samma onboarding', () => {
+  test('blockerad sessionStorage stoppar inte start eller byte till klassisk guide', () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'window')
+    try {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: { get sessionStorage() { throw new Error('SecurityError') } },
+      })
+      expect(readSetupStudioPreference()).toBeNull()
+      expect(() => writeSetupStudioPreference('classic')).not.toThrow()
+    } finally {
+      if (previous) Object.defineProperty(globalThis, 'window', previous)
+      else Reflect.deleteProperty(globalThis, 'window')
+    }
+  })
+
   test('är av som standard och kräver den exakta publika flaggan', () => {
     expect(resolveSetupStudioMode(undefined, '', null)).toBe(false)
     expect(resolveSetupStudioMode('false', '', null)).toBe(false)

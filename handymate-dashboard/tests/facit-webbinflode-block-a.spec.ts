@@ -33,7 +33,7 @@ test('UI:t visar bara loader.js-kontraktet; legacy embed.js finns bara kvar i pu
   expect(kod('app/site/[slug]/StorefrontClient.tsx')).toContain('/widget/loader.js')
 })
 
-test('alla strukturerade webbinflöden använder samma Golden Path', () => {
+test('alla strukturerade webbinflöden använder central mottagning', () => {
   const routes = [
     'app/api/storefront/contact/route.ts',
     'app/api/widget/chat/route.ts',
@@ -42,6 +42,14 @@ test('alla strukturerade webbinflöden använder samma Golden Path', () => {
   ]
   for (const rel of routes) {
     const source = kod(rel)
+    if (source.includes("from '@/lib/leads/durable-intake'")) {
+      expect(source).toContain('receiveIntake(')
+      expect(source).toContain('completeIntake(')
+      if (rel === 'app/api/storefront/contact/route.ts') {
+        expect(source).not.toContain('createLeadAndDeal(')
+      }
+      continue
+    }
     expect(source, `${rel} importerar inte Golden Path`).toContain("from '@/lib/leads/golden-path'")
     expect(source, `${rel} anropar inte Golden Path`).toContain('createLeadAndDeal(')
   }
@@ -92,13 +100,13 @@ test('loaderns installationssignal är minimal, host-baserad och throttlad', () 
 
 test('storefront har honeypot och persistent rate limit men inga egna kund- eller affärsinserts', () => {
   const route = kod('app/api/storefront/contact/route.ts')
-  expect(route).toContain('const { business_id, name, phone, email, message, _hp } = body')
+  expect(route).toContain('const { business_id, _hp } = body || {}')
   expect(route).toContain('if (_hp)')
   // Fail-closed-varianten sedan tenant-svepet 2026-09-01 (lib/rate-limit-db.ts).
   expect(route).toContain('checkPublicRateLimitDb(')
-  expect(route).toContain("source: 'website_form'")
+  expect(route).toContain("'receive_storefront_lead_intake'")
   expect(route).not.toContain("from('pipeline_stage')")
   expect(route).not.toContain("from('pipeline_stages')")
   expect(route).not.toMatch(/from\(['"](?:customer|leads|deal)['"]\)[\s\S]{0,120}\.insert/)
-  expect(route).toContain('result.dealError || !result.dealId')
+  expect(route).toContain("result.state === 'completed' ? 200 : 202")
 })

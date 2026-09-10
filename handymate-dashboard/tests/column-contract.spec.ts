@@ -356,7 +356,9 @@ function collectFilterRefsFromSource(innehall: string, fil: string): Ref[] {
   const methods = FILTER_METHODS.join('|')
 
   const add = (tabell: string, kolumn: string, metod: FilterMethod) => {
-    const normalized = kolumn.toLowerCase()
+    // JSON paths filter inside an existing column, just like JSON selects.
+    // Keep checking the root column; do not add an exception for one query.
+    const normalized = kolumn.split('->')[0].toLowerCase()
     const key = `${tabell}.${normalized}.${metod}.${fil}`
     if (seen.has(key)) return
     seen.add(key)
@@ -550,6 +552,10 @@ test.describe('kolumnkontraktet', () => {
 })
 
 test.describe('parsern', () => {
+  test('JSON-filter kontrollerar rotkolumnen, även när den saknas', () => {
+    const refs = collectFilterRefsFromSource("db.from('pending_approvals').is('payload->>claimed_at', null).eq('missing_payload->>state', 'ready')", 'fixture.ts')
+    expect(refs.map(ref => ref.kolumn)).toEqual(['payload', 'missing_payload'])
+  })
   test('alias pekar ut den riktiga kolumnen', () => {
     // `id:change_id` betyder "hämta change_id, kalla den id". Det är
     // change_id som måste finnas.

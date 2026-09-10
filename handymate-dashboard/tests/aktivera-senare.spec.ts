@@ -144,7 +144,8 @@ test.describe('betalgrinden — bara betalt öppnar', () => {
   test('PUT /api/onboarding kan inte skriva 9 eller 10 — bara finalize gör det', () => {
     const src = read('app/api/onboarding/route.ts')
     expect(src).toContain('step >= 1 && step <= 8')
-    expect(src).toContain('onboarding_step: 10')
+    expect(src.split('export async function POST')[0]).not.toContain('updates.onboarding_step = 10')
+    expect(src.split('export async function POST')[1]).toContain('updates.onboarding_step = 10')
   })
 
   test('GET /api/onboarding härleder paid på servern, med grindens egen regel', () => {

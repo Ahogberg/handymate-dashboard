@@ -1,3 +1,14 @@
+# Aktiv sprint 2026-09-09
+- [x] Gmail: avstängning, full sidläsning, stabil startpunkt och ingen cursor vid fel.
+- [x] Gmail: säkra dubblett-/kunduppslag och verifiera fel/återförsök i faktiska helpers.
+- [ ] Verifiera PR36:s cache-rättelse och Gmail-leverans med sekventiella grindar.
+Aktuell fortsättning: [lanseringsmålet](launch-completion-20260909.md).
+- [x] Portal: beständig mottagning inklusive kategori, belopp och adress.
+- [x] Portal: behåll inskick vid avbrott; skilj mottaget från färdigställt.
+- [ ] Route-/SQL-/UI-prov, tsc, build och checkpoint i PR36.
+
+Se [sex kundutfall](six-outcomes-20260909.md). Egen gren; tidigare punkter nedan bevaras.
+
 ## Nattsvit 8 sept (Claude 06:55 UTC)
 
 4 röda av 7936 (run 34195938778), alla stale facit efter 7–8 sept: 30-sekunderslöftet (Codex #20 tog bort det ur Step1 — nu borta ur Step5 också, 'SMS direkt' är det vi mäter), approvals-sidans fetch-räkning (postKortbeslut), två oklassade business_config-läsningar (yta 5), promise-deadlines start-markör (massutskicksgrinden). Rättat i samma commit. Nästa körning ~06:45 UTC 9 sept.
@@ -1447,3 +1458,23 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 - [x] Testa stängning, kontobyte, tappat svar, datum och återförsök utan dubbelregistrering.
 - [x] Verifiera integrerad backend samt mobilens fulla typkontroll och Expo-paketering där byggmiljön tillåter.
 - [ ] Publicera draft-underlag med exakt version, flaggor och morgondagens iPhone-/inlämningsgrind.
+# Fakturering och offertaccept – 2026-09-09
+
+- [ ] Reproducera källkonflikt, falsk mejlkvittens och tappat återhämtningskort.
+- [ ] Faktura och explicita källor i samma transaktion; säkra återförsök.
+- [ ] Beständig offertaccept med separata kvittenser och återhämtningsvy.
+- [ ] Riktade SQL-/HTTP-/UI-prov, kontraktsgrind, TypeScript och build.
+- [ ] Granskbar gren/PR med migrationsordning och kvarstående externa prov.
+
+# Tre hela värderesor — nattgranskning 2026-09-09
+
+- [x] Läs beständig plan, verifiera aktiva PR-huvuden och identifiera Matte-onboardingens gren.
+- [x] Kartlägg företagsstart → första användbara resultat, med manuell/automatisk övergång och sparat bevis.
+- [x] Kartlägg förfrågan → offert → uppföljning → beslut/projekt och prova läsande i Nordström El.
+- [x] Kartlägg utfört jobb → rapport → ÄTA → fakturaunderlag → ekonomisystem och prova läsande i Nordström El.
+- [x] Rätta första reproducerade intäkts-/administrationsavbrottet och kör riktade samt breda prov.
+- [x] Spara exakt SHA, klickbevis och öppna kund-/providerprov i egen draft-PR; preview/CI avläses på remote HEAD.
+
+Färdig betyder att varje steg har en synlig nästa handling och en sparad kvittens.
+Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
+utskick, fakturasändning, main-merge eller produktionsmigration ingår.

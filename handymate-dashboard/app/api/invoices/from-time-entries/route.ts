@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
@@ -97,16 +96,19 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const materialIds: string[] = []
     // Hämta projektmaterial om project_id
     if (project_id) {
-      const { data: materials } = await supabase
+      const { data: materials, error: materialError } = await supabase
         .from('project_material')
         .select('*')
         .eq('project_id', project_id)
         .eq('business_id', business_id)
         .eq('invoiced', false)
 
+      if (materialError) throw materialError
       for (const mat of materials || []) {
+        materialIds.push(mat.material_id)
         items.push({
           id: 'ii_' + Math.random().toString(36).substr(2, 12),
           item_type: 'item',
@@ -170,6 +172,8 @@ export async function POST(request: NextRequest) {
     // datum/insert/bump — se lib/invoices/create-invoice.ts.
     const { invoice } = await createInvoice(supabase, {
       businessId: business_id,
+      projectId: project_id || null,
+      sources: { timeEntryIds: time_entry_ids, materialIds },
       customerId: resolvedCustomerId,
       items,
       subtotal,
@@ -191,26 +195,6 @@ export async function POST(request: NextRequest) {
     // Källorna markeras atomiskt via den delade vägen (P0-4). Materialet
     // slås upp till id:n först — RPC:n arbetar med explicita rader, aldrig
     // "allt ofakturerat" som kan hinna ändras mellan läsning och skrivning.
-    let materialIds: string[] = []
-    if (project_id) {
-      const { data: mtrl } = await supabase
-        .from('project_material')
-        .select('material_id')
-        .eq('project_id', project_id)
-        .eq('business_id', business_id)
-        .eq('invoiced', false)
-      materialIds = (mtrl || []).map((m: any) => m.material_id)
-    }
-
-    const markering = await markInvoiceSources(supabase, {
-      businessId: business_id,
-      invoiceId: invoice.invoice_id,
-      timeEntryIds: time_entry_ids,
-      materialIds,
-    })
-    if (!markering.ok) {
-      console.error('[from-time-entries] källmarkeringen misslyckades:', markering.errors)
-    }
 
     // A5: varningarna följer med svaret så UI:t kan visa dem — aldrig tyst.
     return NextResponse.json({ invoice, warnings: varningar })

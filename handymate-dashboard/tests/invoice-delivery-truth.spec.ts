@@ -55,7 +55,7 @@ test.describe('skapandet påstår ingen leverans', () => {
     // `from('project_change')` duger inte som slutankare — ÄTA HÄMTAS redan
     // före skapandet. Källmarkeringen som följer efteråt är unik (P0-4:
     // själva invoiced-skrivningen bor numera i lib/invoices/mark-sources).
-    const slut = KOD.indexOf('markInvoiceSources(')
+    const slut = KOD.indexOf('invoice = created.invoice', start)
     expect(start, 'createInvoice-anropet hittades inte').toBeGreaterThan(-1)
     expect(slut, 'ÄTA-blocket hittades inte').toBeGreaterThan(start)
     expect(KOD.slice(start, slut)).not.toContain("'sent'")

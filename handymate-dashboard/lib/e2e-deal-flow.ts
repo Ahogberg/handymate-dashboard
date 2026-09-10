@@ -726,62 +726,32 @@ async function executeInvoiceGeneration(
       return { executed: false, reason: 'Inga fakturerbara poster — manuell fakturering krävs' }
     }
 
-    // Skapa faktura
-    const prefix = config?.invoice_prefix || 'FV'
-    const seqNum = config?.next_invoice_number || 1
-    const invoiceNumber = `${prefix}-${new Date().getFullYear()}-${String(seqNum).padStart(3, '0')}`
-    const invoiceId = `inv_${Date.now().toString(36)}${Math.random().toString(36).substr(2, 6)}`
-    const subtotal = items.reduce((s: number, i: any) => s + (i.total || 0), 0)
+    const subtotal = items.reduce((sum: number, item: any) => sum + (item.total || 0), 0)
     const vatAmount = Math.round(subtotal * 0.25)
     const total = subtotal + vatAmount
-
-    const dueDate = new Date()
-    dueDate.setDate(dueDate.getDate() + (config?.default_payment_days || 30))
-
-    const { error: invoiceErr } = await supabase.from('invoice').insert({
-      invoice_id: invoiceId,
-      business_id: businessId,
-      customer_id: deal.customer_id,
-      invoice_number: invoiceNumber,
-      invoice_type: 'standard',
-      status: 'draft',
-      items,
-      subtotal,
-      vat_rate: 25,
-      vat_amount: vatAmount,
-      total,
-      customer_pays: total,
-      invoice_date: new Date().toISOString().split('T')[0],
-      due_date: dueDate.toISOString().split('T')[0],
-      bankgiro_number: config?.bankgiro || null,
-      plusgiro: config?.plusgiro || null,
-      swish_number: config?.swish_number || null,
-    })
-
-    if (invoiceErr) {
-      return { executed: false, reason: `Fakturagenerering misslyckades: ${invoiceErr.message}` }
+    const { createInvoice } = await import('@/lib/invoices/create-invoice')
+    let invoiceId: string
+    let invoiceNumber: string
+    let replayed = false
+    try {
+      const created = await createInvoice(supabase, {
+        businessId, customerId: deal.customer_id, projectId: project.project_id,
+        items, subtotal, vatRate: 25, vatAmount, total, customerPays: total,
+        status: 'draft', dueDays: config?.default_payment_days || 30,
+        sources: { timeEntryIds: sourceTimeEntryIds, materialIds: sourceMaterialIds },
+        extraFields: { bankgiro_number: config?.bankgiro || null },
+      })
+      invoiceId = created.invoice.invoice_id
+      invoiceNumber = created.invoiceNumber
+      replayed = created.replayed === true
+    } catch (error: any) {
+      return { executed: false, reason: `Fakturagenerering misslyckades: ${error.message}` }
     }
-
-    // Källorna markeras atomiskt via den delade vägen (P0-4) — tidigare två
-    // separata anrop utan felkontroll och utan tenantfilter.
-    const markering = await markInvoiceSources(supabase, {
-      businessId,
-      invoiceId,
-      timeEntryIds: sourceTimeEntryIds,
-      materialIds: sourceMaterialIds,
-    })
-    if (!markering.ok) {
-      console.error('[e2e-deal-flow] källmarkeringen misslyckades:', markering.errors)
-    }
-
-    // Inkrementera fakturanummer
-    await supabase
-      .from('business_config')
-      .update({ next_invoice_number: seqNum + 1 })
-      .eq('business_id', businessId)
 
     // Länka faktura till deal
     await supabase.from('deal').update({ invoice_id: invoiceId }).eq('id', dealId)
+
+    if (replayed) return { executed: true, data: { invoice_id: invoiceId, already_exists: true, review_required: true } }
 
     // Skapa godkännande för att skicka fakturan
     await createDealFlowApproval(businessId, dealId, {

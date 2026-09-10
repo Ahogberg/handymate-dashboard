@@ -78,7 +78,7 @@ test.describe('de fem skapandevägarna anropar hooken EFTER sin insert-felkoll',
     // och hooken ligger efter det — samma markör som /api/actions.
     { fil: 'app/api/customers/route.ts', insertMarkor: 'export async function POST', felkoll: 'throw error' },
     { fil: 'app/api/agent/trigger/tool-router.ts', insertMarkor: 'async function createCustomer(', felkoll: 'if (error) return { success: false, error: error.message }' },
-    { fil: 'lib/leads/golden-path.ts', insertMarkor: "const newId = 'cust_'", felkoll: 'customerId = newCustomer?.customer_id || newId' },
+    { fil: 'lib/leads/golden-path.ts', insertMarkor: "const newId = 'cust_'", felkoll: 'if (customerInsertError || !newCustomer?.customer_id)' },
     { fil: 'lib/approve-actions.ts', insertMarkor: 'async function createCustomer(supabase: SupabaseClient, suggestion', felkoll: 'if (error) throw error' },
   ]
 

@@ -1,3 +1,4 @@
+import { reconcileQuoteFollowupRound, readQuoteFollowupRound } from '@/lib/quotes/followup-round'
 import { hasDurableFollowup } from '@/lib/followup/service'
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
@@ -42,6 +43,9 @@ export async function GET(request: NextRequest) {
     const now = new Date()
     const today = now.toISOString().split('T')[0]
     let followUpsSent = 0
+    let followUpsPrepared = 0
+    let followUpsHeld = 0
+    let followUpsFailed = 0
 
     // 1. Mark expired quotes
     const { data: expiredQuotes } = await supabase
@@ -424,7 +428,7 @@ export async function GET(request: NextRequest) {
           .eq('approval_type', 'send_sms')
           .in('business_id', bizIds)
           .gte('created_at', konfliktSedan)
-        if (konfliktErr) console.warn('[quote-follow-up] konfliktläsning misslyckades (ingen dedup denna körning):', konfliktErr.message)
+        if (konfliktErr) throw new Error('Uppföljningens befintliga förslag kunde inte kontrolleras.')
         for (const r of konfliktRader || []) {
           const rid = (r.payload as { related_id?: unknown } | null)?.related_id
           if (typeof rid === 'string') konflikter.add(rid)
@@ -447,7 +451,7 @@ export async function GET(request: NextRequest) {
       if (v3HandlesQuoteFollowup.has(quote.business_id)) continue
 
       // Use sent_at (not created_at) for accurate timing
-      const sentDate = quote.sent_at || quote.valid_until
+      const sentDate = quote.sent_at
       if (!sentDate) continue
 
       const daysSinceSent = Math.floor((now.getTime() - new Date(sentDate).getTime()) / (1000 * 60 * 60 * 24))
@@ -464,85 +468,64 @@ export async function GET(request: NextRequest) {
       if (!nextStep?.due) continue
       const channel = nextStep.channel
 
-      // VP2 (gap 4): kandidatloopen SAMLAR bara — follow_up_count-uppräkning
-      // och v3-loggen flyttade till steg 5, EFTER agent-triggern, så loggat
-      // status speglar faktiskt utfall. Tidigare loggades 'success' (och
-      // räknaren steg) innan något skickats — och inserten saknade dessutom
-      // trigger_type (NOT NULL) så den har i praktiken tyst failat hela tiden.
+      const reconciliation = await reconcileQuoteFollowupRound(supabase, quote.business_id, {
+        quote_id: quote.quote_id, sent_at: quote.sent_at, round: nextStep.round, channel,
+      })
+      if (reconciliation.state !== 'missing') {
+        if (reconciliation.state === 'reconciled' && reconciliation.advanced) followUpsSent++
+        else followUpsHeld++
+        continue
+      }
+
+      // Collect only rounds without an existing durable approval.
       const list = byBusiness.get(quote.business_id) || []
       list.push({ quote, daysSinceSent, channel, quote_id: quote.quote_id })
       byBusiness.set(quote.business_id, list)
     }
 
-    // 5. Trigger agent per business, logga utfall EFTER köningen
+    // One quote/round per run. Only a persisted provider receipt advances it.
+    // A pending/rejected/failed/unknown card holds its round and is never recreated.
     let agentTriggered = 0
-    for (const [businessId, allaItems] of Array.from(byBusiness)) {
-      const items = filterOutConflicting(allaItems, konflikter)
-      if (items.length === 0) continue
-      const quoteList = items.map((item: any) => {
-        const c = item.quote.customer as any
-        const daysLeft = Math.floor((new Date(item.quote.valid_until).getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
-        return `- Offert "${item.quote.title || item.quote.quote_id}" till ${c?.name || 'Okänd'}: ${(item.quote.customer_pays || item.quote.total || 0).toLocaleString('sv-SE')} kr, skickad för ${item.daysSinceSent} dagar sedan, giltig ${daysLeft} dagar till. Kontakt: telefon ${c?.phone_number || 'saknas'}, email ${c?.email || 'saknas'}. Kanal: ${item.channel}`
-      }).join('\n')
-
-      const result = await triggerAgentInternal(
-        businessId,
-        'cron',
-        {
-          cron_type: 'quote_followup',
-          instruction: `Följ upp dessa offerter. Använd angiven kanal (SMS eller email). Var personlig och fråga om kunden har funderingar:\n\n${quoteList}`,
-        },
-        makeIdempotencyKey('qfu', businessId, today)
-      )
-      if (result.success) agentTriggered++
-
-      // Utfall per kandidat: räknare + logg EFTER köningen, med ärlig status.
-      // follow_up_count stegas BARA vid lyckad köning — vid fail får nästa
-      // cron-körning ett nytt försök istället för att ronden "förbrukas".
+    for (const [businessId, allItems] of Array.from(byBusiness)) {
+      const items = filterOutConflicting(allItems, konflikter)
       for (const item of items) {
-        const followUpCount = item.quote.follow_up_count || 0
-        if (result.success) {
-          await supabase.from('quotes').update({
-            follow_up_count: followUpCount + 1,
-            last_follow_up_at: now.toISOString(),
-          }).eq('quote_id', item.quote.quote_id)
-          followUpsSent++
-        }
-
+        const q = item.quote
+        const scope = { quote_id: q.quote_id, sent_at: q.sent_at,
+          round: (q.follow_up_count || 0) + 1, channel: item.channel as 'sms' | 'email' }
+        const c = q.customer as any
+        const result = await triggerAgentInternal(businessId, 'cron', {
+          cron_type: 'quote_followup', quote_followup_round: scope,
+          instruction: `Förbered ett uppföljningsförslag för offert ${q.quote_id} till ${c?.name || 'kunden'}. Använd ${item.channel}. Telefon: ${c?.phone_number || 'saknas'}, email: ${c?.email || 'saknas'}. Fråga vänligt om kunden har funderingar. Förslaget kräver godkännande; påstå inte att något skickats.`,
+        }, makeIdempotencyKey('qfu', businessId, q.quote_id, q.sent_at, String(scope.round), today))
+        if (result.success) agentTriggered++
+        // Even a lost run response may have left a durable approval. Read it.
+        const card = await readQuoteFollowupRound(supabase, businessId, scope)
+        if (card) followUpsPrepared++
+        else followUpsFailed++
         const { error: logErr } = await supabase.from('v3_automation_logs').insert({
-          business_id: businessId,
-          rule_id: null,
-          // Hanna v2 spel 4 (bärande princip #6): denna runda routas redan till
-          // Daniel-personan via routeToAgent('cron', 'quote_followup') (prefix
-          // 'quote_' → daniel) — stämplar loggraden explicit så scoreboard och
-          // veckodigest kan räkna den utan att räkna om routingen.
-          agent_id: 'daniel',
-          rule_name: 'Offertuppföljning (cron)',
-          trigger_type: 'cron',
-          action_type: `send_${item.channel}`,
-          status: result.success ? 'success' : 'failed',
-          error_message: result.success ? null : 'Agent-köning misslyckades',
-          context: {
-            quote_id: item.quote.quote_id,
-            customer_id: item.quote.customer_id,
-            days_since_sent: item.daysSinceSent,
-            follow_up_round: followUpCount + 1,
-            channel: item.channel,
-          },
+          business_id: businessId, rule_id: null, agent_id: 'daniel',
+          rule_name: 'Offertuppföljning (cron)', trigger_type: 'cron',
+          action_type: 'prepare_quote_followup',
+          status: card ? 'success' : 'failed',
+          error_message: card ? null : (result.error || 'Agentkörningen gav inget sparat uppföljningsförslag.'),
+          context: { quote_id: q.quote_id, customer_id: q.customer_id,
+            follow_up_round: scope.round, channel: item.channel, approval_id: card?.id || null,
+            run_id: result.run_id || null, outcome: card ? 'awaiting_approval_result' : 'not_prepared' },
         })
-        if (logErr) {
-          console.warn('[quote-follow-up] v3_automation_logs insert failed (non-blocking):', logErr.message)
-        }
+        if (logErr) throw new Error('Uppföljningens resultatlogg kunde inte sparas.')
       }
     }
 
     return NextResponse.json({
-      success: true,
+      success: followUpsFailed === 0,
+      follow_ups_prepared: followUpsPrepared,
+      follow_ups_held: followUpsHeld,
+      follow_ups_failed: followUpsFailed,
       follow_ups_sent: followUpsSent,
       expired_count: expiredCount,
       expiry_nudges_sent: expiryNudgesSent,
       agent_triggered: agentTriggered,
-    })
+    }, { status: followUpsFailed ? 503 : 200 })
   } catch (error: any) {
     console.error('Quote follow-up cron error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

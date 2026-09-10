@@ -80,9 +80,9 @@ export function isOverdue(invoice: { status: string; due_date: string }): boolea
 }
 
 const FORTNOX_SYNC_LABEL: Record<string, string> = {
-  pending: 'Synkar…',
+  pending: 'Ej bekräftad',
   synced: 'Synkad',
-  failed: 'Synk misslyckades',
+  failed: 'Behöver kontrolleras',
 }
 
 export function getFortnoxSyncText(status: string | null | undefined): string {

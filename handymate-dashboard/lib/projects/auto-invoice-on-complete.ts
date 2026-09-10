@@ -10,7 +10,6 @@
  */
 
 import { getServerSupabase } from '@/lib/supabase'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { byggProjektFakturaUnderlag } from '@/lib/invoices/project-invoice-draft'
 import { sendInvoice } from '@/lib/invoices/send-invoice'
@@ -93,6 +92,8 @@ export async function autoInvoiceOnComplete(
     try {
       const created = await createInvoice(supabase, {
         businessId,
+        sources: { changeIds: underlag.ataChangeIds },
+        requestKey: `project-completion:${projectId}`,
         customerId: project.customer_id,
         items: allItems,
         subtotal,
@@ -114,44 +115,16 @@ export async function autoInvoiceOnComplete(
       })
       invoice = created.invoice
       invoiceNumber = created.invoiceNumber
+      if (created.replayed) return {
+        success: true, invoice_id: invoice.invoice_id, invoice_number: invoiceNumber,
+        total: invoice.total, customer_delivery_deferred: true,
+        warnings: ['Fakturan finns redan. Kontrollera dess leveransstatus innan något skickas.'],
+      }
     } catch (insertErr: any) {
       return { success: false, error: insertErr.message }
     }
 
-    // ── Markera ÄTA som fakturerade ──────────────────────────────────────
-    //
-    // Satte tidigare BARA `status`. Intäktssvepet (lib/value/missed-revenue.ts:117)
-    // tittar enbart på `invoiced_at`, aldrig på status — så varje ÄTA som
-    // fakturerats den här vägen larmades tre dygn senare som "inte fakturerad".
-    // Ett kort som uppmanar hantverkaren att fakturera samma arbete en gång
-    // till är värre än inget kort alls.
-    //
-    // Detta syntes aldrig i drift eftersom svepet samtidigt var en no-op
-    // (fel kolumnnamn, se cron-rutten). Båda lagas i samma commit — lagar man
-    // bara svepet byter man en tyst nolla mot falska larm.
-    //
-    // `create-final-invoice/route.ts:436-444` gjorde redan rätt; den här vägen
-    // gör nu likadant. Även `business_id` läggs till: en `.in()` på id:n utan
-    // företagsfilter förlitade sig på att id:n är globalt unika.
-    if (underlag.ataChangeIds.length > 0) {
-      // Delade vägen (P0-4): atomisk via RPC:n när v104 är körd.
-      // Misslyckas markeringen är det ÄTA:n som blir fel, inte fakturan —
-      // och det ska synas i loggen i stället för att dyka upp som ett
-      // falskt intäktsfynd tre dygn senare.
-      const markering = await markInvoiceSources(supabase, {
-        businessId,
-        invoiceId: invoice.invoice_id,
-        changeIds: underlag.ataChangeIds,
-      })
-      if (!markering.ok) {
-        warnings.push(`Fakturan skapades, men källmarkeringen misslyckades: ${markering.errors.join('; ')}`)
-        console.error('[auto-invoice] kunde inte markera ÄTA som fakturerade:', markering.errors, {
-          project_id: projectId,
-          invoice_id: invoice?.invoice_id,
-          ata_count: underlag.ataChangeIds.length,
-        })
-      }
-    }
+    // Faktura och ÄTA-ägarskap är redan kvitterade i samma transaktion.
 
     // 9. Hämta kundinfo
     const { data: customer } = await supabase

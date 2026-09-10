@@ -210,6 +210,7 @@ import ts from 'typescript'
 import { NextRequest } from 'next/server'
 import { hasPermission } from '../lib/permissions'
 import * as ekonomiprojektion from '../lib/projects/ekonomiprojektion'
+import * as invoicePath from '../lib/projects/invoice-path'
 
 function projektlista(actor: BusinessUser | null, impersonation = false) {
   const operations: any[] = []
@@ -242,6 +243,7 @@ function projektlista(actor: BusinessUser | null, impersonation = false) {
     '@/lib/projects/derive-lifecycle': { deriveProjectLifecycle: () => ({}) },
     '@/lib/projects/derive-dates': { deriveProjectDates: () => ({ is_late: false }) },
     '@/lib/projects/derive-todo': { deriveProjectTodo: () => ({}) },
+    '@/lib/projects/invoice-path': invoicePath,
     '@/lib/project-stages/stages': { getSystemStage: () => null, PROJECT_SYSTEM_STAGES: [] },
   }
   const output = ts.transpileModule(read('app/api/projects/route.ts'), {

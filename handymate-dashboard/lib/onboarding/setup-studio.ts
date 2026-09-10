@@ -23,12 +23,21 @@ export function resolveSetupStudioMode(
 
 export function readSetupStudioPreference(): SetupStudioPreference | null {
   if (typeof window === 'undefined') return null
-  const value = window.sessionStorage.getItem(STORAGE_KEY)
-  return value === 'studio' || value === 'classic' ? value : null
+  try {
+    const value = window.sessionStorage.getItem(STORAGE_KEY)
+    return value === 'studio' || value === 'classic' ? value : null
+  } catch {
+    // Privat läge eller blockerad lagring får inte stoppa företagsstarten.
+    return null
+  }
 }
 
 export function writeSetupStudioPreference(preference: SetupStudioPreference): void {
   if (typeof window === 'undefined') return
-  window.sessionStorage.setItem(STORAGE_KEY, preference)
+  try {
+    window.sessionStorage.setItem(STORAGE_KEY, preference)
+  } catch {
+    // En presentationspreferens är valfri. Sidans lokala lägesbyte
+    // måste fortfarande kunna slutföras när webbläsaren nekar lagring.
+  }
 }
-

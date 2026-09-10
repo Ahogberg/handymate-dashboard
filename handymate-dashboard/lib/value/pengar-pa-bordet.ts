@@ -208,3 +208,25 @@ export function grupperaPengar(summary: PengarSummary): PengarGrupp[] {
     })
     .filter(g => g.kategorier.length > 0)
 }
+
+/**
+ * Presentationsfacit för hemskärmsbandet. Okända belopp är inte ett
+ * tomläge: posten ska fortfarande synas som ett granskningsbehov i antal.
+ */
+export function pengarBandPresentation(summary: PengarSummary): {
+  grupper: PengarGrupp[]
+  tomt: boolean
+  harKantBelopp: boolean
+} {
+  const grupper = grupperaPengar(summary)
+  return {
+    grupper,
+    tomt: grupper.length === 0,
+    harKantBelopp: summary.totalKr > 0,
+  }
+}
+
+/** Antal faktiska poster i en kategori, inklusive poster utan säkert belopp. */
+export function pengarKategoriAntal(kategori: PengarKategori): number {
+  return kategori.antal + (kategori.antalUtanBelopp ?? 0)
+}

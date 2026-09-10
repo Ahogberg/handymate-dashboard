@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
@@ -241,6 +240,7 @@ async function generateInvoicesForBusiness(params: {
       try {
         const created = await createInvoice(supabase, {
           businessId: params.businessId,
+          sources: { timeEntryIds: pricedEntries.map((e: any) => e.time_entry_id) },
           customerId,
           items,
           subtotal,
@@ -254,6 +254,10 @@ async function generateInvoicesForBusiness(params: {
         })
         invoiceId = created.invoice.invoice_id
         invoiceNumber = created.invoiceNumber
+        if (created.replayed) {
+          result.skipped.push({ customer_name: customerName, reason: `Faktura ${invoiceNumber} finns redan. Kontrollera den sparade fakturan.` })
+          continue
+        }
       } catch (insertError: any) {
         result.errors.push(`${customerName}: ${insertError.message}`)
         continue
@@ -266,14 +270,6 @@ async function generateInvoicesForBusiness(params: {
       // Bara de PRISADE entries — priceLessEntries (Etapp T ovan) ska
       // förbli ofakturerade så de kan plockas upp igen när timpris satts.
       const entryIds = pricedEntries.map((e: any) => e.time_entry_id)
-      const markering = await markInvoiceSources(supabase, {
-        businessId: params.businessId,
-        invoiceId: invoice.invoice_id,
-        timeEntryIds: entryIds,
-      })
-      if (!markering.ok) {
-        console.error('[auto-generate] källmarkeringen misslyckades:', markering.errors)
-      }
 
       // Log customer activity
       await supabase.from('customer_activity').insert({

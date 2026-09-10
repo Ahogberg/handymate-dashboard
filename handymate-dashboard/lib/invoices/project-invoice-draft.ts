@@ -184,10 +184,10 @@ export async function byggProjektFakturaUnderlag(
             id: 'ii_ata_' + Math.random().toString(36).substr(2, 8),
             item_type: ata.change_type === 'removal' ? 'discount' : 'item',
             description: item.description || item.name || ata.description || 'ÄTA',
-            quantity: item.quantity || 1,
+            quantity: Number(item.quantity ?? 1) || 0,
             unit: item.unit || 'st',
             unit_price: Math.abs(item.unit_price || 0),
-            total: sign * Math.abs((item.quantity || 1) * (item.unit_price || 0)),
+            total: sign * Math.abs((Number(item.quantity ?? 1) || 0) * (item.unit_price || 0)),
             type: item.type || 'labor',
             // A6 (stänger TD-26): ÄTA-radens EGEN flagga respekteras när den
             // finns (sätts i ÄTA-editorn); rot_rut_type-fältet på äldre

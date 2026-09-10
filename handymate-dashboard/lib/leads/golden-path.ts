@@ -13,7 +13,7 @@
  *
  * Beslut 2026-05-28: helpern tar `business_id` + `business_phone_number`
  * separat istället för hela business-objektet — tunnare gränssnitt så
- * call-sites slipper bygga full business-row. SMS skickas non-blocking;
+ * call-sites slipper bygga full business-row. SMS inväntas utan att fel stoppar det sparade resultatet;
  * helpern returnerar även om SMS-throws.
  */
 
@@ -141,8 +141,8 @@ export async function createLeadAndDeal(
   // telefonsträng kunde matcha en godtycklig kund utan nummer. Nu samma
   // normaliserade hierarki som kund-API:t: telefon starkast, sedan e-post.
   // Namn+adress är för svagt för automatisk sammanslagning och lämnas
-  // medvetet utanför (granskningens princip: tvetydig identitet failar
-  // säkert som NY kund, aldrig tyst merge).
+  // medvetet utanför. Tvetydiga starka träffar kräver granskning; varken
+  // automatisk sammanslagning eller ytterligare en dubblett är säkert.
   const cleanPhone = phone.replace(/\s/g, '')
   const leadPhone = normalizeSwedishPhone(phone) || cleanPhone
 
@@ -153,9 +153,13 @@ export async function createLeadAndDeal(
     phone: phone || null,
     email: email || null,
   })
-  const match =
-    dubbletter.find(d => d.match_type === 'phone') ??
-    dubbletter.find(d => d.match_type === 'email')
+  const phoneMatches = dubbletter.filter(d => d.match_type === 'phone')
+  const emailMatches = dubbletter.filter(d => d.match_type === 'email')
+  const candidates = phoneMatches.length ? phoneMatches : emailMatches
+  if (candidates.length > 1) {
+    throw new Error('Flera kunder matchar kontaktuppgifterna. Kontrollera kundkopplingen innan förfrågan sparas.')
+  }
+  const match = candidates[0]
 
   if (match) {
     customerId = match.customer_id
@@ -166,11 +170,16 @@ export async function createLeadAndDeal(
     if (!match.phone_number && leadPhone) fyll.phone_number = leadPhone
     if (!match.email && email) fyll.email = email
     if (Object.keys(fyll).length > 0) {
-      await supabase.from('customer').update(fyll).eq('customer_id', match.customer_id)
+      const { data: updatedCustomer, error: updateError } = await supabase.from('customer')
+        .update(fyll).eq('customer_id', match.customer_id).eq('business_id', businessId)
+        .select('customer_id').maybeSingle()
+      if (updateError || !updatedCustomer?.customer_id) {
+        throw new Error('Kunduppgifterna kunde inte kompletteras. Försök igen.')
+      }
     }
   } else {
     const newId = 'cust_' + Math.random().toString(36).substr(2, 9)
-    const { data: newCustomer } = await supabase
+    const { data: newCustomer, error: customerInsertError } = await supabase
       .from('customer')
       .insert({
         customer_id: newId,
@@ -181,7 +190,11 @@ export async function createLeadAndDeal(
       })
       .select('customer_id')
       .single()
-    customerId = newCustomer?.customer_id || newId
+    // Never create a lead or start downstream sync with an unpersisted customer ID.
+    if (customerInsertError || !newCustomer?.customer_id) {
+      throw new Error('Kunduppgifterna kunde inte sparas. Försök igen.')
+    }
+    customerId = newCustomer.customer_id
 
     // Fortnox-kundnummer vid SKAPANDET (2026-08-26, Andreas-beslut: även
     // lead-vägen, så Fortnox löpnummer följer sann skapandeordning mellan
@@ -282,11 +295,10 @@ export async function createLeadAndDeal(
         })
         .select('id')
         .maybeSingle()
-      if (insertError) {
-        dealError = insertError.message
-        console.error('[golden-path] Deal-insert misslyckades:', insertError.message)
-      }
-      dealId = newDeal?.id ?? null
+      if (insertError || !newDeal?.id) {
+        dealError = insertError?.message || 'Affären kunde inte verifieras efter skapandet'
+        console.error('[golden-path] Deal-insert misslyckades:', dealError)
+      } else dealId = newDeal.id
     }
   } catch (err) {
     dealError = err instanceof Error ? err.message : String(err)
@@ -294,26 +306,37 @@ export async function createLeadAndDeal(
     // Non-blocking — lead skapas ändå, men felet surfas via dealError.
   }
 
-  // ── 5. SMS till hantverkaren (non-blocking) ──────────────────
+  await notifyReceivedLead(input, leadId, customerId, supabase)
+  return { leadId, dealId, customerId, dealError }
+}
+
+/** Shared notice effects. Durable callers claim the attempt before calling;
+ * a lost provider acknowledgement must never cause automatic resend. */
+export async function notifyReceivedLead(input: CreateLeadAndDealInput, leadId: string, customerId: string, supabase: SupabaseClient): Promise<boolean> {
+  const { businessId, businessPhoneNumber, name, phone, message, source, notify = true } = input
+  const cleanPhone = phone.replace(/\s/g, '')
+  let confirmed = true
+  // ── 5. SMS till hantverkaren (fel påverkar inte sparade entiteter) ──────────────────
   if (notify && businessPhoneNumber) {
     const smsText = `🌐 Ny lead från ${source}!\nNamn: ${name}\nTel: ${cleanPhone}${message ? `\n"${message.slice(0, 80)}"` : ''}\n→ app.handymate.se/dashboard/pipeline`
-    sendSMS(supabase, businessId, businessPhoneNumber, smsText, 'Handymate').catch(() => {})
+    if (!await sendSMS(supabase, businessId, businessPhoneNumber, smsText, 'Handymate')) confirmed = false
   }
 
   // ── 6. Automation-event ──────────────────────────────────────
   if (notify) {
     try {
       const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(supabase, 'lead_received', businessId, {
+      const result = await fireEvent(supabase, 'lead_received', businessId, {
         source,
         lead_id: leadId,
         customer_id: customerId,
         customer_name: name,
       })
-    } catch { /* non-blocking */ }
+      if (result.failed) confirmed = false
+    } catch { confirmed = false }
   }
 
-  return { leadId, dealId, customerId, dealError }
+  return confirmed
 }
 
 /**

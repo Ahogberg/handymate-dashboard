@@ -114,8 +114,8 @@ test.describe('alla sex ställena går genom vägen', () => {
     'lib/projects/auto-invoice-on-complete.ts',
   ]
   for (const fil of STALLEN) {
-    test(`${fil} använder markInvoiceSources`, () => {
-      expect(kod(fil)).toContain('markInvoiceSources(')
+    test(`${fil} reserverar källorna vid fakturaskapandet`, () => {
+      expect(kod(fil)).toMatch(/await createInvoice\([\s\S]*?sources:/)
     })
   }
 })

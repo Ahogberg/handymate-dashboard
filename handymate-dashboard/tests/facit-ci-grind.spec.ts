@@ -46,6 +46,9 @@ test.describe('Kontraktsgrinden (contracts.yml)', () => {
       'tests/schema-contract.spec.ts',
       'tests/column-contract.spec.ts',
       'tests/facit-ci-grind.spec.ts',
+      'tests/project-derive-todo.spec.ts',
+      'tests/facit-project-list-next-todo.spec.ts',
+      'tests/onboarding-setup-studio.spec.ts',
       'tests/facit-driftsynlighet.spec.ts',
       'tests/kortkvalitet.spec.ts',
     ]) {

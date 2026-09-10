@@ -38,7 +38,7 @@ test.describe('page.tsx — årsmålet skrivs inte längre från onboardingen', 
     // Repin 2026-09-07: 5a01bfc0 (PR #14 jobbtyper) gav anropet ett fjärde
     // argument (strict = step === 2) så att ett misslyckat jobbtypssparande
     // kastar i stället för att tystas — samma payload, samma tre första argument.
-    expect(onboardingPage).toContain('await saveProgress(newStep, sanitizeForSave(data), config, step === 2)')
+    expect(onboardingPage).toContain('await saveProgress(newStep, sanitizeForSave(data), config, true)')
   })
 })
 

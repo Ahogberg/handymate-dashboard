@@ -1,6 +1,5 @@
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
 import { NextRequest, NextResponse } from 'next/server'
-import { markInvoiceSources } from '@/lib/invoices/mark-sources'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -41,7 +40,7 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const currentUser = await getCurrentUser(request)
+    const currentUser = await getCurrentUser(request, business.business_id)
     if (!currentUser || !hasPermission(currentUser, 'create_invoices')) {
       return NextResponse.json(
         { error: 'Otillräckliga behörigheter' },
@@ -75,6 +74,22 @@ export async function POST(
     }
     if (!project) {
       return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+    }
+    if (!hasPermission(currentUser, 'see_all_projects')) {
+      const { data: assignment, error: assignmentError } = await supabase
+        .from('project_assignment')
+        .select('project_id')
+        .eq('business_id', business.business_id)
+        .eq('project_id', projectId)
+        .eq('business_user_id', currentUser.id)
+        .limit(1)
+        .maybeSingle()
+      if (assignmentError) {
+        return NextResponse.json({ error: 'Projektåtkomsten kunde inte kontrolleras. Försök igen.' }, { status: 503 })
+      }
+      if (!assignment) {
+        return NextResponse.json({ error: 'Projekt hittades inte' }, { status: 404 })
+      }
     }
     if (!project.customer_id) {
       return NextResponse.json(
@@ -258,7 +273,7 @@ export async function POST(
 
       if (ataItems.length > 0) {
         for (const ai of ataItems) {
-          const qty = Number(ai.quantity) || 1
+          const qty = Number(ai.quantity ?? 1) || 0
           const rawPrice = Number(ai.unit_price) || 0
           // Removal-ÄTA: negativ unit_price så subtotal-summering kan
           // tas rakt över alla rader utan filter på change_type.
@@ -382,6 +397,7 @@ export async function POST(
     try {
       const created = await createInvoice(supabase, {
         businessId: business.business_id,
+      sources: { changeIds: signedAtas.map(a => a.change_id) },
         customerId: project.customer_id,
         items,
         subtotal,
@@ -445,38 +461,12 @@ export async function POST(
       )
     }
 
-    // ── 11. UPDATE project_change → status='invoiced' ───────────
-    // TD-29: detta är inte atomic med INSERT invoice. Om denna UPDATE
-    // failar är vi i half-state — fakturan finns men ÄTA är inte
-    // markerade invoiced. Loggar error så Andreas kan kompensera
-    // manuellt (manuell UPDATE i Supabase SQL Editor).
-    let ataUpdateWarning: string | undefined
-    if (signedAtas.length > 0) {
-      const changeIds = signedAtas.map(a => a.change_id)
-      // Delade vägen (P0-4): atomisk via RPC:n när v104 är körd; annars
-      // samma per-tabell-fallback som förut, men aldrig tyst.
-      const markering = await markInvoiceSources(supabase, {
-        businessId: business.business_id,
-        invoiceId: invoice.invoice_id,
-        changeIds,
-      })
-
-      if (!markering.ok) {
-        console.error('[create-final-invoice] CRITICAL: källmarkeringen misslyckades efter fakturaskapandet:', {
-          invoice_id: invoice.invoice_id,
-          invoice_number: invoice.invoice_number,
-          change_ids: changeIds,
-          errors: markering.errors,
-        })
-        ataUpdateWarning = `Fakturan skapades (${invoice.invoice_number}) men ÄTA-status kunde inte uppdateras. Kontakta support — change_ids: ${changeIds.join(', ')}`
-      }
-    }
+    // Faktura och godkända ÄTA-källor har sparats tillsammans.
 
     // ── 12. Response ────────────────────────────────────────────
     return NextResponse.json({
       invoice_id: invoice.invoice_id,
       invoice_number: invoice.invoice_number,
-      ...(ataUpdateWarning ? { warning: ataUpdateWarning } : {}),
     })
   } catch (error: any) {
     console.error('[create-final-invoice] unexpected error:', error)
