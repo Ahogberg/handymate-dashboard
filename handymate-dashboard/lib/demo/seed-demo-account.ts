@@ -16,6 +16,17 @@ import { getOrCreateDraftJobbpass } from '@/lib/jobbpass/jobbpass'
 import { arSchemaSaknas } from '@/lib/observability/driftlarm'
 import { maybeCreateReadout } from '@/lib/experiment/report'
 import type { ExperimentMeasureKey } from '@/lib/experiment/types'
+import {
+  loadOpportunityPortfolioForBusiness,
+  type TruthClass,
+} from '@/lib/mission/opportunity-portfolio'
+import { validateMissionPlan, MAX_MISSION_STEPS } from '@/lib/mission/plan-validation'
+import { computePlanHash } from '@/lib/mandates/mission-mandate'
+import {
+  deriveMandateCandidates,
+  deriveDefaultCaps,
+  MANDATE_TARGET_LIST_KEY,
+} from '@/lib/mandates/create'
 
 /**
  * lib/demo/seed-demo-account.ts (2026-07)
@@ -37,6 +48,14 @@ import type { ExperimentMeasureKey } from '@/lib/experiment/types'
  *   pending_approvals, agent_runs, pipeline_activity, quote_items, invoice,
  *   project_checklist, project, quotes, deal, customer, booking,
  *   schedule_entry, time_entry, project_change, project_material
+ *
+ * Sedan 2026-09-10 seedas även (steg 9i): mission, mission_mandate och
+ * uppdragets egna pending_approvals-kort — ett aktivt uppdrag elva dagar in
+ * med fyra utförda deluppföljningar, ett öppet beslut, ett mandat med tak
+ * och tre avslutade uppdrag som underlag för Lärdomar. Radering ägs redan
+ * av RPC:n (sql/v158_demo_reset_v3.sql raderar mission_mandate + mission),
+ * så ingen ny migration behövdes. Seeden är fail-soft: saknas v144/v150
+ * hoppas uppdraget över med en warning i stället för att fälla resten.
  *
  * Sedan 2026-08-12 seedas även: project_outcome (via freezeProjectOutcome),
  * project_lesson, customer_fact och (seedas dock av det separata Meeting
@@ -72,6 +91,14 @@ export interface DemoResetSummary {
   agentRuns: number
   bookings: number
   scheduleEntries: number
+  /** Aktivt uppdrag seedat? Falskt när sql/v144_mission.sql inte är körd. */
+  missionActive: boolean
+  /** Mandat seedat? Falskt utan sql/v150 eller när planen saknar mandaterbar typ. */
+  missionMandate: boolean
+  /** Uppdragets deluppföljningar (utförda kort + öppet beslut). */
+  missionCards: number
+  /** Avslutade uppdrag i historiken (underlaget för Lärdomar). */
+  missionHistory: number
   manifest: DemoManifest
 }
 
@@ -101,6 +128,29 @@ function svDate(offsetDays: number): string {
   const d = new Date()
   d.setDate(d.getDate() + offsetDays)
   return d.toLocaleDateString('sv-SE')
+}
+
+/**
+ * Motiveringen ägaren skulle skrivit när hen bekräftade planen — EN rad per
+ * sanningsklass. Det är det ENDA fria textfältet i ett plansteg; klass, mått,
+ * bevis och kortkoppling kopieras av validateMissionPlan ur portföljens item
+ * (lib/mission/plan-validation.ts). Texten säger därför bara VARFÖR steget
+ * togs med, aldrig hur mycket det är värt — ett belopp här hade varit ett
+ * påhittat mått vid sidan av det riktiga.
+ */
+function missionStepMotivation(truthClass: TruthClass): string {
+  switch (truthClass) {
+    case 'indrivningsbart':
+      return 'Redan intjänade pengar som bara inte kommit in än.'
+    case 'faktureringsklart':
+      return 'Levererat arbete som inte hunnit bli en faktura.'
+    case 'pipeline':
+      return 'Öppen offert som kan avgöras innan deadline.'
+    case 'ateraktivering':
+      return 'Kundgrupp som inte hört något på länge.'
+    case 'marginalskydd':
+      return 'Marginal som riskerar att försvinna om ingen tittar.'
+  }
 }
 
 export async function resetDemoAccount(
@@ -1923,6 +1973,410 @@ export async function resetDemoAccount(
   }
   const experimentReadoutApprovalId = readoutCardRow.id as string
 
+  // Uppföljningsflaggor för seedsammanfattningen (steg 9i nedan). Deklareras
+  // här så returblocket kan läsa dem även när uppdragsseeden hoppas över.
+  let missionSeeded = false
+  let mandateSeeded = false
+  let missionCardsSeeded = 0
+  let missionHistorySeeded = 0
+
+  // ══════════════════════════════════════════════════════════
+  // 9i. UPPDRAG (mission) + MANDAT + DELUPPFÖLJNINGAR
+  //     Mission Control ska inte stå tom i en demo: utan ett aktivt uppdrag
+  //     renderar Uppdragsrad.tsx läge 3/4 (förslags-chips resp. tom pill),
+  //     alltså INBJUDAN att ge ett uppdrag — inte ett pågående som teamet
+  //     arbetat i över tid. Det senare är hela poängen med Goal-to-Plan.
+  //
+  //     ═══ PLANEN BYGGS UR DEN RIKTIGA PORTFÖLJEN, ALDRIG UR TEXT ═══
+  //
+  //     Samma väg som chattverktyget confirm_mission går: läs den FÄRSKT
+  //     räknade portföljen (loadOpportunityPortfolioForBusiness) ur de rader
+  //     som precis seedats, och låt validateMissionPlan kopiera varje stegs
+  //     klass, mått, bevis och kortkoppling ur portföljens item. Ingen
+  //     seedad plan bär ett påhittat belopp — item_id:na är dessutom
+  //     portföljens stabila hashar, så stegen matchar en omräkning under
+  //     demon (opportunity-portfolio.ts:s itemId-kontrakt).
+  //
+  //     ═══ DELUPPFÖLJNINGARNA ÄR RIKTIGA KORT, INTE EN LOGGTEXT ═══
+  //
+  //     "Vad teamet gjort i uppdraget" härleds (mission-facit.ts) ur
+  //     pending_approvals via payload.mission_id: godkänt kort med
+  //     execution_result.outcome==='success' → utfört, 'pending' → väntar
+  //     på ägaren. Vi seedar därför fyra utförda kort spridda över
+  //     uppdragets elva dagar plus ETT öppet beslut — så panelen visar en
+  //     kedja över tid och hero-bandets "kräver beslut"-pill tänds.
+  //
+  //     ═══ VARFÖR EN FAKTURAREFERENS INTE BLÅSER UPP NÅGOT ═══
+  //
+  //     Karins påminnelsekort pekar direkt på den betalda gästtoalett-
+  //     fakturan (payload.invoice_id för attributionskärnan,
+  //     payload.execution_result.artifacts.invoice_id för mission-progress
+  //     — de två läser OLIKA fält, se respektive filhuvud). Det ökar INTE
+  //     bekräftat värde på dashboarden: recovered-revenue.ts loopar per
+  //     HÄNDELSE och väljer ett enda bästa kort per betald faktura, där en
+  //     direktreferens slår en kundmatchning. Kortet ersätter alltså Lisas
+  //     svagare kundmatch som bevis för samma krona — det lägger inte till
+  //     en ny.
+  //
+  //     ═══ HISTORIKEN OCH LÄRDOMARNA ═══
+  //
+  //     mission-learning.ts kräver MIN_ELIGIBLE_PER_GOAL_TYPE (3) avslutade
+  //     uppdrag av samma målstyp innan en enda lärdomsrad får finnas — annars
+  //     forTidigt: true och sektionen är tom. Tre avslutade pengauppdrag
+  //     seedas därför bakåt i tiden, var och ett med egna utförda kort inom
+  //     SITT eget fönster (ett avslutat uppdrag med noll kort skulle visa
+  //     "planen lovade, ingenting hände").
+  //
+  //     ═══ FAIL-SOFT, ALDRIG FATAL ═══
+  //
+  //     mission/mission_mandate körs manuellt (sql/v144, sql/v150) och kan
+  //     saknas. Saknat schema → console.warn och hoppa över; demon i övrigt
+  //     får ALDRIG falla för att Mission Control inte är migrerad. Radering
+  //     ägs redan av RPC:n (sql/v158_demo_reset_v3.sql raderar mission_mandate
+  //     + mission) — ingen ny migration behövs för den här seeden.
+  // ══════════════════════════════════════════════════════════
+  const missionNow = new Date()
+  const missionPortfolio = await loadOpportunityPortfolioForBusiness(supabase, businessId, missionNow)
+
+  // Ett steg per sanningsklass, i den ordning ägaren skulle prioritera dem:
+  // intjänade kronor först, sedan levererat-men-ofakturerat, öppen pipeline
+  // och marginalskydd. Klasser som portföljen inte hittade något i hoppas
+  // tyst över — planen speglar alltid vad som FAKTISKT fanns.
+  const missionStepItems = ([
+    'indrivningsbart',
+    'faktureringsklart',
+    'pipeline',
+    'marginalskydd',
+  ] as const)
+    .map(cls => missionPortfolio.by_class[cls]?.[0])
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .slice(0, MAX_MISSION_STEPS)
+
+  // Deadline: månadsskiftet (samma formulering som partnerdecken använder),
+  // men aldrig ett datum som inte är STRIKT efter idag — validateMissionPlan
+  // avvisar det, och en reset körd den sista i månaden ska inte falla.
+  const monthEnd = new Date(missionNow.getFullYear(), missionNow.getMonth() + 1, 0)
+  const monthEndStr = `${monthEnd.getFullYear()}-${String(monthEnd.getMonth() + 1).padStart(2, '0')}-${String(monthEnd.getDate()).padStart(2, '0')}`
+  const missionDeadline = monthEndStr > dateOnly(0) ? monthEndStr : dateOnly(14)
+
+  // Målet är ÄGARENS siffra, inte en summa av portföljen — därför en rund
+  // beloppsnivå och inte en härledd total. Gapet i panelen räknas mot
+  // VERIFIERAT BETALT (mission-progress.ts), aldrig mot den här raden.
+  const MISSION_GOAL_KR = 60000
+
+  if (missionStepItems.length === 0) {
+    console.warn('[demo-reset] portföljen gav inga item — hoppar över uppdragsseeden (Mission Control visar förslagsläget)')
+  } else {
+    const missionPlan = validateMissionPlan(
+      {
+        goal_type: 'money',
+        goal_kr: MISSION_GOAL_KR,
+        deadline: missionDeadline,
+        steps: missionStepItems.map(item => ({
+          item_id: item.id,
+          motivation: missionStepMotivation(item.truth_class),
+        })),
+      },
+      missionPortfolio,
+      missionNow,
+    )
+
+    if (!missionPlan.ok) {
+      console.warn(`[demo-reset] uppdragsplanen validerade inte (${missionPlan.reason}: ${missionPlan.detail}) — hoppar över uppdragsseeden`)
+    } else {
+      const missionId = genId('mis')
+      const missionCreatedAt = isoAt(-11, 8, 5)
+      const missionOwner = team[0]?.id ?? null
+
+      // goal_type är v145:s kolumn (sql/v145_mission_capacity_goal.sql) och kan
+      // saknas i en miljö där bara v144 körts. Ett INSERT mot en okänd kolumn
+      // ger PGRST204 — INTE en av koderna arSchemaSaknas täcker (den är byggd
+      // för SELECT-fallet 42P01/42703/PGRST205), samma distinktion som
+      // business_knowledge.job_type-fallbacken längre upp i filen gör. Utan den
+      // här grenen hade en v144-utan-v145-miljö fällt HELA demoresetten på ett
+      // valfritt fält. v144:s egen DEFAULT är 'money', så basraden är korrekt
+      // utan kolumnen — inget antagande smyger in.
+      const missionBaseRow = {
+        id: missionId,
+        business_id: businessId,
+        goal_kr: MISSION_GOAL_KR,
+        deadline: missionDeadline,
+        status: 'active',
+        plan_snapshot: { steps: missionPlan.steps },
+        portfolio_generated_at: missionPortfolio.generated_at,
+        created_by: missionOwner,
+        created_at: missionCreatedAt,
+      }
+      let { error: missionErr } = await supabase
+        .from('mission')
+        .insert({ ...missionBaseRow, goal_type: 'money' })
+      if (missionErr && missionErr.code === 'PGRST204') {
+        console.warn(`[demo-reset] mission.goal_type saknas (sql/v145_mission_capacity_goal.sql ej körd) — seedar uppdraget på v144:s DEFAULT 'money': ${missionErr.message}`)
+        const retry = await supabase.from('mission').insert(missionBaseRow)
+        missionErr = retry.error
+      }
+
+      if (missionErr && arSchemaSaknas(missionErr)) {
+        console.warn(`[demo-reset] public.mission saknas (sql/v144_mission.sql ej körd) — Mission Control visar förslagsläget: ${missionErr.message}`)
+      } else if (missionErr) {
+        return failReset(`Kunde inte skapa uppdraget: ${missionErr.message}`, 'mission_insert_failed')
+      } else {
+        missionSeeded = true
+
+        // ── Mandatet: bara de typer planen FAKTISKT bär och som ligger i
+        //    v150:s allowlist (deriveMandateCandidates gör skärningen).
+        //    Målen kommer ur planstegens evidence.ref_id — ägaren kan i
+        //    produktion aldrig skriva in ett eget mål, och seeden hittar
+        //    därför heller inte på ett. Taken är samma konservativa
+        //    förifyllning som panelen föreslår (deriveDefaultCaps).
+        const mandateCandidates = deriveMandateCandidates(missionPlan.steps)
+        if (mandateCandidates.length > 0) {
+          const mandateTargets: Record<string, string[]> = {}
+          for (const candidate of mandateCandidates) {
+            mandateTargets[MANDATE_TARGET_LIST_KEY[candidate.type]] = candidate.targets.map(t => t.ref_id)
+          }
+          const caps = deriveDefaultCaps(mandateCandidates)
+          const { error: mandateErr } = await supabase.from('mission_mandate').insert({
+            id: `mnd_${missionId}`,
+            business_id: businessId,
+            mission_id: missionId,
+            plan_hash: computePlanHash(missionPlan.steps),
+            allowed_action_types: mandateCandidates.map(c => c.type),
+            targets: mandateTargets,
+            daily_cap: caps.daily_cap,
+            total_cap: caps.total_cap,
+            // Ett belopstak ägaren skulle satt själv — under det minsta
+            // enskilda kravet i planen vore meningslöst, så vi tar en rund
+            // nivå över fakturorna i mandatets mål.
+            amount_cap_kr: 25000,
+            // Koden enforcar expires_at <= missionens deadline (v150).
+            expires_at: missionDeadline,
+            status: 'active',
+            created_by: missionOwner,
+            created_at: missionCreatedAt,
+          })
+          if (mandateErr && arSchemaSaknas(mandateErr)) {
+            console.warn(`[demo-reset] public.mission_mandate saknas (sql/v150_mission_mandate.sql ej körd) — uppdraget seedas utan mandat: ${mandateErr.message}`)
+          } else if (mandateErr) {
+            return failReset(`Kunde inte skapa uppdragets mandat: ${mandateErr.message}`, 'mission_mandate_insert_failed')
+          } else {
+            mandateSeeded = true
+          }
+        }
+
+        // ── Deluppföljningarna: uppdragets egen kortkedja över elva dagar.
+        //    Formen speglar de befintliga korten i steg 8 (routed_agent som
+        //    TOPPNIVÅ-kolumn + payload.agent_id, expires_at satt) plus de
+        //    tre uppdragsspecifika fälten: mission_id (kopplingen),
+        //    truth_class (klassattributionen) och execution_result (utfallet
+        //    som gör kortet "utfört" i stället för bara "godkänt").
+        const missionCardRows = [
+          {
+            id: genId('appr'),
+            business_id: businessId,
+            approval_type: 'invoice_reminder',
+            routed_agent: 'karin',
+            title: `Betalningspåminnelse — ${customers.johan.name}`,
+            description: 'Påminde om gästtoalettfakturan inom uppdragets mandat',
+            status: 'approved',
+            risk_level: 'low',
+            payload: {
+              agent_id: 'karin',
+              mission_id: missionId,
+              mandate_id: mandateSeeded ? `mnd_${missionId}` : undefined,
+              truth_class: 'indrivningsbart',
+              // Attributionskärnan läser invoice_id på TOPPNIVÅ för
+              // invoice_reminder; mission-progress läser artifacts. Båda
+              // sätts — samma rad, två läsare, olika fält.
+              invoice_id: johanBadrumInvoice.invoice_id,
+              customer_id: customers.johan.customer_id,
+              customer_name: customers.johan.name,
+              to: ownerPhone,
+              message: `${halsning(customers.johan.name)} En påminnelse om fakturan för gästtoaletten — hör av dig om något är oklart! //${contactName}`,
+              execution_result: {
+                outcome: 'success',
+                artifacts: { invoice_id: johanBadrumInvoice.invoice_id },
+              },
+            },
+            created_at: isoAt(-10, 9, 20),
+            resolved_at: isoAt(-10, 9, 45),
+            expires_at: isoAt(-3),
+          },
+          {
+            id: genId('appr'),
+            business_id: businessId,
+            approval_type: 'invoice_reminder',
+            routed_agent: 'karin',
+            title: `Betalningspåminnelse — ${customers.kristina.name}`,
+            description: 'Skickade första påminnelsen på den förfallna fakturan',
+            status: 'approved',
+            risk_level: 'low',
+            payload: {
+              agent_id: 'karin',
+              mission_id: missionId,
+              mandate_id: mandateSeeded ? `mnd_${missionId}` : undefined,
+              truth_class: 'indrivningsbart',
+              invoice_id: kristinaInvoice.invoice_id,
+              customer_id: customers.kristina.customer_id,
+              customer_name: customers.kristina.name,
+              to: ownerPhone,
+              message: `${halsning(customers.kristina.name)} En påminnelse om fakturan för kökskranen — säg till om du vill ha den igen! //${contactName}`,
+              execution_result: { outcome: 'success', artifacts: {} },
+            },
+            created_at: isoAt(-6, 8, 40),
+            resolved_at: isoAt(-6, 9, 5),
+            expires_at: isoAt(1),
+          },
+          {
+            id: genId('appr'),
+            business_id: businessId,
+            approval_type: 'quote_nudge',
+            routed_agent: 'daniel',
+            title: `Offertuppföljning — ${customers.mikael.name}`,
+            description: 'Följde upp den obesvarade offerten inom uppdraget',
+            status: 'approved',
+            risk_level: 'medium',
+            payload: {
+              agent_id: 'daniel',
+              mission_id: missionId,
+              truth_class: 'pipeline',
+              quote_id: quotes.mikael_quote.quote_id,
+              related_id: quotes.mikael_quote.quote_id,
+              customer_id: customers.mikael.customer_id,
+              customer_name: customers.mikael.name,
+              to: ownerPhone,
+              message: `${halsning(customers.mikael.name)} Hörde av mig om offerten — finns det något du vill att vi justerar? //${contactName}`,
+              execution_result: { outcome: 'success', artifacts: {} },
+            },
+            created_at: isoAt(-4, 10, 15),
+            resolved_at: isoAt(-4, 10, 30),
+            expires_at: isoAt(3),
+          },
+          {
+            id: genId('appr'),
+            business_id: businessId,
+            approval_type: 'customer_reactivation',
+            routed_agent: 'hanna',
+            title: 'Reaktivering — tysta badrumskunder',
+            description: 'Hörde av sig till kundgruppen som inte hört något på länge',
+            status: 'approved',
+            risk_level: 'low',
+            payload: {
+              agent_id: 'hanna',
+              mission_id: missionId,
+              truth_class: 'ateraktivering',
+              to: ownerPhone,
+              message: 'Hej! Vi har en lucka i kalendern i månadsskiftet om ni funderat på något mer. //' + (contactName || ''),
+              execution_result: { outcome: 'success', artifacts: {} },
+            },
+            created_at: isoAt(-7, 7, 55),
+            resolved_at: isoAt(-7, 8, 10),
+            expires_at: isoAt(0),
+          },
+          // ÖPPET beslut — tänder hero-bandets "kräver beslut"-pill och gör
+          // decisions_outstanding=1 i MissionPanel. Ett uppdrag utan ett enda
+          // väntande beslut visar aldrig fyra-ögon-modellen i demon.
+          {
+            id: genId('appr'),
+            business_id: businessId,
+            approval_type: 'missad_intakt',
+            routed_agent: 'lars',
+            title: `Ofakturerat tilläggsarbete — ${customers.anna.name}`,
+            description: 'Extraarbetet på badrummet ser ut att sakna ÄTA innan fakturan går',
+            status: 'pending',
+            risk_level: 'medium',
+            payload: {
+              agent_id: 'lars',
+              mission_id: missionId,
+              truth_class: 'faktureringsklart',
+              project_id: annaProject.project_id,
+              customer_id: customers.anna.customer_id,
+              customer_name: customers.anna.name,
+            },
+            created_at: isoAt(-1, 6, 30),
+            resolved_at: null,
+            expires_at: isoAt(6),
+          },
+        ]
+
+        const { error: missionCardsErr } = await supabase.from('pending_approvals').insert(missionCardRows)
+        if (missionCardsErr) {
+          return failReset(`Kunde inte skapa uppdragets deluppföljningar: ${missionCardsErr.message}`, 'mission_cards_insert_failed')
+        }
+        missionCardsSeeded = missionCardRows.length
+
+        // ── Historiken: tre AVSLUTADE pengauppdrag så Lärdomar-sektionen
+        //    når MIN_ELIGIBLE_PER_GOAL_TYPE (3). Varje uppdrag får ett eget
+        //    utfört kort INOM sitt fönster — annars läser facit dem som
+        //    "planen lovade, ingenting hände". Planerna återanvänder
+        //    portföljens riktiga item (samma stabila item_id:n), men varje
+        //    rad bär sitt EGET portfolio_generated_at: en historisk plan
+        //    byggdes på en historisk portfölj, och det ska synas.
+        const historyPlanSteps = missionPlan.steps.slice(0, 2)
+        const missionHistorySpecs = [
+          { goalKr: 45000, createdOffset: -74, resolvedOffset: -62, agent: 'karin', typ: 'invoice_reminder', titel: 'Betalningspåminnelse — avslutat uppdrag i juli' },
+          { goalKr: 55000, createdOffset: -52, resolvedOffset: -41, agent: 'daniel', typ: 'quote_nudge', titel: 'Offertuppföljning — avslutat uppdrag i augusti' },
+          { goalKr: 50000, createdOffset: -31, resolvedOffset: -19, agent: 'karin', typ: 'invoice_reminder', titel: 'Betalningspåminnelse — avslutat uppdrag i augusti' },
+        ]
+
+        const historyMissionRows = missionHistorySpecs.map(spec => ({
+          id: genId('mis'),
+          business_id: businessId,
+          goal_kr: spec.goalKr,
+          deadline: dateOnly(spec.resolvedOffset),
+          status: 'completed',
+          plan_snapshot: { steps: historyPlanSteps },
+          portfolio_generated_at: isoAt(spec.createdOffset, 7, 0),
+          created_by: missionOwner,
+          created_at: isoAt(spec.createdOffset, 8, 0),
+          resolved_at: isoAt(spec.resolvedOffset, 17, 0),
+        }))
+
+        // Samma goal_type-fallback som det aktiva uppdraget ovan.
+        let { error: historyErr } = await supabase
+          .from('mission')
+          .insert(historyMissionRows.map(row => ({ ...row, goal_type: 'money' })))
+        if (historyErr && historyErr.code === 'PGRST204') {
+          const retry = await supabase.from('mission').insert(historyMissionRows)
+          historyErr = retry.error
+        }
+        if (historyErr) {
+          return failReset(`Kunde inte skapa uppdragshistoriken: ${historyErr.message}`, 'mission_history_insert_failed')
+        }
+        missionHistorySeeded = historyMissionRows.length
+
+        const historyCardRows = historyMissionRows.map((row, idx) => {
+          const spec = missionHistorySpecs[idx]
+          return {
+            id: genId('appr'),
+            business_id: businessId,
+            approval_type: spec.typ,
+            routed_agent: spec.agent,
+            title: spec.titel,
+            description: 'Utfört steg i ett avslutat uppdrag',
+            status: 'approved',
+            risk_level: 'low',
+            payload: {
+              agent_id: spec.agent,
+              mission_id: row.id,
+              truth_class: 'indrivningsbart',
+              to: ownerPhone,
+              execution_result: { outcome: 'success', artifacts: {} },
+            },
+            created_at: isoAt(spec.createdOffset + 2, 9, 0),
+            resolved_at: isoAt(spec.createdOffset + 2, 9, 30),
+            expires_at: isoAt(spec.resolvedOffset),
+          }
+        })
+
+        const { error: historyCardsErr } = await supabase.from('pending_approvals').insert(historyCardRows)
+        if (historyCardsErr) {
+          return failReset(`Kunde inte skapa historikens kort: ${historyCardsErr.message}`, 'mission_history_cards_insert_failed')
+        }
+      }
+    }
+  }
+
   // ── 10. Stabilt entity-manifest för Epic 5 ────────────────
   // Alla värden kommer från de inserts som precis lyckades. Inga belopp eller
   // seedantaganden lagras här — bara pekare till riktiga produktionsobjekt.
@@ -1976,6 +2430,10 @@ export async function resetDemoAccount(
     agentRuns: agentRunSeeds.length,
     bookings: bookingsCreated,
     scheduleEntries: scheduleEntriesCreated,
+    missionActive: missionSeeded,
+    missionMandate: mandateSeeded,
+    missionCards: missionCardsSeeded,
+    missionHistory: missionHistorySeeded,
     manifest,
   }
   } catch (error: any) {
