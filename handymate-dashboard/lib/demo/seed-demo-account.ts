@@ -1556,10 +1556,19 @@ export async function resetDemoAccount(
   //    tool_calls, status, created_at — se sql/agent_tables.sql + v21_agent_specialization.sql)
   //    så vi seedar dem. Läses av app/api/dashboard/team-activity/route.ts (Lisas siffror).
   // ══════════════════════════════════════════════════════════
+  // Tidpunkterna är RELATIVA till återställningen (timmar sedan), inte
+  // absoluta klockslag. Agentremsan på Översikt räknar bara händelser inom 24
+  // timmar (team-activity-rutten). Med de gamla tiderna — i går 19:12, 20:03,
+  // 20:47 — föll Lisa ur fönstret varje förmiddag och visade "Bevakar
+  // telefonen" i stället för "Fångade 3 samtal senaste dygnet" under precis
+  // de timmar en säljdemo brukar hållas. Ett absolut morgonklockslag hade
+  // i stället kunnat hamna i FRAMTIDEN vid en tidig återställning. Relativa
+  // offset är alltid både passerade och inne i fönstret.
+  const timmarSedan = (h: number) => new Date(Date.now() - h * 60 * 60 * 1000).toISOString()
   const agentRunSeeds = [
-    { run_id: genId('agentrun'), business_id: businessId, agent_id: 'lisa', trigger_type: 'phone_call', trigger_data: {}, tool_calls: 2, status: 'completed', created_at: isoAt(-1, 19, 12) },
-    { run_id: genId('agentrun'), business_id: businessId, agent_id: 'lisa', trigger_type: 'phone_call', trigger_data: {}, tool_calls: 1, status: 'completed', created_at: isoAt(-1, 20, 3) },
-    { run_id: genId('agentrun'), business_id: businessId, agent_id: 'lisa', trigger_type: 'incoming_sms', trigger_data: {}, tool_calls: 1, status: 'completed', created_at: isoAt(-1, 20, 47) },
+    { run_id: genId('agentrun'), business_id: businessId, agent_id: 'lisa', trigger_type: 'phone_call', trigger_data: {}, tool_calls: 2, status: 'completed', created_at: timmarSedan(3) },
+    { run_id: genId('agentrun'), business_id: businessId, agent_id: 'lisa', trigger_type: 'phone_call', trigger_data: {}, tool_calls: 1, status: 'completed', created_at: timmarSedan(2) },
+    { run_id: genId('agentrun'), business_id: businessId, agent_id: 'lisa', trigger_type: 'incoming_sms', trigger_data: {}, tool_calls: 1, status: 'completed', created_at: timmarSedan(1) },
   ]
   const { error: agentRunsErr } = await supabase.from('agent_runs').insert(agentRunSeeds)
   if (agentRunsErr) {

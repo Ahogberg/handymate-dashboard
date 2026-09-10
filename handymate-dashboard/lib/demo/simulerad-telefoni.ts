@@ -66,35 +66,39 @@ export function arSimuleratDemonummer(nummer: string | null | undefined): boolea
   return typeof nummer === 'string' && nummer === DEMO_SIMULERAT_NUMMER
 }
 
-/** De simulerade samtalen. Två fångade, ett besvarat — samma blandning en riktig vecka har. */
+/**
+ * De simulerade samtalen. Två fångade, ett besvarat — samma blandning en
+ * riktig vecka har.
+ *
+ * Tiderna är RELATIVA (timmar sedan återställningen), aldrig absoluta
+ * klockslag. Ett absolut "i dag 09:00" hade legat i FRAMTIDEN vid en tidig
+ * återställning, och ett samtal som ännu inte har hänt är sämre demodata än
+ * inget samtal. Samma val som agentkörningarna i seedaren.
+ */
 const SIMULERADE_SAMTAL: Array<{
   kundKey: string
-  dagarSedan: number
-  timme: number
+  timmarSedan: number
   sekunder: number
   sammanfattning: string
   besvarat: boolean
 }> = [
   {
     kundKey: 'mikael',
-    dagarSedan: 0,
-    timme: 9,
+    timmarSedan: 3,
     sekunder: 34,
     sammanfattning: 'Ringde om byte av eluttag i köket. Vill ha pris innan nästa vecka.',
     besvarat: false,
   },
   {
     kundKey: 'brf',
-    dagarSedan: 1,
-    timme: 14,
+    timmarSedan: 2,
     sekunder: 52,
     sammanfattning: 'Ordföranden ringde om belysningen i trapphuset. Undrar när ni kan komma.',
     besvarat: true,
   },
   {
     kundKey: 'kristina',
-    dagarSedan: 2,
-    timme: 16,
+    timmarSedan: 1,
     sekunder: 21,
     sammanfattning: 'Ringde om fakturan för kökskranen. Ville veta OCR-numret.',
     besvarat: false,
@@ -179,9 +183,7 @@ export async function simuleraDemotelefoni(
   const ownerPhone = (cfg?.personal_phone as string | null) ?? null
   const rader = SIMULERADE_SAMTAL.map((s, i) => {
     const kund = kundPerKey[s.kundKey]
-    const start = new Date()
-    start.setDate(start.getDate() - s.dagarSedan)
-    start.setHours(s.timme, 12, 0, 0)
+    const start = new Date(Date.now() - s.timmarSedan * 60 * 60 * 1000)
     const slut = new Date(start.getTime() + s.sekunder * 1000)
     return {
       recording_id: `rec_demo_sim_${i + 1}_${Date.now()}`,
