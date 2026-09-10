@@ -48,6 +48,7 @@ import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
 import CustomerPreparations from '@/components/customer-preparation/CustomerPreparations'
 import CustomerMemory from '@/components/customers/CustomerMemory'
+import CustomerOpenWorkSummary from '@/components/customers/CustomerOpenWorkSummary'
 import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
@@ -824,6 +825,7 @@ export default function CustomerDetailPage() {
             )}
 
             <CustomerMemory key={`${business?.business_id || ''}:${customerId}`} customerId={customerId} />
+            <CustomerOpenWorkSummary key={`open:${business?.business_id || ''}:${customerId}`} customerId={customerId} />
 
             {/* Kundinfo */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">

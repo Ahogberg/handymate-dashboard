@@ -60,11 +60,20 @@ export function taskListOrFilter(scope: TaskScope): string | null {
   return ors.length > 0 ? ors.join(',') : 'id.eq.__ingen__'
 }
 
+/** DB-side equivalent of the private-task rule, used before bounded reads. */
+export function taskPrivacyOrFilter(scope: TaskScope): string {
+  const ors = ['visibility.neq.private', 'visibility.is.null']
+  if (scope.memberId) ors.push(`assigned_to.eq.${scope.memberId}`)
+  if (scope.userId) ors.push(`created_by.eq.${scope.userId}`)
+  return ors.join(',')
+}
+
 export async function resolveTaskScope(
   supabase: SupabaseClient,
   businessId: string,
   currentUser: { id: string; role: 'owner' | 'admin' | 'employee' } | null,
   userId: string | null,
+  strict = false,
 ): Promise<TaskScope> {
   const memberId = currentUser?.id ?? null
   if (!currentUser || currentUser.role === 'owner' || currentUser.role === 'admin') {
@@ -75,8 +84,10 @@ export async function resolveTaskScope(
     const { data, error } = await supabase
       .from('project_assignment')
       .select('project_id')
+      .eq('business_id', businessId)
       .eq('business_user_id', memberId)
       .eq('role', 'lead')
+    if (error && strict) throw error
     if (error) console.warn('[tasks/visibility] project_assignment-läsning misslyckades (behandlas som ingen ledarroll):', error.message)
     leadProjectIds = (data || []).map(r => r.project_id as string)
   }
