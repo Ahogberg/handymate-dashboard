@@ -7,6 +7,7 @@ import Anthropic from '@anthropic-ai/sdk'
 import { toolDefinitions } from './tool-definitions'
 import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
+import { parseQuoteFollowupRound, isQuoteFollowupTool } from '@/lib/quotes/followup-round'
 import { loadCompanyModel } from '@/lib/company/company-model'
 import { loadTradeContext } from '@/lib/branch/trade-context'
 import { getBusinessPreferences } from '@/lib/business-preferences'
@@ -489,6 +490,12 @@ export async function POST(request: NextRequest) {
       agentId,
       triggerSource,
       handoffChain,
+      quoteFollowupRound: trigger_type === 'cron' && trigger_data?.cron_type === 'quote_followup'
+        ? parseQuoteFollowupRound(trigger_data.quote_followup_round) : undefined,
+    }
+
+    if (trigger_type === 'cron' && trigger_data?.cron_type === 'quote_followup' && !context.quoteFollowupRound) {
+      return NextResponse.json({ error: 'Offertuppföljningen saknar verifierbar offert och omgång.' }, { status: 400 })
     }
 
     // Build initial user message
@@ -557,7 +564,8 @@ export async function POST(request: NextRequest) {
         model: MODEL,
         max_tokens: 4096,
         system: systemPromptCached,
-        tools: (agentAllowedTools === 'all' ? toolDefinitions : toolDefinitions.filter((t: any) => agentAllowedTools.includes(t.name))) as any,
+        tools: (agentAllowedTools === 'all' ? toolDefinitions : toolDefinitions.filter((t: any) => agentAllowedTools.includes(t.name)))
+          .filter((t: any) => !context.quoteFollowupRound || isQuoteFollowupTool(t.name, context.quoteFollowupRound)) as any,
         messages: messagesToSend,
       })
 

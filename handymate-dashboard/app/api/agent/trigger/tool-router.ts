@@ -1,4 +1,5 @@
 import { scheduleFollowup, followupError } from '@/lib/followup/service'
+import { prepareQuoteFollowupRound, isQuoteFollowupTool, type QuoteFollowupRound } from '@/lib/quotes/followup-round'
 // Tool router for Next.js runtime
 // Executes tools against Supabase using the server-side client
 
@@ -77,6 +78,7 @@ interface GoogleConnection {
 }
 
 interface ToolContext {
+  quoteFollowupRound?: QuoteFollowupRound
   workReport?: WorkReportScope
   confirmationId?: string
   businessName: string
@@ -142,6 +144,9 @@ export async function executeTool(
   businessId: string,
   context: ToolContext
 ): Promise<ToolResult> {
+  if (context.quoteFollowupRound && !isQuoteFollowupTool(name, context.quoteFollowupRound)) {
+    return { success: false, error: 'Denna körning får bara läsa underlaget och förbereda offertens uppföljning i angiven kanal.' }
+  }
   // ═══ ETAPP S — DUBBELGRINDENS ANDRA HALVA (Lisa Voice steg 1b) ═══
   // filterTools() i lib/agent/agents/shared.ts hindrar redan modellen från
   // att SE ett icke-vitlistat verktyg när aktören är en oidentifierad
@@ -2006,6 +2011,10 @@ async function queueAgentActionForApproval(
   descriptionOverride?: string | null
 ): Promise<ToolResult> {
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
+  if (context.quoteFollowupRound && (approvalType === 'send_sms' || approvalType === 'send_email')) {
+    try { return await prepareQuoteFollowupRound(supabase, businessId, context.quoteFollowupRound, approvalType, payload) }
+    catch (error) { return { success: false, error: error instanceof Error ? error.message : 'Uppföljningen kunde inte förberedas.' } }
+  }
   const { error } = await supabase.from('pending_approvals').insert({
     id,
     business_id: businessId,
