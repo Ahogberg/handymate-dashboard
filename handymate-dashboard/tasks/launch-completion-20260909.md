@@ -169,3 +169,12 @@ Nästa körbara steg: invänta och avläs PR37-grindarna; klickprova sedan ett f
 ### Uppföljning: samma fakturakälla i projektlistan
 
 Slutlig fakturakälleskod för detta pass ligger i `ff4549a6cda47c5fa961fe386150750710d63ad1` före plansynk. Projektlistan använder nu samma källval som detaljsidan, hittar fastprisprojekt utan tid samt löpande projekt med enbart ofakturerat material, och stoppar nytt avtalsutkast när en projektfaktura redan finns. Två ytterligare källfall och ett statiskt kopplingsfacit är tillagda. Grön status inväntas på plansynkad PR-HEAD; kundklick och providerprov är oförändrat öppna.
+
+
+### Slutligt tekniskt bevis för fakturakällan
+
+Draft-PR37 HEAD `7fc9c45c374dfc24a14d7f04791b79fa41798b93` är tekniskt grön: fem GitHub Actions-flöden och båda Vercel-previewbyggena godkända. TypeScript hade noll fel; browserlösa kontraktsgrinden gav 1 772 godkända och 1 befintlig skip. De separata SQL-/intake-/Fortnox-/faktura-/portal-/Gmail-kontrakten var också gröna; providerresultaten är mockade och räknas inte som liveprov.
+
+En kapad filöverföring till PR-grenen upptäcktes av grinden, återställdes till exakt lokalt Git-blob-ID och omprovades. Ett därefter synligt typfel och fem saknade route-harness-mockar rättades; endast den sista gröna SHA:n ovan gäller.
+
+Nästa körbara steg är oförändrat kundprov på samma preview: skapa eller välj ett kontrollerat fastpris-, löpande- och blandprojekt, verifiera källval och belopp hela vägen till fakturautkast utan att skicka. Därefter samordnat mobilprov för rapportkvittens och separat Fortnox/providerprov. `project_type`-heuristiken och Matte-onboardingens portning är fortfarande öppna produktfrågor; inget av dem är kundgodkänt.
