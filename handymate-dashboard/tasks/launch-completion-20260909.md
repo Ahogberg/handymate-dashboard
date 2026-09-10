@@ -145,3 +145,22 @@ Verifierat:
 Öppet före komplett-/kundgodkännande: samordnad backend-preview och mobilbuild, verkligt felprov där HTTP-kvittensen kapas efter DB-commit, telefonprov, rapport→ÄTA→fakturaunderlag→Fortnox med kontrollerade belopp samt kundklick av Andreas/Christopher. Ingen produktion, migration, main-merge eller extern leverantör användes i detta pass.
 
 GitHub-resultat: dashboardens fem Actions-grindar och båda Vercel-byggena är godkända på PR37-HEAD; mobilens `Mobile readiness` run 16 är godkänd på PR7-HEAD. Preview-klicket stoppas före Handymate av Vercels deployment protection och är därför inte ett produktprov. Nästa körbara steg: öppna preview med verifierad Vercel-session och klickprova offertfiltret, därefter samordnat mobilprov mot samma backend-HEAD. Fortsätt sedan med beloppsparitet i rapport→fakturaunderlag och portning av Matte-onboardingens godkända guidning till aktuell motor.
+
+## Checkpoint: rätt fakturakälla och beloppsparitet 2026-09-10
+
+Dashboard draft-PR37 innehåller rättningen i commit `7977b22cee0d50058e596e62ef4a99d7d0953a03`.
+
+Reproducerat avbrott: samma projektsida kunde visa 85 500 kr från avtal/offert och 2 017 kr från faktisk tid, men primärknappen öppnade alltid tid-/materialbyggaren. Därmed kunde ett fastpris-/blandprojekt leda ägaren till fel fakturakälla. Ofakturerat material saknades dessutom i beloppet för löpande projekt, och knapptexten ”Godkänn & skicka” lovade en sändning trots att bara ett utkast öppnas.
+
+Rättat:
+
+- En ren källväljare håller avtalsfakturering och löpande fakturering åtskilda. Fastpris/blandavtal med offert går till offertrader + fakturerbar kundgodkänd ÄTA; löpande projekt eller projekt utan offert går till faktisk ofakturerad tid + material.
+- Samma val styr projektets huvudknapp, åtgärdsrad och ekonomikort. Inga källor summeras ihop universellt.
+- Löpande belopp inkluderar nu både ofakturerad tid och ofakturerat material. Avtalsvägen visar uttryckligen ”kvar av avtalat värde”, inte att hela beloppet redan är ett färdigt fakturaunderlag.
+- Primärknappen heter ”Granska fakturaunderlag”; inget skickas vid klicket.
+
+Verifieringsläge: tre deterministiska käll-/beloppsfall är tillagda, inklusive det reproducerade 85 500/2 017-scenariot. Lokal omkörning kunde inte starta efter att den tidigare scratch-cachen för node_modules försvunnit; offlineinstallationen stoppade på saknat paket `zwitch@2.0.4`. Detta räknas inte som ett godkänt prov. GitHub Actions/Vercel ska avläsas på exakt PR-HEAD innan leveransen kallas tekniskt grön.
+
+Öppen datarisk: `project_type` härleds i dag heuristiskt ur offertens radslag (arbete/material), inte ur ett uttryckligt kundvalt avtalsvillkor. Rättningen följer den befintliga modellens `fixed_price/hourly/mixed`, men ett nytt kontrollerat byggscenario måste verifiera att valt avtal blir rätt typ. Ett framtida explicit `billing_model` är en separat modelländring och ska inte smygas in före kundbeslut.
+
+Nästa körbara steg: invänta och avläs PR37-grindarna; klickprova sedan ett fastpris-, löpande- och blandprojekt på samma preview-HEAD och jämför projektets belopp, valda källrader, ÄTA, fakturautkast och ekonomisystemskvitto. Preview är fortfarande spärrad av Vercels deployment protection utan giltig session. Ingen produktion, migration, fakturasändning eller providerkommunikation har utförts.
