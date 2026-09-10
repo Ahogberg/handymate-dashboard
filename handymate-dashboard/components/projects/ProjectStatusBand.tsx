@@ -155,8 +155,8 @@ function EconomyZone({ economics, loading, bucket }: { economics: ProjectEconomi
           {overBudget
             ? `Över offererat med ${formatSEK(nedlagt - offererat)}`
             : inomBudget
-              ? `Inom budget · kvar att fakturera ${formatSEK(kvar)}`
-              : `kvar att fakturera ${formatSEK(kvar)}`}
+              ? `Inom budget · ${formatSEK(kvar)} kvar av avtalat värde`
+              : `${formatSEK(kvar)} kvar av avtalat värde`}
         </span>
       </div>
     </div>

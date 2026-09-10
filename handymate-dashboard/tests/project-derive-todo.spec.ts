@@ -5,8 +5,32 @@
  */
 import { test, expect } from '@playwright/test'
 import { deriveProjectTodo, deriveTodoMode, getStageBucket, pickTopCard, TODO_PRIMARY_LABEL } from '../lib/projects/derive-todo'
+import { invoiceableProjectAmount, projectInvoicePath } from '../lib/projects/invoice-path'
 
 const BASE = { stageId: 'ps-03', isOverBudget: false, canSeeFinancials: true, hasUninvoicedWork: false, noWorkYet: false }
+
+test.describe('projektets fakturakälla', () => {
+  test('fastpris och blandavtal med offert använder avtalsrader + ÄTA', () => {
+    expect(projectInvoicePath({ projectType: 'fixed_price', quoteId: 'q1' })).toBe('contract')
+    expect(projectInvoicePath({ projectType: 'mixed', quoteId: 'q1' })).toBe('contract')
+  })
+
+  test('löpande eller projekt utan offert använder faktisk tid och material', () => {
+    expect(projectInvoicePath({ projectType: 'hourly', quoteId: 'q1' })).toBe('actuals')
+    expect(projectInvoicePath({ projectType: 'mixed', quoteId: null })).toBe('actuals')
+  })
+
+  test('beloppet följer vald källa och dubbelräknar dem aldrig', () => {
+    const common = {
+      expectedRevenue: 85_500,
+      invoicedRevenue: 0,
+      uninvoicedTimeRevenue: 2_017,
+      uninvoicedMaterialRevenue: 1_000,
+    }
+    expect(invoiceableProjectAmount({ ...common, path: 'contract' })).toBe(85_500)
+    expect(invoiceableProjectAmount({ ...common, path: 'actuals' })).toBe(3_017)
+  })
+})
 
 test.describe('getStageBucket', () => {
   test('null/okänt → planering; ps-01–02 planering; ps-03–04 pågående; ps-05+ klart', () => {

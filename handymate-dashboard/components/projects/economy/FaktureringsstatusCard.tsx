@@ -6,7 +6,7 @@ import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 /**
  * FaktureringsstatusCard (Etapp 4b steg 2, 2026-05-23).
  *
- * Stacked bar med betalt / fakturerat-ej-betalt / kvar att fakturera.
+ * Stacked bar med betalt / fakturerat-ej-betalt / kvar av avtalat värde.
  * Helper-mappning från Etapp 1 (invoice.project_id-koppling):
  * - intakter.betalt_kr → grön del
  * - intakter.fakturerat_kr - betalt_kr → amber del (obetalda fakturor)
@@ -96,7 +96,7 @@ export function FaktureringsstatusCard({
         />
         <FaktRow
           colorClass="bg-slate-200"
-          label="Kvar att fakturera"
+          label="Kvar av avtalat värde"
           netto={kvar}
           inkl={Math.round(kvar * vatMultiplier)}
           p={totalBudget > 0 ? Math.round((kvar / totalBudget) * 100) : 0}
@@ -111,7 +111,7 @@ export function FaktureringsstatusCard({
           className="mt-3.5 w-full inline-flex items-center justify-center gap-2 px-6 py-3 bg-primary-700 hover:bg-primary-600 text-white font-bold rounded-xl transition-colors"
         >
           <Receipt className="w-4 h-4" />
-          Fakturera projekt ({formatKr(kvar)} netto kvar)
+          Granska fakturaunderlag
         </button>
       )}
 

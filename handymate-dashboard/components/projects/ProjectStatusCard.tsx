@@ -242,10 +242,10 @@ function EkonomiStaplar({ economics, state }: { economics: ProjectEconomics; sta
   // copy.projektvy.sv.json prognos_kvar = "kvar att fakturera {belopp}" (belopp
   // sist) — DESIGN-NOTES.md-exemplet visar motsatt ordning, men JSON:en är
   // uttryckligen "exakt copy"-källan, se HANDOFF.md.
-  let prognosText = `kvar att fakturera ${formatSEK(kvarAttFakturera)}`
+  let prognosText = `${formatSEK(kvarAttFakturera)} kvar av avtalat värde`
   if (isPositive) {
     dotClass = 'bg-emerald-500'
-    prognosText = kvarAttFakturera > 0 ? `Inom budget · kvar att fakturera ${formatSEK(kvarAttFakturera)}` : 'Inom budget'
+    prognosText = kvarAttFakturera > 0 ? `Inom budget · ${formatSEK(kvarAttFakturera)} kvar av avtalat värde` : 'Inom budget'
   } else if (isNegative) {
     dotClass = 'bg-red-500'
     const over = nedlagt != null ? Math.max(0, nedlagt - offererat) : 0
