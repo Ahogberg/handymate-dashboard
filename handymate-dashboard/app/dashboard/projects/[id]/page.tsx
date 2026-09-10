@@ -246,6 +246,7 @@ interface Summary {
   total_revenue: number
   uninvoiced_hours: number
   uninvoiced_revenue: number
+  uninvoiced_material_sell: number
   ata_additions: number
   ata_removals: number
   ata_net: number
