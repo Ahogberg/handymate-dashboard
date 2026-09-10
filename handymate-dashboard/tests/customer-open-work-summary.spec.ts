@@ -13,8 +13,8 @@ function bookingRoute(seed: Record<string, Row[]>, projectError = false, project
     let limit: number | null = null
     const q: any = {
       select() { return q },
-      eq(key: string, value: unknown) { operations.push(`${table}:eq:${key}:${value}`); rows = rows.filter(row => row[key] === value); return q },
-      in(key: string, values: unknown[]) { operations.push(`${table}:in:${key}:${values.join('|')}`); rows = rows.filter(row => values.includes(row[key])); return q },
+      eq(key: string, value: unknown) { if (table === 'booking' && key === 'status' && !['confirmed', 'cancelled', 'completed', 'no_show'].includes(String(value))) throw new Error('invalid booking_status enum'); operations.push(`${table}:eq:${key}:${value}`); rows = rows.filter(row => row[key] === value); return q },
+      in(key: string, values: unknown[]) { if (table === 'booking' && key === 'status' && values.some(value => !['confirmed', 'cancelled', 'completed', 'no_show'].includes(String(value)))) throw new Error('invalid booking_status enum'); operations.push(`${table}:in:${key}:${values.join('|')}`); rows = rows.filter(row => values.includes(row[key])); return q },
       gte(key: string, value: string) { operations.push(`${table}:gte:${key}:${value}`); rows = rows.filter(row => row[key] >= value); return q },
       lte(key: string, value: string) { rows = rows.filter(row => row[key] <= value); return q },
       is(key: string, value: unknown) { operations.push(`${table}:is:${key}:${value}`); rows = rows.filter(row => row[key] == null); return q },
@@ -68,7 +68,7 @@ function taskRoute(rows: Row[], currentUser: Row | null, assignmentError = false
 }
 
 const direct = { booking_id: 'direct', business_id: 'tenant-a', customer_id: 'cust', project_id: null, scheduled_start: '2026-09-12T10:00:00Z', status: 'confirmed' }
-const projectBooking = { booking_id: 'project-booking', business_id: 'tenant-a', customer_id: null, project_id: 'project-safe', scheduled_start: '2026-09-11T10:00:00Z', status: 'scheduled' }
+const projectBooking = { booking_id: 'project-booking', business_id: 'tenant-a', customer_id: null, project_id: 'project-safe', scheduled_start: '2026-09-11T10:00:00Z', status: 'confirmed', job_status: 'scheduled' }
 
 test('actual bookings route includes tenant customer projects and filters inactive or conflicting candidates before its limit', async () => {
   const harness = bookingRoute({ project: [{ project_id: 'project-safe', business_id: 'tenant-a', customer_id: 'cust' }], booking: [direct, projectBooking,
@@ -80,6 +80,7 @@ test('actual bookings route includes tenant customer projects and filters inacti
   expect((await response.json()).bookings.map((row: Row) => row.booking_id)).toEqual(['project-booking', 'direct'])
   expect(harness.operations).toContain('project:eq:business_id:tenant-a')
   expect(harness.operations).toContain('booking:in:project_id:project-safe')
+  expect(harness.operations).toContain('booking:eq:status:confirmed')
 })
 
 test('customer filter never enters raw PostgREST grammar and project lookup failures are explicit', async () => {

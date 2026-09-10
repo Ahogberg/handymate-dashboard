@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const bookingQuery = () => {
       let query = supabase.from('booking').select('*').eq('business_id', business.business_id)
       if (status) query = query.eq('status', status)
-      if (nextActive) query = query.in('status', ['pending', 'confirmed', 'in_progress', 'scheduled'])
+      if (nextActive) query = query.eq('status', 'confirmed')
       if (nextActive) query = query.is('completed_at', null).or('job_status.is.null,job_status.not.in.(cancelled,completed)')
       if (projectId) query = query.eq('project_id', projectId)
       if (from) query = query.gte('scheduled_start', from)

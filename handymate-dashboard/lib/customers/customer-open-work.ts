@@ -45,7 +45,6 @@ export async function loadCustomerNextBooking(customerId: string, now: Date, sig
   const rows = assertResponseRows(await response.json().catch(() => null), 'bookings')
   if (signal.aborted) throw new DOMException('Aborted', 'AbortError')
   if (rows.some(row => !row || typeof row.booking_id !== 'string' || typeof row.scheduled_start !== 'string' || Number.isNaN(Date.parse(row.scheduled_start)) || typeof row.status !== 'string')) throw new Error('open-work-malformed')
-  const active = new Set(['pending', 'confirmed', 'in_progress', 'scheduled'])
-  return (rows as CustomerBookingSummary[]).filter(row => active.has(row.status) && !row.completed_at && !['cancelled', 'completed'].includes(row.job_status || '') && new Date(row.scheduled_start) >= now)
+  return (rows as CustomerBookingSummary[]).filter(row => row.status === 'confirmed' && !row.completed_at && !['cancelled', 'completed'].includes(row.job_status || '') && new Date(row.scheduled_start) >= now)
     .sort((a, b) => Date.parse(a.scheduled_start) - Date.parse(b.scheduled_start) || a.booking_id.localeCompare(b.booking_id))[0] || null
 }

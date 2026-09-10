@@ -1636,6 +1636,10 @@ Read-only audit genomförd efter kundminnets publicering. Återanvänd task-API 
 
 **PUBLICERINGSBLOCKER — TVÅKÄLLORSVYN:** lokal kodcommit `a9f6e3b`, 13 riktade tester/typkontroll gröna. Automatisk säkerhetsgranskning avvisade uppladdning av detta nya paket (kod, tester och uppdaterad roadmap) till publika `Ahogberg/handymate-dashboard`, med skälet att senaste uttryckliga godkännandet gällde det tidigare kundminnespaketet. Ingen fjärrbranch uppdaterad för tvåkällorsvyn. Publicerad head är fortsatt `fae59443be930d4340f8ffc880aeb0dceb0fb696`, verifierad i CI och inloggad preview. Användaren har därefter uttryckligen godkänt publicering av uppgifts-/bokningsvyn inklusive API-rättningar, tester och styrdokument i PR #38. Publicering och preview-kontroll återupptas.
 
+### RUNTIMERÄTTNING — BOKNINGSSTATUS
+
+Read-only produktionskontroll efter publicering av tvåkällorspaketet `7ee588bf2e9361c3adb94111f1e5fe79ec8bf5c3` upptäckte att lokal testdubbel tillät ogiltiga booking_status-värden. Faktisk enum är confirmed/cancelled/completed/no_show; next_active använder nu enbart confirmed och behåller completed_at/job_status-grindarna. Route-harness avvisar nu ogiltiga enumvärden. Korrigerad SELECT fungerar och identifierar en befintlig kommande bokning i testföretaget. 13 riktade tester, typkontroll och diffkontroll gröna efter rättningen. Fyllda öppna kunduppgifter saknas i testföretagets icke-privata data; inget skapas för test. Slutlig preview-kontroll väntar på det rättade bygget.
+
 ### REPRODUCERA LOKALA KONTROLLER
 
 Kör från `handymate-dashboard/` efter `npm ci`:
