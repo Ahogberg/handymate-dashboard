@@ -189,6 +189,7 @@ jobs:
           tests/elks-webhook-grind.spec.ts
           tests/elks-ljudfalt.spec.ts
           tests/nummerverifiering.spec.ts
+          tests/sms-inkommande.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
