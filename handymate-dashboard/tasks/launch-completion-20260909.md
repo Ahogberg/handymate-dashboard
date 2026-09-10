@@ -213,3 +213,24 @@ Ingen ny inloggad klickverifiering: preview kräver fortfarande giltig Vercel-se
 
 ### Nästa körbara steg
 Prioritera nu förfrågan → agent → offert/uppföljning: storefront/contact använder fortfarande legacy createLeadAndDeal utan beständig inskickningsnyckel. Befintlig intakeInput kräver telefon, men storefront tillåter endast e-post; anslut inte genom att hitta på telefonnummer eller bryta befintliga formulär. Inventera den publicerade klientens nyckel/återförsök och SQL-kontraktets kontaktkrav; bygg email-only-kompatibel beständig mottagning med prov innan integration. Därefter kvarvarande widget/public-book/email-inbound, uppföljningens verkliga aktivering och stoppvillkor. Fortsätt jämförelsen av nya Matte-designen med aktuell guidning. Kund-/telefon-/Fortnoxprov och alla tre hela kundresornas slutgodkännande är fortfarande öppna.
+
+## Checkpoint: beständig mottagning från publicerad hemsida 2026-09-10
+
+Draft-PR37, kod-HEAD `141e89c3c761d4ec2b4f2605b2a1819e3189a19d`. Implementationen ersätter storefront/contact:s legacy-sparning med separat beständig mottagning och transaktionell kund/lead/affär/notis/statistik. Bara ett komplett kvitto ger kundbekräftelse; blockerat kvitto ger 202 och samma förfrågan kan återförsökas.
+
+- Telefon ELLER mejl krävs. Mejlkund kopplas företagsskopat; tomma telefonfält får inte matcha orelaterade kunder. Tvetydighet blockerar utan att kasta bort mottagningen. Befintlig portal/intake behåller telefonkravet.
+- Klienten sparar nyckel och oföränderligt innehåll före POST, återställer samma förfrågan vid omladdning i samma flik och låser dubbelklick. OPTIONS-kontrakt hindrar normal blind replay till äldre server. Detta är inte ett universellt skydd mot rollback mellan OPTIONS och POST. SessionStorage gäller samma flik, inte ny enhet eller stängd flik.
+- Gamla klienter utan nyckel får 428 och behöver laddas om. Driftsättning kräver först migrationskontraktet, därefter samordnad server/klient; ingen legacy-fallback som kan skapa dubletter.
+- Migration `supabase/migrations/20260910073644_storefront_durable_intake.sql` är förberedd, INTE applicerad. Det isolerade Supabase-projektet `eoodwyfxrdjmlqaealhj` svarade Project not found med tillgänglig connectoråtkomst. Inget annat projekt användes.
+- Testiteration: tidigare facit förbjöd legacy-sparning även i generic intake som har avsiktlig kompatibilitetsväg. Kravet har avgränsats till den helt migrerade storefront-rutten. Avbrottsprovet kapar nu svaret efter POST och kräver identiskt retry, inte bara nätfel under OPTIONS.
+- Ingen ny inloggad klickverifiering. Vercel-preview saknar verifierad giltig session. Provider-/SMS/agentleverans räknas inte som liveverifierad av isolerade routeprov.
+
+### Nästa körbara steg
+Widgetens app/api/widget/chat/route.ts markerar lead_created även när Golden Path rapporterar dealError och saknar beständig transaktion mellan affär och konversationsmarkör. Reproducera affärsfel och tappad markörkvittens, inför en stabil konversationsbaserad mottagning med oföränderligt första underlag och verifiera exakt en affär vid retry. Koppla inte om genom att återanvända ett ändrat chattunderlag med samma nyckel.
+
+Publik bokning app/api/public/book/[slug]/route.ts kontrollerar kollision före separat INSERT. Kommentarens påstående att detta ger idempotens vid dubbelklick är inte hållbart för samtidiga anrop. Befintlig-kalenderläsning hanterar inte error och kan behandla misslyckad läsning som ledigt. Behöver isolerad fel-/samtidighetsreproduktion och transaktionell bokningsreservation; kund/lead/affär, kalender och SMS-kvitton måste hanteras uttryckligt. Utför inga verkliga bokningar/SMS som del av dessa prov.
+
+Kvar: generic intake:s legacyväg, email-inbound, uppföljningens aktivering/stopp, rätt nya Matte-guidning och hela klickresor; telefon-/Fortnox-/kundgodkännande är öppet. Ingen main-merge/push, produktionsmigration eller skarp kundkommunikation.
+
+### Verifierat på exakt kod-HEAD
+Fem GitHub Actions och båda Vercel-byggen gröna på `141e89c3c761d4ec2b4f2605b2a1819e3189a19d`. Kontraktsgrind run 486/job 102791077254: TypeScript utan fel, 1827 browserlösa prov godkända + en befintlig skip. Sex-kundutfall-sviten grön: 17 riktiga SQL-intakeprov i PGlite (fyra nya), 12 storefront route/klientprov med isolerad browser/network samt befintliga 42 boundary, 35 intake/HTTP, 45 Fortnox, 15 faktura/accept-SQL, 20 faktura/accept-service, 18 portal och 30 Gmail. Inga providerprov är liveprov. Lokal full körning saknar beroenden; CI är det fulla körbeviset. Alla tio ändrade fjärrfiler jämförda med lokala Git-blobbar.
