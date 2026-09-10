@@ -73,6 +73,13 @@
   font-weight: 600;
   border-radius: 8px;
 }
+/* Demoutgången står först i navet; "Lämna guiden" hamnar längst till höger
+   eftersom .ob-exit-nav är justify-content: flex-end. Knappen ärver
+   .ob-exit-link, så träffytan är samma 44px. */
+.ob-demo-tillbaka { display: flex; align-items: center; gap: 8px; margin-right: auto; }
+.ob-demo-tillbaka .ob-exit-link { display: inline-flex; gap: 8px; background: none; border: 0; cursor: pointer; font: inherit; }
+.ob-demo-tillbaka .ob-exit-link:disabled { opacity: 0.6; cursor: default; }
+.ob-demo-tillbaka-fel { margin: 0; font-size: 13px; color: #b91c1c; }
 .ob-exit-link:focus-visible {
   outline: 3px solid var(--ob-primary-600);
   outline-offset: 2px;
