@@ -52,14 +52,19 @@ test('blocked receipt is 202, never success or a fabricated deal',async()=>{
 })
 test('lost response and reload preserve immutable body and key, isolated by company',async()=>{
  const s=storage();const original=browser.prepareStorefrontSubmission(s,'a',input,()=> 'request-123')
- await assert.rejects(()=>browser.sendStorefrontSubmission(original,async()=>{throw Error('lost response')}))
+ const sent=[]
+ await assert.rejects(()=>browser.sendStorefrontSubmission(original,async(_url,options)=>{
+  if(options.method==='OPTIONS')return Response.json({contract:'storefront-intake-v1'})
+  sent.push(options);throw Error('lost response after POST')
+ }))
+ assert.equal(sent.length,1)
  const retry=browser.prepareStorefrontSubmission(s,'a',{...input,message:'changed'},()=> 'different')
  assert.deepEqual(retry,original);assert.equal(browser.readStorefrontSubmission(s,'b'),null)
- const sent=[];const result=await browser.sendStorefrontSubmission(retry,async(_url,options)=>{
+ const result=await browser.sendStorefrontSubmission(retry,async(_url,options)=>{
   if(options.method==='OPTIONS')return Response.json({contract:'storefront-intake-v1'})
   sent.push(options);return Response.json({success:true,state:'completed',receipt_id:'r',lead_id:'l',deal_id:'d'})
  })
- assert.equal(result.completed,true);assert.equal(sent[0].headers['Idempotency-Key'],'request-123');assert.equal(JSON.parse(sent[0].body).message,input.message)
+ assert.equal(result.completed,true);assert.equal(sent.length,2);assert.deepEqual(sent[1],sent[0]);assert.equal(sent[0].headers['Idempotency-Key'],'request-123');assert.equal(JSON.parse(sent[0].body).message,input.message)
  browser.clearStorefrontSubmission(s,'a');assert.equal(browser.readStorefrontSubmission(s,'a'),null)
 })
 test('legacy backend cannot receive a blind retry from a new client',async()=>{
