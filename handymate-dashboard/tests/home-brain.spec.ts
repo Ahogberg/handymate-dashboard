@@ -6,15 +6,17 @@ import { deriveBrainOverview, scheduledFollowupCount } from '../lib/jarvis/brain
 const root = path.resolve(__dirname, '..')
 const read = (file: string) => fs.readFileSync(path.join(root, file), 'utf8')
 
-test('femlägesadaptern gör okända källor synliga i stället för gröna nollor', () => {
-  const cells = deriveBrainOverview({ handledVerified: null, missionKnown: false, missionActive: false, waitingFollowups: null, decisions: null, moneyCases: null })
+test('femlägesadaptern skiljer laddning från okända källor', () => {
+  const loading = deriveBrainOverview({ handledVerified: undefined, missionState: 'loading', missionActive: false, waitingFollowups: null, decisions: undefined, moneyCases: undefined })
+  expect(loading.every(cell => cell.value === 'Läser läget…')).toBe(true)
+  const cells = deriveBrainOverview({ handledVerified: null, missionState: 'unavailable', missionActive: false, waitingFollowups: null, decisions: null, moneyCases: null })
   expect(cells).toHaveLength(5)
   expect(cells.every(cell => cell.value === 'Läget kunde inte läsas')).toBe(true)
   expect(cells.map(cell => cell.value).join(' ')).not.toContain('Inga beslut')
 })
 
 test('adaptern skiljer sparat uppdrag, väntande uppföljningar och begränsade listor', () => {
-  const cells = Object.fromEntries(deriveBrainOverview({ handledVerified: 4, missionKnown: true, missionActive: true, waitingFollowups: 2, decisions: 15, moneyCases: 3 }).map(cell => [cell.label, cell.value]))
+  const cells = Object.fromEntries(deriveBrainOverview({ handledVerified: 4, missionState: 'known', missionActive: true, waitingFollowups: 2, decisions: 15, moneyCases: 3 }).map(cell => [cell.label, cell.value]))
   expect(cells['Arbetar med']).toBe('Aktivt uppdrag – öppna för aktuellt läge')
   expect(cells['Arbetar med']).not.toMatch(/kör|utför/)
   expect(cells['Väntar på']).toBe('2 planerade uppföljningar i uppdraget')
@@ -22,6 +24,12 @@ test('adaptern skiljer sparat uppdrag, väntande uppföljningar och begränsade 
   expect(cells['Hanterat']).toBe('4 visade verifierade resultat')
   expect(cells['Pengar']).toBe('3 synliga pengakategorier')
   expect(cells['Pengar']).not.toContain('kr')
+})
+
+test('känt tomt uppdragsläge påstår inte en global nolla för väntande arbete', () => {
+  const cells = Object.fromEntries(deriveBrainOverview({ handledVerified: 0, missionState: 'known', missionActive: false, waitingFollowups: null, decisions: 0, moneyCases: 0 }).map(cell => [cell.label, cell.value]))
+  expect(cells['Arbetar med']).toBe('Inget aktivt uppdrag')
+  expect(cells['Väntar på']).toBe('Inget aktivt uppdrag')
 })
 
 test('bara faktiskt schemalagda uppföljningar räknas som väntande', () => {
@@ -39,6 +47,8 @@ test('beslutsstatus kräver både kön och NBA inom aktuell företagsscope', () 
   expect(home).toContain("throw new Error('invalid approvals payload')")
   expect(home).toContain('setQueueKnown(false)')
   expect(home).toContain('setNbaKnown(false)')
+  expect(home).toContain('setNbaLoaded(false)')
+  expect(home).toContain('const decisionsLoaded = queueLoaded && nbaLoaded')
   expect(home).toContain('data?.recommendation === null')
   const page = read('app/dashboard/page.tsx')
   expect(page).toContain("key={`${business.business_id}:${user?.id || ''}`}")
@@ -50,6 +60,8 @@ test('aktivitetsläsningen bevisar bara exakta utfall och redovisar källornas f
   expect(route).toContain("'Cache-Control': 'no-store'")
   expect(route).toContain("automation_type === 'veckorapport'")
   expect(route).toContain("a.status === 'delivered'")
+  expect(route).toContain("select('id, channel, message, status, created_at')")
+  expect(route).not.toMatch(/communication_log'[\s\S]{0,300}ai_reason/)
   expect(route).toContain('verified: false')
   for (const source of ['rules: ruleErr', 'pipeline: pipelineError', 'communication: commError']) expect(route).toContain(source)
 })

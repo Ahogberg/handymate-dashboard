@@ -4,19 +4,20 @@ import { useMission } from '@/lib/mission/MissionProvider'
 import { deriveBrainOverview, scheduledFollowupCount } from '@/lib/jarvis/brain-overview'
 
 interface Props {
-  handled: number | null
-  needsYou: number | null
-  moneyCases: number | null
+  handled: number | null | undefined
+  needsYou: number | null | undefined
+  moneyCases: number | null | undefined
 }
 
 export function BrainOverview({ handled, needsYou, moneyCases }: Props) {
   const mission = useMission()
-  const missionKnown = !mission.loading && !mission.error
+  const missionState = mission.loading ? 'loading' : mission.error ? 'unavailable' : 'known'
+  const missionActive = missionState === 'known' && mission.mission?.status === 'active'
   const cells = deriveBrainOverview({
     handledVerified: handled,
-    missionKnown,
-    missionActive: missionKnown && mission.mission?.status === 'active',
-    waitingFollowups: missionKnown ? scheduledFollowupCount(mission.handover) : null,
+    missionState,
+    missionActive,
+    waitingFollowups: missionActive ? scheduledFollowupCount(mission.handover) : null,
     decisions: needsYou,
     moneyCases,
   })

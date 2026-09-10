@@ -48,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     const { data: commLogs, error: commError } = await supabase
       .from('communication_log')
-      .select('id, channel, message, ai_reason, status, created_at')
+      .select('id, channel, message, status, created_at')
       .eq('business_id', business.business_id)
       .gte('created_at', weekAgo.toISOString())
       .order('created_at', { ascending: false })
@@ -125,7 +125,7 @@ export async function GET(request: NextRequest) {
         id: a.id,
         type: 'sms',
         action: a.channel,
-        description: a.ai_reason || a.message?.substring(0, 80),
+        description: a.message?.substring(0, 80),
         status: a.status === 'sent' || a.status === 'delivered' ? 'success' : a.status === 'failed' ? 'failed' : 'skipped',
         created_at: a.created_at,
         source: 'communication' as const,

@@ -1561,6 +1561,19 @@ Dokument infogade mot main `3ae0029`; initial dokumentcommit `87d3355`. Runtimek
 
 **NEXT ACTION:** skapa åtkomlig preview av arbetsbranchen med korrekt testkonfiguration och testkonto; kör riktiga Home/Quote-resor inklusive omladdning, läsfel, företagsbyte och smal skärm. Avstäm därefter de fyra legacy-veckorapporterna mot provider före eventuell omsändning och åtgärda nummer/saldo. ROT-exklusivitet och legacy suggestions-tenantgrind kvarstår före launch. Tidigare push blockerades av automatisk säkerhetsgranskning; användaren har därefter uttryckligen godkänt publicering av branchen inklusive auditdokumenten. Nästa publiceringssteg är push och draft-PR, inte merge till main.
 
+### PREVIEWKONTROLL 2026-09-10 — PR #38
+
+Preview för GitHub-commit `c11f205f1a9bc313e1e483ccb01bbfce1291efc8` är byggd. Alla rapporterade GitHub-checkar är gröna, inklusive befintliga webbläsarprov med simulerade API-svar och tester mot tillfällig Postgres. Detta är inte samma sak som hela kundresan mot verkliga providers.
+
+Inloggad browserkontroll har nu genomförts i previewn, efter Vercels åtkomstkontroll och Handymates egen inloggning. Home laddar och visar den begränsade beslutskön. En accepterad testoffert visar registrerad accept och projektplanering som nästa steg, även efter reload. En öppnad testoffert visar uttryckligt att nästa uppföljningstid inte kan bekräftas. Offertvyn har ingen horisontell overflow i testad desktopbredd (1363 px). Inga beslut godkändes och inga utskick initierades.
+
+Två konkreta fel hittades och har rättats i nästa avgränsade ändring:
+
+- Aktivitetsrutten väljer `communication_log.ai_reason`, som inte finns i verifierat prod-schema. Läs befintliga meddelandefält i stället; ingen migration.
+- Home blandar laddning med läsfel och visar läsfel för väntansläget även när avsaknad av aktivt uppdrag är känd. Skilj laddning, känt tomt uppdragsläge och fel utan att påstå att hela firman saknar väntande saker.
+
+Rättningarna har fokuserade regressioner i befintlig CI: faktisk aktivitetsrutt mot verifierat kolumnkontrakt, Home laddning/tomt/fel och UI-prov för laddning → tomt samt offertkvitto. Aktivitetsruttharnessen och sju Home-tester är lokalt gröna. Ny previewkontroll återstår efter publicering. Slice 1 och 2 är fortfarande öppna: positiv sändkvittens med verklig provider, komplett kundresa, byte mellan två företag och mobilapp är inte bevisade här.
+
 ### REPRODUCERA LOKALA KONTROLLER
 
 Kör från `handymate-dashboard/` efter `npm ci`:

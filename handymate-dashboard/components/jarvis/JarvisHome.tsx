@@ -266,6 +266,7 @@ export default function JarvisHome({
   const [queueLoaded, setQueueLoaded] = useState(false)
   const [queueKnown, setQueueKnown] = useState(false)
   const [nbaKnown, setNbaKnown] = useState(false)
+  const [nbaLoaded, setNbaLoaded] = useState(false)
   const [observations, setObservations] = useState<Observation[]>([])
   const [reschedules, setReschedules] = useState<RescheduleSuggestion[]>([])
   const [doneRows, setDoneRows] = useState<DoneRow[]>([])
@@ -328,7 +329,9 @@ export default function JarvisHome({
   const [moments, setMoments] = useState<AgentMoment[]>([])
   const [aktiviteter, setAktiviteter] = useState<DigestAktivitet[]>([])
   const [activityKnown, setActivityKnown] = useState(false)
+  const [activityLoaded, setActivityLoaded] = useState(false)
   const [moneyKnown, setMoneyKnown] = useState(false)
+  const [moneyLoaded, setMoneyLoaded] = useState(false)
   const [homeRefreshTick, setHomeRefreshTick] = useState(0)
   const [samtal, setSamtal] = useState<{ antal: number; bokade: number } | null>(null)
   const [kvitto, setKvitto] = useState<Vardekvitto | null>(null)
@@ -413,6 +416,7 @@ export default function JarvisHome({
   const fetchQueue = useCallback(async () => {
     const requestedBusinessId = business.business_id
     if (businessScopeRef.current === requestedBusinessId) {
+      setQueueLoaded(false)
       setQueueKnown(false)
       setApprovals([])
     }
@@ -443,6 +447,7 @@ export default function JarvisHome({
     setNba(null)
     setNbaList([])
     setNbaKnown(false)
+    setNbaLoaded(false)
     ;(async () => {
       try {
         const res = await fetch('/api/next-best-action', { headers: await authHeaders() })
@@ -456,7 +461,10 @@ export default function JarvisHome({
             setNbaKnown(true)
           }
         }
-      } catch { /* ingen rankning idag är ett giltigt, tyst utfall */ }
+      } catch { /* ett läsfel visas som okänt läge */ }
+      finally {
+        if (active && businessScopeRef.current === requestedBusinessId) setNbaLoaded(true)
+      }
     })()
     return () => { active = false }
   }, [authHeaders, business.business_id, homeRefreshTick])
@@ -629,6 +637,7 @@ export default function JarvisHome({
   useEffect(() => {
     let active = true
     setActivityKnown(false)
+    setActivityLoaded(false)
     setAktiviteter([])
     // limit=100, inte 30 (Pass C, del 2): fönstret kan nu sträcka sig upp
     // till 7 dagar bakåt (lib/jarvis/senast-sedd.ts) — automation_activity
@@ -646,6 +655,7 @@ export default function JarvisHome({
         setActivityKnown(res.completeness && Object.values(res.completeness).every(value => value === 'complete'))
       })
       .catch(() => { /* loggen är en bekvämlighet, aldrig blockerande */ })
+      .finally(() => { if (active) setActivityLoaded(true) })
     return () => { active = false }
   }, [business.business_id, homeRefreshTick])
 
@@ -694,11 +704,13 @@ export default function JarvisHome({
   useEffect(() => {
     let aktiv = true
     setMoneyKnown(false)
+    setMoneyLoaded(false)
     setPengarData(null)
     fetch('/api/dashboard/pengar')
       .then(r => { if (r.status === 403) return null; if (!r.ok) throw new Error('pengar unavailable'); return r.json() })
       .then(d => { if (aktiv && d) { setPengarData(d); setMoneyKnown(true) } })
       .catch(() => { /* kortet är grädde, aldrig mjölk */ })
+      .finally(() => { if (aktiv) setMoneyLoaded(true) })
     return () => { aktiv = false }
   }, [business.business_id, homeRefreshTick])
 
@@ -1090,6 +1102,7 @@ export default function JarvisHome({
   }, [forstaAtgardId, forstaAtgardHamtad, queueLoaded, approvals])
   const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0) + synligaNba.length
   const decisionsKnown = queueKnown && nbaKnown
+  const decisionsLoaded = queueLoaded && nbaLoaded
   const koTom = queueLoaded && decisionsKnown && beslut === 0
 
   // Cross-Agent Case — filtrera bort hanterade signaler (samma !hiddenIds-
@@ -1193,7 +1206,7 @@ export default function JarvisHome({
           <Link href="/dashboard/avlastning#min-dag" className="mb-3 inline-flex min-h-[44px] items-center text-sm text-teal-800 underline">Se din dag · rapporterat arbete och nästa steg</Link>
           <MatteHero
             greetingName={greetingName}
-            queueLoaded={queueLoaded}
+            queueLoaded={decisionsLoaded}
             queueKnown={decisionsKnown}
             beslut={beslut}
             nbaKandidater={synligaNba}
@@ -1217,9 +1230,9 @@ export default function JarvisHome({
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}
         <div className="min-w-0 lg:row-start-2 lg:col-start-1">
           <BrainOverview
-            handled={activityKnown ? verifieradeHanterade.length : null}
-            needsYou={decisionsKnown ? beslut : null}
-            moneyCases={moneyKnown ? pengarData?.kategorier.length ?? 0 : null}
+            handled={!activityLoaded ? undefined : activityKnown ? verifieradeHanterade.length : null}
+            needsYou={!decisionsLoaded ? undefined : decisionsKnown ? beslut : null}
+            moneyCases={!moneyLoaded ? undefined : moneyKnown ? pengarData?.kategorier.length ?? 0 : null}
           />
           {feedback && (
             <div className={`mb-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium flex items-center justify-between gap-3 ${
@@ -1336,7 +1349,7 @@ export default function JarvisHome({
             />
           )}
 
-          {!queueLoaded ? (
+          {!decisionsLoaded ? (
             <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-center min-h-[88px]">
               <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
             </div>

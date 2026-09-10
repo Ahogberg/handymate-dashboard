@@ -101,3 +101,22 @@ test('ändrad offert kräver ny förhandsvisning och läsfel ger inget överläm
   await expect(page.getByRole('alert')).toContainText('Kunde inte kontrollera överlämningen')
   await expect(page.getByText('Daniel har en uppföljning inställd')).toHaveCount(0)
 })
+
+test('Home går från laddning till känt tomt läge utan falskt läsfel',async({page})=>{
+  await setup(page)
+  await page.getByRole('button',{name:'home',exact:true}).click()
+  await expect(page.getByText('Läser läget…')).toHaveCount(5)
+  await page.evaluate(()=> (window as any).fixture.settleHomeEmpty())
+  await expect(page.getByText('Inget aktivt uppdrag')).toHaveCount(2)
+  await expect(page.getByText('Inga beslut just nu')).toBeVisible()
+  await expect(page.getByText('Läget kunde inte läsas')).toHaveCount(0)
+})
+
+test('offertöverlämningen visar senaste sändkvittot separat',async({page})=>{
+  await setup(page)
+  await page.route('**/api/quotes/q/handoff',r=>r.fulfill({json:{checkedAt:'2026-09-10T10:00:00Z',summary:{latestReceipt:{round:2,channel:'email',executedAt:'2026-09-10T09:00:00Z',artifactId:'mail-1'},state:'closed',headline:'Kunden har accepterat offerten',done:'Offerten är accepterad.',next:'Nästa steg finns i projektet.',needsYou:null,link:'/dashboard/quotes/q',linkLabel:'Öppna offerten'}}}))
+  await page.getByRole('button',{name:'handoff',exact:true}).click()
+  await expect(page.getByText('Kunden har accepterat offerten')).toBeVisible()
+  await expect(page.getByText(/Uppföljning 2 via e-post har sändkvittens/)).toBeVisible()
+  await expect(page.getByText(/Det bekräftar inte att kunden har läst meddelandet/)).toBeVisible()
+})
