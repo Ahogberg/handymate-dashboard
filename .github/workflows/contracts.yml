@@ -80,6 +80,8 @@ jobs:
           tests/permission-contract.spec.ts
           tests/schema-contract.spec.ts
           tests/facit-ci-grind.spec.ts
+          tests/project-derive-todo.spec.ts
+          tests/facit-project-list-next-todo.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts
           tests/kortkvalitet.spec.ts
