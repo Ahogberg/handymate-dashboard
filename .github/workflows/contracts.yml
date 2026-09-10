@@ -145,6 +145,8 @@ jobs:
           tests/reservations.spec.ts
           tests/product-reservations-route.spec.ts
           tests/time-entry-write-path.spec.ts
+          tests/tidrapport-forslag.spec.ts
+          tests/fakturaberedskap.spec.ts
           tests/ata-livscykeln.spec.ts
           tests/ata-dokumentet.spec.ts
           tests/canonical-project-completion.spec.ts
