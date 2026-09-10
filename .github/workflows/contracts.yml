@@ -82,6 +82,7 @@ jobs:
           tests/facit-ci-grind.spec.ts
           tests/project-derive-todo.spec.ts
           tests/facit-project-list-next-todo.spec.ts
+          tests/facit-webbinflode-block-a.spec.ts
           tests/onboarding-setup-studio.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts

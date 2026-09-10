@@ -27,7 +27,7 @@ export class IntakeError extends Error {
   constructor(message: string, readonly status: number) { super(message) }
 }
 
-export function intakeInput(body: unknown, sourceId: string | null): IntakeInput {
+export function intakeInput(body: unknown, sourceId: string | null, requirePhone = true): IntakeInput {
   if (!body || typeof body !== 'object' || Array.isArray(body)) throw new IntakeError('Förfrågan har ogiltigt format.', 400)
   const b = body as Record<string, unknown>
   const text = (key: string, max: number, required = false): string | null => {
@@ -36,10 +36,19 @@ export function intakeInput(body: unknown, sourceId: string | null): IntakeInput
     if (typeof value !== 'string' || value.length > max || (required && !value.trim())) throw new IntakeError(`Kontrollera ${({ name: 'namnet', phone: 'telefonnumret', email: 'e-postadressen', message: 'meddelandet', source_ref: 'källreferensen' } as Record<string, string>)[key]}.`, 400)
     return value.trim() || null
   }
-  return { name: text('name', 200, true)!, phone: text('phone', 80, true)!, email: text('email', 320), message: text('message', 10000), source_ref: text('source_ref', 1000), lead_source_id: sourceId }
+  return { name: text('name', 200, true)!, phone: text('phone', 80, requirePhone) || '', email: text('email', 320), message: text('message', 10000), source_ref: text('source_ref', 1000), lead_source_id: sourceId }
 }
 
-export async function receiveIntake(db: SupabaseClient, businessId: string, sourceScope: string, requestKey: string, input: IntakeInput, rpcName: 'receive_lead_intake' | 'receive_portal_lead_intake' = 'receive_lead_intake'): Promise<IntakeReceipt> {
+export function storefrontIntakeInput(body: unknown): IntakeInput {
+  const input = intakeInput(body, null, false)
+  input.email = input.email?.toLowerCase() || null
+  if (!input.phone && !input.email) throw new IntakeError('Ange telefon eller e-post.', 400)
+  if (input.phone && !/[0-9]/.test(input.phone)) throw new IntakeError('Ange ett giltigt telefonnummer.', 400)
+  if (input.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(input.email)) throw new IntakeError('Ange en giltig e-postadress.', 400)
+  return input
+}
+
+export async function receiveIntake(db: SupabaseClient, businessId: string, sourceScope: string, requestKey: string, input: IntakeInput, rpcName: 'receive_lead_intake' | 'receive_portal_lead_intake' | 'receive_storefront_lead_intake' = 'receive_lead_intake'): Promise<IntakeReceipt> {
   if (!/^[A-Za-z0-9._:-]{8,100}$/.test(requestKey)) throw new IntakeError('Förfrågans återförsöksnyckel är ogiltig.', 400)
   const { data, error } = await db.rpc(rpcName, { p_business: businessId, p_scope: sourceScope, p_key: requestKey, p_input: input })
   if (error || !data?.id) {

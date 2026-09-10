@@ -5,8 +5,41 @@ const input={name:'Testkund',phone:'0701234567',email:'test_kund@example.invalid
 async function receive(key='request-0001',body=input,biz='a'){return (await db.query('select to_jsonb(receive_lead_intake($1,$2,$3,$4::jsonb)) r',[biz,'website',key,JSON.stringify(body)])).rows[0].r}
 async function complete(id,biz='a'){return (await db.query('select complete_lead_intake($1,$2) r',[biz,id])).rows[0].r}
 async function count(table){return Number((await db.query(`select count(*) n from ${table}`)).rows[0].n)}
-async function seed(){await db.exec("TRUNCATE lead_intake_request,leads,deal,customer,pipeline_stage,pipeline_stages,counters,business_config CASCADE;INSERT INTO business_config VALUES('a'),('b');INSERT INTO pipeline_stage VALUES('s','a','new_inquiry');")}
+async function seed(){await db.exec("TRUNCATE notification,storefront,lead_intake_request,leads,deal,customer,pipeline_stage,pipeline_stages,counters,business_config CASCADE;INSERT INTO business_config VALUES('a'),('b');INSERT INTO pipeline_stage VALUES('s','a','new_inquiry');")}
 const cases=[];const test=(name,fn)=>cases.push([name,fn])
+async function storefrontReceive(key, body, biz='a') { return (await db.query('select to_jsonb(receive_storefront_lead_intake($1,$2,$3,$4::jsonb)) r',[biz,'storefront:site',key,JSON.stringify(body)])).rows[0].r }
+test('email-only website inquiry skips empty-phone customers and replays one complete result',async()=>{
+ await db.exec("INSERT INTO customer VALUES('blank1','a','Other','',null,null),('blank2','a','Other',null,null,null);INSERT INTO storefront VALUES('a',0)")
+ const r=await storefrontReceive('email-only-1',{...input,phone:'',email:'NEW@example.invalid'})
+ const first=await complete(r.id),again=await complete(r.id)
+ assert.equal(first.receipt.state,'completed');assert.equal(again.receipt.deal_id,first.receipt.deal_id)
+ assert.equal(await count('leads'),1);assert.equal(await count('deal'),1);assert.equal(await count('notification'),1)
+ assert.equal((await db.query("select contact_form_submissions n from storefront where business_id='a'")).rows[0].n,1)
+ assert(!['blank1','blank2'].includes(first.receipt.customer_id))
+})
+test('email-only reception matches only this business and refuses ambiguous customers',async()=>{
+ await db.exec("INSERT INTO customer VALUES('other','b','Other','', 'test_kund@example.invalid',null),('a1','a','One','', 'test_kund@example.invalid',null),('a2','a','Two','', 'TEST_KUND@example.invalid',null)")
+ const r=await storefrontReceive('email-only-2',{...input,phone:''})
+ assert.equal((await complete(r.id)).receipt.error_code,'customer_ambiguous')
+ assert.equal(await count('leads'),0)
+ await db.exec("DELETE FROM customer WHERE customer_id='a2'")
+ assert.equal((await complete(r.id)).receipt.customer_id,'a1')
+})
+test('website receipt requires real contact and legacy phone-required intake stays strict',async()=>{
+ await assert.rejects(()=>storefrontReceive('invalid-1',{...input,phone:'',email:null}),/intake_invalid/)
+ await assert.rejects(()=>storefrontReceive('invalid-2',{...input,phone:'',email:'broken'}),/intake_invalid/)
+ await assert.rejects(()=>receive('legacy-1',{...input,phone:''}),/intake_invalid/)
+ assert.equal(await count('lead_intake_request'),0)
+})
+test('website notification failure rolls back entities, retaining receipt for safe retry',async()=>{
+ await db.exec("CREATE FUNCTION reject_test_notification() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected';END $$;CREATE TRIGGER reject_test_notification BEFORE INSERT ON notification FOR EACH ROW EXECUTE FUNCTION reject_test_notification();")
+ const r=await storefrontReceive('notice-fail-1',{...input,phone:''})
+ assert.equal((await complete(r.id)).receipt.state,'blocked')
+ for(const table of ['customer','leads','deal','notification'])assert.equal(await count(table),0)
+ await db.exec('DROP TRIGGER reject_test_notification ON notification;DROP FUNCTION reject_test_notification();')
+ assert.equal((await complete(r.id)).receipt.state,'completed')
+ assert.equal(await count('notification'),1)
+})
 test('receive commits before processing; replay preserves one receipt and rejects changed input',async()=>{
  const r=await receive(),again=await receive();assert.equal(r.id,again.id);assert.equal(r.state,'received');assert.equal(await count('customer'),0)
  await assert.rejects(()=>receive('request-0001',{...input,message:'Annat jobb'}),/intake_request_changed/)
@@ -87,6 +120,8 @@ test('metadata failure rolls back address and all entities, then recovery uses s
 ;(async()=>{
  db=new PGlite()
  await db.exec(`CREATE ROLE anon;CREATE ROLE authenticated;CREATE ROLE service_role;
+ CREATE TABLE notification(business_id text,type text,title text,message text,icon text,link text,is_read boolean);
+ CREATE TABLE storefront(business_id text,contact_form_submissions integer);
  CREATE TABLE business_config(business_id text primary key);
  CREATE TABLE customer(customer_id text primary key,business_id text,name text,phone_number text,email text);
  CREATE TABLE leads(lead_id text primary key,business_id text,customer_id text references customer(customer_id),name text,phone text,email text,notes text,source text CHECK(source='website_form'),status text,pipeline_stage_key text,score integer,lead_number text,lead_source_id uuid,source_ref text);
@@ -100,6 +135,7 @@ test('metadata failure rolls back address and all entities, then recovery uses s
  await db.exec(fs.readFileSync('sql/v2_durable_lead_intake.sql','utf8'))
  await db.exec('ALTER TABLE customer ADD COLUMN address_line text; ALTER TABLE leads ADD COLUMN category text, ADD COLUMN estimated_value integer; ALTER TABLE lead_sources ADD COLUMN default_category text;')
  await db.exec(fs.readFileSync('sql/v2_portal_durable_intake.sql','utf8'))
+ await db.exec(fs.readFileSync('supabase/migrations/20260910073644_storefront_durable_intake.sql','utf8'))
  let failed=0
  for(const [name,fn]of cases){await seed();try{await fn();console.log('PASS',name)}catch(e){failed++;console.error('FAIL',name,e)}}
  await db.close();assert.equal(failed,0);console.log(`PASS ${cases.length} actual SQL intake contracts (isolated PGlite)`)

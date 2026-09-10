@@ -1,13 +1,15 @@
 import { createHash } from 'crypto'
 import { NextRequest, NextResponse } from 'next/server'
-import { createLeadAndDeal } from '@/lib/leads/golden-path'
+import { IntakeError, storefrontIntakeInput, receiveIntake, completeIntake, intakeReply } from '@/lib/leads/durable-intake'
+
+export const dynamic = 'force-dynamic'
 import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { getServerSupabase } from '@/lib/supabase'
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, Idempotency-Key',
 }
 
 function clientIp(request: NextRequest): string {
@@ -21,7 +23,7 @@ function hashIp(ip: string): string {
 }
 
 export async function OPTIONS() {
-  return NextResponse.json({}, { headers: CORS_HEADERS })
+  return NextResponse.json({ contract: 'storefront-intake-v1' }, { headers: { ...CORS_HEADERS, 'Cache-Control': 'no-store' } })
 }
 
 /**
@@ -31,19 +33,17 @@ export async function OPTIONS() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}))
-    const { business_id, name, phone, email, message, _hp } = body
+    const { business_id, _hp } = body || {}
 
     // Honeypot: svara framgång så boten inte får feedback, men skriv inget.
     if (_hp) {
       return NextResponse.json({ success: true }, { headers: CORS_HEADERS })
     }
 
-    if (!business_id || !name?.trim()) {
-      return NextResponse.json({ error: 'Namn krävs' }, { status: 400, headers: CORS_HEADERS })
-    }
-    if (!phone?.trim() && !email?.trim()) {
-      return NextResponse.json({ error: 'Ange telefon eller e-post' }, { status: 400, headers: CORS_HEADERS })
-    }
+    if (typeof business_id !== 'string' || !business_id) throw new IntakeError('Företaget saknas.', 400)
+    const input = storefrontIntakeInput(body)
+    const requestKey = request.headers.get('Idempotency-Key')
+    if (!requestKey) throw new IntakeError('Ladda om formuläret innan du skickar.', 428)
 
     const rateCheck = await checkPublicRateLimitDb(`storefront-contact:ip:${hashIp(clientIp(request))}`, {
       maxRequests: 10,
@@ -85,63 +85,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Hemsidan hittades inte' }, { status: 404, headers: CORS_HEADERS })
     }
 
-    // Schemat tillåter website_form (inte storefront_contact) som källa.
-    // Samma värde används av widgeten och den publika bokningssidan.
-    const result = await createLeadAndDeal(
-      {
-        businessId: config.business_id,
-        businessPhoneNumber: config.phone_number || null,
-        name: name.trim(),
-        phone: phone?.trim() || '',
-        email: email?.trim().toLowerCase() || null,
-        message: message?.trim() || null,
-        source: 'website_form',
-      },
-      supabase,
-    )
-
-    // Lead utan affär är ett verkligt delfel. Svara aldrig success trots att
-    // en rad hann skapas — ägaren behöver kunna se och åtgärda det.
-    if (result.dealError || !result.dealId) {
-      console.error('[storefront/contact] Lead skapad men affär misslyckades:', result.dealError)
-      return NextResponse.json(
-        {
-          error: 'Förfrågan sparades, men kunde inte läggas i företagets affärsflöde.',
-          lead_created: true,
-          deal_created: false,
-        },
-        { status: 500, headers: CORS_HEADERS },
-      )
-    }
-
-    // Golden Path sköter ägar-SMS och automation-event men inte appnotisen.
-    const { error: notificationError } = await supabase.from('notification').insert({
-      business_id,
-      type: 'new_lead',
-      title: 'Ny förfrågan via hemsidan',
-      message: `${name.trim()}${message?.trim() ? `: ${message.trim().substring(0, 100)}` : ''}`,
-      icon: '🌐',
-      link: '/dashboard/pipeline',
-      is_read: false,
-    })
-    if (notificationError) {
-      console.error('[storefront/contact] Notis kunde inte skapas:', notificationError)
-    }
-
-    // Analysräknaren får aldrig avgöra om kundens förfrågan lyckades.
-    const { error: analyticsError } = await supabase
-      .from('storefront')
-      .update({ contact_form_submissions: (storefront.contact_form_submissions || 0) + 1 })
-      .eq('id', storefront.id)
-    if (analyticsError) {
-      console.error('[storefront/contact] Kunde inte uppdatera formulärstatistik:', analyticsError)
-    }
-
+    const receipt = await receiveIntake(supabase, config.business_id,
+      'storefront:' + storefront.id, requestKey, input, 'receive_storefront_lead_intake')
+    const result = await completeIntake(supabase, config.business_id, receipt.id)
     return NextResponse.json(
-      { success: true, lead_id: result.leadId, deal_id: result.dealId },
-      { headers: CORS_HEADERS },
+      { ...intakeReply(result), deal_id: result.state === 'completed' ? result.deal_id : null },
+      { status: result.state === 'completed' ? 200 : 202, headers: CORS_HEADERS },
     )
   } catch (error: unknown) {
+    if (error instanceof IntakeError) return NextResponse.json({ error: error.message }, { status: error.status, headers: CORS_HEADERS })
     const message = error instanceof Error ? error.message : 'Okänt fel'
     console.error('[storefront/contact] Oväntat fel:', message)
     return NextResponse.json(

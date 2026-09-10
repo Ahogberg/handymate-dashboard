@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import { readStorefrontSubmission, prepareStorefrontSubmission, sendStorefrontSubmission, clearStorefrontSubmission, type StorefrontSubmission } from '@/lib/leads/storefront-submission'
 import {
   Phone,
   Mail,
@@ -259,6 +260,23 @@ export default function StorefrontClient({
   const [formSending, setFormSending] = useState(false)
   const [formSent, setFormSent] = useState(false)
   const [formError, setFormError] = useState('')
+  const [formPending, setFormPending] = useState<StorefrontSubmission | null>(null)
+  const formLock = useRef(false)
+  useEffect(() => {
+    try {
+      const pending = readStorefrontSubmission(window.sessionStorage, business.business_id)
+      if (pending) {
+        setFormPending(pending)
+        setFormName(String(pending.body.name || ''))
+        setFormPhone(String(pending.body.phone || ''))
+        setFormEmail(String(pending.body.email || ''))
+        setFormMessage(String(pending.body.message || ''))
+        setFormError('Ett tidigare inskick behöver kontrolleras. Fortsätt med samma förfrågan nedan.')
+      }
+    } catch {
+      setFormError('Tidigare inskick kunde inte läsas. Kontakta företaget om du redan har skickat en förfrågan.')
+    }
+  }, [business.business_id])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [scrolled, setScrolled] = useState(false)
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null)
@@ -280,29 +298,40 @@ export default function StorefrontClient({
 
   async function handleSubmitContact(e: React.FormEvent) {
     e.preventDefault()
+    if (formLock.current) return
+    if (!formPending && !formPhone.trim() && !formEmail.trim()) {
+      setFormError('Ange telefon eller e-post.')
+      return
+    }
+    formLock.current = true
     setFormError('')
     setFormSending(true)
     try {
-      const res = await fetch('/api/storefront/contact', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
+      const pending = prepareStorefrontSubmission(window.sessionStorage, business.business_id, {
           business_id: business.business_id,
           name: formName,
           phone: formPhone,
           email: formEmail,
           message: formMessage,
-        }),
-      })
-      if (res.ok) {
+          _hp: new FormData(e.currentTarget as HTMLFormElement).get('website') || '',
+        }, () => crypto.randomUUID())
+      setFormPending(pending)
+      const result = await sendStorefrontSubmission(pending, fetch)
+      if (result.completed) {
+        try { clearStorefrontSubmission(window.sessionStorage, business.business_id) } catch { /* The saved receipt remains safe to replay. */ }
         setFormSent(true)
       } else {
-        const data = await res.json()
-        setFormError(data.error || 'Något gick fel')
+        if (result.status === 400 || result.status === 428) {
+          // These statuses are validation failures before durable reception.
+          clearStorefrontSubmission(window.sessionStorage, business.business_id)
+          setFormPending(null)
+        }
+        setFormError(result.result.message || result.result.error || 'Resultatet kunde inte bekräftas. Kontrollera samma förfrågan igen.')
       }
     } catch {
-      setFormError('Kunde inte skicka förfrågan')
+      setFormError('Resultatet kunde inte bekräftas. Försök med samma förfrågan igen. Om felet kvarstår, kontakta företaget.')
     } finally {
+      formLock.current = false
       setFormSending(false)
     }
   }
@@ -914,7 +943,7 @@ export default function StorefrontClient({
                     <div className="text-center py-12">
                       <CheckCircle className="w-16 h-16 text-green-500 mx-auto mb-4" />
                       <h3 className="text-2xl font-semibold text-gray-900 mb-2">Tack!</h3>
-                      <p className="text-gray-500">Vi återkommer inom 24 timmar.</p>
+                      <p className="text-gray-500">Din förfrågan är mottagen.</p>
                     </div>
                   ) : (
                     <form onSubmit={handleSubmitContact} className="space-y-4">
@@ -926,6 +955,8 @@ export default function StorefrontClient({
                       <input
                         type="text"
                         value={formName}
+                        readOnly={!!formPending}
+                        maxLength={200}
                         onChange={e => setFormName(e.target.value)}
                         required
                         placeholder="Ditt namn *"
@@ -935,6 +966,8 @@ export default function StorefrontClient({
                         <input
                           type="tel"
                           value={formPhone}
+                          readOnly={!!formPending}
+                          maxLength={80}
                           onChange={e => setFormPhone(e.target.value)}
                           placeholder="Telefon"
                           className={`w-full h-12 px-4 bg-gray-50 border-0 rounded-xl text-base focus:ring-2 ${c.ring} focus:border-transparent`}
@@ -942,6 +975,8 @@ export default function StorefrontClient({
                         <input
                           type="email"
                           value={formEmail}
+                          readOnly={!!formPending}
+                          maxLength={320}
                           onChange={e => setFormEmail(e.target.value)}
                           placeholder="E-post"
                           className={`w-full h-12 px-4 bg-gray-50 border-0 rounded-xl text-base focus:ring-2 ${c.ring} focus:border-transparent`}
@@ -949,6 +984,8 @@ export default function StorefrontClient({
                       </div>
                       <textarea
                         value={formMessage}
+                        readOnly={!!formPending}
+                        maxLength={10000}
                         onChange={e => setFormMessage(e.target.value)}
                         placeholder="Beskriv vad du behöver hjälp med..."
                         rows={4}
@@ -960,7 +997,7 @@ export default function StorefrontClient({
                         disabled={formSending}
                         className={`w-full h-12 rounded-xl text-white font-semibold text-lg ${c.accent} ${c.accentHover} transition-all disabled:opacity-50`}
                       >
-                        {formSending ? 'Skickar...' : 'Skicka förfrågan'}
+                        {formSending ? 'Kontrollerar...' : formPending ? 'Kontrollera samma förfrågan' : 'Skicka förfrågan'}
                       </button>
                     </form>
                   )}
