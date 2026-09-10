@@ -62,6 +62,7 @@ import { resolveGoalType } from '@/lib/mission/goal-type'
 export function MatteHero({
   greetingName,
   queueLoaded,
+  queueKnown,
   beslut,
   nbaKandidater,
   bevis,
@@ -71,6 +72,7 @@ export function MatteHero({
 }: {
   greetingName: string
   queueLoaded: boolean
+  queueKnown: boolean
   /** Antal beslut som väntar — samma räknare som sektionsbadgen. */
   beslut: number
   /** De SYNLIGA rankade kandidaterna (samma lista som GorDettaForst får). */
@@ -78,7 +80,7 @@ export function MatteHero({
   /** halsningsBevis-raden — fallback när ingen NBA-rad finns. */
   bevis: string | null
   /** Dygnsdigestens automatiska rader (auto-flaggan). */
-  autoCount: number
+  autoCount: number | null
   /**
    * Uppdragsradens band (Etapp E) — förslagschipsen/fritextpillen när inget
    * uppdrag är aktivt, eller en kompakt "Öppna →"-yta när ett är det.
@@ -94,11 +96,12 @@ export function MatteHero({
    */
   absenceBand?: React.ReactNode
 }) {
-  const { mission, progress, loading: missionLoading } = useMission()
+  const { mission, progress, loading: missionLoading, error: missionError } = useMission()
   const missionActive = mission != null && mission.status === 'active'
   // Väntar in BÅDA källorna innan rubriken påstår något — se
   // ärlighetsreglerna ovan.
-  const heroLoaded = queueLoaded && !missionLoading
+  const heroLoaded = queueLoaded && queueKnown && !missionLoading && !missionError
+  const heroFailed = (queueLoaded && !queueKnown) || (!missionLoading && Boolean(missionError))
 
   const datum = new Date()
     .toLocaleDateString('sv-SE', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -120,8 +123,8 @@ export function MatteHero({
             : undefined,
       )}`
     : beslut === 0
-      ? 'Inget behöver dig just nu. Allt är hanterat.'
-      : `${beslut} ${beslut === 1 ? 'sak' : 'saker'} behöver dig i dag. Resten är hanterat.`
+      ? 'Inga beslut väntar just nu.'
+      : `${beslut} beslut behöver dig i dag.`
 
   // Beloppssumman: bara verkliga belopp räknas, och en enda UPPSKATTAT-del
   // gör hela summan ungefärlig (~) — en blandad summa som ser exakt ut
@@ -156,6 +159,8 @@ export function MatteHero({
               <h1 className="m-0 mt-0.5 font-heading text-[20px] sm:text-[24px] font-bold tracking-[-0.02em] leading-tight text-white">
                 {headline}
               </h1>
+            ) : heroFailed ? (
+              <p role="alert" className="m-0 mt-1 text-sm text-amber-200">Läget kunde inte läsas. Försök igen.</p>
             ) : (
               <div className="mt-1.5 h-6 sm:h-7 w-56 sm:w-80 max-w-full bg-white/10 rounded animate-pulse" aria-hidden />
             )}
@@ -226,14 +231,14 @@ export function MatteHero({
             </div>
           </div>
         ) : (
-          heroLoaded && !missionActive && (autoCount > 0 || beslut > 0) && (
+          heroLoaded && !missionActive && ((autoCount ?? 0) > 0 || beslut > 0) && (
             <div className="flex gap-7 shrink-0 border-t lg:border-t-0 lg:border-l border-white/10 pt-3.5 lg:pt-0 lg:pl-7">
-              {autoCount > 0 && (
+              {autoCount != null && autoCount > 0 && (
                 <div>
                   <div className="font-heading tabular-nums text-[26px] sm:text-3xl font-bold leading-none text-white">
                     {autoCount}
                   </div>
-                  <div className="text-xs text-white/55 mt-1">skötta sedan i går</div>
+                  <div className="text-xs text-white/55 mt-1">verifierade resultat</div>
                 </div>
               )}
               <div>

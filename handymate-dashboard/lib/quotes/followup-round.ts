@@ -29,6 +29,37 @@ export function followupProviderAccepted(card: any, scope: QuoteFollowupRound): 
     && typeof id === 'string' && !!id.trim()
 }
 
+export interface QuoteFollowupReceipt {
+  approvalId: string
+  round: number
+  channel: 'sms' | 'email'
+  executedAt: string
+  artifactId: string
+}
+
+/** Senaste verifierade kvittot bland exakt offertens tre deterministiska omgångar. */
+export function latestQuoteFollowupReceipt(
+  cards: any[],
+  scopes: QuoteFollowupRound[],
+  businessId: string,
+  nowMs: number,
+): QuoteFollowupReceipt | null {
+  const byId = new Map(cards.map(card => [card.id, card]))
+  const receipts: QuoteFollowupReceipt[] = []
+  for (const scope of scopes) {
+    const card = byId.get(quoteFollowupApprovalId(businessId, scope))
+    const savedScope = parseQuoteFollowupRound(card?.payload?.quote_followup_round)
+    if (!card || !savedScope || savedScope.quote_id !== scope.quote_id || savedScope.sent_at !== scope.sent_at
+      || savedScope.round !== scope.round || !followupProviderAccepted(card, scope)) continue
+    const executedAt = card.payload?.execution_result?.executed_at
+    const executedMs = typeof executedAt === 'string' ? Date.parse(executedAt) : NaN
+    if (!Number.isFinite(executedMs) || executedMs < Date.parse(scope.sent_at) || executedMs > nowMs) continue
+    const artifactId = card.payload.execution_result.artifacts[scope.channel === 'sms' ? 'sms_id' : 'message_id']
+    receipts.push({ approvalId: card.id, round: scope.round, channel: scope.channel, executedAt, artifactId })
+  }
+  return receipts.sort((a, b) => Date.parse(b.executedAt) - Date.parse(a.executedAt))[0] || null
+}
+
 /** Shared by composition and approval execution. A run/approval is not delivery. */
 export async function verifyQuoteFollowupSource(db: SupabaseClient, businessId: string, scope: QuoteFollowupRound,
   recipient?: unknown, fingerprint?: unknown) {

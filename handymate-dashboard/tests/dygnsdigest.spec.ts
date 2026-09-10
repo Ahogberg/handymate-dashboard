@@ -55,6 +55,10 @@ test.describe('grindarna', () => {
     expect(byggDygnsdigest({ aktiviteter: [akt('x', { status: 'failed' })], nu: NU })).toEqual([])
   })
 
+  test('en lyckad körning utan verifierat domän- eller leveransutfall är inte hanterat', () => {
+    expect(byggDygnsdigest({ aktiviteter: [akt('x', { verified: false })], nu: NU })).toEqual([])
+  })
+
   test('rader utan beskrivning faller', () => {
     expect(byggDygnsdigest({ aktiviteter: [akt('x', { description: null })], nu: NU })).toEqual([])
     expect(byggDygnsdigest({ aktiviteter: [akt('x', { description: '   ' })], nu: NU })).toEqual([])
@@ -142,8 +146,9 @@ test.describe('ytan', () => {
     expect(skott).toContain('Godkänt av dig')
   })
 
-  test('hälsningen använder bevisraden och färska beslut prependas orörda', () => {
-    expect(home).toContain('halsningsBevis(proof, beslut)')
+  test('hälsningens bevis använder verifierade källrader och inte optimistiska beslut', () => {
+    expect(home).toContain('activityKnown && verifieradeHanterade.length > 0')
+    expect(home).not.toMatch(/const bevis[\s\S]{0,180}doneRows/)
     // executeSend-prepend till doneRows är orörd — färskt beslut syns direkt.
     expect(home).toContain('setDoneRows(prev => [{')
     expect(home).toContain('...doneRows,')

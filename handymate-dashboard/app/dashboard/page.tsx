@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { svDateStr } from '@/lib/dates'
 import JarvisHome from '@/components/jarvis/JarvisHome'
 
@@ -35,6 +36,21 @@ interface BookingRow {
 }
 
 export default function DashboardPage() {
+  const business = useBusiness()
+  const { user } = useCurrentUser()
+
+  if (!business?.business_id) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+      </div>
+    )
+  }
+
+  return <DashboardContent key={`${business.business_id}:${user?.id || ''}`} />
+}
+
+function DashboardContent() {
   const business = useBusiness()
 
   const [bookings, setBookings] = useState<BookingRow[]>([])
@@ -82,14 +98,6 @@ export default function DashboardPage() {
 
     return () => { active = false }
   }, [business?.business_id])
-
-  if (!business?.business_id) {
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
-      </div>
-    )
-  }
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">

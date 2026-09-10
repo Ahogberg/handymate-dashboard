@@ -486,36 +486,51 @@ Den ska kartlägga verklig runtime.
 
 ## 7.1 Minsta auditmatris
 
-Skapa och underhåll matrisen nedan i detta dokument.
+Underlag: [skiva 0](../brain-visibility/SLICE_0_CAPABILITY_REALITY_AUDIT.md) och [detaljmatris](../brain-visibility/CAPABILITY_MATRIX_PREFILL.md). Ursprunglig audit följd av daterad Codex-verifiering; status uppgraderas endast med bevis.
 
-| Capability | Code | Trigger | Real data | Can act | Approval/autonomy | Receipt/audit | Web exposure | Mobile exposure | Live/E2E proof | Cost concern | Status | Next action |
+Legend: ✅ finns/ja · ⚠️ delvis · ❌ nej/saknas · `n` = prod-antal 2026-09-10 · facit = källskannande test, E2E = inloggad browser/route-körning
+
+| Capability | Code | Trigger | Real data | Can act | Approval/autonomy | Receipt/audit | Web | Mobile | Live/E2E proof | Cost | Status | Next action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Company Scan | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Value Receipts | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Next Best Action | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Company Goals | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Customer Memory | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Business Preferences / Rules | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Quote Intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Quote Follow-up | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Meeting Intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Work Report | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Voice / Matte field input | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| ÄTA detection | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Customer promises | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Project intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Profitability / Margin | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Invoice / accounting intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Fortnox | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| ROT/RUT | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Missions / agent work | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Approval rail | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Operating Experiments | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Partner / referral capability | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
+| Company Scan | ✅ `company-scan-rows.ts` | klient (hem, onboarding) | läser invoice/customer/project/quotes; tomt konto → 0 rader | ❌ läs | – | ❌ inget kvitto | ✅ hem + onb. | ❌ | facit ×5 | 0 | **PROVE** | kall testperson; besluta om kvitto |
+| Value Receipts | ✅ `lib/value/*` | on-demand | 109 utförda kort, 12 fakturor (test) | ❌ | – | ⚠️ omräknas per anrop, ingen tabell | ✅ /pengar, hem | ❌ | E2E (golden-path) | 0 | **PROVE** | visa nära kontext (skiva 6); persistens = beslut |
+| Next Best Action | ✅ `lib/jarvis/next-best-action*` | cron 07:00 | grind: ≥2 kand. + ≥1 priority_rule → **0 regler, 0 rader någonsin** | rankar bara | – | ✅ `next_best_action` | ✅ GorDettaForst | ✅ mobile-home | facit ×3 | Sonnet/dag/företag (körs aldrig) | **ACTIVATE** | seed standardprinciper i genomgången |
+| Company Goals | ✅ kolumner på business_config | ägaren i settings/onb. | **1 marginalmål, 0 omsättningsmål** av 29 | guardian-kort | INFORMATIONAL | kortet | ✅ monthly-review, projekt | ✅ profitability/mobile | E2E (margin-guardian) | 0 | **ACTIVATE** | obligatoriskt/förifyllt mål i genomgången |
+| Customer Memory | ✅ `lib/customer-facts/*` | gmail-poll */15, voice/analyze, cron 07:20 | 6 fakta, 4 godkända (prov) | via kort | `customer_fact` | ✅ rad + decision_record | ✅ kundsida | ❌ | E2E (golden-path) | Haiku/mejl | **PROVE** | ett riktigt samtal genom kedjan |
+| Business Rules / Prefs / Agent memory | ✅ 3 mekanismer | ägaren; efter agentkörning | **0 business_rule, 0 priority_rule**, 37 agent_memories | input | `agent_memory_confirmation` | ✅ 3 tabeller | ✅ settings | ❌ | facit ×5 | Haiku/agentkörning | **ACTIVATE** (regler) / PROVE (minne) | regelfråga i genomgång eller första Matte-samtal |
+| Quote Intelligence | ⚠️ 3 överlappande motorer | offertsida GET, cron 05:00, tool | kräver 3+ avslutade jobb/kategori → `insufficient` överallt; 7 rader pricing_intelligence | `price_adjustment`-kort | ja | execution_result, cost_event | ✅ offert, builder | ❌ | facit ×10 | Sonnet + Haiku | **ACTIVATE** | efter lansering: en yta "så sattes priset" |
+| Quote Follow-up | ✅ cron-rutt + `followup-round.ts` | cron 08:00, first-action, thresholds | 42 offerter, 11 uppföljda, 2070 loggar | SMS under autonomitak / `send_sms`-kort | ja, per runda bunden till kort (7f367da5) | ✅ v3_automation_logs + follow_up_count + kort | ⚠️ approvals; offertsidan säger bara "Skickad" | ✅ kort | facit ×7, ingen E2E | 0 i cron | **EXPOSE** | **skiva 2:** läsmodell på offertsidan |
+| Meeting Intelligence | ✅ `lib/meetings/*` | worker */5, reminders */5 | 1 möte, 1 segment | kort ×4 typer | ja | meeting_job/segment, call_recording, cost_event | ✅ inkorg, recordings | ⚠️ samma yta | facit ×5 | Whisper + Claude | **PROVE** | riktigt möte, två telefoner |
+| Work Report (fältrapport + Matte dagsavslut) | ✅ två saker | UI + token; DayClose → /api/day-close | **0 field_reports** | signering; time_entry/project_log via bekräftelsekort | egna kort, ej pending_approvals | field_reports; deterministiska id | ✅ projekt, jobbpass, portal | ✅ signeringssida | facit ×4 | Sonnet (Matte) | **PROVE** | riktigt dagsavslut från telefon; = Field Command-substrat |
+| Voice / Matte field input | ✅ `voice/analyze` (1107 r), `lib/transcription/*` | 46elks-webhooks, UI, Jobbkompisen | 6 inspelningar, 1 transkript; **46elks 8 kr** | kort ×4 | ja | call_recording, kort, cost_event | ✅ calls, recordings, inkorg, kund | ✅ Jobbkompisen | facit ×10 + 46 unit (transkription) | Whisper + Claude | **PROVE (blockerad)** | fyll 46elks, telefonprov |
+| ÄTA detection | ✅ `lib/ata/suggest-ata-draft.ts` | analyze, tool, Matte, manuell | 9 project_change (manuella), **0 `create_ata_draft`-kort någonsin** | kort, max 1/samtal | ja, risk low | project_change, artifacts, PDF | ✅ projekt | ✅ portal-beslut | facit ×6 | Claude ×2 | **PROVE** | samtal med extra scope; Change Order Radar = detta + jämförelse |
+| Customer promises | ✅ i `customer_fact` (v147) + deadline-sweep | cron 07:20, analyze, gmail | **0 öppna löften** (kräver extrakt + godkännande) | nudge-kort, aldrig "brutet" auto | Matte | customer_fact + kort | ✅ kundsida, projekt | ✅ kort | unit ×5 | Haiku (extrakt) | **PROVE** | Promise Engine = EXPOSE + löften ur SMS/röst |
+| Project intelligence | ✅ `project-ai-engine` + playbook + drift + mission | 4 crons + events | project_ai_log **770** (lever), lesson 3, mission 0, drift-kort 4 | kort ×3 typer | ja | project_ai_log, execution_outcome | ✅ projekt, approvals, MissionPanel | ✅ kort + räknare | E2E `flywheel`, `mission-proof` (service-role) | extraction-modell (mönster) | motor **PROVE**, playbook+mission **ACTIVATE** | skiva 3 = EXPOSE av loggen på projektsidan |
+| Profitability / Margin | ✅ `margin-guardian.ts`; ⚠️ gammal `calculateProfitability` lever | cron 06:00 + realtid | **0 profitability_warning-kort**; 1264 cost_event/30 d | INFORMATIONAL-kort; bränsletak blockerar | Karin | kort, cost_event | ✅ projekt, Fuel* | ✅ profitability/mobile | E2E (margin-guardian) | 0 | **PROVE** | ta bort gamla vägen (liten CONNECT) |
+| Invoice / accounting (inkl. **fakturaberedskap**) | ✅ `auto-invoice-on-complete`, `send-invoice`, `fakturaberedskap.ts`, `RedoAttFakturera.tsx` | projektavslut, 4 crons | 12 fakturor, **0 påminnelser skickade** | skapar/skickar, overdue, avgift/ränta | `invoice_reminder`-kort; mandat | invoice_reminders, customer_activity, manifest | ✅ invoices, projekt; ⚠️ beredskap ej på hem | ⚠️ kortfeed | facit ×15 + golden-path | 0 | **PROVE** (kedja) / **EXPOSE** (beredskap) | "X kr väntar på fakturering" på hem = summa av beredskap |
+| Fortnox | ✅ `lib/fortnox*`; 4 ingångar mot samma kärna | cron */2h; Fortnox-först vid utskick | **0 kopplade**, 19 api_log | externa skrivningar, **ej spåret** | – | fortnox_api_log, automation_activity, invoice-kolumner | ✅ integrations, invoices | ❌ | facit ×15, **0 live** | 0 | **PROVE (blockerad)** | Andreas kopplar riktigt konto i helgen; en faktura genom |
+| ROT/RUT | ⚠️ **två vägar** (egen XML vs Fortnox taxreductions) | UI only | **0 rot_payment_request** | skriver request + status; `hasPermission` | ej spåret | rot_payment_request, automation_activity | ✅ rot-payment, offert/faktura-sektioner | ❌ | facit ×9, 0 live | 0 | **PROVE + arkitekturbeslut** | Astra: en väg |
+| Missions / agent work | ✅ `lib/agents/*` (kanonisk), `lib/mission/*`; `lib/agent/*` 13/17 levande | 6 crons; mission ingen cron | agent_runs 1362 (282/30 d), **mission 0** | via `agent-gating.ts` | ja | agent_runs, automation_activity | ✅ JarvisHome | ✅ räknare | facit ×20, mission-proof | **hög**; Matte-chat utanför taket | agenter **PROVE**, missions **ACTIVATE** | Matte-chat under taket; radera 4 filer utan anropare |
+| Approval rail | ✅ `lib/approvals/*`, `[id]/route.ts` >3000 r, per-typ-grindar | alla producenter; användaren | **477 kort, 26 väntande, 109 utförda**, 30+ typer | ja | ja; självgodkännande nekas; fyra-ögon | execution_result klassad | ✅ approvals, hem, RailCard | ✅ 3 kort + push | E2E (golden-path, permission-check) | 0 | **SCALE** | inget bygge; skiva 5 = visa `_decision` som redan finns |
+| Operating Experiments | ✅ `lib/experiment/*` | inline + maintenance 03:00 | **0 rader** (kräver avslutade projekt) | kort ×2 | owner_admin | tabellrad | ✅ /experiments | ❌ | facit + experiment-proof | 0 | **ACTIVATE** (sovande by design) | rör inte |
+| Partner / referral | ✅ `lib/partners/*` | Stripe-webhook, portal; ingen cron | 2 partners, 0 ledger | direkt, **ej spåret** | admin + token | ledger, payout_batch, events | ✅ /partners | ❌ | facit ×15 | 0 | **PROVE** | utanför programmet |
+| **Home / Mission Control** | ✅ JarvisHome 1980 r, 18 datakällor; räkningarna finns (MatteHero:123, TeamActivityStrip:66) | klient | allt ovan | – | – | – | ✅; ⚠️ gamla Idag-vyn parallell på /oversikt | ✅ /api/mobile/home | facit ×6 | 0 | **EXPOSE** | **skiva 1:** läsmodell, ingen ny struktur; hanterat ≠ failed |
+| **Adoption / "hanterat"** | ✅ `lib/admin/adoption.ts` (8 ytor), activation-metrics, weekly-value | admin; cron | veckorapport **0/4 lyckade**; 53 tysta fel/7 d | – | – | automation_activity | ⚠️ bara admin | ❌ | facit | 0 | **EXPOSE** | laga veckorapport + tysta fel FÖRST |
+| **Mobilappen** | separat repo `handymate-mobile`; backend `/api/mobile/home`, push | – | 1 push_token, 0 web-push, **VAPID saknas** | – | – | push-journal | – | ⚠️ | facit (push ×5) | 0 | **CONNECT** | VAPID i Vercel; bygg + installera |
 
-Lägg till capabilities som hittas.
+**Fördelning:** SCALE 1 · EXPOSE 4 · ACTIVATE 6 · PROVE 11 · CONNECT 1 · **BUILD 0**.
 
-Slå ihop redundanta namn när samma motor ligger bakom flera ytor.
+
+## Codex-verifiering 2026-09-10
+
+Kodbas: `3ae0029` (main efter uppladdat styrdokument); Claudes historiska audit gäller `64484e11`. Räkningar nedan är läsande SQL mot Handymates prodprojekt, inte provider- eller E2E-bevis.
+
+- Bekräftat: 29 företag; 1 uttryckligt marginalmål; 0 omsättningsmål, prioriteringsregler, business rules, NBA-rader, Fortnox-kopplade företag och ROT-begäranden.
+- Bekräftat: 477 approval-rader: 109 `approved`, 26 `pending`, 324 `expired`, 18 `rejected`. **109 godkända är inte 109 utförda handlingar**: runtime `payload.execution_result.outcome` är 37 `success`, 13 `failed`, 22 `skipped`, 37 saknas. Auditens historiska formulering "109 utförda" är därmed fel; sparat success är i sin tur inte automatiskt live-providerbevis.
+- Bekräftat senaste sju dagar: 53 `tyst_fel/failed` (43 `telefonnummer_saknas`, 10 `sms:leverantorsfel-saldo`), 4 `veckorapport/failed`, inga lyckade veckorapporter. Dessa auditposter ska inte raderas eller omskrivas till success.
+- Bekräftad schemadrift: `customer_document` har `id`, inte `document_id`.
+- Rättelse: `tryAutoApprove` har ingen runtime-anropare i TS/TSX. `/api/automations` läser `getAutoApproveStats`; `/api/auto-approve/patterns` läser lärandestatistik. `voice/analyze` har avvecklat legacy-vägen. Legacy-exekveraren respekterar inte dagens routing/mandat och får inte återaktiveras; detta är inte en verifierad aktiv automatisk bypass.
+- Inga förmågor uppgraderas. Övriga uppgifter/statusar är Claudes underlag; ingen ny live-, provider- eller mobilverifiering har gjorts. Fördelningarna i ursprungsunderlagen är inte normaliserade: blandade delstatusar ska inte tolkas som en verifierad summering av en primär status per rad.
 
 ---
 
@@ -1471,76 +1486,110 @@ Brain Visibility Weekend
 2026-09-11 → 2026-09-13
 
 ### OVERALL STATUS
-NOT STARTED
+
+Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av slice 1 och 2 är implementerad och lokalt verifierad. Slice 1/2 är INTE stängda enligt sina Definition of Done; preview, verklig kundresa och externa providerbevis återstår.
+
+| Del | Aktuell status | Kvar före stängning |
+| --- | --- | --- |
+| Slice 0 — audit | Klar för att styra nästa bygge | Osäkra runtime-rader behåller sin osäkerhet; matrisen uppdateras vid nya bevis |
+| CONNECT före Home | Veckorapportskod och lokala tester klara; driftblocker kvar | Nummer/saldo, avstämning av fyra äldre rapportfel, verifierad leverans |
+| Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
+| Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
+| Slice 3–10 | Inte påbörjade i denna session | Respektive leverans och testgrind |
+
+Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
-SLICE 0 — Capability Reality Audit
 
-### CURRENT OBJECTIVE
-Kartlägg den faktiska intelligensen på aktuell `main` och mobile innan någon större ny implementation görs.
+Verifiering av slice 1 och 2 samt kvarvarande CONNECT-driftblocker. Inget nytt slice-bygge före denna avstämning.
 
-### DEFAULT NEXT ORDER
-1. Capability Reality Audit
-2. Brain Surface / Home
-3. Quote Brain
-4. Project / Job Brain
-5. Customer Brain
-6. Explainability
-7. Proof of Work / Value Receipts
-8. Mobile Brain Visibility
-9. Field Command 2.0
-10. Money Brain
-11. Full Journey Proof
+### LAST COMPLETED — historisk auditbaseline
 
-### KNOWN HIGH-PRIORITY QUESTIONS
-
-- Hur mycket av Company Scan är faktiskt aktivt, kundsynligt och E2E-bevisat?
-- Hur används Value Receipts i riktig UI idag?
-- Finns NBA/Company Goals men saknar real-world consumer/data?
-- Hur mycket av Field Command-substratet finns redan?
-- Är ÄTA-detection från samtal/möten runtime-aktiv och säkert kopplad till rätt projekt/offert?
-- Vilka kundlöften finns redan och vad saknas för full Promise Engine?
-- Vilken rule/memory-logik har faktisk downstream consumer?
-- Vad är Operating Experiments verkliga runtime-status?
-- Vad består befintligt partnerprogram av och vad är endast referral/provision?
-- Vilken intelligent state finns idag men är dold i auditloggar/backend?
-- Vilka smarta capabilities fungerar på web men inte mobile?
-- Vilka LLM-anrop görs i onödan eller flera gånger?
-- Var saknas provider-proof trots gröna tester?
-- Kan Home redan byggas huvudsakligen som read model ovanpå befintliga primitives?
-
-### KNOWN LAUNCH-CRITICAL JOURNEYS
-
-A. Onboarding → First Real Value  
-B. Inquiry → Quote → Follow-up → Customer Decision → Project  
-C. Work → Time/Material/ÄTA → Invoice Basis → ROT/RUT → Fortnox
-
-### PROGRAM DEFAULT
-CONNECT → ACTIVATE → EXPOSE → PROVE
-
-### NEW BUILD POLICY
-BUILD only when audit proves the required capability/primitive does not already exist.
-
-### LAST COMPLETED
-None.
+Skiva 0: matris med 25 rader, statusfördelning SCALE 1 / EXPOSE 4 / ACTIVATE 6 / PROVE 11 / CONNECT 1 / BUILD 0. Lokal katalog synkad till origin/main 64484e11; typkontroll grön (kräver `--max-old-space-size=8192`).
 
 ### VERIFIED
-None in this program yet.
+
+Kodinventering mot origin/main; runtime-antal ur prod; cron-lista; anropare för `lib/agent/*`, DayClose → dagsavslut, automation-engine.
 
 ### NOT VERIFIED
-Entire Brain Visibility program.
+
+Mobilappens byggstatus (separat repo); om `auto-approve*` respekterar `routing.ts`-grindarna; om `pdf-preview.ts` (pdfjs-dist) fungerar i prod-build.
+
+### STATUS CHANGES
+
+Alla 25 rader: AUDIT → (se matris). Två rättelser mot förhandsversionen: Work Report CONNECT → PROVE (inkopplat via DayClose); "lib/agent död" → 4 filer döda, resten levande.
 
 ### OPEN RISKS
-- Duplicating existing intelligence because naming differs.
-- Showing agent activity without durable object linkage.
-- Overstating financial value.
-- Desktop-only improvements for field workflows.
-- Increasing LLM cost just to generate presentation text.
-- Destabilizing launch-critical flows through unnecessary refactors.
-- Treating green isolated tests as live customer-journey proof.
 
-### NEXT ACTION
-Perform SLICE 0 Capability Reality Audit and update the matrix in this document with repo-grounded evidence before starting implementation.
+- 53 tysta fel + trasig veckorapport gör varje "hanterat"-påstående osant tills de är lagade.
+
+- Fjärde Home-ombyggnaden på två månader om skiva 1 inte hålls till läsmodell.
+
+- 1264 LLM-kostnadshändelser/30 d utan en riktig kund; Matte-chat utan tak.
+
+- GO-förutsättningarna (46elks, Stripe live, VAPID, Google, schemafix, Fortnox) ligger utanför programmet men blockerar all PROVE.
+
+### NEXT ACTION — överlämningens prioritering, aktuell checkpoint nedan
+
+1. CONNECT: töm tysta fel, laga veckorapporten (Fable, ~2 h).
+
+2. EXPOSE: Quote Brain-läsmodell på offertsidan ur `followup-round.ts` + `v3_automation_logs` (Codex, ~4–5 h).
+
+3. EXPOSE: Home-läsmodell med fem states ur befintliga källor, `failed` räknas aldrig som hanterat (Fable, ~5–6 h).
+
+4. ACTIVATE: standardprinciper + mål i genomgången (~2 h).
+
+5. Astra-beslut: ROT-väg; `auto-approve*` vs `routing.ts`.
+
+### CODEX CHECKPOINT 2026-09-10
+
+Dokument infogade mot main `3ae0029`; initial dokumentcommit `87d3355`. Runtimekontroller och begränsningar i §7.1. Arbetsordningen följer auditens §8 (CONNECT → Quote → Home), eftersom sanningsenlig leveransstatus krävs före Home-claims.
+
+**DONE / REUSED:** veckorapporten återanvänder SMS-sändaren, värdekärnan och `automation_activity` för en atomär veckoreservation och separata auditposter. Inga nya tabeller. Fail-closed för fel i paus-, dedupe- och rapportunderlag. Bara bevisat utebliven sändning tillåter retry. Osäkert providersvar eller success utan provider-id låser för avstämning. Legacy-fel omsänds inte automatiskt.
+
+**VERIFIED:** separat veckorapport-harness för samtidighet/retry/timeout/5xx/saknat provider-id/auditfel grön. Samlad körning: 132 tester gröna (Home, dygnsdigest, autopilot-rapport, strict-read, Quote Brain, first-value-production och durable-followup). Slutlig `NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit` grön. Testerna kör faktisk logik/rutthanterare med kontrollerade beroenden; vissa befintliga kontraktstester granskar källkod. Detta är inte webbläsar-E2E. Produktion endast SELECT för audit/schema.
+
+**NOT VERIFIED / RISKS:** inga riktiga utskick; 46elks-saldo/telefonnummer och gamla fyra misslyckade veckorapporter kräver extern åtgärd/avstämning. Inga historiska fel raderade. Inga capability-statusar uppgraderade.
+
+**QUOTE — KOD IMPLEMENTERAD / LOKALT VERIFIERAD:** befintlig handoff-kedja läser tre deterministiska rundkort för aktuell sent_at och visar senaste sändkvittens med giltig exekveringstid och kanalens artifact-id. Ingen ny endpoint eller skrivning från GET. Oberoende Astra-review klar; 25 riktade offert-/routetester gröna. Kvittot påstår inte läsning hos kund. Reliability-review klar.
+
+**LOKALA COMMITS:** dokument `87d3355`, reliability `ed0345a`, Quote `3ef6c3d`, Home `c6b24a3`, på `codex/brain-visibility-weekend-20260910`. Användaren har uttryckligen godkänt push av branchen inklusive auditdokumenten till det publika repot. Merge/deploy har inte utförts.
+
+**HOME — KOD IMPLEMENTERAD / ÅTERANVÄNDNING:** fem kategorier via liten presentationsadapter och befintliga källor. Kö/NBA-läsfel visas uttryckligt; inga ovillkorliga allt-hanterat-claims. Hanterat begränsas till visade aktivitetsrader med identifierat leveransbevis, inte optimistiska beslut eller generiska agent-successes. Uppföljningar filtreras på `scheduled` i befintlig handover; pengakategorier summeras inte till kronor. Hela dashboardinnehållet återställs per företag/användare; relevanta läsningar uppdateras vid fokus. Befintliga API:er kompletterade med fullständighetsinformation. Astra-slutreview klar efter rättning av tidsfönstertext. UI-översikten är en första läsyta; inte bevis för att alla launch-förmågor är aktiva.
+
+**LOKAL KÖRMILJÖ:** lokal Chromium avbryts med SIGTRAP. Molnwebbläsaren ansluter, men lokal serveradress blockeras med ERR_BLOCKED_BY_CLIENT. Försök att starta Next dev avbröts i Sentry instrumentation (`uv_resident_set_memory`, ENOENT). Ingen fungerande appserver eller browser-/mobilverifiering kan därför påstås. Slutligt `npm run build` mot Home-commit `c6b24a3` avslutades med exitkod 0 (325/325 sidor genererade). Byggloggen innehåller ändå saknad Supabase-konfiguration och befintliga metadata/dynamic-render-varningar. Grönt bygge är därför inte bevis för fungerande inloggning eller runtime i denna miljö.
+
+**NEXT ACTION:** skapa åtkomlig preview av arbetsbranchen med korrekt testkonfiguration och testkonto; kör riktiga Home/Quote-resor inklusive omladdning, läsfel, företagsbyte och smal skärm. Avstäm därefter de fyra legacy-veckorapporterna mot provider före eventuell omsändning och åtgärda nummer/saldo. ROT-exklusivitet och legacy suggestions-tenantgrind kvarstår före launch. Tidigare push blockerades av automatisk säkerhetsgranskning; användaren har därefter uttryckligen godkänt publicering av branchen inklusive auditdokumenten. Nästa publiceringssteg är push och draft-PR, inte merge till main.
+
+### REPRODUCERA LOKALA KONTROLLER
+
+Kör från `handymate-dashboard/` efter `npm ci`:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=8192 npx tsc --noEmit
+node tests/veckorapport-reliability-harness.cjs
+npx playwright test tests/home-brain.spec.ts tests/dygnsdigest.spec.ts tests/autopilot-rapport.spec.ts tests/weekly-value-read-errors.spec.ts tests/quote-brain.spec.ts tests/first-value-production.spec.ts tests/durable-followup.spec.ts --no-deps --project=chromium --workers=1 --reporter=line
+npm run build
+```
+
+Den uppräknade testsamlingen startar inte någon browser och använder inte produktion. Kör inte en ospecificerad full Playwright-svit som ersättning: repots standard-BASE_URL pekar mot produktion och vissa separata resor gör verkliga skrivningar/utskick. För nästa UI-grind behövs rätt branch-preview och avsett testkonto.
+
+### ARKITEKTURBESLUT FÖRE BYGGE
+
+1. ROT: egen XML är vald ansökningsriktning inför launch. Ingen snabb avstängning av Fortnox `taxreductions`: dess betydelse för fakturans avdrag/saldo är ännu obevisad. Exklusivitet per faktura och idempotent XML-återhämtning kräver avgränsad Money-slice med providerbevis. Två vägar finns alltså fortfarande i kod; ROT kvarstår PROVE/blockerad. Home/Quote tillför ingen ansöknings-CTA. `generated` betyder XML-underlag skapat; Fortnox `submitted` bevisar inte mottagning hos Skatteverket.
+2. Auto-approval: legacy `tryAutoApprove` saknar runtime-anropare och får inte återaktiveras. Mänskliga beslut går via approvals/[id] och `canActOnApproval`; systembeslut via befintlig earned-autonomy/mandat. Statistik/learning confidence är inte mandat. Ingen bred approval-refactor i läsmodellerna.
+3. Separat launch-fynd: legacy `/api/suggestions/approve` reschedule-handler saknar tenantfilter för uttryckligt booking_id; kräver avgränsad fix och regression före launch.
+
+### IMPLEMENTATIONSBRIEF — ASTRA → SOL
+
+- **CONNECT:** veckorapportens misslyckade försök får inte permanent spärra veckan. Återanvänd `automation_activity.id` för atomär veckoreservation med attempt-token/CAS; håll reservationen vid osäkert leveransutfall. Separata historiska auditposter bevaras. Läsfel i dedupe/paus/underlag blockerar utskick. Inga auditlarm undertrycks. Ingen verklig sändning i tester.
+- **Quote:** utöka `app/api/quotes/[id]/handoff` → `lib/quotes/handoff.ts` → `QuoteHandoff.tsx`. Läs samma sent_at-kedjas högst tre deterministiska omgångskort, härled senaste kvitto med `followupProviderAccepted`. Behåll stopvillkor, regel/cadence, pending/claimed/expired-semantik. Ingen skrivning/reconcile från GET. Giltig executed_at krävs för tidsclaim. Owner/admin och tenantgrind oförändrade.
+- **Home:** ren presentationsadapter från JarvisHomes redan använda källor och MissionProvider. Fem kategorier; planerat är inte utfört/pågående. `failed`/`skipped` och generellt agent-run-success är inte hanterat. Läsfel är okänt, inte noll. Återanvänd samma deduplicerade beslut; märkt begränsad lista. Behåll ekonomiska sanningsklasser och behörigheter. Ingen ny tabell/motor/LLM/API-hub.
+- **TEST GATE:** retry/concurrency/response-loss, tenant/permissions, falsk framgång vid läsfel, omgångskvitto efter reconcile/ny sent_at, företagsbyte/stale response, reload och smal skärm. Unit/kontrakts-/lokala browserbevis ersätter inte live/provider/mobilapp.
+
+### VERIFIERINGSGRÄNS
+
+Historiska auditstatusar behållna med rättad evidens. `approved` är inte samma sak som verifierat execution outcome. Externa nummer-/saldoåtgärder återstår. Ingen felhistorik raderas för att få gröna siffror.
 
 ---
 

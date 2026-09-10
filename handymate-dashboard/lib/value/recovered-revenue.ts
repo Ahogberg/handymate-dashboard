@@ -340,7 +340,7 @@ export function sumRecoveredKr(attributions: Attribution[]): number {
 export async function getRecoveredRevenue(
   supabase: SupabaseClient,
   businessId: string,
-  opts: { sinceDays?: number; now?: Date } = {},
+  opts: { sinceDays?: number; now?: Date; failOnReadError?: boolean } = {},
 ): Promise<RecoveredRevenue> {
   const sinceDays = opts.sinceDays ?? 30
   const nowMs = (opts.now ?? new Date()).getTime()
@@ -360,6 +360,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] pending_approvals-uppslag misslyckades (ger 0 kr):', error.message)
+      if (opts.failOnReadError) throw error
     } else {
       for (const row of data || []) {
         const card = mapApprovalRowToCard(row)
@@ -368,6 +369,7 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] pending_approvals-uppslag kastade (ger 0 kr):', err?.message || err)
+    if (opts.failOnReadError) throw err
   }
 
   if (cards.length === 0) {
@@ -393,6 +395,7 @@ export async function getRecoveredRevenue(
         .in('change_id', pendingAtaIds)
       if (error) {
         console.warn('[recovered-revenue] project_change-uppslag misslyckades (ÄTA-kort utesluts):', error.message)
+        if (opts.failOnReadError) throw error
       } else {
         const invoiceByAta = new Map<string, string | null>(
           (data || []).map((r: any) => [String(r.change_id), r.invoice_id ? String(r.invoice_id) : null]),
@@ -405,6 +408,7 @@ export async function getRecoveredRevenue(
       }
     } catch (err: any) {
       console.warn('[recovered-revenue] project_change-uppslag kastade (ÄTA-kort utesluts):', err?.message || err)
+      if (opts.failOnReadError) throw err
     }
   }
 
@@ -420,6 +424,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] quotes-uppslag misslyckades (skippar offerter):', error.message)
+      if (opts.failOnReadError) throw error
     } else {
       for (const q of data || []) {
         if (!q.accepted_at) continue
@@ -435,6 +440,7 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] quotes-uppslag kastade (skippar offerter):', err?.message || err)
+    if (opts.failOnReadError) throw err
   }
 
   try {
@@ -447,6 +453,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] invoice-uppslag misslyckades (skippar fakturor):', error.message)
+      if (opts.failOnReadError) throw error
     } else {
       for (const inv of data || []) {
         if (!inv.paid_at) continue
@@ -463,6 +470,7 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] invoice-uppslag kastade (skippar fakturor):', err?.message || err)
+    if (opts.failOnReadError) throw err
   }
 
   try {
@@ -474,6 +482,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] booking-uppslag misslyckades (skippar bokningar):', error.message)
+      if (opts.failOnReadError) throw error
     } else {
       for (const b of data || []) {
         if (!b.created_at) continue
@@ -489,6 +498,7 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] booking-uppslag kastade (skippar bokningar):', err?.message || err)
+    if (opts.failOnReadError) throw err
   }
 
   const attributions = attributeRevenue(cards, events)

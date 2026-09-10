@@ -8,7 +8,7 @@ import { buildValueReceipt } from '@/lib/approvals/value-receipt'
 import { Banknote, Check, ChevronDown, ChevronRight, ChevronUp, FileText, Loader2, Mic, Phone, Undo2, User } from 'lucide-react'
 import { nyhetsAtgard, type NyhetsIkon } from '@/lib/jarvis/news-actions'
 import { byggBevakning, fyndPerAgent, type BevakningsRad } from '@/lib/jarvis/bevakning'
-import { byggDygnsdigest, halsningsBevis, type DigestAktivitet } from '@/lib/jarvis/dygnsdigest'
+import { byggDygnsdigest, type DigestAktivitet } from '@/lib/jarvis/dygnsdigest'
 import { SENAST_SEDD_KEY, digestFonsterStartMs, skottUtanDigRubrik } from '@/lib/jarvis/senast-sedd'
 import { TeamBevakning } from '@/components/jarvis/TeamBevakning'
 import { supabase } from '@/lib/supabase'
@@ -65,6 +65,7 @@ import { KundCaseKort, type KundCaseData } from '@/components/jarvis/KundCaseKor
 import { ProjectCloseoutCopilotCard } from '@/components/jarvis/ProjectCloseoutCopilotCard'
 import type { CloseoutCandidate } from '@/lib/agents/lars/closeout-copilot'
 import { RevenueRecoveryCaseKort } from '@/components/jarvis/RevenueRecoveryCaseKort'
+import { BrainOverview } from '@/components/jarvis/home/BrainOverview'
 import type { RevenueRecoveryCase } from '@/lib/value/revenue-recovery-case'
 import { FuelWarningCard } from '@/components/jarvis/FuelWarningCard'
 import { ReaktiveringsInsikt, type ReaktiveringsSignal } from '@/components/jarvis/ReaktiveringsInsikt'
@@ -263,6 +264,8 @@ export default function JarvisHome({
 
   const [approvals, setApprovals] = useState<Approval[]>([])
   const [queueLoaded, setQueueLoaded] = useState(false)
+  const [queueKnown, setQueueKnown] = useState(false)
+  const [nbaKnown, setNbaKnown] = useState(false)
   const [observations, setObservations] = useState<Observation[]>([])
   const [reschedules, setReschedules] = useState<RescheduleSuggestion[]>([])
   const [doneRows, setDoneRows] = useState<DoneRow[]>([])
@@ -320,15 +323,22 @@ export default function JarvisHome({
   const [nbaHiddenIds, setNbaHiddenIds] = useState<Set<string>>(new Set())
   const [snack, setSnack] = useState<{ approvalId: string; text: string } | null>(null)
   const [feedback, setFeedback] = useState<{ text: string; isError: boolean; link?: string; linkLabel?: string } | null>(null)
-  const [proof, setProof] = useState<string | null>(null)
   const [bevakning, setBevakning] = useState<BevakningsRad[]>([])
   const [pengarData, setPengarData] = useState<PengarSummary | null>(null)
   const [moments, setMoments] = useState<AgentMoment[]>([])
   const [aktiviteter, setAktiviteter] = useState<DigestAktivitet[]>([])
+  const [activityKnown, setActivityKnown] = useState(false)
+  const [moneyKnown, setMoneyKnown] = useState(false)
+  const [homeRefreshTick, setHomeRefreshTick] = useState(0)
   const [samtal, setSamtal] = useState<{ antal: number; bokade: number } | null>(null)
   const [kvitto, setKvitto] = useState<Vardekvitto | null>(null)
   const [ledger, setLedger] = useState<ManadsLedger | null>(null)
   const [retentionText, setRetentionText] = useState<string | null>(null)
+  useEffect(() => {
+    const refresh = () => setHomeRefreshTick(value => value + 1)
+    window.addEventListener('focus', refresh)
+    return () => window.removeEventListener('focus', refresh)
+  }, [])
   // Kedjningen (tasks/jaunty-pondering-hummingbird.md): CompanyScan renderas
   // FÖRST — Hemturen släpps inte fram förrän skannen anropat onClose (klar,
   // hoppad, eller aldrig aktuell för kontot). HemTur behåller sina egna
@@ -388,6 +398,8 @@ export default function JarvisHome({
   }, [])
 
   const pendingTimers = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map())
+  const businessScopeRef = useRef(business.business_id)
+  businessScopeRef.current = business.business_id
   // Det köade beslutet i sin helhet — så att en sidlämning kan SKICKA det i
   // stället för att tyst kasta det (Andreas fynd 2026-08-10: godkända kort
   // återuppstod, för unmount-städningen clearTimeout:ade bort själva beslutet).
@@ -399,34 +411,55 @@ export default function JarvisHome({
   }, [])
 
   const fetchQueue = useCallback(async () => {
+    const requestedBusinessId = business.business_id
+    if (businessScopeRef.current === requestedBusinessId) {
+      setQueueKnown(false)
+      setApprovals([])
+    }
     try {
       const res = await fetch('/api/approvals?status=pending&limit=15', { headers: await authHeaders() })
       if (res.ok) {
         const data = await res.json()
-        setApprovals(data.approvals || [])
+        if (!Array.isArray(data?.approvals)) throw new Error('invalid approvals payload')
+        if (businessScopeRef.current === requestedBusinessId) {
+          setApprovals(data.approvals)
+          setQueueKnown(true)
+        }
       }
     } catch { /* tomt är rätt svar — hemskärmen får aldrig krascha på kön */ }
-    setQueueLoaded(true)
-  }, [authHeaders])
+    if (businessScopeRef.current === requestedBusinessId) setQueueLoaded(true)
+  }, [authHeaders, business.business_id])
 
-  useEffect(() => { void fetchQueue() }, [fetchQueue])
+  useEffect(() => {
+    setApprovals([])
+    setQueueLoaded(false)
+    setQueueKnown(false)
+    void fetchQueue()
+  }, [fetchQueue])
 
   useEffect(() => {
     let active = true
+    const requestedBusinessId = business.business_id
+    setNba(null)
+    setNbaList([])
+    setNbaKnown(false)
     ;(async () => {
       try {
         const res = await fetch('/api/next-best-action', { headers: await authHeaders() })
         if (res.ok) {
           const data = await res.json()
-          if (active) {
+          const emptyKnown = data?.recommendation === null && data?.recommendations === undefined
+          const recommendations = Array.isArray(data?.recommendations) ? data.recommendations : emptyKnown ? [] : null
+          if (active && businessScopeRef.current === requestedBusinessId && recommendations) {
             setNba(data.recommendation || null)
-            setNbaList(data.recommendations || [])
+            setNbaList(recommendations)
+            setNbaKnown(true)
           }
         }
       } catch { /* ingen rankning idag är ett giltigt, tyst utfall */ }
     })()
     return () => { active = false }
-  }, [authHeaders])
+  }, [authHeaders, business.business_id, homeRefreshTick])
 
   useEffect(() => {
     let active = true
@@ -569,7 +602,7 @@ export default function JarvisHome({
       .then(d => { if (active) setObservations(d.observations || []) })
       .catch(() => { if (active) setObservations([]) })
     return () => { active = false }
-  }, [])
+  }, [business.business_id, homeRefreshTick])
 
   // Momenten (teamets penga-fynd) i Värt att veta: samma härledning som
   // MomentsProvider läser (/api/moments, ägargrindad) — providerns flyktiga
@@ -581,7 +614,7 @@ export default function JarvisHome({
       .then(d => { if (aktiv && d?.moments) setMoments(d.moments as AgentMoment[]) })
       .catch(() => { /* momentraderna är grädde, aldrig mjölk */ })
     return () => { aktiv = false }
-  }, [])
+  }, [business.business_id, homeRefreshTick])
 
   // Frågeläget: bokningskrockar som AI:n stötte på och inte kunde lösa.
   useEffect(() => {
@@ -591,10 +624,12 @@ export default function JarvisHome({
       .then(d => { if (active) setReschedules(d.suggestions || d.data || []) })
       .catch(() => { if (active) setReschedules([]) })
     return () => { active = false }
-  }, [])
+  }, [business.business_id, homeRefreshTick])
 
   useEffect(() => {
     let active = true
+    setActivityKnown(false)
+    setAktiviteter([])
     // limit=100, inte 30 (Pass C, del 2): fönstret kan nu sträcka sig upp
     // till 7 dagar bakåt (lib/jarvis/senast-sedd.ts) — automation_activity
     // (huvudkällan i /api/automations/activity) har ingen egen tidsgräns,
@@ -608,10 +643,11 @@ export default function JarvisHome({
         // upp till 7 dagar via `from`) och grindarna bor i
         // lib/jarvis/dygnsdigest.ts, inte här.
         setAktiviteter(res.data as DigestAktivitet[])
+        setActivityKnown(res.completeness && Object.values(res.completeness).every(value => value === 'complete'))
       })
       .catch(() => { /* loggen är en bekvämlighet, aldrig blockerande */ })
     return () => { active = false }
-  }, [])
+  }, [business.business_id, homeRefreshTick])
 
   // Tomma lägets tidsstämpel: när behövde något dig senast?
   useEffect(() => {
@@ -630,21 +666,16 @@ export default function JarvisHome({
 
   useEffect(() => {
     let active = true
+    setSamtal(null)
+    setBevakning([])
     fetch('/api/dashboard/team-activity')
       .then(r => (r.ok ? r.json() : null))
       .then(d => {
-        if (!active || !d?.summary) return
+        if (!active || !d?.summary || d.completeness !== true) return
         const s = d.summary
         // Substantivfraser, inte verbfraser. "Senaste dygnet tog 7 samtal …
         // teamet" är svengelska med subjektet på fel plats; en uppräkning
         // slipper böjningen helt och läses snabbare.
-        const delar: string[] = []
-        if (s.total_calls > 0) delar.push(`${s.total_calls} samtal`)
-        if (s.total_sms > 0) delar.push(`${s.total_sms} SMS`)
-        if (s.total_quotes > 0) delar.push(`${s.total_quotes} offert${s.total_quotes > 1 ? 'er' : ''}`)
-        if (s.total_bookings_updated > 0) delar.push(`${s.total_bookings_updated} bokning${s.total_bookings_updated > 1 ? 'ar' : ''}`)
-        if (delar.length === 0 && s.total_automations > 0) delar.push(`${s.total_automations} åtgärd${s.total_automations > 1 ? 'er' : ''}`)
-        setProof(delar.length ? delar.join(', ').replace(/,([^,]*)$/, ' och$1') : null)
         // Digestens dåtidsaggregat: samtalen bor i agent_runs, inte i
         // aktivitetsloggen. Bokade besök kan inte attribueras ärligt ännu —
         // 0 gör att raden aldrig påstår det (regeln bor i dygnsdigest.ts).
@@ -654,18 +685,22 @@ export default function JarvisHome({
       })
       .catch(() => { /* bandet är inte kritiskt */ })
     return () => { active = false }
-  }, [])
+  }, [business.business_id, homeRefreshTick])
+
+  useEffect(() => { setDoneRows([]) }, [business.business_id])
 
   // Att hämta: tyst hämtning — 403 (anställd) eller fel betyder inget kort,
   // aldrig ett halvt. Samma tystnadsregel som kalenderwidgeten.
   useEffect(() => {
     let aktiv = true
+    setMoneyKnown(false)
+    setPengarData(null)
     fetch('/api/dashboard/pengar')
-      .then(r => (r.ok ? r.json() : null))
-      .then(d => { if (aktiv && d) setPengarData(d) })
+      .then(r => { if (r.status === 403) return null; if (!r.ok) throw new Error('pengar unavailable'); return r.json() })
+      .then(d => { if (aktiv && d) { setPengarData(d); setMoneyKnown(true) } })
       .catch(() => { /* kortet är grädde, aldrig mjölk */ })
     return () => { aktiv = false }
-  }, [])
+  }, [business.business_id, homeRefreshTick])
 
   // Värdekvittot (etapp 7): månadens bekräftade kronor — samma tystnad.
   useEffect(() => {
@@ -1021,6 +1056,7 @@ export default function JarvisHome({
       auto: r.auto,
     })),
   ]
+  const verifieradeHanterade = byggDygnsdigest({ aktiviteter, samtal: null, nu: new Date(nuMs), from: new Date(dygnsFonsterStartMs) })
   // Rubriken byggs av SAMMA fönster som filtrerade raderna ovan — den ljuger
   // aldrig om vad "Skött utan dig" faktiskt visar (filens egen regel, se
   // lib/jarvis/senast-sedd.ts).
@@ -1053,7 +1089,8 @@ export default function JarvisHome({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [forstaAtgardId, forstaAtgardHamtad, queueLoaded, approvals])
   const beslut = grupper.length + reschedules.length + (fuelCritical ? 1 : 0) + (closeoutCandidates.length > 0 ? 1 : 0) + synligaNba.length
-  const koTom = queueLoaded && beslut === 0
+  const decisionsKnown = queueKnown && nbaKnown
+  const koTom = queueLoaded && decisionsKnown && beslut === 0
 
   // Cross-Agent Case — filtrera bort hanterade signaler (samma !hiddenIds-
   // logik som hero'n ovan), och dölj hela caset om under 2 distinkta typer
@@ -1072,7 +1109,9 @@ export default function JarvisHome({
     .filter(c => new Set(c.signals.map(s => s.approval_type)).size >= 2)
 
   // Hälsningens bevisrad — rullande dygn, ärligt om något behövde ägaren.
-  const bevis = halsningsBevis(proof, beslut)
+  const bevis = activityKnown && verifieradeHanterade.length > 0
+    ? `${verifieradeHanterade.length} visade verifierade resultat i visad period`
+    : null
 
   // Observationer vars ärende redan står som kort ovanför filtreras bort —
   // samma sak på två ställen gör att man slutar läsa båda.
@@ -1155,10 +1194,11 @@ export default function JarvisHome({
           <MatteHero
             greetingName={greetingName}
             queueLoaded={queueLoaded}
+            queueKnown={decisionsKnown}
             beslut={beslut}
             nbaKandidater={synligaNba}
             bevis={bevis}
-            autoCount={dygnsRader.filter(r => r.auto).length}
+            autoCount={activityKnown ? verifieradeHanterade.filter(r => r.auto).length : null}
             // Uppdragsradens band (Goal-to-Plan V1, Etapp C → Etapp E:
             // Hero-integrationen, tasks/jaunty-pondering-hummingbird.md).
             // Etapp E flyttade Uppdragsrad IN i heron som ett band i dess
@@ -1176,6 +1216,11 @@ export default function JarvisHome({
 
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}
         <div className="min-w-0 lg:row-start-2 lg:col-start-1">
+          <BrainOverview
+            handled={activityKnown ? verifieradeHanterade.length : null}
+            needsYou={decisionsKnown ? beslut : null}
+            moneyCases={moneyKnown ? pengarData?.kategorier.length ?? 0 : null}
+          />
           {feedback && (
             <div className={`mb-4 px-3.5 py-2.5 border rounded-xl text-sm font-medium flex items-center justify-between gap-3 ${
               feedback.isError
@@ -1295,6 +1340,8 @@ export default function JarvisHome({
             <div className="bg-white border border-slate-200 rounded-2xl p-4 flex items-center justify-center min-h-[88px]">
               <Loader2 className="w-4 h-4 text-slate-300 animate-spin" />
             </div>
+          ) : !decisionsKnown ? (
+            <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">Beslutskön kunde inte läsas. Uppdatera sidan och försök igen.</div>
           ) : koTom ? (
             <EmptyQueue lastResolvedAt={lastResolvedAt} />
           ) : (

@@ -244,8 +244,8 @@ test.describe('Del 1 — cron/veckorapport', () => {
   test('ett misslyckat SMS loggas som status failed, ALDRIG som skickat', () => {
     const idx = cronRuttRen.indexOf("automation_type: 'veckorapport'")
     expect(idx, 'automation_activity-inserten hittades inte').toBeGreaterThan(-1)
-    const block = cronRuttRen.slice(idx, idx + 500)
-    expect(block).toMatch(/status:\s*r\.success\s*\?\s*'success'\s*:\s*'failed'/)
+    const block = cronRuttRen.slice(idx, idx + 1200)
+    expect(block).toMatch(/status:\s*verifieradLeverans\s*\?\s*'success'\s*:\s*'failed'/)
     expect(block).not.toMatch(/status:\s*'success'(?!\s*:)/) // ingen ovillkorlig 'success'
   })
 

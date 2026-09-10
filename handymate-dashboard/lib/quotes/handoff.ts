@@ -1,5 +1,6 @@
 import { OPEN_QUOTE_STATUSES, WON_QUOTE_STATUSES } from './statuses'
 import { quoteFollowupStep } from './followup-cadence'
+import type { QuoteFollowupReceipt } from './followup-round'
 
 export interface HandoffRule {
   id: string; name: string; trigger_config: Record<string, unknown>
@@ -11,11 +12,13 @@ export interface HandoffSummary {
   state: 'draft' | 'closed' | 'decision' | 'paused' | 'configured' | 'attention'
   headline: string; done: string; next: string; needsYou: string
   eligibleAt?: string; lastRunAt?: string; link?: string; linkLabel?: string
+  latestReceipt?: QuoteFollowupReceipt | null
 }
 export interface HandoffInput {
   quote: { status: string; sent_at: string | null; valid_until: string | null; follow_up_count: number | null }
   paused: boolean; teamActive: boolean; hasPhone: boolean; hasEmail: boolean
   historyIncomplete?: boolean
+  latestReceipt?: QuoteFollowupReceipt | null
   followupRound?: { id: string; status: string; sendClaimed: boolean; providerAccepted: boolean; expired: boolean } | null
   rules: HandoffRule[]; logs: HandoffLog[]; pendingId: string | null
   intervalDays: number | null; today: string; now: number
@@ -23,7 +26,9 @@ export interface HandoffInput {
 
 export function deriveQuoteHandoff(input: HandoffInput): HandoffSummary {
   const { quote, rules, logs } = input
-  const done = quote.sent_at ? 'Offerten är registrerad som skickad.' : 'Inget utskick är bekräftat för offerten.'
+  const done = input.latestReceipt
+    ? `Uppföljning ${input.latestReceipt.round} har en sparad sändkvittens.`
+    : quote.sent_at ? 'Offerten är registrerad som skickad.' : 'Inget utskick är bekräftat för offerten.'
   if ((WON_QUOTE_STATUSES as readonly string[]).includes(quote.status)) return {
     state: 'closed', headline: 'Kunden har accepterat offerten', done: 'Accepten är registrerad.',
     next: 'Fortsätt med projektets planering.', needsYou: 'Kontrollera bemanning och starttid i projektet.' }

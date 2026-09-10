@@ -30,7 +30,7 @@ export async function productionPreview() {
         }})):null,
         view==='resume'?h(modules['@/components/onboarding/WorkSampleResume'].WorkSampleResume,{key:business,businessId:business,hasContent:true,onApply:s=>{setApplied(s);setDescription(s.description)},onSource:setDescription}):null,
         view==='regel'?h(modules['@/components/quotes/VisitRuleEditor'].VisitRuleEditor,{key:business+job,jobType:job,description,onApply:setDescription}):null,
-        view==='handoff'?h(modules['@/components/quotes/QuoteHandoff'].QuoteHandoff,{quoteId:'q',revision:'sent'}):null,
+        view==='handoff'?h(modules['@/components/quotes/QuoteHandoff'].QuoteHandoff,{quoteId:'q',revision:'sent',businessId:business}):null,
         h('output',{'data-testid':'description'},description),h('output',{'data-testid':'applied'},JSON.stringify(applied)),h('p',{role:'status'},receipt));
     }
     ReactDOM.createRoot(document.getElementById('root')).render(h(Host));`
