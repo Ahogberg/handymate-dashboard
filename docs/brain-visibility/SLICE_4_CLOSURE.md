@@ -44,3 +44,7 @@ Den nya felvisningen blottlade ett äldre schemafel: kundsidans affärsläsning 
 ## Kvotprioritering
 
 Användaren uttryckte oro för veckoanvändningen. Ingen ytterligare breddning av slice 4 eller start av slice 5 efter denna checkpoint. Fortsätt först med legitima roll-/företagssessioner och smal webbkontroll. Prioritera därefter återstående helgarbete efter konkret lanseringsnytta; ett avgränsat Sol-paket och en samlad planerings-/granskningsomgång åt gången. Ingen garanti ges att hela helgplanen ryms i kvarvarande kvot.
+
+## Beslut om arbetsordning
+
+Användaren godkände därefter att gå till slice 5 utan ytterligare testmiljöarbete. Slice 4 behåller sina öppna livegrindar. Read-only kontroll visar att testanställdens medlemskap är korrekt, men testföretagets onboarding är steg 1 och sparat companyName avviker från business_name. Ingen kundresa verifierades som anställd; ingen medlemskoppling eller onboardinggrind ändrades.

@@ -7,6 +7,7 @@ import { buildApprovalReview, type ApprovalReview } from './review-contract'
 import { classify } from './action-contract'
 import { rejectionEffect } from './receipt'
 import type { ReviewedDocument } from './document-delivery'
+import { withApprovalEvidence } from './explainability'
 
 export interface PreparedApprovalReview {
   review: ApprovalReview
@@ -18,7 +19,7 @@ export interface PreparedApprovalReview {
 /** Read-only preparation. Each target lookup is explicitly tenant-scoped.
  * Live values are part of the signed review, never silently substituted later.
  */
-export async function prepareApprovalReview(db: SupabaseClient, businessId: string,
+async function prepareApprovalReviewInternal(db: SupabaseClient, businessId: string,
   approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any; created_at?: string },
   body: Record<string, any>,
 ): Promise<PreparedApprovalReview | undefined> {
@@ -387,4 +388,16 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     r.blockedReason = error instanceof Error ? error.message : String(error || 'Granskningen kunde inte förberedas.')
     return { review: r, snapshot }
   }
+}
+
+/** Attach explainability after every type-specific early return. Evidence is
+ * intentionally derived from the stored row, never from edited request data. */
+export async function prepareApprovalReview(db: SupabaseClient, businessId: string,
+  approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any; created_at?: string },
+  body: Record<string, any>,
+): Promise<PreparedApprovalReview | undefined> {
+  return withApprovalEvidence(
+    await prepareApprovalReviewInternal(db, businessId, approval, body),
+    { approval_type: approval.approval_type, payload: approval.payload },
+  )
 }

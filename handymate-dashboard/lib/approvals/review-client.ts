@@ -4,6 +4,13 @@ import type { ApprovalReview } from './review-contract'
 
 let reviewing = false
 interface ReviewDecision { confirmed: boolean; actionOverrides?: Record<string, 'approved' | 'rejected'> }
+export function approvalEvidenceRows(review: ApprovalReview): { heading: string; text: string }[] {
+  if (!review.evidence) return []
+  return [
+    { heading: review.evidence.heading, text: '' },
+    ...review.evidence.items.map(item => ({ heading: item.label, text: item.text })),
+  ]
+}
 export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit): Promise<ReviewDecision> {
   if (reviewing || typeof document === 'undefined') return Promise.resolve({ confirmed: false })
   reviewing = true
@@ -19,6 +26,10 @@ export function showApprovalReview(review: ApprovalReview, headers?: HeadersInit
     }
     add('h2', review.title)
     add('p', review.effect)
+    for (const row of approvalEvidenceRows(review)) {
+      add(row.text ? 'h4' : 'h3', row.heading)
+      if (row.text) add('p', row.text)
+    }
     for (const detail of review.details || []) { add('h3', detail.label); add('p', detail.text) }
     for (const message of review.messages) {
       add('h3', `${message.channel} · ${message.recipients.length} mottagare`)

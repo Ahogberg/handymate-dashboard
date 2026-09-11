@@ -511,7 +511,7 @@ Legend: ✅ finns/ja · ⚠️ delvis · ❌ nej/saknas · `n` = prod-antal 2026
 | Fortnox | ✅ `lib/fortnox*`; 4 ingångar mot samma kärna | cron */2h; Fortnox-först vid utskick | **0 kopplade**, 19 api_log | externa skrivningar, **ej spåret** | – | fortnox_api_log, automation_activity, invoice-kolumner | ✅ integrations, invoices | ❌ | facit ×15, **0 live** | 0 | **PROVE (blockerad)** | Andreas kopplar riktigt konto i helgen; en faktura genom |
 | ROT/RUT | ⚠️ **två vägar** (egen XML vs Fortnox taxreductions) | UI only | **0 rot_payment_request** | skriver request + status; `hasPermission` | ej spåret | rot_payment_request, automation_activity | ✅ rot-payment, offert/faktura-sektioner | ❌ | facit ×9, 0 live | 0 | **PROVE + arkitekturbeslut** | Astra: en väg |
 | Missions / agent work | ✅ `lib/agents/*` (kanonisk), `lib/mission/*`; `lib/agent/*` 13/17 levande | 6 crons; mission ingen cron | agent_runs 1362 (282/30 d), **mission 0** | via `agent-gating.ts` | ja | agent_runs, automation_activity | ✅ JarvisHome | ✅ räknare | facit ×20, mission-proof | **hög**; Matte-chat utanför taket | agenter **PROVE**, missions **ACTIVATE** | Matte-chat under taket; radera 4 filer utan anropare |
-| Approval rail | ✅ `lib/approvals/*`, `[id]/route.ts` >3000 r, per-typ-grindar | alla producenter; användaren | **477 kort, 26 väntande, 109 utförda**, 30+ typer | ja | ja; självgodkännande nekas; fyra-ögon | execution_result klassad | ✅ approvals, hem, RailCard | ✅ 3 kort + push | E2E (golden-path, permission-check) | 0 | **SCALE** | inget bygge; skiva 5 = visa `_decision` som redan finns |
+| Approval rail | ✅ `lib/approvals/*`, `[id]/route.ts` >3000 r, per-typ-grindar | alla producenter; användaren | **477 kort, 26 väntande, 109 utförda**, 30+ typer | ja | ja; självgodkännande nekas; fyra-ögon | execution_result klassad | ✅ approvals, hem, RailCard | ✅ 3 kort + push | E2E (golden-path, permission-check) | 0 | **SCALE** | befintlig motor; skiva 5 visar objektbaserat underlag — `_decision` är enbart teknisk metadata enligt källrevision |
 | Operating Experiments | ✅ `lib/experiment/*` | inline + maintenance 03:00 | **0 rader** (kräver avslutade projekt) | kort ×2 | owner_admin | tabellrad | ✅ /experiments | ❌ | facit + experiment-proof | 0 | **ACTIVATE** (sovande by design) | rör inte |
 | Partner / referral | ✅ `lib/partners/*` | Stripe-webhook, portal; ingen cron | 2 partners, 0 ledger | direkt, **ej spåret** | admin + token | ledger, payout_batch, events | ✅ /partners | ❌ | facit ×15 | 0 | **PROVE** | utanför programmet |
 | **Home / Mission Control** | ✅ JarvisHome 1980 r, 18 datakällor; räkningarna finns (MatteHero:123, TeamActivityStrip:66) | klient | allt ovan | – | – | – | ✅; ⚠️ gamla Idag-vyn parallell på /oversikt | ✅ /api/mobile/home | facit ×6 | 0 | **EXPOSE** | **skiva 1:** läsmodell, ingen ny struktur; hanterat ≠ failed |
@@ -1497,13 +1497,24 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
 | Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
-| Slice 5–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
+| Slice 5 — Explainability | Första paketet lokalt granskat och testat i gemensam kortgranskning | Publicering/preview; fler prioriterade flöden före full DoD |
+| Slice 6–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
 
-Slice 4 — Customer. Användarens aktuella instruktion är att stänga slice 4 innan slice 5 påbörjas. Slutpaketet är publicerat och inloggad preview verifierad; roll-/företagsbyte och smal webbkontroll återstår. Användarens kvotoro innebär ingen ytterligare breddning före dessa grindar och därefter prioritering efter lanseringsnytta. Öppna externa grindar för övriga slices behålls. Slice 4 får inte markeras stängd enbart på basis av kod och isolerade tester.
+Slice 5 — Explainability Layer. Användaren har uttryckligen godkänt att gå vidare utan att först lösa testmiljön för slice 4, för att begränsa veckoanvändningen. Slice 4 är kodklar och previewverifierad men inte slutstängd: verkligt roll-/företagsbyte och smal webbkontroll återstår. Testanställden är korrekt kopplad till Svensson Bygg AB, men företagets onboarding är ofullständig och sparat companyName är Bee Service AB. Ingen företagskoppling ändrades för att passera grinden.
+
+För slice 5 återanvänds befintliga kort och underlag i ett avgränsat paket. Källrevision: `_decision` i `lib/ai/decision-record.ts` innehåller modell/promptversion/indatahash och tidpunkt, inte objektbaserad evidens. Auditradens tidigare formulering om att bara visa `_decision` räcker därför inte. Tekniska metadata eller modellens fria resonemang ska inte visas som förklaring. Inga nya motorer eller tabeller.
+
+### SLICE 5 — första avgränsade paketet
+
+Gemensam ApprovalReview visar "Varför säger Handymate detta?" för customer_fact, meeting_followup, project_log_note, create_quote_draft och create_ata_draft. Endast typstyrda sparade källutdrag/referenser och relevanta datum används; förslag till datum skiljs från källdatum. Referensens typ visas som sparad referens, utan påstående att källobjektet nyligen har lästs/verifierats. Inga nya länkar, tabeller eller motorer. Saknad källa visas uttryckligen, även om ett datumförslag finns.
+
+Underlaget kommer från den ursprungliga lagrade payloaden, inte klientens edited_payload. INFORMATIONAL/ACK-grindar, åtgärdsknappar, tenantfilter och exekveringsregler ändras inte. `_decision`, modell/prompt/hash och generiska modellbeskrivningar används inte som evidens.
+
+Verifiering: sex riktade mapper-/prepare-/renderadaptertester, berörd customer-fact-replacement-harness, typkontroll med 8192 MB och kontraktsparitet gröna. Ingen livegranskning i ny roll hävdas. Paketet täcker inte ännu alla viktiga rekommendationer; slice 5 hålls öppen. Nästa steg är preview av detta paket och därefter ett avgränsat val av återstående offert-/kommunikationsflöde, utifrån befintligt objektunderlag och lanseringsnytta.
 
 ### LAST COMPLETED — historisk auditbaseline
 

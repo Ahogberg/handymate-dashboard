@@ -1,3 +1,5 @@
+import type { ApprovalEvidence } from './explainability'
+
 /** Shared wire contract. No secret, database access or client-supplied preview. */
 export interface ApprovalReview {
   title: string
@@ -9,6 +11,7 @@ export interface ApprovalReview {
   open?: { label: string; path: string }
   choices?: { id: string; label: string; description: string; defaultSelected: boolean; required?: boolean }[]
   blockedReason?: string
+  evidence?: ApprovalEvidence
 }
 
 // Every mutation that does not yet have a complete execution-bound preview
