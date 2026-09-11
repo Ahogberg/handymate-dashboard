@@ -2242,3 +2242,15 @@ Efter omladdning av previewn, inloggad som bekräftad ägare för Nordström El 
 - Offertutkast `quote_2jm0fz9lnwf`: `Signeringslänk skapad` synlig, noll förekomster av `Väntar på signering`.
 
 De tre avgränsade rättningarna är därmed browserverifierade. Tidigare listade kvarvarande acceptanstester, själva checklistans databasfel och dess råa feltext är fortfarande öppna.
+
+### 31.4 Checklistor och godkännandekort — sprint 2026-09-11
+
+Publicerad kod: `d78175d7f494880f7c9ffddb80450c5c2146190f` i PR #38. Båda Vercel-byggena och samtliga fem CI-flöden godkända. 53 riktade lokala tester och typkontroll godkända: checklist-review-recovery, approval-review, approval-artifact-write, approval-view, approval-receipt och brain-visibility-ui-regressions.
+
+- Prod-schema verifierat read-only: `order_id` är redan nullable och `project_checklist_project_or_order` kräver projekt eller order. V215-rättningen finns alltså i databasen; ingen ny migration behövdes. Det visade felet var ett historiskt misslyckande från 2026-09-06.
+- Ny checklistgranskning läser tidigare deterministiskt checklist-ID inom samma företag. Saknad checklista visar alla kontrollpunkter före skapande; befintlig checklista bekräftas utan dubblett eller återställda punkter. Läsfel eller annat projekt blockerar bekräftelsen. Testat isolerat inklusive förlorat svar via befintligt artifact-write-test.
+- Kända tekniska databasfel får begriplig korttext. Fellistans knapp heter `Granska återförsök` och beskriver därmed nästa steg. Verifierat i publicerad UI.
+- Verkligt återförsök via den granskade UI-vägen utfört på användarens bekräftade testföretag Nordström El AB, projekt `proj_1788704644276_0zfdth`, kort `appr_1788704645731_sxix4cq`. Ingen kundkommunikation. Resultat verifierat via SQL: exakt en checklista `429c6780-7344-5067-a83f-8e6bf336621e`, tio punkter, noll ikryssade, status `in_progress`.
+- Kortets sparade utförande visar `outcome: success`, `retried: true`, kvittens `saved`/`Checklistan är skapad.` och samma checklist-ID. Fellistan försvann. Projektets kvittoregion visar `Sparat` och `Checklistan är skapad.` i webbläsaren.
+
+Checklistans historiska fel är återhämtat. De interna testpunkterna finns kvar som ej utförda; inga säkerhetskontroller påstås vara genomförda. Full täckning av samtliga korttyper i live-UI, roll-/företagsbyte, smal viewport och installerad app kvarstår enligt tidigare avgränsning. Denna sprint stänger inte dessa bredare acceptanspunkter.
