@@ -1495,7 +1495,7 @@ Slice 0 klar som audit. Flera läsytor är nu verifierade i inloggad preview enl
 | CONNECT före Home | Veckorapportskod och lokala tester klara; driftblocker kvar | Nummer/saldo, avstämning av fyra äldre rapportfel, verifierad leverans |
 | Slice 1 — Home | Femlägesyta och reload verifierade på ägarkontot; SMS-gruppavbrott rättat och omtestat | Verklig användare förstår läget inom 10 sekunder; fel/retry, roller, företagsbyte och smal viewport |
 | Slice 2 — Quote | Rundbundet kvitto implementerat; utkast, omläsning och ärlig signeringsstatus browserverifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
-| Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
+| Slice 3 — Project | Tidrapport, beslut och nästa steg verifierade i preview; samlad administrationsöverblick implementerad (§31.11) | Visuell acceptans av överblicken; aktiv automatisk bevakning kräver eget verifierat underlag |
 | Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
 | Slice 5 — Explainability | Fem ursprungliga korttyper samt rundbunden offertuppföljning via SMS/e-post har källpresentation; se §31.10 | Inloggat UI-prov uppskjutet av användaren; full DoD ej stängd |
 | Slice 6 — Proof of Work | Tomläge och positivt checklistkvitto browserverifierade; faktisk återhämtning verifierad i DB och projektvy (§31.4) | Delutfall, osäkert utskick, fel/retry och övriga prioriterade kvittotyper i live-UI |
@@ -2319,3 +2319,15 @@ Användaren har uttryckligen skjutit upp liveprovet och bett att övrigt arbete 
 **Verifierat:** 13 riktade evidens-/producenttester, 27 isolerade uppföljningskontrakt (faktiska helpers/cron med mockad DB/provider), 10 CI-kontrakt och typkontroll gröna. De tre nya evidensfallen ligger i befintlig CI-spec. Tidigare `customer-fact-evidence-journey.spec.ts` är nu också inkopplad i både npm-kontraktskommandot och GitHub-workflow. Inga liveutskick eller databasskrivningar.
 
 **Kvarvarande avgränsningar:** Project-slicens fulla administrativa läsmodell är fortfarande ett kod-/produktgap; loggarnas fritext får inte direkt presenteras som verifierade skickat-kvitton. Roller/företagsbyte, smal webbvy, installerad app, verkliga provider-/betalningsbevis och sista sammanhållna användarresor är acceptansluckor enligt statusmatrisen. Kodpaketet ovan stänger inte dessa delar.
+
+### 31.11 Projektets administrationsöverblick — avgränsat paket
+
+Användaren prioriterar kvarvarande usage till UI-förbättringar. Ny överblick `Administration kring jobbet` i befintliga ProjectTodoBlock komponerar projektets redan behörighetsfiltrerade ärenden och kvitton. Den visar vad som behöver granskas, sparade handlingar, utskick accepterade av sändtjänsten samt köade/osäkra utfall. Befintliga kort, nästa steg, kvittenser och deras återförsök ligger kvar direkt under överblicken.
+
+Inga extra API-anrop, tabeller, AI-körningar eller motorer. Kvittornas befintliga `complete`-klassning styr räknarna: en gammal sparat-/skickat-kvittens med misslyckat utfall räknas inte som utförd. Noterat/avvisat räknas inte som utfört arbete. Delvis läst lista och läsfel anges uttryckligen, och alla tal avser det lästa underlaget. ProjectTodoBlock remountas per företag/projekt så summeringen inte följer med mellan kontexter.
+
+Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom listan även kan innehålla informationskort. Tomläget lovar inte längre att inget kräver användaren eller att ett klick alltid godkänner: tidigare utfall kan behöva kontrolleras i kvittolistan.
+
+22 riktade tester och typkontroll gröna. Nya sammanställningstester ingår i befintlig CI-spec och täcker blandade kvitton, tidigare misslyckade utfall, partiella/felande läsningar och kopplingen till samma befintliga läsningar. Livewebbläsare är enligt användarens beslut uppskjuten. Detta paket bevisar inte att kontinuerlig automatisk bevakning är aktiv; historiska fritextloggar används inte som sådant bevis.
+
+**Efter detta paket:** prioritera visuell/UI-förbättring av befintliga flöden. Behåll separat acceptanslista för live-evidenskort, smal vy, roller/företagsbyte, installerad mobilapp och fullständiga användarresor. Externa utskick, Fortnox, betalning och ROT-exklusivitet är kvarvarande lanseringsgrindar, inte klara genom denna överblick. Ingen slice uppgraderas till SCALE.
