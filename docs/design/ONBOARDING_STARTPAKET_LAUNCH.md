@@ -157,7 +157,7 @@ Endast kodstatus, inga externa flöden har körts i detta arbete.
 
 1. Revidera nya katalogförslag i `lib/job-type-catalog.ts`; behåll befintliga kunders namn, sluggar, mallar och artikelkopplingar.
 2. Anpassa urvalet i `Step3HowYouWork` utan fler huvudsteg. Behåll egna val och tillägg från andra branscher.
-3. Paketera valt startunderlag i befintliga `StepProductRegister`, `JobTypeQuoteSetup`, job-standard-/quote-setup-API:er och produkteditor. Säkra att planen tillåter avsett antal startmallar; kringgå inte befintliga kvoter.
+3. Paketera valt startunderlag i befintliga `StepProductRegister`, `JobTypeQuoteSetup`, job-standard-/quote-setup-API:er och produkteditor. Offertmallar och jobbtypsupplägg ska sakna antalstak enligt användarens korrigering 2026-09-11; 3–5 är endast en rekommendation.
 4. Inför explicit artikelurval och idempotent återanvändning, aldrig okontrollerad mass-seedning eller matchning enbart på liknande namn. Ingen ny prismotor.
 5. Lägg kundintagsfrågan i befintligt kontaktsteg. Verifiera hur svaret ska sparas i befintligt schema före bygge; skapa inte en separat kanalmodell.
 6. Koppla endast de integrationsvägar som har fungerande återgång och status. Gmail/Outlook ska inte framställas som färdiga genom designen.
@@ -183,3 +183,7 @@ Detta dokument ska följa med Claude Design-briefen. Det ändrar inte appen och 
 ## Förberedelser för Gmail och Microsoft 365
 
 Se [implementations- och lanseringsplan](../runbooks/MAIL_INTEGRATIONS_PREPARATION.md), [verifieringsunderlag](../runbooks/MAIL_PROVIDER_VERIFICATION.md) och [acceptansprotokoll](../runbooks/MAIL_INTEGRATIONS_ACCEPTANCE.md). Underlagen är förberedda 2026-09-11; integrationerna är inte aktiverade eller liveverifierade genom dokumentleveransen.
+
+## Implementationsuppdatering
+
+Se [branschpaket och onboarding](BRANSCHPAKET_ONBOARDING_LAUNCH.md) för genomfört kodpaket för samtliga sju namngivna branscher, kundkanal och borttagna malltak. Befintliga kundval bevaras. Underhållsmålning har ersatts av Trapphus och gemensamma utrymmen i måleriets starturval.

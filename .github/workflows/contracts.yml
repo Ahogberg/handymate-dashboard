@@ -225,3 +225,6 @@ jobs:
 
       - name: Mejlintegrationer — tokenåtkomst, OAuth och meddelandeidentitet
         run: node tests/sprint/mail-boundaries.cjs
+
+      - name: Branschpaket och kundkanal — lokala kontrakt
+        run: npx playwright test tests/trade-start-packages.spec.ts tests/customer-intake-ui.spec.ts --no-deps --project=chromium --reporter=line

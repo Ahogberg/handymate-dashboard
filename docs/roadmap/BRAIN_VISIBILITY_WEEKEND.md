@@ -2357,3 +2357,13 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **NOT VERIFIED / RISKS:** Ingen prodmigration/deploy eller liveprovider-verifiering. SQL och app måste införas samordnat med import pausad. Full tokenkryptering/nyckelrotation, Microsoft-adapter, kvarvarande OAuth-härdning och flerbrevlåde-sändarval återstår. Äldre överlapp kräver verifierad kontokoppling innan berörd synk fortsätter.
 
 **CUSTOMER IMPACT:** Efter införande skyddas anslutningarna från direkta klientändringar, kalendern bevaras vid säker återanslutning och nya mejl får kontospecifik identitet. **STATUS CHANGES:** Inga liveförmågor uppgraderas. **NEXT ACTION:** Följ införandeordningen i MAIL_INTEGRATIONS_PREPARATION.md, verifiera på testmiljö före samordnad release. Fortsätt separat med tokenkryptering och providerimplementation; inga nya scopes aktiveras av paketet.
+
+### 31.14 Branschpaket och kundkanal i befintlig onboarding
+
+**DONE:** Fem breda startpaket för var och en av sju branscher (35 totalt), egna jobb först för Övrigt, gamla exempel fortsatt frivilliga. Jobbtyps-/artikelsteget visar omfattning, arbete, materialidéer och frågor; produkteditorn kan öppnas med granskningsbara förslag utan priser. Arbetskostnad härleds från artikelmetadata, inklusive inkluderat arbete i fastpris. Kontaktsteget sparar primär kundkanal och mejlleverantör; verklig vidarebefordringsprovisionering sker endast vid uttryckligt knapptryck och visas aldrig som leveransbevis.
+
+**ANVÄNDARBESLUT:** Starter är inte aktuellt erbjudande och malltak är inte önskade. Begränsningen på fem offertmallar tas bort både centralt och ur båda skapandeflödena, även för legacy-konton. 3–5 jobbtyper är en rekommendation, ingen begränsning.
+
+**REUSED / NEW:** Befintlig katalogkonsumtion, jobbtypspersistens, standardrader, produkteditor, priser, onboarding_data och email-lead-API. Ny redaktionell paketkälla och liten kundkanalkomponent; inga nya tabeller, huvudsteg eller motorer. Tidigare kunders jobbnamn/sluggar/priser/mallar skrivs inte om.
+
+**VERIFIED:** Riktade kontrakts- och lokala DOM-/Postgrest-fixture-tester samt typkontroll; se BRANSCHPAKET_ONBOARDING_LAUNCH.md. **NOT VERIFIED:** Livebrowser och extern e-postleverans; inga prodskrivningar eller aktiveringar. **CUSTOMER IMPACT:** Efter release kan nya kunder välja begripligare jobbpaket och granska artikel-/arbetsunderlag samt prioritera rätt kundkanal. **STATUS CHANGES:** Ingen liveförmåga uppgraderas. **NEXT ACTION:** Visuell och sammanhängande onboarding-/offertacceptans när browserprov återupptas. Gmail/Outlook följer separat gransknings-/implementationsplan.
