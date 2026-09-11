@@ -1443,3 +1443,346 @@ Marketplace -> customer payments/payouts -> Ledger
 If we build this foundation correctly, Pay and Ledger are not two features. They become the shared financial infrastructure that lets Handymate expand into the rest of the customer's company without repeatedly reinventing how money, accounting, audit and reconciliation work.
 
 > **Guiding principle:** operational work creates economic events; the Financial Kernel records the money truth; Ledger records the accounting truth; reconciliation proves they agree.
+
+---
+
+## 35. Platform & Product Integration Contract
+
+This section is a **binding product-architecture decision**. Pay and Ledger must integrate into the existing Handymate product as parts of one platform, not become separate applications that fragment context, navigation or data ownership.
+
+### 35.1 One platform, not a separate Accounting product
+
+Handymate remains the platform and primary application shell.
+
+Do **not** create a separate Accounting codebase, separate login experience, separate tenant model or a standalone `accounting.handymate...` product that forces customers to leave the operational context.
+
+The product hierarchy is:
+
+```text
+HANDYMATE PLATFORM
+
+CRM / Leads / Quotes / Projects / Time / Materials / Invoices
+                         |
+                         v
+                FINANCIAL KERNEL
+        Money • Events • Receivables • Payables
+        Payments • Allocations • Bank • Audit
+                 |                |
+          +------+                +------+
+          v                              v
+   HANDYMATE PAY                  HANDYMATE LEDGER
+ payment capability              accounting module
+ PSP / Swish / bank              journal / VAT / reports
+```
+
+The Financial Kernel is infrastructure. It has no requirement to be exposed as one monolithic user-facing product surface.
+
+### 35.2 Ledger is an entitlement-based Handymate module
+
+Handymate Ledger / Accounting is an optional module inside the existing Handymate platform.
+
+A customer without Ledger may continue using Handymate for operational workflows, invoicing and Pay while an external accounting system remains system of record.
+
+A customer with Ledger gets additional finance surfaces in the same product context.
+
+Target information architecture:
+
+```text
+Economy
+├── Overview
+├── Invoices / Accounts Receivable
+├── Payments
+├── Supplier Invoices / Accounts Payable
+├── Bank & Reconciliation
+├── Bookkeeping              [ledger entitlement]
+├── VAT                      [ledger entitlement]
+├── Reports                  [ledger entitlement]
+└── Accountant / Auditor     [role + entitlement]
+```
+
+Do not require customers to understand ledger concepts for ordinary daily work. Detailed accounting is available when needed, but most bookkeeping should be the verified consequence of operational events.
+
+### 35.3 Pay is a cross-platform capability first, admin surface second
+
+Handymate Pay is primarily a service/capability embedded where payment intent naturally occurs.
+
+Primary surfaces:
+
+```text
+Invoice
+  -> payment link / Swish / card / bank
+
+Customer portal
+  -> pay outstanding invoice
+
+Project
+  -> financial status / paid / outstanding
+
+Automation / Karin
+  -> payment reminders / payment status / exceptions
+
+Financial timeline
+  -> initiated / settled / allocated / payout / reconciled
+```
+
+Pay also needs a dedicated operational surface for exceptions and administration:
+
+```text
+Economy > Payments
+├── Transactions
+├── Payment attempts
+├── Payouts
+├── Refunds
+├── Failed / disputed payments
+└── Provider settings
+```
+
+The dedicated Pay page is not the primary customer workflow. Users should normally encounter Pay inside the invoice, portal, project and financial workflows they already use.
+
+### 35.4 Pay and Ledger must be independently purchasable/capable
+
+Technical coupling through the Financial Kernel must **not** force commercial coupling.
+
+Supported configurations must include:
+
+```text
+Core only
+Core + Pay
+Core + Ledger
+Core + Pay + Ledger
+```
+
+#### Core + Pay, external accounting
+
+```text
+Invoice
+ -> Handymate Pay
+ -> payment settled
+ -> allocation
+ -> invoice projection updated
+ -> current Handymate workflows/automation
+ -> external accounting/Fortnox remains accounting system of record
+```
+
+#### Core + Ledger, external payment rails
+
+```text
+Invoice
+ -> external bank/payment
+ -> bank/import/provider event
+ -> reconciliation/allocation
+ -> Handymate Ledger posting
+```
+
+#### Core + Pay + Ledger
+
+```text
+Invoice
+ -> Handymate Pay
+ -> payment settled
+ -> allocation
+ -> receivable settled
+ -> Ledger posting
+ -> payout/bank reconciliation
+ -> project profitability / cash / reports updated
+```
+
+Pay must never depend on `handymate_ledger_enabled=true` to operate. Ledger must never require Handymate Pay to receive and reconcile external payments.
+
+### 35.5 Entitlements and rollout flags
+
+Separate infrastructure activation from product entitlement.
+
+Conceptually:
+
+```text
+financial_kernel_enabled       internal infrastructure rollout
+handymate_pay_enabled          customer can use Pay
+handymate_ledger_enabled       customer can use Ledger/accounting
+bank_reconciliation_enabled    bank/reconciliation surfaces enabled
+auto_post_accounting_enabled   autonomous posting policy
+payroll_enabled                future module
+```
+
+A Core customer may have Financial Kernel infrastructure active under the hood even when Ledger UI is not licensed. This lets payment/allocation history be captured consistently and makes later upgrades/migrations much safer.
+
+Do not gate canonical kernel correctness behind a UI entitlement. Entitlements govern product access, not whether economic history is represented correctly.
+
+### 35.6 Contextual finance across the existing platform
+
+Ledger data must not live only on a bookkeeping screen.
+
+Project surfaces should be able to show, subject to permissions:
+
+```text
+Revenue
+Cost
+Gross margin / contribution
+Invoiced
+Paid
+Outstanding
+Booked status
+Reconciliation status
+```
+
+Invoice surfaces should show a lifecycle such as:
+
+```text
+Issued       ✓
+Sent         ✓
+Paid         ✓
+Reconciled   ✓
+Booked       ✓
+```
+
+with drill-down to detailed financial evidence when needed.
+
+Customer and deal timelines can include financial milestones, but detailed account/journal information remains permission-controlled.
+
+The Financial Timeline defined in section 24 should therefore support multiple presentation modes:
+
+- internal engineering/support detail;
+- accountant detail;
+- business-owner summary;
+- contextual invoice/project timeline.
+
+All modes read the same canonical chain; they do not create separate status models.
+
+### 35.7 User modes: business owner, accounting professional, auditor
+
+The same underlying financial truth should be presented differently by role.
+
+#### Business owner / trades company
+
+Default UX is outcome- and exception-oriented:
+
+```text
+184,000 SEK outstanding
+23,000 SEK due this week
+38 of 40 financial events handled automatically
+2 items require your review
+```
+
+Avoid forcing routine users into debit/credit screens.
+
+#### Accountant / finance operator
+
+Provide the full Ledger workspace:
+
+- journals and voucher detail;
+- source documents;
+- reconciliation;
+- VAT;
+- corrections/reversals;
+- reports;
+- exception handling;
+- closing/period controls.
+
+#### Auditor / reviewer
+
+Future controlled access should support read-only/review workflows for relevant periods, documents, journal history and audit trail without granting normal operational mutation rights.
+
+This should reuse the same tenant/account identity system rather than creating a separate auditor application architecture.
+
+### 35.8 Karin is the default day-to-day financial interface
+
+The strategic UX goal is not to reproduce Fortnox screens inside Handymate.
+
+Karin should surface outcomes and exceptions from Pay, Ledger and reconciliation, for example:
+
+```text
+Karin · Economy
+
+✓ 12 payments matched
+✓ 7 supplier invoices booked
+✓ Bank reconciled through 10 September
+
+Needs review:
+• Supplier invoice 18,420 SEK — unusual project cost
+• Bank transaction 2,995 SEK — receipt missing
+```
+
+The user can drill down into the underlying payment, allocation, source document, journal entry and audit chain.
+
+Karin does not create a parallel finance truth. She consumes Financial Kernel state and invokes explicit, permissioned financial commands.
+
+### 35.9 Navigation direction
+
+Do not couple this architecture change to an immediate navigation redesign, but design toward a coherent Economy area.
+
+Possible mature navigation:
+
+```text
+Home
+Sales
+Projects
+Calendar
+
+Economy
+├── Invoices
+├── Payments
+├── Supplier invoices
+├── Bank
+├── Bookkeeping
+├── VAT
+└── Reports
+
+Analytics
+...
+```
+
+Existing standalone Invoice navigation may remain during migration. Move/merge navigation only when customer UX evidence supports it; do not combine risky financial backend migration with unnecessary information-architecture churn.
+
+### 35.10 Product-surface source-of-truth rule
+
+No UI surface may maintain its own independent interpretation of financial truth.
+
+Examples:
+
+- Project `paid` values derive from canonical payment allocations.
+- Invoice payment status derives from receivable/allocation projections.
+- Ledger badges derive from posting state.
+- Reconciliation badges derive from reconciliation state.
+- Karin summaries derive from the same canonical data.
+
+Never add convenience booleans that become parallel sources of truth unless they are explicitly documented projections with reproducible derivation.
+
+### 35.11 Internationalization consequence
+
+The product shell should stay globally consistent while financial capabilities localize underneath it.
+
+```text
+Handymate Product UX
+        |
+Financial Kernel
+        |
++-------------------------------+
+| Global Pay domain             |
+| Global Ledger domain          |
++-------------------------------+
+        |
+Country pack + provider adapters
+```
+
+A Swedish user and a future Norwegian/UK user should largely experience the same operational concepts — invoice, payment, bank, bookkeeping, report — while local tax/accounting/payment implementations differ below the shared product model.
+
+### 35.12 Product integration acceptance criteria
+
+Before Pay/Ledger is considered correctly integrated into Handymate, prove that:
+
+1. An invoice can be created by today's existing flows and enter the Financial Kernel without a second invoice model.
+2. Pay can settle that invoice without Ledger enabled.
+3. An externally received payment can settle/reconcile that invoice without Handymate Pay enabled.
+4. Ledger can consume the same canonical events when enabled without changing Pay semantics.
+5. Turning Ledger on does not require migrating users to another app/login/tenant.
+6. Project, invoice and Economy surfaces display consistent financial state from the same canonical objects.
+7. Karin reports the same state that detailed financial views show.
+8. Accountant/auditor permissions expose deeper views without creating separate financial records.
+9. Disabling a product entitlement hides/disables its product capability but does not corrupt or erase canonical financial history.
+10. A future country pack/provider can be added without rewriting the Handymate product shell or invoice/project domains.
+
+### 35.13 Final product rule
+
+> **Handymate is the platform. Financial Kernel is the economic infrastructure. Pay is an embedded money-movement capability with an operational admin surface. Ledger is an entitlement-based accounting module inside the same platform.**
+
+Do not build a second finance product beside Handymate. Build financial depth into the system that already knows why the economic event exists.
