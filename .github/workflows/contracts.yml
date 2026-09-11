@@ -76,6 +76,7 @@ jobs:
           tests/home-brain.spec.ts
           tests/agent-team.spec.ts
           tests/approval-explainability.spec.ts
+          tests/customer-fact-evidence-journey.spec.ts
           tests/approval-action-contract.spec.ts
           tests/approval-display.spec.ts
           tests/column-contract.spec.ts

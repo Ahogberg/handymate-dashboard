@@ -1497,7 +1497,7 @@ Slice 0 klar som audit. Flera läsytor är nu verifierade i inloggad preview enl
 | Slice 2 — Quote | Rundbundet kvitto implementerat; utkast, omläsning och ärlig signeringsstatus browserverifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
 | Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
-| Slice 5 — Explainability | Första paketet publicerat; 13 CI och båda previewbyggen gröna | Inloggat UI-prov och fler prioriterade flöden före full DoD |
+| Slice 5 — Explainability | Fem ursprungliga korttyper samt rundbunden offertuppföljning via SMS/e-post har källpresentation; se §31.10 | Inloggat UI-prov uppskjutet av användaren; full DoD ej stängd |
 | Slice 6 — Proof of Work | Tomläge och positivt checklistkvitto browserverifierade; faktisk återhämtning verifierad i DB och projektvy (§31.4) | Delutfall, osäkert utskick, fel/retry och övriga prioriterade kvittotyper i live-UI |
 | Slice 7 — Mobile | CONNECT implementerad i mobilcommit `4f8414a0dea9904371d174a66663e1d9f529f724`: klienten läser `/api/mobile/activity` och presenterar sparat/skickat, väntar, kontrollbehov och noterat separat under neutrala "Handymate idag". 47 tester, strikt typkontroll och Expo iOS-export gröna. | Autentiserat prov i installerad app före SCALE |
 | Slice 8 — Field Command | PROVE efter audit; befintligt rapportläge tar ett yttrande till högst fyra separata granskningskort för egen tid, anteckning, material och ÄTA, med signerad kontext, återvalidering, idempotens och journalförda kvitton. 77 riktade tester gröna. | Verklig autentiserad mobil/native-resa; bokning/kundlöfte ingår medvetet inte i det avgränsade rapportläget |
@@ -2307,3 +2307,15 @@ Liveprovet är fortsatt blockerat av webbläsaranslutningen: CDP refresh tabs ti
 Fortsatt kodgranskning hittade en lokal avvikelse i Godkännanden: quote_nudge visade `Noterat, jag ringer` och hade en hårdkodad telefonkvittens trots att exekveraren hanterar typen som SMS. Specialfallen togs bort. Kortet använder nu den gemensamma `Granska`-etiketten och ordinarie utfalls-/kvittenshantering; typnamnet ändrades till `Offertuppföljning`. Ingen exekveringsregel eller utskicksbehörighet ändrades.
 
 32 befintliga riktade tester för kortpresentation och åtgärdskontrakt godkända. Visuell verifiering av denna ändring återstår när webbläsaren fungerar. Föregående commit 5c2adcb har fem gröna CI-flöden och två lyckade Vercelbyggen.
+
+### 31.10 Fortsatt arbete utan livewebbläsare
+
+Användaren har uttryckligen skjutit upp liveprovet och bett att övrigt arbete fortsätter. Demoinloggning, testmöte och browserkontroller ska därför inte återförsökas i denna arbetsomgång. Tidigare godkännande av det avgränsade demoprovet kvarstår.
+
+**Färdigställt kodpaket:** Explainability omfattar nu även ordinarie rundbundna offertuppföljningskort (`send_sms`, `send_email`). Befintlig `parseQuoteFollowupRound` återanvänds. Den ursprungliga sparade payloaden ger begriplig offertreferens, offertens sparade utskicksdatum samt omgång/kanal. Inga råa ID:n, fingerprint, modelltext eller antaganden om uteblivet kundsvar exponeras som källunderlag. Det anges uttryckligen att uppgifterna beskriver ett förslag, inte en leveranskvittens. Felaktigt datum, kanal eller ofullständigt underlag ger en synlig lucka. Vanliga fristående meddelanden får ingen påhittad offertkälla.
+
+Åtgärdsgrindarna och exekveringen är oförändrade. Evidens kan inte ge en blockerad granskning en bekräftelseknapp eller ersätta dess mottagare/meddelande.
+
+**Verifierat:** 13 riktade evidens-/producenttester, 27 isolerade uppföljningskontrakt (faktiska helpers/cron med mockad DB/provider), 10 CI-kontrakt och typkontroll gröna. De tre nya evidensfallen ligger i befintlig CI-spec. Tidigare `customer-fact-evidence-journey.spec.ts` är nu också inkopplad i både npm-kontraktskommandot och GitHub-workflow. Inga liveutskick eller databasskrivningar.
+
+**Kvarvarande avgränsningar:** Project-slicens fulla administrativa läsmodell är fortfarande ett kod-/produktgap; loggarnas fritext får inte direkt presenteras som verifierade skickat-kvitton. Roller/företagsbyte, smal webbvy, installerad app, verkliga provider-/betalningsbevis och sista sammanhållna användarresor är acceptansluckor enligt statusmatrisen. Kodpaketet ovan stänger inte dessa delar.
