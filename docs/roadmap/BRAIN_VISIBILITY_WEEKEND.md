@@ -2230,3 +2230,15 @@ Testpasset är avslutat med öppna fynd, inte full acceptans. Kvar: rätta och r
 - Offertens signeringskort kräver skickat/öppnat status och `sent_at` för att säga `Väntar på signering`. Enbart token visas som `Signeringslänk skapad`, inte som utskicksbevis.
 - Ny regressionstestfil `brain-visibility-ui-regressions.spec.ts`: fem tester för gruppavbrott, framgång/fel, historikstatus, offertstatus och inkoppling i de faktiska UI-komponenterna. Tillsammans med approval-review, approval-view och project-receipts: 41 tester godkända. Typkontroll med 8192 MB godkänd.
 - Detta är lokala kodrättningar. Preview-publicering och browseromtest av rättningarna återstår; ingen slice får full DoD på dessa testresultat ensamma.
+
+### 31.3 Publicerat och omtestat 2026-09-11
+
+Kodcommit `f69a2307072410151b7dd46a592c5eba061f91ae` publicerad till arbetsgrenen/PR #38, inte main. Dashboardens Vercel-build lyckades och samtliga fem GitHub Actions-flöden för denna commit är gröna.
+
+Efter omladdning av previewn, inloggad som bekräftad ägare för Nordström El AB:
+
+- Historikens checklista visar `Behöver följas upp` i stället för den gröna godkännandestatusen.
+- SMS-grupp med två väntande ärenden: första granskningen öppnades och avbröts med `Tillbaka`. Därefter fanns noll granskningsdialoger och gruppknappen för två väntande ärenden var kvar. Ingen andra dialog öppnades och inget skickades.
+- Offertutkast `quote_2jm0fz9lnwf`: `Signeringslänk skapad` synlig, noll förekomster av `Väntar på signering`.
+
+De tre avgränsade rättningarna är därmed browserverifierade. Tidigare listade kvarvarande acceptanstester, själva checklistans databasfel och dess råa feltext är fortfarande öppna.
