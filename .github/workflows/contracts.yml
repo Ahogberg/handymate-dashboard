@@ -227,3 +227,6 @@ jobs:
 
       - name: Mejlintegrationer — tokenåtkomst, OAuth och meddelandeidentitet
         run: node tests/sprint/mail-boundaries.cjs
+
+      - name: Livetestets företags- och skrivgrindar (utan nätverk)
+        run: node --test tests/live-journey/policy.test.cjs

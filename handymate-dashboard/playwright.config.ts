@@ -25,7 +25,7 @@ export default defineConfig({
   // nattsviten mot produktion; contract.test.mjs är en node:test-fil
   // (node --test i test:contracts) som Playwrights standard-testMatch
   // (*.test.mjs) annars laddar och kör vid import.
-  testIgnore: [/.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /.*\.launch\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/, /tests[\\/]launch[\\/]/, /tests[\\/]customer-preparation[\\/]/],
+  testIgnore: [/tests[\\/]live-journey[\\/]/, /.*\.integration\.spec\.ts/, /.*\.partner-proof\.spec\.ts/, /.*\.launch\.spec\.ts/, /tests[\\/]e2e-golden-path[\\/]/, /tests[\\/]e2e-margin-guardian[\\/]/, /tests[\\/]e2e-launch-promise[\\/]/, /tests[\\/]filming[\\/]/, /tests[\\/]launch[\\/]/, /tests[\\/]customer-preparation[\\/]/],
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 2 : 0,
