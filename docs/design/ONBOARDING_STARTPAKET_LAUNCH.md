@@ -179,3 +179,7 @@ Endast kodstatus, inga externa flöden har körts i detta arbete.
 `lib/job-type-catalog.ts`, `app/onboarding/components/Step3HowYouWork.tsx`, `app/onboarding/components/StepProductRegister.tsx`, `lib/onboarding/pricing-start.ts`, `lib/quotes/job-type-setup.ts`, `lib/quotes/job-type-start.ts`, `lib/quotes/job-standard-server.ts`, `lib/onboarding/channel-health.ts`, `app/api/google/connect/route.ts`, `app/api/google/callback/route.ts`, `lib/bolagsverket/client.ts`.
 
 Detta dokument ska följa med Claude Design-briefen. Det ändrar inte appen och uppgraderar ingen integrationsstatus till verifierad.
+
+## Förberedelser för Gmail och Microsoft 365
+
+Se [implementations- och lanseringsplan](../runbooks/MAIL_INTEGRATIONS_PREPARATION.md), [verifieringsunderlag](../runbooks/MAIL_PROVIDER_VERIFICATION.md) och [acceptansprotokoll](../runbooks/MAIL_INTEGRATIONS_ACCEPTANCE.md). Underlagen är förberedda 2026-09-11; integrationerna är inte aktiverade eller liveverifierade genom dokumentleveransen.

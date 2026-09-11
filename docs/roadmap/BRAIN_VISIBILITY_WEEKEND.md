@@ -2331,3 +2331,17 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 22 riktade tester och typkontroll gröna. Nya sammanställningstester ingår i befintlig CI-spec och täcker blandade kvitton, tidigare misslyckade utfall, partiella/felande läsningar och kopplingen till samma befintliga läsningar. Livewebbläsare är enligt användarens beslut uppskjuten. Detta paket bevisar inte att kontinuerlig automatisk bevakning är aktiv; historiska fritextloggar används inte som sådant bevis.
 
 **Efter detta paket:** prioritera visuell/UI-förbättring av befintliga flöden. Behåll separat acceptanslista för live-evidenskort, smal vy, roller/företagsbyte, installerad mobilapp och fullständiga användarresor. Externa utskick, Fortnox, betalning och ROT-exklusivitet är kvarvarande lanseringsgrindar, inte klara genom denna överblick. Ingen slice uppgraderas till SCALE.
+
+### 31.12 Förberedelser för Gmail och Microsoft 365
+
+**DONE:** Tre underlag i `docs/runbooks/`: MAIL_INTEGRATIONS_PREPARATION.md, MAIL_PROVIDER_VERIFICATION.md och MAIL_INTEGRATIONS_ACCEPTANCE.md. Scope-motiveringar, ansökningsfält, videomanus, avgränsade kodpaket, testfall och onboarding-/vidarebefordringsvillkor är förberedda enligt användarens nya beställning.
+
+**REUSED:** Befintlig Google OAuth, Gmail-poller/processor, godkännandekedja, email_inbound_route och channel-health. **NEW:** Dokumentation; ingen ny runtime, tabell eller motor.
+
+**VERIFIED:** Lokal kod och aktuell arbetsgren; read-only schema/policy/grants/indexmetadata i prod 2026-09-11. calendar_connection har medlemsbaserad ALL-policy och authenticated CRUD på tabellen med tokenkolumner. email_conversations har global unik gmail_message_id. email_inbound_route finns trots äldre kodkommentar om saknad tabell. Inga kundmejl/tokenvärden lästes.
+
+**NOT VERIFIED:** Google Cloud-/Entra-konfiguration, leverantörsgranskning, tokenkrypteringens fulla kedja, Data API-exponering, liveanslutning, sändning och radering. Alla nya acceptansfall står som ej körda; browserprovet är fortsatt uppskjutet.
+
+**CUSTOMER IMPACT:** Inget ändrat appbeteende. Konkret underlag för att kunna koppla faktisk mejlavlastning i befintlig onboarding. **RISKS:** Tokenåtkomst, global meddelandeidentitet, återanvänd token vid kontobyte och implicit avsändarval måste lösas före aktivering. Microsoft kräver adapter och säker identitetsmappning; inga Gmail-fält får tyst återanvändas för Graph-ID:n.
+
+**STATUS CHANGES:** Inga förmågor uppgraderas. **NEXT ACTION:** Genomför avgränsat token-/OAuth-skydd med kalenderregression, därefter Gmail-behörigheter och Microsoft-adapter enligt underlagen. Färdigställ extern verifiering med verklig demonstrationsvideo. Öppna endast provad provider i onboarding.
