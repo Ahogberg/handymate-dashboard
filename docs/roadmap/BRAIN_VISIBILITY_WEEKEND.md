@@ -2367,3 +2367,18 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **REUSED / NEW:** Befintlig katalogkonsumtion, jobbtypspersistens, standardrader, produkteditor, priser, onboarding_data och email-lead-API. Ny redaktionell paketkälla och liten kundkanalkomponent; inga nya tabeller, huvudsteg eller motorer. Tidigare kunders jobbnamn/sluggar/priser/mallar skrivs inte om.
 
 **VERIFIED:** Riktade kontrakts- och lokala DOM-/Postgrest-fixture-tester samt typkontroll; se BRANSCHPAKET_ONBOARDING_LAUNCH.md. **NOT VERIFIED:** Livebrowser och extern e-postleverans; inga prodskrivningar eller aktiveringar. **CUSTOMER IMPACT:** Efter release kan nya kunder välja begripligare jobbpaket och granska artikel-/arbetsunderlag samt prioritera rätt kundkanal. **STATUS CHANGES:** Ingen liveförmåga uppgraderas. **NEXT ACTION:** Visuell och sammanhängande onboarding-/offertacceptans när browserprov återupptas. Gmail/Outlook följer separat gransknings-/implementationsplan.
+
+
+### 31.15 Releasegrind och kundresa — 2026-09-11
+
+**DONE:** Releasegrinden körd. Korrigerade ett tidigare publiceringsfel: 47 app-/underlagsfiler hade hamnat i repo-roten i GitHub i stället för `handymate-dashboard/`. De flyttades med verifierade blob-SHA; rotkopiorna togs bort utan att befintliga rotdokument ändrades. Hela versionshanterade innehållet jämfördes efteråt med den lokala appen. Tidigare gröna byggen verifierade alltså inte dessa nya ändringar. CI-/lokal testlista synkades och UI-testresan uppdaterades till de aktuella branschpaketen.
+
+**REUSED:** Befintlig kontraktsgrind, kundrese-/SQL-fixtures och godkännandekortens testprogram. **NEW:** En liten regressionsgrind mot appfiler i fel rot samt beteendeprov för datum i stället för gammal regextext. Ingen ny produktmotor eller UI-design.
+
+**VERIFIED:** Lokal typkontroll, 2 063 kontraktstester (1 separat överhoppat), 17 kundunderlagsfall, aktivitetsläsning, 327 kundutfallsfall, 30 mejlgränstester och 29 server-/DOM-testprogram för godkännandekort. Alla fem GitHub-workflows och båda Vercel-byggena är gröna på `b2552eb0`, inklusive jobbtypernas mobil-/desktopresa med nya branschpaket. Fullständigt CI-läge och bevisgränser finns i `handymate-dashboard/docs/runbooks/RELEASE_GATE_2026_09_11.md`.
+
+**NOT VERIFIED:** Komplett inloggad kundresa i driftsatt app, riktiga leverantörskvitton, PDF/browserproven som inte kunde slutföras och mejlmigration i prod. Browserförsöket fick CDP-timeout; ingen inloggnings- eller mottagarkontroll påstås vara utförd.
+
+**CUSTOMER IMPACT:** Branschpaket, egna artikelpriser och de senaste godkännandeförbättringarna finns nu faktiskt på den sökväg som previewbygget läser. **RISKS:** Read-only databasprov bekräftar att de tre nya mejlidentitetskolumnerna ännu saknas i prod. Mejlkoden och SQL måste införas samordnat enligt befintlig runbook. Tidigare dokumenterade integration-/ROT-blockerare kvarstår.
+
+**STATUS CHANGES:** Ingen capability uppgraderas till livebevis. Releasebeslut **HOLD**, ingen merge/proddeploy utförd. **NEXT ACTION:** Testa rätt preview med dedikerat konto genom företagsstart → bransch/jobben → egna arbets-/materialpriser → kundkanal → avbrott/återinloggning → testförfrågan → granskad offert → kontrollerad leverans → acceptans/projekt. Inför och verifiera mejlschemat först i isolerad testmiljö innan samordnad produktionsrelease. UI-design fortsätter separat hos Claude Design.
