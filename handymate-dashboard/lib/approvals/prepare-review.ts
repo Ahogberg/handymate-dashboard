@@ -312,6 +312,15 @@ async function prepareApprovalReviewInternal(db: SupabaseClient, businessId: str
       }
       case 'checklist_forslag': {
         if (!p.project_id || !Array.isArray(p.template_items) || !p.template_items.length) throw new Error('Checklistan saknar projekt eller punkter.')
+        const checklistId = approvalArtifactId(businessId, approval.id, 'checklist')
+        const existing = await db.from('project_checklist').select('id, project_id, name, items, status').eq('id', checklistId).eq('business_id', businessId).maybeSingle()
+        if (existing.error) throw new Error('Tidigare checklistresultat kunde inte kontrolleras. Försök läsa ärendet igen.')
+        snapshot.checklist = existing.data || null
+        if (existing.data) {
+          if (existing.data.project_id !== p.project_id) throw new Error('Den sparade checklistans projekt stämmer inte med förslaget.')
+          detail('Sparad checklista', existing.data.name)
+          return complete('Checklistan finns redan på projektet. Bekräftar det sparade resultatet utan att skapa en dubblett eller återställa kontrollpunkterna.', 'Bekräfta sparad checklista')
+        }
         detail('Checklista', p.template_name)
         if (p.template_items.some((item: any) => typeof item?.text !== 'string' || !item.text.trim())) throw new Error('Alla kontrollpunkter måste ha en text.')
         p.template_items.forEach((item: any, i: number) => detail(`Punkt ${i + 1}${item.required ? ' (obligatorisk)' : ''}`, item.text))

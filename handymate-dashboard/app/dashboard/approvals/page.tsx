@@ -3,6 +3,7 @@
 import { fetchApprovalList } from '@/lib/approvals/list-client'
 import { classify } from '@/lib/approvals/action-contract'
 import { historyStatus } from '@/lib/approvals/history-status'
+import { approvalErrorText } from '@/lib/approvals/error-presentation'
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -819,7 +820,7 @@ export default function ApprovalsPage() {
                       <p className="text-xs text-red-600 truncate">
                         {execResult?.outcome === 'retrying'
                           ? 'Omkörning avbröts — försök igen'
-                          : execResult?.receipt?.text || execResult?.error_text || 'Handlingen kunde inte utföras'}
+                          : approvalErrorText(execResult?.receipt?.text || execResult?.error_text)}
                       </p>
                     </div>
                     <button
@@ -827,7 +828,7 @@ export default function ApprovalsPage() {
                       disabled={retryLoading === item.id}
                       className="px-3 py-1.5 min-h-[44px] rounded-lg bg-red-600 text-white text-sm font-medium hover:bg-red-700 disabled:opacity-50 whitespace-nowrap"
                     >
-                      {retryLoading === item.id ? 'Försöker...' : 'Försök igen'}
+                      {retryLoading === item.id ? 'Öppnar granskning...' : 'Granska återförsök'}
                     </button>
                   </div>
                 )
