@@ -2299,3 +2299,11 @@ Isolerat scenario använder ordinarie `buildCustomerFactCard` → `prepareApprov
 Hittat och rättat: `normalizeDueDateIso` accepterade omöjliga kalenderdatum som Date.parse rullar vidare till nästa månad. Nu krävs verkligt kalenderdatum och antingen datum utan tid eller explicit tidszon. Ogiltigt producentdatum tas inte med; ett ogiltigt redigerat datum blockerar beslut. Skottår och giltiga offsets verifierade.
 
 52 riktade tester gröna och typkontroll godkänd. Ett gammalt källkodstest i promise-deadlines förväntade sig tyst borttagning av löftesdatum vid schemafel; det uppdaterades till den redan införda exekveringens ärliga felutfall utan att ändra exekveraren. Detta är inte bevis på modellens extraktion eller en genomförd livebeslutsresa.
+
+### 31.9 Offertuppföljningens knapp och kvittens
+
+Liveprovet är fortsatt blockerat av webbläsaranslutningen: CDP refresh tabs timeout kvarstod även efter användarens uttryckliga godkännande av demoinloggning. Inloggningsresultatet är okänt; inget testmöte eller livebeslut har verifierats. Ingen slice stängs på detta underlag.
+
+Fortsatt kodgranskning hittade en lokal avvikelse i Godkännanden: quote_nudge visade `Noterat, jag ringer` och hade en hårdkodad telefonkvittens trots att exekveraren hanterar typen som SMS. Specialfallen togs bort. Kortet använder nu den gemensamma `Granska`-etiketten och ordinarie utfalls-/kvittenshantering; typnamnet ändrades till `Offertuppföljning`. Ingen exekveringsregel eller utskicksbehörighet ändrades.
+
+32 befintliga riktade tester för kortpresentation och åtgärdskontrakt godkända. Visuell verifiering av denna ändring återstår när webbläsaren fungerar. Föregående commit 5c2adcb har fem gröna CI-flöden och två lyckade Vercelbyggen.
