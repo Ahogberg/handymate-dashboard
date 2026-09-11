@@ -275,12 +275,19 @@ The customer should interact with exceptions, not perform bookkeeping line-by-li
 
 ## 10. Sweden country pack — initial scope
 
-The Swedish pack should eventually cover at minimum:
+The Swedish pack should eventually cover at minimum the list below. The authoritative and more
+detailed scope is `docs/strategy/FINANCIAL_KERNEL_ARCHITECTURE.md` §15 and §36; this list is a
+summary and must not be treated as complete on its own.
+
 
 - BAS-compatible chart of accounts
 - Swedish VAT codes and reporting
+- **VAT regime per invoice: standard, reverse-charge construction (omvänd skattskyldighet för
+  byggtjänster), exempt** — a large share of B2B volume in this segment, not an edge case
+- **Accounting method: accrual and cash basis (kontantmetoden)** — cash basis is the default for
+  most companies in the target segment
 - ROT/RUT accounting behavior
-- SIE import/export
+- SIE import/export — **needed before the first pilot, not before broad migration**
 - Swedish customer/supplier accounting conventions
 - Financial year/period handling
 - Required system documentation/auditability
