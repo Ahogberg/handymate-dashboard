@@ -2254,3 +2254,11 @@ Publicerad kod: `d78175d7f494880f7c9ffddb80450c5c2146190f` i PR #38. Båda Verce
 - Kortets sparade utförande visar `outcome: success`, `retried: true`, kvittens `saved`/`Checklistan är skapad.` och samma checklist-ID. Fellistan försvann. Projektets kvittoregion visar `Sparat` och `Checklistan är skapad.` i webbläsaren.
 
 Checklistans historiska fel är återhämtat. De interna testpunkterna finns kvar som ej utförda; inga säkerhetskontroller påstås vara genomförda. Full täckning av samtliga korttyper i live-UI, roll-/företagsbyte, smal viewport och installerad app kvarstår enligt tidigare avgränsning. Denna sprint stänger inte dessa bredare acceptanspunkter.
+
+### 31.5 Behörigheter och mobilens aktivitetsstatus
+
+- Första körningen: 57/62 tester gröna. Fem äldre routingtester förväntade fortfarande öppen `any`-routing, i konflikt med den skärpta policyn från 2026-09-09 och `kortgrindar-per-behorighet.spec.ts`. Förväntningarna uppdaterade till den beslutade policyn; ingen runtime-behörighet försvagades.
+- Efter korrigering: 25/25 routing-/kortgrindstester gröna, tillsammans med de tidigare 42 övriga gröna testerna totalt **67 unika tester** (permission-contract, approval-routing, dashboard-mobile-shell, project-mobile-layout, mobile-home-feed och kortgrindar-per-behorighet).
+- Tre isolerade harness-körningar gröna: mobile-activity, history-recovery och stale-review-recovery. Verifierar bland annat 401/403, företagsfilter, medarbetarens egna tillåtna beslut, läsfel, sidindelning och avbrutet beslut utan skickad handling.
+- Hittat och rättat ett separat mobilglapp: API:t kunde lämna ut ett gammalt `saved`/`sent`-kvitto trots att senaste execution outcome var failed/retrying eller saknades. API:t returnerar nu `needs_action` och skiljer tidigare kvittens från obekräftat utfall. Mobilens befintliga presentation mappar redan detta till uppmärksamhet. Utökat faktiskt route-harness verifierar båda kvittotyperna med failed/retrying/saknat utfall och att success bevaras.
+- Typkontroll godkänd. Mobil-layouttesterna ovan är källkodskontrakt, inte visuella tester i smal viewport. Inget live-rollbyte eller test av installerad app utfördes i detta pass. Dessa acceptanspunkter är fortsatt öppna, liksom alla korttyper i live-UI.
