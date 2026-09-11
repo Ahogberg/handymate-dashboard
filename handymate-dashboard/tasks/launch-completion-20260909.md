@@ -265,3 +265,54 @@ Färsk browserkontroll: preview visar Log in to Vercel. Ny läsande navigation t
 2. Per-offert-uppföljning enligt ovan, godkännande/stopp vid kundbeslut och projektkvittens.
 3. Samordnat mobilrapport→ÄTA→fakturaunderlag→verkligt ekonomisystem med samma kontrollerade belopp och kundprov.
 Inget av detta är slutgodkänt. Ingen main-merge/push, schemaändring, kundkommunikation eller providerkörning i detta pass.
+
+## Checkpoint: block 6 sammanställt 2026-09-11
+
+Releasepaketet ligger i `tasks/release-package-20260911.md`. Block 6 går från **Planerad**
+till **Sammanställt, releasebeslut öppet**. Sammanställt utan produktionsåtkomst; avsnitt 10
+i paketet listar exakt vad som därför inte är kontrollerat.
+
+Exakta SHA: backend `f7d921587dc71c7859b31163caadef1d590c58ba` (2026-09-11), mobil
+`4ec114c18d22c1458232b4c98534884feeb7ce1d` (2026-09-07, dokumentationscommit; koden är
+`853f617` = källan för produktionsbygge 12), landning `973e46d4323f73d802d1338648bddeb04d1fc4ff`.
+
+Testbevis kört på backend-SHA i den här sessionen, inte bara avläst: `npm run test:contracts`
+1917 passerade + 1 befintlig skip + `node --test` 17/17, exit 0. `npm run test:six-outcomes`
+15 delsviter gröna, 325 PASS-rader, exit 0. Riktad roll-/tenant-/lanseringsgrind över tio
+filer: 156 passerade. Fem Actions gröna på samma SHA. Samtliga är browserlösa kontraktsprov
+med mockade providers — inga liveprov, inga inloggade klickprov, inga kundprov.
+
+### Fynd som ändrar releasebeslutet
+
+1. **iOS-granskningen är försenad.** `handymate-mobile/tasks/eas-build-2026-05-12.md` har
+   punkten "Skicka in till granskning senast onsdag 9 sept (1–3 dagars granskning, lansering
+   14 sept)" obockad. Deadlinen passerade 2026-09-09. Produktionsbygge 12 finns hos EAS men
+   ingen inlämning är dokumenterad. Frågan som måste besvaras först: ingår appen i
+   lanseringen den 14:e?
+2. **Mobil och backend är inte samordnade.** Sju draft-PR:er (#2–#8) ligger omergade på
+   `handymate-mobile`. Bygge 12 är byggt före samtliga. PR7, som backendens checkpoint
+   2026-09-10 refererar som den samordnade mobilstaten, finns inte på main och inte i något
+   byggt artefakt — så `WORK_REPORT_CONTINUITY_ENABLED` har ingen mobilmotpart i drift.
+3. **Ingen migrationslogg finns.** 404 `sql/v*.sql` och åtta CLI-migrationer, utan någon fil
+   som säger vilka som är körda mot produktion. Största luckan i paketet och den enda som
+   inte går att stänga utan produktionsåtkomst.
+4. **EAS-produktionsprofilen har `SENTRY_DISABLE_AUTO_UPLOAD: "true"`** — inga källkartor,
+   alltså oläsbara kraschrapporter från skarpa användare. `ascAppId` saknas dessutom i
+   `eas.json` trots att ASC App ID 6769730756 är dokumenterat.
+5. **Tre utvecklingsflaggor med skarp effekt** måste kontrolleras i produktionsmiljön:
+   `ELKS_SKIP_SIGNATURE` (webhook-signaturen verifieras inte), `DISABLE_SMS_NIGHT_BLOCK`
+   (nattspärren kringgås), `USE_MOCK_SUPPLIERS`.
+6. **`/api/cron/push-morgon` är schemalagd två gånger** i `vercel.json` (`10 5` och `10 6`).
+   Avsiktliga vågor eller dubblett — en dubblerad morgonpush är kundsynlig.
+7. **`handymate-mobile/LAUNCH-GUIDE.md` är föråldrad:** alla 12 punkter står som ❌ medan
+   eas-build-dokumentet visar att ASC-appen finns och bygget är kört. Får inte användas som
+   lanseringschecklista förrän den stämts av.
+8. **Hemlighetskontroll av det publika dashboard-repot: rent.** Inga riktiga nycklar i
+   spårade filer, inga committade `.env`. Mindre fynd: fem signerade Storage-URL:er för
+   agentavatarer i `lib/agents/team.ts` med utgång år 2053.
+
+### Nästa körbara steg
+
+Ordningen står i avsnitt 9 i releasepaketet. Punkt 1 (ingår appen?) och punkt 2 (logga in och
+kör de tre resorna) blockerar allt annat och kan inte göras från en container utan
+produktionsåtkomst. Punkt 3–8 är en halvdag.
