@@ -1487,18 +1487,18 @@ Brain Visibility Weekend
 
 ### OVERALL STATUS
 
-Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av slice 1 och 2 är implementerad och lokalt verifierad. Slice 1/2 är INTE stängda enligt sina Definition of Done; preview, verklig kundresa och externa providerbevis återstår.
+Slice 0 klar som audit. Flera läsytor är nu verifierade i inloggad preview enligt §31, inklusive Home-reload, offertutkast, kundens nästa steg och ett verkligt sparat checklistkvitto. Detta ersätter inte fullständiga kundresor, roll-/företagsbyte, installerad app eller externa providerbevis. Slice 1/2 är fortfarande INTE stängda enligt sina Definition of Done.
 
 | Del | Aktuell status | Kvar före stängning |
 | --- | --- | --- |
 | Slice 0 — audit | Klar för att styra nästa bygge | Osäkra runtime-rader behåller sin osäkerhet; matrisen uppdateras vid nya bevis |
 | CONNECT före Home | Veckorapportskod och lokala tester klara; driftblocker kvar | Nummer/saldo, avstämning av fyra äldre rapportfel, verifierad leverans |
-| Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
-| Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
+| Slice 1 — Home | Femlägesyta och reload verifierade på ägarkontot; SMS-gruppavbrott rättat och omtestat | Verklig användare förstår läget inom 10 sekunder; fel/retry, roller, företagsbyte och smal viewport |
+| Slice 2 — Quote | Rundbundet kvitto implementerat; utkast, omläsning och ärlig signeringsstatus browserverifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
 | Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
 | Slice 5 — Explainability | Första paketet publicerat; 13 CI och båda previewbyggen gröna | Inloggat UI-prov och fler prioriterade flöden före full DoD |
-| Slice 6 — Proof of Work | Projektets kvitton publicerat i `7ebe1dc570e3344c9da1ba71e1fe67a01660ee7e`; 20 riktade tester, typkontroll, 13 CI-checkar och båda previewbyggen gröna | Inloggat UI-prov kvar |
+| Slice 6 — Proof of Work | Tomläge och positivt checklistkvitto browserverifierade; faktisk återhämtning verifierad i DB och projektvy (§31.4) | Delutfall, osäkert utskick, fel/retry och övriga prioriterade kvittotyper i live-UI |
 | Slice 7 — Mobile | CONNECT implementerad i mobilcommit `4f8414a0dea9904371d174a66663e1d9f529f724`: klienten läser `/api/mobile/activity` och presenterar sparat/skickat, väntar, kontrollbehov och noterat separat under neutrala "Handymate idag". 47 tester, strikt typkontroll och Expo iOS-export gröna. | Autentiserat prov i installerad app före SCALE |
 | Slice 8 — Field Command | PROVE efter audit; befintligt rapportläge tar ett yttrande till högst fyra separata granskningskort för egen tid, anteckning, material och ÄTA, med signerad kontext, återvalidering, idempotens och journalförda kvitton. 77 riktade tester gröna. | Verklig autentiserad mobil/native-resa; bokning/kundlöfte ingår medvetet inte i det avgränsade rapportläget |
 | Slice 9 — Money Brain | PROVE efter audit; befintlig fakturaberedskap, intäktskö och value ledger visar blockerare, nästa steg och verifierade utfall utan att blanda potential med betalt. 107 riktade tester gröna. | Verklig inloggad resa och provider-/betalningsbevis |
@@ -2262,3 +2262,17 @@ Checklistans historiska fel är återhämtat. De interna testpunkterna finns kva
 - Tre isolerade harness-körningar gröna: mobile-activity, history-recovery och stale-review-recovery. Verifierar bland annat 401/403, företagsfilter, medarbetarens egna tillåtna beslut, läsfel, sidindelning och avbrutet beslut utan skickad handling.
 - Hittat och rättat ett separat mobilglapp: API:t kunde lämna ut ett gammalt `saved`/`sent`-kvitto trots att senaste execution outcome var failed/retrying eller saknades. API:t returnerar nu `needs_action` och skiljer tidigare kvittens från obekräftat utfall. Mobilens befintliga presentation mappar redan detta till uppmärksamhet. Utökat faktiskt route-harness verifierar båda kvittotyperna med failed/retrying/saknat utfall och att success bevaras.
 - Typkontroll godkänd. Mobil-layouttesterna ovan är källkodskontrakt, inte visuella tester i smal viewport. Inget live-rollbyte eller test av installerad app utfördes i detta pass. Dessa acceptanspunkter är fortsatt öppna, liksom alla korttyper i live-UI.
+
+### 31.6 Sammanhållet webbpass — Project, underlag och Explainability
+
+Samtliga fem CI-flöden för `b6b8cbe724abe9c99f92d5938b314f8f0eb97184` verifierade gröna. I detta pass: 134 riktade tester godkända (72 i job-preparation/project-reality/approval-explainability och 62 i project-invoice-journey/project-approval-visibility). Dessa är isolerade funktions-/kontraktstester, inte fulla användarresor.
+
+Inloggad preview på Nordström El AB:
+
+- Projekt P-1015 visar väntande SMS-beslut, ej tilldelad personal, kvarvarande delmoment som faktureringsblockerare och sparat checklistkvitto.
+- `Inför nästa jobb` på projektet visar att ett kommande bokat besök saknas. `Läs in igen` behåller korrekt stopp och länk till kalendern.
+- `Granska fakturaunderlag` kräver explicit val mellan offert/godkända ÄTA och faktisk tid/material; texten förklarar att underlagen inte slås ihop automatiskt.
+- Valet offert/ÄTA öppnar underlag med signerad offert, signeringsdatum och rader. Ett befintligt utkast FV-2026-004 identifieras; UI säger uttryckligen att ingen ny faktura skapas. Återgång till projektet fungerar. Ingen faktura skapades eller ändrades.
+- Bokning `book_film_5` finns men saknar projektkoppling. Förberedelsen stoppar med begriplig förklaring och kalenderlänk. Ingen koppling ändrades för att få testet grönt.
+
+**Kvar före stängning:** positiv förberedelseresa med faktisk bokning/projekt/källunderlag; prioriterade aktiva Explainability-kort med sparad evidens i UI; Project-ytans fulla svar på vad som bevakas administrativt. Ovanstående runtimebevis stänger specifika stopp-/underlagsvägar, inte hela slice 3 eller 5. Inga externa utskick eller andra affärsbeslut utfördes.
