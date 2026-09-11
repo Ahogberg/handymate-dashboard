@@ -13,10 +13,10 @@ Kundvyn ska visa vad Handymate vet om relationen, vad som är öppet och nästa 
 | Nästa aktiva bokning | Publicerat; befintlig bokning, korrekt lokalt datum, länk och tomläge verifierade. Produktionsenum rättad till confirmed. |
 | Kundkopplade ärenden och senaste offert | Implementerat och granskat lokalt. Befintlig routing och quote handoff återanvänds. Kundkopplade informationsärenden får neutral presentation, utan ny Godkänn-knapp. |
 | Nästa administrativa steg | Implementerat med samma läsningar som översikten; okända källor blockerar ett definitivt besked. |
-| Historik och äldre räknare | Källfel synliggörs, tillgänglig historik behålls och sena svar skyddas. Äldre kärnläsningar har explicita företagsfilter och okända räknare vid fel. Faktiska route-regressioner är gröna; slutlig preview återstår. |
+| Historik och äldre räknare | Källfel synliggörs, tillgänglig historik behålls och sena svar skyddas. Äldre kärnläsningar har explicita företagsfilter och okända räknare vid fel. Faktiska route-regressioner och inloggad preview är gröna; schemafelet i äldre affärsläsning är rättat. |
 | Verkligt roll-/företagsbyte | Ej verifierat. Kontomenyn saknar väljare. Read-only medlemskontroll: en aktiv owner med user_id och en employee utan user_id i testföretaget. Legitima ytterligare testsessioner krävs. |
 | Mobil | Ingen separat kunddetaljvy i mobilrepots aktuella app-träd. Webbvyn behöver prövas smalt; aktuell cloud-browser annonserar ingen viewport-/device-emulering. Detta är inte native-build-proof. |
-| Publicering och slutlig preview | Lokalt slutpaket granskat och verifierat; publicering/preview återstår. |
+| Publicering och slutlig preview | Slutpaket och runtime-rättning publicerade och inloggad preview verifierad. Se versionsbundet bevis nedan. |
 
 ## Avgränsning
 
@@ -39,4 +39,8 @@ Faktisk transpilierad GET provas för paginerad kundärendeläsning efter rad 1 
 
 Kod `0af3fc4eb85af288754e575d7e74ff9d9ff2a6ad`: samtliga 13 CI-checkar och båda Vercelbyggen gröna. Inloggad preview visar två kundkopplade SMS-ärenden, rätt senaste offert med Utkast och kanonisk överlämning. Öppna offerten leder till samma offertnummer och kund. En annan kund visar verifierat tomma ärenden/offerter/uppgifter och en riktig bokning den 11 september kl. 12:00; nästa steg blir att förbereda bokningen och länken pekar på rätt boknings-ID. Samma resultat efter omladdning. Historiken visar kundens bokningar. Inga utskick eller beslut utfördes.
 
-Den nya felvisningen blottlade ett äldre schemafel: kundsidans affärsläsning använder `pipeline_stage.label`, medan read-only runtimekontroll bevisar `name`. Rättningen till `label:name` och okända flikräknare vid läsfel är lokalt granskad. Typkontroll, diffkontroll och 15 riktade tester är gröna. Rättningens previewkontroll återstår.
+Den nya felvisningen blottlade ett äldre schemafel: kundsidans affärsläsning använder `pipeline_stage.label`, medan read-only runtimekontroll bevisar `name`. Rättningen till `label:name` och okända flikräknare vid läsfel är lokalt granskad. Typkontroll, diffkontroll och 15 riktade tester är gröna. Rättningen publicerad som `edf411790bee87bf98c2a844480b3858161b22ea`. Båda Vercelbyggen gröna. Inloggad omladdning visar att kärnläsningens felmeddelande försvunnit, bokningsantalet är två och nästa bokning/nästa steg är oförändrat korrekta. Vid checkpointen var 11/13 CI-checkar gröna och två kontraktskörningar pågick, utan rapporterade fel.
+
+## Kvotprioritering
+
+Användaren uttryckte oro för veckoanvändningen. Ingen ytterligare breddning av slice 4 eller start av slice 5 efter denna checkpoint. Fortsätt först med legitima roll-/företagssessioner och smal webbkontroll. Prioritera därefter återstående helgarbete efter konkret lanseringsnytta; ett avgränsat Sol-paket och en samlad planerings-/granskningsomgång åt gången. Ingen garanti ges att hela helgplanen ryms i kvarvarande kvot.

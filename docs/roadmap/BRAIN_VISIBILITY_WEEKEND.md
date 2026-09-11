@@ -1496,14 +1496,14 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
-| Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg lokalt granskat och testat | Slutpaketets publicering och preview, verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
+| Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
 | Slice 5–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
 
-Slice 4 — Customer. Användarens aktuella instruktion är att stänga slice 4 innan slice 5 påbörjas. Slutpaketet granskas och verifieras; öppna externa grindar för övriga slices behålls. Slice 4 får inte markeras stängd enbart på basis av kod och isolerade tester.
+Slice 4 — Customer. Användarens aktuella instruktion är att stänga slice 4 innan slice 5 påbörjas. Slutpaketet är publicerat och inloggad preview verifierad; roll-/företagsbyte och smal webbkontroll återstår. Användarens kvotoro innebär ingen ytterligare breddning före dessa grindar och därefter prioritering efter lanseringsnytta. Öppna externa grindar för övriga slices behålls. Slice 4 får inte markeras stängd enbart på basis av kod och isolerade tester.
 
 ### LAST COMPLETED — historisk auditbaseline
 
