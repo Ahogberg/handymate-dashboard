@@ -2,10 +2,39 @@ import { expect, test } from '@playwright/test'
 import { readFileSync } from 'node:fs'
 import ts from 'typescript'
 import { NextRequest, NextResponse } from 'next/server'
-import { loadCustomerNextBooking, loadCustomerTasks } from '../lib/customers/customer-open-work'
+import { loadCustomerNextBooking, loadCustomerRelationship, loadCustomerTasks, nextAdministrativeStep } from '../lib/customers/customer-open-work'
 import * as taskVisibility from '../lib/tasks/visibility'
 
 type Row = Record<string, any>
+function customerDecisionRoute(seed: Record<string, Row[]>, options: { failPage?: number; denied?: string[] } = {}) {
+  function query(table: string) {
+    let rows = [...(seed[table] || [])]; let range: [number, number] | null = null
+    const q: any = {
+      select() { return q },
+      eq(key: string, value: unknown) { rows = rows.filter(row => row[key] === value); return q },
+      in(key: string, values: unknown[]) { rows = rows.filter(row => values.includes(row[key])); return q },
+      or() { rows = rows.filter(row => !row.snoozed_until || Date.parse(row.snoozed_until) < Date.now()); return q },
+      order(key: string, config?: { ascending?: boolean }) { rows.sort((a, b) => String(a[key]).localeCompare(String(b[key])) * (config?.ascending === true ? 1 : -1)); return q },
+      range(from: number, to: number) { range = [from, to]; return q },
+      maybeSingle() { return Promise.resolve({ data: rows[0] || null, error: null }) },
+      then(resolve: (result: any) => void) {
+        if (table === 'pending_approvals' && range && options.failPage === range[0]) return resolve({ data: null, error: { message: 'page failed' } })
+        resolve({ data: range ? rows.slice(range[0], range[1] + 1) : rows, error: null })
+      },
+    }; return q
+  }
+  const code = ts.transpileModule(readFileSync('app/api/customers/[id]/decisions/route.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
+  const caseTypes = ['customer_fact', 'send_sms', 'send_email', 'quote_nudge', 'invoice_reminder', 'profitability_warning']
+  const deps: Record<string, any> = {
+    'next/server': { NextResponse }, '@/lib/auth': { getAuthenticatedBusiness: async () => ({ business_id: 'tenant-a' }) },
+    '@/lib/permissions': { getCurrentUser: async () => ({ id: 'user', business_id: 'tenant-a', role: 'owner' }) }, '@/lib/supabase': { getServerSupabase: () => ({ from: query }) },
+    '@/lib/approvals/routing': { canActOnApproval: async (_db: any, _user: any, row: Row) => !options.denied?.includes(row.id) },
+    '@/lib/jarvis/approval-view': { approvalDisplay: () => ({ type_label: 'Beslut' }) }, '@/lib/testdata': { arTestdataApproval: (row: Row) => row.test_data === true },
+    '@/lib/jarvis/customer-case': { CUSTOMER_CASE_APPROVAL_TYPES: caseTypes.slice(3), kundReferensForApproval: (row: Row) => row.approval_type === 'quote_nudge' ? { kind: 'quote', id: row.payload.quote_id } : row.approval_type === 'invoice_reminder' ? { kind: 'invoice', id: row.payload.invoice_id } : row.approval_type === 'profitability_warning' ? { kind: 'project', id: row.payload.project_id } : null },
+  }
+  const module = { exports: {} as any }; new Function('require', 'module', 'exports', code)((name: string) => deps[name], module, module.exports)
+  return module.exports.GET as (request: NextRequest, context: { params: Promise<{ id: string }> }) => Promise<Response>
+}
 function bookingRoute(seed: Record<string, Row[]>, projectError = false, projectCountOffset = 0) {
   const operations: string[] = []
   function query(table: string) {
@@ -142,6 +171,48 @@ test('next booking selection is deterministic and excludes completed and cancell
   expect(next?.booking_id).toBe('next')
 })
 
+test('relationship loader uses canonical quote handoff and preserves role denial', async () => {
+  const controller = new AbortController(); const urls: string[] = []
+  const result = await loadCustomerRelationship('cust / å', controller.signal, async input => {
+    const url = String(input); urls.push(url)
+    if (url.includes('/decisions')) return new Response(JSON.stringify({ approvals: [{ id: 'a1', title: 'Välj tid', created_at: '2026-09-10' }], has_more: false }))
+    if (url.startsWith('/api/quotes?')) return new Response(JSON.stringify({ quotes: [{ quote_id: 'old', title: 'Äldre', quote_number: null, status: 'sent', created_at: '2026-09-01' }, { quote_id: 'new', title: 'Senaste', quote_number: null, status: 'opened', created_at: '2026-09-09' }] }))
+    return new Response('{}', { status: 403 })
+  })
+  expect(urls).toContain('/api/customers/cust%20%2F%20%C3%A5/decisions')
+  expect(result.quote?.quote_id).toBe('new')
+  expect(result.handoffUnavailable).toBe(true)
+  expect(nextAdministrativeStep(result, [], null)).toBe('Öppna ärendet: Välj tid')
+})
+
+test('unknown relationship input prevents a definitive administrative next step', async () => {
+  const controller = new AbortController()
+  const partial = await loadCustomerRelationship('cust', controller.signal, async input => String(input).includes('/decisions')
+    ? new Response('{}', { status: 503 })
+    : new Response(JSON.stringify({ quotes: [] })))
+  expect(partial.decisionsError).toBe(true)
+  expect(nextAdministrativeStep(partial, [], null)).toContain('inte bekräftas')
+  const source = readFileSync('components/customers/CustomerOpenWorkSummary.tsx', 'utf8')
+  expect(source).toContain('Nästa steg kan inte bekräftas eftersom allt underlag inte kunde läsas.')
+  expect(source).toContain('Öppna besluts­kön')
+  expect(source).not.toContain('/dashboard/approvals?focus=')
+})
+
+for (const scenario of ['rejected', 'malformed'] as const) test(`handoff ${scenario} retains verified decisions and quote without claiming a next step`, async () => {
+  const controller = new AbortController()
+  const result = await loadCustomerRelationship('cust', controller.signal, async input => {
+    const url = String(input)
+    if (url.includes('/decisions')) return new Response(JSON.stringify({ approvals: [{ id: 'a1', title: 'Kundärende', created_at: '2026-09-10' }], has_more: false }))
+    if (url.startsWith('/api/quotes?')) return new Response(JSON.stringify({ quotes: [{ quote_id: 'q1', title: 'Offert', status: 'sent', created_at: '2026-09-10' }] }))
+    if (scenario === 'rejected') throw new Error('network')
+    return new Response(JSON.stringify({ summary: {} }))
+  })
+  expect(result.decisions.map(item => item.id)).toEqual(['a1'])
+  expect(result.quote?.quote_id).toBe('q1')
+  expect(result.handoffError).toBe(true)
+  expect(nextAdministrativeStep(result, [], null)).toContain('inte bekräftas')
+})
+
 test('customer summary is keyed by tenant and customer and exposes independent read states and exact links', () => {
   const page = readFileSync('app/dashboard/customers/[id]/page.tsx', 'utf8')
   expect(page).toContain("key={`open:${business?.business_id || ''}:${customerId}`}")
@@ -150,4 +221,47 @@ test('customer summary is keyed by tenant and customer and exposes independent r
   expect(component).toContain('Bokningarna kunde inte läsas.')
   expect(component).toContain('/dashboard/bookings/${encodeURIComponent(booking.value.booking_id)}')
   expect(component).toContain('Visar upp till 3')
+})
+
+test('actual customer decision route scans row 1001 and preserves tenant, snooze, contradiction and routing gates', async () => {
+  const filler = Array.from({ length: 1000 }, (_, i) => ({ id: `f${i}`, business_id: 'tenant-a', status: 'pending', approval_type: 'customer_fact', title: 'Other', created_at: `2026-09-${String(30 - (i % 20)).padStart(2, '0')}T12:00:00Z`, payload: { customer_id: 'other' } }))
+  const rows = [...filler,
+    { id: 'target', business_id: 'tenant-a', status: 'pending', approval_type: 'customer_fact', title: 'Target', created_at: '2020-01-01', payload: { customer_id: 'cust' } },
+    { id: 'snoozed', business_id: 'tenant-a', status: 'pending', approval_type: 'customer_fact', title: 'Later', created_at: '2030-01-01', snoozed_until: '2099-01-01', payload: { customer_id: 'cust' } },
+    { id: 'foreign', business_id: 'tenant-b', status: 'pending', approval_type: 'customer_fact', title: 'Foreign', created_at: '2030-01-02', payload: { customer_id: 'cust' } },
+    { id: 'contradictory', business_id: 'tenant-a', status: 'pending', approval_type: 'send_sms', title: 'Wrong', created_at: '2030-01-03', payload: { project_id: 'p1', customer_id: 'other' } },
+    { id: 'denied', business_id: 'tenant-a', status: 'pending', approval_type: 'customer_fact', title: 'Denied', created_at: '2030-01-04', payload: { customer_id: 'cust' } },
+  ]
+  const get = customerDecisionRoute({ customer: [{ customer_id: 'cust', business_id: 'tenant-a' }], pending_approvals: rows, project: [{ project_id: 'p1', customer_id: 'cust', business_id: 'tenant-a' }] }, { denied: ['denied'] })
+  const response = await get(new NextRequest('https://test/api/customers/cust/decisions'), { params: Promise.resolve({ id: 'cust' }) })
+  expect(response.status).toBe(200)
+  expect((await response.json()).approvals.map((row: Row) => row.id)).toEqual(['target'])
+  const failed = customerDecisionRoute({ customer: [{ customer_id: 'cust', business_id: 'tenant-a' }], pending_approvals: rows }, { failPage: 500 })
+  expect((await failed(new NextRequest('https://test/api/customers/cust/decisions'), { params: Promise.resolve({ id: 'cust' }) })).status).toBe(503)
+})
+
+test('customer decision reader source retains complete scan contract', () => {
+  const route = readFileSync('app/api/customers/[id]/decisions/route.ts', 'utf8')
+  expect(route).toContain(".eq('business_id', business.business_id).eq('status', 'pending')")
+  expect(route).toContain('snoozed_until.is.null,snoozed_until.lt.')
+  expect(route).toContain('.range(offset, offset + 499)')
+  expect(route).toContain('kundReferensForApproval')
+  expect(route).toContain('canActOnApproval')
+  expect(route).toContain('direct === customerId')
+  expect(route).not.toContain('?focus=')
+})
+
+test('legacy customer and timeline reads do not present a failed read as verified empty state', () => {
+  const page = readFileSync('app/dashboard/customers/[id]/page.tsx', 'utf8')
+  expect(page).toContain("key={`${business?.business_id || ''}:${customerId}`}")
+  expect(page).toContain(".eq('business_id', business.business_id)")
+  expect(page).toContain('sequence !== fetchSequence.current')
+  expect(page).toContain('Antal och tomma listor kan inte bekräftas.')
+  const timelineRoute = readFileSync('app/api/customers/[id]/timeline/route.ts', 'utf8')
+  expect(timelineRoute).toContain('incomplete_sources: Array.from(new Set(incompleteSources))')
+  expect(timelineRoute).toContain("incompleteSources.push('Bokningar')")
+  expect(timelineRoute).toContain("incompleteSources.push('SMS-konversationer')")
+  const timeline = readFileSync('components/CustomerTimeline.tsx', 'utf8')
+  expect(timeline).toContain('listan är inte komplett')
+  expect(timeline).toContain('Historiken kunde inte läsas.')
 })

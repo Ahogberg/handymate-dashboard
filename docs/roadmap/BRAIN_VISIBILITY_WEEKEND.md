@@ -1496,14 +1496,14 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 1 — Home | Första läsyta byggd; slutkriterier ej verifierade | Verklig användare förstår läget inom 10 sekunder; UI, reload, roller och företagsbyte i preview |
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
-| Slice 4 — Customer | Kundminne, synliga öppna uppgifter och nästa aktiva bokning implementerade | Samlad offert-/beslutsbild, fyllda löften/uppgifter och verkligt företagsbyte kvar |
+| Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg lokalt granskat och testat | Slutpaketets publicering och preview, verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
 | Slice 5–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
 
-Verifiering av slice 1 och 2 samt kvarvarande CONNECT-driftblocker. Efter inloggad preview-avstämning: avgränsad sanningsrättning i befintlig Project-vy (slice 3), ingen bred ombyggnad. Öppna externa och mobila testgrindar behålls.
+Slice 4 — Customer. Användarens aktuella instruktion är att stänga slice 4 innan slice 5 påbörjas. Slutpaketet granskas och verifieras; öppna externa grindar för övriga slices behålls. Slice 4 får inte markeras stängd enbart på basis av kod och isolerade tester.
 
 ### LAST COMPLETED — historisk auditbaseline
 
