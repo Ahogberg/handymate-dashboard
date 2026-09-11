@@ -2276,3 +2276,26 @@ Inloggad preview på Nordström El AB:
 - Bokning `book_film_5` finns men saknar projektkoppling. Förberedelsen stoppar med begriplig förklaring och kalenderlänk. Ingen koppling ändrades för att få testet grönt.
 
 **Kvar före stängning:** positiv förberedelseresa med faktisk bokning/projekt/källunderlag; prioriterade aktiva Explainability-kort med sparad evidens i UI; Project-ytans fulla svar på vad som bevakas administrativt. Ovanstående runtimebevis stänger specifika stopp-/underlagsvägar, inte hela slice 3 eller 5. Inga externa utskick eller andra affärsbeslut utfördes.
+
+### 31.7 Positivt läsflöde med befintlig testbokning
+
+Read-only inventering av Nordström El AB hittade tre ej avslutade projektkopplade testbokningar, samtliga från maj. Inga aktiva pending-kort fanns för customer_fact, meeting_followup, project_log_note, create_quote_draft eller create_ata_draft. Därför finns inget aktuellt evidenskort att livegranska i den testkön.
+
+Browserprov med `book_proj_day2` och projekt `6791b989-912c-4608-bd76-2ab30f797ed0`:
+
+- Förberedelsen laddar projekt/kund och källor för avtalat arbete och fyra ÄTA-poster. Saknad projektadress markeras uttryckligen som ej verifierad.
+- Expanderat `Visa varför` visar offertkälla samt skillnaden mellan skickad/ej godkänd ÄTA och fakturerad/ej bevis på utförd ÄTA. Källänkar visas; inga källuppgifter konstruerades för testet.
+- Saknade checklistor, handlingar, installationer och projektkopplad kontakt visas som luckor i det lästa underlaget.
+- `Fråga Matte` öppnar en redigerbar, oskickad fråga med projektkontext, källtidsstämpel och luckor. Ingen fråga skickades. Detta testar övergång till utkast, inte agentens svar eller genomförande.
+
+Begränsning: bokningen är historisk men fortfarande schemalagd i testdata. Detta är ett positivt läsflöde, inte bevis på ett kommande besök eller komplett underlag. Aktiva evidensbaserade godkännandekort behöver ett avgränsat testscenario via ordinarie producent före full slice 5-acceptans.
+
+### 31.8 Evidenskedja och datumvalidering
+
+Live-preview: `Skapa testmöte` på `/dashboard/demo` svarade att Nordström El AB inte är demokontot. Serverns DEMO_BUSINESS_ID-grind avbröt före skapande. Inget syntetiskt möte eller kort skapades; spärren behölls. Positiv evidensgranskning i live-UI är fortsatt öppen och kräver det avsedda demokontot eller ett verkligt befintligt kort.
+
+Isolerat scenario använder ordinarie `buildCustomerFactCard` → `prepareApprovalReview` → `approvalEvidenceRows`, med mockade läsningar och inga databas-/modell-/utskicksanrop. Mötes- och e-postkällor behåller citat, begriplig referens, föreslaget datum och knappen `Spara kunduppgiften`.
+
+Hittat och rättat: `normalizeDueDateIso` accepterade omöjliga kalenderdatum som Date.parse rullar vidare till nästa månad. Nu krävs verkligt kalenderdatum och antingen datum utan tid eller explicit tidszon. Ogiltigt producentdatum tas inte med; ett ogiltigt redigerat datum blockerar beslut. Skottår och giltiga offsets verifierade.
+
+52 riktade tester gröna och typkontroll godkänd. Ett gammalt källkodstest i promise-deadlines förväntade sig tyst borttagning av löftesdatum vid schemafel; det uppdaterades till den redan införda exekveringens ärliga felutfall utan att ändra exekveraren. Detta är inte bevis på modellens extraktion eller en genomförd livebeslutsresa.
