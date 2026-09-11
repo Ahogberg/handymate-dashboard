@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { approvalEvidence } from '../lib/approvals/explainability'
+import { approvalEvidence, withApprovalEvidence } from '../lib/approvals/explainability'
 import { prepareApprovalReview } from '../lib/approvals/prepare-review'
 import { approvalEvidenceRows } from '../lib/approvals/review-client'
 
@@ -75,4 +75,45 @@ test('shared renderer consumes evidence rows without adding an action', () => {
     { heading: 'Varför säger Handymate detta?', text: '' },
     { heading: 'Sparad källreferens', text: 'Lead' },
   ])
+})
+
+test('quote followup evidence distinguishes saved quote date and round from delivery', () => {
+  for (const [round, channel] of [[1, 'sms'], [2, 'email'], [3, 'sms']] as const) {
+    const evidence = approvalEvidence({ approval_type: `send_${channel}`, payload: {
+      quote_followup_round: { quote_id: 'internal-quote-id', round, channel, sent_at: '2026-09-10T08:30:00Z' },
+      quote_followup_source: 'internal-fingerprint', message: 'AI-written message is not source evidence',
+    } })!
+    expect(evidence.items).toContainEqual({ label: 'Sparad källreferens', text: 'Offert' })
+    expect(evidence.items).toContainEqual({ label: 'Offertens sparade utskicksdatum', text: '10 sep. 2026 08:30 UTC' })
+    expect(evidence.items).toContainEqual({ label: 'Sparad uppföljning', text: `Omgång ${round} av 3 · ${channel === 'sms' ? 'SMS' : 'E-post'}` })
+    expect(evidence.items.find(item => item.label === 'Status')?.text).toContain('inte en kvittens')
+    expect(JSON.stringify(evidence)).not.toMatch(/internal-|AI-written/)
+  }
+})
+
+test('incomplete or contradictory followup context stays explicitly unverified', () => {
+  const payload = { quote_followup_round: { quote_id: 'q1', round: 1, channel: 'sms', sent_at: '2026-09-10T08:30:00Z' }, quote_followup_source: 'hash' }
+  for (const invalid of [
+    { ...payload, quote_followup_source: '' },
+    { ...payload, quote_followup_round: { ...payload.quote_followup_round, round: 2 } },
+    { ...payload, quote_followup_round: { ...payload.quote_followup_round, sent_at: '2026-02-30T08:30:00Z' } },
+  ]) {
+    expect(approvalEvidence({ approval_type: 'send_sms', payload: invalid })?.items).toEqual([
+      { label: 'Underlag', text: 'Det sparade förslaget saknar ett fullständigt underlag för offertuppföljningen.' },
+    ])
+  }
+  expect(approvalEvidence({ approval_type: 'send_email', payload })?.items[0].label).toBe('Underlag')
+  expect(approvalEvidence({ approval_type: 'send_sms', payload: { message: 'An ordinary message' } })).toBeNull()
+})
+
+test('followup evidence does not enable a blocked send or replace its reviewed text', () => {
+  const prepared = { review: { title: 'Granska', effect: 'Underlaget måste verifieras.', confirmLabel: null,
+    blockedReason: 'Kunden har hört av sig.', messages: [{ channel: 'SMS' as const, recipients: ['+46700000000'], text: 'Granskad text' }] } }
+  const result = withApprovalEvidence(prepared, { approval_type: 'send_sms', payload: {
+    quote_followup_round: { quote_id: 'q1', round: 1, channel: 'sms', sent_at: '2026-09-10T08:30:00Z' }, quote_followup_source: 'hash',
+  } })
+  expect(result.review.confirmLabel).toBeNull()
+  expect(result.review.blockedReason).toBe(prepared.review.blockedReason)
+  expect(result.review.messages).toEqual(prepared.review.messages)
+  expect(approvalEvidenceRows(result.review)).toContainEqual({ heading: 'Sparad källreferens', text: 'Offert' })
 })

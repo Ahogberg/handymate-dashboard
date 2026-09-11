@@ -1,3 +1,4 @@
+import type { CustomerIntakeChannel, CustomerMailProvider } from '@/lib/onboarding/customer-intake'
 import type { FirstFocusId } from '@/lib/onboarding/first-focus'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 import type { WorkPricingModel } from '@/lib/onboarding/pricing-start'
@@ -75,6 +76,9 @@ export interface OnboardingFormData {
    * onboarding_data (JSONB) via sanitizeForSave, ingen egen kolumn.
    */
   firstFocus?: FirstFocusId
+
+  primaryLeadChannel?: CustomerIntakeChannel
+  customerMailProvider?: CustomerMailProvider
 
   // ── Step 4: Telefonnummer ────────────────────────────────
   lisaNumber?: string

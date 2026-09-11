@@ -52,7 +52,7 @@ export const TYPE_LABEL: Record<string, string> = {
   send_invoice: 'Faktura',
   create_booking: 'Bokning',
   lead_review: 'Ny lead',
-  quote_nudge: 'Manuell åtgärd',
+  quote_nudge: 'Offertuppföljning',
   review_request: 'Recension',
   manual_project_create: 'Skapa projekt',
   autonomy_offer: 'Förtroende',

@@ -27,6 +27,7 @@ interface ComponentDraft {
 }
 
 interface ProductEditorModalProps {
+  initialValues?: { name: string; unit: string; description?: string; category?: 'arbete' | 'material'; laborShare?: number }
   /** Befintlig produkt vid redigering, null vid skapande */
   product: ProductRow | null
   categories: ProductCategory[]
@@ -56,16 +57,17 @@ function formatKr(n: number): string {
  */
 export function ProductEditorModal({
   product,
+  initialValues,
   categories,
   saving,
   onSave,
   onClose,
   onError,
 }: ProductEditorModalProps) {
-  const [name, setName] = useState(product?.name ?? '')
-  const [description, setDescription] = useState(product?.description ?? '')
+  const [name, setName] = useState(product?.name ?? initialValues?.name ?? '')
+  const [description, setDescription] = useState(product?.description ?? initialValues?.description ?? '')
   const [sku, setSku] = useState(product?.sku ?? '')
-  const [unit, setUnit] = useState(product?.unit ?? 'st')
+  const [unit, setUnit] = useState(product?.unit ?? initialValues?.unit ?? 'st')
   // Noll betyder "aldrig prissatt", inte "kostar noll" — fältet ska då stå
   // tomt. Med en nolla i rutan får hantverkaren rensa den innan han skriver,
   // och artikeln påstår sig vara gratis medan han tittar på den.
@@ -87,9 +89,9 @@ export function ProductEditorModal({
   const [categoryId, setCategoryId] = useState(product?.category_id ?? '')
 
   // Andel arbete: null i DB = ingen ROT-split. 0 är GILTIGT (ren material).
-  const [shareEnabled, setShareEnabled] = useState(product?.default_labor_share != null)
+  const [shareEnabled, setShareEnabled] = useState((product?.default_labor_share ?? initialValues?.laborShare) != null)
   const [sharePct, setSharePct] = useState(
-    product?.default_labor_share != null ? Math.round(product.default_labor_share * 100) : 60
+    (product?.default_labor_share ?? initialValues?.laborShare) != null ? Math.round((product?.default_labor_share ?? initialValues?.laborShare ?? 0) * 100) : 60
   )
 
   const [rows, setRows] = useState<ComponentDraft[]>(
@@ -268,6 +270,8 @@ export function ProductEditorModal({
     if (components.length === 0) {
       payload.default_labor_share = shareEnabled ? Math.min(100, Math.max(0, sharePct)) / 100 : null
     }
+
+    if (!product && initialValues?.category) payload.category = initialValues.category
 
     onSave(
       payload,

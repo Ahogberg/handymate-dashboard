@@ -42,7 +42,14 @@ export function normalizeDueDateIso(value: unknown): string | null {
   if (typeof value !== 'string') return null
   const trimmed = value.trim()
   if (!trimmed) return null
-  if (!/^\d{4}-\d{2}-\d{2}/.test(trimmed)) return null
+  const iso = /^(\d{4})-(\d{2})-(\d{2})(?:T(?:[01]\d|2[0-3]):[0-5]\d(?::[0-5]\d(?:\.\d{1,3})?)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d))?$/.exec(trimmed)
+  if (!iso) return null
+  // Date.parse normaliserar t.ex. 30 februari till mars. Ett sådant
+  // modellförslag får inte aktivera bevakning på ett annat datum.
+  const calendarDate = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T00:00:00.000Z`)
+  if (calendarDate.getUTCFullYear() !== Number(iso[1]) ||
+      calendarDate.getUTCMonth() + 1 !== Number(iso[2]) ||
+      calendarDate.getUTCDate() !== Number(iso[3])) return null
   if (Number.isNaN(Date.parse(trimmed))) return null
   return trimmed
 }

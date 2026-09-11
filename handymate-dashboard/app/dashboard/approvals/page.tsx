@@ -100,7 +100,7 @@ const TYPE_CONFIG: Record<string, { label: string; icon: React.ElementType; bgCo
   send_invoice: { label: 'Faktura', icon: Receipt, bgColor: 'bg-green-50', textColor: 'text-green-600' },
   create_booking: { label: 'Bokning', icon: Calendar, bgColor: 'bg-cyan-50', textColor: 'text-cyan-700' },
   autopilot_package: { label: 'Autopilot', icon: Zap, bgColor: 'bg-amber-50', textColor: 'text-amber-600' },
-  quote_nudge: { label: 'Manuell åtgärd', icon: Phone, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
+  quote_nudge: { label: 'Offertuppföljning', icon: Phone, bgColor: 'bg-primary-50', textColor: 'text-primary-700' },
   low_stock_alert: { label: 'Lager', icon: Package, bgColor: 'bg-red-50', textColor: 'text-red-600' },
   seasonal_campaign: { label: 'Säsong', icon: Calendar, bgColor: 'bg-orange-50', textColor: 'text-orange-600' },
   time_attestation: { label: 'Tid', icon: Clock, bgColor: 'bg-primary-50', textColor: 'text-primary-600' },
@@ -492,8 +492,6 @@ export default function ApprovalsPage() {
             if (result.receipt.next_url) setFeedbackLink(result.receipt.next_url)
           } else if (result?.execution_outcome?.outcome === 'skipped') {
             setFeedbackMsg(result?.execution?.note || 'Noterat — ingen handling utfördes')
-          } else if (approvedItem?.approval_type === 'quote_nudge') {
-            setFeedbackMsg('Påminnelse noterad — ring kunden när du har möjlighet')
           } else {
             const exec = result?.execution
             const valueReceipt = buildValueReceipt(approvedItem, exec, result?.execution_outcome?.outcome)
@@ -1506,17 +1504,8 @@ export default function ApprovalsPage() {
                             disabled={actionLoading !== null}
                             className="flex items-center gap-2 px-4 py-2 min-h-[44px] bg-primary-700 hover:bg-primary-800 disabled:opacity-50 text-white text-sm font-medium rounded-lg transition-all"
                           >
-                            {approval.approval_type === 'quote_nudge' ? (
-                              <>
-                                <Phone className="w-4 h-4" />
-                                {actionLoading === approval.id + 'approve' ? 'Noterar...' : 'Noterat, jag ringer'}
-                              </>
-                            ) : (
-                              <>
-                                <CheckCircle className="w-4 h-4" />
-                                {actionLoading === approval.id + 'approve' ? 'Öppnar granskning...' : presentation.approve_label}
-                              </>
-                            )}
+                            <CheckCircle className="w-4 h-4" />
+                            {actionLoading === approval.id + 'approve' ? 'Öppnar granskning...' : presentation.approve_label}
                           </button>
                           {messagePreview && (
                             <button

@@ -1,4 +1,5 @@
 import type { ApprovalReview } from './review-contract'
+import { parseQuoteFollowupRound } from '@/lib/quotes/followup-round'
 
 export interface ApprovalEvidence {
   heading: 'Varför säger Handymate detta?'
@@ -40,8 +41,25 @@ export function approvalEvidence(approval: {
   approval_type: string
   payload?: Record<string, unknown> | null
 }): ApprovalEvidence | null {
-  if (!SUPPORTED.has(approval.approval_type)) return null
   const payload = approval.payload || {}
+  if (['send_sms', 'send_email'].includes(approval.approval_type) && payload.quote_followup_round) {
+    const scope = parseQuoteFollowupRound(payload.quote_followup_round)
+    const sentAt = scope ? displayDate(scope.sent_at) : null
+    if (!scope || !sentAt || approval.approval_type !== `send_${scope.channel}` || !text(payload.quote_followup_source)) {
+      return { heading: 'Varför säger Handymate detta?', items: [
+        { label: 'Underlag', text: 'Det sparade förslaget saknar ett fullständigt underlag för offertuppföljningen.' },
+      ] }
+    }
+    // Saved round context is not a delivery receipt or proof of no customer reply.
+    // The existing prepare/execute source checks still decide whether sending is allowed.
+    return { heading: 'Varför säger Handymate detta?', items: [
+      { label: 'Sparad källreferens', text: 'Offert' },
+      { label: 'Offertens sparade utskicksdatum', text: sentAt },
+      { label: 'Sparad uppföljning', text: `Omgång ${scope.round} av 3 · ${scope.channel === 'sms' ? 'SMS' : 'E-post'}` },
+      { label: 'Status', text: 'Detta är ett uppföljningsförslag. Uppgifterna ovan är inte en kvittens på att uppföljningen har skickats.' },
+    ] }
+  }
+  if (!SUPPORTED.has(approval.approval_type)) return null
   const items: ApprovalEvidence['items'] = []
   const type = approval.approval_type
   const excerpt = type === 'customer_fact' ? text(payload.evidence_quote)

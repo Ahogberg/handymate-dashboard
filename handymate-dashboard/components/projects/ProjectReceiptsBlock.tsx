@@ -7,6 +7,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { APPROVAL_QUEUE_CHANGED } from '@/lib/approvals/review-client'
 import { createProjectApprovalReadGuard, loadProjectApprovalPage } from '@/lib/projects/load-project-approvals'
 import { areValidProjectReceiptRows, projectReceiptPresentation, resolveProjectReceiptRead, type ProjectReceiptPresentation } from '@/lib/projects/project-receipt-presentation'
+import type { ProjectReceiptReadSummary } from '@/lib/projects/administration-summary'
 
 type ApprovalRow = Parameters<typeof projectReceiptPresentation>[0]
 
@@ -24,7 +25,8 @@ function receiptTone(receipt: ProjectReceiptPresentation) {
   return 'border-amber-200 bg-amber-50/60'
 }
 
-function ProjectReceiptsScope({ projectId, businessId }: { projectId: string; businessId: string }) {
+interface Props { projectId: string; onReadStateChange?: (state: ProjectReceiptReadSummary) => void }
+function ProjectReceiptsScope({ projectId, businessId, onReadStateChange }: Props & { businessId: string }) {
   const business = useBusiness()
   const [receipts, setReceipts] = useState<ProjectReceiptPresentation[]>([])
   const [nextOffset, setNextOffset] = useState<number | null>(null)
@@ -32,6 +34,10 @@ function ProjectReceiptsScope({ projectId, businessId }: { projectId: string; bu
   const [readingMore, setReadingMore] = useState(false)
   const guard = useRef(createProjectApprovalReadGuard())
   const rowsRef = useRef<ApprovalRow[]>([])
+
+  useEffect(() => {
+    onReadStateChange?.({ status: state, receipts, hasMore: nextOffset !== null })
+  }, [state, receipts, nextOffset, onReadStateChange])
 
   const read = useCallback(async (offset = 0) => {
     if (!business?.business_id) return
@@ -96,8 +102,8 @@ function ProjectReceiptsScope({ projectId, businessId }: { projectId: string; bu
   )
 }
 
-export default function ProjectReceiptsBlock({ projectId }: { projectId: string }) {
+export default function ProjectReceiptsBlock({ projectId, onReadStateChange }: Props) {
   const business = useBusiness()
   if (!business?.business_id) return null
-  return <ProjectReceiptsScope key={`${business.business_id}:${projectId}`} projectId={projectId} businessId={business.business_id} />
+  return <ProjectReceiptsScope key={`${business.business_id}:${projectId}`} projectId={projectId} businessId={business.business_id} onReadStateChange={onReadStateChange} />
 }

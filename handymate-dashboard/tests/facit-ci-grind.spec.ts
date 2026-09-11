@@ -112,6 +112,13 @@ test.describe('Kontraktsgrinden (contracts.yml)', () => {
     }
   })
 
+  test('appfiler publiceras i appkatalogen och inte i repots rot', () => {
+    for (const misplaced of ['app', 'components', 'lib', 'tests', 'sql', 'package.json']) {
+      expect(fs.existsSync(path.join(REPO_ROOT, misplaced)),
+        `${misplaced} ligger i repo-roten men CI och bygget kör handymate-dashboard/`).toBe(false)
+    }
+  })
+
   test('kräver inga produktionshemligheter och ingen browser', () => {
     const yaml = read(file)
     expect(yaml).not.toContain('secrets.')
