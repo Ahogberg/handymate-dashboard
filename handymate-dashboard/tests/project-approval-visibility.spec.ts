@@ -17,7 +17,7 @@ function route(rows: Row[], permitted: (row: Row) => boolean = () => true) {
   const query: any = {
     select() { operations.push('select'); return query },
     eq(key: string, value: unknown) { operations.push(`eq:${key}`); selected = selected.filter(row => (row as any)[key] === value); return query },
-    in() { return query },
+    in(key: string, values: unknown[]) { operations.push(`in:${key}`); selected = selected.filter(row => values.includes((row as any)[key])); return query },
     or() { return query },
     contains(key: string, value: Record<string, unknown>) { operations.push(`contains:${key}`); selected = selected.filter(row => Object.entries(value).every(([field, expected]) => (row as any)[key]?.[field] === expected)); return query },
     order() { return query },
@@ -48,6 +48,15 @@ test('project filter is applied in the database before pagination, so unrelated 
   const body = await response.json()
   expect(body.approvals.map((approval: Row) => approval.id)).toEqual(['project-2', 'project-1'])
   expect(body.next_offset).toBeNull()
+  expect(harness.operations).toContain('contains:payload')
+})
+
+test('resolved project receipts use the existing tenant route and project filtering before pagination', async () => {
+  const resolved = (id: string, projectId: string): Row => ({ ...row(id, projectId), status: 'approved' })
+  const harness = route([...Array.from({ length: 60 }, (_, i) => resolved(`other-${i}`, 'other')), resolved('receipt-1', 'project-a'), row('pending', 'project-a')])
+  const response = await harness.get(new NextRequest('https://test/api/approvals?status=resolved&limit=50&project_id=project-a'))
+  const body = await response.json()
+  expect(body.approvals.map((approval: Row) => approval.id)).toEqual(['receipt-1'])
   expect(harness.operations).toContain('contains:payload')
 })
 

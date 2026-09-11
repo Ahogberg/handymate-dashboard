@@ -20,9 +20,10 @@ export async function loadProjectApprovalPage<T>(
   offset: number,
   signal: AbortSignal,
   fetchPage: FetchPage = fetch,
+  status: 'pending' | 'resolved' = 'pending',
 ): Promise<ProjectApprovalPage<T>> {
   const params = new URLSearchParams({
-    status: 'pending',
+    status,
     limit: '50',
     project_id: projectId,
     offset: String(offset),

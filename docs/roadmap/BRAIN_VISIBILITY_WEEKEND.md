@@ -1497,14 +1497,15 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 2 — Quote | Befintlig handoff utökad med rundbundet kvitto; slutkriterier ej verifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
 | Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
-| Slice 5 — Explainability | Första paketet lokalt granskat och testat i gemensam kortgranskning | Publicering/preview; fler prioriterade flöden före full DoD |
-| Slice 6–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
+| Slice 5 — Explainability | Första paketet publicerat; 13 CI och båda previewbyggen gröna | Inloggat UI-prov och fler prioriterade flöden före full DoD |
+| Slice 6 — Proof of Work | Projektets kvitton implementerat och granskat; 20 riktade tester och typkontroll gröna | Publicering och inloggat UI-prov kvar |
+| Slice 7–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
 
-Slice 5 — Explainability Layer. Användaren har uttryckligen godkänt att gå vidare utan att först lösa testmiljön för slice 4, för att begränsa veckoanvändningen. Slice 4 är kodklar och previewverifierad men inte slutstängd: verkligt roll-/företagsbyte och smal webbkontroll återstår. Testanställden är korrekt kopplad till Svensson Bygg AB, men företagets onboarding är ofullständig och sparat companyName är Bee Service AB. Ingen företagskoppling ändrades för att passera grinden.
+Slice 6 — Proof of Work / Value Receipts. Användaren har nu godkänt att gå vidare från första slice 5-paketet. Det paketets kod f890123fbff451959f3b2e473011dd94c7d0f9c8 har samtliga 13 CI-checkar och båda previewbyggen gröna; bredare flödestäckning och inloggat UI-prov återstår. Användaren har också uttryckligen godkänt att gå vidare utan att först lösa testmiljön för slice 4, för att begränsa veckoanvändningen. Slice 4 är kodklar och previewverifierad men inte slutstängd: verkligt roll-/företagsbyte och smal webbkontroll återstår. Testanställden är korrekt kopplad till Svensson Bygg AB, men företagets onboarding är ofullständig och sparat companyName är Bee Service AB. Ingen företagskoppling ändrades för att passera grinden.
 
 För slice 5 återanvänds befintliga kort och underlag i ett avgränsat paket. Källrevision: `_decision` i `lib/ai/decision-record.ts` innehåller modell/promptversion/indatahash och tidpunkt, inte objektbaserad evidens. Auditradens tidigare formulering om att bara visa `_decision` räcker därför inte. Tekniska metadata eller modellens fria resonemang ska inte visas som förklaring. Inga nya motorer eller tabeller.
 
@@ -1515,6 +1516,16 @@ Gemensam ApprovalReview visar "Varför säger Handymate detta?" för customer_fa
 Underlaget kommer från den ursprungliga lagrade payloaden, inte klientens edited_payload. INFORMATIONAL/ACK-grindar, åtgärdsknappar, tenantfilter och exekveringsregler ändras inte. `_decision`, modell/prompt/hash och generiska modellbeskrivningar används inte som evidens.
 
 Verifiering: sex riktade mapper-/prepare-/renderadaptertester, berörd customer-fact-replacement-harness, typkontroll med 8192 MB och kontraktsparitet gröna. Ingen livegranskning i ny roll hävdas. Paketet täcker inte ännu alla viktiga rekommendationer; slice 5 hålls öppen. Nästa steg är preview av detta paket och därefter ett avgränsat val av återstående offert-/kommunikationsflöde, utifrån befintligt objektunderlag och lanseringsnytta.
+
+### SLICE 6 — projektets sparade kvitton
+
+Audit före bygge: befintlig `lib/approvals/receipt.ts` ger state/text som sparas i `pending_approvals.payload.execution_result.receipt` efter första körning och omkörning. `executed_at` registrerar körningen, `resolved_at` beslutet. Befintlig GET `/api/approvals?status=resolved&project_id=...` har företags-/routingfilter och paginering. Ekonomiska value-/ledger-beräkningar återanvänds inte för detta paket: de svarar på andra frågor och vissa äldre värdekvittotexter har vidare leveranspåståenden än den kanoniska kvittensen.
+
+Paketet visar "Projektets kvitton" som egen sektion efter projektets Att göra/beslutsyta. Endast sparad kvittens används; godkänt beslut utan kvittens är inget utförandebevis. Köat, delvis utfört, misslyckat, noterat och accepterat av sändtjänsten hålls isär. Inga påståenden om sparad tid, levererat/läst meddelande eller automatiskt utfört arbete läggs till. Samma approval-ID visas en gång; ingen sammanblandning med v3-loggar eller nya värdesummeringar.
+
+Källan sorterar på kortets skapandetid, därför utlovas inte "senast utfört". Fortsatt sidläsning erbjuds även om en sida saknar kvitton. Läsfel är separata från verifierat tomläge; redan lästa kvitton behålls vid fel på nästa sida. Företags-/projektbyte får egen komponentidentitet, äldre svar ignoreras och kvitton läses om efter beslut. Inga nya endpoints, motorer eller tabeller.
+
+20 riktade tester, typkontroll (8192 MB) och diffkontroll är gröna. Riktad verifiering omfattar faktisk resolved-GET med projekt-/företags-/routingfilter, kvittensstatus, sidläsning, asynkront gammalt svar, läsfel samt kontraktsparitet. Inloggat UI-prov återstår; inga nya inloggningsförsök eller produktionsbeslut görs för att stänga paketet. Slice 6 markeras inte slutstängd på enbart lokal verifiering.
 
 ### LAST COMPLETED — historisk auditbaseline
 

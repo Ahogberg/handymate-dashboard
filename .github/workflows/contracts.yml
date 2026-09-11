@@ -72,6 +72,7 @@ jobs:
         # prod-sviten, inte här.
         run: >-
           npx playwright test
+          tests/project-receipts.spec.ts
           tests/home-brain.spec.ts
           tests/agent-team.spec.ts
           tests/approval-explainability.spec.ts

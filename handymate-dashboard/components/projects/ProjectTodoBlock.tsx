@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AlertTriangle, Check } from 'lucide-react'
 import { formatSEK } from '@/lib/format-price'
 import ProjectApprovalsBlock from '@/components/projects/ProjectApprovalsBlock'
+import ProjectReceiptsBlock from '@/components/projects/ProjectReceiptsBlock'
 import type { ProjectApprovalsReadState } from '@/components/projects/ProjectApprovalsBlock'
 
 /**
@@ -79,6 +80,7 @@ export default function ProjectTodoBlock({
     'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-[52px] bg-primary-700 hover:bg-primary-800 text-white text-[15px] font-semibold rounded-xl shadow-sm shadow-primary-700/20 transition-colors'
 
   return (
+    <>
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         {/* 2026-08-27: "Att göra" är nu hantverkarens uppgifter (ProjectTasksBlock);
@@ -158,5 +160,9 @@ export default function ProjectTodoBlock({
         </div>
       )}
     </div>
+    <div className="mt-5">
+      <ProjectReceiptsBlock projectId={projectId} />
+    </div>
+    </>
   )
 }
