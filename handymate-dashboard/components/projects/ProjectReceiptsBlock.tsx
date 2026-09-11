@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock3, Info, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { APPROVAL_QUEUE_CHANGED } from '@/lib/approvals/review-client'
@@ -9,6 +9,20 @@ import { createProjectApprovalReadGuard, loadProjectApprovalPage } from '@/lib/p
 import { areValidProjectReceiptRows, projectReceiptPresentation, resolveProjectReceiptRead, type ProjectReceiptPresentation } from '@/lib/projects/project-receipt-presentation'
 
 type ApprovalRow = Parameters<typeof projectReceiptPresentation>[0]
+
+function ReceiptIcon({ receipt }: { receipt: ProjectReceiptPresentation }) {
+  if (receipt.complete) return <CheckCircle2 className="h-4 w-4 text-emerald-700" aria-hidden />
+  if (receipt.state === 'queued') return <Clock3 className="h-4 w-4 text-blue-700" aria-hidden />
+  if (receipt.state === 'acknowledged' || receipt.state === 'rejected') return <Info className="h-4 w-4 text-slate-600" aria-hidden />
+  return <AlertTriangle className="h-4 w-4 text-amber-700" aria-hidden />
+}
+
+function receiptTone(receipt: ProjectReceiptPresentation) {
+  if (receipt.complete) return 'border-emerald-200 bg-emerald-50/50'
+  if (receipt.state === 'queued') return 'border-blue-200 bg-blue-50/50'
+  if (receipt.state === 'acknowledged' || receipt.state === 'rejected') return 'border-slate-200 bg-slate-50/70'
+  return 'border-amber-200 bg-amber-50/60'
+}
 
 function ProjectReceiptsScope({ projectId, businessId }: { projectId: string; businessId: string }) {
   const business = useBusiness()
@@ -65,14 +79,19 @@ function ProjectReceiptsScope({ projectId, businessId }: { projectId: string; bu
   }, [read])
 
   return (
-    <section className="rounded-xl border border-[#E2E8F0] bg-white p-4" aria-labelledby="project-receipts-heading">
-      <h3 id="project-receipts-heading" className="text-sm font-semibold text-gray-900">Projektets kvitton</h3>
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm" aria-labelledby="project-receipts-heading">
+      <div className="border-b border-slate-100 bg-gradient-to-r from-slate-50 to-white px-4 py-3.5 sm:px-5">
+        <h3 id="project-receipts-heading" className="text-sm font-semibold text-slate-950">Projektets kvitton</h3>
+        <p className="mt-1 text-xs leading-relaxed text-slate-500">Sparade bevis på vad Handymate faktiskt har gjort. Väntande eller osäkra utfall visas som sådana.</p>
+      </div>
+      <div className="px-4 py-3.5 sm:px-5">
       {state === 'loading' && <div role="status" className="mt-3 flex items-center gap-2 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" />Hämtar kvitton…</div>}
-      {state === 'error' && <div role="alert" className="mt-3 text-sm text-amber-800"><p>Kunde inte läsa projektets kvitton.</p><button type="button" className="mt-2 min-h-11 font-semibold text-primary-700" onClick={() => void read(0)}>Försök igen</button></div>}
+      {state === 'error' && <div role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900"><p>Kunde inte läsa projektets kvitton.</p><button type="button" className="mt-2 min-h-11 font-semibold text-primary-700" onClick={() => void read(0)}>Försök igen</button></div>}
       {state === 'ready' && receipts.length === 0 && nextOffset === null && <p className="mt-2 text-sm text-gray-500">Inga sparade utförandekvitton hittades för projektet.</p>}
-      {receipts.length > 0 && <ul className="mt-3 divide-y divide-gray-100">{receipts.map(receipt => <li key={receipt.id} className="py-3 first:pt-0 last:pb-0"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className={`text-xs font-semibold ${receipt.complete ? 'text-emerald-700' : 'text-amber-700'}`}>{receipt.statusLabel}</span>{receipt.recordedAt && <time className="text-xs text-gray-400" dateTime={receipt.recordedAt}>{receipt.recordedAtLabel} {new Intl.DateTimeFormat('sv-SE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(receipt.recordedAt))}</time>}</div><p className="mt-1 whitespace-pre-line text-sm text-gray-700">{receipt.text}</p></li>)}</ul>}
+      {receipts.length > 0 && <ul className="space-y-2.5">{receipts.map(receipt => <li key={receipt.id} className={`rounded-xl border p-3.5 ${receiptTone(receipt)}`}><div className="flex items-start gap-2.5"><span className="mt-0.5 shrink-0"><ReceiptIcon receipt={receipt} /></span><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-x-2 gap-y-1"><span className={`text-xs font-semibold ${receipt.complete ? 'text-emerald-800' : receipt.state === 'queued' ? 'text-blue-800' : receipt.state === 'acknowledged' || receipt.state === 'rejected' ? 'text-slate-700' : 'text-amber-800'}`}>{receipt.statusLabel}</span>{receipt.recordedAt && <time className="text-xs text-slate-500" dateTime={receipt.recordedAt}>{receipt.recordedAtLabel} {new Intl.DateTimeFormat('sv-SE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(receipt.recordedAt))}</time>}</div><p className="mt-1.5 whitespace-pre-line text-sm leading-relaxed text-slate-700">{receipt.text}</p></div></div></li>)}</ul>}
       {state === 'ready' && receipts.length === 0 && nextOffset !== null && <p className="mt-2 text-sm text-gray-500">Den lästa sidan saknar sparade kvitton. Det finns fler beslut att läsa.</p>}
       {state === 'ready' && nextOffset !== null && <button type="button" disabled={readingMore} onClick={() => void read(nextOffset)} className="mt-3 min-h-11 text-sm font-semibold text-primary-700 disabled:opacity-50">{readingMore ? 'Hämtar…' : 'Visa fler'}</button>}
+      </div>
     </section>
   )
 }

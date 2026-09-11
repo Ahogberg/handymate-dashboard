@@ -1498,14 +1498,17 @@ Slice 0 klar som audit. Kod för veckorapportens tillförlitlighet samt delar av
 | Slice 3 — Project | Avgränsad tidrapport-rättning verifierad i inloggad preview | Korrekt rapport-/underlagsstatus, nästa steg och verklig UI-verifiering |
 | Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
 | Slice 5 — Explainability | Första paketet publicerat; 13 CI och båda previewbyggen gröna | Inloggat UI-prov och fler prioriterade flöden före full DoD |
-| Slice 6 — Proof of Work | Projektets kvitton implementerat och granskat; 20 riktade tester och typkontroll gröna | Publicering och inloggat UI-prov kvar |
-| Slice 7–10 | Inte påbörjade som fulla slices i denna session | Respektive leverans och testgrind; avgränsad mobilbrygga finns |
+| Slice 6 — Proof of Work | Projektets kvitton publicerat i `7ebe1dc570e3344c9da1ba71e1fe67a01660ee7e`; 20 riktade tester, typkontroll, 13 CI-checkar och båda previewbyggen gröna | Inloggat UI-prov kvar |
+| Slice 7 — Mobile | CONNECT implementerad i mobilcommit `2f1d7b6ddcdf62cd77df467bb2b598c4e67777f5`: klienten läser `/api/mobile/activity` och presenterar sparat/skickat, väntar, kontrollbehov och noterat separat under neutrala "Handymate idag" | CI samt autentiserat native build-/app-prov före SCALE |
+| Slice 8 — Field Command | PROVE efter audit; befintligt rapportläge tar ett yttrande till högst fyra separata granskningskort för egen tid, anteckning, material och ÄTA, med signerad kontext, återvalidering, idempotens och journalförda kvitton. 77 riktade tester gröna. | Verklig autentiserad mobil/native-resa; bokning/kundlöfte ingår medvetet inte i det avgränsade rapportläget |
+| Slice 9 — Money Brain | PROVE efter audit; befintlig fakturaberedskap, intäktskö och value ledger visar blockerare, nästa steg och verifierade utfall utan att blanda potential med betalt. 107 riktade tester gröna. | Verklig inloggad resa och provider-/betalningsbevis |
+| Slice 10 — Full Journey Proof | PROVE på kod-/kontraktsnivå; 231 riktade tester gröna över de tre resornas centrala domänövergångar | Autentiserad faktisk UI/mobile/provider-körning för A–C före SCALE |
 
 Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
 
-Slice 6 — Proof of Work / Value Receipts. Användaren har nu godkänt att gå vidare från första slice 5-paketet. Det paketets kod f890123fbff451959f3b2e473011dd94c7d0f9c8 har samtliga 13 CI-checkar och båda previewbyggen gröna; bredare flödestäckning och inloggat UI-prov återstår. Användaren har också uttryckligen godkänt att gå vidare utan att först lösa testmiljön för slice 4, för att begränsa veckoanvändningen. Slice 4 är kodklar och previewverifierad men inte slutstängd: verkligt roll-/företagsbyte och smal webbkontroll återstår. Testanställden är korrekt kopplad till Svensson Bygg AB, men företagets onboarding är ofullständig och sparat companyName är Bee Service AB. Ingen företagskoppling ändrades för att passera grinden.
+Helgsprintens kod-/kontraktsarbete är genomgånget till och med Slice 10. Slice 8 och 9 klassificerades PROVE utan ny produktkod, och Slice 10 har ett grönt sammanhållet kontraktsprov men saknar fortfarande de faktiska autentiserade UI/mobile/provider-resor som krävs för SCALE. När veckoanvändning åter blev tillgänglig återöppnade användaren arbetet: mobilens kvittenskoppling är implementerad och ett fokuserat visuellt pass på Brain Visibility-ytorna pågår.
 
 För slice 5 återanvänds befintliga kort och underlag i ett avgränsat paket. Källrevision: `_decision` i `lib/ai/decision-record.ts` innehåller modell/promptversion/indatahash och tidpunkt, inte objektbaserad evidens. Auditradens tidigare formulering om att bara visa `_decision` räcker därför inte. Tekniska metadata eller modellens fria resonemang ska inte visas som förklaring. Inga nya motorer eller tabeller.
 
@@ -1526,6 +1529,32 @@ Paketet visar "Projektets kvitton" som egen sektion efter projektets Att göra/b
 Källan sorterar på kortets skapandetid, därför utlovas inte "senast utfört". Fortsatt sidläsning erbjuds även om en sida saknar kvitton. Läsfel är separata från verifierat tomläge; redan lästa kvitton behålls vid fel på nästa sida. Företags-/projektbyte får egen komponentidentitet, äldre svar ignoreras och kvitton läses om efter beslut. Inga nya endpoints, motorer eller tabeller.
 
 20 riktade tester, typkontroll (8192 MB) och diffkontroll är gröna. Riktad verifiering omfattar faktisk resolved-GET med projekt-/företags-/routingfilter, kvittensstatus, sidläsning, asynkront gammalt svar, läsfel samt kontraktsparitet. Inloggat UI-prov återstår; inga nya inloggningsförsök eller produktionsbeslut görs för att stänga paketet. Slice 6 markeras inte slutstängd på enbart lokal verifiering.
+
+### SLICE 7–8 — mobilbeslut och Field Command-audit
+
+Slice 7:s CONNECT-lucka är implementerad i mobilcommit `2f1d7b6ddcdf62cd77df467bb2b598c4e67777f5`. Mobilklienten läser nu dashboardens befintliga `/api/mobile/activity` i stället för `automation_logs` direkt. Ytan heter neutralt "Handymate idag" och markerar bara sparade/skickade kvittenser eller lyckade regelkörningar som klara; köat, delvis/misslyckat/behöver hanteras samt noterat/avvisat visas som separata tillstånd. Den sparade kvittenstexten vinner över kortets yttre rubrik och `auto` kommer från servern. Riktade klienttester och workflowgrind lades till. CI och autentiserat native build-/app-prov återstår före SCALE.
+
+Slice 8 återanvänder befintligt rapportläge i Matte/Day Close. Ett yttrande kan skapa högst ett granskningskort vardera för egen tid, intern arbetsanteckning, material och ÄTA. Varje del är osparad tills sitt eget klick, bär signerad projekt-/användar-/datumkontext, återvalideras vid beslut och skrivs genom befintlig verktygsrouter. `work_report_session` ger ett stabilt request-id, seriell claim och beständiga delkvitton; retry och samtidiga beslut får inte duplicera state. Bokning och kundmeddelande är uttryckligen förbjudna i detta avgränsade rapportläge och ska inte läggas in som en parallell motor.
+
+Verifiering 2026-09-11: 77/77 riktade tester gröna i `work-report.spec.ts` och `quote-packages-day-close.spec.ts`. De täcker bland annat fyrdelad kedja, roll/projekt/datum, återvalidering, retry/idempotens, inga gissade priser/belopp och att en text eller obekräftad körning aldrig blir "sparad". Eftersom autentiserad app/native-resa återstår klassificeras Slice 8 som PROVE, inte SCALE. Ingen ny Field Command-motor behövdes.
+
+### SLICE 9 — Money Brain-audit
+
+Money Brain återanvänder tre befintliga läsmodeller. Projektets fakturaberedskap visar tillgängliga underlagsdelar och värsta kända blockerare utan att räkna saknad data som klar. Intäktskön följer `create_ata_draft` och `missad_intakt` genom granskning, kund, leverans, faktura och betalning; varje fas skiljer användarens tur, väntan, kontrollbehov och avslutat samt länkar till den befintliga domänytan för nästa steg. Value ledger håller identifierat, agerat, fakturerat och verifierat betalt som separata nivåer. Identifierat underlag och hela fakturans belopp presenteras separat och okända eller motsägande referenser failar stängt.
+
+Verifiering 2026-09-11: 107/107 riktade tester gröna i `fakturaberedskap.spec.ts`, `revenue-recovery-case.spec.ts`, `revenue-work-queue.spec.ts`, `value-ledger.spec.ts` och `recovered-revenue.spec.ts`. De täcker blockerare, roll-/tenantgrind, felläsning, direkt artefaktkoppling, prioriterad nästa handling, attribution, deduplicering och kravet att betald status har både kanonisk status och tidpunkt. Verklig inloggad resa och provider-/betalningsbevis återstår; Slice 9 klassificeras därför PROVE, inte SCALE. Ingen ny produktkod behövdes.
+
+### SLICE 10 — Full Journey Proof-checkpoint
+
+Ett sammanhållet kod-/kontraktsprov kördes över de tre styrda resornas centrala domänövergångar:
+
+| Resa | Bevisat i denna checkpoint | Kvar före SCALE |
+| --- | --- | --- |
+| A — Lead → Quote → Customer → Project | Offertens val/underlag bevaras, projekt skapas tenant- och retry-idempotent, ansvarig valideras och kvittensen skiljer verkligt utfall från accepterad/köad handling | Riktig förfrågan, agentsvar, providerutskick, kundrespons, stoppvillkor och synlig reload-resa |
+| B — Field Work → ÄTA | Ett yttrande kan ge tid/material/anteckning/ÄTA som separata signerade beslut; ÄTA följer låst livscykel, kundsignering och fakturerbar status | Faktisk autentiserad mobil/native-resa samt verkligt kundbeslut/providerbevis |
+| C — Work → Money | Projektunderlag och accepterad ÄTA bevaras till retry-idempotent faktura; ROT-bedömning failar okänt i stället för falskt nej; utskick och Fortnox-betalningsklassning skiljer utkast, providersvar, kundandel och slutbetalning | Verklig Resend/Fortnox-körning, återläsning och synligt beständigt kvitto |
+
+Verifiering 2026-09-11: 231/231 riktade tester gröna i elva suites för offert, projekt, fältrapport, ÄTA, faktura, ROT, Fortnox och approval-kvitton. Detta är kod-/kontraktsbevis med kontrollerade beroenden, inte ett påstående om faktisk providerleverans eller en full autentiserad UI-resa. Slice 10 klassificeras PROVE, inte SCALE. Ingen ny motor eller tabell skapades.
 
 ### LAST COMPLETED — historisk auditbaseline
 
