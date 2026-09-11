@@ -257,6 +257,8 @@ test('legacy customer and timeline reads do not present a failed read as verifie
   expect(page).toContain(".eq('business_id', business.business_id)")
   expect(page).toContain('sequence !== fetchSequence.current')
   expect(page).toContain('Antal och tomma listor kan inte bekräftas.')
+  expect(page).toContain("Bokningar ({coreReadError ? '—' : bookings.length})")
+  expect(page).toContain("Uppgifter ({tasksReadError ? '—' : tasks.filter")
   const timelineRoute = readFileSync('app/api/customers/[id]/timeline/route.ts', 'utf8')
   expect(timelineRoute).toContain('incomplete_sources: Array.from(new Set(incompleteSources))')
   expect(timelineRoute).toContain("incompleteSources.push('Bokningar')")
@@ -264,4 +266,10 @@ test('legacy customer and timeline reads do not present a failed read as verifie
   const timeline = readFileSync('components/CustomerTimeline.tsx', 'utf8')
   expect(timeline).toContain('listan är inte komplett')
   expect(timeline).toContain('Historiken kunde inte läsas.')
+})
+
+test('customer deal read aliases the verified pipeline stage name to the existing label DTO', () => {
+  const page = readFileSync('app/dashboard/customers/[id]/page.tsx', 'utf8')
+  expect(page).toContain('stage:pipeline_stage(label:name, slug)')
+  expect(page).not.toContain('stage:pipeline_stage(label, slug)')
 })

@@ -34,3 +34,9 @@ Slice 5 påbörjas inte. Providerleverans behöver inte simuleras för denna lä
 Typkontroll med `NODE_OPTIONS=--max-old-space-size=8192` och diffkontroll är gröna. Slutkörningen av customer-open-work-summary, customer-project-timeline och feature-test-parity är 28/28 grön. Tidigare körning inklusive customer-context-trail var 41/41 grön före de fyra sista feltesterna.
 
 Faktisk transpilierad GET provas för paginerad kundärendeläsning efter rad 1 000, snooze, annan tenant, motstridiga kundreferenser, routingavslag och sidfel. Historikens faktiska GET provas med SMS-källfel samtidigt som en giltig bokning bevaras, samt fatal kontextläsning. Offertöverlämningens nätverksfel och felaktiga svar bevarar verifierad offert och ärenden. Dessa tester är isolerade; de ersätter inte verkliga roll-/företagsbyten. Båda berörda specfilerna är kopplade till kontraktsworkflow och lokal kontraktslista.
+
+## Livekontroll av slutpaketet — 2026-09-11
+
+Kod `0af3fc4eb85af288754e575d7e74ff9d9ff2a6ad`: samtliga 13 CI-checkar och båda Vercelbyggen gröna. Inloggad preview visar två kundkopplade SMS-ärenden, rätt senaste offert med Utkast och kanonisk överlämning. Öppna offerten leder till samma offertnummer och kund. En annan kund visar verifierat tomma ärenden/offerter/uppgifter och en riktig bokning den 11 september kl. 12:00; nästa steg blir att förbereda bokningen och länken pekar på rätt boknings-ID. Samma resultat efter omladdning. Historiken visar kundens bokningar. Inga utskick eller beslut utfördes.
+
+Den nya felvisningen blottlade ett äldre schemafel: kundsidans affärsläsning använder `pipeline_stage.label`, medan read-only runtimekontroll bevisar `name`. Rättningen till `label:name` och okända flikräknare vid läsfel är lokalt granskad. Typkontroll, diffkontroll och 15 riktade tester är gröna. Rättningens previewkontroll återstår.

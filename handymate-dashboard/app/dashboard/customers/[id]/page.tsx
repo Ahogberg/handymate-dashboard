@@ -363,7 +363,7 @@ function CustomerDetailContent() {
     // Hämta deals
     const { data: dealData, error: dealError } = await supabase
       .from('deal')
-      .select('id, title, stage_id, value, created_at, deal_number, stage:pipeline_stage(label, slug)')
+      .select('id, title, stage_id, value, created_at, deal_number, stage:pipeline_stage(label:name, slug)')
       .eq('customer_id', customerId)
       .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
@@ -1232,7 +1232,7 @@ function CustomerDetailContent() {
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Bokningar ({bookings.length})
+                Bokningar ({coreReadError ? '—' : bookings.length})
               </button>
               <button
                 onClick={() => setActiveTab('documents')}
@@ -1252,7 +1252,7 @@ function CustomerDetailContent() {
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Projekt & Affärer ({projects.length + quotes.length + invoices.length})
+                Projekt & Affärer ({coreReadError ? '—' : projects.length + quotes.length + invoices.length})
               </button>
               <button
                 onClick={() => setActiveTab('tasks')}
@@ -1262,7 +1262,7 @@ function CustomerDetailContent() {
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Uppgifter ({tasks.filter(t => t.status !== 'done').length})
+                Uppgifter ({tasksReadError ? '—' : tasks.filter(t => t.status !== 'done').length})
               </button>
             </div>
 
