@@ -2345,3 +2345,15 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **CUSTOMER IMPACT:** Inget ändrat appbeteende. Konkret underlag för att kunna koppla faktisk mejlavlastning i befintlig onboarding. **RISKS:** Tokenåtkomst, global meddelandeidentitet, återanvänd token vid kontobyte och implicit avsändarval måste lösas före aktivering. Microsoft kräver adapter och säker identitetsmappning; inga Gmail-fält får tyst återanvändas för Graph-ID:n.
 
 **STATUS CHANGES:** Inga förmågor uppgraderas. **NEXT ACTION:** Genomför avgränsat token-/OAuth-skydd med kalenderregression, därefter Gmail-behörigheter och Microsoft-adapter enligt underlagen. Färdigställ extern verifiering med verklig demonstrationsvideo. Öppna endast provad provider i onboarding.
+
+### 31.13 Kodpaket för mejlintegrationernas gränser
+
+**DONE:** Serverstyrd Google-synkriktning, kontroll av användare i callback, verifierad refresh-kontoidentitet, bevarad vald kalender och scopeflaggor från Google. Generisk företag/provider/konto/meddelandeidentitet används i Gmail-importen; äldre tvetydig identitet ger stopp, inte gissning. Granskat SQL-paket begränsar klienternas tokenåtkomst och inför identitetskolumner/index på befintlig mejltabell.
+
+**REUSED / NEW:** Befintlig callback, processor, poller och statusläsning; en liten preferences-route och identitets-/återanslutningshelpers. Inga nya tabeller eller motorer.
+
+**VERIFIED:** 30 nya gränstester inklusive exekverad SQL i lokal PGlite/Postgres; 30 Gmail-regressioner, 47 Google-/tenant-/lagringskontrakt och typkontroll. Read-only prodmetadata visade inga view-/funktionsdefinitioner som direkt refererar anslutningstabellen.
+
+**NOT VERIFIED / RISKS:** Ingen prodmigration/deploy eller liveprovider-verifiering. SQL och app måste införas samordnat med import pausad. Full tokenkryptering/nyckelrotation, Microsoft-adapter, kvarvarande OAuth-härdning och flerbrevlåde-sändarval återstår. Äldre överlapp kräver verifierad kontokoppling innan berörd synk fortsätter.
+
+**CUSTOMER IMPACT:** Efter införande skyddas anslutningarna från direkta klientändringar, kalendern bevaras vid säker återanslutning och nya mejl får kontospecifik identitet. **STATUS CHANGES:** Inga liveförmågor uppgraderas. **NEXT ACTION:** Följ införandeordningen i MAIL_INTEGRATIONS_PREPARATION.md, verifiera på testmiljö före samordnad release. Fortsätt separat med tokenkryptering och providerimplementation; inga nya scopes aktiveras av paketet.

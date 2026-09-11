@@ -95,3 +95,24 @@ Visa separat vilket verifierat konto eller vilken avsändardomän svar går frå
 ## Klar-för-aktivering
 
 Samtliga relevanta acceptansfall är godkända på samma release; token-/meddelandehindren ovan är lösta; leverantörens nödvändiga godkännande finns; supporttext och faktiskt beteende stämmer. Säker rollback pausar ny import och sändning utan att radera kundens befintliga uppgifter. Kvarvarande köade försök måste också omfattas av pausgrinden. Aktivering får ske per provider så att Google inte blockerar Microsoft eller övrigt kundintag.
+
+## Kodpaket 2026-09-11: åtkomst, återanslutning och identitet
+
+Implementerat på arbetsgrenen, inte aktiverat i prod:
+
+- `sql/mail_integration_boundaries.sql` tar bort klienternas tabell- och kolumnprivilegier på anslutningar; ger endast SELECT på id/business_id/gmail_sync_enabled. Befintlig RLS gäller fortfarande. Service-role behåller åtkomst. Den direkta klientuppdateringen av synkriktning har ersatts av `/api/google/preferences`, begränsad till aktuell användares Google-koppling och tre tillåtna värden. [Supabase kolumnprivilegier](https://supabase.com/docs/guides/database/postgres/column-level-security).
+- Callback kontrollerar även aktuell business-user, stoppar vid läsfel, behåller vald kalender och härleder mejlbehörighet från Googles tokeninformation. Sparad refresh-token verifieras mot Googles subject före återanvändning. Kontobyte kräver uttrycklig frånkoppling först. Ingen ny Gmail-scope begärs; incremental authorization bevarar redan beviljade scopes.
+- Nya mejl får generisk provider-/konto-/original-ID-identitet. Unik nyckel omfattar företag, provider, konto och meddelande. Gmail-original-ID/tråd finns kvar för befintliga läsare. Äldre rader klassas som legacy utan gissat konto. Överlapp med en äldre rad stoppar synken med ett synligt fel tills dess konto verifierats, i stället för att generera dubbletter.
+
+### Införandeordning
+
+1. Granska PR:n och kontrollera att inga senare klienter läser andra calendar_connection-kolumner direkt. Den kontrollerade dashboardkoden har en säker läsning i oversikt och den gamla inställningsskrivningen som nu flyttats. Genomsökt mobilkopia innehåller ingen sådan referens. Metadata i prod visar inga view-/funktionsdefinitioner med direkt referens till calendar_connection; detta är inte en fullständig indirekt åtkomstaudit.
+2. Inför först i testmiljö. Pausa berörda importjobb under det samordnade bytet. Kör SQL via ordinarie migrationsprocess och deploya den matchande appversionen innan import återupptas. Supabase CLI finns inte i denna miljö; filen är därför ett granskat SQL-underlag i sql/, inte en påhittad registrerad migration.
+3. Kontrollera klientens nekade tokenåtkomst, serverns åtkomst och kalenderns synkriktning. Verifiera nya mejlidentiteter, legacy-överlapp och återanslutning enligt acceptansprotokollet. Därefter motsvarande kontroller i prod före återstart. Aktivera inga nya Gmail-/Microsoft-kopplingar genom denna ändring.
+4. Vid fel: håll importen pausad. Återställ inte de breda tokengrantsen. En rollback till gammal importerare är inte säker efter att nya identiteter börjat skrivas; använd kompatibel korrigering. Droppad global unik nyckel får inte återskapas om legitima kontospecifika ID-kollisioner nu finns.
+
+### Verifierat och kvar
+
+30 nya exekverbara tester för OAuth-beslut, verklig callback och preferences-route, identitetsläsning samt SQL i PGlite/Postgres; 30 befintliga Gmail-poller-/processorfall; 47 befintliga Google-/tenant-/lagringskontrakt. Typkontroll godkänd med 8 GB Node-heap. Nya gränstester är inkopplade i GitHub CI. Testerna använder syntetiska uppgifter och mockade externa providers; inga liveutskick.
+
+Prod-SQL är **inte körd**, kodpaketet är **inte mergat**. Tokenåtkomst från klient begränsas av SQL-paketet men full applikationskryptering/nyckelrotation är ännu inte genomförd. PKCE/engångsnonce, Microsoft-adapter, säker vald sändare för flera brevlådor, raderingskedja och Googles externa verifiering återstår enligt planen. Det här paketet gör inte hela integrationsgranskningen klar.

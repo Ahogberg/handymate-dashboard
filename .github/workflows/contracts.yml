@@ -222,3 +222,6 @@ jobs:
 
       - name: Aktivitetsläsning — verifierat kolumnkontrakt
         run: node tests/sprint/activity-route.cjs
+
+      - name: Mejlintegrationer — tokenåtkomst, OAuth och meddelandeidentitet
+        run: node tests/sprint/mail-boundaries.cjs

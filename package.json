@@ -6,6 +6,7 @@
     "node": ">=22.13.0"
   },
   "scripts": {
+    "test:mail-boundaries": "node tests/sprint/mail-boundaries.cjs",
     "test:approval-economy": "node tests/approvals/quote-send-harness.cjs && node tests/approvals/invoice-send-harness.cjs",
     "test:approval-documents": "node tests/approvals/document-email-harness.cjs && node tests/approvals/document-delivery-harness.cjs && node tests/approvals/job-report-review-harness.cjs && node tests/approvals/job-report-route-harness.cjs && node tests/approvals/pdf-preview-browser-harness.cjs",
     "dev": "next dev",
