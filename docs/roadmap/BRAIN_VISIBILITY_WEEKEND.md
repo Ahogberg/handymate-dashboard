@@ -2197,3 +2197,36 @@ Sol används där tydlig execution skapar mer kundvärde per token.
 
 > **Astra prevents expensive mistakes.  
 > Sol turns good decisions into product.**
+
+## 31. Inloggat webb-smoke-test 2026-09-11
+
+Miljö: Vercel-preview för `codex/brain-visibility-weekend-20260910`. Användaren bekräftade Nordström El AB som rätt testföretag. Färsk inloggning och omladdning behöll rätt ägarkonto. Detta är begränsad UI-observation, inte full slice-DoD eller providerbevis.
+
+- Home: efter laddning visas fem lägeskategorier och två beslutsgrupper. Omladdning återgår till dashboarden utan onboarding-redirect.
+- Kampanjens Granska: dialogen blockerar utförande eftersom fullständig text eller giltiga unika mottagare saknas, och visar uttryckligen att inget har skickats.
+- SMS-grupp: granskningen visar projekt, kund, en mottagare, meddelandetext och separat `Bekräfta och skicka`. Ingen bekräftelse utfördes.
+- AVVIKELSE: efter `Tillbaka` på gruppens första SMS öppnades granskning av nästa SMS, även efter navigering till projektet. Gruppavbrott och dialogens livscykel vid navigation behöver utredas och regressionstestas; inte godkänt som avslutat flöde.
+- Projekt `TEST Codex – preview #16 ROT och projekt`: två väntande SMS och regionen `Projektets kvitton` visas. Regionen anger att inga sparade utförandekvitton hittades. Endast tomläget verifierat, inte positiva/felaktiga kvitton.
+- Kund Andreas från projektlänken: `Öppet och nästa` visar de två ärendena, senaste offert som utkast, att uppföljning börjar först efter skickande, samt explicita tomlägen för öppna uppgifter och framtida bokning.
+
+Inga godkännanden, utskick, avvisningar, skapanden eller Fortnox-ändringar utfördes. Första passet omfattade ingen visuell screenshot-granskning.
+
+### 31.1 Fortsatt testpass samma dag
+
+- Offertutkastets `Kontrollera igen` uppdaterade kontrolltiden och behöll `Inget utskick är bekräftat` samt nästa steg att granska och skicka.
+- AVVIKELSE: samma oskickade offert visar samtidigt den äldre sidopanelrubriken `VÄNTAR PÅ SIGNERING`. Läsmodellen och sidopanelen ger olika signaler; presentationen behöver rättas.
+- Beslutsköns Väntande/Hanterade går att läsa. Historiska informationskort (bland annat Måndagskortet och signerad ÄTA) saknar godkännandeknappar; ett läst kort visas som `Läst`. Inget aktivt oläst informationskort fanns i den väntande kön, så dess klickflöde är inte browserverifierat.
+- AVVIKELSE: checklistan i historiken visar både en grön `Godkänd`-etikett och `Behöver följas upp`. I väntande-vyn exponeras ett rått NOT NULL-fel för `project_checklist.order_id`. Ingen retry utfördes. Felets ursprung är inte fastställt av detta test.
+- SMS-gruppens avbrottsorsak bekräftad i kod: gruppslingan i `components/jarvis/JarvisHome.tsx` fortsätter efter `executeSend`, medan en avbruten review (HTTP 499) endast returnerar ur det enskilda anropet. Inget stoppresultat förs tillbaka till gruppslingan. Ingen produktkod ändrad i testpasset.
+- Visuell screenshot-granskning av desktop-historiken utförd: kort/filter renderas, men den gröna beslutsstatusen för misslyckad checklista är missvisande. Ingen smal viewport testad.
+- **96 isolerade tester godkända**: `approval-display`, `approval-review`, `project-receipts`, `approval-explainability`, `approval-action-contract` (41); `home-brain`, `customer-open-work-summary`, `approval-receipt`, `approval-view` (55). Körda med `--no-deps --project=chromium --reporter=line --workers=2`. Dessa är funktions-/kontraktstester med mocks eller källkodskontroller, inte installerad app eller riktiga provideranrop.
+
+Testpasset är avslutat med öppna fynd, inte full acceptans. Kvar: rätta och regressionstesta ovanstående fynd, aktiva informationskort/övriga korttyper i UI, fel/retry i live-UI, roll-/företagsbyte, smal viewport, installerad mobilapp och verkliga providerutfall. De senare kräver tillgänglig enhet respektive avgränsat godkänt utskicks-/Fortnox-testmål.
+
+### 31.2 Lokala rättningar efter testfynd
+
+- Home använder en sekventiell review-grupp som avbryter när ett enskilt anrop inte uttryckligen lyckas. Avbruten review, läs-/nätfel och misslyckat/delvis utförande stoppar återstående medlemmar; redan utförda handlingar återkallas inte.
+- Både paketkort och vanliga historikkort använder samma statuspresentation. Misslyckande/delutfall markeras `Behöver följas upp`; enbart godkänt beslut får en neutral `Beslut godkänt`, inte en grön utförandemarkör. Rå checklistfeltext och själva checklistfelet är inte ändrade.
+- Offertens signeringskort kräver skickat/öppnat status och `sent_at` för att säga `Väntar på signering`. Enbart token visas som `Signeringslänk skapad`, inte som utskicksbevis.
+- Ny regressionstestfil `brain-visibility-ui-regressions.spec.ts`: fem tester för gruppavbrott, framgång/fel, historikstatus, offertstatus och inkoppling i de faktiska UI-komponenterna. Tillsammans med approval-review, approval-view och project-receipts: 41 tester godkända. Typkontroll med 8192 MB godkänd.
+- Detta är lokala kodrättningar. Preview-publicering och browseromtest av rättningarna återstår; ingen slice får full DoD på dessa testresultat ensamma.

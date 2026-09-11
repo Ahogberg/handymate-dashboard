@@ -1,6 +1,7 @@
 'use client'
 
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
+import { reviewGroup } from '@/lib/approvals/review-group'
 import { APPROVAL_EDIT_REVIEW_LABEL, approvalGroupReviewLabel } from '@/lib/approvals/presentation'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -896,6 +897,7 @@ export default function JarvisHome({
         auto: false,
         fresh: true,
       }, ...prev])
+      return utfall !== 'failed' && !['partial', 'failed', 'needs_action'].includes(svar?.receipt?.state)
     } catch {
       setHiddenIds(prev => { const n = new Set(prev); n.delete(approval.id); return n })
       flash('Kunde inte spara — försök igen', true)
@@ -919,7 +921,7 @@ export default function JarvisHome({
     if (medlemmar.length === 0) return
     const forsta = medlemmar[0]
 
-    if (action !== 'reject') { void (async () => { for (const item of medlemmar) await executeSend(item, action, editedText) })(); return }
+    if (action !== 'reject') { void reviewGroup(medlemmar, item => executeSend(item, action, editedText)); return }
     setEditingId(null)
     setHiddenIds(prev => {
       const n = new Set(prev)

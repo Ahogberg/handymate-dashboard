@@ -2,6 +2,7 @@
 
 import { fetchApprovalList } from '@/lib/approvals/list-client'
 import { classify } from '@/lib/approvals/action-contract'
+import { historyStatus } from '@/lib/approvals/history-status'
 import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
 
 import { useEffect, useState, useRef } from 'react'
@@ -898,12 +899,8 @@ export default function ApprovalsPage() {
                           </span>
                         )}
                         {approval.status !== 'pending' && (
-                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                            approval.status === 'approved' ? 'bg-green-50 text-green-700' :
-                            approval.status === 'rejected' ? 'bg-red-50 text-red-700' :
-                            'bg-gray-100 text-gray-500'
-                          }`}>
-                            {approval.status === 'approved' ? (classify(approval.approval_type) === 'INFORMATIONAL' ? 'Läst' : classify(approval.approval_type) === 'ACKNOWLEDGEMENT' ? 'Noterad' : 'Godkänd') : approval.status === 'rejected' ? 'Avvisad' : 'Utgången'}
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${historyStatus(approval).className}`}>
+                            {historyStatus(approval).label}
                           </span>
                         )}
                       </div>
@@ -1056,19 +1053,8 @@ export default function ApprovalsPage() {
                             </span>
                           )}
                           {approval.status !== 'pending' && (
-                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
-                              approval.status === 'approved'
-                                ? 'bg-green-50 text-green-700'
-                                : approval.status === 'rejected'
-                                ? 'bg-red-50 text-red-700'
-                                : approval.status === 'auto_approved'
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'bg-gray-100 text-gray-500'
-                            }`}>
-                              {approval.status === 'approved' ? (classify(approval.approval_type) === 'INFORMATIONAL' ? 'Läst' : classify(approval.approval_type) === 'ACKNOWLEDGEMENT' ? 'Noterad' : 'Godkänd') :
-                               approval.status === 'rejected' ? 'Avvisad' :
-                               approval.status === 'auto_approved' ? 'Automatiskt godkänd' :
-                               'Utgången'}
+                            <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${historyStatus(approval).className}`}>
+                              {historyStatus(approval).label}
                             </span>
                           )}
                           {primaryAmount != null && (
