@@ -305,3 +305,49 @@ test.describe('Sidebar-badgen räknar via samma API som sidan visar (Andreas fyn
     expect(slice).not.toContain(".from('pending_approvals')")
   })
 })
+
+test.describe('heron står först på startsidan', () => {
+  // Andreas 2026-09-12: avlastningen låg som en banderoll ovanför heron,
+  // med en ANDRA länk till samma sida direkt under sig — två
+  // navigationsrader före Mission Control. "Det knuffar ner Mission
+  // Control och blir rörigt med väldigt mycket olika block igen."
+  //
+  // Heron svarar "det här behöver dig". Avlastningen frågar "ge mig
+  // något". En inmatningsyta får inte stå före utmatningen. Ytan är
+  // oförändrad — bara vägen in har flyttat.
+  const hem = fs.readFileSync(path.join(ROOT, 'components/jarvis/JarvisHome.tsx'), 'utf8')
+  const meny = fs.readFileSync(path.join(ROOT, 'components/Sidebar.tsx'), 'utf8')
+
+  test('ingen länk till avlastningen står före heron', () => {
+    const heroPos = hem.indexOf('<MatteHero')
+    expect(heroPos, 'hittade inte heron').toBeGreaterThan(-1)
+    const fore = hem.slice(0, heroPos)
+    // Mät på koden, inte på kommentaren som förklarar varför den är borta.
+    const utanKommentarer = fore
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    expect(utanKommentarer).not.toContain('/dashboard/avlastning')
+    expect(utanKommentarer).not.toContain('Vad ligger kvar till ikväll')
+  })
+
+  test('men vägen in finns kvar — en rad efter heron och en menypost', () => {
+    const heroPos = hem.indexOf('<MatteHero')
+    expect(hem.slice(heroPos)).toContain('/dashboard/avlastning')
+    // Menyposten är det som gör att ytan inte blir orphanad när
+    // banderollen försvinner. Utan den fanns ingen annan väg dit.
+    expect(meny).toContain("href: '/dashboard/avlastning'")
+  })
+
+  test('bara EN väg in från startsidan — inte två länkar till samma sida', () => {
+    const traffar = hem.match(/href="\/dashboard\/avlastning[^"]*"/g) || []
+    expect(traffar).toHaveLength(1)
+  })
+
+  test('sidan behåller sin egen ankarlänk till dagen', () => {
+    // Den borttagna banderollraden pekade på #min-dag. Ankaret och länken
+    // dit bor på sidan själv, så ingenting blev oåtkomligt.
+    const sida = fs.readFileSync(path.join(ROOT, 'app/dashboard/avlastning/page.tsx'), 'utf8')
+    expect(sida).toContain('id="min-dag"')
+    expect(sida).toContain('href="#min-dag"')
+  })
+})

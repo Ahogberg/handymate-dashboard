@@ -31,6 +31,7 @@ import {
   HelpCircle,
   Package,
   Banknote,
+  Inbox,
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
@@ -104,6 +105,16 @@ const NAV: NavItem[] = [
     ],
   },
   { type: 'link', key: 'approvals', label: 'Godkännanden', icon: ClipboardCheck, href: '/dashboard/approvals', hasApprovalBadge: true },
+  // Avlastningen (2026-09-12). Sidan fanns sedan tidigare men hade ingen
+  // menypost: enda vägen in var en banderoll ovanför heron på Översikt,
+  // plus en andra länk till samma sida direkt under den. Andreas
+  // 2026-09-12: de knuffade ner Mission Control och gjorde startsidan
+  // rörig. Banderollen är borta; ytan bor här i stället, där ytor bor.
+  //
+  // Det är en INMATNINGSyta ("lämna ditt underlag, vi förbereder nästa
+  // steg"), inte en överblick — därför en egen rad bland sakerna man gör,
+  // inte i Dashboard-gruppen bland sammanställningarna.
+  { type: 'link', key: 'avlastning', label: 'Lämna över underlag', icon: Inbox, href: '/dashboard/avlastning' },
   { type: 'link', key: 'customers', label: 'Kunder', icon: Users, href: '/dashboard/customers', paths: ['/dashboard/customers', '/dashboard/warranties', '/dashboard/customer-portal'] },
   { type: 'link', key: 'pipeline', label: 'Verksamhetsöversikt', icon: TrendingUp, href: '/dashboard/pipeline' },
   { type: 'link', key: 'agent', label: 'Mitt team', icon: Bot, href: '/dashboard/agent' },
