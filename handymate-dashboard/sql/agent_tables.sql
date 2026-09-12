@@ -18,7 +18,16 @@ CREATE TABLE IF NOT EXISTS agent_runs (
   tokens_used INT DEFAULT 0,
   estimated_cost DECIMAL(10, 4) DEFAULT 0,
   duration_ms INT DEFAULT 0,
-  status TEXT DEFAULT 'running',
+  -- Ingen DEFAULT (2026-09-12). Kolumnen bar tidigare DEFAULT 'running',
+  -- men raden skrivs ALLTID efter att korningen avslutats och varje
+  -- insert i koden satter status uttryckligen ('completed' pa samtliga
+  -- fem stallen). Matt i produktion: 1362 rader, alla 'completed' —
+  -- defaulten hade aldrig anvants. Kvar var bara risken: en framtida
+  -- insert som glommer faltet hade fatt raden att pasta att korningen
+  -- PAGAR, i all evighet, och en agent som visas som arbetande utan att
+  -- arbeta ar precis den logn vi stangde i agentremsan. NULL ar okant,
+  -- och okant ska se okant ut.
+  status TEXT,
   error_message TEXT,
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
