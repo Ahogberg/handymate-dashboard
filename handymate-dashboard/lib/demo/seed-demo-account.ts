@@ -172,14 +172,31 @@ export async function resetDemoAccount(
     console.error('[demo-reset] atomisk radering misslyckades:', resetError?.message)
     // RPC-transaktionen rullade tillbaka även sin påbörjade audit. Skriv en
     // separat, smal felrad efter rollback så försöket ändå blir synligt.
+    //
+    // ═══ VARFÖR ORSAKEN SKRIVS UT, INTE BARA KODEN ═══
+    //
+    // Fram till 2026-09-11 stod här bara den platta strängen
+    // 'delete_transaction_failed'. Den är sann men oanvändbar: den säger att
+    // transaktionen föll, inte varför. Det kostade två separata jakter på
+    // samma funktion. Först v227 (rollgrinden jämförde uuid mot text), och
+    // när resetten ändå misslyckades fyra gånger till fick felet reproduceras
+    // mot produktionen för att visa sig vara v229: sista satsen nollade
+    // business_config.fortnox_token_expires_at, en kolumn som bor i
+    // business_integration_credentials. Båda hade kunnat läsas direkt ur
+    // auditen om orsaken sparats.
+    //
+    // PostgREST-felet innehåller aldrig kunddata — det är SQLSTATE plus
+    // Postgres egen text om schemat — så det är tryggt att spara. Kapas till
+    // 500 tecken så en lång CONTEXT-stack inte sväller auditraden.
+    const orsak = (resetError?.message || 'okänt fel utan meddelande').slice(0, 500)
     const { error: auditInsertError } = await supabase.from('demo_reset_audit').insert({
       business_id: businessId,
       actor_user_id: actorUserId,
       started_at: resetStartedAt,
       finished_at: new Date().toISOString(),
       ok: false,
-      error_text: 'delete_transaction_failed',
-      reset_version: 'v158',
+      error_text: `delete_transaction_failed: ${orsak}`,
+      reset_version: 'v229',
     })
     if (auditInsertError) {
       console.error('[demo-reset] kunde inte auditlogga rollback:', auditInsertError.message)

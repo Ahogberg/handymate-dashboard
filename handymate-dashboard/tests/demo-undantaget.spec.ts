@@ -209,6 +209,27 @@ test.describe('Fortnox-simmen: "bearbetade av agenterna" är Karins riktiga kort
   })
 })
 
+test.describe('en misslyckad reset går att läsa ur auditen', () => {
+  test('den riktiga Postgres-orsaken sparas, inte bara en platt kod', () => {
+    // 2026-09-11. demo_reset_audit hade fyra rader, alla med error_text
+    // 'delete_transaction_failed'. Den strängen säger att transaktionen föll,
+    // inte varför — och kostade två separata jakter på samma funktion:
+    // v227 (rollgrinden jämförde uuid mot text) och v229 (sista satsen nollade
+    // business_config.fortnox_token_expires_at, en kolumn som bor i
+    // business_integration_credentials). Båda hade gått att läsa direkt ur
+    // auditen om orsaken sparats.
+    const src = read(SEEDARE)
+    const block = src.slice(src.indexOf('if (resetError ||'), src.indexOf('reset_version:', src.indexOf('if (resetError ||')) + 60)
+    expect(block, 'hittade inte felgrenen').toBeTruthy()
+    expect(block, 'orsaken sparas inte i auditraden').toMatch(/error_text: `delete_transaction_failed: \$\{orsak\}`/)
+    expect(block, 'orsaken hämtas inte ur resetError').toContain('resetError?.message')
+    // Kapad, så en lång CONTEXT-stack inte sväller raden.
+    expect(block, 'orsaken kapas inte').toMatch(/\.slice\(0, \d+\)/)
+    // Och den platta strängen får inte stå kvar som ENDA innehåll.
+    expect(block, "den platta koden står kvar utan orsak").not.toMatch(/error_text: 'delete_transaction_failed'/)
+  })
+})
+
 test.describe('Hannas underlag är härlett, inte handskrivet', () => {
   const seedare = read(SEEDARE)
 
