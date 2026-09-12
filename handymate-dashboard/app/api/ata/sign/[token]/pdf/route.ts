@@ -15,10 +15,8 @@ export const maxDuration = 30
  * Aldrig för draft/pending: kunden får bara se det hantverkaren faktiskt
  * skickat. Token loggas aldrig.
  */
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     if (!params.token) {
       return NextResponse.json({ error: 'Token saknas' }, { status: 400 })

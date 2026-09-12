@@ -2,18 +2,14 @@ const { withSentryConfig } = require('@sentry/nextjs')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  experimental: {
+  outputFileTracingRoot: __dirname,
     // Chromium-PDF (app/api/quotes/pdf): puppeteer-core + @sparticuz/chromium
     // måste lämnas utanför webpack-bundlingen — binär-uppackningen och
     // dynamiska require:s går sönder om de bundlas.
-    serverComponentsExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfjs-dist', '@napi-rs/canvas'],
+    serverExternalPackages: ['puppeteer-core', '@sparticuz/chromium', 'pdfjs-dist', '@napi-rs/canvas'],
     outputFileTracingIncludes: {
       '/api/approvals/*/document': ['./node_modules/pdfjs-dist/legacy/build/*', './node_modules/pdfjs-dist/standard_fonts/*', './node_modules/pdfjs-dist/wasm/*', './node_modules/@napi-rs/canvas*/**/*'],
     },
-    // Krävs på Next 14 för att instrumentation.ts (Sentry server/edge-init)
-    // ska köras. Utan DSN är initieringen en no-op.
-    instrumentationHook: true,
-  },
 }
 
 // Sentry (2026-09-01): felspårning på server + klient. Bygget är oförändrat

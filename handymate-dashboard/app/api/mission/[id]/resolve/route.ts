@@ -18,10 +18,8 @@ export const dynamic = 'force-dynamic'
  * pengamål är en styrande handling, inte en läsning — ägare/admin
  * (tests/permission-contract.spec.ts).
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

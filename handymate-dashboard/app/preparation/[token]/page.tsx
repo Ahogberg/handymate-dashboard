@@ -1,9 +1,10 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react';
 import { TEMPLATES, isTemplate, validateAnswers, type TemplateKey, type Answers } from '@/lib/customer-preparation/contract'
 
 type RequestData = { template: TemplateKey; context: string; due_date: string | null; status: string }
-export default function PreparationPage({ params }: { params: { token: string } }) {
+export default function PreparationPage(props: { params: Promise<{ token: string }> }) {
+  const params = use(props.params);
   const [data, setData] = useState<RequestData | null>(null)
   const [answers, setAnswers] = useState<Answers>({})
   const [files, setFiles] = useState<File[]>([])

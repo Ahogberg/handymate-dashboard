@@ -26,7 +26,8 @@ export async function OPTIONS(request: NextRequest) {
   return new Response(null, { status: 204, headers: demoCorsHeaders(request) })
 }
 
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   const headers = { ...demoCorsHeaders(request), 'Cache-Control': 'no-store' }
   const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers })
 

@@ -86,9 +86,10 @@ function subtitleFor(business: ViaBusiness): string | null {
   return parts.length > 0 ? parts.join(' · ') : null
 }
 
-type PageProps = { params: { code: string } }
+type PageProps = { params: Promise<{ code: string }> }
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
+export async function generateMetadata(props: PageProps): Promise<Metadata> {
+  const params = await props.params;
   const code = normalizeCode(params.code)
   const business = await lookupBusiness(code)
   return {
@@ -115,7 +116,8 @@ const POINTS = [
   },
 ] as const
 
-export default async function ViaPage({ params }: PageProps) {
+export default async function ViaPage(props: PageProps) {
+  const params = await props.params;
   const code = normalizeCode(params.code)
   const business = await lookupBusiness(code)
 

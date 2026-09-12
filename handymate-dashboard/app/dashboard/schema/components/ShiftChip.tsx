@@ -10,7 +10,7 @@ import type { PersonDayShift } from '@/lib/schedule/person-day'
  * (frånvaromarkerad). Medvetet INGA violetta/fuchsia toner (CLAUDE.md:
  * "aldrig mörkt tema eller lila/fuchsia").
  */
-function shiftStyle(shift: PersonDayShift): { bg: string; text: string; border: string; icon: JSX.Element } {
+function shiftStyle(shift: PersonDayShift): { bg: string; text: string; border: string; icon: React.JSX.Element } {
   switch (shift.type) {
     case 'booking':
       return { bg: 'bg-teal-50', text: 'text-teal-700', border: 'border-teal-300', icon: <Briefcase className="w-3 h-3" /> }

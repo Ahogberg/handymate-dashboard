@@ -15,7 +15,7 @@ interface PipelineFiltersProps {
    * bakom projekt-rutan trots z-index z-[100] — för att höger panel har
    * egen stacking context. Portal + position:fixed löser det permanent.
    */
-  anchorRef: RefObject<HTMLElement>
+  anchorRef: RefObject<HTMLElement | null>
 }
 
 /**

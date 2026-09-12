@@ -270,7 +270,7 @@ export interface PipelineContextValue {
   hideEmpty: boolean
   toggleHideEmpty: () => void
   scrollPipeline: (dir: 'left' | 'right') => void
-  scrollContainerRef: React.RefObject<HTMLDivElement>
+  scrollContainerRef: React.RefObject<HTMLDivElement | null>
   mobileStageIndex: number
   setMobileStageIndex: Dispatch<SetStateAction<number>>
   lostExpanded: boolean

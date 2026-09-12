@@ -8,10 +8,8 @@ import { sanitizeSenderId } from '@/lib/sms/sender-id'
 /**
  * POST /api/work-orders/[id]/send — Skicka arbetsorder via SMS
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

@@ -23,7 +23,8 @@ export const dynamic = 'force-dynamic'
  *     latest_automation: { agent, action, rule_name, action_type, created_at } | null
  *   }
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

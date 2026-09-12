@@ -23,7 +23,8 @@ const PROJECT_FILES_BUCKET = 'project-files'
  * kommer se innan publicering. Owner-admin, precis som app/api/absence
  * (registrerad i tests/permission-contract.spec.ts).
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -102,7 +103,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
   }
 }
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

@@ -1,3 +1,6 @@
+## Säkerhet och betalning 12 september
+Se [plan och verifiering](launch-security-billing.md).
+
 # Aktiv sprint 2026-09-09
 - [x] Gmail: avstängning, full sidläsning, stabil startpunkt och ingen cursor vid fel.
 - [x] Gmail: säkra dubblett-/kunduppslag och verifiera fel/återförsök i faktiska helpers.

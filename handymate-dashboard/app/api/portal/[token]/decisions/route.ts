@@ -26,7 +26,8 @@ export const dynamic = 'force-dynamic'
  * Aggregerad vy: delfrågorna är best-effort och loggas var för sig — en
  * trasig delfråga ska inte tömma hela kortet. Bara token-uppslaget är hårt.
  */
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(

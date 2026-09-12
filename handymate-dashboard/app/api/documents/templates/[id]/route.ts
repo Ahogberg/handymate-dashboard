@@ -10,10 +10,8 @@ export const dynamic = 'force-dynamic'
 /**
  * GET - Get single template with full details
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params
     const business = await getAuthenticatedBusiness(request)
@@ -44,10 +42,8 @@ export async function GET(
 /**
  * PATCH - Update custom template (only own templates)
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params
     const business = await getAuthenticatedBusiness(request)
@@ -104,10 +100,8 @@ export async function PATCH(
 /**
  * DELETE - Delete custom template
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params
     const business = await getAuthenticatedBusiness(request)

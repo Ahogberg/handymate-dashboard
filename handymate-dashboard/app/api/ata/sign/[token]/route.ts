@@ -13,10 +13,8 @@ const BILAGE_BUCKET = 'project-files'
 /**
  * GET /api/ata/sign/[token] — Hämta ÄTA via publik signeringslänk (ingen auth)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const token = params.token
@@ -127,10 +125,8 @@ export async function GET(
  * POST /api/ata/sign/[token] — Signera eller avböj ÄTA (ingen auth)
  * Body: { action: 'sign' | 'decline', name, signature_data, reason }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const token = params.token

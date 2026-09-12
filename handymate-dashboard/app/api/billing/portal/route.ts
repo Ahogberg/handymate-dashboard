@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
 
     // Rollskydd: ENDAST owner/admin. Utan detta kan en anställd öppna
     // Stripe-portalen och säga upp/ändra prenumerationen.
-    const currentUser = await getCurrentUser(request)
+    const currentUser = await getCurrentUser(request, business.business_id)
     if (currentUser?.role !== 'owner' && currentUser?.role !== 'admin') {
       return NextResponse.json({ error: 'Endast ägare/admin' }, { status: 403 })
     }

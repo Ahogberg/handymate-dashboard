@@ -42,8 +42,9 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { token: string; id: string } },
+  props: { params: Promise<{ token: string; id: string }> }
 ) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const { token, id: invoiceId } = params

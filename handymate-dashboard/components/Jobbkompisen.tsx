@@ -774,7 +774,7 @@ function ChatTab({
   messages: ChatMessage[]
   input: string
   loading: boolean
-  messagesEndRef: React.RefObject<HTMLDivElement>
+  messagesEndRef: React.RefObject<HTMLDivElement | null>
   suggestions: { id: string; type: string; title: string; description: string }[]
   executingActions: Set<string>
   pendingConfirmation: PendingConfirmation | null

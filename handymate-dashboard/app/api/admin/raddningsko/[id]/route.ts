@@ -20,7 +20,8 @@ const NASTA_STATUS: Record<string, string> = {
  * rör aldrig ett ärende med resolved_by satt av en människa förrän
  * signalen försvinner (då stämplas resolved_by='system' separat).
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const admin = await isAdmin(request)
   if (!admin.isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

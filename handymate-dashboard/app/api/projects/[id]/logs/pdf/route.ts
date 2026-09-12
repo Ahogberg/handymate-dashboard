@@ -91,10 +91,8 @@ async function laddaFoto(
  * tilläggsanteckningar i kursiv. Sidbrytning mäts FÖRE ritning så ett block
  * aldrig hamnar utanför sidan.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
   // Läsning följer GET /logs: alla i företaget som når projektet får exportera.

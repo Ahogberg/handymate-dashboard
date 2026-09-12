@@ -29,10 +29,8 @@ export const dynamic = 'force-dynamic'
  *
  * Felhantering: per-business try/catch — ett fel stoppar inte resten.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { agent: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ agent: string }> }) {
+  const params = await props.params;
   if (!verifyCronSecret(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

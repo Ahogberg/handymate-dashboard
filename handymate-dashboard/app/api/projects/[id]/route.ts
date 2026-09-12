@@ -32,10 +32,8 @@ export const dynamic = 'force-dynamic'
  *    tidposternas timpris och milstolpsintäkt gick ut råa. Hela svaret
  *    går nu genom lib/projects/ekonomiprojektion.ts när prices_redacted.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

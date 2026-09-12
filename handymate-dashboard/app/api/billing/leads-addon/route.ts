@@ -1,3 +1,5 @@
+import { createSubscriptionCheckout, CheckoutConflict } from '@/lib/billing/checkout-session'
+import { cancelLeadsSubscriptions } from '@/lib/billing/leads-subscription'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -40,10 +42,11 @@ export async function POST(request: NextRequest) {
 
     // Avsluta addon
     if (action === 'cancel') {
-      await supabase
-        .from('business_config')
-        .update({ leads_addon: false, leads_addon_tier: null })
-        .eq('business_id', business.business_id)
+      const { data: config, error } = await supabase.from('business_config')
+        .select('stripe_customer_id').eq('business_id', business.business_id).single()
+      if (error || !config) throw new Error('Betalningskontot kunde inte läsas')
+      if (!config.stripe_customer_id) return NextResponse.json({ error: 'Inget Stripe-konto är kopplat. Kontakta support.' }, { status: 409 })
+      await cancelLeadsSubscriptions(supabase, stripe, business.business_id, config.stripe_customer_id)
       return NextResponse.json({ success: true, message: 'Leads add-on avslutad' })
     }
 
@@ -56,33 +59,10 @@ export async function POST(request: NextRequest) {
 
     // Om Stripe Price ID finns → skapa checkout session
     if (stripePriceId) {
-      // Hämta eller skapa Stripe customer
-      const { data: config } = await supabase
-        .from('business_config')
-        .select('stripe_customer_id, contact_email, business_name')
-        .eq('business_id', business.business_id)
-        .single()
-
-      let customerId = config?.stripe_customer_id
-
-      if (!customerId) {
-        const customer = await stripe.customers.create({
-          email: config?.contact_email || undefined,
-          name: config?.business_name || undefined,
-          metadata: { business_id: business.business_id },
-        })
-        customerId = customer.id
-        await supabase
-          .from('business_config')
-          .update({ stripe_customer_id: customerId })
-          .eq('business_id', business.business_id)
-      }
-
       const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
-      const session = await stripe.checkout.sessions.create({
+      const session = await createSubscriptionCheckout(supabase, stripe, business.business_id, {
         mode: 'subscription',
-        customer: customerId,
         line_items: [{ price: stripePriceId, quantity: 1 }],
         metadata: {
           business_id: business.business_id,
@@ -98,26 +78,14 @@ export async function POST(request: NextRequest) {
         },
         success_url: `${appUrl}/dashboard/marketing/leads?activated=true`,
         cancel_url: `${appUrl}/dashboard/marketing/leads`,
-      })
+      }, 'leads')
 
       return NextResponse.json({ checkout_url: session.url })
     }
 
-    // Fallback: aktivera direkt utan Stripe (dev/test)
-    await supabase
-      .from('business_config')
-      .update({
-        leads_addon: true,
-        leads_addon_tier: tier,
-      })
-      .eq('business_id', business.business_id)
-
-    return NextResponse.json({
-      success: true,
-      message: `Leads ${tier} aktiverad`,
-      redirect: '/dashboard/marketing/leads',
-    })
+    return NextResponse.json({ error: 'Leads-tillägget är inte tillgängligt för köp ännu.' }, { status: 503 })
   } catch (error: any) {
+    if (error instanceof CheckoutConflict) return NextResponse.json({ error: error.message }, { status: 409 })
     console.error('Leads addon error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

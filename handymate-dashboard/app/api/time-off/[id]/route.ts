@@ -6,10 +6,8 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 /**
  * PATCH /api/time-off/[id] - Godkänn eller avslå ledighetsansökan
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -116,10 +114,8 @@ export async function PATCH(
 /**
  * DELETE /api/time-off/[id] - Ta bort ledighetsansökan (bara pending)
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

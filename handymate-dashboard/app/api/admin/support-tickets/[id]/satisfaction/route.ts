@@ -15,7 +15,8 @@ const HANDYMATE_GOOGLE_REVIEW_URL = process.env.HANDYMATE_GOOGLE_REVIEW_URL || '
  * därför verifieras kravet med den vanliga hantverkar-sessionshjälparen,
  * inte den interna teamets adminkontroll.
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

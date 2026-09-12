@@ -16,10 +16,8 @@ import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
  * recensionsschemaläggning bor kvar här och körs bara när kunden JUST
  * gjort sitt (to_paid / to_customer_paid) — aldrig vid slutreglering.
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id: invoiceId } = params
 

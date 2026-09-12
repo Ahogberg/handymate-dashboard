@@ -9,7 +9,8 @@ export const dynamic = 'force-dynamic'
  * tråden direkt mot thread_message istället för att gå via
  * loadThreadMessages (som trimmar/summerar för LLM-context).
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const admin = await isAdmin(request)
   if (!admin.isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

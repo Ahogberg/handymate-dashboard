@@ -33,7 +33,8 @@ export interface PortalDocumentDto {
  * kollar `error` (TD-22) — ett fel i en källa gör att just den källan
  * utelämnas och loggas, aldrig en tyst tom lista.
  */
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(supabase, params.token)

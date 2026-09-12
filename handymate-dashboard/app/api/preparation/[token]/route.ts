@@ -5,11 +5,12 @@ import { findPublicPreparation, BUCKET } from '@/lib/customer-preparation/server
 import { validateAnswers, imageExtension, isExpired, isTemplate, MAX_IMAGE_BYTES } from '@/lib/customer-preparation/contract'
 import { readPreparationForm } from '@/lib/customer-preparation/body'
 export const dynamic = 'force-dynamic'
-type Params = { params: { token: string } }
+type Params = { params: Promise<{ token: string }> }
 const unavailable = () => NextResponse.json({ error: 'Länken är inte längre tillgänglig. Kontakta företaget.' }, { status: 404 })
 
 // Kundväg: tidsbegränsad capability för exakt en förfrågan, inte företags-session.
-export async function GET(_request: NextRequest, { params }: Params) {
+export async function GET(_request: NextRequest, props: Params) {
+  const params = await props.params;
   try {
     const row = await findPublicPreparation(params.token)
     if (!row || row.status === 'cancelled' || isExpired(row.expires_at) || !isTemplate(row.template)) return unavailable()
@@ -20,7 +21,8 @@ export async function GET(_request: NextRequest, { params }: Params) {
   } catch { return NextResponse.json({ error: 'Kunde inte läsa underlaget. Försök igen.' }, { status: 503 }) }
 }
 
-export async function POST(request: NextRequest, { params }: Params) {
+export async function POST(request: NextRequest, props: Params) {
+  const params = await props.params;
   const uploaded: string[] = []
   const db = getServerSupabase()
   let committed = false

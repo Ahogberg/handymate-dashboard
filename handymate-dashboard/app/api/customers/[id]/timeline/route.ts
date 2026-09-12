@@ -20,10 +20,8 @@ interface TimelineEvent {
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await getAuthenticatedBusiness(request)
   if (!auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

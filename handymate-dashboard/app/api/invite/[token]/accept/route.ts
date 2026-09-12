@@ -5,10 +5,8 @@ import { createClient } from '@supabase/supabase-js'
 /**
  * POST /api/invite/[token]/accept - Acceptera inbjudan och skapa konto
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const body = await request.json()

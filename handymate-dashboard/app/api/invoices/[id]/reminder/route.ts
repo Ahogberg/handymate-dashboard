@@ -12,10 +12,8 @@ const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD!
  * POST - Send payment reminder for overdue invoice
  * Creates invoice_reminders record with fee + penalty interest
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id: invoiceId } = params
 

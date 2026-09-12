@@ -26,7 +26,8 @@ export const dynamic = 'force-dynamic'
  * Kundens egna uppgifter lämnas aldrig ut. Samma slug-grind som book-
  * routen: storefront måste finnas och vara publicerad, annars 404.
  */
-export async function GET(_request: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const supabase = getServerSupabase()
 
   const { data: storefront } = await supabase

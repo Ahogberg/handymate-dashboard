@@ -4,7 +4,8 @@ import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import { reconcileFortnoxInvoice } from '@/lib/invoices/reconcile-fortnox'
 export const maxDuration = 60
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const headers = { 'Cache-Control': 'no-store' }
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Logga in först.' }, { status: 401, headers })

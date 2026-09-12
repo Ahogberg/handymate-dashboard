@@ -19,7 +19,8 @@ export const dynamic = 'force-dynamic'
  * Ett omdöme per kund: finns en rad redan svarar vi 409 med när det
  * lämnades — kortet visar "Tack för ditt omdöme, lämnat {datum}".
  */
-export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(
@@ -131,7 +132,8 @@ export async function POST(request: NextRequest, { params }: { params: { token: 
  * PATCH — kunden klickade "Recensera på Google". Bara en tidsstämpel på
  * senaste omdömet; vi kan aldrig se om recensionen faktiskt skrevs.
  */
-export async function PATCH(request: NextRequest, { params }: { params: { token: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(supabase, params.token)

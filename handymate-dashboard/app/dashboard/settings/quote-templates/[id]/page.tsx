@@ -66,7 +66,7 @@ export default function QuoteTemplateEditorPage() {
   })
 
   const dirtyRef = useRef(false)
-  const saveTimeoutRef = useRef<NodeJS.Timeout>()
+  const saveTimeoutRef = useRef<NodeJS.Timeout | undefined>(undefined)
 
   useEffect(() => {
     if (templateId) fetchTemplate()

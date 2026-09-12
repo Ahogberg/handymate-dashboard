@@ -10,7 +10,8 @@ const MESSAGES_CUSTOMER_SELECT = 'customer_id, business_id, portal_enabled, name
 const PORTAL_MESSAGE_MAX_PER_WINDOW = 20
 const PORTAL_MESSAGE_WINDOW_MS = 15 * 60 * 1000
 
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(supabase, params.token, MESSAGES_CUSTOMER_SELECT)
@@ -49,7 +50,8 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
   }
 }
 
-export async function POST(request: NextRequest, { params }: { params: { token: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(supabase, params.token, MESSAGES_CUSTOMER_SELECT)

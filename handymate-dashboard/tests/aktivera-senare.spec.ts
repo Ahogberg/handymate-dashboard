@@ -181,7 +181,8 @@ test.describe('betalgrinden — bara betalt öppnar', () => {
   test('webhooken och verify delar exakt en skrivväg', () => {
     const webhook = read('app/api/billing/webhook/route.ts')
     expect(webhook).toContain("from '@/lib/billing/write-billing-update'")
-    expect(webhook).toContain('byggAbonnemangsfalt(stripe, session)')
+    expect(webhook).toContain('byggAbonnemangsfalt(stripe, session, supabase)')
+    expect(webhook).toContain('await writeBillingUpdate(supabase, businessId, critical, period)')
     // Inga lokala kopior kvar
     expect(webhook).not.toContain('async function writeBillingUpdate(')
     expect(webhook).not.toContain('function toIsoOrNull(')

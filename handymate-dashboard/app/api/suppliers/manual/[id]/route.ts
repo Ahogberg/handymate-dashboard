@@ -6,7 +6,8 @@ import { internalPushHeaders } from '@/lib/notifications/push-internal'
 /**
  * PUT /api/suppliers/manual/[id] — Uppdatera leverantör
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -106,7 +107,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
 /**
  * DELETE /api/suppliers/manual/[id] — Ta bort leverantör
  */
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -6,10 +6,8 @@ import { getCustomerRotRutUsage, validateRotRutDeduction } from '@/lib/rot-rut-l
  * GET /api/customers/[id]/rot-rut - Hämta ROT/RUT-användning för kund
  * Query: ?type=rot|rut&laborCost=12000  (optional, för validering)
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

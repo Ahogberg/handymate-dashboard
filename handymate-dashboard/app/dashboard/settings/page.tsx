@@ -1123,6 +1123,7 @@ export default function SettingsPage() {
       const { error } = await supabase
         .from('calendar_connection')
         .update({ sync_direction: direction })
+        .eq('business_id', business.business_id)
         .eq('account_email', googleStatus.email)
       if (!error) {
         setGoogleStatus(prev => prev ? { ...prev, syncDirection: direction } : null)

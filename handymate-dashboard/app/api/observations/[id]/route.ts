@@ -16,10 +16,8 @@ export const dynamic = 'force-dynamic'
  * redan pending_approval-rad vid observation-skapande, så frontend
  * länkar till /approvals?filter=agent_observation istället.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

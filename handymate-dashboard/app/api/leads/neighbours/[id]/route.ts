@@ -5,7 +5,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 /**
  * PATCH /api/leads/neighbours/[id] — Uppdatera kampanj (approve, edit, mark converted)
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

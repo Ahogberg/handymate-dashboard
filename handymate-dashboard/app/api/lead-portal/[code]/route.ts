@@ -24,10 +24,8 @@ export async function OPTIONS() {
 /**
  * GET /api/lead-portal/[code] — Hämta portal-info + leads för leverantören
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { code: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ code: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const { code } = params
@@ -100,10 +98,8 @@ export async function GET(
 }
 
 /** Public source-code authorization; durable receipt precedes all entity writes. */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { code: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ code: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const { code } = params

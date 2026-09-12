@@ -43,7 +43,8 @@ export const dynamic = 'force-dynamic'
  * sql/v150 körs manuellt och kan saknas i vissa miljöer — 42P01 ⇒ 503 med
  * ett svenskt meddelande, aldrig ett 500 eller ett kastat fel.
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -153,7 +154,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
  * längre, ägaren måste ge ett NYTT mandat (POST ovan, som accepterar en
  * upsert över just den här kombinationen).
  */
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
