@@ -141,6 +141,26 @@ export async function PUT(request: NextRequest) {
         ...inkommande,
         ...(funnel ? { [FUNNEL_KEY]: funnel } : {}),
       }
+
+      // ═══ SÄLJGENOMGÅNGEN BLEV ETT KONTO (2026-09-12) ═══
+      //
+      // Stämplas HÄR och inte i en egen rutt: det är först nu token och
+      // business_id finns i samma anrop. En separat klientkall hade varit
+      // ett extra led som kan misslyckas tyst, och stämpeln är inte värd
+      // ett eget felläge.
+      //
+      // Svarar på "ledde genomgången till en registrering?" utan att gissa.
+      // Best-effort och avgränsad: bara raden med exakt den token, och bara
+      // om den inte redan är stämplad (en resume får aldrig flytta datumet).
+      const salesCaseToken = (inkommande as Record<string, any>)?.salesCase?.token
+      if (typeof salesCaseToken === 'string' && salesCaseToken) {
+        const { error: caseErr } = await supabase
+          .from('sales_case')
+          .update({ consumed_at: new Date().toISOString(), consumed_by_business_id: business.business_id })
+          .eq('token', salesCaseToken)
+          .is('consumed_at', null)
+        if (caseErr) console.error('[onboarding] kunde inte stämpla sales_case:', caseErr.message)
+      }
     }
 
     // Direct business_config column writes (whitelisted för säkerhet).

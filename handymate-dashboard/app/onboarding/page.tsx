@@ -151,6 +151,17 @@ export default function OnboardingPage() {
     async function load() {
       setLoading(true); setLoadError(false)
       try {
+        // ═══ SÄLJGENOMGÅNGEN FÖRST ═══
+        //
+        // Hämtas INNE i load() och inte i en egen effekt, med avsikt:
+        // stegbeslutet nedan (ny kund → 0 eller 1) beror på om ett case
+        // finns, och två effekter som båda sätter step hade tävlat om
+        // vem som skrev sist. Här är ordningen given.
+        const caseToken = new URLSearchParams(window.location.search).get('case')
+        const salesCase = caseToken ? await hamtaSalesCase(caseToken) : null
+        if (cancelled) return
+        if (salesCase) stadaCaseParam()
+
         const res = await fetch('/api/onboarding')
         if (!res.ok) {
           if (res.status !== 401) throw new Error('Saved onboarding unavailable')
@@ -161,7 +172,16 @@ export default function OnboardingPage() {
           // allt försvann. Step2Business hydrerar sina fält från samma
           // utkast vid mount.
           if (!cancelled) {
-            setStep(hasStep2Draft() ? 1 : 0)
+            if (salesCase) {
+              // Genomgången har redan gjort steg 0:s jobb — kunden har
+              // träffat teamet, sett sina egna siffror och fått en
+              // rekommendation. Att visa introt igen vore att be dem om
+              // samma sak två gånger.
+              setData(d => ({ ...salesCase.prefill, ...d, salesCase: salesCase.extras }))
+              setStep(1)
+            } else {
+              setStep(hasStep2Draft() ? 1 : 0)
+            }
             setLoading(false)
           }
           return
@@ -264,7 +284,14 @@ export default function OnboardingPage() {
           setStudioMode(true)
         }
 
-        setData(restored)
+        // Ett befintligt konto som öppnar en säljlänk: kontots EGNA data
+        // vinner alltid. Genomgången får bara fylla luckor (spreadas före
+        // restored), och salesCase-extras skrivs bara om kontot inte redan
+        // har en genomgång sparad — en gammal länk får aldrig skriva över
+        // den som faktiskt ledde till kontot.
+        setData(salesCase
+          ? { ...salesCase.prefill, ...restored, salesCase: restored.salesCase ?? salesCase.extras }
+          : restored)
         setStep(uiStep)
         setLoading(false)
       } catch {
@@ -586,6 +613,40 @@ export default function OnboardingPage() {
  * Tar bara med fält som ska persisteras i onboarding_data JSONB.
  * Strippar bort businessId, password, etc.
  */
+/**
+ * Läser säljgenomgången bakom ?case=<token> (2026-09-12).
+ *
+ * Rutten är publik — token ÄR legitimationen, samma mönster som
+ * portallänkarna. Fail-soft hela vägen: en okänd, utgången eller trasig
+ * token ger null, och onboardingen fortsätter precis som utan länk. En
+ * kund ska aldrig kunna låsas ute av att en säljlänk gått ut.
+ */
+async function hamtaSalesCase(token: string): Promise<{
+  prefill: Partial<OnboardingFormData>
+  extras: OnboardingFormData['salesCase']
+} | null> {
+  try {
+    const res = await fetch(`/api/sales-case/${encodeURIComponent(token)}`)
+    if (!res.ok) return null
+    const json = await res.json().catch(() => null)
+    if (!json?.ok || !json.prefill) return null
+    return { prefill: json.prefill as Partial<OnboardingFormData>, extras: json.extras }
+  } catch {
+    return null
+  }
+}
+
+/** Tar bort ?case= ur adressfältet men lämnar ?via= och ?studio= orörda. */
+function stadaCaseParam(): void {
+  try {
+    const url = new URL(window.location.href)
+    if (!url.searchParams.has('case')) return
+    url.searchParams.delete('case')
+    const q = url.searchParams.toString()
+    window.history.replaceState({}, '', url.pathname + (q ? `?${q}` : ''))
+  } catch { /* ignorera — en token kvar i adressfältet är inte värt en krasch */ }
+}
+
 function sanitizeForSave(d: OnboardingFormData): Record<string, unknown> {
   const {
     businessId: _bid,
