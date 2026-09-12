@@ -65,6 +65,7 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
  */
 const PUBLIC_BY_DESIGN: Record<string, string> = {
   'preparation/[token]': 'Unik randomUUID för exakt en förfrågan, expires_at + återkallelse, begränsat GET och rate-limitad atomisk POST',
+  'sales-case/[token]': 'sales_case.token (randomUUID, UNIQUE) i path + expires_at (90 dgr) — läsning av EN säljgenomgång kunden själv fått länken till. Svaret utelämnar created_by_*; okänd och utgången token ger samma 404. Skapandet (POST /api/sales-case) är standardgrindat.',
   'health': 'Ingen — visar bara booleans/SHA/sparat kreditläge, gör inga leverantörsanrop',
   'ata/sign/[token]': 'sign_token (randomUUID, unik) i path — atomisk statusövergång sedan 2026-09-01',
   'ata/sign/[token]/pdf': 'sign_token i path — samma credential som signeringssidan, läsning av dokumentet',
@@ -209,5 +210,13 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   expect(alla.length).toBeGreaterThanOrEqual(550)
   // 2026-09-10 (nummerverifieringen): cron/phone-number-verify — cron-hemlighet,
   // ingen tenant-kontext. Svepet kontrollerar alla konton, inte ett → 154.
-  expect(utanStandard.length).toBeLessThanOrEqual(154)
+  // 2026-09-12 (säljgenomgångens överlämning): sales-case/[token] —
+  // token-grindad läsning av EN genomgång, samma mönster som portallänkarna.
+  // Ingen tenant-kontext finns: raden skapas av säljaren och läses av ett
+  // PROSPEKT som ännu inte har ett konto. Skrivvägen (POST /api/sales-case)
+  // bär standardgrinden och räknas därför inte här → 155.
+  // 2026-09-12 (Revenue OS V1): admin/revenue — plattformsadmin via
+  // isAdmin(request), service-role bakom admin-grinden och ingen kundtenant-
+  // kontext. Den interna säljytan arbetar med husets GTM-data → 156.
+  expect(utanStandard.length).toBeLessThanOrEqual(156)
 })

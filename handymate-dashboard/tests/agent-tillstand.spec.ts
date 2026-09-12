@@ -416,3 +416,72 @@ test.describe('källskanning — TeamActivityStrip renderar icke-grönt för beh
     expect(dotBlock).toMatch(/behover_aktiveras/)
   })
 })
+
+test.describe('en avslutad körning får aldrig påstå att den pågår', () => {
+  // 2026-09-12. `agent_runs.status` bar DEFAULT 'running' sedan den första
+  // agent-migrationen. Raden skrivs dock alltid EFTER att körningen är klar,
+  // och samtliga insert-ställen sätter status uttryckligen. Mätt i
+  // produktion: 1362 rader, alla 'completed' — defaulten hade aldrig
+  // använts. Kvar var bara risken: en insert som glömmer fältet hade fått
+  // raden att påstå PÅGÅR i all evighet, alltså exakt samma slags lögn som
+  // den gröna Standby-remsan. Utan default blir samma rad NULL.
+  //
+  // Skanningen görs på koden UTAN kommentarer — den här filens egna
+  // kommentarer nämner DEFAULT 'running', och ett facit som faller på sin
+  // egen prosa är inget facit (lärdomen från 2026-09-11).
+  test("CREATE-filen ger inte status någon DEFAULT", () => {
+    const ren = utanKommentarer(read('sql/agent_tables.sql'))
+    const skapa = ren.slice(ren.indexOf('CREATE TABLE IF NOT EXISTS agent_runs'))
+    const tabell = skapa.slice(0, skapa.indexOf(');'))
+    const statusrad = tabell.split('\n').find(rad => /^\s*status\s+TEXT/i.test(rad))
+    expect(statusrad, 'hittade ingen status-kolumn i agent_runs').toBeTruthy()
+    expect(statusrad!.toUpperCase()).not.toContain('DEFAULT')
+  })
+
+  test('varje insert i agent_runs sätter status uttryckligen', () => {
+    const filer = execSync(`grep -rl "from('agent_runs')" --include=*.ts app lib || true`, { cwd: ROOT })
+      .toString().trim().split('\n').filter(Boolean)
+    expect(filer.length, 'ingen fil skriver agent_runs — skanningen mäter inget').toBeGreaterThan(0)
+    let inserts = 0
+    for (const fil of filer) {
+      const ren = utanKommentarer(read(fil))
+      // Gå på varje from('agent_runs') och pröva bara dem där .insert(
+      // följer DIREKT — annars fångar skanningen en select här och en
+      // orelaterad insert hundra rader längre ner.
+      const nyckel = "from('agent_runs')"
+      let pos = ren.indexOf(nyckel)
+      while (pos !== -1) {
+        const efter = ren.slice(pos + nyckel.length)
+        const traff = /^[\s]*\.insert\(\s*([^\s)]*)/.exec(efter)
+        if (traff) {
+          inserts++
+          const argument = traff[1]
+          if (argument.startsWith('{')) {
+            // Objektlitteral på plats — status ska stå i blocket.
+            expect(ren.slice(pos, pos + 900), `insert i ${fil} saknar uttrycklig status`).toMatch(/status:\s*'/)
+          } else {
+            // insert(variabel): följ variabeln och kräv status på VARJE rad
+            // den bär. Annars räckte det att döpa om raderna till en const
+            // för att slippa under grinden.
+            const namn = argument.replace(/[^\w$]/g, '')
+            expect(namn.length, `kunde inte tolka insert-argumentet i ${fil}`).toBeGreaterThan(0)
+            const deklaration = ren.indexOf(`const ${namn}`)
+            expect(deklaration, `hittade inte ${namn} i ${fil}`).toBeGreaterThan(-1)
+            const kropp = ren.slice(deklaration, ren.indexOf('\n  ]', deklaration) + 4 || deklaration + 2000)
+            // run_id är radens primärnyckel — varje RAD bär den, medan
+            // nästlade objekt (trigger_data: {}) inte gör det. Så skiljs
+            // raderna från sitt innehåll utan att parsa TypeScript.
+            const rader = (kropp.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g) || [])
+              .filter(rad => rad.includes('run_id'))
+            expect(rader.length, `${namn} i ${fil} bär inga rader att pröva`).toBeGreaterThan(0)
+            for (const rad of rader) {
+              expect(rad, `en rad i ${namn} (${fil}) saknar uttrycklig status`).toMatch(/status:\s*'/)
+            }
+          }
+        }
+        pos = ren.indexOf(nyckel, pos + 1)
+      }
+    }
+    expect(inserts, 'hittade inga insert-block att pröva').toBeGreaterThan(0)
+  })
+})

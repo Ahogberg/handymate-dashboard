@@ -1203,10 +1203,14 @@ export default function JarvisHome({
              Tidsfönstret för bevisraden är ett RULLANDE dygn (team-activity,
              HOURS_BACK=24) — halsningsBevis säger det den mäter. */}
         <div className="min-w-0 lg:col-span-2">
-          <Link href="/dashboard/avlastning" className="mb-4 flex min-h-[64px] items-center justify-between gap-4 rounded-2xl border border-teal-200 bg-white p-4 text-teal-900 hover:bg-teal-50">
-            <span><strong className="block text-base">Vad ligger kvar till ikväll?</strong><span className="text-sm text-slate-600">Ta med ett underlag · förbered nästa steg · granska resultatet</span></span><span aria-hidden="true">→</span>
-          </Link>
-          <Link href="/dashboard/avlastning#min-dag" className="mb-3 inline-flex min-h-[44px] items-center text-sm text-teal-800 underline">Se din dag · rapporterat arbete och nästa steg</Link>
+          {/* Avlastningen låg tidigare som en banderoll HÄR, ovanför heron,
+              med en andra länk till samma sida direkt under sig — två
+              navigationsrader före Mission Control (Andreas 2026-09-12:
+              "det knuffar ner Mission Control och blir rörigt").
+              Heron svarar "det här behöver dig"; avlastningen frågar "ge
+              mig något". En inmatningsyta ska inte stå före utmatningen.
+              Ytan bor nu i sidomenyn (Sidebar, 'Lämna över underlag') och
+              når man härifrån via den tysta raden UNDER heron. */}
           <MatteHero
             greetingName={greetingName}
             queueLoaded={decisionsLoaded}
@@ -1228,6 +1232,11 @@ export default function JarvisHome({
             // Uppdragsrad), så den monteras ovillkorligt här.
             absenceBand={<AbsenceBand />}
           />
+          {/* En rad, ingen ram, efter heron: vägen in för den som sitter
+              med något i huvudet på kvällen. Samma mål som menyposten. */}
+          <Link href="/dashboard/avlastning" className="mt-3 inline-flex min-h-[44px] items-center text-sm text-teal-800 underline">
+            Lämna över något från dagen · vi förbereder nästa steg
+          </Link>
         </div>
 
         {/* ── Huvudspalten ─────────────────────────────────────────────── */}

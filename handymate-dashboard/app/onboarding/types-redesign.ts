@@ -9,6 +9,18 @@ import type { WorkPricingModel } from '@/lib/onboarding/pricing-start'
  */
 
 export interface OnboardingFormData {
+  /**
+   * Säljgenomgången som tog kunden hit (2026-09-12). Sätts när onboardingen
+   * öppnas med ?case=<token> och rider med in i business_config.
+   * onboarding_data via sanitizeForSave — ingen egen kolumn, samma mönster
+   * som fokuset och Företagsskannerns underlag.
+   *
+   * Bär BARA det som inte har någon egen plats i formuläret: kundens mål,
+   * smärtpunkt, uppgivna siffror och rekommenderat paket. De fält som FINNS
+   * här (companyName, orgNumber, adress, trade, area) förifylls direkt i
+   * stället. Se lib/sales/sales-case.ts.
+   */
+  salesCase?: import('@/lib/sales/sales-case').SalesCaseExtras
   workSampleSeen?: boolean
   workSampleSource?: string
   workSample?: import('@/lib/onboarding/work-sample').WorkSample | null

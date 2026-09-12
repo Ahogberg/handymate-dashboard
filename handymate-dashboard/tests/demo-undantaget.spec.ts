@@ -209,6 +209,27 @@ test.describe('Fortnox-simmen: "bearbetade av agenterna" är Karins riktiga kort
   })
 })
 
+test.describe('en misslyckad reset går att läsa ur auditen', () => {
+  test('den riktiga Postgres-orsaken sparas, inte bara en platt kod', () => {
+    // 2026-09-11. demo_reset_audit hade fyra rader, alla med error_text
+    // 'delete_transaction_failed'. Den strängen säger att transaktionen föll,
+    // inte varför — och kostade två separata jakter på samma funktion:
+    // v227 (rollgrinden jämförde uuid mot text) och v229 (sista satsen nollade
+    // business_config.fortnox_token_expires_at, en kolumn som bor i
+    // business_integration_credentials). Båda hade gått att läsa direkt ur
+    // auditen om orsaken sparats.
+    const src = read(SEEDARE)
+    const block = src.slice(src.indexOf('if (resetError ||'), src.indexOf('reset_version:', src.indexOf('if (resetError ||')) + 60)
+    expect(block, 'hittade inte felgrenen').toBeTruthy()
+    expect(block, 'orsaken sparas inte i auditraden').toMatch(/error_text: `delete_transaction_failed: \$\{orsak\}`/)
+    expect(block, 'orsaken hämtas inte ur resetError').toContain('resetError?.message')
+    // Kapad, så en lång CONTEXT-stack inte sväller raden.
+    expect(block, 'orsaken kapas inte').toMatch(/\.slice\(0, \d+\)/)
+    // Och den platta strängen får inte stå kvar som ENDA innehåll.
+    expect(block, "den platta koden står kvar utan orsak").not.toMatch(/error_text: 'delete_transaction_failed'/)
+  })
+})
+
 test.describe('Hannas underlag är härlett, inte handskrivet', () => {
   const seedare = read(SEEDARE)
 
@@ -267,5 +288,65 @@ test.describe('Hannas underlag är härlett, inte handskrivet', () => {
     // Och städningen måste ligga FÖRE motorn, annars raderar den sitt eget kort.
     expect(stad, 'städningen ligger efter LTV-körningen')
       .toBeLessThan(seedare.indexOf('calculateCustomerLTV(businessId)'))
+  })
+})
+
+test.describe('en misslyckad återställning säger VAD som gick fel', () => {
+  // 2026-09-12. v229 stängde blindheten för raderingssteget. Nästa gång
+  // knappen trycktes föll den i stället på seedningen — och auditraden sa
+  // bara 'defaults_seed_failed'. Det tog en jakt över nio tabeller i
+  // produktionsdatan för att hitta att checklist_template var den som föll,
+  // på två kolumner som inte fanns (tabellen skapades för hand med
+  // description/branch/is_system; repots CREATE-fil deklarerar category/
+  // is_default men är IF NOT EXISTS och blev en no-op). Orsaken fanns bara
+  // i Vercels loggar. Ett fel som kräver loggåtkomst för att tolkas är ett
+  // fel Andreas inte kan diagnosticera själv.
+  const seedareRen = utanKommentarer(read(SEEDARE))
+  const defaultsRen = utanKommentarer(read('lib/seed-defaults.ts'))
+
+  test('auditens error_text bär både koden OCH den riktiga orsaken', () => {
+    const pos = seedareRen.indexOf('async function failReset')
+    expect(pos, 'hittade inte failReset').toBeGreaterThan(-1)
+    const block = seedareRen.slice(pos, pos + 900)
+    // Koden ensam räcker inte: meddelandet måste med i samma sträng.
+    expect(block).toMatch(/error_text:\s*`\$\{errorCode\}:/)
+    expect(block).toMatch(/message/)
+  })
+
+  test('seedAllDefaults lämnar tillbaka orsakerna, inte bara antalet', () => {
+    expect(defaultsRen).toMatch(/reasons/)
+    const retur = defaultsRen.slice(defaultsRen.indexOf('return { total: results.length'))
+    expect(retur.slice(0, 200)).toMatch(/reasons/)
+  })
+
+  test('demoåterställningen skriver ut vilken delseeder som föll', () => {
+    const pos = seedareRen.indexOf("'defaults_seed_failed'")
+    expect(pos, 'hittade inte defaults-grenen').toBeGreaterThan(-1)
+    const block = seedareRen.slice(pos - 400, pos)
+    expect(block).toMatch(/reasons/)
+  })
+
+  test('checklist_template seedas inte — GET syntetiserar redan branschens mallar', () => {
+    // Två skäl (se kommentaren i lib/seed-defaults.ts): seedaren kunde
+    // aldrig lyckas, och en rättad seedare hade gett DUBBLA rader i
+    // projektvyn eftersom rutten lägger till kodens standardmallar ovanpå.
+    const listaStart = defaultsRen.indexOf('const results = await Promise.allSettled([')
+    const lista = defaultsRen.slice(listaStart, defaultsRen.indexOf('])', listaStart))
+    expect(lista).not.toContain('seedChecklistTemplates')
+    // Och rutten måste fortfarande syntetisera dem, annars försvinner de helt.
+    const rutt = utanKommentarer(read('app/api/checklists/templates/route.ts'))
+    expect(rutt).toContain('getChecklistsForBranch')
+  })
+
+  test('kolumnerna koden skriver till checklist_template finns i en sql-fil', () => {
+    // Grundfelet: koden skrev kolumner som bara fanns i repots CREATE-fil,
+    // och den filen var en no-op mot en handskapad tabell. v233 lägger till
+    // dem på riktigt. Provet kräver att BÅDA formerna är deklarerade i sql/,
+    // så nästa läsare ser vilken tabell som faktiskt gäller.
+    const v233 = read('sql/v233_checklist_template_kolumner.sql')
+    expect(v233).toMatch(/ADD COLUMN IF NOT EXISTS category/)
+    expect(v233).toMatch(/ADD COLUMN IF NOT EXISTS is_default/)
+    const rutt = utanKommentarer(read('app/api/checklists/templates/route.ts'))
+    expect(rutt, 'rutten skriver category — då måste v233 finnas kvar').toMatch(/category/)
   })
 })

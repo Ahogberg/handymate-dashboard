@@ -1,3 +1,13 @@
+# PR #38 readiness-pass 2026-09-12
+
+- [x] Hämta aktuell main och PR #38, skapa separat arbetskopia och riktig merge.
+- [x] Bevara Brain Visibility-state, Mission Control först och båda grenarnas testlistor.
+- [ ] Kör typkontroll, Home/Quote-kontrakt och produktionsbygge på kombinationen.
+- [ ] Publicera synkad branch och verifiera samtliga PR-kontroller på aktuell commit.
+- [ ] Uppdatera Brain Visibility/release-bevis och redovisa kvarstående livegrindar.
+
+Styrdokument: `docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md` i reporoten. Ingen ny feature eller produktionsrelease ingår.
+
 # Aktiv sprint 2026-09-09
 - [x] Gmail: avstängning, full sidläsning, stabil startpunkt och ingen cursor vid fel.
 - [x] Gmail: säkra dubblett-/kunduppslag och verifiera fel/återförsök i faktiska helpers.
