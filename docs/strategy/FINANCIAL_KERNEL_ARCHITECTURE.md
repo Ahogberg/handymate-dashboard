@@ -2196,87 +2196,11 @@ businesses can be pilots at all.
 
 ---
 
-## 39. The end state is a finished financial outcome, not accounting software
+## 39. AI-native Accounting Outcome Delivery Contract
 
-> Added 2026-09-12. Records a positioning decision and, more importantly, the three
-> limits that keep it honest. Read the limits before quoting the ambition.
+This section is a **binding product-architecture rule** for Handymate Accounting. §40 states the three limits that keep the ambition honest; read them before quoting this section anywhere customer-facing. The target system is not a bookkeeping UI where AI prepares suggestions and a human permanently reviews every transaction. The target is verified financial outcomes delivered from operational truth, with human review reserved for exceptions that require judgment or elevated risk handling.
 
-The long-term product is not "Handymate's Fortnox". It is that the work is done:
-
-```text
-books closed · bank reconciled · VAT correct · exceptions handled
-```
-
-The customer's felt experience should be *"min bokföring är klar"*, not *"jag måste gå
-in i bokföringsmodulen"*. Everything in this document — the kernel, the posting engine,
-reconciliation, the SE pack, the integrity checks — exists to make that sentence true
-rather than to ship a ledger UI.
-
-That ambition is easy to overstate, so it is bounded by three rules.
-
-### 39.1 The obligation never moves to Handymate
-
-Roadmap §3 and §36 of this document both say it: the bookkeeping obligation stays with
-the bookkeeping entity. A "finished outcome" therefore means **the work is done and
-verifiable**, never that the responsibility has transferred.
-
-Consequences:
-
-- Never write or say that Handymate "ansvarar för" or "tar över" a customer's bookkeeping
-  in product copy, pricing or sales material. Handymate performs and evidences the work.
-- A service line where Handymate *does* take on the work as an engagement is a separate,
-  regulated business with its own liability, insurance and professional standards — see
-  roadmap §17.1. It is never a tier in the SaaS price list.
-- §36.6 still holds: where an implementation needs a threshold, an account number or a
-  filing rule, the model flags it and blocks. An outcome promise does not license a guess.
-
-### 39.2 Exception-based review is a target with a number, not a description of today
-
-The intended operating shape is that the deterministic engine and the classifiers handle
-the ordinary case, the integrity checks verify it, and a human sees only the exceptions.
-
-**That is not where the product is.** Today `lib/autonomy/earned-autonomy.ts` grants
-autonomy for **four** action types (`invoice_reminder`, `booking_reminder`,
-`quote_followup_sms`, `review_request`) behind a hardcoded allowlist, after a streak of
-**15** approvals in a 60-day window, always revocable. That conservatism is deliberate and
-correct for the current stage.
-
-The distance between that and "a human sees 2–3 %" is the initiative, not a detail to be
-filled in later. So:
-
-- Any claim about an automation share must name the measured figure and the date it was
-  measured. An unmeasured percentage does not go in a document, a deck or a price list.
-- The autonomy allowlist grows one reviewed action type at a time, with the same streak
-  and revocation mechanics. Widening it is an explicit decision, never a side effect of
-  the ledger getting better.
-- Marginal cost is metered, not zero: `lib/costs/meter.ts`, `lib/agents/shared/cost-guard.ts`
-  and the daily ceiling already produce a real per-business COGS number. Price against that
-  number, not against the assumption that inference is free.
-
-### 39.3 Auto-posting still passes every gate in §31
-
-An outcome framing must not soften a single rollout control. Auto-posting broadly still
-requires shadow comparison in phase S2 (§20.1) and professional review (roadmap §13)
-first. "The customer wants the books closed" is not an argument for skipping validation —
-it is the reason validation matters.
-
----
-
-## 40. Amendment log
-
-| Date | Change | Source |
-|---|---|---|
-| 2026-09-11 | Original blueprint. | — |
-| 2026-09-12 | Added §39: the end state is a finished financial outcome, bounded by the obligation staying with the customer, exception-based review being a measured target rather than a description of today, and §31's rollout gates remaining intact. | AI-native services thesis (Isenberg 2026-09-11) reviewed against the codebase |
-| 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
-
----
-
-## 40. AI-native Accounting Outcome Delivery Contract
-
-This section is a **binding product-architecture rule** for Handymate Accounting. The target system is not a bookkeeping UI where AI prepares suggestions and a human permanently reviews every transaction. The target is verified financial outcomes delivered from operational truth, with human review reserved for exceptions that require judgment or elevated risk handling.
-
-### 40.1 Outcome, not tool usage, is the product target
+### 39.1 Outcome, not tool usage, is the product target
 
 The desired customer experience is increasingly:
 
@@ -2298,7 +2222,7 @@ Please approve them one by one.
 
 Detailed journals, vouchers and accounting controls remain available to accountants and auditors, but routine customers should consume **completed outcomes and exceptions**, not bookkeeping work queues.
 
-### 40.2 Delivery architecture
+### 39.2 Delivery architecture
 
 The accounting delivery loop is:
 
@@ -2336,7 +2260,7 @@ verified, within policy       exception / uncertainty / high risk
 
 Human review is therefore a first-class safety path, but it must not become an implicit permanent dependency for all transactions.
 
-### 40.3 The rulebook is durable product infrastructure
+### 39.3 The rulebook is durable product infrastructure
 
 For Accounting, the "rulebook" is not a prompt file. It is the combined, versioned body of evidence that defines what correct means:
 
@@ -2353,7 +2277,7 @@ For Accounting, the "rulebook" is not a prompt file. It is the combined, version
 
 A material real-world mistake or divergence should, where appropriate, become a durable addition to this rulebook rather than a one-off manual fix.
 
-### 40.4 Exception-to-automation flywheel
+### 39.4 Exception-to-automation flywheel
 
 The intended learning loop is:
 
@@ -2382,7 +2306,7 @@ mean time to resolve exception
 percentage of resolved exceptions converted into durable tests/rules
 ```
 
-### 40.5 Model capability is replaceable; correctness history is not
+### 39.5 Model capability is replaceable; correctness history is not
 
 Do not make the moat depend on a specific foundation model.
 
@@ -2401,7 +2325,7 @@ Handymate operational context
 
 A model/provider can be swapped or improved underneath this system. The accumulated definition of correctness must remain Handymate-owned and portable across model runtimes.
 
-### 40.6 Review-layer scaling rule
+### 39.6 Review-layer scaling rule
 
 A managed or human-assisted Accounting offering is allowed and may be strategically valuable, but its economics must improve with automation rather than scale linearly with headcount.
 
@@ -2413,7 +2337,7 @@ Therefore:
 - operational dashboards must distinguish straight-through work from reviewed work;
 - no implementation may claim "autonomous accounting" while silently routing all transactions through human approval.
 
-### 40.7 Relationship to shadow and integrity architecture
+### 39.7 Relationship to shadow and integrity architecture
 
 `FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` is the first concrete implementation of this learning model. During migration it asks whether Handymate agrees with an independent reference; after Fortnox cut-over the same machinery evolves into a permanent Financial Integrity Engine that asks whether Ledger, bank, payments, receivables, payables, VAT and source documents agree with each other.
 
@@ -2422,6 +2346,76 @@ Every meaningful divergence should be treated as both:
 1. a current correctness issue to resolve, and
 2. potential training material for the deterministic rulebook/regression corpus.
 
-### 40.8 Final outcome-delivery rule
+### 39.8 Final outcome-delivery rule
 
 > **Handymate Accounting should increasingly sell and deliver "the financial work is done and verified", not "here is software that helps you do the financial work". Agents and deterministic systems perform the routine work; humans review exceptions; the rulebook grows from every verified edge case.**
+
+---
+
+## 40. Limits on the outcome ambition
+
+> Added 2026-09-12. §39 states the target. This section states the three limits that keep
+> it honest, and it is the half that gets dropped when the ambition is quoted. Do not
+> repeat §39 in product copy, pricing or sales material without these.
+
+### 40.1 The obligation never moves to Handymate
+
+Roadmap §3 and §36 of this document both say it: the bookkeeping obligation stays with
+the bookkeeping entity. A "finished outcome" therefore means **the work is done and
+evidenced**, never that the responsibility has transferred.
+
+§39 uses the phrase "software-operated accounting service". That phrase is accurate about
+the delivery and misleading about the liability, so it never travels alone:
+
+- Never write or say that Handymate "ansvarar för" or "tar över" a customer's bookkeeping.
+  Handymate performs and evidences the work; the customer remains the bookkeeping entity.
+- A service line where Handymate *does* undertake the work as an engagement is a separate,
+  regulated business with its own liability, insurance and professional standards — see
+  roadmap §17.1. It is never a tier in the SaaS price list.
+- §36.6 still holds: where an implementation needs a threshold, an account number or a
+  filing rule, the model flags it and blocks. An outcome promise does not license a guess.
+
+### 40.2 The review share is a measured number, not a direction
+
+§39.4 and §39.6 both describe the review percentage falling as the rulebook grows. That is
+the right direction. It is not a claim anyone may make without a measurement.
+
+**Where the product actually is today:** `lib/autonomy/earned-autonomy.ts` grants autonomy
+for **four** action types (`invoice_reminder`, `booking_reminder`, `quote_followup_sms`,
+`review_request`) behind a hardcoded allowlist, after a streak of **15** approvals in a
+60-day window, always revocable. That conservatism is deliberate and correct for this
+stage, and it is a long way from "a human sees two items".
+
+Therefore:
+
+- Any claim about an automation or straight-through share must name the measured figure and
+  the date it was measured. An unmeasured percentage does not go in a document, a deck or a
+  price list. This is the same rule §39.6 sets for the product; it applies to our own
+  strategy documents too.
+- The autonomy allowlist grows one reviewed action type at a time, with the same streak and
+  revocation mechanics. Widening it is an explicit decision, never a side effect of the
+  ledger getting better.
+- Marginal cost is metered, not zero. `lib/costs/meter.ts`, `lib/agents/shared/cost-guard.ts`
+  and the daily ceiling already produce a real per-business COGS figure. Price against that
+  figure rather than against an assumption that inference is free — being able to measure it
+  is an advantage, so use it.
+
+### 40.3 Auto-posting still passes every gate in §31
+
+An outcome framing must not soften a single rollout control. Broad auto-posting still
+requires shadow comparison in phase S2 (§20.1) and professional review (roadmap §13)
+first. "The customer wants the books closed" is not an argument for skipping validation —
+it is the reason validation matters.
+
+---
+
+## 41. Amendment log
+
+| Date | Change | Source |
+|---|---|---|
+| 2026-09-11 | Original blueprint. | — |
+| 2026-09-12 | Added §39 (outcome-delivery contract) and §40 (its three limits: the obligation stays with the customer, the review share is a measured number not a direction, and §31's rollout gates remain intact). | AI-native services thesis (Isenberg 2026-09-11), reviewed against the codebase |
+| 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
+
+---
+

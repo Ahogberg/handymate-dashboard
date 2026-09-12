@@ -96,23 +96,29 @@ vertical cheaper than a standalone specialist's. That is a bet, not a settled co
 each vertical still needs its own rulebook at full depth. Do not cite the AI-native
 services thesis as support for the breadth — it argues the opposite.
 
-## Product principle — finished outcomes, with a boundary
+## Product principle — the boundary on outcome delivery
 
-> Adopted 2026-09-12.
+> Adopted 2026-09-12. The direction is stated under **AI-native outcome delivery** above.
+> This is the clause that makes it usable, and it is the half that gets dropped when the
+> principle is quoted.
 
 **Handymate delivers finished business outcomes where the outcome is verifiable and the
 obligation stays with the customer. Where the obligation would move to Handymate, that is
 a separate, regulated service line with its own economics and its own liability — never a
 tier in the SaaS price list.**
 
-The second sentence is what makes the principle usable. Without it the principle approves
-everything.
+Without the second sentence the principle approves everything.
 
-The direction of travel is from AI-enabled software toward performing the administrative
-and financial workflows rather than only offering tools for them — the customer should feel
-*"det är gjort"*, not *"jag måste gå in i modulen"*. The limits on that ambition are
-written out in `FINANCIAL_KERNEL_ARCHITECTURE.md` §39 and `../HANDYMATE_ACCOUNTING_ROADMAP.md`
-§17.1 and §21. Read those before quoting the ambition anywhere customer-facing.
+Two further limits, both written out in full in `FINANCIAL_KERNEL_ARCHITECTURE.md` §40:
+
+- **The review share is a measured number, not a direction.** Earned autonomy today covers
+  four action types behind a hardcoded allowlist after a 15-approval streak. Any claim about
+  an automation share must name the measured figure and the date.
+- **Marginal cost is metered, not zero.** The existing cost guard produces a real
+  per-business COGS figure. Price against it.
+
+Read §39, §40 and `../HANDYMATE_ACCOUNTING_ROADMAP.md` §17.1 and §21 before quoting the
+ambition anywhere customer-facing.
 
 ## Architectural rule for financial expansion
 
@@ -200,9 +206,9 @@ Fortnox is currently the source of payment truth and syncs into Handymate. Until
 
 Roadmap §16 (PMF first) and orchestration §10 (spend reasoning capacity on the kernel now) are not in conflict. Specification, review, contracts and executable golden paths carry no production risk and proceed now; implementation, shadow mode and pilots are gated by PMF evidence. Available model capacity is a reason to specify more, never a reason to ship finance code earlier.
 
-### 2026-09-12 — Finished outcomes, with the obligation staying with the customer
+### 2026-09-12 — The obligation stays with the customer; Managed is a separate line
 
-Handymate moves from AI-enabled SaaS toward performing administrative and financial workflows, not only supplying tools. Bounded: the outcome must be verifiable, and the bookkeeping obligation stays with the bookkeeping entity. A service line where Handymate undertakes the work is a separate regulated business (roadmap §17.1), never a SaaS tier.
+Boundary on the outcome-delivery principle above. The outcome must be verifiable and the bookkeeping obligation stays with the bookkeeping entity — a finished outcome means the work is done and evidenced, not that responsibility transferred. A service line where Handymate undertakes the work as an engagement is a separate regulated business with its own liability and insurance (roadmap §17.1), never a SaaS tier.
 
 ### 2026-09-12 — Exception-based review is a measured target, not a description of today
 
