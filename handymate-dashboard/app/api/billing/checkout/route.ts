@@ -1,3 +1,4 @@
+import { createSubscriptionCheckout, CheckoutConflict } from '@/lib/billing/checkout-session'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     const supabase = getServerSupabase()
     const { planId, interval: rawInterval } = await request.json()
 
-    if (!planId) {
+    if (!['professional', 'business'].includes(planId)) {
       return NextResponse.json({ error: 'Missing planId' }, { status: 400 })
     }
 
@@ -81,40 +82,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    // Hämta eller skapa Stripe customer
-    const { data: billingData } = await supabase
-      .from('business_config')
-      .select('stripe_customer_id, subscription_plan')
-      .eq('business_id', business.business_id)
-      .single()
-
-    let stripeCustomerId = billingData?.stripe_customer_id
-
-    if (!stripeCustomerId) {
-      // Skapa ny Stripe-kund
-      const customer = await stripe.customers.create({
-        email: business.contact_email || undefined,
-        name: business.business_name || undefined,
-        metadata: {
-          business_id: business.business_id,
-          handymate_plan: planId
-        }
-      })
-
-      stripeCustomerId = customer.id
-
-      // Spara Stripe customer ID
-      await supabase
-        .from('business_config')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('business_id', business.business_id)
-    }
-
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
     // Skapa Stripe Checkout-session
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
+    const session = await createSubscriptionCheckout(supabase, stripe, business.business_id, {
       mode: 'subscription',
       locale: 'sv',
       line_items: [
@@ -153,6 +124,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url })
   } catch (error: any) {
+    if (error instanceof CheckoutConflict) return NextResponse.json({ error: error.message }, { status: 409 })
     console.error('Create checkout session error:', error)
     return NextResponse.json(
       { error: 'Något gick fel med betalningen — försök igen om en stund.' },

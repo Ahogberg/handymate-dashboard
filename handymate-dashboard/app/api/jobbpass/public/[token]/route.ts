@@ -18,7 +18,8 @@ export const dynamic = 'force-dynamic'
  * Sammansättningen (källdata + signerade foton + derivation) bor i
  * assembleJobbpassView — delad med kundportalen (Fastighetspasset steg 1).
  */
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const token = params.token
     if (!token) return NextResponse.json({ error: 'Token saknas' }, { status: 400 })

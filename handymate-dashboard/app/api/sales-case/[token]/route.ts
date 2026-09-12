@@ -29,7 +29,8 @@ export const dynamic = 'force-dynamic'
  * gissande anropare inte kan skilja "fanns men gick ut" från "fanns
  * aldrig".
  */
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const token = (params?.token || '').trim()
     if (!token) return NextResponse.json({ error: 'Genomgången finns inte.' }, { status: 404 })

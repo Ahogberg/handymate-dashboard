@@ -11,10 +11,8 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/projects/[id]/costs - Hämta projektkostnader
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -63,10 +61,8 @@ export async function GET(
  * POST /api/projects/[id]/costs - Lägg till projektkostnad
  * Body: { category, description, amount, date }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -134,7 +130,7 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     const business = await getAuthenticatedBusiness(request)

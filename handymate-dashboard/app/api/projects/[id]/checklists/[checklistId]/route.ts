@@ -8,8 +8,9 @@ import { getCurrentUser } from '@/lib/permissions'
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; checklistId: string } }
+  props: { params: Promise<{ id: string; checklistId: string }> }
 ) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -92,8 +93,9 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; checklistId: string } }
+  props: { params: Promise<{ id: string; checklistId: string }> }
 ) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

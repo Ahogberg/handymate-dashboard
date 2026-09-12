@@ -8,7 +8,8 @@ import { renderReviewedPdf } from '@/lib/approvals/pdf-preview'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const headers = { 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' }
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
     const db = getServerSupabase()
     const { data: approval, error } = await db.from('pending_approvals').select('*').eq('id', params.id).eq('business_id', business.business_id).single()
     if (error || !approval || approval.approval_type !== 'job_report') return NextResponse.json({ error: 'Dokumentet hittades inte' }, { status: 404, headers })
-    if (!await canActOnApproval(db, user, approval)) return NextResponse.json({ error: 'Åtkomst nekad' }, { status: 403, headers })
+    if (!(await canActOnApproval(db, user, approval))) return NextResponse.json({ error: 'Åtkomst nekad' }, { status: 403, headers })
     const { document } = await prepareJobReport(db, business.business_id, approval.id, approval.payload || {})
     if (request.nextUrl.searchParams.get('version') !== document.version) return NextResponse.json({ error: 'Underlaget har ändrats. Öppna en ny granskning.' }, { status: 409, headers })
     const html = await renderReviewedPdf(document.pdf)

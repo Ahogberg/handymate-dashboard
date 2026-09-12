@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -27,7 +28,8 @@ export async function PUT(request: NextRequest, { params }: { params: { id: stri
   return NextResponse.json({ segment: data })
 }
 
-export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -17,7 +17,8 @@ async function access(request:NextRequest,quoteId:string) {
  if(!q.data)return {error:reply({error:'Offerten hittades inte.'},404)}
  return {db,business,user,quote:q.data}
 }
-export async function GET(request:NextRequest,{params}:{params:{id:string}}) {
+export async function GET(request:NextRequest, props:{params: Promise<{id:string}>}) {
+ const params = await props.params;
  try {
   const a=await access(request,params.id);if(a.error)return a.error
   if(!followupEnabled())return reply({enabled:false,items:[]})
@@ -30,7 +31,8 @@ export async function GET(request:NextRequest,{params}:{params:{id:string}}) {
   return reply({enabled:true,healthy,canSchedule:['sent','opened'].includes(a.quote!.status)&&!!a.quote!.sent_at&&(!a.quote!.valid_until||a.quote!.valid_until>=svDateStr()),lastTickAt:runner.data?.last_tick_at,items:rows.data})
  }catch{return reply({error:'Uppföljningen kunde inte kontrolleras.'},503)}
 }
-export async function POST(request:NextRequest,{params}:{params:{id:string}}) {
+export async function POST(request:NextRequest, props:{params: Promise<{id:string}>}) {
+ const params = await props.params;
  try {
   const a=await access(request,params.id);if(a.error)return a.error
   const body=await request.json()
@@ -38,7 +40,8 @@ export async function POST(request:NextRequest,{params}:{params:{id:string}}) {
   return reply({item})
  }catch(e){return reply({error:followupError(e instanceof Error?e.message:'')},409)}
 }
-export async function DELETE(request:NextRequest,{params}:{params:{id:string}}) {
+export async function DELETE(request:NextRequest, props:{params: Promise<{id:string}>}) {
+ const params = await props.params;
  try {
   const a=await access(request,params.id);if(a.error)return a.error
   const id=request.nextUrl.searchParams.get('id')

@@ -15,7 +15,8 @@ export const dynamic = 'force-dynamic'
  * som den publika sidan (assembleJobbpassView) — ingen kopia, ingen ny
  * sanning. Bara status 'published'; fel svaras ärligt, aldrig som tom lista.
  */
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(supabase, params.token)

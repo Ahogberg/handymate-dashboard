@@ -58,8 +58,9 @@ async function laddaRedigerbarRad(ctx: Ctx, logId: string): Promise<
  */
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string; logId: string } }
+  props: { params: Promise<{ id: string; logId: string }> }
 ) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
 
@@ -121,8 +122,9 @@ export async function POST(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; logId: string } }
+  props: { params: Promise<{ id: string; logId: string }> }
 ) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
 

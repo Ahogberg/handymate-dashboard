@@ -27,10 +27,8 @@ export const dynamic = 'force-dynamic'
  * GET /api/quotes/public/[token] - Hämta offert via publik signeringslänk
  * Ingen auth krävs
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const token = params.token
@@ -286,10 +284,8 @@ export async function GET(
  * action: 'sign' (default) | 'decline'
  * Ingen auth krävs
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { token: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const token = params.token

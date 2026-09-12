@@ -22,10 +22,8 @@ export const dynamic = 'force-dynamic'
  * /api/ata/sign/[token]. Skicka-ÄTA-flödet via /api/ata/[id]/send
  * är opåverkat.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -55,10 +53,8 @@ export async function GET(
 /**
  * POST - Skapa ny ÄTA
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -112,10 +108,8 @@ export async function POST(
 /**
  * PUT - Uppdatera ÄTA (godkänn/avslå)
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -224,10 +218,8 @@ export async function PUT(
 /**
  * DELETE - Ta bort ÄTA (bara pending)
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

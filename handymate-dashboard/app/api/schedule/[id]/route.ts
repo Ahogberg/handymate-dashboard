@@ -23,10 +23,8 @@ function canMutateEntry(
 /**
  * PATCH /api/schedule/[id] - Uppdatera schema-post
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -161,10 +159,8 @@ export async function PATCH(
 /**
  * DELETE /api/schedule/[id] - Ta bort schema-post
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

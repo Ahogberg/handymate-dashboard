@@ -10,7 +10,8 @@ export const dynamic = 'force-dynamic'
  * Tillgänglighet = arbetstider (business_config.working_hours) minus befintliga
  * bokningar. (Google Calendar freebusy = senare förbättring.)
  */
-export async function GET(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const supabase = getServerSupabase()
   const { searchParams } = new URL(request.url)
   const date = searchParams.get('date') || new Date().toISOString().slice(0, 10)

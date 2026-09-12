@@ -20,10 +20,8 @@ export const dynamic = 'force-dynamic'
  * (v73-migrationen inte körd) degraderar vi till outcome: null istället
  * för 500 — sektionen är då bara osynlig, aldrig en trasig sida.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

@@ -1,8 +1,8 @@
 /** Riktiga React-komponenter + lokal DOM; ingen browser/auth/API i produktion. */
 import { test, expect } from '@playwright/test'
 import React from 'react'
-import { createRoot, type Root } from 'react-dom/client'
-import { act, Simulate } from 'react-dom/test-utils'
+import type { Root } from 'react-dom/client'
+import { act } from 'react'
 import { toSetupTemplate } from '../lib/quotes/job-type-setup'
 import fs from 'fs'
 import path from 'path'
@@ -43,7 +43,8 @@ test.beforeEach(() => {
     Object.defineProperty(global, key, { configurable: true, writable: true, value: key === 'IS_REACT_ACT_ENVIRONMENT' ? true : dom.window[key] })
   }
   host = dom.window.document.getElementById('root')
-  root = createRoot(host)
+  // React's event capability detection must run after a DOM exists.
+  root = require('react-dom/client').createRoot(host)
   originalFetch = global.fetch
   global.fetch = (async () => Response.json(setup)) as typeof fetch
 })
@@ -178,7 +179,10 @@ test('prissparning flaggar väntan till föräldern och synligt fel vid 503, ald
   global.fetch = (async () => new Response('{}', { status: 503 })) as typeof fetch
   await render(QuickPriceInput, { productId: 'p1', unit: 'tim', onSavingChange: (state: boolean) => states.push(state), onSaved: () => { saved = true } })
   const input = host.querySelector('input')!
-  await act(async () => Simulate.change(input, { target: { value: '950' } } as any))
+  await act(async () => {
+    Object.getOwnPropertyDescriptor(dom.window.HTMLInputElement.prototype, 'value')!.set!.call(input, '950')
+    input.dispatchEvent(new dom.window.Event('input', { bubbles: true }))
+  })
   await act(async () => host.querySelector('button')!.click())
   expect(states).toEqual([true, false])
   expect(saved).toBe(false)

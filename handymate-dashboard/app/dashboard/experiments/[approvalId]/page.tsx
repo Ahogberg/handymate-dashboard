@@ -22,7 +22,7 @@ import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
  * lib/experiment/types.ts filhuvud).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, use } from 'react';
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FlaskConical, ArrowLeft, CheckCircle2, XCircle, Repeat } from 'lucide-react'
@@ -76,7 +76,8 @@ const MEASURE_LABELS: Record<string, string> = {
   materialavvikelser: 'Materialavvikelser',
 }
 
-export default function ExperimentReadoutPage({ params }: { params: { approvalId: string } }) {
+export default function ExperimentReadoutPage(props: { params: Promise<{ approvalId: string }> }) {
+  const params = use(props.params);
   const router = useRouter()
   const [approval, setApproval] = useState<ApprovalRow | null>(null)
   const [loading, setLoading] = useState(true)

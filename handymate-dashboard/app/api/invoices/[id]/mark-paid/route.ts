@@ -16,10 +16,8 @@ import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
  *
  * Body (optional): { paid_at?: string, amount?: number, paid_via?: string }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

@@ -18,8 +18,9 @@ import { isCustomerSettled } from '@/lib/invoices/status'
  */
 export async function POST(
   _request: NextRequest,
-  { params }: { params: { token: string; id: string } },
+  props: { params: Promise<{ token: string; id: string }> }
 ) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const { token, id: invoiceId } = params

@@ -6,10 +6,8 @@ import { getAdapter } from '@/lib/suppliers/registry'
 /**
  * GET /api/grossist/[supplier]/search - Sök produkter hos grossist
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { supplier: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ supplier: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

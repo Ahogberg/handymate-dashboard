@@ -6,7 +6,8 @@ export const dynamic = 'force-dynamic'
 /**
  * POST /api/admin/support-tickets/[id]/resolve — markerar ärendet löst.
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const admin = await isAdmin(request)
   if (!admin.isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

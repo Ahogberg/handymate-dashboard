@@ -11,10 +11,8 @@ function getResend() {
 /**
  * POST /api/team/[id]/resend-invite - Skicka ny inbjudan
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

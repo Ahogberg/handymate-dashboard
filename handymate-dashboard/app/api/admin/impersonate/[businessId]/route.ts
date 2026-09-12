@@ -6,10 +6,8 @@ import { cookies } from 'next/headers'
  * POST /api/admin/impersonate/[businessId]
  * Impersonate a business user (for support/debugging)
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { businessId: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ businessId: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = params
 
@@ -125,10 +123,8 @@ export async function POST(
  * DELETE /api/admin/impersonate/[businessId]
  * End impersonation session
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { businessId: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ businessId: string }> }) {
+  const params = await props.params;
   try {
     const { businessId } = params
 

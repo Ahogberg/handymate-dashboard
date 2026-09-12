@@ -66,8 +66,9 @@ async function svaraMedRad(ctx: Ctx, logId: string) {
  */
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { id: string; logId: string } }
+  props: { params: Promise<{ id: string; logId: string }> }
 ) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
 
@@ -183,8 +184,9 @@ export async function PATCH(
  */
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string; logId: string } }
+  props: { params: Promise<{ id: string; logId: string }> }
 ) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
 

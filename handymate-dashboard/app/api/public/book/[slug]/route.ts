@@ -19,7 +19,8 @@ export const dynamic = 'force-dynamic'
  * gör bokningskanalen synlig i pipelinen (Increment A6, 2026-08-10) — sen
  * booking, kalendersynk, SMS-bekräftelse till kund + notis till hantverkaren.
  */
-export async function POST(request: NextRequest, { params }: { params: { slug: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const supabase = getServerSupabase()
   const body = await request.json().catch(() => ({}))
   const { date, time, name, email, service_type, notes } = body

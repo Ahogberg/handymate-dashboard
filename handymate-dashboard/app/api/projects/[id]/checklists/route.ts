@@ -10,10 +10,8 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/projects/[id]/checklists - Lista checklistor för projekt
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -54,10 +52,8 @@ export async function GET(
 /**
  * POST /api/projects/[id]/checklists - Skapa checklista från mall eller custom
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

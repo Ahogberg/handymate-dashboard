@@ -21,7 +21,8 @@ interface ActivityItem {
  * Returnerar de 10 senaste händelserna över quotes, invoices,
  * project-photos, customer_messages och project_tracker_stages.
  */
-export async function GET(_request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(_request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const supabase = getServerSupabase()
     const customer = await getCustomerFromPortalToken(supabase, params.token)

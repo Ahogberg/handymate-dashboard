@@ -291,7 +291,7 @@ function FilRuta({
   laser: boolean
   fel: string | null
   onFil: (file: File) => void
-  inputRef: React.RefObject<HTMLInputElement>
+  inputRef: React.RefObject<HTMLInputElement | null>
   antalRader?: number
 }) {
   const [dragOver, setDragOver] = useState(false)

@@ -13,8 +13,9 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(
   request: NextRequest,
-  { params }: { params: { supplier: string; id: string } }
+  props: { params: Promise<{ supplier: string; id: string }> }
 ) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

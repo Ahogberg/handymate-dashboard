@@ -28,7 +28,7 @@ function isMissingRelationError(error: any): boolean {
   if (!error) return false
   if (error.code === '42P01') return true
   const message = String(error?.message || '')
-  return /does not exist|schema cache/i.test(message) && /relation|table|service_agreement/i.test(message)
+  return /does not exist|schema cache/i.test(message) && /relation|table|service_agreement/i.test(message);
 }
 
 async function getCustomerFromToken(token: string) {
@@ -42,7 +42,8 @@ async function getCustomerFromToken(token: string) {
   return data
 }
 
-export async function GET(request: NextRequest, { params }: { params: { token: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ token: string }> }) {
+  const params = await props.params;
   try {
     const customer = await getCustomerFromToken(params.token)
     if (!customer) return NextResponse.json({ error: 'Ogiltig länk' }, { status: 404 })

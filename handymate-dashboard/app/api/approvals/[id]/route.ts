@@ -53,10 +53,8 @@ export const maxDuration = 60
  * payload (measurement, verdict, hypothesis) för att rendera de tre valen —
  * husets bulk-lista (GET /api/approvals) räcker inte för en djuplänkad sida.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -107,10 +105,8 @@ export async function GET(
  * On approve: execute the payload action (send SMS, quote, etc.)
  * On reject: mark as rejected
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

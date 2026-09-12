@@ -14,7 +14,8 @@ export const dynamic = 'force-dynamic'
  * — idempotent, en redan publicerad länk byts aldrig ut. Owner-admin, samma
  * grind som huvudrutten (registrerad i tests/permission-contract.spec.ts).
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

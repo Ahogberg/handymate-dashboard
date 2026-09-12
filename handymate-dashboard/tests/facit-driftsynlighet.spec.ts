@@ -48,14 +48,14 @@ test.describe('Sentry — på med DSN, av utan, aldrig PII', () => {
     expect(src).toContain("./sentry.edge.config")
   })
 
-  test('next.config.js: instrumentationHook + withSentryConfig, bygger utan auth-token', () => {
+  test('next.config.js: Next 15 instrumentation + withSentryConfig, bygger utan auth-token', () => {
     const src = read('next.config.js')
-    expect(src).toContain('instrumentationHook: true')
+    expect(src).not.toContain('instrumentationHook: true') // Stable since Next 15.
     expect(src).toContain('withSentryConfig(')
     expect(src).toContain('disable: !process.env.SENTRY_AUTH_TOKEN')
     expect(src).toContain('telemetry: false')
     // Den ursprungliga PDF-regeln får inte försvinna i omskrivningen.
-    expect(src).toMatch(/serverComponentsExternalPackages:\s*\[[^\]]*'puppeteer-core'[^\]]*'@sparticuz\/chromium'/)
+    expect(src).toMatch(/serverExternalPackages:\s*\[[^\]]*'puppeteer-core'[^\]]*'@sparticuz\/chromium'/)
   })
 
   test('@sentry/nextjs är en beroende i package.json', () => {

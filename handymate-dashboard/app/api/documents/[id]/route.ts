@@ -8,10 +8,8 @@ import { GENERATED_DOCUMENT_SELECT, attachDocumentRelations } from '@/lib/docume
  * GET - Get single document
  * Query param: format=html returns rendered HTML
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params
     const business = await getAuthenticatedBusiness(request)
@@ -60,10 +58,8 @@ export async function GET(
 /**
  * PATCH - Update document (variables, content, status, signatures)
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params
     const business = await getAuthenticatedBusiness(request)
@@ -135,10 +131,8 @@ export async function PATCH(
 /**
  * DELETE - Delete document
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const { id } = params
     const business = await getAuthenticatedBusiness(request)

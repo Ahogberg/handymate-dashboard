@@ -14,10 +14,8 @@ export const dynamic = 'force-dynamic'
  * post, oavsett vilket id den får in. Samma skäl gör att en annan
  * verksamhets post aldrig kan raderas härifrån.
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

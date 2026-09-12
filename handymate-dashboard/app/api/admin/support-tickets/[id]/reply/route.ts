@@ -21,7 +21,8 @@ export const dynamic = 'force-dynamic'
  * Vi gör därför inserten direkt, i samma form som saveThreadMessage
  * använder internt (lib/agent/thread-messages.ts), och kontrollerar felet.
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const admin = await isAdmin(request)
   if (!admin.isAdmin) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })

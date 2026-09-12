@@ -9,7 +9,8 @@ import { parseQuoteFollowupRound, quoteFollowupApprovalId, followupProviderAccep
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Logga in.' }, { status: 401 })
   const user = await getCurrentUser(request, business.business_id)

@@ -44,10 +44,8 @@ async function verifyProductOwnership(
 /**
  * GET /api/products/[id]/reservations — förbehåll länkade till artikeln
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -99,10 +97,8 @@ export async function GET(
  * andra artiklars kopplingar och andra triggertyper (category/keyword) på
  * SAMMA reservationer rörs aldrig.
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

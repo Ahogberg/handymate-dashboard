@@ -285,7 +285,7 @@ test.describe('Bränsle-webhooken', () => {
     expect(efterGren).toContain("event_type: 'fuel_topup_completed'")
     // Måste ligga FÖRE prenumerationslogiken (planId/subscription_status) —
     // annars skriver ett fuel-köp av misstag över kundens riktiga plan.
-    const planUppdatering = s.indexOf('await byggAbonnemangsfalt(stripe, session)')
+    const planUppdatering = s.indexOf('await byggAbonnemangsfalt(stripe, session, supabase)')
     expect(s.slice(grenStart, planUppdatering)).toContain('return\n  }')
     expect(planUppdatering).toBeGreaterThan(grenStart)
   })

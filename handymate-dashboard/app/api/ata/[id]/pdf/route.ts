@@ -19,10 +19,8 @@ export const maxDuration = 30
  * Dokumentet visar belopp, så samma grind som övriga ÄTA-rutter:
  * see_financials (TD-77) — annars 403, aldrig ett prisstrippat dokument.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 /** PostgREST `or(...)`-filter tolkar komma och parenteser som syntax —
  * en fritextsökning får inte kunna forma om filtret. */
 function saneraSokterm(q: string): string {
-  return q.replace(/[,()\\%]/g, ' ').trim().slice(0, 80)
+  return q.replace(/[,()\\%]/g, ' ').trim().slice(0, 80);
 }
 
 /**
@@ -21,10 +21,8 @@ function saneraSokterm(q: string): string {
  * (lib/diary/serialize.ts) + `permissions` för vad DEN HÄR användaren får
  * göra på projektet.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
   const { supabase, businessId, projectId, user, assignment } = ctx
@@ -92,10 +90,8 @@ export async function GET(
  * till databasens (date/work_performed/description/workers_count/issues).
  * Dubblett (samma text, samma dag, nyss) → befintlig rad + `duplicate: true`.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const ctx = await loadDiaryContext(request, params.id)
   if (!ctx.ok) return ctx.response
   const { supabase, businessId, projectId, user, assignment } = ctx

@@ -11,10 +11,8 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/projects/[id]/team - Lista tilldelade användare på projekt
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -59,10 +57,8 @@ export async function GET(
 /**
  * POST /api/projects/[id]/team - Tilldela användare till projekt
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -155,10 +151,8 @@ export async function POST(
  *
  * Body: { businessUserId, role: 'lead' | 'member' }
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -231,10 +225,8 @@ export async function PATCH(
  * DELETE /api/projects/[id]/team - Ta bort tilldelning
  * Query param: userId (business_user_id)
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

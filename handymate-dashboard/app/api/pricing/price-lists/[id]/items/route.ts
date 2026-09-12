@@ -5,7 +5,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 /**
  * POST /api/pricing/price-lists/[id]/items — Add item to price list
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -46,7 +47,8 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
 /**
  * PUT /api/pricing/price-lists/[id]/items — Bulk update items
  */
-export async function PUT(request: NextRequest, { params }: { params: { id: string } }) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

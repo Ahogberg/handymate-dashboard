@@ -1,3 +1,5 @@
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { createSubscriptionCheckout, CheckoutConflict } from '@/lib/billing/checkout-session'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -40,11 +42,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    const currentUser = await getCurrentUser(request, business.business_id)
+    if (!currentUser || !isOwnerOrAdmin(currentUser)) {
+      return NextResponse.json({ error: 'Endast ägare eller administratör' }, { status: 403 })
+    }
+
     const stripe = getStripe()
     const supabase = getServerSupabase()
     const { planId, interval: rawInterval } = await request.json()
 
-    if (!planId) {
+    if (!['professional', 'business'].includes(planId)) {
       return NextResponse.json({ error: 'Missing planId' }, { status: 400 })
     }
 
@@ -86,38 +93,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: message }, { status: 400 })
     }
 
-    // Hämta eller skapa Stripe customer (samma logik som /api/billing/checkout)
-    const { data: billingData } = await supabase
-      .from('business_config')
-      .select('stripe_customer_id')
-      .eq('business_id', business.business_id)
-      .single()
-
-    let stripeCustomerId = billingData?.stripe_customer_id
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: business.contact_email ?? undefined,
-        name: business.business_name ?? undefined,
-        metadata: {
-          business_id: business.business_id,
-          handymate_plan: planId,
-        },
-      })
-
-      stripeCustomerId = customer.id
-
-      await supabase
-        .from('business_config')
-        .update({ stripe_customer_id: stripeCustomerId })
-        .eq('business_id', business.business_id)
-    }
-
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
 
     // Skapa Stripe Checkout-session — INGEN provperiod, debiteras direkt.
-    const session = await stripe.checkout.sessions.create({
-      customer: stripeCustomerId,
+    const session = await createSubscriptionCheckout(supabase, stripe, business.business_id, {
       mode: 'subscription',
       locale: 'sv',
       line_items: [
@@ -162,6 +141,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ url: session.url })
   } catch (error: any) {
+    if (error instanceof CheckoutConflict) return NextResponse.json({ error: error.message }, { status: 409 })
     console.error('[billing/onboarding-checkout] Error:', error)
     return NextResponse.json(
       { error: 'Något gick fel med betalningen — försök igen om en stund.' },

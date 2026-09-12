@@ -17,10 +17,8 @@ export const dynamic = 'force-dynamic'
  * Rollskydd (TD-77, 2026-05-23): see_financials-stripping på belopp
  * för icke-behörig. Konsekvent med /api/ata och /api/projects/[id].
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -53,10 +51,8 @@ export async function GET(
 /**
  * PATCH /api/ata/[id] — Uppdatera ÄTA (redigera, godkänn, avslå)
  */
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PATCH(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -161,10 +157,8 @@ export async function PATCH(
 /**
  * DELETE /api/ata/[id] — Ta bort ÄTA (bara draft/pending)
  */
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function DELETE(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

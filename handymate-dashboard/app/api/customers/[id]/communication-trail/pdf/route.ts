@@ -23,10 +23,8 @@ export const maxDuration = 30
  * Innehållet är identiskt i båda lägena; bara leveransformatet skiljer.
  * ?format=html tvingar HTML-vyn (förhandsgranskning i flik).
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const auth = await getAuthenticatedBusiness(request)
   if (!auth) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

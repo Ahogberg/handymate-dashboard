@@ -124,10 +124,8 @@ async function losUtskick(request: NextRequest, changeId: string) {
  * GET /api/ata/[id]/send — förhandsvisning för "Skicka ÄTA"-dialogen:
  * mottagare, kundnamn och exakt den text som POST kommer att skicka.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const r = await losUtskick(request, params.id)
     if ('fel' in r) return r.fel
@@ -147,10 +145,8 @@ export async function GET(
  * POST /api/ata/[id]/send — Skicka ÄTA till kund för signering
  * Body: { method: 'sms' | 'email', to?: string }
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const body = await request.json().catch(() => ({}))
     const { method = 'sms', to } = body

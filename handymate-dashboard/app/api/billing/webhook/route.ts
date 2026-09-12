@@ -1,3 +1,4 @@
+import { syncLeadsSubscription } from '@/lib/billing/leads-subscription'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { logAutomationActivity } from '@/lib/automations'
@@ -7,7 +8,7 @@ import { classifyStripeInvoiceForPartner } from '@/lib/partners/stripe-revenue'
 // Skrivningen av prenumerationsstatus är delad med betalverifieringen i
 // onboardingen (POST /api/billing/onboarding-checkout/verify) — se
 // lib/billing/write-billing-update.ts. Två vägar, exakt en sanning.
-import { writeBillingUpdate, byggAbonnemangsfalt, toIsoOrNull, STRIPE_STATUS_MAP } from '@/lib/billing/write-billing-update'
+import { writeBillingUpdate, byggAbonnemangsfalt, toIsoOrNull, STRIPE_STATUS_MAP, subscriptionPeriod, subscriptionPlan } from '@/lib/billing/write-billing-update'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -89,23 +90,24 @@ export async function POST(request: NextRequest) {
     }
 
     switch (event.type) {
+      case 'checkout.session.async_payment_succeeded':
       case 'checkout.session.completed': {
         await handleCheckoutCompleted(supabase, event, stripe)
         break
       }
 
       case 'customer.subscription.updated': {
-        await handleSubscriptionUpdated(supabase, event)
+        await handleSubscriptionUpdated(supabase, event, stripe)
         break
       }
 
       case 'customer.subscription.deleted': {
-        await handleSubscriptionDeleted(supabase, event)
+        await handleSubscriptionDeleted(supabase, event, stripe)
         break
       }
 
       case 'invoice.payment_succeeded': {
-        await handlePaymentSucceeded(supabase, event)
+        await handlePaymentSucceeded(supabase, event, stripe)
         break
       }
 
@@ -120,7 +122,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'invoice.payment_failed': {
-        await handlePaymentFailed(supabase, event)
+        await handlePaymentFailed(supabase, event, stripe)
         break
       }
 
@@ -151,16 +153,17 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
     return
   }
 
-  // (Idempotens hanteras nu centralt i POST innan dispatch.)
+  // Delayed payment methods are acknowledged only after successful settlement.
+  if (session.payment_status !== 'paid' && session.payment_status !== 'no_payment_required') return
 
   // Leads-addon-köp: uppdatera INTE subscription_plan (annars nedgraderas
   // kundens riktiga plan till 'starter'). Sätt addon-fälten och hoppa över
   // plan-uppdatering + referral (det är inte en första-betalning).
   if (session.metadata?.addon === 'leads') {
     const tier = session.metadata?.tier || null
-    await supabase.from('business_config')
-      .update({ leads_addon: true, leads_addon_tier: tier, stripe_customer_id: session.customer as string })
-      .eq('business_id', businessId)
+    const customerId = typeof session.customer === 'string' ? session.customer : session.customer?.id
+    if (!customerId) throw new Error('Leads-köp saknar Stripe-kund')
+    await syncLeadsSubscription(supabase, stripe, businessId, customerId)
     await supabase.from('billing_event').insert({
       business_id: businessId, event_type: 'leads_addon_activated', stripe_event_id: event.id,
       data: { tier, customer_id: session.customer },
@@ -216,14 +219,15 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
 
   // Delad med betalverifieringen i onboardingen — se
   // lib/billing/write-billing-update.ts. Speglar Stripes verkliga status.
-  const { critical, period } = await byggAbonnemangsfalt(stripe, session)
+  const { critical, period } = await byggAbonnemangsfalt(stripe, session, supabase)
+  await writeBillingUpdate(supabase, businessId, critical, period)
 
   // Onboarding: provisionera telefonnummer nu när betalningen är genomförd.
   // Vi anropar INTE /api/onboarding/phone härifrån (den kräver användarens
   // auth-token; webhooken har ingen session). Istället används den delade
   // service-role-hjälparen direkt — idempotent (returnerar befintligt nummer
   // om assigned_phone_number redan är satt) och icke-blockerande.
-  if (isOnboarding) {
+  if (isOnboarding && critical.subscription_status === 'active') {
     try {
       const { purchaseAndAssignNumber } = await import('@/lib/phone/purchase-number')
       const phoneResult = await purchaseAndAssignNumber(supabase, businessId)
@@ -304,8 +308,14 @@ async function handleCheckoutCompleted(supabase: any, event: Stripe.Event, strip
  * customer.subscription.updated
  * Prenumerationen har uppdaterats (byte av plan, förnyelse, etc.)
  */
-async function handleSubscriptionUpdated(supabase: any, event: Stripe.Event) {
-  const subscription = event.data.object as Stripe.Subscription
+async function handleSubscriptionUpdated(supabase: any, event: Stripe.Event, stripe: Stripe) {
+  const subscription = await stripe.subscriptions.retrieve((event.data.object as Stripe.Subscription).id)
+  if (subscription.metadata.addon === 'leads' && subscription.metadata.business_id) {
+    const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
+    await syncLeadsSubscription(supabase, stripe, subscription.metadata.business_id, customerId)
+    return
+  }
+  if (subscription.metadata.addon) return
   const businessId = subscription.metadata?.business_id
 
   if (!businessId) {
@@ -334,9 +344,15 @@ async function updateSubscriptionData(
   subscription: Stripe.Subscription,
   eventId: string
 ) {
+  // Ignore old/replaced subscriptions and add-ons, even if their metadata names this business.
+  const { data: current, error: currentError } = await supabase.from('business_config')
+    .select('stripe_subscription_id').eq('business_id', businessId).single()
+  if (currentError) throw currentError
+  if (current?.stripe_subscription_id !== subscription.id) return
+
   // Mappa Stripe-status till vår subscription_status (delad tabell)
   const billingStatus = STRIPE_STATUS_MAP[subscription.status] || subscription.status
-  const planId = subscription.metadata?.plan_id
+  const planId = await subscriptionPlan(supabase, subscription)
 
   const critical: Record<string, any> = {
     subscription_status: billingStatus,
@@ -353,12 +369,9 @@ async function updateSubscriptionData(
 
   // billing_period_* skrivs separat best-effort (kolumnen kan saknas innan v69);
   // subscription_status MÅSTE persisteras och får aldrig blockeras av den.
-  const period = {
-    start: toIsoOrNull((subscription as any).current_period_start),
-    end: toIsoOrNull((subscription as any).current_period_end),
-  }
+  const period = subscriptionPeriod(subscription)
 
-  await writeBillingUpdate(supabase, businessId, critical, period)
+  await writeBillingUpdate(supabase, businessId, critical, period, subscription.id)
 
   // Logga händelse
   await supabase
@@ -380,8 +393,13 @@ async function updateSubscriptionData(
  * customer.subscription.deleted
  * Prenumerationen har avslutats.
  */
-async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event) {
+async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event, stripe: Stripe) {
   const subscription = event.data.object as Stripe.Subscription
+  if (subscription.metadata.addon === 'leads' && subscription.metadata.business_id) {
+    const customerId = typeof subscription.customer === 'string' ? subscription.customer : subscription.customer.id
+    await syncLeadsSubscription(supabase, stripe, subscription.metadata.business_id, customerId)
+    return
+  }
   const businessId = subscription.metadata?.business_id
 
   let targetBusinessId = businessId
@@ -401,13 +419,14 @@ async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event) {
     targetBusinessId = business.business_id
   }
 
-  await supabase
+  const { data: cancelled, error: cancelError } = await supabase
     .from('business_config')
-    .update({
-      subscription_status: 'cancelled',
-      stripe_subscription_id: null
-    })
+    .update({ subscription_status: 'cancelled', stripe_subscription_id: null })
     .eq('business_id', targetBusinessId)
+    .eq('stripe_subscription_id', subscription.id)
+    .select('business_id').maybeSingle()
+  if (cancelError) throw cancelError
+  if (!cancelled) return
 
   // Logga händelse
   await supabase
@@ -450,7 +469,7 @@ async function handleSubscriptionDeleted(supabase: any, event: Stripe.Event) {
  * invoice.payment_succeeded
  * Betalning lyckades -- logga händelse.
  */
-async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
+async function handlePaymentSucceeded(supabase: any, event: Stripe.Event, stripe: Stripe) {
   const invoice = event.data.object as Stripe.Invoice
   const customerId = invoice.customer as string
 
@@ -466,11 +485,7 @@ async function handlePaymentSucceeded(supabase: any, event: Stripe.Event) {
     return
   }
 
-  // Säkerställ att status är aktiv
-  await supabase
-    .from('business_config')
-    .update({ subscription_status: 'active' })
-    .eq('business_id', business.business_id)
+  await reconcileInvoiceSubscription(supabase, stripe, invoice, business.business_id)
 
   const partnerRevenue = await classifyStripeInvoiceForPartner(supabase, invoice as unknown as Record<string, unknown>)
 
@@ -592,7 +607,7 @@ async function handleRevenueReversal(
  * invoice.payment_failed
  * Betalning misslyckades -- markera som past_due.
  */
-async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
+async function handlePaymentFailed(supabase: any, event: Stripe.Event, stripe: Stripe) {
   const invoice = event.data.object as Stripe.Invoice
   const customerId = invoice.customer as string
 
@@ -610,10 +625,7 @@ async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
 
   const wasAlreadyPastDue = business.subscription_status === 'past_due'
 
-  await supabase
-    .from('business_config')
-    .update({ subscription_status: 'past_due' })
-    .eq('business_id', business.business_id)
+  const currentStatus = await reconcileInvoiceSubscription(supabase, stripe, invoice, business.business_id)
 
   // Logga händelse
   await supabase
@@ -635,7 +647,7 @@ async function handlePaymentFailed(supabase: any, event: Stripe.Event) {
   // Allt nedan är best-effort: webhooken har redan gjort sitt kritiska jobb
   // ovan (status + billing_event-logg) och måste alltid returnera 200 till
   // Stripe oavsett om mailen lyckas.
-  if (!wasAlreadyPastDue) {
+  if (!wasAlreadyPastDue && currentStatus === 'past_due') {
     try {
       const { sendEmail, logEmail } = await import('@/lib/email')
 
@@ -725,4 +737,20 @@ function buildPaymentFailedEmailHtml(firstName: string): string {
   </div>
 </body>
 </html>`
+}
+
+/** Invoice delivery can be delayed or concern an add-on. Never infer base-plan status from it. */
+async function reconcileInvoiceSubscription(db: any, stripe: Stripe, invoice: Stripe.Invoice, businessId: string) {
+  const ref = invoice.parent?.subscription_details?.subscription
+  if (!ref) return null
+  const id = typeof ref === 'string' ? ref : ref.id
+  const { data: current, error } = await db.from('business_config')
+    .select('stripe_subscription_id').eq('business_id', businessId).single()
+  if (error) throw error
+  if (current?.stripe_subscription_id !== id) return null
+  const subscription = await stripe.subscriptions.retrieve(id)
+  if (subscription.metadata.addon) return null
+  const status = STRIPE_STATUS_MAP[subscription.status] || 'incomplete'
+  await writeBillingUpdate(db, businessId, { subscription_status: status }, subscriptionPeriod(subscription), subscription.id)
+  return status
 }

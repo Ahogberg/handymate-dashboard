@@ -10,10 +10,8 @@ const BUCKET = 'project-files'
 /**
  * GET /api/projects/[id]/documents - Lista projektdokument
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -59,10 +57,8 @@ export async function GET(
  * server-runtime fungerar inte tillförlitligt med Supabase storage-js's
  * multipart-upload. Customer + deal upload-rutter använder samma mönster.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

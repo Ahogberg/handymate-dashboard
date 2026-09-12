@@ -28,7 +28,8 @@ const STAGE_SMS: Record<string, string> = {
 /**
  * GET /api/projects/[id]/stages — Hämta alla steg för ett projekt
  */
-export async function GET(request: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -47,7 +48,8 @@ export async function GET(request: NextRequest, { params }: { params: { id: stri
 /**
  * POST /api/projects/[id]/stages — Uppdatera/skapa ett steg
  */
-export async function POST(request: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

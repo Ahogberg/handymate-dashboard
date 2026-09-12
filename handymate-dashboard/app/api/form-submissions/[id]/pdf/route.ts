@@ -31,10 +31,8 @@ const KATEGORI_LABEL: Record<string, string> = {
  * (2026-09-07) bär den firmans logotyp, accentfärg och företagsfot ur
  * brand-lagret (lib/branding/pdf.ts), som offert och faktura.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

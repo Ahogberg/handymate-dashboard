@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Permission check: kräver owner eller admin
-    const currentUser = await getCurrentUser(request)
+    const currentUser = await getCurrentUser(request, authBusiness.business_id)
     if (!currentUser || !isOwnerOrAdmin(currentUser)) {
       return NextResponse.json({ error: 'Otillräckliga behörigheter' }, { status: 403 })
     }
@@ -404,12 +404,17 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
     // Hämta befintlig bokning för att behålla duration
     const { data: currentBooking } = await supabase
       .from('booking')
-      .select('scheduled_start, scheduled_end')
+      .select('scheduled_start, scheduled_end, customer_id')
       .eq('booking_id', bookingId)
+      .eq('business_id', businessId)
       .single()
 
     if (!currentBooking) {
       return { success: false, error: 'Kunde inte hitta bokningen' }
+    }
+
+    if (customerId && currentBooking.customer_id !== customerId) {
+      return { success: false, error: 'Bokningen tillhör inte kunden' }
     }
 
     const oldStart = new Date(currentBooking.scheduled_start)
@@ -434,7 +439,7 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
     const newScheduledEnd = new Date(newScheduledStart.getTime() + durationMs)
 
     // Uppdatera bokningen
-    const { error: updateError } = await supabase
+    const { data: updatedBooking, error: updateError } = await supabase
       .from('booking')
       .update({
         scheduled_start: newScheduledStart.toISOString(),
@@ -442,7 +447,13 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
         notes: `${actionData.reason ? `Ombokad: ${actionData.reason}` : 'Ombokad via AI-förslag'}`
       })
       .eq('booking_id', bookingId)
+      .eq('business_id', businessId)
+      .eq('scheduled_start', currentBooking.scheduled_start)
+      .eq('scheduled_end', currentBooking.scheduled_end)
+      .select('booking_id')
+      .maybeSingle()
 
+    if (!updatedBooking && !updateError) throw new Error('Bokningen har ändrats. Läs in den igen.')
     if (updateError) throw updateError
 
     // Skicka bekräftelse-SMS om vi har telefonnummer

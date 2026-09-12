@@ -19,10 +19,8 @@ import { syncInvoiceToFortnox } from '@/lib/invoices/sync-to-fortnox'
  * Bokföring ändrar inte leveransstatus och denna fristående väg skickar
  * ingen e-faktura. Kundleverans hanteras av det separata sändflödet.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

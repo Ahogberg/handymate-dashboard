@@ -136,6 +136,7 @@ export const BEHALLS: string[] = [
 // scopad ordning (se header för varför en enda naiv ordning inte räcker).
 // ─────────────────────────────────────────────────────────────────────────
 export const RADERAS: string[] = [
+  'billing_checkout_attempt', // beständiga betalningsförsök och Stripe-kundreferenser
   'quote_acceptance_completion', // återhämtningsjournal för kundens offertaccept
   'lead_intake_request', // mottagna förfrågningar innehåller kundens kontaktuppgifter
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.

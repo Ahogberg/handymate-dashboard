@@ -30,10 +30,8 @@ async function verifyProductOwnership(
 /**
  * GET /api/products/[id]/components — komponentlistan för en produkt
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
@@ -69,10 +67,8 @@ export async function GET(
  * Validering sker FÖRE någon skrivning: component_type 'arbete'|'material',
  * quantity_per_unit > 0, unit_cost >= 0, description icke-tom.
  */
-export async function PUT(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function PUT(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

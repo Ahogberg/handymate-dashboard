@@ -31,10 +31,8 @@ export const dynamic = 'force-dynamic'
  * TD-22-pattern: alla queries destrukturerar `{ data, error }` och
  * returnerar PostgrestError-detaljer i 500-respons.
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

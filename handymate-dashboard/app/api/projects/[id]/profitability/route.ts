@@ -31,10 +31,8 @@ export const dynamic = 'force-dynamic'
  * - extra_costs (project_cost-tabellen) och cost-modal-funktionalitet
  *   är temporärt urkopplade. Återinförs i Etapp 2.3 via helpern (TD-60).
  */
-export async function GET(
-  request: NextRequest,
-  { params }: { params: { id: string } },
-) {
+export async function GET(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {

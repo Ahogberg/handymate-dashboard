@@ -17,10 +17,8 @@ import { advanceProjectStage } from '@/lib/project-stages/automation-engine'
  * framgång returneras nya current_stage så modalen kan uppdatera sig
  * själv direkt utan refetch.
  */
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 

@@ -20,16 +20,16 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim
 export async function isAdmin(request: NextRequest): Promise<{ isAdmin: boolean; userId?: string; email?: string }> {
   try {
     const cookieStore = await cookies()
-    const supabase = createRouteHandlerClient({ cookies: () => cookieStore })
+    const supabase = createRouteHandlerClient({ cookies: () => cookieStore as unknown as ReturnType<typeof cookies> })
 
-    const { data: { session } } = await supabase.auth.getSession()
+    const { data: { user }, error } = await supabase.auth.getUser()
 
-    if (!session?.user) {
+    if (error || !user) {
       return { isAdmin: false }
     }
 
-    const email = session.user.email?.toLowerCase() || ''
-    const userId = session.user.id
+    const email = user.email?.toLowerCase() || ''
+    const userId = user.id
 
     // Check if email ends with @handymate.se or is in admin list
     const isAdminUser = email.endsWith('@handymate.se') || ADMIN_EMAILS.includes(email)

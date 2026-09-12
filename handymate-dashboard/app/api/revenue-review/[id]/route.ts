@@ -35,10 +35,8 @@ import { createInvoice } from '@/lib/invoices/create-invoice'
  *     är SEPARATA tal, läsbara ur payloaden.
  */
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: { id: string } }
-) {
+export async function POST(request: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const business = await getAuthenticatedBusiness(request)
     if (!business) {
