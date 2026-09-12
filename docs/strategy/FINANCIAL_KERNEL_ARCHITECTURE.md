@@ -4,6 +4,7 @@
 > Date: 2026-09-11
 > Scope: Handymate Pay, Handymate Ledger, reconciliation, financial events, Fortnox shadow mode and migration from the current invoice/payment model.
 > Strategic context: `docs/HANDYMATE_ACCOUNTING_ROADMAP.md` and `docs/HANDYMATE_VERTICAL_EXPANSION_STRATEGY.md`.
+> Review record: `docs/strategy/FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` (2026-09-11). Its accepted findings are already written into this document as normative requirements — **you do not need to read the review to implement correctly**. It records why the requirements exist.
 
 ## 0. Why this document exists
 
@@ -268,6 +269,26 @@ Why allow >2 decimals internally? VAT allocation, FX and future jurisdictions ca
 - Financial calculations use helper functions, never ad hoc `number + number` throughout the codebase.
 - Define one rounding policy per currency/country pack.
 - Existing invoice fields remain compatible during migration, but canonical kernel calculations use exact values.
+
+### Rounding differences are postings, never tolerances
+
+A monetary comparison in the kernel is exact. There is no "close enough" band.
+
+Where a real-world difference exists — öresavrundning, a bank or provider fee taken at source, a
+foreign-exchange difference — it is resolved in exactly one of two ways:
+
+```text
+difference within the country pack's documented rounding policy
+  -> an explicit rounding posting on a dedicated account
+     (SE proposal: 3740 Öres- och kronutjämning — confirm with the accounting consultant)
+
+difference outside that policy
+  -> a reconciliation exception; never absorbed, never silently written off
+```
+
+**Binding:** no comparison tolerance constant may exist in kernel code. `TOLERANCE_KR = 1` in
+`lib/invoices/payment-decision.ts` is legacy behaviour that must not be carried across the
+boundary — see §18.3 for the migration consequence, which is breaking.
 
 ---
 
@@ -784,15 +805,99 @@ Swedish pack handles:
 ```text
 BAS mappings
 VAT codes/rules
+VAT regime per invoice (standard / reverse charge / exempt)
+accounting method (accrual / cash basis)
 ROT/RUT accounting
-SIE
+SIE import and export
 Swedish report conventions
 local rounding/tax rules
+statutory retention and voucher identification rules (see §36)
 ```
 
 Do not hard-code `1510`, `1930`, `2611` etc. into generic Pay code.
 
 A provider payment event asks the country/posting layer which accounts apply.
+
+Every BAS account number proposed in this document is a **proposal pending confirmation by the
+accounting consultant**, per §13 of the roadmap. Models must not present a chosen account number
+as an accounting decision.
+
+### 15.1 Reverse-charge construction VAT (omvänd skattskyldighet för byggtjänster)
+
+**This is not an edge case for Handymate's core segment. It is a large share of B2B invoice
+volume and must be modelled before the first SE posting rule is considered complete.**
+
+When a construction service is sold to a buyer who is a taxable person that sells construction
+services other than temporarily, the seller charges no output VAT and the buyer accounts for it.
+
+Consequences that reach outside the ledger:
+
+```text
+Invoice        needs a VAT regime, not just a vat_rate
+Counterparty   needs a recorded, evidenced buyer status (it is a property of the buyer)
+Posting        sale posts with no output VAT, to its own revenue account
+Purchase side  the buyer books both output and input VAT on the acquisition
+VAT return     separate boxes on both sides
+Invoice PDF    a statutory reference to reverse charge must appear on the document
+```
+
+Current code state (2026-09-11): no reverse-charge concept exists anywhere in the repository.
+`lib/invoices/create-invoice.ts` defaults `vat_rate` to 25 and the invoice carries a single rate.
+Introducing a VAT regime is therefore a **data-model change to the invoice domain**, not a
+country-pack-only change, and it must be designed in the same package as the SE posting rules.
+
+Required by: §31, §36.3, Golden path 31–32.
+
+### 15.2 Accounting method: accrual vs cash basis (kontantmetoden)
+
+The posting model in §14 assumes accrual basis — `invoice_issued` immediately posts accounts
+receivable. Swedish companies below the statutory net-sales threshold for kontantmetoden may
+instead book purchases and sales on payment, with unpaid documents booked at the fiscal year end.
+
+**That describes the default configuration of Handymate's core customer, not an exception.**
+
+The kernel must therefore treat accounting method as a per-business SE pack setting that changes
+*which event triggers the revenue/VAT posting*:
+
+```text
+accrual (faktureringsmetoden)
+  invoice_issued        -> AR + revenue + output VAT
+  payment_allocated     -> bank/clearing vs AR
+
+cash basis (kontantmetoden)
+  invoice_issued        -> no ledger posting (commercial/receivable state only)
+  payment_allocated     -> bank/clearing + revenue + output VAT
+  fiscal year end       -> unpaid documents booked as receivables/payables
+```
+
+Note the architectural consequence: under cash basis the **receivable still exists in the
+kernel** — Pay, allocation, reconciliation and the invoice projection are unchanged. Only the
+Ledger projection differs. This is a good test of the Financial Kernel boundary: if supporting
+cash basis requires changing Pay, the boundary has been drawn wrong.
+
+A business may also change method at a fiscal-year boundary, which interacts with §18.4.
+
+Required by: §31, §36.4, Golden path 33.
+
+### 15.3 VAT return (momsdeklaration)
+
+The SE pack must produce the VAT return figures, mapped to the declaration's boxes, including
+the reverse-charge and ROT/RUT interactions above.
+
+Whether Handymate also **files** the return is an open product decision (§38.3), not an
+implementation detail to be settled by whoever writes the module. Produce-only and file-also
+are different products with different liability. Do not let the answer default by omission.
+
+### 15.4 SIE is an early deliverable, not a late one
+
+SIE import and export must be available **before the first pilot business**, not before broad
+migration, for three reasons:
+
+1. Export is the customer's exit guarantee and the cheapest answer to "what happens to my books
+   if Handymate disappears" — see roadmap §5 (export capability to prevent lock-in).
+2. Import is how opening balances enter the ledger at cut-over (§18.4).
+3. It is the format in which an external accounting consultant or auditor will want to inspect
+   the ledger — which is exactly during the pilot, when their review matters most.
 
 ---
 
@@ -834,6 +939,14 @@ payment_settled(tax_authority)
 ```
 
 This generalizes better than special-casing `paid_amount` and prepares the architecture for other split payer/subsidy models internationally.
+
+Two interactions must not be forgotten:
+
+- **Accounting method (§15.2).** Under cash basis the receivable components still exist in the
+  kernel; only the ledger posting moment differs. If supporting cash basis forces a change to the
+  ROT/RUT receivable model, the kernel boundary has been drawn in the wrong place.
+- **Post-payment automation (§18.5).** Settlement of the *customer* component is what fires the
+  customer-facing effects. Settlement of the tax-authority component must not fire them again.
 
 ---
 
@@ -885,7 +998,7 @@ Karin UX target:
 
 Do not break today's invoice UI/API while building the kernel.
 
-### Phase A — compatibility projection
+### 18.1 Phase A — compatibility projection
 
 Keep current fields:
 
@@ -899,7 +1012,7 @@ invoice.paid_via
 
 But once the kernel is enabled, treat them as **compatibility projections** from receivable/payment allocation state.
 
-### Evolve `applyInvoicePayment()`
+### 18.2 Evolve `applyInvoicePayment()`
 
 Current callers should continue calling `applyInvoicePayment()` initially.
 
@@ -922,7 +1035,75 @@ This lets these callers migrate without simultaneous rewrites:
 - status patch;
 - Fortnox sync.
 
-### Later
+### 18.3 Removing the legacy rounding tolerance is a breaking change
+
+`lib/invoices/payment-decision.ts` applies `TOLERANCE_KR = 1` — a documented ±1 kr tolerance
+against öresavrundning between Handymate and Fortnox. It decides, today, whether an invoice
+becomes `paid` or stays `customer_paid`.
+
+It cannot cross into the kernel (§5). A silent tolerance produces a general ledger that is a
+krona out with nothing that explains it, and the drift compounds across partial payments.
+
+Treat this as a **breaking semantic change to tested behaviour**, not a cleanup:
+
+```text
+legacy      difference <= 1 kr  -> treated as fully settled, silently
+kernel      difference within rounding policy  -> explicit rounding posting, receivable settled
+            difference outside rounding policy -> reconciliation exception, receivable open
+```
+
+Requirements:
+
+- The kernel path must reproduce the *user-visible outcome* of the legacy path for every case
+  currently covered by `tests/apply-payment-decision.spec.ts` — an invoice that settles today
+  must still settle, now with a posting that says why.
+- The rounding policy and its account live in the SE pack, not in payment code.
+- Shadow mode (§20) must report a tolerance-driven divergence as a divergence, not hide it.
+
+### 18.4 Opening balances and historical data
+
+No document may assume that historical invoices can be replayed into the ledger. They cannot:
+`paid_amount` is an aggregate with no stored receivable composition, so the components of an
+invoice paid before the kernel existed are not reconstructable.
+
+**The cut-over model is an opening balance at a fiscal-year boundary, not a replay.**
+
+```text
+choose cut-over date = a fiscal year start
+  -> import ingående balans from the outgoing system (SIE, see §15.4)
+  -> post it as an opening-balance journal in its own journal type
+  -> lock every period before the cut-over
+  -> the ledger is canonical only from the cut-over forward
+```
+
+Consequences that must be designed, not discovered:
+
+- Invoices issued before the cut-over but paid after it settle against an opening AR balance,
+  not against a receivable the kernel created. This is a real case in every migration and needs
+  a golden path (see 35).
+- The cut-over date is per business and must be stored, displayed and auditable.
+- Periods before the cut-over are permanently locked; §22's locked-period invariant applies.
+- Which fiscal-year boundary to use for the first pilots is an open decision (§38.4).
+
+### 18.5 Preserve the exact post-payment automation semantics
+
+§7 says `payment_received` must not be silently redefined. The specific trap is narrower than
+that and is encoded in today's code rather than in any specification:
+
+```text
+applyInvoicePayment() fires post-payment effects on:
+  to_paid           yes
+  to_customer_paid  yes   <- the customer relationship is complete when the customer has paid
+  settled           NO    <- no second thank-you SMS when Skatteverket pays out
+```
+
+Under the receivable-component model (§16) the natural implementation fires on receivable
+settlement — which produces exactly the duplicate customer message the current code avoids.
+
+**Binding:** the bridge fires on settlement of the *customer* receivable component only. This
+is a named regression test (golden path 34), not a note to be careful.
+
+### 18.6 Later
 
 New Handymate Pay flows call the Financial Kernel directly; `applyInvoicePayment()` remains only as a compatibility adapter for manual/import paths.
 
@@ -971,7 +1152,31 @@ compare with Financial Kernel
       +--> mismatch: PAYMENT_DIVERGENCE
 ```
 
-### Accounting shadowing
+### 20.1 Shadow mode is structurally blind until the direction is flipped
+
+Read this before interpreting any shadow comparison as evidence.
+
+Today Fortnox is the **source** of payment truth: `lib/fortnox/sync-payments.ts` pulls Fortnox
+state on a 2h cron and normalizes it through `applyInvoicePayment()` with `source: 'fortnox'`.
+Handymate's payment state is therefore *derived from* Fortnox.
+
+```text
+Phase S1  Fortnox -> Handymate        comparison proves the sync works.
+                                      It CANNOT detect divergent payment truth,
+                                      because there is only one truth.
+
+Phase S2  Handymate -> its own truth  Fortnox import becomes a reference snapshot
+          Fortnox -> snapshot only    for the business. Divergence is now meaningful.
+```
+
+**Binding:** the phase flip is per business, explicit, dated and recorded. A green comparison in
+phase S1 must never be reported — in a dashboard, a status update or a pilot decision — as
+evidence that the kernel computes payment state correctly. Divergence metrics start at S2.
+
+This does not weaken shadow mode; it is the strongest idea in this document. It means the
+team must not read the easy green period as the hard one.
+
+### 20.2 Accounting shadowing
 
 For pilot businesses compare:
 
@@ -1091,6 +1296,22 @@ Minimum suite:
 28. Replay all financial events produces same derived state.
 29. Cross-tenant reference attempt is rejected.
 30. Same command retried after network timeout remains exactly-once economically.
+31. Reverse-charge construction invoice: no output VAT, correct revenue account, correct VAT
+    return boxes, statutory reference present on the invoice document (§15.1).
+32. Same customer, one standard-VAT invoice and one reverse-charge invoice in the same period —
+    VAT return and revenue accounts stay separated (§15.1).
+33. Cash-basis business: `invoice_issued` produces no ledger posting; payment produces revenue
+    and output VAT; fiscal-year-end books the unpaid documents (§15.2).
+34. ROT/RUT settlement fires post-payment automation exactly once — on the customer share, not
+    again when the Skatteverket share arrives (§18.5). Regression test for existing behaviour.
+35. Invoice issued before cut-over, paid after cut-over: settles against the opening AR balance,
+    no duplicate revenue, no posting into a locked pre-cut-over period (§18.4).
+36. Öresavrundning difference: settles with an explicit rounding posting, not a tolerance (§18.3).
+37. Difference outside the rounding policy: receivable stays open, reconciliation exception
+    raised, nothing silently absorbed (§5).
+38. Cash-basis business switching to accrual at a fiscal-year boundary (§15.2).
+39. Dunning fee and interest on an overdue invoice: correct VAT treatment and accounts (§37).
+40. Shadow phase S1 comparison is not reported as kernel-correctness evidence (§20.1).
 
 Each test should assert the **whole final state**:
 
@@ -1220,6 +1441,25 @@ Never require a big-bang migration.
 
 ## 28. Suggested implementation phases
 
+### Sprint −1 — Commercial and regulatory track (starts first, runs in parallel throughout)
+
+**The critical path for Pay is not owned by the engineering team.** This sprint has no code and
+must start before Sprint 0, because its lead times are months, not weeks:
+
+- **Merchant-of-record decision** (§38.1). Merchant-of-record vs. platform vs. marketplace payout
+  determines who holds customer money, who owns the receivable at each moment, what the clearing
+  account *means*, who carries chargeback liability, and how Handymate's own fee is invoiced and
+  VAT-treated. These are ledger semantics. The decision must precede the first posting rule even
+  though the implementation stays behind the adapter boundary (§11).
+- **PSP selection and onboarding**: KYC, commercial terms, contract.
+- **Bank transaction access**: a PSD2/AIS licence or a contract with a licensed aggregator.
+- **Named domain experts engaged**: an operational accounting consultant and an auditor who will
+  actually review the posting rules, per roadmap §13. Sprint 3 and Package C9 are blocked on a
+  real person, not on a document.
+
+Sprint estimates elsewhere in this section price coding time only. Treat any date that depends
+on a counterparty as unestimated until that counterparty is contracted.
+
 ### Sprint 0 — Contracts and architecture
 
 - Update canonical `ARCHITECTURE.md` with approved financial events.
@@ -1253,6 +1493,11 @@ Never require a big-bang migration.
 
 ### Sprint 3 — Ledger core
 
+> **Open decision (§38.2):** the review recommends running Ledger *before* Pay — Ledger has no
+> regulated counterparty, no customer money at risk, and delivers the margin-truth moat directly,
+> while Pay has the longest external lead time and the largest blast radius. The order below is
+> the original plan and stands until the owner decides. Do not reorder unilaterally.
+
 - Accounts/fiscal years/periods/journals/entries/lines.
 - SE country-pack skeleton.
 - Invoice posting rules.
@@ -1274,7 +1519,8 @@ Never require a big-bang migration.
 - Payable model.
 - Supplier payment allocations.
 - AP posting rules.
-- VAT reporting primitives.
+- VAT reporting primitives, including reverse charge on both sides (§15.1).
+- VAT return box mapping (§15.3).
 
 ### Sprint 6 — Shadow Accounting
 
@@ -1314,6 +1560,9 @@ Beta requires at minimum:
 - Reconciliation-ready external refs.
 - E2E tests for duplicates/retries/failures.
 - Current invoice UI/status remains consistent.
+- Merchant-of-record model decided, documented and reflected in the clearing/receivable semantics (§38.1).
+- No monetary comparison tolerance anywhere in the kernel path (§5, §18.3).
+- Post-payment automation fires exactly as it does today, ROT/RUT included (§18.5, golden path 34).
 
 ---
 
@@ -1329,15 +1578,21 @@ Beta requires at minimum:
 - Fiscal years/periods/locking.
 - Immutable posted history + reversal workflow.
 - Source-document/event provenance.
-- SE account/VAT mapping.
+- SE account/VAT mapping, reviewed and confirmed by the accounting consultant.
+- VAT regime support: standard, reverse-charge construction, exempt (§15.1).
+- Accounting method support: accrual and cash basis (§15.2).
 - Customer invoice posting.
 - Customer payment/clearing posting.
 - Supplier invoice/AP posting.
+- Rounding differences posted explicitly; no tolerances (§5, §18.3).
 - Basic P&L/balance/general ledger.
-- SIE export target before broad migration.
+- SIE import and export working **before the first pilot business**, not before broad migration (§15.4).
+- Opening-balance cut-over implemented, with pre-cut-over periods locked (§18.4).
+- Statutory requirements met and evidenced: voucher identification, retention, system
+  documentation and processing history, readable presentation (§36).
 - Audit/system documentation.
 - Golden-path E2E suite.
-- Fortnox shadow validation for pilot companies.
+- Fortnox shadow validation for pilot companies, in phase S2 — phase S1 does not count (§20.1).
 
 ---
 
@@ -1356,7 +1611,17 @@ Do not:
 - let Fortnox divergences overwrite Handymate automatically;
 - hard-code Swedish account numbers into global payment code;
 - add new financial event names locally without first updating `ARCHITECTURE.md`;
-- launch auto-posting broadly before shadow comparison and professional review.
+- launch auto-posting broadly before shadow comparison and professional review;
+- introduce any monetary comparison tolerance in kernel code — a difference is a posting or an
+  exception, never a band (§5, §18.3);
+- assume every Swedish invoice carries output VAT — reverse-charge construction VAT is a large
+  share of B2B volume in this segment (§15.1);
+- assume accrual accounting — cash basis is the default for most of the target segment (§15.2);
+- plan to replay historical invoices into the ledger; cut over on an opening balance (§18.4);
+- report a phase S1 shadow comparison as evidence that the kernel is correct (§20.1);
+- present a chosen BAS account number as an accounting decision — it is a proposal until the
+  accounting consultant confirms it (§15);
+- resolve an open decision in §38 by picking the convenient answer.
 
 ---
 
@@ -1364,12 +1629,12 @@ Do not:
 
 | Existing path | Keep | Change during kernel migration |
 |---|---|---|
-| `lib/invoices/create-invoice.ts` | Yes | emit durable `invoice_issued/receivable_created` transactionally or via safe outbox path; retain legacy event bridge |
+| `lib/invoices/create-invoice.ts` | Yes | emit durable `invoice_issued/receivable_created` transactionally or via safe outbox path; retain legacy event bridge; **add VAT regime — today it defaults `vat_rate` to 25 with no reverse-charge concept (§15.1)** |
 | `app/api/invoices/route.ts` | Yes | consume Money helpers gradually; no direct Ledger writes |
 | `lib/invoices/apply-payment.ts` | Yes, initially | become compatibility facade over payment + allocation + invoice projection |
-| `lib/invoices/payment-decision.ts` | Concepts yes | move toward receivable-component/allocation rules; remove aggregate-only assumptions over time |
+| `lib/invoices/payment-decision.ts` | Concepts yes | move toward receivable-component/allocation rules; remove aggregate-only assumptions over time; **`TOLERANCE_KR` must not cross into the kernel — breaking change, see §18.3** |
 | `app/api/invoices/[id]/mark-paid/route.ts` | Yes | manual payment becomes explicit financial command/event |
-| `lib/fortnox/sync-payments.ts` | Yes | shift from source-of-truth importer to reference/shadow adapter per rollout phase |
+| `lib/fortnox/sync-payments.ts` | Yes | shift from source-of-truth importer to reference/shadow adapter per rollout phase; **the flip is what makes shadow divergence meaningful (§20.1)** |
 | `app/api/invoices/[id]/reconcile-fortnox` | Yes | evolve into shadow reconciliation/reporting surface |
 | `app/api/invoices/[id]/send-via-fortnox` | Temporary | bridge until Handymate is accounting system of record |
 | `app/api/swish-qr/route.ts` | UX helper | tenant-bound invoice Pay flows should use payment intents; do not treat QR generation as settlement |
@@ -1786,3 +2051,310 @@ Before Pay/Ledger is considered correctly integrated into Handymate, prove that:
 > **Handymate is the platform. Financial Kernel is the economic infrastructure. Pay is an embedded money-movement capability with an operational admin surface. Ledger is an entitlement-based accounting module inside the same platform.**
 
 Do not build a second finance product beside Handymate. Build financial depth into the system that already knows why the economic event exists.
+
+---
+
+## 36. Swedish statutory bookkeeping requirements
+
+> Source of these requirements: review finding F8. They are stated concretely here because
+> "audit trail" and "archiving" as generic goals are how a team discovers a hard requirement
+> during a pilot instead of during design. Cheap now, expensive to retrofit.
+
+The bookkeeping obligation remains with the customer (roadmap §3). Handymate's obligation is to
+be a system in which the customer *can* comply. The following are design constraints, not
+features to be prioritized later.
+
+### 36.1 Voucher identification and sequence
+
+Every posted entry must carry a voucher identification that lets the connection between the
+voucher, the source document and the bookkeeping be established without effort, in an unbroken
+series. Consequences:
+
+- Voucher numbers are allocated by the ledger, atomically, per journal series and fiscal year —
+  never by an application caller and never optimistically in JavaScript.
+- A gap in a series is a defect, not an inconvenience. A failed posting must not consume a number,
+  or if it does, the consumption must itself be recorded and explainable.
+- A reversal is a new voucher referencing the original (§13), never a reuse or a rewrite.
+
+### 36.2 Retention, readability and system documentation
+
+- Räkenskapsinformation must be retained until the seventh year after the end of the calendar
+  year in which the fiscal year ended. This is a **data lifecycle requirement that outlives the
+  customer's subscription** — it must be reflected in the deletion, export and offboarding design,
+  and it interacts with the account-deletion paths that already exist in the product.
+- The information must be presentable in readable form. SIE export (§15.4) is part of this answer
+  but is not the whole of it — source documents (receipts, supplier invoices, invoice PDFs) must
+  remain retrievable and linked to their vouchers.
+- **System documentation and processing history are a named obligation**, not internal
+  engineering notes. The system must be able to describe how a posting came to exist, including
+  posting rule and version, AI involvement and approval provenance (§14). The provenance model
+  already specified is the right shape; this section makes it a compliance requirement, so it
+  cannot be deprioritized as a nice-to-have.
+
+### 36.3 Reverse-charge construction VAT
+
+Statutory consequences beyond the posting itself (see §15.1 for the model):
+
+- The invoice document must carry a reference indicating reverse charge.
+- The determination depends on the buyer's status, which must be recorded with evidence and a
+  date — a customer's status can change.
+
+### 36.4 Accounting method
+
+Cash basis (kontantmetoden) is available below the statutory net-sales threshold and requires a
+year-end booking of unpaid documents. See §15.2. The threshold, and the consequences of a company
+crossing it mid-year, require confirmation by the accounting consultant.
+
+### 36.5 Adjacent but out of scope
+
+Personalliggare/ID06 is a statutory obligation for the construction sector but is not accounting.
+Noted here only so that it is not mistaken for a Financial Kernel responsibility.
+
+### 36.6 Rule for models
+
+Nothing in this section is a substitute for professional review. Where an implementation needs a
+threshold, an account number or a filing rule, the model **flags it for the accounting consultant
+and blocks** rather than choosing a plausible value. Presenting a model's assumption as an
+accounting decision is the one failure this whole architecture is designed to prevent.
+
+---
+
+## 37. Receivables lifecycle beyond settlement
+
+The current documents model a receivable as something that is created and then settled. Real
+receivables in this segment have more states, and each has an accounting treatment that must be
+defined **before the Ledger becomes canonical** (it is not required for beta).
+
+```text
+issued -> overdue -> reminded -> interest charged -> collection -> written off
+                  \
+                   -> sold (factoring)
+```
+
+Required treatments:
+
+- **Påminnelseavgift and dröjsmålsränta.** These already exist as invoice rows with `vat_rate 0`
+  in `lib/invoices/fortnox-rows.ts` — the comment there records that they were previously posted
+  incorrectly. They need their own revenue accounts and an explicit VAT treatment, and interest
+  accrues over time rather than at a point, which interacts with period boundaries (§26).
+- **Debt collection / Kronofogden handoff.** Who owns the receivable during collection, and what
+  happens to the ledger when a collection agency remits a net amount after its fee.
+- **Bad debt write-off.** Including the VAT consequence, which is not symmetric with the original
+  posting and differs between accounting methods (§15.2).
+- **Factoring / fakturaköp.** Common in trades and structurally significant: the receivable is
+  sold, so Handymate's AR must be able to stop representing a claim on the customer while the
+  invoice remains commercially visible to the user. If the receivable model cannot express a
+  change of owner, this cannot be added later without a migration.
+
+---
+
+## 38. Open decisions — owner's call, not the implementer's
+
+These are commercial or strategic judgements. A model that encounters one **states the blocker
+and stops**; it does not resolve it by choosing the convenient answer. Record the resolution here
+and in the `STRATEGY_INDEX.md` decision log when it is made.
+
+### 38.1 Merchant-of-record model for Handymate Pay — D1
+
+Merchant-of-record vs. platform vs. marketplace payout. Decides who holds customer money, who
+owns the receivable at each moment, what the clearing account means, who carries chargeback and
+refund liability, and how Handymate's own fee is invoiced and VAT-treated.
+
+*Recommendation:* decide before the first posting rule is written (Sprint −1). It is a ledger
+semantic wearing an integration costume.
+
+**Status: open.**
+
+### 38.2 Sprint order — Pay before Ledger, or Ledger before Pay — D2
+
+*Recommendation:* swap, running Ledger first. Ledger has no regulated counterparty, no KYC and no
+customer money at risk; a failure is a wrong number in a report rather than a wrong movement of
+cash. It also delivers the moat directly — true realized margin per project. Pay has the longest
+external lead time and the largest blast radius, so it is better run as a parallel commercial
+procurement track than as a sequential coding sprint.
+
+*Counter-argument the review cannot weigh:* a Pay launch may be worth more to pricing,
+positioning or a funding conversation than a correct ledger.
+
+**Status: open.** §28 keeps the original order until this is decided.
+
+### 38.3 Does Handymate file the momsdeklaration, or only produce it? — D3
+
+Producing correct VAT figures and filing a return are different products with different liability,
+and the customer's perception of "Handymate replaced Fortnox" is anchored on the second.
+
+*Recommendation:* decide explicitly. Do not let it default to produce-only by omission.
+
+**Status: open.**
+
+### 38.4 Cut-over fiscal-year boundary for the first pilots — D4
+
+Drives §18.4. Needed before the first pilot business is selected, because it constrains which
+businesses can be pilots at all.
+
+**Status: open.**
+
+---
+
+## 39. Amendment log
+
+| Date | Change | Source |
+|---|---|---|
+| 2026-09-11 | Original blueprint. | — |
+| 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
+
+---
+
+## 40. AI-native Accounting Outcome Delivery Contract
+
+This section is a **binding product-architecture rule** for Handymate Accounting. The target system is not a bookkeeping UI where AI prepares suggestions and a human permanently reviews every transaction. The target is verified financial outcomes delivered from operational truth, with human review reserved for exceptions that require judgment or elevated risk handling.
+
+### 40.1 Outcome, not tool usage, is the product target
+
+The desired customer experience is increasingly:
+
+```text
+Books current                 ✓
+Bank reconciled               ✓
+Supplier invoices booked      ✓
+Customer payments matched     ✓
+VAT prepared                  ✓
+Needs review                  2 items
+```
+
+not:
+
+```text
+Here are 87 AI-generated bookkeeping suggestions.
+Please approve them one by one.
+```
+
+Detailed journals, vouchers and accounting controls remain available to accountants and auditors, but routine customers should consume **completed outcomes and exceptions**, not bookkeeping work queues.
+
+### 40.2 Delivery architecture
+
+The accounting delivery loop is:
+
+```text
+Operational truth
+(project/customer/quote/time/material/invoice/supplier/payment)
+        |
+        v
+Financial Kernel
+        |
+        v
+Deterministic Ledger rules + bounded AI classification
+        |
+        v
+Rulebook / Country Pack / company policy
+        |
+        v
+Reconciliation + Financial Integrity Engine
+        |
+        +-------------------------+
+        |                         |
+        v                         v
+verified, within policy       exception / uncertainty / high risk
+        |                         |
+        |                         v
+        |                    human review
+        |                         |
+        +-------------+-----------+
+                      v
+              completed financial outcome
+                      |
+                      v
+                Karin / Economy UI
+```
+
+Human review is therefore a first-class safety path, but it must not become an implicit permanent dependency for all transactions.
+
+### 40.3 The rulebook is durable product infrastructure
+
+For Accounting, the "rulebook" is not a prompt file. It is the combined, versioned body of evidence that defines what correct means:
+
+- Global Ledger invariants;
+- country-pack rules;
+- company accounting policy;
+- posting-rule versions;
+- Golden Paths;
+- regression tests;
+- shadow/integrity comparison rules;
+- documented exception resolutions;
+- professional accounting decisions and provenance;
+- confidence and approval policies.
+
+A material real-world mistake or divergence should, where appropriate, become a durable addition to this rulebook rather than a one-off manual fix.
+
+### 40.4 Exception-to-automation flywheel
+
+The intended learning loop is:
+
+```text
+new real-world exception
+  -> classify root cause
+  -> obtain professional/domain decision where needed
+  -> update rule/policy
+  -> add regression/Golden Path/integrity check
+  -> replay or re-verify affected cases
+  -> future equivalent cases auto-handle when policy allows
+```
+
+The metric to optimize is **not maximum autonomy at any cost**. It is safe growth in the proportion of financial work that can be completed without human intervention while correctness, traceability and customer accountability remain intact.
+
+Track at minimum:
+
+```text
+straight-through processing rate
+human-review rate
+exception rate by category
+false-auto-post rate
+false-review / unnecessary-escalation rate
+repeat-divergence rate
+mean time to resolve exception
+percentage of resolved exceptions converted into durable tests/rules
+```
+
+### 40.5 Model capability is replaceable; correctness history is not
+
+Do not make the moat depend on a specific foundation model.
+
+The durable financial moat is:
+
+```text
+Handymate operational context
++ Financial Kernel history
++ trades-specific country/domain rules
++ real edge cases
++ professional decisions
++ shadow divergences
++ regression corpus
++ outcome feedback
+```
+
+A model/provider can be swapped or improved underneath this system. The accumulated definition of correctness must remain Handymate-owned and portable across model runtimes.
+
+### 40.6 Review-layer scaling rule
+
+A managed or human-assisted Accounting offering is allowed and may be strategically valuable, but its economics must improve with automation rather than scale linearly with headcount.
+
+Therefore:
+
+- low-confidence, novel, regulated/high-risk or policy-required cases may require human review;
+- reviewers should receive a bounded exception with evidence, not reconstruct the entire transaction manually;
+- the resolution must feed the rulebook where generalizable;
+- operational dashboards must distinguish straight-through work from reviewed work;
+- no implementation may claim "autonomous accounting" while silently routing all transactions through human approval.
+
+### 40.7 Relationship to shadow and integrity architecture
+
+`FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` is the first concrete implementation of this learning model. During migration it asks whether Handymate agrees with an independent reference; after Fortnox cut-over the same machinery evolves into a permanent Financial Integrity Engine that asks whether Ledger, bank, payments, receivables, payables, VAT and source documents agree with each other.
+
+Every meaningful divergence should be treated as both:
+
+1. a current correctness issue to resolve, and
+2. potential training material for the deterministic rulebook/regression corpus.
+
+### 40.8 Final outcome-delivery rule
+
+> **Handymate Accounting should increasingly sell and deliver "the financial work is done and verified", not "here is software that helps you do the financial work". Agents and deterministic systems perform the routine work; humans review exceptions; the rulebook grows from every verified edge case.**

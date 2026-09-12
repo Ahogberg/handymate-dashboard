@@ -9,6 +9,8 @@
 - [`../HANDYMATE_ACCOUNTING_ROADMAP.md`](../HANDYMATE_ACCOUNTING_ROADMAP.md) — strategic roadmap for replacing Fortnox/Bokio-class accounting for Handymate's core customer segment, including Global Ledger, country packs, shadow accounting, rollout and pricing implications.
 - [`../HANDYMATE_VERTICAL_EXPANSION_STRATEGY.md`](../HANDYMATE_VERTICAL_EXPANSION_STRATEGY.md) — vertical expansion thesis: Pay, Supply/Procurement, Payroll, Capital, Fleet, Insurance, People/Capacity Network and Marketplace.
 - [`FINANCIAL_KERNEL_ARCHITECTURE.md`](FINANCIAL_KERNEL_ARCHITECTURE.md) — implementation blueprint tying Handymate Pay and Ledger together with durable financial events, payments, allocations, reconciliation, posting engine, Fortnox shadow mode and migration from current invoice/payment code.
+- [`FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md`](FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md) — execution contract for how Codex and Claude divide, implement, review and merge Financial Kernel work. Mandatory reading for implementation agents.
+- [`FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md`](FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md) — permanent adversarial review record (2026-09-11). Its accepted findings are already normative in the two documents above; it preserves the reasoning so a constraint is not silently reversed. **Implementation agents do not need to read it.**
 
 ### Business / platform strategy
 
@@ -39,6 +41,36 @@ AI administration
 The expansion test is not "can we add this feature?" but:
 
 > **Does Handymate already own, or naturally deserve to own, the data and workflow behind something the customer currently pays another vendor to do?**
+
+### AI-native outcome delivery
+
+Handymate should not stop at giving trades companies better AI tools. Over time the platform should increasingly **deliver finished business outcomes**, with agents and deterministic systems doing the work and humans reviewing only the exceptions that genuinely require judgment.
+
+```text
+Traditional SaaS
+  customer receives a tool
+  -> customer or external firm still performs the work
+
+Handymate target state
+  operational truth enters Handymate
+  -> agents + deterministic engines execute the workflow
+  -> rulebooks/integrity checks verify the result
+  -> exceptions are escalated
+  -> customer receives the finished outcome
+```
+
+This is a product and operating-model principle, not a mandate to disguise manual services as software. The system must deliberately collapse the service overhead as it matures: structured intake, explicit scope, machine-readable rules, confidence/risk gates, exception review and visible delivery state.
+
+The model provider is not the moat. The durable moat is the combination of:
+
+- proprietary operational context;
+- domain rulebooks defining what "correct" means;
+- real customer edge cases;
+- Golden Paths and regression tests;
+- shadow/integrity divergences and their resolutions;
+- accumulated automation policies and outcome history.
+
+Every material production mistake that teaches Handymate a new domain rule should, where appropriate, become a permanent rule, test or integrity check. The desired long-term effect is that the human-review percentage falls as the rulebook grows while accountability and auditability increase.
 
 High-priority adjacent vertical order currently:
 
@@ -121,10 +153,38 @@ Financial events need their own durable/idempotent/replayable event/outbox layer
 
 Legacy `number` fields can remain during migration, but Pay/Ledger canonical state must use exact monetary representations and PostgreSQL NUMERIC/integer minor units rather than floating-point arithmetic.
 
+### 2026-09-11 — Rounding differences are postings, never tolerances
+
+The legacy ±1 kr tolerance in `lib/invoices/payment-decision.ts` must not cross into the kernel. A difference within the country pack's rounding policy becomes an explicit posting; a difference outside it becomes a reconciliation exception. This is a breaking change to tested behaviour, not a cleanup.
+
+### 2026-09-11 — The SE pack must support reverse-charge construction VAT and cash basis from the start
+
+Omvänd skattskyldighet för byggtjänster is a large share of B2B invoice volume for the target segment, and kontantmetoden is the default accounting method for most companies in it. Neither was in the original scope and neither exists in the codebase today. Both are segment-blocking rather than edge cases.
+
+### 2026-09-11 — Historical data enters the ledger as an opening balance, never as a replay
+
+`paid_amount` is an aggregate with no stored receivable composition, so pre-kernel invoices cannot be reconstructed. Cut over at a fiscal-year boundary via SIE import, post an opening-balance journal and lock every earlier period.
+
+### 2026-09-11 — Shadow mode is structurally blind until the payment direction is flipped
+
+Fortnox is currently the source of payment truth and syncs into Handymate. Until that is reversed per business, a green shadow comparison proves the sync works and must never be reported as evidence that the kernel computes payment state correctly.
+
+### 2026-09-11 — Specify now, implement after PMF
+
+Roadmap §16 (PMF first) and orchestration §10 (spend reasoning capacity on the kernel now) are not in conflict. Specification, review, contracts and executable golden paths carry no production risk and proceed now; implementation, shadow mode and pilots are gated by PMF evidence. Available model capacity is a reason to specify more, never a reason to ship finance code earlier.
+
+### 2026-09-11 — Four decisions deliberately left open
+
+Merchant-of-record model, Pay-vs-Ledger sprint order, whether Handymate files the momsdeklaration, and the pilot cut-over fiscal-year boundary are recorded as open in `FINANCIAL_KERNEL_ARCHITECTURE.md` §38. Implementation agents state the blocker and stop rather than choosing a convenient answer.
+
+### 2026-09-12 — Finished outcomes, not just AI tools
+
+Handymate's target operating model is AI-native outcome delivery: customers increasingly buy completed administrative and financial outcomes rather than software they must operate line-by-line. Agents and deterministic systems perform the routine work; rulebooks and integrity systems verify it; humans handle exceptions. This principle applies first and most concretely to Accounting, but should guide future service-like verticals where Handymate already owns the underlying operational context.
+
 ---
 
 ## North Star
 
 > **Handymate — The operating system for the trades.**
 
-The moat is not any individual module. It is the closed loop from demand and quote assumptions through operational execution, money movement, accounting truth and realized profitability back into better future decisions.
+The moat is not any individual module. It is the closed loop from demand and quote assumptions through operational execution, money movement, accounting truth and realized profitability back into better future decisions — plus the rulebook of real edge cases that lets Handymate increasingly deliver those outcomes without proportional human headcount.
