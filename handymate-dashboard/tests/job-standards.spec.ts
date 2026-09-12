@@ -109,12 +109,14 @@ for (const rows of [[{productId:'foreign',quantity:1}], [{productId:'p',quantity
     expect((await loadQuoteSetup(f.db, 'a')).templates[0].items).toHaveLength(0)
   })
 }
-test('läsfel är inte tomma listor och mallkvoten gäller nya standarder', async () => {
+test('läsfel är inte tomma listor; även legacy-konton får skapa fler än fem mallar', async () => {
   const t = await setup()
   f.fail('products'); await expect(append(t)).rejects.toMatchObject({status:503}); f.fail('')
   for (let i=0;i<5;i++) await f.pg.query('INSERT INTO quote_templates(id,business_id,name) VALUES($1,$2,$3)', ['t'+i,'a','Egen '+i])
   await ensureOnboardingJobTypes(f.db,'a',['Nytt jobb'])
-  await expect(writeJobStandard(f.db,'a',{operation:'create',jobTypeSlug:'nytt_jobb'})).rejects.toMatchObject({status:403})
+  const extra = await writeJobStandard(f.db,'a',{operation:'create',jobTypeSlug:'nytt_jobb'},'starter')
+  expect(extra.jobTypeSlug).toBe('nytt_jobb')
+  expect((await f.pg.query('SELECT id FROM quote_templates')).rows).toHaveLength(7)
 })
 
 test('främmande jobbtyp och mall kan inte ändras via manipulerade id:n', async () => {

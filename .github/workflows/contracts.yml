@@ -72,8 +72,15 @@ jobs:
         # prod-sviten, inte här.
         run: >-
           npx playwright test
+          tests/trade-start-packages.spec.ts
+          tests/customer-intake-ui.spec.ts
+          tests/project-receipts.spec.ts
+          tests/home-brain.spec.ts
           tests/agent-team.spec.ts
+          tests/approval-explainability.spec.ts
+          tests/customer-fact-evidence-journey.spec.ts
           tests/approval-action-contract.spec.ts
+          tests/approval-display.spec.ts
           tests/column-contract.spec.ts
           tests/cron-auth.spec.ts
           tests/dead-code-paths.spec.ts
@@ -144,6 +151,8 @@ jobs:
           tests/reservations.spec.ts
           tests/product-reservations-route.spec.ts
           tests/time-entry-write-path.spec.ts
+          tests/tidrapport-forslag.spec.ts
+          tests/fakturaberedskap.spec.ts
           tests/ata-livscykeln.spec.ts
           tests/ata-dokumentet.spec.ts
           tests/canonical-project-completion.spec.ts
@@ -194,6 +203,10 @@ jobs:
           tests/push-nar-ingen-nas.spec.ts
           tests/project-derive-todo.spec.ts
           tests/facit-project-list-next-todo.spec.ts
+          tests/project-approval-visibility.spec.ts
+          tests/customer-memory-truth.spec.ts
+          tests/customer-open-work-summary.spec.ts
+          tests/customer-project-timeline.spec.ts
           tests/facit-webbinflode-block-a.spec.ts
           tests/onboarding-setup-studio.spec.ts
           tests/demo-onboarding-utgang.spec.ts
@@ -209,3 +222,12 @@ jobs:
 
       - name: Sex kundutfall — sparning och leveranssanning
         run: npm run test:six-outcomes
+
+      - name: Aktivitetsläsning — verifierat kolumnkontrakt
+        run: node tests/sprint/activity-route.cjs
+
+      - name: Mejlintegrationer — tokenåtkomst, OAuth och meddelandeidentitet
+        run: node tests/sprint/mail-boundaries.cjs
+
+      - name: Livetestets företags- och skrivgrindar (utan nätverk)
+        run: node --test tests/live-journey/policy.test.cjs

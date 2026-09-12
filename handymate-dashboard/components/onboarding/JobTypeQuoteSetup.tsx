@@ -1,5 +1,6 @@
 'use client'
 
+import { getTradeStartPackage } from '@/lib/onboarding/trade-start-packages'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowRight, Check, FileText, Loader2, Plus } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
@@ -8,11 +9,12 @@ import { JobStandardRowsEditor } from '@/components/onboarding/JobStandardRowsEd
 import { slugifyJobType } from '@/lib/job-types'
 import { JobTypeQuotePreview } from '@/components/onboarding/JobTypeQuotePreview'
 import type { ReservationWithTriggers } from '@/lib/reservations/match'
-import { coreArticleGuidance, inspectTemplate, relevantProducts, resolveFirstQuoteSelection, sameUnit, setupSummary, templatesForJobType,
+import { hasLaborCost, coreArticleGuidance, inspectTemplate, relevantProducts, resolveFirstQuoteSelection, sameUnit, setupSummary, templatesForJobType,
   type FirstQuoteSelection, type QuoteSetupData, type SetupTemplate } from '@/lib/quotes/job-type-setup'
 import './job-type-setup.css'
 
 interface Props {
+  trade?: string
   syncOnboarding?: boolean
   initialJobTypes?: string[]
   initialSelection?: FirstQuoteSelection | null
@@ -25,7 +27,7 @@ interface Props {
 type SetupResponse = QuoteSetupData & { canManage: boolean }
 
 /** Delad riktig uppsättningsyta — ingen offertpreview och inga AI-anrop. */
-export function JobTypeQuoteSetup({ syncOnboarding = false, initialJobTypes = [], initialSelection, onChange, onBusyChange, refreshKey = 0, allowCreateJobType = true }: Props) {
+export function JobTypeQuoteSetup({ trade, syncOnboarding = false, initialJobTypes = [], initialSelection, onChange, onBusyChange, refreshKey = 0, allowCreateJobType = true }: Props) {
   const [data, setData] = useState<SetupResponse | null>(null)
   const [selected, setSelected] = useState<string[]>(() => Array.from(new Set([
     ...(initialSelection ? [initialSelection.jobTypeSlug] : []), ...initialJobTypes,
@@ -87,6 +89,7 @@ export function JobTypeQuoteSetup({ syncOnboarding = false, initialJobTypes = []
   useEffect(() => { void load(); return () => { revision.current++ } }, [load, refreshKey])
 
   const job = data?.jobTypes.find(j => j.slug === focused && selected.includes(j.slug))
+  const starterPackage = getTradeStartPackage(trade, job?.name)
   const linked = job && data ? templatesForJobType(data.templates, job.slug) : []
   // EN explicit kopplad mall kan väljas direkt. Flera = människan väljer.
   const chosen = job && data ? data.templates.find(t => t.id === templateId && (t.jobTypeSlug === job.slug || !t.jobTypeSlug))
@@ -160,6 +163,13 @@ export function JobTypeQuoteSetup({ syncOnboarding = false, initialJobTypes = []
       </details>}
       {job && data.linkingAvailable && <div className="job-setup-workspace" key={job.slug}>
         <div className="job-setup-document-heading"><FileText size={23} /><div><span className="job-setup-eyebrow">Ditt upplägg för</span><h3>{job.name}</h3></div></div>
+        {starterPackage && <div className="job-setup-note">
+          <p>{starterPackage.scope}</p>
+          <p><strong>Arbetskostnad:</strong> {starterPackage.labor} med eget timpris, eller uttryckligen inkluderat arbete i ett fastpris. Ange hur arbetet ska prissättas innan offerten används.</p>
+          <p><strong>Inför offerten behöver ni veta:</strong></p>
+          <ul>{starterPackage.questions.map(question => <li key={question}>{question}</li>)}</ul>
+          <p>Materialförslag: {starterPackage.materials.join(', ')}. Välj specifika produkter som passar uppdraget. Standardmängder är ert eget val, inte en bedömning av det kommande jobbet.</p>
+        </div>}
         {!linked.length && data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => { setTemplateId(''); void mutate('/api/job-types/quote-setup', 'POST', { operation: 'create', jobTypeSlug: job.slug }) }}>Förbered standardrader för {job.name}</button>}
         <details className="job-setup-details" open={linked.length > 1 || undefined}><summary>{linked.length > 1 ? 'Välj vilket offertupplägg du vill använda' : 'Utgå från en befintlig offertmall'}</summary>
         <label className="job-setup-label" htmlFor="quote-setup-template">Offertupplägg</label>
@@ -173,11 +183,14 @@ export function JobTypeQuoteSetup({ syncOnboarding = false, initialJobTypes = []
         </div>}
         </details>
         {chosen && <>
+          <p className="job-setup-note">{hasLaborCost(rows)
+            ? 'Arbete finns i artikelunderlaget. Kontrollera pris och omfattning för det aktuella jobbet.'
+            : 'Arbetskostnad behöver anges. Koppla en arbetsartikel eller ett fastprispaket där arbetsandelen är angiven. Lägg inte timmar ovanpå samma inkluderade arbete.'}</p>
           {chosen.jobTypeSlug !== job.slug && <div className="job-setup-note"><p>Du granskar mallen. Den blir inte ert standardunderlag förrän du kopplar den.</p>
             {data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => void mutate('/api/job-types/quote-setup', 'PUT',
               { templateId: chosen.id, jobTypeSlug: job.slug, updatedAt: chosen.updatedAt })}>Koppla till {job.name} <ArrowRight size={16} /></button>}
           </div>}
-          {chosen.jobTypeSlug === job.slug && data.canManage && <JobStandardRowsEditor template={chosen} products={data.products} busy={busy || priceSaving || loading}
+          {chosen.jobTypeSlug === job.slug && data.canManage && <JobStandardRowsEditor starterPackage={starterPackage} template={chosen} products={data.products} busy={busy || priceSaving || loading}
             onWrite={body => mutate('/api/job-types/quote-setup', 'POST', body)} onRefresh={load} onBusyChange={setPriceSaving} />}
           <p className="job-setup-summary" role="status">{setupSummary(rows)}</p>
           <p className="job-setup-caption">{coreArticleGuidance(rows)}</p>

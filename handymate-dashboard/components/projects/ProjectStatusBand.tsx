@@ -229,6 +229,8 @@ export function ProjectStatusBand({
 }: ProjectStatusBandProps) {
   const redo = !beredskap
     ? { text: 'Underlag saknas', tone: 'muted' as const }
+    : beredskap.pct >= 100 && !beredskap.tidrapportBedömd
+      ? { text: 'Tillgängligt underlag komplett — tidrapport behöver kontrolleras', tone: 'muted' as const }
     : beredskap.pct >= 100
       ? { text: uninvoicedKr != null && uninvoicedKr > 0 ? `Ja — ${formatSEK(uninvoicedKr)} ofakturerat` : 'Ja', tone: 'ok' as const }
       : { text: `Nej — ${beredskap.varsta_blocker || 'underlag saknas'}`, tone: 'warn' as const }

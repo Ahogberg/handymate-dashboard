@@ -7,6 +7,7 @@
  * Rena funktioner + källskanning — ingen webbläsare, inget ljud, ingen databas.
  */
 import { test, expect } from '@playwright/test'
+import { normalizeDueDateIso } from '../lib/customer-facts/build-card'
 import fs from 'fs'
 import path from 'path'
 import {
@@ -353,10 +354,11 @@ test.describe('datumankaret för löften', () => {
   })
 
   test('valideringen i kod är kvar — prompttillit räcker inte', () => {
-    const build = kod('lib/customer-facts/build-card.ts')
-    expect(build).toContain('export function normalizeDueDateIso')
-    // Formatkontrollen står som regex-literal i källan: /^\d{4}-\d{2}-\d{2}/
-    expect(build).toContain(String.raw`\d{4}-\d{2}-\d{2}`)
+    expect(normalizeDueDateIso('2026-09-11')).toBe('2026-09-11')
+    expect(normalizeDueDateIso('2024-02-29T12:00:00+02:00')).toBe('2024-02-29T12:00:00+02:00')
+    for (const invalid of ['nästa fredag', '2026-02-30', '2026-02-29', '2026-09-11skräp', '2026-09-11T25:00:00Z', '', null]) {
+      expect(normalizeDueDateIso(invalid), String(invalid)).toBeNull()
+    }
   })
 })
 

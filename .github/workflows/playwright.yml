@@ -40,14 +40,24 @@ on:
     # 02:00 UTC = 04:00 Stockholm (sommartid) — före morgonens crons (05:00 UTC).
     - cron: '0 2 * * *'
   workflow_dispatch:
+    inputs:
+      customer_journey:
+        description: 'Kör endast Nordström Els avgränsade kundresa'
+        type: boolean
+        default: false
+      create_draft:
+        description: 'Skapa ett märkt testutkast utan kundkoppling (sparas för granskning)'
+        type: boolean
+        default: false
 
 concurrency:
-  group: nightly-prod-${{ github.ref }}
-  cancel-in-progress: true
+  group: nightly-prod-${{ github.ref }}-${{ (github.event.inputs.customer_journey == 'true' || github.event.inputs.create_draft == 'true') && 'customer-journey' || 'full' }}
+  cancel-in-progress: ${{ github.event.inputs.customer_journey != 'true' && github.event.inputs.create_draft != 'true' }}
 
 jobs:
   gate:
     name: Full svit mot produktion
+    if: github.event.inputs.customer_journey != 'true' && github.event.inputs.create_draft != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 40
     defaults:
@@ -110,6 +120,7 @@ jobs:
 
   tenant-isolation:
     name: Tvåtenant-RLS-bevis (riktig databas)
+    if: github.event.inputs.customer_journey != 'true' && github.event.inputs.create_draft != 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     defaults:
@@ -158,3 +169,52 @@ jobs:
           TENANT_B_PASSWORD: ${{ secrets.TENANT_B_PASSWORD }}
           TENANT_B_BUSINESS_ID: ${{ secrets.TENANT_B_BUSINESS_ID }}
         run: npm run test:tenant-isolation
+
+  customer-journey:
+    name: Nordström El — inloggad kundresa
+    if: github.event_name == 'workflow_dispatch' && (github.event.inputs.customer_journey == 'true' || github.event.inputs.create_draft == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment: live-test
+    concurrency:
+      group: nordstrom-el-live-journey
+      cancel-in-progress: false
+    defaults:
+      run:
+        working-directory: handymate-dashboard
+    env:
+      LIVE_TEST_BASE_URL: ${{ vars.LIVE_TEST_BASE_URL || 'https://handymate-dashboard-git-codex-ecd8bb-andreas-projects-f2b98374.vercel.app' }}
+      LIVE_TEST_COMMIT_SHA: ${{ vars.LIVE_TEST_COMMIT_SHA || github.sha }}
+      LIVE_TEST_BUSINESS_ID: ${{ vars.LIVE_TEST_BUSINESS_ID || 'biz_al7pjuu5smi' }}
+      LIVE_TEST_EMAIL: ${{ secrets.LIVE_TEST_EMAIL || 'andreashogberg93@gmail.com' }}
+      LIVE_TEST_CREATE_DRAFT: ${{ github.event.inputs.create_draft }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Kontrollera testkonfiguration
+        run: node tests/live-journey/policy.cjs
+        env:
+          LIVE_TEST_PASSWORD: ${{ secrets.LIVE_TEST_PASSWORD || secrets.TEST_USER_PASSWORD }}
+      - run: npm install --no-audit --no-fund
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npx playwright install --with-deps chromium
+      - name: Inloggning, företagskontroll och vald testresa
+        run: npx playwright test --config=playwright.live-journey.config.ts
+        env:
+          LIVE_TEST_PASSWORD: ${{ secrets.LIVE_TEST_PASSWORD || secrets.TEST_USER_PASSWORD }}
+          VERCEL_AUTOMATION_BYPASS_SECRET: ${{ secrets.VERCEL_AUTOMATION_BYPASS_SECRET }}
+      - name: Rapport och skärmbilder (aldrig cookies eller nätverksspår)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nordstrom-el-live-journey-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            handymate-dashboard/live-journey-report/
+            handymate-dashboard/live-journey-results/
+          retention-days: 3
+          if-no-files-found: ignore

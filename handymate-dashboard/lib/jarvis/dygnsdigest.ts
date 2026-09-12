@@ -33,6 +33,8 @@ export interface DigestAktivitet {
   status?: string | null
   created_at: string
   auto?: boolean
+  /** false = källan bevisar aktivitet men inte en slutförd extern/domänhandling. */
+  verified?: boolean
 }
 
 export interface DigestRad {
@@ -70,7 +72,8 @@ export function byggDygnsdigest(input: {
       if (!Number.isFinite(t) || t < sedan || t > input.nu.getTime()) return false
       const text = typeof a.description === 'string' ? a.description.trim() : ''
       if (!text) return false
-      if (a.status === 'failed') return false
+      if (a.status === 'failed' || a.status === 'skipped') return false
+      if (a.verified === false) return false
       if (arBrus(text)) return false
       return true
     })

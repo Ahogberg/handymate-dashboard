@@ -27,3 +27,7 @@ docs/marketing/*.zip
 # Färskkontoprovets utfallsfil — en körningsartefakt, inte källkod.
 # Ifyllda bevisprotokoll (docs/launch/evidence/*.md) checkas DÄREMOT in.
 docs/launch/evidence/fresh-account-senaste.json
+
+# Private live-test reports; never commit sessions or customer screenshots
+/live-journey-results/
+/live-journey-report/

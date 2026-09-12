@@ -14,6 +14,7 @@ import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import { approvalDisplay, typeLabel, agentForApproval, approveLabel } from '../lib/jarvis/approval-view'
+import { classify } from '../lib/approvals/action-contract'
 
 const ROOT = path.resolve(__dirname, '..')
 const kod = (p: string) =>
@@ -25,7 +26,7 @@ test('GET /api/approvals skickar display byggt av approvalDisplay', () => {
   const src = kod('app/api/approvals/route.ts')
   expect(src).toContain("import { approvalDisplay } from '@/lib/jarvis/approval-view'")
   expect(src).toContain('display: approvalDisplay(')
-  expect(src).toContain('NextResponse.json({ approvals })')
+  expect(src).toContain('NextResponse.json({ approvals, next_offset:')
 })
 
 test('GET /api/mobile/home skickar display på varje kort i kön (NBA och fallback)', () => {
@@ -45,6 +46,7 @@ test('approvalDisplay = typeLabel + agentForApproval + approveLabel', () => {
     expect(d.type_label).toBe(typeLabel(a.approval_type))
     expect(d.agent).toBe(agentForApproval(a))
     expect(d.approve_label).toBe(approveLabel(a.approval_type, a.payload))
+    expect(d.action_class).toBe(classify(a.approval_type))
   }
   expect(approvalDisplay(ata).type_label).toBe('ÄTA-förslag')
   expect(approvalDisplay(dagbok).type_label).toBe('Dagboksanteckning')

@@ -1,10 +1,14 @@
 'use client'
 
-import { ReactNode, useState } from 'react'
+import { ReactNode, useCallback, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, Check } from 'lucide-react'
 import { formatSEK } from '@/lib/format-price'
 import ProjectApprovalsBlock from '@/components/projects/ProjectApprovalsBlock'
+import ProjectReceiptsBlock from '@/components/projects/ProjectReceiptsBlock'
+import type { ProjectApprovalsReadState } from '@/components/projects/ProjectApprovalsBlock'
+import { useBusiness } from '@/lib/BusinessContext'
+import { projectAdministrationSummary, type ProjectReceiptReadSummary } from '@/lib/projects/administration-summary'
 
 /**
  * ProjectTodoBlock — "Att göra" (Projektvy Fas 1, 2026-07-31).
@@ -52,7 +56,7 @@ interface ProjectTodoBlockProps {
   hidePrimary?: boolean
 }
 
-export default function ProjectTodoBlock({
+function ProjectTodoScope({
   projectId,
   mode,
   primaryHref,
@@ -63,24 +67,41 @@ export default function ProjectTodoBlock({
   hidePrimary = false,
 }: ProjectTodoBlockProps) {
   const [approvalsCount, setApprovalsCount] = useState(0)
-  const [approvalsReady, setApprovalsReady] = useState(false)
+  const [approvalsStatus, setApprovalsStatus] = useState<ProjectApprovalsReadState['status']>('loading')
+  const [receiptRead, setReceiptRead] = useState<ProjectReceiptReadSummary>({ status: 'loading', receipts: [], hasMore: false })
+  const administration = projectAdministrationSummary({ status: approvalsStatus, count: approvalsCount }, receiptRead)
 
   const totalCount = approvalsCount + actionRows.length
-  const showEmpty = approvalsReady && totalCount === 0 && !overBudgetAlert
+  const showEmpty = approvalsStatus === 'complete' && totalCount === 0 && !overBudgetAlert
+  const handleApprovalsState = useCallback((state: ProjectApprovalsReadState) => {
+    setApprovalsCount(state.count)
+    setApprovalsStatus(state.status)
+    if (state.status === 'complete') onApprovalsCount?.(state.count)
+  }, [onApprovalsCount])
 
   const primaryLabel = TODO_PRIMARY_LABEL[mode]
   const primaryButtonCls =
     'w-full sm:w-auto inline-flex items-center justify-center gap-2 px-6 h-[52px] bg-primary-700 hover:bg-primary-800 text-white text-[15px] font-semibold rounded-xl shadow-sm shadow-primary-700/20 transition-colors'
 
   return (
+    <>
+    <section aria-labelledby="project-administration-heading" className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-4 sm:p-5">
+      <h2 id="project-administration-heading" className="text-sm font-semibold text-slate-950">Administration kring jobbet</h2>
+      <p className="mt-1 text-xs leading-relaxed text-slate-600">Handymates förslag och sparade resultat för projektet. Nästa steg och underlag finns nedan.</p>
+      <dl className="mt-4 space-y-3 text-sm" aria-live="polite">
+        <div><dt className="font-semibold text-slate-900">Behöver din granskning</dt><dd className="mt-1 text-slate-600">{administration.pending}</dd></div>
+        <div><dt className="font-semibold text-slate-900">Sparat och skickat</dt><dd className="mt-1 text-slate-600">{administration.handled}</dd></div>
+        <div><dt className="font-semibold text-slate-900">Väntar eller behöver kontrolleras</dt><dd className="mt-1 text-slate-600">{administration.waiting}</dd></div>
+      </dl>
+    </section>
     <div className="space-y-3">
       <div className="flex items-center gap-2">
         {/* 2026-08-27: "Att göra" är nu hantverkarens uppgifter (ProjectTasksBlock);
             det här blocket är agenternas förslag + nästa steg som väntar på ägaren. */}
-        <h2 className="text-[15px] font-semibold text-gray-900">Väntar på ditt OK</h2>
-        {totalCount > 0 && (
+        <h2 className="text-[15px] font-semibold text-gray-900">Projektets ärenden</h2>
+        {approvalsCount > 0 && approvalsStatus === 'complete' && (
           <span className="font-heading text-xs font-bold bg-primary-700 text-white rounded-full min-w-[21px] h-[21px] px-1.5 inline-flex items-center justify-center">
-            {totalCount}
+            {approvalsCount}
           </span>
         )}
       </div>
@@ -117,13 +138,12 @@ export default function ProjectTodoBlock({
 
       <ProjectApprovalsBlock
         projectId={projectId}
-        onCountChange={count => {
-          setApprovalsCount(count)
-          setApprovalsReady(true)
-          onApprovalsCount?.(count)
-        }}
+        onReadStateChange={handleApprovalsState}
       />
 
+      {actionRows.length > 0 && (
+        <h3 className="pt-1 text-xs font-semibold uppercase tracking-wide text-gray-500">Nästa steg</h3>
+      )}
       {actionRows.map(row => (
         <div
           key={row.id}
@@ -146,12 +166,21 @@ export default function ProjectTodoBlock({
           <span className="w-11 h-11 rounded-full bg-primary-50 text-primary-700 inline-flex items-center justify-center mb-2">
             <Check className="w-5 h-5" strokeWidth={2.5} />
           </span>
-          <h3 className="font-semibold text-gray-900">Inget väntar på dig här</h3>
+          <h3 className="font-semibold text-gray-900">Inga ärenden eller nästa steg visas här</h3>
           <p className="text-sm text-gray-500 mt-0.5 max-w-xs mx-auto">
-            När teamet förbereder något för projektet dyker det upp här — du godkänner med ett tryck.
+            Nya förslag visas här för granskning. Kontrollera även kvittona nedan för tidigare utfall.
           </p>
         </div>
       )}
     </div>
+    <div className="mt-5">
+      <ProjectReceiptsBlock projectId={projectId} onReadStateChange={setReceiptRead} />
+    </div>
+    </>
   )
+}
+
+export default function ProjectTodoBlock(props: ProjectTodoBlockProps) {
+  const business = useBusiness()
+  return <ProjectTodoScope key={`${business?.business_id || 'loading'}:${props.projectId}`} {...props} />
 }

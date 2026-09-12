@@ -15,7 +15,29 @@
 
 # 0. Uppdraget
 
-## Make Handymate’s existing intelligence impossible for the customer to miss.
+## Readiness-pass 2026-09-12 — aktuell verifiering för PR #38
+
+**Senare verifiering 2026-09-13:** Vercel-åtkomsten är nu inkopplad med uttryckligt godkänd automationsnyckel i GitHub `live-test`. [Körning 34721809781](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34721809781), kodversion `e44b2b71a`, når appen men stoppas före login av hälsoruttens HTTP 503 (`credit_watch=error`, lagrad kreditkontroll från 12 september 05:05 UTC). Det tidigare SSO-hindret nedan är löst. Ingen autentiserad kundresa eller providerverifiering påstås. Alla vanliga CI-flöden och båda previewbyggen är gröna på den nya testkoden. Aktuell detaljerad status finns i `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`; release kvar på HOLD.
+
+Detta statusavsnitt kompletterar historiken nedan. Det uppgraderar inte äldre slice-/providerbevis.
+
+**DONE:** Riktig tvåföräldersmerge `fc586381aa7bc2defd0dc2ebe4dcb327d04b694b` förenar PR-head `6885379c9596619ac4a795e706d4052b9ac7616e` med main `f709bbe15d8e6151b21a0fe51e8b7378423c2694`. Main är därmed helt inkluderad. Brain Visibility-state är bevarat; Mission Control/heron ligger först och avlastningslänken under heron. Revenue OS, säljöverlämning och mains strategidokument är bevarade. Båda grenarnas kontraktslistor ingår.
+
+**REGRESSION FIX:** CI på den verkliga kombinationen fångade ett gammalt krav i `tests/sprint/onboarding-seeding.cjs`: checklistmallar skulle fortfarande seedas trots mains uttryckliga borttagning. Rättningen `743a12679ff1a19c06ab3b43b0cc15dfbd727ae7` bevarar fel-/återhämtningsproven för övriga standarddata och verifierar att checklistmallar varken läses eller skrivs under seedningen. Standardmallarna fortsätter komma från befintlig GET/kodkälla. Ingen produktmotor eller feature tillagd.
+
+**VERIFIED på kodversion `743a12679ff1a19c06ab3b43b0cc15dfbd727ae7`:**
+
+- Alla fem PR-workflows och motsvarande push-körningar gröna; båda Vercel-previewbyggen gröna. [Kontraktsgrind 34720582150](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720582150): TypeScript, 2 093 godkända Playwright-kontrakt, en befintlig skip, kundunderlag, sex kundutfall, aktivitetens kolumnkontrakt, mejlgränser samt livetestets 17 policyprov.
+- Lokalt: separat typkontroll och `npm run build` exit 0; 58 riktade Home/Quote/hero/veckovärde-regressioner samt veckorapportens harness för atomär reservation, fel, återförsök och okänd leverans. Provider/db är isolerade i dessa tester. Windows-svitens miljöfel (grep/radslut) omtestades godkänt med Git-verktyg och repoexakta LF-filer; inga produktkodändringar behövdes.
+- Inga öppna inline-granskningstrådar. GitHub rapporterar PR:n konfliktfri. Detta är integrations-/kodbevis, inte fullständig kundresa.
+
+**LIVE BLOCKED, observerat:** [Nordström El-körning 34720493107](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720493107) startades på merge-versionen med läsläge (`create_draft=false`). Konfigurationen passerade, men `/api/health` gav 302 till Vercels SSO innan credentials skickades. Ingen appinloggning, företagskontroll, navigering eller utkastskapning genomfördes. CLI-start fungerar nu; previewåtkomst är den konkreta kvarvarande spärren för detta prov. Se `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`.
+
+**STATUS:** Kodintegrationen är CI-grön och redo för mergegranskning. Full slice-DoD och produktionsrelease kvar på **HOLD**: godkänd autentiserad kundresa, företags-/rollbyte, verkliga providerkvitton och tidigare dokumenterade migrations-/mobil-/launchkrav är inte stängda av detta pass. Ingen merge till main eller produktionsdeploy utförd. PR:n behålls som draft tills de beslutade acceptansgrindarna är uppfyllda. Före merge ska kontrollerna även vara gröna på dokumentationscommitten som innehåller detta avsnitt.
+
+**NEXT:** Ordna godkänd previewåtkomst och kör det avgränsade läsprovet igen på aktuell head. Genomför därefter återstående uttryckliga kundrese-/providerprov enligt respektive runbook; kringgå inte skyddet och tolka inte grön CI som leveransbevis.
+
+## Make Handymate's existing intelligence impossible for the customer to miss.
 
 Handymate ska inte bara **vara intelligent i backend**.
 
@@ -486,36 +508,51 @@ Den ska kartlägga verklig runtime.
 
 ## 7.1 Minsta auditmatris
 
-Skapa och underhåll matrisen nedan i detta dokument.
+Underlag: [skiva 0](../brain-visibility/SLICE_0_CAPABILITY_REALITY_AUDIT.md) och [detaljmatris](../brain-visibility/CAPABILITY_MATRIX_PREFILL.md). Ursprunglig audit följd av daterad Codex-verifiering; status uppgraderas endast med bevis.
 
-| Capability | Code | Trigger | Real data | Can act | Approval/autonomy | Receipt/audit | Web exposure | Mobile exposure | Live/E2E proof | Cost concern | Status | Next action |
+Legend: ✅ finns/ja · ⚠️ delvis · ❌ nej/saknas · `n` = prod-antal 2026-09-10 · facit = källskannande test, E2E = inloggad browser/route-körning
+
+| Capability | Code | Trigger | Real data | Can act | Approval/autonomy | Receipt/audit | Web | Mobile | Live/E2E proof | Cost | Status | Next action |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
-| Company Scan | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Value Receipts | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Next Best Action | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Company Goals | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Customer Memory | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Business Preferences / Rules | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Quote Intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Quote Follow-up | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Meeting Intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Work Report | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Voice / Matte field input | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| ÄTA detection | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Customer promises | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Project intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Profitability / Margin | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Invoice / accounting intelligence | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Fortnox | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| ROT/RUT | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Missions / agent work | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Approval rail | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Operating Experiments | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
-| Partner / referral capability | ? | ? | ? | ? | ? | ? | ? | ? | ? | ? | AUDIT | |
+| Company Scan | ✅ `company-scan-rows.ts` | klient (hem, onboarding) | läser invoice/customer/project/quotes; tomt konto → 0 rader | ❌ läs | – | ❌ inget kvitto | ✅ hem + onb. | ❌ | facit ×5 | 0 | **PROVE** | kall testperson; besluta om kvitto |
+| Value Receipts | ✅ `lib/value/*` | on-demand | 109 utförda kort, 12 fakturor (test) | ❌ | – | ⚠️ omräknas per anrop, ingen tabell | ✅ /pengar, hem | ❌ | E2E (golden-path) | 0 | **PROVE** | visa nära kontext (skiva 6); persistens = beslut |
+| Next Best Action | ✅ `lib/jarvis/next-best-action*` | cron 07:00 | grind: ≥2 kand. + ≥1 priority_rule → **0 regler, 0 rader någonsin** | rankar bara | – | ✅ `next_best_action` | ✅ GorDettaForst | ✅ mobile-home | facit ×3 | Sonnet/dag/företag (körs aldrig) | **ACTIVATE** | seed standardprinciper i genomgången |
+| Company Goals | ✅ kolumner på business_config | ägaren i settings/onb. | **1 marginalmål, 0 omsättningsmål** av 29 | guardian-kort | INFORMATIONAL | kortet | ✅ monthly-review, projekt | ✅ profitability/mobile | E2E (margin-guardian) | 0 | **ACTIVATE** | obligatoriskt/förifyllt mål i genomgången |
+| Customer Memory | ✅ `lib/customer-facts/*` | gmail-poll */15, voice/analyze, cron 07:20 | 6 fakta, 4 godkända (prov) | via kort | `customer_fact` | ✅ rad + decision_record | ✅ kundsida | ❌ | E2E (golden-path) | Haiku/mejl | **PROVE** | ett riktigt samtal genom kedjan |
+| Business Rules / Prefs / Agent memory | ✅ 3 mekanismer | ägaren; efter agentkörning | **0 business_rule, 0 priority_rule**, 37 agent_memories | input | `agent_memory_confirmation` | ✅ 3 tabeller | ✅ settings | ❌ | facit ×5 | Haiku/agentkörning | **ACTIVATE** (regler) / PROVE (minne) | regelfråga i genomgång eller första Matte-samtal |
+| Quote Intelligence | ⚠️ 3 överlappande motorer | offertsida GET, cron 05:00, tool | kräver 3+ avslutade jobb/kategori → `insufficient` överallt; 7 rader pricing_intelligence | `price_adjustment`-kort | ja | execution_result, cost_event | ✅ offert, builder | ❌ | facit ×10 | Sonnet + Haiku | **ACTIVATE** | efter lansering: en yta "så sattes priset" |
+| Quote Follow-up | ✅ cron-rutt + `followup-round.ts` | cron 08:00, first-action, thresholds | 42 offerter, 11 uppföljda, 2070 loggar | SMS under autonomitak / `send_sms`-kort | ja, per runda bunden till kort (7f367da5) | ✅ v3_automation_logs + follow_up_count + kort | ⚠️ approvals; offertsidan säger bara "Skickad" | ✅ kort | facit ×7, ingen E2E | 0 i cron | **EXPOSE** | **skiva 2:** läsmodell på offertsidan |
+| Meeting Intelligence | ✅ `lib/meetings/*` | worker */5, reminders */5 | 1 möte, 1 segment | kort ×4 typer | ja | meeting_job/segment, call_recording, cost_event | ✅ inkorg, recordings | ⚠️ samma yta | facit ×5 | Whisper + Claude | **PROVE** | riktigt möte, två telefoner |
+| Work Report (fältrapport + Matte dagsavslut) | ✅ två saker | UI + token; DayClose → /api/day-close | **0 field_reports** | signering; time_entry/project_log via bekräftelsekort | egna kort, ej pending_approvals | field_reports; deterministiska id | ✅ projekt, jobbpass, portal | ✅ signeringssida | facit ×4 | Sonnet (Matte) | **PROVE** | riktigt dagsavslut från telefon; = Field Command-substrat |
+| Voice / Matte field input | ✅ `voice/analyze` (1107 r), `lib/transcription/*` | 46elks-webhooks, UI, Jobbkompisen | 6 inspelningar, 1 transkript; **46elks 8 kr** | kort ×4 | ja | call_recording, kort, cost_event | ✅ calls, recordings, inkorg, kund | ✅ Jobbkompisen | facit ×10 + 46 unit (transkription) | Whisper + Claude | **PROVE (blockerad)** | fyll 46elks, telefonprov |
+| ÄTA detection | ✅ `lib/ata/suggest-ata-draft.ts` | analyze, tool, Matte, manuell | 9 project_change (manuella), **0 `create_ata_draft`-kort någonsin** | kort, max 1/samtal | ja, risk low | project_change, artifacts, PDF | ✅ projekt | ✅ portal-beslut | facit ×6 | Claude ×2 | **PROVE** | samtal med extra scope; Change Order Radar = detta + jämförelse |
+| Customer promises | ✅ i `customer_fact` (v147) + deadline-sweep | cron 07:20, analyze, gmail | **0 öppna löften** (kräver extrakt + godkännande) | nudge-kort, aldrig "brutet" auto | Matte | customer_fact + kort | ✅ kundsida, projekt | ✅ kort | unit ×5 | Haiku (extrakt) | **PROVE** | Promise Engine = EXPOSE + löften ur SMS/röst |
+| Project intelligence | ✅ `project-ai-engine` + playbook + drift + mission | 4 crons + events | project_ai_log **770** (lever), lesson 3, mission 0, drift-kort 4 | kort ×3 typer | ja | project_ai_log, execution_outcome | ✅ projekt, approvals, MissionPanel | ✅ kort + räknare | E2E `flywheel`, `mission-proof` (service-role) | extraction-modell (mönster) | motor **PROVE**, playbook+mission **ACTIVATE** | skiva 3 = EXPOSE av loggen på projektsidan |
+| Profitability / Margin | ✅ `margin-guardian.ts`; ⚠️ gammal `calculateProfitability` lever | cron 06:00 + realtid | **0 profitability_warning-kort**; 1264 cost_event/30 d | INFORMATIONAL-kort; bränsletak blockerar | Karin | kort, cost_event | ✅ projekt, Fuel* | ✅ profitability/mobile | E2E (margin-guardian) | 0 | **PROVE** | ta bort gamla vägen (liten CONNECT) |
+| Invoice / accounting (inkl. **fakturaberedskap**) | ✅ `auto-invoice-on-complete`, `send-invoice`, `fakturaberedskap.ts`, `RedoAttFakturera.tsx` | projektavslut, 4 crons | 12 fakturor, **0 påminnelser skickade** | skapar/skickar, overdue, avgift/ränta | `invoice_reminder`-kort; mandat | invoice_reminders, customer_activity, manifest | ✅ invoices, projekt; ⚠️ beredskap ej på hem | ⚠️ kortfeed | facit ×15 + golden-path | 0 | **PROVE** (kedja) / **EXPOSE** (beredskap) | "X kr väntar på fakturering" på hem = summa av beredskap |
+| Fortnox | ✅ `lib/fortnox*`; 4 ingångar mot samma kärna | cron */2h; Fortnox-först vid utskick | **0 kopplade**, 19 api_log | externa skrivningar, **ej spåret** | – | fortnox_api_log, automation_activity, invoice-kolumner | ✅ integrations, invoices | ❌ | facit ×15, **0 live** | 0 | **PROVE (blockerad)** | Andreas kopplar riktigt konto i helgen; en faktura genom |
+| ROT/RUT | ⚠️ **två vägar** (egen XML vs Fortnox taxreductions) | UI only | **0 rot_payment_request** | skriver request + status; `hasPermission` | ej spåret | rot_payment_request, automation_activity | ✅ rot-payment, offert/faktura-sektioner | ❌ | facit ×9, 0 live | 0 | **PROVE + arkitekturbeslut** | Astra: en väg |
+| Missions / agent work | ✅ `lib/agents/*` (kanonisk), `lib/mission/*`; `lib/agent/*` 13/17 levande | 6 crons; mission ingen cron | agent_runs 1362 (282/30 d), **mission 0** | via `agent-gating.ts` | ja | agent_runs, automation_activity | ✅ JarvisHome | ✅ räknare | facit ×20, mission-proof | **hög**; Matte-chat utanför taket | agenter **PROVE**, missions **ACTIVATE** | Matte-chat under taket; radera 4 filer utan anropare |
+| Approval rail | ✅ `lib/approvals/*`, `[id]/route.ts` >3000 r, per-typ-grindar | alla producenter; användaren | **477 kort, 26 väntande, 109 utförda**, 30+ typer | ja | ja; självgodkännande nekas; fyra-ögon | execution_result klassad | ✅ approvals, hem, RailCard | ✅ 3 kort + push | E2E (golden-path, permission-check) | 0 | **SCALE** | befintlig motor; skiva 5 visar objektbaserat underlag — `_decision` är enbart teknisk metadata enligt källrevision |
+| Operating Experiments | ✅ `lib/experiment/*` | inline + maintenance 03:00 | **0 rader** (kräver avslutade projekt) | kort ×2 | owner_admin | tabellrad | ✅ /experiments | ❌ | facit + experiment-proof | 0 | **ACTIVATE** (sovande by design) | rör inte |
+| Partner / referral | ✅ `lib/partners/*` | Stripe-webhook, portal; ingen cron | 2 partners, 0 ledger | direkt, **ej spåret** | admin + token | ledger, payout_batch, events | ✅ /partners | ❌ | facit ×15 | 0 | **PROVE** | utanför programmet |
+| **Home / Mission Control** | ✅ JarvisHome 1980 r, 18 datakällor; räkningarna finns (MatteHero:123, TeamActivityStrip:66) | klient | allt ovan | – | – | – | ✅; ⚠️ gamla Idag-vyn parallell på /oversikt | ✅ /api/mobile/home | facit ×6 | 0 | **EXPOSE** | **skiva 1:** läsmodell, ingen ny struktur; hanterat ≠ failed |
+| **Adoption / "hanterat"** | ✅ `lib/admin/adoption.ts` (8 ytor), activation-metrics, weekly-value | admin; cron | veckorapport **0/4 lyckade**; 53 tysta fel/7 d | – | – | automation_activity | ⚠️ bara admin | ❌ | facit | 0 | **EXPOSE** | laga veckorapport + tysta fel FÖRST |
+| **Mobilappen** | separat repo `handymate-mobile`; backend `/api/mobile/home`, push | – | 1 push_token, 0 web-push, **VAPID saknas** | – | – | push-journal | – | ⚠️ | facit (push ×5) | 0 | **CONNECT** | VAPID i Vercel; bygg + installera |
 
-Lägg till capabilities som hittas.
+**Fördelning:** SCALE 1 · EXPOSE 4 · ACTIVATE 6 · PROVE 11 · CONNECT 1 · **BUILD 0**.
 
-Slå ihop redundanta namn när samma motor ligger bakom flera ytor.
+
+## Codex-verifiering 2026-09-10
+
+Kodbas: `3ae0029` (main efter uppladdat styrdokument); Claudes historiska audit gäller `64484e11`. Räkningar nedan är läsande SQL mot Handymates prodprojekt, inte provider- eller E2E-bevis.
+
+- Bekräftat: 29 företag; 1 uttryckligt marginalmål; 0 omsättningsmål, prioriteringsregler, business rules, NBA-rader, Fortnox-kopplade företag och ROT-begäranden.
+- Bekräftat: 477 approval-rader: 109 `approved`, 26 `pending`, 324 `expired`, 18 `rejected`. **109 godkända är inte 109 utförda handlingar**: runtime `payload.execution_result.outcome` är 37 `success`, 13 `failed`, 22 `skipped`, 37 saknas. Auditens historiska formulering "109 utförda" är därmed fel; sparat success är i sin tur inte automatiskt live-providerbevis.
+- Bekräftat senaste sju dagar: 53 `tyst_fel/failed` (43 `telefonnummer_saknas`, 10 `sms:leverantorsfel-saldo`), 4 `veckorapport/failed`, inga lyckade veckorapporter. Dessa auditposter ska inte raderas eller omskrivas till success.
+- Bekräftad schemadrift: `customer_document` har `id`, inte `document_id`.
+- Rättelse: `tryAutoApprove` har ingen runtime-anropare i TS/TSX. `/api/automations` läser `getAutoApproveStats`; `/api/auto-approve/patterns` läser lärandestatistik. `voice/analyze` har avvecklat legacy-vägen. Legacy-exekveraren respekterar inte dagens routing/mandat och får inte återaktiveras; detta är inte en verifierad aktiv automatisk bypass.
+- Inga förmågor uppgraderas. Övriga uppgifter/statusar är Claudes underlag; ingen ny live-, provider- eller mobilverifiering har gjorts. Fördelningarna i ursprungsunderlagen är inte normaliserade: blandade delstatusar ska inte tolkas som en verifierad summering av en primär status per rad.
 
 ---
 
@@ -1471,76 +1508,246 @@ Brain Visibility Weekend
 2026-09-11 → 2026-09-13
 
 ### OVERALL STATUS
-NOT STARTED
+
+Slice 0 klar som audit. Flera läsytor är nu verifierade i inloggad preview enligt §31, inklusive Home-reload, offertutkast, kundens nästa steg och ett verkligt sparat checklistkvitto. Detta ersätter inte fullständiga kundresor, roll-/företagsbyte, installerad app eller externa providerbevis. Slice 1/2 är fortfarande INTE stängda enligt sina Definition of Done.
+
+| Del | Aktuell status | Kvar före stängning |
+| --- | --- | --- |
+| Slice 0 — audit | Klar för att styra nästa bygge | Osäkra runtime-rader behåller sin osäkerhet; matrisen uppdateras vid nya bevis |
+| CONNECT före Home | Veckorapportskod och lokala tester klara; driftblocker kvar | Nummer/saldo, avstämning av fyra äldre rapportfel, verifierad leverans |
+| Slice 1 — Home | Femlägesyta och reload verifierade på ägarkontot; SMS-gruppavbrott rättat och omtestat | Verklig användare förstår läget inom 10 sekunder; fel/retry, roller, företagsbyte och smal viewport |
+| Slice 2 — Quote | Rundbundet kvitto implementerat; utkast, omläsning och ärlig signeringsstatus browserverifierade | Verklig offert genom skickad, bevakad, uppföljd, kundrespons och stoppvillkor |
+| Slice 3 — Project | Tidrapport, beslut och nästa steg verifierade i preview; samlad administrationsöverblick implementerad (§31.11) | Visuell acceptans av överblicken; aktiv automatisk bevakning kräver eget verifierat underlag |
+| Slice 4 — Customer | Kundminne, uppgifter och nästa bokning publicerade; slutpaket för offert/ärenden/nästa steg publicerat och previewverifierat | Verkligt roll-/företagsbyte samt smal webbvy kvar. Se `docs/brain-visibility/SLICE_4_CLOSURE.md`. |
+| Slice 5 — Explainability | Fem ursprungliga korttyper samt rundbunden offertuppföljning via SMS/e-post har källpresentation; se §31.10 | Inloggat UI-prov uppskjutet av användaren; full DoD ej stängd |
+| Slice 6 — Proof of Work | Tomläge och positivt checklistkvitto browserverifierade; faktisk återhämtning verifierad i DB och projektvy (§31.4) | Delutfall, osäkert utskick, fel/retry och övriga prioriterade kvittotyper i live-UI |
+| Slice 7 — Mobile | CONNECT implementerad i mobilcommit `4f8414a0dea9904371d174a66663e1d9f529f724`: klienten läser `/api/mobile/activity` och presenterar sparat/skickat, väntar, kontrollbehov och noterat separat under neutrala "Handymate idag". 47 tester, strikt typkontroll och Expo iOS-export gröna. | Autentiserat prov i installerad app före SCALE |
+| Slice 8 — Field Command | PROVE efter audit; befintligt rapportläge tar ett yttrande till högst fyra separata granskningskort för egen tid, anteckning, material och ÄTA, med signerad kontext, återvalidering, idempotens och journalförda kvitton. 77 riktade tester gröna. | Verklig autentiserad mobil/native-resa; bokning/kundlöfte ingår medvetet inte i det avgränsade rapportläget |
+| Slice 9 — Money Brain | PROVE efter audit; befintlig fakturaberedskap, intäktskö och value ledger visar blockerare, nästa steg och verifierade utfall utan att blanda potential med betalt. 107 riktade tester gröna. | Verklig inloggad resa och provider-/betalningsbevis |
+| Slice 10 — Full Journey Proof | PROVE på kod-/kontraktsnivå; 231 riktade tester gröna över de tre resornas centrala domänövergångar | Autentiserad faktisk UI/mobile/provider-körning för A–C före SCALE |
+
+Arbetsordningen var CONNECT → Quote (2) → Home (1), enligt auditöverlämningens NEXT ACTION. Det är ingen strikt sekventiell stängning av slices: kodarbetet fortsatte medan externa CONNECT-blockerare kvarstod. Ingen slice markeras SCALE på basis av lokala tester.
 
 ### CURRENT SLICE
-SLICE 0 — Capability Reality Audit
 
-### CURRENT OBJECTIVE
-Kartlägg den faktiska intelligensen på aktuell `main` och mobile innan någon större ny implementation görs.
+Helgsprintens kod-/kontraktsarbete är genomgånget till och med Slice 10. Slice 8 och 9 klassificerades PROVE utan ny produktkod, och Slice 10 har ett grönt sammanhållet kontraktsprov men saknar fortfarande de faktiska autentiserade UI/mobile/provider-resor som krävs för SCALE. När veckoanvändning åter blev tillgänglig återöppnade användaren arbetet: mobilens kvittenskoppling är implementerad och ett fokuserat visuellt pass på Brain Visibility-ytorna pågår.
 
-### DEFAULT NEXT ORDER
-1. Capability Reality Audit
-2. Brain Surface / Home
-3. Quote Brain
-4. Project / Job Brain
-5. Customer Brain
-6. Explainability
-7. Proof of Work / Value Receipts
-8. Mobile Brain Visibility
-9. Field Command 2.0
-10. Money Brain
-11. Full Journey Proof
+För slice 5 återanvänds befintliga kort och underlag i ett avgränsat paket. Källrevision: `_decision` i `lib/ai/decision-record.ts` innehåller modell/promptversion/indatahash och tidpunkt, inte objektbaserad evidens. Auditradens tidigare formulering om att bara visa `_decision` räcker därför inte. Tekniska metadata eller modellens fria resonemang ska inte visas som förklaring. Inga nya motorer eller tabeller.
 
-### KNOWN HIGH-PRIORITY QUESTIONS
+### SLICE 5 — första avgränsade paketet
 
-- Hur mycket av Company Scan är faktiskt aktivt, kundsynligt och E2E-bevisat?
-- Hur används Value Receipts i riktig UI idag?
-- Finns NBA/Company Goals men saknar real-world consumer/data?
-- Hur mycket av Field Command-substratet finns redan?
-- Är ÄTA-detection från samtal/möten runtime-aktiv och säkert kopplad till rätt projekt/offert?
-- Vilka kundlöften finns redan och vad saknas för full Promise Engine?
-- Vilken rule/memory-logik har faktisk downstream consumer?
-- Vad är Operating Experiments verkliga runtime-status?
-- Vad består befintligt partnerprogram av och vad är endast referral/provision?
-- Vilken intelligent state finns idag men är dold i auditloggar/backend?
-- Vilka smarta capabilities fungerar på web men inte mobile?
-- Vilka LLM-anrop görs i onödan eller flera gånger?
-- Var saknas provider-proof trots gröna tester?
-- Kan Home redan byggas huvudsakligen som read model ovanpå befintliga primitives?
+Gemensam ApprovalReview visar "Varför säger Handymate detta?" för customer_fact, meeting_followup, project_log_note, create_quote_draft och create_ata_draft. Endast typstyrda sparade källutdrag/referenser och relevanta datum används; förslag till datum skiljs från källdatum. Referensens typ visas som sparad referens, utan påstående att källobjektet nyligen har lästs/verifierats. Inga nya länkar, tabeller eller motorer. Saknad källa visas uttryckligen, även om ett datumförslag finns.
 
-### KNOWN LAUNCH-CRITICAL JOURNEYS
+Underlaget kommer från den ursprungliga lagrade payloaden, inte klientens edited_payload. INFORMATIONAL/ACK-grindar, åtgärdsknappar, tenantfilter och exekveringsregler ändras inte. `_decision`, modell/prompt/hash och generiska modellbeskrivningar används inte som evidens.
 
-A. Onboarding → First Real Value  
-B. Inquiry → Quote → Follow-up → Customer Decision → Project  
-C. Work → Time/Material/ÄTA → Invoice Basis → ROT/RUT → Fortnox
+Verifiering: sex riktade mapper-/prepare-/renderadaptertester, berörd customer-fact-replacement-harness, typkontroll med 8192 MB och kontraktsparitet gröna. Ingen livegranskning i ny roll hävdas. Paketet täcker inte ännu alla viktiga rekommendationer; slice 5 hålls öppen. Nästa steg är preview av detta paket och därefter ett avgränsat val av återstående offert-/kommunikationsflöde, utifrån befintligt objektunderlag och lanseringsnytta.
 
-### PROGRAM DEFAULT
-CONNECT → ACTIVATE → EXPOSE → PROVE
+### SLICE 6 — projektets sparade kvitton
 
-### NEW BUILD POLICY
-BUILD only when audit proves the required capability/primitive does not already exist.
+Audit före bygge: befintlig `lib/approvals/receipt.ts` ger state/text som sparas i `pending_approvals.payload.execution_result.receipt` efter första körning och omkörning. `executed_at` registrerar körningen, `resolved_at` beslutet. Befintlig GET `/api/approvals?status=resolved&project_id=...` har företags-/routingfilter och paginering. Ekonomiska value-/ledger-beräkningar återanvänds inte för detta paket: de svarar på andra frågor och vissa äldre värdekvittotexter har vidare leveranspåståenden än den kanoniska kvittensen.
 
-### LAST COMPLETED
-None.
+Paketet visar "Projektets kvitton" som egen sektion efter projektets Att göra/beslutsyta. Endast sparad kvittens används; godkänt beslut utan kvittens är inget utförandebevis. Köat, delvis utfört, misslyckat, noterat och accepterat av sändtjänsten hålls isär. Inga påståenden om sparad tid, levererat/läst meddelande eller automatiskt utfört arbete läggs till. Samma approval-ID visas en gång; ingen sammanblandning med v3-loggar eller nya värdesummeringar.
+
+Källan sorterar på kortets skapandetid, därför utlovas inte "senast utfört". Fortsatt sidläsning erbjuds även om en sida saknar kvitton. Läsfel är separata från verifierat tomläge; redan lästa kvitton behålls vid fel på nästa sida. Företags-/projektbyte får egen komponentidentitet, äldre svar ignoreras och kvitton läses om efter beslut. Inga nya endpoints, motorer eller tabeller.
+
+20 riktade tester, typkontroll (8192 MB) och diffkontroll är gröna. Riktad verifiering omfattar faktisk resolved-GET med projekt-/företags-/routingfilter, kvittensstatus, sidläsning, asynkront gammalt svar, läsfel samt kontraktsparitet. Inloggat UI-prov återstår; inga nya inloggningsförsök eller produktionsbeslut görs för att stänga paketet. Slice 6 markeras inte slutstängd på enbart lokal verifiering.
+
+### SLICE 7–8 — mobilbeslut och Field Command-audit
+
+Slice 7:s CONNECT-lucka är implementerad i mobilcommit `4f8414a0dea9904371d174a66663e1d9f529f724`. Mobilklienten läser nu dashboardens befintliga `/api/mobile/activity` i stället för `automation_logs` direkt. Ytan heter neutralt "Handymate idag" och markerar bara sparade/skickade kvittenser eller lyckade regelkörningar som klara; köat, delvis/misslyckat/behöver hanteras samt noterat/avvisat visas som separata tillstånd. Den sparade kvittenstexten vinner över kortets yttre rubrik och `auto` kommer från servern. Workflowgrinden bevisar 47 riktade tester, strikt TypeScript och en verklig Expo-export för iOS. Ett autentiserat prov i installerad app återstår före SCALE.
+
+Slice 8 återanvänder befintligt rapportläge i Matte/Day Close. Ett yttrande kan skapa högst ett granskningskort vardera för egen tid, intern arbetsanteckning, material och ÄTA. Varje del är osparad tills sitt eget klick, bär signerad projekt-/användar-/datumkontext, återvalideras vid beslut och skrivs genom befintlig verktygsrouter. `work_report_session` ger ett stabilt request-id, seriell claim och beständiga delkvitton; retry och samtidiga beslut får inte duplicera state. Bokning och kundmeddelande är uttryckligen förbjudna i detta avgränsade rapportläge och ska inte läggas in som en parallell motor.
+
+Verifiering 2026-09-11: 77/77 riktade tester gröna i `work-report.spec.ts` och `quote-packages-day-close.spec.ts`. De täcker bland annat fyrdelad kedja, roll/projekt/datum, återvalidering, retry/idempotens, inga gissade priser/belopp och att en text eller obekräftad körning aldrig blir "sparad". Eftersom autentiserad app/native-resa återstår klassificeras Slice 8 som PROVE, inte SCALE. Ingen ny Field Command-motor behövdes.
+
+### SLICE 9 — Money Brain-audit
+
+Money Brain återanvänder tre befintliga läsmodeller. Projektets fakturaberedskap visar tillgängliga underlagsdelar och värsta kända blockerare utan att räkna saknad data som klar. Intäktskön följer `create_ata_draft` och `missad_intakt` genom granskning, kund, leverans, faktura och betalning; varje fas skiljer användarens tur, väntan, kontrollbehov och avslutat samt länkar till den befintliga domänytan för nästa steg. Value ledger håller identifierat, agerat, fakturerat och verifierat betalt som separata nivåer. Identifierat underlag och hela fakturans belopp presenteras separat och okända eller motsägande referenser failar stängt.
+
+Verifiering 2026-09-11: 107/107 riktade tester gröna i `fakturaberedskap.spec.ts`, `revenue-recovery-case.spec.ts`, `revenue-work-queue.spec.ts`, `value-ledger.spec.ts` och `recovered-revenue.spec.ts`. De täcker blockerare, roll-/tenantgrind, felläsning, direkt artefaktkoppling, prioriterad nästa handling, attribution, deduplicering och kravet att betald status har både kanonisk status och tidpunkt. Verklig inloggad resa och provider-/betalningsbevis återstår; Slice 9 klassificeras därför PROVE, inte SCALE. Ingen ny produktkod behövdes.
+
+Visuellt Brain Visibility-pass 2026-09-11: projektkvitton har fått tydlig hierarki och separata visuella tillstånd för verifierat klart, köat, noterat och kontrollbehov. Money Brain-intäktskön har fått tydligare produktidentitet, fasetiketter, handlingshierarki och visuellt avvikande kontrollärenden. Paketet är publicerat till dashboardbranchen i `2447024ccc9ac0636e963912986b80a0cd154097`; fem GitHub Actions-grindar och båda Vercel-previewbyggen är gröna. Lokal typkontroll och riktade logik-/komponenttester är gröna. De lokala browserbaserade queue-testerna kunde inte starta utan containerns Playwright-binär, men motsvarande CI-grind blev grön.
+
+### SLICE 10 — Full Journey Proof-checkpoint
+
+Ett sammanhållet kod-/kontraktsprov kördes över de tre styrda resornas centrala domänövergångar:
+
+| Resa | Bevisat i denna checkpoint | Kvar före SCALE |
+| --- | --- | --- |
+| A — Lead → Quote → Customer → Project | Offertens val/underlag bevaras, projekt skapas tenant- och retry-idempotent, ansvarig valideras och kvittensen skiljer verkligt utfall från accepterad/köad handling | Riktig förfrågan, agentsvar, providerutskick, kundrespons, stoppvillkor och synlig reload-resa |
+| B — Field Work → ÄTA | Ett yttrande kan ge tid/material/anteckning/ÄTA som separata signerade beslut; ÄTA följer låst livscykel, kundsignering och fakturerbar status | Faktisk autentiserad mobil/native-resa samt verkligt kundbeslut/providerbevis |
+| C — Work → Money | Projektunderlag och accepterad ÄTA bevaras till retry-idempotent faktura; ROT-bedömning failar okänt i stället för falskt nej; utskick och Fortnox-betalningsklassning skiljer utkast, providersvar, kundandel och slutbetalning | Verklig Resend/Fortnox-körning, återläsning och synligt beständigt kvitto |
+
+Verifiering 2026-09-11: 231/231 riktade tester gröna i elva suites för offert, projekt, fältrapport, ÄTA, faktura, ROT, Fortnox och approval-kvitton. Detta är kod-/kontraktsbevis med kontrollerade beroenden, inte ett påstående om faktisk providerleverans eller en full autentiserad UI-resa. Slice 10 klassificeras PROVE, inte SCALE. Ingen ny motor eller tabell skapades.
+
+### LAST COMPLETED — historisk auditbaseline
+
+Skiva 0: matris med 25 rader, statusfördelning SCALE 1 / EXPOSE 4 / ACTIVATE 6 / PROVE 11 / CONNECT 1 / BUILD 0. Lokal katalog synkad till origin/main 64484e11; typkontroll grön (kräver `--max-old-space-size=8192`).
 
 ### VERIFIED
-None in this program yet.
+
+Kodinventering mot origin/main; runtime-antal ur prod; cron-lista; anropare för `lib/agent/*`, DayClose → dagsavslut, automation-engine.
 
 ### NOT VERIFIED
-Entire Brain Visibility program.
+
+Mobilappens byggstatus (separat repo); om `auto-approve*` respekterar `routing.ts`-grindarna; om `pdf-preview.ts` (pdfjs-dist) fungerar i prod-build.
+
+### STATUS CHANGES
+
+Alla 25 rader: AUDIT → (se matris). Två rättelser mot förhandsversionen: Work Report CONNECT → PROVE (inkopplat via DayClose); "lib/agent död" → 4 filer döda, resten levande.
 
 ### OPEN RISKS
-- Duplicating existing intelligence because naming differs.
-- Showing agent activity without durable object linkage.
-- Overstating financial value.
-- Desktop-only improvements for field workflows.
-- Increasing LLM cost just to generate presentation text.
-- Destabilizing launch-critical flows through unnecessary refactors.
-- Treating green isolated tests as live customer-journey proof.
 
-### NEXT ACTION
-Perform SLICE 0 Capability Reality Audit and update the matrix in this document with repo-grounded evidence before starting implementation.
+- 53 tysta fel + trasig veckorapport gör varje "hanterat"-påstående osant tills de är lagade.
+
+- Fjärde Home-ombyggnaden på två månader om skiva 1 inte hålls till läsmodell.
+
+- 1264 LLM-kostnadshändelser/30 d utan en riktig kund; Matte-chat utan tak.
+
+- GO-förutsättningarna (46elks, Stripe live, VAPID, Google, schemafix, Fortnox) ligger utanför programmet men blockerar all PROVE.
+
+### NEXT ACTION — överlämningens prioritering, aktuell checkpoint nedan
+
+1. CONNECT: töm tysta fel, laga veckorapporten (Fable, ~2 h).
+
+2. EXPOSE: Quote Brain-läsmodell på offertsidan ur `followup-round.ts` + `v3_automation_logs` (Codex, ~4–5 h).
+
+3. EXPOSE: Home-läsmodell med fem states ur befintliga källor, `failed` räknas aldrig som hanterat (Fable, ~5–6 h).
+
+4. ACTIVATE: standardprinciper + mål i genomgången (~2 h).
+
+5. Astra-beslut: ROT-väg; `auto-approve*` vs `routing.ts`.
+
+### CODEX CHECKPOINT 2026-09-10
+
+Dokument infogade mot main `3ae0029`; initial dokumentcommit `87d3355`. Runtimekontroller och begränsningar i §7.1. Arbetsordningen följer auditens §8 (CONNECT → Quote → Home), eftersom sanningsenlig leveransstatus krävs före Home-claims.
+
+**DONE / REUSED:** veckorapporten återanvänder SMS-sändaren, värdekärnan och `automation_activity` för en atomär veckoreservation och separata auditposter. Inga nya tabeller. Fail-closed för fel i paus-, dedupe- och rapportunderlag. Bara bevisat utebliven sändning tillåter retry. Osäkert providersvar eller success utan provider-id låser för avstämning. Legacy-fel omsänds inte automatiskt.
+
+**VERIFIED:** separat veckorapport-harness för samtidighet/retry/timeout/5xx/saknat provider-id/auditfel grön. Samlad körning: 132 tester gröna (Home, dygnsdigest, autopilot-rapport, strict-read, Quote Brain, first-value-production och durable-followup). Slutlig `NODE_OPTIONS=--max-old-space-size=8192 tsc --noEmit` grön. Testerna kör faktisk logik/rutthanterare med kontrollerade beroenden; vissa befintliga kontraktstester granskar källkod. Detta är inte webbläsar-E2E. Produktion endast SELECT för audit/schema.
+
+**NOT VERIFIED / RISKS:** inga riktiga utskick; 46elks-saldo/telefonnummer och gamla fyra misslyckade veckorapporter kräver extern åtgärd/avstämning. Inga historiska fel raderade. Inga capability-statusar uppgraderade.
+
+**QUOTE — KOD IMPLEMENTERAD / LOKALT VERIFIERAD:** befintlig handoff-kedja läser tre deterministiska rundkort för aktuell sent_at och visar senaste sändkvittens med giltig exekveringstid och kanalens artifact-id. Ingen ny endpoint eller skrivning från GET. Oberoende Astra-review klar; 25 riktade offert-/routetester gröna. Kvittot påstår inte läsning hos kund. Reliability-review klar.
+
+**LOKALA COMMITS:** dokument `87d3355`, reliability `ed0345a`, Quote `3ef6c3d`, Home `c6b24a3`, på `codex/brain-visibility-weekend-20260910`. Användaren har uttryckligen godkänt push av branchen inklusive auditdokumenten till det publika repot. Merge/deploy har inte utförts.
+
+**HOME — KOD IMPLEMENTERAD / ÅTERANVÄNDNING:** fem kategorier via liten presentationsadapter och befintliga källor. Kö/NBA-läsfel visas uttryckligt; inga ovillkorliga allt-hanterat-claims. Hanterat begränsas till visade aktivitetsrader med identifierat leveransbevis, inte optimistiska beslut eller generiska agent-successes. Uppföljningar filtreras på `scheduled` i befintlig handover; pengakategorier summeras inte till kronor. Hela dashboardinnehållet återställs per företag/användare; relevanta läsningar uppdateras vid fokus. Befintliga API:er kompletterade med fullständighetsinformation. Astra-slutreview klar efter rättning av tidsfönstertext. UI-översikten är en första läsyta; inte bevis för att alla launch-förmågor är aktiva.
+
+**LOKAL KÖRMILJÖ:** lokal Chromium avbryts med SIGTRAP. Molnwebbläsaren ansluter, men lokal serveradress blockeras med ERR_BLOCKED_BY_CLIENT. Försök att starta Next dev avbröts i Sentry instrumentation (`uv_resident_set_memory`, ENOENT). Ingen fungerande appserver eller browser-/mobilverifiering kan därför påstås. Slutligt `npm run build` mot Home-commit `c6b24a3` avslutades med exitkod 0 (325/325 sidor genererade). Byggloggen innehåller ändå saknad Supabase-konfiguration och befintliga metadata/dynamic-render-varningar. Grönt bygge är därför inte bevis för fungerande inloggning eller runtime i denna miljö.
+
+**NEXT ACTION:** skapa åtkomlig preview av arbetsbranchen med korrekt testkonfiguration och testkonto; kör riktiga Home/Quote-resor inklusive omladdning, läsfel, företagsbyte och smal skärm. Avstäm därefter de fyra legacy-veckorapporterna mot provider före eventuell omsändning och åtgärda nummer/saldo. ROT-exklusivitet och legacy suggestions-tenantgrind kvarstår före launch. Tidigare push blockerades av automatisk säkerhetsgranskning; användaren har därefter uttryckligen godkänt publicering av branchen inklusive auditdokumenten. Nästa publiceringssteg är push och draft-PR, inte merge till main.
+
+### PREVIEWKONTROLL 2026-09-10 — PR #38
+
+Preview för GitHub-commit `c11f205f1a9bc313e1e483ccb01bbfce1291efc8` är byggd. Alla rapporterade GitHub-checkar är gröna, inklusive befintliga webbläsarprov med simulerade API-svar och tester mot tillfällig Postgres. Detta är inte samma sak som hela kundresan mot verkliga providers.
+
+Inloggad browserkontroll har nu genomförts i previewn, efter Vercels åtkomstkontroll och Handymates egen inloggning. Home laddar och visar den begränsade beslutskön. En accepterad testoffert visar registrerad accept och projektplanering som nästa steg, även efter reload. En öppnad testoffert visar uttryckligt att nästa uppföljningstid inte kan bekräftas. Offertvyn har ingen horisontell overflow i testad desktopbredd (1363 px). Inga beslut godkändes och inga utskick initierades.
+
+Två konkreta fel hittades och har rättats i nästa avgränsade ändring:
+
+- Aktivitetsrutten väljer `communication_log.ai_reason`, som inte finns i verifierat prod-schema. Läs befintliga meddelandefält i stället; ingen migration.
+- Home blandar laddning med läsfel och visar läsfel för väntansläget även när avsaknad av aktivt uppdrag är känd. Skilj laddning, känt tomt uppdragsläge och fel utan att påstå att hela firman saknar väntande saker.
+
+Rättningarna har fokuserade regressioner i befintlig CI: faktisk aktivitetsrutt mot verifierat kolumnkontrakt, Home laddning/tomt/fel och UI-prov för laddning → tomt samt offertkvitto. Aktivitetsruttharnessen och sju Home-tester är lokalt gröna. Efterkontroll av preview-commit `e18199e`: Home laddar aktivitetsläget utan fel, visar känt tomt uppdragsläge och två synliga beslut. Reload visar först laddningstext och sedan aktuellt läge. Nya UI-proven för Home och offertkvitto är gröna i CI. Kontraktsgrinden fångade en skillnad mellan lokal testlista och workflow-lista; listorna synkas och aktivitetsruttharnessen läggs även i workflowen. Slice 1 och 2 är fortfarande öppna: positiv sändkvittens med verklig provider, komplett kundresa, byte mellan två företag och mobilapp är inte bevisade här.
+
+### CHECKPOINT — OMBOKNING OCH NÄSTA SLICE
+
+Alla 13 rapporterade CI-checkar för `1d0e22b` är gröna, inklusive den synkade kontraktsgrinden. Därefter har legacy-ombokningen fått företagsfilter både vid läsning och uppdatering av uttryckligt booking_id. Läsfel, saknad bokning, skrivfel och noll uppdaterade rader ger misslyckat resultat utan SMS. Bekräftelse kan skickas först när uppdateringen returnerat en bokning inom samma företag. Fem isolerade regressioner kör faktisk POST-hanterare och är gröna; harnessen ingår i befintlig `test:six-outcomes`. Inget verkligt SMS skickat; detta bevisar den avgränsade tenantgrinden, inte hela legacy-flödets samtidighet eller leverans.
+
+Project är inspekterad inför nästa brief, inte nybyggd: återanvänd `project-reality.ts`, `derive-todo.ts`, befintliga status-/ekonomikomponenter och projektets nästa steg. Ingen parallell ekonomimodell eller ny motor. Större visuell designöversyn kommer efter kärnflödena; begriplig status, nästa steg och mobil användbarhet tillhör varje slice. Slice 1/2 och provider-/företagsbyte-/mobilgrindarna ovan är fortfarande öppna.
+
+### PROJECT — AVGRÄNSAD SANNINGSRÄTTNING
+
+**OBSERVERAT:** inloggad preview av befintligt testprojekt visade ”Tidrapport i går — Klar” samtidigt som senaste tidrapport var fyra dagar gammal. Kodgranskningen visade att både ingen tillämplig bokning och misslyckade läsningar kunde tolkas som klar rapport.
+
+**IMPLEMENTERAT / ÅTERANVÄNT:** samma gårdagsuppslag och `findProjectsMissingTimeEntry` ligger kvar. Läsfel/laddning är okänt, inga genomförda bokningar innebär ej tillämpligt och räknas inte som färdig rapport. Bara genomförd bokning med matchande tidrapport ger klar tidrapport. Äldre svar vid projekt-/företagsbyte ignoreras. Befintlig fakturaberedskap visar granskningsbehov när tidrapportbeviset är okänt, även om tillgängliga övriga delar ger 100 procent. Ingen fakturering eller annan skrivning har lagts till.
+
+**VERIFIERING:** 57 fokuserade tester gröna, inklusive faktisk asynkron callback med läsfel, tomt svar, ogiltigt null-svar och äldre svar efter ny läsning. Typkontroll grön före testkompletteringen. De två befintliga rapportspecifikationerna är tillagda i både lokal kontraktslista och CI-lista; paritetsgrinden är grön. Ombokningscommit `f14390c` är grön i samtliga 13 CI-checkar. Project-rättningen är ännu inte bevisad i uppdaterad preview. Publiceringsförsöket via GitHub create_tree/create_blob gav ett serialiseringsfel för den stora projektfilen; önskat träd kunde inte hämtas efteråt. Överföringen återhämtades efter uttryckligt användargodkännande via GitHubs webbeditor till `codex/project-time-transfer-20260910`. Filens blob-SHA `39fcccbff649212b4091388f7db45a3b3d7496b0` matchar den testade lokala filen exakt. Komplett paket sammanförs i PR #38; efterföljande CI och previewkontroll återstår. Lokal implementation är committad som `f625ad6`.
+
+**LIVE-CHECKPOINT:** komplett kod på GitHub `ffb29cf3d471d93a22636533593dd56114fd56ef`, samtliga 13 CI-checkar gröna och båda Vercelbyggena gröna. Samma inloggade testprojekt visar nu ingen falsk ”Tidrapport i går — Klar”, även efter full omladdning. Befintlig blockerare ”Nej — 1 delmoment kvar” och nästa steg ”Rapportera tid” kvarstår. Inga godkännanden, utskick eller produktionsskrivningar genomfördes.
+
+**KVAR / NÄSTA STEG:** fortsätt Project-granskningen av vad Handymate bevakar, vad användaren behöver göra och vilket underlag som saknas; återanvänd befintliga komponenter och motorer. Slice 3 är inte stängd: detta rättar tidrapportbeviset, inte hela projektets administrativa läsmodell eller fullständig fakturaberedskap. Övriga slice 1/2-, provider- och mobilgrindar kvarstår. Inga capability-statusar uppgraderade.
+
+### PROJECT — BESLUT OCH NÄSTA STEG
+
+**OBSERVERAT:** ProjectApprovalsBlock läste företagets första 50 väntande beslut och filtrerade först därefter på projekt, vilket kunde dölja äldre projektbeslut. Läsfel kunde bli ett tomt block. Inloggad preview visade dessutom badge 4 för två beslutsförslag plus två vanliga nästa steg.
+
+**AVGRÄNSNING:** behåll `/api/approvals`, tenantfilter, `canActOnApproval` och befintlig gransknings-/godkännandeväg. Filtrera projektets payload före paginering, visa delvis lista med fortsatt läsning och skilj okänt/fel från verifierat tomt. Beslutsantal ska avse beslut; vanliga åtgärdsrader visas som nästa steg. Ingen ny motor eller tabell, inga verkliga beslut/utskick i regressionerna.
+
+**STATUS:** implementerat med projektfilter i befintlig GET, tydlig fortsatt läsning, synliga fel/återförsök, skydd mot äldre svar och omläsning från sida ett efter beslut. Badge räknar beslut; åtgärdsrader ligger under Nästa steg. Typkontroll och 18 riktade tester gröna, inklusive faktisk GET och asynkron läscallback. Nya regressioner är inkopplade i både lokal kontraktslista och workflow; separat körning av ny spec och paritetsgrind är grön (8/8). GitHub-kodcommit `3ca682f63c07f6b34a9fc2bde9f7ee3b94ec0464` har samtliga 13 CI-checkar och båda previewbyggen gröna. Inloggad kontroll av samma testprojekt visar två beslut (tidigare badge fyra), separat Nästa steg och samma resultat efter full omladdning. Tidrapportens tidigare falska klarstatus är fortsatt borta. Förberedelsevyn verifierades också: inget kommande bokat besök ger tydligt besked och kalenderlänk. Inga beslut eller utskick genomfördes. Live-företagsbyte, mobil och verklig kö med fler än 50 projektbeslut är inte bevisade; paginering och sena svar har isolerade regressioner. Detta stänger inte hela Project-slicen.
+
+### PROJECT — TYDLIG GRANSKNING
+
+Projektkorten återanvänder nu API:ets gemensamma `approvalDisplay` med samma kanoniska fallback, i stället för egna agent-/typkartor. Effektfulla ärenden öppnas med ”Granska”, informationskort med ”Jag har läst det”, och redigerat innehåll med ”Granska ändring”. Det ovillkorliga ”Skickas efter ditt OK” är ersatt av neutral väntansstatus. Befintlig granskningsdialog och servergrind är oförändrade. Tio riktade presentation-/läsregressioner och typkontroll är gröna; publicerad preview och avbruten granskning återstår vid denna checkpoint. Inga capability-statusar uppgraderade.
+
+### UTÖKAT SCOPE — ALLA GODKÄNNANDEKORT
+
+Användaren har uttryckligen begärt korrekt struktur för alla korttyper och ytor, inklusive informationskort utan Godkänn. Se `docs/brain-visibility/APPROVAL_CARD_SURFACE_AUDIT.md`. Samma befintliga klassificering/granskningsväg ska styra webb och mobil. Webbpaketet är lokalt implementerat över de kartlagda kortytorna: kanoniska primär-/redigerings-/paketetiketter och klassmedvetna gruppetiketter, med 17 riktade tester inklusive CI-paritet och typkontroll gröna. Paketet är publicerat i dashboard-PR #38, commit `29f778bad29a3b1f4186ceea96314c557952d778`, med exakt samma träd som lokalt. Mobilbryggan är publicerad i separat draft-PR `Ahogberg/handymate-mobile#8`, commit `8cc43b6815b645e1bbe97ea42af75765ac18b696`. Lokal kontroll av faktiska ApprovalCard visar att beslut/okända klasser endast öppnar webbgranskning, informationskort kvitteras och misslyckad länk inte tar bort kortet. CI, uppdaterad webbpreview och faktisk mobilbuild redovisas separat. Användaren godkände uttryckligen publicering av hela paketet inklusive arbetsplan/tester efter automatisk granskningsblockering. Native mobilgranskning ersätts inte med ogrundad direktgodkänning.
+
+### LIVE-CHECKPOINT — GEMENSAM KORTPRESENTATION
+
+Dashboard-kod `29f778bad29a3b1f4186ceea96314c557952d778`: alla 13 CI-checkar och båda Vercelbyggen gröna. Inloggad Project-preview visar två Granska-knappar; första SMS-kortet öppnar serverns dialog och Tillbaka lämnar båda korten kvar. Ingen slutlig bekräftelse eller sändning utfördes. Mobil-PR #8 har grön fokuserad Jest-CI; faktisk mobilbuild kvarstår. En missvisande konsekvenstext i webbgranskningen (”skickas nu” före bekräftelse) identifierades och har rättats till villkorad formulering för meddelanden, kampanjer och interna handlingar. Nio befintliga granskningsregressioner passerar; textuppföljningen `463ab7b7fa4c76312584f7cc0acd993887c78803` har samtliga 13 CI-checkar och båda Vercelbyggen gröna. Inloggad dialog visar nu ”När du bekräftar skickas meddelandet via SMS.” Tillbaka lämnar båda korten kvar. Godkännandesidan visar också korrekt Granska på sina tre väntande effektkort. Ett historiskt checklistfel syns i kvittensen; read-only schemakontroll visar att order_id numera är nullable. Det gamla felet är därför inte bevis för en kvarvarande NOT NULL-blocker och ingen automatisk retry utförs.
+
+### SLICE 4 — FÖRSTA VERTIKAL: SANNINGSENLIGT KUNDMINNE
+
+**OBSERVATION:** inloggad kundvy har historik och statistik men saknar samlad öppen/nästa-status. Befintlig facts-route svarar 200/tom lista vid DB-fel och kundsidan döljer då minnet. Deadline och uppfyllandestatus finns i customer_fact men visas inte.
+
+**BESLUT/AVGRÄNSNING:** börja med befintligt kundminne: skilj laddning, läsfel med återförsök och verifierat tomt; visa bekräftade aktiva fakta, källcitat/datum och lagrad löftesstatus. Separera kund-/företagssessioner så sena svar inte visar föregående kund. Återanvänd facts-route och befintlig borttagning. Ingen ny motor/tabell eller bred kundmodell med fem nya läskällor. Ingen slutsats om personlighet eller att ett passerat datum betyder brutet löfte.
+
+**RUNTIMEUNDERLAG:** read-only schema bekräftar due_at, promise_status, fulfilled_at, confirmed_at, evidence_quote och källreferenser. Aktiva fakta är två kontaktfakta och en preferens, samtliga bekräftade; inga aktiva löften finns att verifiera live. Löftesgrenar provas isolerat. Legacy-kundsidans övriga läsningar och tidslinjens ofullständighetsrisk kvarstår; denna vertikal stänger inte slice 4.
+
+**LOKAL STATUS:** första kundminnesvertikalen implementerad. Fyra nya route-/loader-/löftesstatusregressioner samt CI-paritet passerar; typkontroll och diffkontroll gröna. Den äldre customer-facts-specens API-assertion har uppdaterats för synliga fel. Fyra andra äldre assertions om approval-write-kodens textfönster faller efter tidigare refaktorering; dessa är inte en del av nya minnesgrinden och lämnas som separat testskuld. Projektvyns separata minneskonsument döljer fortsatt läsfel. Ingen faktisk löftesuppfyllelse eller borttagning testad i produktion.
+
+**PUBLICERINGSBLOCKER:** automatisk säkerhetsgranskning avvisade uppladdning av kundminnespaketet till publika `Ahogberg/handymate-dashboard`, eftersom senaste uttryckliga godkännandet bedömdes gälla föregående kortpaket. Kundminneskoden är lokalt committad som `845abf6` och inga branchändringar för den har publicerats. Ny uttrycklig bekräftelse för kundminneskod, arbetsplan och tester krävs enligt granskningsbeslutet. Befintlig publicerad head är `463ab7b7fa4c76312584f7cc0acd993887c78803`, alla 13 CI-checkar/båda previews gröna; mobil-PR #8 är grön i fokuserad Jest-CI. Användaren har därefter uttryckligen godkänt publicering av kundminnesändringen inklusive styrdokument och tester i PR #38. Publicering och preview-kontroll återupptas.
+
+### LIVE-CHECKPOINT — KUNDMINNE
+
+Kundminneskod publicerad som `fae59443be930d4340f8ffc880aeb0dceb0fb696` i PR #38 med exakt trädmatchning mot lokal kod. Alla 13 CI-checkar och båda Vercelbyggen gröna. Inloggad testkund visar nu ”Det här vet Handymate” och ”Inga bekräftade kundfakta finns ännu”, även efter full omladdning. Ingen produktionsskrivning, borttagning eller löftesuppfyllelse utförd. Löftesstatus och läsfel/sena svar har isolerade regressioner; fyllda löftesrader och verkligt företagsbyte är inte livebevisade.
+
+### NÄSTA AVGRÄNSNING — ÖPPNA UPPGIFTER OCH NÄSTA BOKNING
+
+Read-only audit genomförd efter kundminnets publicering. Återanvänd task-API med resolveTaskScope/canSeeTask och separata läslägen per källa. Kundfiltrerad bookings-GET behöver först inkludera tenantägda projektkopplade bokningar, inte bara direkt customer_id; projektläsfel får inte ge falskt tomt. Kommande aktiv bokning avgörs från lagrad status och schematid; avbokade/avslutade jobb exkluderas. Varje yta ska ha källänk, begränsad lista, tydligt tomt/fel och skydd mot sena svar. Befintliga legacy-tabräknare får inte användas som verifierat underlag. Tvåkällorsvyn är nu implementerad och lokalt granskad. Task-summary använder befintlig actor-/privatsynlighet före sortering och fyraradersgräns, visar tre och flaggar fler; okänd roll eller misslyckad projektledarläsning ger synligt fel. Bokningsläsningen räknar tenantägda kundprojekt, stoppar vid ofullständigt eller över 500 projekt, inkluderar bara null-customer-projektbokningar utöver direkt kopplade och utesluter avslutat/avbokat före gränsen. Indata-ID interpoleras inte i rå filtergrammatik. Separata läslägen och sena-svar-skydd behålls. Inga skrivflöden ändrade. 13 riktade tester, typkontroll och diffkontroll passerar. Faktiska route-harnessar provar privata rader före synliga, scopefel, avslutade jobb och motstridiga kundkopplingar; publicerad preview för tvåkällorsvyn återstår.
+
+**PUBLICERINGSBLOCKER — TVÅKÄLLORSVYN:** lokal kodcommit `a9f6e3b`, 13 riktade tester/typkontroll gröna. Automatisk säkerhetsgranskning avvisade uppladdning av detta nya paket (kod, tester och uppdaterad roadmap) till publika `Ahogberg/handymate-dashboard`, med skälet att senaste uttryckliga godkännandet gällde det tidigare kundminnespaketet. Ingen fjärrbranch uppdaterad för tvåkällorsvyn. Publicerad head är fortsatt `fae59443be930d4340f8ffc880aeb0dceb0fb696`, verifierad i CI och inloggad preview. Användaren har därefter uttryckligen godkänt publicering av uppgifts-/bokningsvyn inklusive API-rättningar, tester och styrdokument i PR #38. Publicering och preview-kontroll återupptas.
+
+### RUNTIMERÄTTNING — BOKNINGSSTATUS
+
+Read-only produktionskontroll efter publicering av tvåkällorspaketet `7ee588bf2e9361c3adb94111f1e5fe79ec8bf5c3` upptäckte att lokal testdubbel tillät ogiltiga booking_status-värden. Faktisk enum är confirmed/cancelled/completed/no_show; next_active använder nu enbart confirmed och behåller completed_at/job_status-grindarna. Route-harness avvisar nu ogiltiga enumvärden. Korrigerad SELECT fungerar och identifierar en befintlig kommande bokning i testföretaget. 13 riktade tester, typkontroll och diffkontroll gröna efter rättningen. Fyllda öppna kunduppgifter saknas i testföretagets icke-privata data; inget skapas för test. Slutlig preview-kontroll väntar på det rättade bygget.
+
+### LIVE-CHECKPOINT — ÖPPET OCH NÄSTA
+
+Den föregående previewversionens enumfel gav synligt ”Bokningarna kunde inte läsas” med återförsök, medan uppgifterna fortfarande visade sitt separata verifierade tomläge. Felet blev inte ”ingen bokning”. Rättad kod är publicerad som `55cb3ac2912d7fb7fd0d712bb5246e1164bf1eff`. Båda Vercelbyggen är gröna. Inloggad kundvy visar befintlig kommande bokning 11 september kl. 12:00; Öppna bokningen går till rätt bokningsdetaljer med samma tid och innehåll. Alla 13 CI-checkar är gröna. Den andra testkunden visar separata verifierade tomlägen för uppgifter och kommande bokning. Fylld bokning, rätt navigering och tomma lägen är därmed liveprovade; projekt-only-bokning, fyllda uppgifter/privatsynlighet och sena svar har isolerade regressioner. Verkligt roll-/företagsbyte och hela slice 4 är fortsatt öppna. Inga bokningar eller uppgifter skapades eller ändrades.
+
+### REPRODUCERA LOKALA KONTROLLER
+
+Kör från `handymate-dashboard/` efter `npm ci`:
+
+```bash
+NODE_OPTIONS=--max-old-space-size=8192 npx tsc --noEmit
+node tests/veckorapport-reliability-harness.cjs
+npx playwright test tests/home-brain.spec.ts tests/dygnsdigest.spec.ts tests/autopilot-rapport.spec.ts tests/weekly-value-read-errors.spec.ts tests/quote-brain.spec.ts tests/first-value-production.spec.ts tests/durable-followup.spec.ts --no-deps --project=chromium --workers=1 --reporter=line
+npm run build
+```
+
+Den uppräknade testsamlingen startar inte någon browser och använder inte produktion. Kör inte en ospecificerad full Playwright-svit som ersättning: repots standard-BASE_URL pekar mot produktion och vissa separata resor gör verkliga skrivningar/utskick. För nästa UI-grind behövs rätt branch-preview och avsett testkonto.
+
+### ARKITEKTURBESLUT FÖRE BYGGE
+
+1. ROT: egen XML är vald ansökningsriktning inför launch. Ingen snabb avstängning av Fortnox `taxreductions`: dess betydelse för fakturans avdrag/saldo är ännu obevisad. Exklusivitet per faktura och idempotent XML-återhämtning kräver avgränsad Money-slice med providerbevis. Två vägar finns alltså fortfarande i kod; ROT kvarstår PROVE/blockerad. Home/Quote tillför ingen ansöknings-CTA. `generated` betyder XML-underlag skapat; Fortnox `submitted` bevisar inte mottagning hos Skatteverket.
+2. Auto-approval: legacy `tryAutoApprove` saknar runtime-anropare och får inte återaktiveras. Mänskliga beslut går via approvals/[id] och `canActOnApproval`; systembeslut via befintlig earned-autonomy/mandat. Statistik/learning confidence är inte mandat. Ingen bred approval-refactor i läsmodellerna.
+3. Separat launch-fynd: legacy `/api/suggestions/approve` reschedule-handler hade inget tenantfilter för uttryckligt booking_id. Avgränsad fix och fem regressioner är nu implementerade, se checkpoint ovan; ingen bred återaktivering/refactor av legacy-flödet.
+
+### IMPLEMENTATIONSBRIEF — ASTRA → SOL
+
+- **CONNECT:** veckorapportens misslyckade försök får inte permanent spärra veckan. Återanvänd `automation_activity.id` för atomär veckoreservation med attempt-token/CAS; håll reservationen vid osäkert leveransutfall. Separata historiska auditposter bevaras. Läsfel i dedupe/paus/underlag blockerar utskick. Inga auditlarm undertrycks. Ingen verklig sändning i tester.
+- **Quote:** utöka `app/api/quotes/[id]/handoff` → `lib/quotes/handoff.ts` → `QuoteHandoff.tsx`. Läs samma sent_at-kedjas högst tre deterministiska omgångskort, härled senaste kvitto med `followupProviderAccepted`. Behåll stopvillkor, regel/cadence, pending/claimed/expired-semantik. Ingen skrivning/reconcile från GET. Giltig executed_at krävs för tidsclaim. Owner/admin och tenantgrind oförändrade.
+- **Home:** ren presentationsadapter från JarvisHomes redan använda källor och MissionProvider. Fem kategorier; planerat är inte utfört/pågående. `failed`/`skipped` och generellt agent-run-success är inte hanterat. Läsfel är okänt, inte noll. Återanvänd samma deduplicerade beslut; märkt begränsad lista. Behåll ekonomiska sanningsklasser och behörigheter. Ingen ny tabell/motor/LLM/API-hub.
+- **TEST GATE:** retry/concurrency/response-loss, tenant/permissions, falsk framgång vid läsfel, omgångskvitto efter reconcile/ny sent_at, företagsbyte/stale response, reload och smal skärm. Unit/kontrakts-/lokala browserbevis ersätter inte live/provider/mobilapp.
+
+### VERIFIERINGSGRÄNS
+
+Historiska auditstatusar behållna med rättad evidens. `approved` är inte samma sak som verifierat execution outcome. Externa nummer-/saldoåtgärder återstår. Ingen felhistorik raderas för att få gröna siffror.
 
 ---
 
@@ -2012,3 +2219,196 @@ Sol används där tydlig execution skapar mer kundvärde per token.
 
 > **Astra prevents expensive mistakes.  
 > Sol turns good decisions into product.**
+
+## 31. Inloggat webb-smoke-test 2026-09-11
+
+Miljö: Vercel-preview för `codex/brain-visibility-weekend-20260910`. Användaren bekräftade Nordström El AB som rätt testföretag. Färsk inloggning och omladdning behöll rätt ägarkonto. Detta är begränsad UI-observation, inte full slice-DoD eller providerbevis.
+
+- Home: efter laddning visas fem lägeskategorier och två beslutsgrupper. Omladdning återgår till dashboarden utan onboarding-redirect.
+- Kampanjens Granska: dialogen blockerar utförande eftersom fullständig text eller giltiga unika mottagare saknas, och visar uttryckligen att inget har skickats.
+- SMS-grupp: granskningen visar projekt, kund, en mottagare, meddelandetext och separat `Bekräfta och skicka`. Ingen bekräftelse utfördes.
+- AVVIKELSE: efter `Tillbaka` på gruppens första SMS öppnades granskning av nästa SMS, även efter navigering till projektet. Gruppavbrott och dialogens livscykel vid navigation behöver utredas och regressionstestas; inte godkänt som avslutat flöde.
+- Projekt `TEST Codex – preview #16 ROT och projekt`: två väntande SMS och regionen `Projektets kvitton` visas. Regionen anger att inga sparade utförandekvitton hittades. Endast tomläget verifierat, inte positiva/felaktiga kvitton.
+- Kund Andreas från projektlänken: `Öppet och nästa` visar de två ärendena, senaste offert som utkast, att uppföljning börjar först efter skickande, samt explicita tomlägen för öppna uppgifter och framtida bokning.
+
+Inga godkännanden, utskick, avvisningar, skapanden eller Fortnox-ändringar utfördes. Första passet omfattade ingen visuell screenshot-granskning.
+
+### 31.1 Fortsatt testpass samma dag
+
+- Offertutkastets `Kontrollera igen` uppdaterade kontrolltiden och behöll `Inget utskick är bekräftat` samt nästa steg att granska och skicka.
+- AVVIKELSE: samma oskickade offert visar samtidigt den äldre sidopanelrubriken `VÄNTAR PÅ SIGNERING`. Läsmodellen och sidopanelen ger olika signaler; presentationen behöver rättas.
+- Beslutsköns Väntande/Hanterade går att läsa. Historiska informationskort (bland annat Måndagskortet och signerad ÄTA) saknar godkännandeknappar; ett läst kort visas som `Läst`. Inget aktivt oläst informationskort fanns i den väntande kön, så dess klickflöde är inte browserverifierat.
+- AVVIKELSE: checklistan i historiken visar både en grön `Godkänd`-etikett och `Behöver följas upp`. I väntande-vyn exponeras ett rått NOT NULL-fel för `project_checklist.order_id`. Ingen retry utfördes. Felets ursprung är inte fastställt av detta test.
+- SMS-gruppens avbrottsorsak bekräftad i kod: gruppslingan i `components/jarvis/JarvisHome.tsx` fortsätter efter `executeSend`, medan en avbruten review (HTTP 499) endast returnerar ur det enskilda anropet. Inget stoppresultat förs tillbaka till gruppslingan. Ingen produktkod ändrad i testpasset.
+- Visuell screenshot-granskning av desktop-historiken utförd: kort/filter renderas, men den gröna beslutsstatusen för misslyckad checklista är missvisande. Ingen smal viewport testad.
+- **96 isolerade tester godkända**: `approval-display`, `approval-review`, `project-receipts`, `approval-explainability`, `approval-action-contract` (41); `home-brain`, `customer-open-work-summary`, `approval-receipt`, `approval-view` (55). Körda med `--no-deps --project=chromium --reporter=line --workers=2`. Dessa är funktions-/kontraktstester med mocks eller källkodskontroller, inte installerad app eller riktiga provideranrop.
+
+Testpasset är avslutat med öppna fynd, inte full acceptans. Kvar: rätta och regressionstesta ovanstående fynd, aktiva informationskort/övriga korttyper i UI, fel/retry i live-UI, roll-/företagsbyte, smal viewport, installerad mobilapp och verkliga providerutfall. De senare kräver tillgänglig enhet respektive avgränsat godkänt utskicks-/Fortnox-testmål.
+
+### 31.2 Lokala rättningar efter testfynd
+
+- Home använder en sekventiell review-grupp som avbryter när ett enskilt anrop inte uttryckligen lyckas. Avbruten review, läs-/nätfel och misslyckat/delvis utförande stoppar återstående medlemmar; redan utförda handlingar återkallas inte.
+- Både paketkort och vanliga historikkort använder samma statuspresentation. Misslyckande/delutfall markeras `Behöver följas upp`; enbart godkänt beslut får en neutral `Beslut godkänt`, inte en grön utförandemarkör. Rå checklistfeltext och själva checklistfelet är inte ändrade.
+- Offertens signeringskort kräver skickat/öppnat status och `sent_at` för att säga `Väntar på signering`. Enbart token visas som `Signeringslänk skapad`, inte som utskicksbevis.
+- Ny regressionstestfil `brain-visibility-ui-regressions.spec.ts`: fem tester för gruppavbrott, framgång/fel, historikstatus, offertstatus och inkoppling i de faktiska UI-komponenterna. Tillsammans med approval-review, approval-view och project-receipts: 41 tester godkända. Typkontroll med 8192 MB godkänd.
+- Detta är lokala kodrättningar. Preview-publicering och browseromtest av rättningarna återstår; ingen slice får full DoD på dessa testresultat ensamma.
+
+### 31.3 Publicerat och omtestat 2026-09-11
+
+Kodcommit `f69a2307072410151b7dd46a592c5eba061f91ae` publicerad till arbetsgrenen/PR #38, inte main. Dashboardens Vercel-build lyckades och samtliga fem GitHub Actions-flöden för denna commit är gröna.
+
+Efter omladdning av previewn, inloggad som bekräftad ägare för Nordström El AB:
+
+- Historikens checklista visar `Behöver följas upp` i stället för den gröna godkännandestatusen.
+- SMS-grupp med två väntande ärenden: första granskningen öppnades och avbröts med `Tillbaka`. Därefter fanns noll granskningsdialoger och gruppknappen för två väntande ärenden var kvar. Ingen andra dialog öppnades och inget skickades.
+- Offertutkast `quote_2jm0fz9lnwf`: `Signeringslänk skapad` synlig, noll förekomster av `Väntar på signering`.
+
+De tre avgränsade rättningarna är därmed browserverifierade. Tidigare listade kvarvarande acceptanstester, själva checklistans databasfel och dess råa feltext är fortfarande öppna.
+
+### 31.4 Checklistor och godkännandekort — sprint 2026-09-11
+
+Publicerad kod: `d78175d7f494880f7c9ffddb80450c5c2146190f` i PR #38. Båda Vercel-byggena och samtliga fem CI-flöden godkända. 53 riktade lokala tester och typkontroll godkända: checklist-review-recovery, approval-review, approval-artifact-write, approval-view, approval-receipt och brain-visibility-ui-regressions.
+
+- Prod-schema verifierat read-only: `order_id` är redan nullable och `project_checklist_project_or_order` kräver projekt eller order. V215-rättningen finns alltså i databasen; ingen ny migration behövdes. Det visade felet var ett historiskt misslyckande från 2026-09-06.
+- Ny checklistgranskning läser tidigare deterministiskt checklist-ID inom samma företag. Saknad checklista visar alla kontrollpunkter före skapande; befintlig checklista bekräftas utan dubblett eller återställda punkter. Läsfel eller annat projekt blockerar bekräftelsen. Testat isolerat inklusive förlorat svar via befintligt artifact-write-test.
+- Kända tekniska databasfel får begriplig korttext. Fellistans knapp heter `Granska återförsök` och beskriver därmed nästa steg. Verifierat i publicerad UI.
+- Verkligt återförsök via den granskade UI-vägen utfört på användarens bekräftade testföretag Nordström El AB, projekt `proj_1788704644276_0zfdth`, kort `appr_1788704645731_sxix4cq`. Ingen kundkommunikation. Resultat verifierat via SQL: exakt en checklista `429c6780-7344-5067-a83f-8e6bf336621e`, tio punkter, noll ikryssade, status `in_progress`.
+- Kortets sparade utförande visar `outcome: success`, `retried: true`, kvittens `saved`/`Checklistan är skapad.` och samma checklist-ID. Fellistan försvann. Projektets kvittoregion visar `Sparat` och `Checklistan är skapad.` i webbläsaren.
+
+Checklistans historiska fel är återhämtat. De interna testpunkterna finns kvar som ej utförda; inga säkerhetskontroller påstås vara genomförda. Full täckning av samtliga korttyper i live-UI, roll-/företagsbyte, smal viewport och installerad app kvarstår enligt tidigare avgränsning. Denna sprint stänger inte dessa bredare acceptanspunkter.
+
+### 31.5 Behörigheter och mobilens aktivitetsstatus
+
+- Första körningen: 57/62 tester gröna. Fem äldre routingtester förväntade fortfarande öppen `any`-routing, i konflikt med den skärpta policyn från 2026-09-09 och `kortgrindar-per-behorighet.spec.ts`. Förväntningarna uppdaterade till den beslutade policyn; ingen runtime-behörighet försvagades.
+- Efter korrigering: 25/25 routing-/kortgrindstester gröna, tillsammans med de tidigare 42 övriga gröna testerna totalt **67 unika tester** (permission-contract, approval-routing, dashboard-mobile-shell, project-mobile-layout, mobile-home-feed och kortgrindar-per-behorighet).
+- Tre isolerade harness-körningar gröna: mobile-activity, history-recovery och stale-review-recovery. Verifierar bland annat 401/403, företagsfilter, medarbetarens egna tillåtna beslut, läsfel, sidindelning och avbrutet beslut utan skickad handling.
+- Hittat och rättat ett separat mobilglapp: API:t kunde lämna ut ett gammalt `saved`/`sent`-kvitto trots att senaste execution outcome var failed/retrying eller saknades. API:t returnerar nu `needs_action` och skiljer tidigare kvittens från obekräftat utfall. Mobilens befintliga presentation mappar redan detta till uppmärksamhet. Utökat faktiskt route-harness verifierar båda kvittotyperna med failed/retrying/saknat utfall och att success bevaras.
+- Typkontroll godkänd. Mobil-layouttesterna ovan är källkodskontrakt, inte visuella tester i smal viewport. Inget live-rollbyte eller test av installerad app utfördes i detta pass. Dessa acceptanspunkter är fortsatt öppna, liksom alla korttyper i live-UI.
+
+### 31.6 Sammanhållet webbpass — Project, underlag och Explainability
+
+Samtliga fem CI-flöden för `b6b8cbe724abe9c99f92d5938b314f8f0eb97184` verifierade gröna. I detta pass: 134 riktade tester godkända (72 i job-preparation/project-reality/approval-explainability och 62 i project-invoice-journey/project-approval-visibility). Dessa är isolerade funktions-/kontraktstester, inte fulla användarresor.
+
+Inloggad preview på Nordström El AB:
+
+- Projekt P-1015 visar väntande SMS-beslut, ej tilldelad personal, kvarvarande delmoment som faktureringsblockerare och sparat checklistkvitto.
+- `Inför nästa jobb` på projektet visar att ett kommande bokat besök saknas. `Läs in igen` behåller korrekt stopp och länk till kalendern.
+- `Granska fakturaunderlag` kräver explicit val mellan offert/godkända ÄTA och faktisk tid/material; texten förklarar att underlagen inte slås ihop automatiskt.
+- Valet offert/ÄTA öppnar underlag med signerad offert, signeringsdatum och rader. Ett befintligt utkast FV-2026-004 identifieras; UI säger uttryckligen att ingen ny faktura skapas. Återgång till projektet fungerar. Ingen faktura skapades eller ändrades.
+- Bokning `book_film_5` finns men saknar projektkoppling. Förberedelsen stoppar med begriplig förklaring och kalenderlänk. Ingen koppling ändrades för att få testet grönt.
+
+**Kvar före stängning:** positiv förberedelseresa med faktisk bokning/projekt/källunderlag; prioriterade aktiva Explainability-kort med sparad evidens i UI; Project-ytans fulla svar på vad som bevakas administrativt. Ovanstående runtimebevis stänger specifika stopp-/underlagsvägar, inte hela slice 3 eller 5. Inga externa utskick eller andra affärsbeslut utfördes.
+
+### 31.7 Positivt läsflöde med befintlig testbokning
+
+Read-only inventering av Nordström El AB hittade tre ej avslutade projektkopplade testbokningar, samtliga från maj. Inga aktiva pending-kort fanns för customer_fact, meeting_followup, project_log_note, create_quote_draft eller create_ata_draft. Därför finns inget aktuellt evidenskort att livegranska i den testkön.
+
+Browserprov med `book_proj_day2` och projekt `6791b989-912c-4608-bd76-2ab30f797ed0`:
+
+- Förberedelsen laddar projekt/kund och källor för avtalat arbete och fyra ÄTA-poster. Saknad projektadress markeras uttryckligen som ej verifierad.
+- Expanderat `Visa varför` visar offertkälla samt skillnaden mellan skickad/ej godkänd ÄTA och fakturerad/ej bevis på utförd ÄTA. Källänkar visas; inga källuppgifter konstruerades för testet.
+- Saknade checklistor, handlingar, installationer och projektkopplad kontakt visas som luckor i det lästa underlaget.
+- `Fråga Matte` öppnar en redigerbar, oskickad fråga med projektkontext, källtidsstämpel och luckor. Ingen fråga skickades. Detta testar övergång till utkast, inte agentens svar eller genomförande.
+
+Begränsning: bokningen är historisk men fortfarande schemalagd i testdata. Detta är ett positivt läsflöde, inte bevis på ett kommande besök eller komplett underlag. Aktiva evidensbaserade godkännandekort behöver ett avgränsat testscenario via ordinarie producent före full slice 5-acceptans.
+
+### 31.8 Evidenskedja och datumvalidering
+
+Live-preview: `Skapa testmöte` på `/dashboard/demo` svarade att Nordström El AB inte är demokontot. Serverns DEMO_BUSINESS_ID-grind avbröt före skapande. Inget syntetiskt möte eller kort skapades; spärren behölls. Positiv evidensgranskning i live-UI är fortsatt öppen och kräver det avsedda demokontot eller ett verkligt befintligt kort.
+
+Isolerat scenario använder ordinarie `buildCustomerFactCard` → `prepareApprovalReview` → `approvalEvidenceRows`, med mockade läsningar och inga databas-/modell-/utskicksanrop. Mötes- och e-postkällor behåller citat, begriplig referens, föreslaget datum och knappen `Spara kunduppgiften`.
+
+Hittat och rättat: `normalizeDueDateIso` accepterade omöjliga kalenderdatum som Date.parse rullar vidare till nästa månad. Nu krävs verkligt kalenderdatum och antingen datum utan tid eller explicit tidszon. Ogiltigt producentdatum tas inte med; ett ogiltigt redigerat datum blockerar beslut. Skottår och giltiga offsets verifierade.
+
+52 riktade tester gröna och typkontroll godkänd. Ett gammalt källkodstest i promise-deadlines förväntade sig tyst borttagning av löftesdatum vid schemafel; det uppdaterades till den redan införda exekveringens ärliga felutfall utan att ändra exekveraren. Detta är inte bevis på modellens extraktion eller en genomförd livebeslutsresa.
+
+### 31.9 Offertuppföljningens knapp och kvittens
+
+Liveprovet är fortsatt blockerat av webbläsaranslutningen: CDP refresh tabs timeout kvarstod även efter användarens uttryckliga godkännande av demoinloggning. Inloggningsresultatet är okänt; inget testmöte eller livebeslut har verifierats. Ingen slice stängs på detta underlag.
+
+Fortsatt kodgranskning hittade en lokal avvikelse i Godkännanden: quote_nudge visade `Noterat, jag ringer` och hade en hårdkodad telefonkvittens trots att exekveraren hanterar typen som SMS. Specialfallen togs bort. Kortet använder nu den gemensamma `Granska`-etiketten och ordinarie utfalls-/kvittenshantering; typnamnet ändrades till `Offertuppföljning`. Ingen exekveringsregel eller utskicksbehörighet ändrades.
+
+32 befintliga riktade tester för kortpresentation och åtgärdskontrakt godkända. Visuell verifiering av denna ändring återstår när webbläsaren fungerar. Föregående commit 5c2adcb har fem gröna CI-flöden och två lyckade Vercelbyggen.
+
+### 31.10 Fortsatt arbete utan livewebbläsare
+
+Användaren har uttryckligen skjutit upp liveprovet och bett att övrigt arbete fortsätter. Demoinloggning, testmöte och browserkontroller ska därför inte återförsökas i denna arbetsomgång. Tidigare godkännande av det avgränsade demoprovet kvarstår.
+
+**Färdigställt kodpaket:** Explainability omfattar nu även ordinarie rundbundna offertuppföljningskort (`send_sms`, `send_email`). Befintlig `parseQuoteFollowupRound` återanvänds. Den ursprungliga sparade payloaden ger begriplig offertreferens, offertens sparade utskicksdatum samt omgång/kanal. Inga råa ID:n, fingerprint, modelltext eller antaganden om uteblivet kundsvar exponeras som källunderlag. Det anges uttryckligen att uppgifterna beskriver ett förslag, inte en leveranskvittens. Felaktigt datum, kanal eller ofullständigt underlag ger en synlig lucka. Vanliga fristående meddelanden får ingen påhittad offertkälla.
+
+Åtgärdsgrindarna och exekveringen är oförändrade. Evidens kan inte ge en blockerad granskning en bekräftelseknapp eller ersätta dess mottagare/meddelande.
+
+**Verifierat:** 13 riktade evidens-/producenttester, 27 isolerade uppföljningskontrakt (faktiska helpers/cron med mockad DB/provider), 10 CI-kontrakt och typkontroll gröna. De tre nya evidensfallen ligger i befintlig CI-spec. Tidigare `customer-fact-evidence-journey.spec.ts` är nu också inkopplad i både npm-kontraktskommandot och GitHub-workflow. Inga liveutskick eller databasskrivningar.
+
+**Kvarvarande avgränsningar:** Project-slicens fulla administrativa läsmodell är fortfarande ett kod-/produktgap; loggarnas fritext får inte direkt presenteras som verifierade skickat-kvitton. Roller/företagsbyte, smal webbvy, installerad app, verkliga provider-/betalningsbevis och sista sammanhållna användarresor är acceptansluckor enligt statusmatrisen. Kodpaketet ovan stänger inte dessa delar.
+
+### 31.11 Projektets administrationsöverblick — avgränsat paket
+
+Användaren prioriterar kvarvarande usage till UI-förbättringar. Ny överblick `Administration kring jobbet` i befintliga ProjectTodoBlock komponerar projektets redan behörighetsfiltrerade ärenden och kvitton. Den visar vad som behöver granskas, sparade handlingar, utskick accepterade av sändtjänsten samt köade/osäkra utfall. Befintliga kort, nästa steg, kvittenser och deras återförsök ligger kvar direkt under överblicken.
+
+Inga extra API-anrop, tabeller, AI-körningar eller motorer. Kvittornas befintliga `complete`-klassning styr räknarna: en gammal sparat-/skickat-kvittens med misslyckat utfall räknas inte som utförd. Noterat/avvisat räknas inte som utfört arbete. Delvis läst lista och läsfel anges uttryckligen, och alla tal avser det lästa underlaget. ProjectTodoBlock remountas per företag/projekt så summeringen inte följer med mellan kontexter.
+
+Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom listan även kan innehålla informationskort. Tomläget lovar inte längre att inget kräver användaren eller att ett klick alltid godkänner: tidigare utfall kan behöva kontrolleras i kvittolistan.
+
+22 riktade tester och typkontroll gröna. Nya sammanställningstester ingår i befintlig CI-spec och täcker blandade kvitton, tidigare misslyckade utfall, partiella/felande läsningar och kopplingen till samma befintliga läsningar. Livewebbläsare är enligt användarens beslut uppskjuten. Detta paket bevisar inte att kontinuerlig automatisk bevakning är aktiv; historiska fritextloggar används inte som sådant bevis.
+
+**Efter detta paket:** prioritera visuell/UI-förbättring av befintliga flöden. Behåll separat acceptanslista för live-evidenskort, smal vy, roller/företagsbyte, installerad mobilapp och fullständiga användarresor. Externa utskick, Fortnox, betalning och ROT-exklusivitet är kvarvarande lanseringsgrindar, inte klara genom denna överblick. Ingen slice uppgraderas till SCALE.
+
+### 31.12 Förberedelser för Gmail och Microsoft 365
+
+**DONE:** Tre underlag i `docs/runbooks/`: MAIL_INTEGRATIONS_PREPARATION.md, MAIL_PROVIDER_VERIFICATION.md och MAIL_INTEGRATIONS_ACCEPTANCE.md. Scope-motiveringar, ansökningsfält, videomanus, avgränsade kodpaket, testfall och onboarding-/vidarebefordringsvillkor är förberedda enligt användarens nya beställning.
+
+**REUSED:** Befintlig Google OAuth, Gmail-poller/processor, godkännandekedja, email_inbound_route och channel-health. **NEW:** Dokumentation; ingen ny runtime, tabell eller motor.
+
+**VERIFIED:** Lokal kod och aktuell arbetsgren; read-only schema/policy/grants/indexmetadata i prod 2026-09-11. calendar_connection har medlemsbaserad ALL-policy och authenticated CRUD på tabellen med tokenkolumner. email_conversations har global unik gmail_message_id. email_inbound_route finns trots äldre kodkommentar om saknad tabell. Inga kundmejl/tokenvärden lästes.
+
+**NOT VERIFIED:** Google Cloud-/Entra-konfiguration, leverantörsgranskning, tokenkrypteringens fulla kedja, Data API-exponering, liveanslutning, sändning och radering. Alla nya acceptansfall står som ej körda; browserprovet är fortsatt uppskjutet.
+
+**CUSTOMER IMPACT:** Inget ändrat appbeteende. Konkret underlag för att kunna koppla faktisk mejlavlastning i befintlig onboarding. **RISKS:** Tokenåtkomst, global meddelandeidentitet, återanvänd token vid kontobyte och implicit avsändarval måste lösas före aktivering. Microsoft kräver adapter och säker identitetsmappning; inga Gmail-fält får tyst återanvändas för Graph-ID:n.
+
+**STATUS CHANGES:** Inga förmågor uppgraderas. **NEXT ACTION:** Genomför avgränsat token-/OAuth-skydd med kalenderregression, därefter Gmail-behörigheter och Microsoft-adapter enligt underlagen. Färdigställ extern verifiering med verklig demonstrationsvideo. Öppna endast provad provider i onboarding.
+
+### 31.13 Kodpaket för mejlintegrationernas gränser
+
+**DONE:** Serverstyrd Google-synkriktning, kontroll av användare i callback, verifierad refresh-kontoidentitet, bevarad vald kalender och scopeflaggor från Google. Generisk företag/provider/konto/meddelandeidentitet används i Gmail-importen; äldre tvetydig identitet ger stopp, inte gissning. Granskat SQL-paket begränsar klienternas tokenåtkomst och inför identitetskolumner/index på befintlig mejltabell.
+
+**REUSED / NEW:** Befintlig callback, processor, poller och statusläsning; en liten preferences-route och identitets-/återanslutningshelpers. Inga nya tabeller eller motorer.
+
+**VERIFIED:** 30 nya gränstester inklusive exekverad SQL i lokal PGlite/Postgres; 30 Gmail-regressioner, 47 Google-/tenant-/lagringskontrakt och typkontroll. Read-only prodmetadata visade inga view-/funktionsdefinitioner som direkt refererar anslutningstabellen.
+
+**NOT VERIFIED / RISKS:** Ingen prodmigration/deploy eller liveprovider-verifiering. SQL och app måste införas samordnat med import pausad. Full tokenkryptering/nyckelrotation, Microsoft-adapter, kvarvarande OAuth-härdning och flerbrevlåde-sändarval återstår. Äldre överlapp kräver verifierad kontokoppling innan berörd synk fortsätter.
+
+**CUSTOMER IMPACT:** Efter införande skyddas anslutningarna från direkta klientändringar, kalendern bevaras vid säker återanslutning och nya mejl får kontospecifik identitet. **STATUS CHANGES:** Inga liveförmågor uppgraderas. **NEXT ACTION:** Följ införandeordningen i MAIL_INTEGRATIONS_PREPARATION.md, verifiera på testmiljö före samordnad release. Fortsätt separat med tokenkryptering och providerimplementation; inga nya scopes aktiveras av paketet.
+
+### 31.14 Branschpaket och kundkanal i befintlig onboarding
+
+**DONE:** Fem breda startpaket för var och en av sju branscher (35 totalt), egna jobb först för Övrigt, gamla exempel fortsatt frivilliga. Jobbtyps-/artikelsteget visar omfattning, arbete, materialidéer och frågor; produkteditorn kan öppnas med granskningsbara förslag utan priser. Arbetskostnad härleds från artikelmetadata, inklusive inkluderat arbete i fastpris. Kontaktsteget sparar primär kundkanal och mejlleverantör; verklig vidarebefordringsprovisionering sker endast vid uttryckligt knapptryck och visas aldrig som leveransbevis.
+
+**ANVÄNDARBESLUT:** Starter är inte aktuellt erbjudande och malltak är inte önskade. Begränsningen på fem offertmallar tas bort både centralt och ur båda skapandeflödena, även för legacy-konton. 3–5 jobbtyper är en rekommendation, ingen begränsning.
+
+**REUSED / NEW:** Befintlig katalogkonsumtion, jobbtypspersistens, standardrader, produkteditor, priser, onboarding_data och email-lead-API. Ny redaktionell paketkälla och liten kundkanalkomponent; inga nya tabeller, huvudsteg eller motorer. Tidigare kunders jobbnamn/sluggar/priser/mallar skrivs inte om.
+
+**VERIFIED:** Riktade kontrakts- och lokala DOM-/Postgrest-fixture-tester samt typkontroll; se BRANSCHPAKET_ONBOARDING_LAUNCH.md. **NOT VERIFIED:** Livebrowser och extern e-postleverans; inga prodskrivningar eller aktiveringar. **CUSTOMER IMPACT:** Efter release kan nya kunder välja begripligare jobbpaket och granska artikel-/arbetsunderlag samt prioritera rätt kundkanal. **STATUS CHANGES:** Ingen liveförmåga uppgraderas. **NEXT ACTION:** Visuell och sammanhängande onboarding-/offertacceptans när browserprov återupptas. Gmail/Outlook följer separat gransknings-/implementationsplan.
+
+
+### 31.15 Releasegrind och kundresa — 2026-09-11
+
+**DONE:** Releasegrinden körd. Korrigerade ett tidigare publiceringsfel: 47 app-/underlagsfiler hade hamnat i repo-roten i GitHub i stället för `handymate-dashboard/`. De flyttades med verifierade blob-SHA; rotkopiorna togs bort utan att befintliga rotdokument ändrades. Hela versionshanterade innehållet jämfördes efteråt med den lokala appen. Tidigare gröna byggen verifierade alltså inte dessa nya ändringar. CI-/lokal testlista synkades och UI-testresan uppdaterades till de aktuella branschpaketen.
+
+**REUSED:** Befintlig kontraktsgrind, kundrese-/SQL-fixtures och godkännandekortens testprogram. **NEW:** En liten regressionsgrind mot appfiler i fel rot samt beteendeprov för datum i stället för gammal regextext. Ingen ny produktmotor eller UI-design.
+
+**VERIFIED:** Lokal typkontroll, 2 063 kontraktstester (1 separat överhoppat), 17 kundunderlagsfall, aktivitetsläsning, 327 kundutfallsfall, 30 mejlgränstester och 29 server-/DOM-testprogram för godkännandekort. Alla fem GitHub-workflows och båda Vercel-byggena är gröna på `b2552eb0`, inklusive jobbtypernas mobil-/desktopresa med nya branschpaket. Fullständigt CI-läge och bevisgränser finns i `handymate-dashboard/docs/runbooks/RELEASE_GATE_2026_09_11.md`.
+
+**NOT VERIFIED:** Komplett inloggad kundresa i driftsatt app, riktiga leverantörskvitton, PDF/browserproven som inte kunde slutföras och mejlmigration i prod. Browserförsöket fick CDP-timeout; ingen inloggnings- eller mottagarkontroll påstås vara utförd.
+
+**CUSTOMER IMPACT:** Branschpaket, egna artikelpriser och de senaste godkännandeförbättringarna finns nu faktiskt på den sökväg som previewbygget läser. **RISKS:** Read-only databasprov bekräftar att de tre nya mejlidentitetskolumnerna ännu saknas i prod. Mejlkoden och SQL måste införas samordnat enligt befintlig runbook. Tidigare dokumenterade integration-/ROT-blockerare kvarstår.
+
+**STATUS CHANGES:** Ingen capability uppgraderas till livebevis. Releasebeslut **HOLD**, ingen merge/proddeploy utförd. **NEXT ACTION:** Testa rätt preview med dedikerat konto genom företagsstart → bransch/jobben → egna arbets-/materialpriser → kundkanal → avbrott/återinloggning → testförfrågan → granskad offert → kontrollerad leverans → acceptans/projekt. Inför och verifiera mejlschemat först i isolerad testmiljö innan samordnad produktionsrelease. UI-design fortsätter separat hos Claude Design.
+
+### 31.16 Förberedd inloggad CI-resa — Nordström El AB
+
+**DONE / NEW:** Befintlig manuell nightly-workflow har ett separat val för en smal inloggad kundresa från arbetsgrenen, utan att starta den breda prod-/tvåtenant-sviten. Ny separat Playwright-konfiguration och testkatalog, explicit versions-/företagsgrind, blockerade sid-skrivningar samt valfritt märkt API-utkast utan kundkoppling. Sessions-/lösenordsdata publiceras inte i rapporten. **REUSED:** Appens auth-, me-, health- och quote-API samt befintlig GitHub-lösenordssecret som fallback.
+
+**VERIFIED:** Read-only uppslag bekräftar Nordström El AB, `biz_al7pjuu5smi`, med det tidigare testkontot. Lokala 17 policytester och 12 CI-kontrakt, testupptäckt samt typkontroll. **NOT VERIFIED:** Ingen autentiserad livekörning genomförd. Aktuellt lösenord i GitHub och åtkomst till preview inte verifierade. Browser fortfarande blockerad; ingen ny omgång browserförsök gjord här.
+
+**CUSTOMER IMPACT:** Återanvändbar testkörning för session, navigering och verkligt sparat/återöppnat utkast. **RISKS:** API-inloggning/skapande ersätter inte hela formulärresan; testutkast lämnas kvar; preview kan använda proddata. **STATUS CHANGES:** Release kvar på HOLD. **NEXT ACTION:** Följ `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`: använd befintlig secret om giltig, starta manuellt från arbetsgrenen, läs verkligt resultat och åtgärda observerade fel. GitHub-anslutningen saknar ny workflow_dispatch och secret-administration; första starten behöver göras i GitHub/CLI.

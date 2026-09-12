@@ -27,34 +27,46 @@ export async function GET(request: NextRequest) {
     const projectId = request.nextUrl.searchParams.get('project_id')
     const from = request.nextUrl.searchParams.get('from')
     const to = request.nextUrl.searchParams.get('to')
+    const nextActive = request.nextUrl.searchParams.get('next_active') === 'true'
 
-    let query = supabase
-      .from('booking')
-      .select('*')
-      .eq('business_id', business.business_id)
-      .order('scheduled_start', { ascending: true })
-
-    if (status) {
-      query = query.eq('status', status)
+    const bookingQuery = () => {
+      let query = supabase.from('booking').select('*').eq('business_id', business.business_id)
+      if (status) query = query.eq('status', status)
+      if (nextActive) query = query.eq('status', 'confirmed')
+      if (nextActive) query = query.is('completed_at', null).or('job_status.is.null,job_status.not.in.(cancelled,completed)')
+      if (projectId) query = query.eq('project_id', projectId)
+      if (from) query = query.gte('scheduled_start', from)
+      if (to) query = query.lte('scheduled_start', to)
+      query = query.order('scheduled_start', { ascending: true })
+      return nextActive ? query.limit(1) : query
     }
 
+    let bookings: any[] | null = null
+    let error: any = null
     if (customerId) {
-      query = query.eq('customer_id', customerId)
+      // A customer booking may be linked directly or only through a project.
+      // Keep user-supplied IDs in typed query-builder values; never interpolate
+      // them into PostgREST's raw `.or(...)` grammar.
+      const projectsResult = await supabase.from('project').select('project_id', { count: 'exact' })
+        .eq('business_id', business.business_id).eq('customer_id', customerId).limit(501)
+      if (projectsResult.error) throw projectsResult.error
+      if (projectsResult.count !== (projectsResult.data || []).length || (projectsResult.count || 0) > 500) {
+        throw new Error('Kundens projektlista är för stor för en säker bokningsläsning.')
+      }
+      const customerProjects = (projectsResult.data || []).map((row: any) => row.project_id).filter(Boolean)
+      const [direct, throughProjects] = await Promise.all([
+        bookingQuery().eq('customer_id', customerId),
+        customerProjects.length > 0 ? bookingQuery().in('project_id', customerProjects).is('customer_id', null) : Promise.resolve({ data: [], error: null }),
+      ])
+      error = direct.error || throughProjects.error
+      const byId = new Map<string, any>()
+      for (const row of [...(direct.data || []), ...(throughProjects.data || [])]) byId.set(row.booking_id, row)
+      bookings = Array.from(byId.values()).sort((a, b) => new Date(a.scheduled_start).getTime() - new Date(b.scheduled_start).getTime())
+    } else {
+      const result = await bookingQuery()
+      bookings = result.data
+      error = result.error
     }
-
-    if (projectId) {
-      query = query.eq('project_id', projectId)
-    }
-
-    if (from) {
-      query = query.gte('scheduled_start', from)
-    }
-
-    if (to) {
-      query = query.lte('scheduled_start', to)
-    }
-
-    const { data: bookings, error } = await query
 
     if (error) throw error
 

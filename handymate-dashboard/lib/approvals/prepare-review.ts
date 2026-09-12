@@ -7,6 +7,7 @@ import { buildApprovalReview, type ApprovalReview } from './review-contract'
 import { classify } from './action-contract'
 import { rejectionEffect } from './receipt'
 import type { ReviewedDocument } from './document-delivery'
+import { withApprovalEvidence } from './explainability'
 
 export interface PreparedApprovalReview {
   review: ApprovalReview
@@ -18,7 +19,7 @@ export interface PreparedApprovalReview {
 /** Read-only preparation. Each target lookup is explicitly tenant-scoped.
  * Live values are part of the signed review, never silently substituted later.
  */
-export async function prepareApprovalReview(db: SupabaseClient, businessId: string,
+async function prepareApprovalReviewInternal(db: SupabaseClient, businessId: string,
   approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any; created_at?: string },
   body: Record<string, any>,
 ): Promise<PreparedApprovalReview | undefined> {
@@ -311,6 +312,15 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
       }
       case 'checklist_forslag': {
         if (!p.project_id || !Array.isArray(p.template_items) || !p.template_items.length) throw new Error('Checklistan saknar projekt eller punkter.')
+        const checklistId = approvalArtifactId(businessId, approval.id, 'checklist')
+        const existing = await db.from('project_checklist').select('id, project_id, name, items, status').eq('id', checklistId).eq('business_id', businessId).maybeSingle()
+        if (existing.error) throw new Error('Tidigare checklistresultat kunde inte kontrolleras. Försök läsa ärendet igen.')
+        snapshot.checklist = existing.data || null
+        if (existing.data) {
+          if (existing.data.project_id !== p.project_id) throw new Error('Den sparade checklistans projekt stämmer inte med förslaget.')
+          detail('Sparad checklista', existing.data.name)
+          return complete('Checklistan finns redan på projektet. Bekräftar det sparade resultatet utan att skapa en dubblett eller återställa kontrollpunkterna.', 'Bekräfta sparad checklista')
+        }
         detail('Checklista', p.template_name)
         if (p.template_items.some((item: any) => typeof item?.text !== 'string' || !item.text.trim())) throw new Error('Alla kontrollpunkter måste ha en text.')
         p.template_items.forEach((item: any, i: number) => detail(`Punkt ${i + 1}${item.required ? ' (obligatorisk)' : ''}`, item.text))
@@ -387,4 +397,16 @@ export async function prepareApprovalReview(db: SupabaseClient, businessId: stri
     r.blockedReason = error instanceof Error ? error.message : String(error || 'Granskningen kunde inte förberedas.')
     return { review: r, snapshot }
   }
+}
+
+/** Attach explainability after every type-specific early return. Evidence is
+ * intentionally derived from the stored row, never from edited request data. */
+export async function prepareApprovalReview(db: SupabaseClient, businessId: string,
+  approval: { id: string; approval_type: string; title?: string; description?: string; payload?: any; package_data?: any; created_at?: string },
+  body: Record<string, any>,
+): Promise<PreparedApprovalReview | undefined> {
+  return withApprovalEvidence(
+    await prepareApprovalReviewInternal(db, businessId, approval, body),
+    { approval_type: approval.approval_type, payload: approval.payload },
+  )
 }

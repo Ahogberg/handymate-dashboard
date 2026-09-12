@@ -1120,14 +1120,15 @@ export default function SettingsPage() {
   const handleChangeSyncDirection = async (direction: string) => {
     if (!googleStatus?.connected) return
     try {
-      const { error } = await supabase
-        .from('calendar_connection')
-        .update({ sync_direction: direction })
-        .eq('account_email', googleStatus.email)
-      if (!error) {
-        setGoogleStatus(prev => prev ? { ...prev, syncDirection: direction } : null)
-      }
-    } catch { /* ignore */ }
+      const authHeaders = await getAuthHeaders()
+      const response = await fetch('/api/google/preferences', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...authHeaders },
+        body: JSON.stringify({ syncDirection: direction }),
+      })
+      if (!response.ok) throw new Error('save failed')
+      setGoogleStatus(prev => prev ? { ...prev, syncDirection: direction } : null)
+    } catch { showToast('Kunde inte spara synkriktningen', 'error') }
   }
 
   const handleToggleGmailSync = async (enabled: boolean) => {

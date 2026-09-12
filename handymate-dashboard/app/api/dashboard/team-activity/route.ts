@@ -270,13 +270,15 @@ export async function GET(request: NextRequest) {
 
   const nastaBokningRad = (nastaBokningRes.data || [])[0] || null
   let nastaBokningKund: string | null = null
+  let nastaBokningKundError = false
   if (nastaBokningRad?.customer_id) {
-    const { data: kund } = await supabase
+    const { data: kund, error: kundError } = await supabase
       .from('customer')
       .select('name')
       .eq('business_id', businessId)
       .eq('customer_id', nastaBokningRad.customer_id)
       .maybeSingle()
+    nastaBokningKundError = Boolean(kundError)
     nastaBokningKund = kund?.name || null
   }
 
@@ -492,6 +494,10 @@ export async function GET(request: NextRequest) {
     agents: [matte, lisa, daniel, karin, lars, hanna],
     summary,
     watch,
+    completeness: [agentRunsRes, automationLogsRes, invoicesRes, quotesRes, bookingsRes,
+      obetaldaRes, oppnaOffRes, settingsRes, cfgRes, nastaBokningRes,
+      automationSettingsRes, invoiceAnyRes, tidigareKunderRes, vantandeKortRes,
+      lisaSamtalNagonsinRes].every(result => !result.error) && !nastaBokningKundError,
     since: sinceIso,
   })
 }

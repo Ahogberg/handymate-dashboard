@@ -39,7 +39,7 @@ export interface FakturaberedskapDel {
 
 export interface FakturaberedskapInput {
   /** Sidans yesterdayTimeGap — null när uppslaget inte kunnat göras. */
-  tidrapportGap: { missing: boolean } | null
+  tidrapportGap: { missing: boolean; applicable?: boolean } | null
   milestones: Array<{ status: string }>
   /** Projektets checklistor med items[] — [] tills Dokumentation öppnats. */
   checklists: Array<{ status: string; items?: Array<{ checked: boolean }> }>
@@ -52,6 +52,8 @@ export interface Fakturaberedskap {
   pct: number
   delar: FakturaberedskapDel[]
   varsta_blocker: string | null
+  /** Om gårdagens tidrapportbevis är läst (även när ingen bokning var tillämplig). */
+  tidrapportBedömd: boolean
 }
 
 export interface EgenkontrollChecklistLike {
@@ -101,7 +103,7 @@ function blockerText(del: FakturaberedskapDel): string {
 export function beraknaFakturaberedskap(input: FakturaberedskapInput): Fakturaberedskap | null {
   const delar: FakturaberedskapDel[] = []
 
-  if (input.tidrapportGap != null) {
+  if (input.tidrapportGap != null && input.tidrapportGap.applicable !== false) {
     delar.push({
       key: 'tidrapport',
       label: 'Tidrapport i går',
@@ -151,5 +153,10 @@ export function beraknaFakturaberedskap(input: FakturaberedskapInput): Fakturabe
       null,
     )
 
-  return { pct, delar, varsta_blocker: varst ? blockerText(varst) : null }
+  return {
+    pct,
+    delar,
+    varsta_blocker: varst ? blockerText(varst) : null,
+    tidrapportBedömd: input.tidrapportGap != null,
+  }
 }

@@ -118,7 +118,7 @@ import type { ProjectEconomics } from '@/lib/projects/compute-economics'
 import type { LonsamhetsVarning } from '@/lib/projects/margin-guardian'
 import { svDateStr, svDateStrPlusDays, svStartOfDay } from '@/lib/dates'
 import {
-  findProjectsMissingTimeEntry,
+  deriveTimeEntryGapEvidence,
   pickUnambiguousAssignee,
   type BookingForTimeMatch,
   type TimeEntryForTimeMatch,
@@ -740,7 +740,11 @@ export default function ProjectDetailPage() {
   // bara läst ur en redan skapad pending_approval, se fetchYesterdayTimeGap
   // nedan). personName kommer från samma entydig-tilldelning-logik som
   // Etapp 2a (pickUnambiguousAssignee) — null om 0 eller 2+ tilldelade.
-  const [yesterdayTimeGap, setYesterdayTimeGap] = useState<{ missing: boolean; personName: string | null } | null>(null)
+  const [yesterdayTimeGap, setYesterdayTimeGap] = useState<{
+    applicable: boolean
+    missing: boolean
+    personName: string | null
+  } | null>(null)
   // Dedup (Etapp 2b, punkt 4): sant om ett 'tidrapport_forslag'-kort redan
   // syns i ProjectApprovalsBlock för samma projekt+dag — då hoppas raden
   // över, länken i kortet räcker.
@@ -1000,8 +1004,14 @@ export default function ProjectDetailPage() {
   // körd LIVE mot gårdagens bokning/tidrapport-data för bara DETTA
   // projekt, så raden är korrekt även om dagens cron-körning inte hunnit
   // köra än. Fail-safe: fel här döljer bara raden, kraschar aldrig sidan.
+  const timeGapReadVersion = useRef(0)
   const fetchYesterdayTimeGap = useCallback(async () => {
+    const version = ++timeGapReadVersion.current
+    setYesterdayTimeGap(null)
+    setHasPendingTimeApproval(false)
     if (!business?.business_id || !projectId) return
+    const businessId = business.business_id
+    const requestedProjectId = projectId
     try {
       const yesterday = svDateStrPlusDays(-1)
       const today = svDateStr()
@@ -1012,37 +1022,43 @@ export default function ProjectDetailPage() {
         supabase
           .from('booking')
           .select('booking_id, project_id, job_status, scheduled_start, scheduled_end')
-          .eq('business_id', business.business_id)
-          .eq('project_id', projectId)
+          .eq('business_id', businessId)
+          .eq('project_id', requestedProjectId)
           .eq('job_status', 'completed')
           .gte('scheduled_start', rangeStart.toISOString())
           .lt('scheduled_start', rangeEnd.toISOString()),
         supabase
           .from('time_entry')
           .select('project_id')
-          .eq('business_id', business.business_id)
-          .eq('project_id', projectId)
+          .eq('business_id', businessId)
+          .eq('project_id', requestedProjectId)
           .eq('work_date', yesterday),
         // Dedup-underlag (punkt 4): finns redan ett pending tidrapport_forslag-
         // kort för samma projekt+dag i ProjectApprovalsBlock?
         supabase
           .from('pending_approvals')
           .select('*', { count: 'exact', head: true })
-          .eq('business_id', business.business_id)
+          .eq('business_id', businessId)
           .eq('approval_type', 'tidrapport_forslag')
           .eq('status', 'pending')
-          .contains('payload', { project_id: projectId, booking_date: yesterday }),
+          .contains('payload', { project_id: requestedProjectId, booking_date: yesterday }),
       ])
 
+      if (version !== timeGapReadVersion.current) return
       setHasPendingTimeApproval(!!approvalsRes.count && approvalsRes.count > 0)
 
-      const missing = findProjectsMissingTimeEntry(
-        (bookingsRes.data || []) as BookingForTimeMatch[],
-        (entriesRes.data || []) as TimeEntryForTimeMatch[],
+      const evidence = deriveTimeEntryGapEvidence(
+        bookingsRes.error || !Array.isArray(bookingsRes.data)
+          ? null
+          : bookingsRes.data as BookingForTimeMatch[],
+        entriesRes.error || !Array.isArray(entriesRes.data)
+          ? null
+          : entriesRes.data as TimeEntryForTimeMatch[],
         yesterday,
       )
-      if (missing.length === 0) {
-        setYesterdayTimeGap({ missing: false, personName: null })
+      if (evidence == null) return
+      if (!evidence.applicable || !evidence.missing) {
+        setYesterdayTimeGap({ ...evidence, personName: null })
         return
       }
 
@@ -1052,8 +1068,10 @@ export default function ProjectDetailPage() {
       const { data: assignments } = await supabase
         .from('project_assignment')
         .select('business_user:business_user_id (name)')
-        .eq('business_id', business.business_id)
-        .eq('project_id', projectId)
+        .eq('business_id', businessId)
+        .eq('project_id', requestedProjectId)
+
+      if (version !== timeGapReadVersion.current) return
 
       const personName = pickUnambiguousAssignee(
         ((assignments || []) as { business_user: { name: string | null } | null }[]).map(row => ({
@@ -1061,14 +1079,17 @@ export default function ProjectDetailPage() {
         })),
       )
 
-      setYesterdayTimeGap({ missing: true, personName })
+      setYesterdayTimeGap({ applicable: true, missing: true, personName })
     } catch {
-      setYesterdayTimeGap(null)
+      if (version === timeGapReadVersion.current) setYesterdayTimeGap(null)
     }
   }, [business?.business_id, projectId])
 
   useEffect(() => {
     fetchYesterdayTimeGap()
+    return () => {
+      timeGapReadVersion.current++
+    }
   }, [fetchYesterdayTimeGap])
 
   const fetchProjectTasks = useCallback(async () => {

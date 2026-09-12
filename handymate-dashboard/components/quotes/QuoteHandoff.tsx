@@ -7,7 +7,7 @@ import type { HandoffSummary } from '@/lib/quotes/handoff'
 
 const date = (value: string) => new Date(value).toLocaleString('sv-SE', { timeZone: 'Europe/Stockholm', dateStyle: 'short', timeStyle: 'short' })
 
-export function QuoteHandoff({ quoteId, revision }: { quoteId: string; revision: string }) {
+export function QuoteHandoff({ quoteId, revision, businessId }: { quoteId: string; revision: string; businessId: string }) {
   const [data, setData] = useState<{ checkedAt: string; summary: HandoffSummary } | null>(null)
   const [error, setError] = useState('')
   const [hidden, setHidden] = useState(false)
@@ -28,7 +28,7 @@ export function QuoteHandoff({ quoteId, revision }: { quoteId: string; revision:
     const refresh = () => setAttempt(n => n + 1)
     window.addEventListener('focus', refresh)
     return () => { active = false; controller.abort(); clearTimeout(timeout); window.removeEventListener('focus', refresh) }
-  }, [quoteId, revision, attempt])
+  }, [quoteId, revision, businessId, attempt])
   if (hidden) return null
   const summary = data?.summary
   return <section className="my-4 rounded-2xl border border-teal-100 bg-white p-4 sm:p-5" aria-label="Överlämning till teamet">
@@ -40,6 +40,9 @@ export function QuoteHandoff({ quoteId, revision }: { quoteId: string; revision:
         <div><dt className="font-semibold text-teal-900">När du behövs</dt><dd className="mt-1 text-slate-600">{summary.needsYou}</dd></div>
       </dl>
       {summary.link && <a href={summary.link} className="inline-flex items-center min-h-[44px] mt-2 text-sm font-semibold text-teal-800 underline">{summary.linkLabel}</a>}
+      {summary.latestReceipt && <p className="mt-3 rounded-xl bg-teal-50 px-3 py-2 text-sm text-teal-900">
+        Uppföljning {summary.latestReceipt.round} via {summary.latestReceipt.channel === 'sms' ? 'SMS' : 'e-post'} har sändkvittens {date(summary.latestReceipt.executedAt)}. Det bekräftar inte att kunden har läst meddelandet.
+      </p>}
       <p className="mt-3 text-xs text-slate-500">Uppgifterna kontrollerade {date(data.checkedAt)}.{summary.lastRunAt ? ` Regelns senaste körning: ${date(summary.lastRunAt)}.` : summary.state === 'configured' ? ' Ingen körningstid är bekräftad här.' : ''}</p>
     </> : !error && <p role="status" className="mt-3 text-sm text-slate-500">Läser offert, inställningar och väntande beslut…</p>}
     <button type="button" className="min-h-[44px] text-sm text-teal-800 underline" onClick={() => setAttempt(n => n + 1)}>{error ? 'Försök igen' : 'Kontrollera igen'}</button>

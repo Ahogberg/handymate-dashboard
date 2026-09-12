@@ -1,5 +1,6 @@
 'use client'
 
+import { CustomerIntakeSetup } from './CustomerIntakeSetup'
 import { useEffect, useState } from 'react'
 import { ArrowRight, ChevronDown, Info } from 'lucide-react'
 import OnboardingHeader from './OnboardingHeader'
@@ -398,6 +399,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
     <div className="ob-screen">
       <OnboardingHeader step={OB_DOTS.phone} total={OB_DOT_TOTAL} onBack={onBack} />
       <div className="ob-body" style={{ display: 'flex', flexDirection: 'column' }}>
+        <CustomerIntakeSetup key={data.businessId} data={data} setData={setData} />
         <h1 className="ob-headline">Här är ditt Handymate-nummer</h1>
         <p className="ob-sub">
           Lisa fångar samtalen till numret åt dig, och hela teamet använder det

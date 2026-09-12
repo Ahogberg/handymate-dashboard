@@ -1,8 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { QuoteSetupError, nextTemplateVersion } from './job-type-setup-server'
 import { toSetupTemplate } from './job-type-setup'
-import { getFeatureLimit, type PlanType } from '@/lib/feature-gates'
-import { getAllDefaultTemplateNames } from '@/lib/quote-template-defaults'
+import type { PlanType } from '@/lib/feature-gates'
 
 export function validateStandardRows(value: unknown): { productId: string; quantity: number }[] {
   if (!Array.isArray(value) || !value.length || value.length > 100) throw new QuoteSetupError(400, 'Välj mellan 1 och 100 artikelrader.')
@@ -32,7 +31,7 @@ async function productRows(db: SupabaseClient, businessId: string, value: unknow
   })
 }
 
-export async function writeJobStandard(db: SupabaseClient, businessId: string, input: unknown, plan: PlanType = 'starter') {
+export async function writeJobStandard(db: SupabaseClient, businessId: string, input: unknown, _legacyPlan?: PlanType) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new QuoteSetupError(400, 'Ogiltigt upplägg.')
   const body = input as Record<string, any>
   if (Object.keys(body).some(k => !['operation', 'jobTypeSlug', 'templateId', 'updatedAt', 'itemIndex', 'quantity', 'rows'].includes(k)) ||
@@ -48,13 +47,6 @@ export async function writeJobStandard(db: SupabaseClient, businessId: string, i
     if (error) throw new QuoteSetupError(503, 'Kunde inte läsa offertuppläggen. Kontrollera att jobbtypskopplingen är aktiverad.')
     if (linked?.length === 1) return toSetupTemplate(linked[0])
     if (linked?.length) throw new QuoteSetupError(409, 'Jobbet har flera upplägg. Välj vilket du vill ändra.')
-    const limit = getFeatureLimit(plan, 'quote_templates')
-    if (limit !== null) {
-      const { data: names, error: countError } = await db.from('quote_templates').select('name').eq('business_id', businessId)
-      if (countError) throw new QuoteSetupError(503, 'Kunde inte kontrollera antalet mallar.')
-      const seeds = new Set(getAllDefaultTemplateNames())
-      if ((names || []).filter(t => !seeds.has(t.name)).length >= limit) throw new QuoteSetupError(403, `Maxgränsen på ${limit} offertmallar är nådd. Använd en befintlig mall eller uppgradera.`)
-    }
     // Same job, same id: concurrent requests cannot create duplicate standards.
     const id = `qstd_${job.id}`
     const { data: created, error: createError } = await db.from('quote_templates').insert({ id, business_id: businessId,

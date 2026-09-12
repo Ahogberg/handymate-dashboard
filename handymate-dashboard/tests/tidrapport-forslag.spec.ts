@@ -23,6 +23,7 @@
 import { test, expect } from '@playwright/test'
 import {
   findProjectsMissingTimeEntry,
+  deriveTimeEntryGapEvidence,
   pickUnambiguousAssignee,
   pickUnambiguousBookingAssignee,
   resolveTimeEntryBusinessUserId,
@@ -116,6 +117,29 @@ test.describe('findProjectsMissingTimeEntry — matchningskärna', () => {
   test('tom input → tom output', () => {
     const result = findProjectsMissingTimeEntry([], [], REF_DATE)
     expect(result).toEqual([])
+  })
+})
+
+test.describe('deriveTimeEntryGapEvidence — sanningsläge för projektsidan', () => {
+  test('läsfel är okänt, aldrig ett färdigt bevis', () => {
+    expect(deriveTimeEntryGapEvidence(null, [], REF_DATE)).toBeNull()
+    expect(deriveTimeEntryGapEvidence([], null, REF_DATE)).toBeNull()
+  })
+
+  test('ingen genomförd bokning är inte tillämpligt', () => {
+    expect(deriveTimeEntryGapEvidence([], [], REF_DATE)).toEqual({ applicable: false, missing: false })
+    expect(deriveTimeEntryGapEvidence([booking({ job_status: 'scheduled' })], [], REF_DATE))
+      .toEqual({ applicable: false, missing: false })
+  })
+
+  test('genomförd bokning med rapport är komplett', () => {
+    expect(deriveTimeEntryGapEvidence([booking()], [{ project_id: 'proj_1' }], REF_DATE))
+      .toEqual({ applicable: true, missing: false })
+  })
+
+  test('genomförd bokning utan rapport saknas', () => {
+    expect(deriveTimeEntryGapEvidence([booking()], [], REF_DATE))
+      .toEqual({ applicable: true, missing: true })
   })
 })
 
