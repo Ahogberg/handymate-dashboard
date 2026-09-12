@@ -677,3 +677,109 @@ Minimum definition of done:
 - continued operation as Financial Integrity Engine after Fortnox cut-over.
 
 > **Final rule:** Shadow Accounting is an automated evidence system, not a confidence ritual. Handymate earns the right to become system of record by independently deriving financial truth, continuously comparing it, explaining every difference and proving readiness with persisted evidence.
+
+---
+
+## 21. External dependencies — what the comparison ladder actually needs
+
+> Added 2026-09-12 after checking this document against the Fortnox integration as it
+> exists in the tree. Nothing below changes the architecture. It records which parts are
+> reachable today, which are not, and what it would cost to reach them — so that Sprint 6
+> does not discover it.
+
+### 21.1 The comparison ladder is scope-gated, and only Level 1 is reachable
+
+`app/api/integrations/fortnox/connect/route.ts` requests exactly four OAuth scopes:
+
+```text
+FORTNOX_SCOPES = 'invoice customer companyinformation supplierinvoice'
+```
+
+Mapping that against §6:
+
+| Level | Needs | Status today |
+|---|---|---|
+| 1 — object equality | `invoice`, `supplierinvoice` | **reachable** |
+| 2 — ledger equality (vouchers, accounts, VAT codes) | `bookkeeping` | **not granted** |
+| 3 — aggregate equality (AR/AP/bank/clearing/VAT/result) | `bookkeeping` | **not granted** |
+| 4 — statutory/report outcome (VAT return, trial balance) | `bookkeeping` | **not granted** |
+
+The `bookkeeping` scope was **deliberately removed on 2026-06-03**. The reason is recorded
+in the same file and it is commercial, not technical:
+
+> *"9 av 12 scopes var oanvända; slimning sparar Christoffer licens-pengar (Fortnox kräver
+> 'Offert & order' / 'Tidredovisning'-licenser för respektive scope)"*
+
+and the strategy line above it reads:
+
+> *"Handymate äger arbetet, Fortnox äger bokföringen."*
+
+That is the opposite premise from Levels 2–4, which require reading Fortnox's bookkeeping.
+`lib/fortnox.ts` carries the consequence as two `@deprecated` functions —
+`bookFortnoxInvoice` (needs `bookkeeping`) and `registerFortnoxPayment` (needs `payment`) —
+both annotated *"Lägg tillbaka scope + kräv re-OAuth innan användning."*
+
+In practice the integration today calls `POST /invoices`, `GET /invoices/{id}` for the
+`Balance` field, the customer endpoints, `/invoicepayments` and the supplier-invoice pull.
+Nothing voucher- or account-level.
+
+### 21.2 Re-adding the scope is a customer migration, not a code change
+
+Precedent is in the tree. `supplierinvoice` was added on 2026-08-19, and
+`app/api/integrations/fortnox/connect/route.ts` records what followed:
+
+> *"REDAN ANSLUTNA konton saknar detta scope på sin nuvarande token och måste ÅTERANSLUTA
+> (göra om OAuth)."*
+
+A missing scope surfaces as a bare 403 (`lib/fortnox/import-supplier-invoices.ts`), which
+the sync cron now reports explicitly. So adding `bookkeeping` means every connected pilot
+business re-authorises, and until they do, their shadow comparison silently caps at Level 1.
+
+It also runs into `tasks/fortnox-license-blocker.md`, open since 2026-05-30, whose symptom
+was *"Handymate behöver licens för något/några scopes vi requestar"*. The June slimming
+looks like the workaround for that blocker. Reversing it re-opens it, and per the comment
+above, the licence cost lands on the customer.
+
+### 21.3 Bank and clearing data exists on neither side
+
+§6 Level 3 and §13's gate both require bank and clearing reconciliation. There is no bank
+integration and no `bank_accounts` / `bank_transactions` table in the schema, and the
+slimmed Fortnox grant exposes no bank data either. Those dimensions are unsupported on both
+sides of the comparison until the kernel's own bank/reconciliation work (parent §17,
+orchestration Package C11) exists.
+
+### 21.4 Consequence for §13's readiness gate
+
+The gate as written requires `VAT/report comparison = 100%` and
+`Bank / clearing reconciliation = 100%`, and §6 makes it **binding** that readiness cannot
+rest on object-level matches alone. With the current grant, none of those three can be
+satisfied. **The gate therefore cannot go green today** — not because a business is
+unready, but because the evidence is unobtainable.
+
+That is the right failure direction: a gate that cannot be satisfied blocks migration,
+which is safer than one that passes on thin evidence. But it must be a known state rather
+than a surprise, because the predictable failure mode is that someone loosens the gate
+under schedule pressure.
+
+Three ways forward, and the choice is the owner's, not an implementer's:
+
+1. **Re-add `bookkeeping` and run the re-OAuth migration.** Full ladder, at the cost of a
+   customer-facing reauthorisation and the licence question from §21.2.
+2. **Ship S2 at Level 1 only, with the gate explicitly reduced and the reduction recorded**
+   as an accepted limitation with the dimensions marked unsupported per §6 — using the
+   mechanism §14 already provides for recording which regimes were exercised.
+3. **Defer S2 until the kernel's own integrity engine can substitute for the external
+   reference** at Levels 2–4 (§16), comparing Handymate against itself rather than against
+   Fortnox.
+
+Option 2 is the only one that is reachable without external dependencies, and it is
+compatible with this document provided the reduction is written down rather than assumed.
+
+### 21.5 Loose end
+
+`tasks/fortnox-scope-audit.md` is cited by three separate code comments as the authority
+for the scope decision. **The file is not in the repository.** The reasoning behind the
+current grant therefore exists only in those comments. Worth restoring or replacing before
+anyone revisits the scope question.
+
+---
