@@ -14,6 +14,7 @@
 
 ### Business / platform strategy
 
+- [`HANDYMATE_REVENUE_OS.md`](HANDYMATE_REVENUE_OS.md) — canonical internal GTM system: Buyer Radar, seller queue, Admin Leak Audit, trigger outbound, playbooks, closed-loop learning and the 7–10 / 20–30 / 200 customer traction path.
 - [`BUSINESS_TWIN_VISION.md`](BUSINESS_TWIN_VISION.md) — Business Twin vision.
 - [`BUSINESS_TWIN_IDEA_BACKLOG.md`](BUSINESS_TWIN_IDEA_BACKLOG.md) — strategic idea backlog around Business Twin.
 - [`PRICING_STRATEGY.md`](PRICING_STRATEGY.md) — pricing strategy.
@@ -86,6 +87,14 @@ Core / PMF
 ```
 
 This order is directional rather than a fixed launch commitment. Real customer demand, retention data and unit economics after launch decide actual prioritization.
+
+## Internal GTM operating principle
+
+Handymate's own go-to-market should use the same intelligence philosophy as the customer product: surface the best next actions rather than forcing humans to inspect raw data.
+
+The internal Revenue OS should combine evidence-backed market signals, transparent account scoring, seller actions, pipeline outcomes and retained-customer quality into one learning loop. Astra may research, summarize and recommend; durable facts, stages and approved seller actions remain explicit system state.
+
+**Binding seller UX rule:** Andreas, Christopher and future sellers should not start from a blank CRM card. The system should answer which account to work now, why now, what evidence supports that priority, and what next action is recommended.
 
 ## Architectural rule for financial expansion
 
@@ -180,6 +189,16 @@ Merchant-of-record model, Pay-vs-Ledger sprint order, whether Handymate files th
 ### 2026-09-12 — Finished outcomes, not just AI tools
 
 Handymate's target operating model is AI-native outcome delivery: customers increasingly buy completed administrative and financial outcomes rather than software they must operate line-by-line. Agents and deterministic systems perform the routine work; rulebooks and integrity systems verify it; humans handle exceptions. This principle applies first and most concretely to Accounting, but should guide future service-like verticals where Handymate already owns the underlying operational context.
+
+## Decision log — GTM / Revenue OS
+
+### 2026-09-12 — Revenue OS is a learning-and-execution system, not a generic CRM
+
+The first purpose is to help the founders win 7–10 customers through high-precision founder-led sales. The second is to make that motion legible and transferable to future sellers on the path to 20–30 customers and beyond. Account priorities remain evidence-backed and component-scored; AI recommendations do not silently become facts, pipeline stages or outbound actions.
+
+### 2026-09-12 — Prove traction before trying to buy growth
+
+The early financing case should be built around paying/retained customers, activation, cash/ARR, funnel repeatability and a demonstrated acquisition channel. The target investor story is that capital accelerates a working motion rather than funds discovery of PMF.
 
 ---
 
