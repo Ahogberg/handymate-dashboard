@@ -475,6 +475,53 @@ Recommended responsibilities:
 
 AI coding agents implement and test rules; humans define and validate accounting truth.
 
+### 13.1 Opening questions, split by role
+
+> Added 2026-09-12. Ask the right person. The two lists above are not interchangeable, and
+> the gaps that matter most — reverse-charge construction VAT and cash-basis accounting
+> (§10, `FINANCIAL_KERNEL_ARCHITECTURE.md` §15.1–15.2) — belong to the consultant, not the
+> auditor.
+
+**Before either conversation:** a question list is the weaker instrument. An auditor asked
+*"how is reverse charge posted?"* gives the textbook answer, which is already in the BAS
+documentation. What cannot be read up is which cases actually occur in a Swedish trades
+company.
+
+**The most valuable single artifact is a SIE4 export of a pilot customer's last closed
+fiscal year.** Every posting they made, in a standard format, one click for them. It shows
+empirically which VAT regimes, accounts and scenarios occur in a real elfirma, and it is the
+seed of the rulebook (§21.2). Ask for that first.
+
+#### To the auditor — controls and evidence
+
+1. What must we be able to show you for **a single voucher** so you can review it without
+   asking us anything?
+2. For an AI-suggested posting: is rule id + rule version + who approved it enough, or do
+   you need the model's underlying evidence?
+3. What do system documentation and processing history need to contain to hold up in a
+   review?
+4. **What would make you reject a system like ours?**
+5. Correction by reversal rather than amendment — are there cases where that is not enough?
+
+#### To the operational accounting consultant — posting truth
+
+1. Reverse-charge construction VAT: how do you determine **in practice** whether the buyer
+   is a construction company, and what happens when it is wrong?
+2. Cash basis: what must the system produce in December for a company using it?
+3. ROT/RUT: when do you know the Skatteverket share is actually coming, and what do you do
+   when it deviates?
+4. Which five mistakes do you see most often in trades companies' bookkeeping?
+5. Öresavrundning, credit notes, partial payments — which of these cause the most trouble?
+
+#### Two cautions
+
+- **A pilot customer's auditor works for the customer, not for Handymate.** Asking them to
+  specify our product is unpaid consulting from someone with a duty elsewhere, and if
+  Handymate replaces part of what a byrå does, their incentive is not neutral. Be explicit:
+  a short conversation is a favour, deeper work is engaged and paid.
+- §3 still holds: **a bookkeeping system is not made valid because an auditor approves the
+  software.** An auditor's blessing is useful input; it is not a compliance story.
+
 ## 14. Development model with Codex + Claude
 
 Suggested parallel workstreams after launch:

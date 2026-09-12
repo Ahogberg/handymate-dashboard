@@ -735,12 +735,28 @@ A missing scope surfaces as a bare 403 (`lib/fortnox/import-supplier-invoices.ts
 the sync cron now reports explicitly. So adding `bookkeeping` means every connected pilot
 business re-authorises, and until they do, their shadow comparison silently caps at Level 1.
 
-It also runs into `tasks/fortnox-license-blocker.md`, open since 2026-05-30, whose symptom
-was *"Handymate behöver licens för något/några scopes vi requestar"*. The June slimming
-looks like the workaround for that blocker. Reversing it re-opens it, and per the comment
-above, the licence cost lands on the customer.
+### 21.3 Three different things are called "licens" here
 
-### 21.3 Bank and clearing data exists on neither side
+An earlier draft of this section ran them together. They are separate, and only one of them
+is an open blocker.
+
+| | What it is | Status |
+|---|---|---|
+| Developer registration | Lets Handymate build the integration and run OAuth at all | **Held.** Not a constraint. |
+| Customer Fortnox modules | `connect/route.ts` notes that *"Fortnox kräver 'Offert & order' / 'Tidredovisning'-licenser för respektive scope"* — modules the **customer** subscribes to. A customer without "Offert & order" cannot grant the `offer` scope regardless of what Handymate holds. | Real, and the stated reason the June slimming *"sparar Christoffer licens-pengar"*. |
+| Fortnox partner status | `tasks/fortnox-license-blocker.md`: *"Externt blockerande: Fortnox-konto/partner-status hos oss"*, with action item *"Fråga vilket licens/partner-program vi behöver"* | **Open since 2026-05-30.** |
+
+**Whether `bookkeeping` carries a customer module cost is unknown.** The comment's examples
+are `offer` and time reporting; bookkeeping is Fortnox's core product and plausibly sits in
+every plan. Do not assume either way — it is exactly action item 4 in the blocker file,
+*"Identifiera vilka scopes som specifikt kräver licens"*, and it should be answered before
+option 1 is costed.
+
+What is certain about `bookkeeping` is the re-OAuth requirement above. The partner-status
+blocker is separate from the scope question and blocks Fortnox connections for new
+customers regardless of which shadow option is chosen.
+
+### 21.4 Bank and clearing data exists on neither side
 
 §6 Level 3 and §13's gate both require bank and clearing reconciliation. There is no bank
 integration and no `bank_accounts` / `bank_transactions` table in the schema, and the
@@ -748,7 +764,7 @@ slimmed Fortnox grant exposes no bank data either. Those dimensions are unsuppor
 sides of the comparison until the kernel's own bank/reconciliation work (parent §17,
 orchestration Package C11) exists.
 
-### 21.4 Consequence for §13's readiness gate
+### 21.5 Consequence for §13's readiness gate
 
 The gate as written requires `VAT/report comparison = 100%` and
 `Bank / clearing reconciliation = 100%`, and §6 makes it **binding** that readiness cannot
@@ -805,7 +821,7 @@ companies' running bookkeeping by hand — is what produces the VAT evidence the
 cannot. Choosing option 2 without running that track leaves the highest-risk area with no
 verification at all.
 
-### 21.5 Loose end
+### 21.7 Loose end
 
 `tasks/fortnox-scope-audit.md` is cited by three separate code comments as the authority
 for the scope decision. **The file is not in the repository.** The reasoning behind the
