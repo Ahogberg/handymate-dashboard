@@ -713,28 +713,17 @@ After the current launch and once prioritization allows:
 11. Migrate a small number of professionally reviewed pilot customers.
 12. Only then begin broad Fortnox replacement messaging.
 
-## 21. Operating model
+## 21. Notes on the operating model
 
 > Added 2026-09-12, after reviewing the AI-native services thesis (Isenberg, 2026-09-11)
-> against the actual codebase. The shape is a useful frame; the notes below are where
-> Handymate differs from the generic version.
+> against the actual codebase. §2.1 states the operating model; this section records four
+> things that follow from it and are easy to lose.
 
-The generic pattern for delivering finished work with software is five stages. Handymate
-already has a counterpart to each:
+### 21.1 Intake is the only stage that is structurally hard to copy
 
-| Stage | Generic | Handymate |
-|---|---|---|
-| Intake | "Upload the document, fill in five fields" | Operational data that already exists — customer, project, quote, time, material, supplier, payment |
-| Engine | A model plus prompts | Financial Kernel; deterministic wherever the accounting treatment is known, classifiers only for ambiguity (§8) |
-| Rulebook | A written list of what "correct" means, grown one mistake at a time | SE Country Pack + posting rules + golden paths + shadow divergences + regression tests |
-| Review layer | A human checks the risky cases | Exception queue, permission-filtered, with earned autonomy |
-| Delivery | A dashboard the customer logs into | Karin and the Economy surfaces |
-
-### 21.1 Intake is the part that is structurally hard to copy
-
-Of the five stages, four are reproducible by a competitor with the same models and enough
-patience. The rulebook takes time but is buildable. The engine is commodity. The review
-layer is hiring. Delivery is UI.
+Of the five stages in §2.1, four are reproducible by a competitor with the same models and
+enough patience. The rulebook takes time but is buildable. The engine is commodity. The
+review layer is hiring. Delivery is UI.
 
 **Intake is the exception.** A standalone AI bookkeeping service has to ask what the
 purchase was for, which project it belongs to, who the customer is and why the payment
@@ -745,42 +734,31 @@ rows and ROT share when it is born (`lib/invoices/create-invoice.ts`).
 That is the advantage worth protecting, and it argues for the sequencing in §16: the
 operational platform earns the data, and the data is what makes the accounting cheap.
 
-### 21.2 The rulebook is grown, not designed
+### 21.2 The rulebook can start before the ledger exists
 
-Every divergence found in shadow mode becomes a root-cause analysis, a posting-rule
-correction, a regression test and — where appropriate — a historical replay (§11, §12).
-After enough real Swedish construction volume, that corpus is harder to reproduce than
-any model.
+§2.1 describes the exception-to-automation loop as something the running system produces.
+It does not have to wait for the system. Taking a handful of pilot companies' running
+bookkeeping **by hand** — in the existing external system if necessary — produces rulebook
+entries before there is code that can be wrong about them.
 
-The thesis implies this can start before the ledger exists, and it can. Taking a handful
-of pilot companies' running bookkeeping **by hand** — in the existing external system if
-necessary — produces rulebook entries before there is code that can be wrong about them.
-It needs no Fortnox partner licence, no migration and no kernel. It is the cheapest way
-to make §15.1 and §36 concrete, and it is worth doing while the contracts are still being
-specified.
+It needs no Fortnox partner licence, no migration and no kernel. It is the cheapest way to
+make §10 and `FINANCIAL_KERNEL_ARCHITECTURE.md` §36 concrete, and it is worth doing while
+the contracts are still being specified.
 
-### 21.3 The known failure mode
+### 21.3 The review layer is a hiring constraint before it is a software one
 
-The thesis is explicit that pointing AI at production while keeping the overhead around it
-produces a slightly cheaper agency, not a software business. For Handymate that failure
-looks like:
-
-```text
-the engine does most of the work
-  -> a Handymate employee reads all of it anyway
-  -> the customer emails support
-  -> someone fixes it by hand
-```
-
-That is an accounting firm with better tools. Avoiding it is what the exception queue, the
-integrity checks and the visible agent state are for — and it is why the automation share
-has to be measured rather than assumed (see `FINANCIAL_KERNEL_ARCHITECTURE.md` §39.2).
+"One accounting professional handles 200 companies instead of 30" assumes a person
+competent enough to judge the exceptions and comfortable enough to trust the system for
+everything else. That person is the same bottleneck that caps every accounting firm today.
+At 200 companies per reviewer, one person's sick leave is a business-continuity event, not
+a margin question. Model the redundancy before quoting the ratio, and see §17.1 for why
+that offering is a separate line.
 
 ### 21.4 Where the thesis does not support the strategy
 
-The generic argument is an argument for **narrow**: one unit, one niche, depth in a single
-rulebook. Handymate's vertical expansion is the opposite shape — Accounting, then Pay,
-Procurement, Payroll, Capital, Insurance.
+The generic argument for AI-native services is an argument for **narrow**: one unit, one
+niche, depth in a single rulebook. Handymate's vertical expansion is the opposite shape —
+Accounting, then Pay, Procurement, Payroll, Capital, Insurance.
 
 Those are in mild tension, and the tension should not be papered over. Handymate's answer
 is that the shared operational dataset makes each new vertical cheaper than it would be
