@@ -2196,9 +2196,76 @@ businesses can be pilots at all.
 
 ---
 
-## 39. Amendment log
+## 39. The end state is a finished financial outcome, not accounting software
+
+> Added 2026-09-12. Records a positioning decision and, more importantly, the three
+> limits that keep it honest. Read the limits before quoting the ambition.
+
+The long-term product is not "Handymate's Fortnox". It is that the work is done:
+
+```text
+books closed · bank reconciled · VAT correct · exceptions handled
+```
+
+The customer's felt experience should be *"min bokföring är klar"*, not *"jag måste gå
+in i bokföringsmodulen"*. Everything in this document — the kernel, the posting engine,
+reconciliation, the SE pack, the integrity checks — exists to make that sentence true
+rather than to ship a ledger UI.
+
+That ambition is easy to overstate, so it is bounded by three rules.
+
+### 39.1 The obligation never moves to Handymate
+
+Roadmap §3 and §36 of this document both say it: the bookkeeping obligation stays with
+the bookkeeping entity. A "finished outcome" therefore means **the work is done and
+verifiable**, never that the responsibility has transferred.
+
+Consequences:
+
+- Never write or say that Handymate "ansvarar för" or "tar över" a customer's bookkeeping
+  in product copy, pricing or sales material. Handymate performs and evidences the work.
+- A service line where Handymate *does* take on the work as an engagement is a separate,
+  regulated business with its own liability, insurance and professional standards — see
+  roadmap §17.1. It is never a tier in the SaaS price list.
+- §36.6 still holds: where an implementation needs a threshold, an account number or a
+  filing rule, the model flags it and blocks. An outcome promise does not license a guess.
+
+### 39.2 Exception-based review is a target with a number, not a description of today
+
+The intended operating shape is that the deterministic engine and the classifiers handle
+the ordinary case, the integrity checks verify it, and a human sees only the exceptions.
+
+**That is not where the product is.** Today `lib/autonomy/earned-autonomy.ts` grants
+autonomy for **four** action types (`invoice_reminder`, `booking_reminder`,
+`quote_followup_sms`, `review_request`) behind a hardcoded allowlist, after a streak of
+**15** approvals in a 60-day window, always revocable. That conservatism is deliberate and
+correct for the current stage.
+
+The distance between that and "a human sees 2–3 %" is the initiative, not a detail to be
+filled in later. So:
+
+- Any claim about an automation share must name the measured figure and the date it was
+  measured. An unmeasured percentage does not go in a document, a deck or a price list.
+- The autonomy allowlist grows one reviewed action type at a time, with the same streak
+  and revocation mechanics. Widening it is an explicit decision, never a side effect of
+  the ledger getting better.
+- Marginal cost is metered, not zero: `lib/costs/meter.ts`, `lib/agents/shared/cost-guard.ts`
+  and the daily ceiling already produce a real per-business COGS number. Price against that
+  number, not against the assumption that inference is free.
+
+### 39.3 Auto-posting still passes every gate in §31
+
+An outcome framing must not soften a single rollout control. Auto-posting broadly still
+requires shadow comparison in phase S2 (§20.1) and professional review (roadmap §13)
+first. "The customer wants the books closed" is not an argument for skipping validation —
+it is the reason validation matters.
+
+---
+
+## 40. Amendment log
 
 | Date | Change | Source |
 |---|---|---|
 | 2026-09-11 | Original blueprint. | — |
+| 2026-09-12 | Added §39: the end state is a finished financial outcome, bounded by the obligation staying with the customer, exception-based review being a measured target rather than a description of today, and §31's rollout gates remaining intact. | AI-native services thesis (Isenberg 2026-09-11) reviewed against the codebase |
 | 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |

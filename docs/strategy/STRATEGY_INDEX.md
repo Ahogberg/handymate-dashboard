@@ -57,6 +57,33 @@ Core / PMF
 
 This order is directional rather than a fixed launch commitment. Real customer demand, retention data and unit economics after launch decide actual prioritization.
 
+### Note on the breadth of that order
+
+The order above is broad by design, and that is in **mild tension** with the case for
+AI-native service delivery below, which argues that the defensible asset is depth in one
+narrow rulebook. Handymate's answer is that the shared operational dataset makes each new
+vertical cheaper than a standalone specialist's. That is a bet, not a settled conclusion:
+each vertical still needs its own rulebook at full depth. Do not cite the AI-native
+services thesis as support for the breadth — it argues the opposite.
+
+## Product principle — finished outcomes, with a boundary
+
+> Adopted 2026-09-12.
+
+**Handymate delivers finished business outcomes where the outcome is verifiable and the
+obligation stays with the customer. Where the obligation would move to Handymate, that is
+a separate, regulated service line with its own economics and its own liability — never a
+tier in the SaaS price list.**
+
+The second sentence is what makes the principle usable. Without it the principle approves
+everything.
+
+The direction of travel is from AI-enabled software toward performing the administrative
+and financial workflows rather than only offering tools for them — the customer should feel
+*"det är gjort"*, not *"jag måste gå in i modulen"*. The limits on that ambition are
+written out in `FINANCIAL_KERNEL_ARCHITECTURE.md` §39 and `../HANDYMATE_ACCOUNTING_ROADMAP.md`
+§17.1 and §21. Read those before quoting the ambition anywhere customer-facing.
+
 ## Architectural rule for financial expansion
 
 Pay and Ledger are not independent integrations. They share the **Handymate Financial Kernel**:
@@ -142,6 +169,18 @@ Fortnox is currently the source of payment truth and syncs into Handymate. Until
 ### 2026-09-11 — Specify now, implement after PMF
 
 Roadmap §16 (PMF first) and orchestration §10 (spend reasoning capacity on the kernel now) are not in conflict. Specification, review, contracts and executable golden paths carry no production risk and proceed now; implementation, shadow mode and pilots are gated by PMF evidence. Available model capacity is a reason to specify more, never a reason to ship finance code earlier.
+
+### 2026-09-12 — Finished outcomes, with the obligation staying with the customer
+
+Handymate moves from AI-enabled SaaS toward performing administrative and financial workflows, not only supplying tools. Bounded: the outcome must be verifiable, and the bookkeeping obligation stays with the bookkeeping entity. A service line where Handymate undertakes the work is a separate regulated business (roadmap §17.1), never a SaaS tier.
+
+### 2026-09-12 — Exception-based review is a measured target, not a description of today
+
+Earned autonomy currently covers four action types behind a hardcoded allowlist after a 15-approval streak. Any claim about an automation share must name the measured figure and the date. Marginal cost is metered by the existing cost guard, not assumed to be zero. See `FINANCIAL_KERNEL_ARCHITECTURE.md` §39.2.
+
+### 2026-09-12 — Start the rulebook before the ledger
+
+Taking a handful of pilot companies' running bookkeeping by hand, in the existing external system if needed, produces rulebook entries before there is code that can be wrong about them. No Fortnox partner licence, no migration, no kernel required. See roadmap §21.2.
 
 ### 2026-09-11 — Four decisions deliberately left open
 
