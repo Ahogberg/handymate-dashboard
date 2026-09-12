@@ -775,6 +775,36 @@ Three ways forward, and the choice is the owner's, not an implementer's:
 Option 2 is the only one that is reachable without external dependencies, and it is
 compatible with this document provided the reduction is written down rather than assumed.
 
+### 21.6 Decision 2026-09-12 — option 2, with the VAT gap covered elsewhere
+
+**Chosen: run S2 at Level 1, with §13's gate explicitly reduced and the unsupported
+dimensions recorded per §6 and §14.** Option 3 is the direction of travel; option 1 only if
+a pilot business or its accountant requires voucher-level evidence, and not while the
+Fortnox licence blocker is open.
+
+What that means concretely:
+
+- Level 1 comparison runs on real pilot traffic: invoice, supplier invoice, payment,
+  customer balance, supplier balance. That is reachable with the current grant and touches
+  no customer connection.
+- `bookkeeping` is **not** requested. No re-OAuth, no added licence cost for pilot
+  businesses.
+- Levels 2, 3 and 4 are persisted as `unsupported` with the reason, not as absent or as
+  passing. §13's gate is reduced to the dimensions actually obtainable, and the reduction
+  is recorded as an accepted limitation with an owner and a date — never inferred from a
+  green Level 1 run.
+
+**The known weakness, stated plainly:** VAT and voucher-level accounting get the least
+external evidence under this option, and that is exactly where the two segment-blocking
+gaps sit — reverse-charge construction VAT and cash-basis accounting
+(`FINANCIAL_KERNEL_ARCHITECTURE.md` §15.1, §15.2). Shadow Level 1 cannot cover them.
+
+The compensating measure is therefore **not optional** under this decision: the manual
+rulebook track in `../HANDYMATE_ACCOUNTING_ROADMAP.md` §21.2 — taking a handful of pilot
+companies' running bookkeeping by hand — is what produces the VAT evidence the shadow
+cannot. Choosing option 2 without running that track leaves the highest-risk area with no
+verification at all.
+
 ### 21.5 Loose end
 
 `tasks/fortnox-scope-audit.md` is cited by three separate code comments as the authority
