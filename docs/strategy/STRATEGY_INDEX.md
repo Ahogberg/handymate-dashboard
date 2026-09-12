@@ -207,6 +207,10 @@ Fortnox is currently the source of payment truth and syncs into Handymate. Until
 
 Roadmap §16 (PMF first) and orchestration §10 (spend reasoning capacity on the kernel now) are not in conflict. Specification, review, contracts and executable golden paths carry no production risk and proceed now; implementation, shadow mode and pilots are gated by PMF evidence. Available model capacity is a reason to specify more, never a reason to ship finance code earlier.
 
+### 2026-09-12 — Shadow runs at Level 1; the VAT gap is covered by the manual rulebook track
+
+`bookkeeping` scope is not requested, so no pilot business has to re-OAuth and no added Fortnox licence cost is triggered. S2 compares objects — invoice, supplier invoice, payment, balances — and Levels 2–4 are persisted as unsupported with the reason rather than as passing. §13's readiness gate is reduced accordingly, recorded with an owner and a date. Because VAT and voucher level then have no external evidence, the manual bookkeeping track (roadmap §21.2) is a condition of this decision, not an option. See `FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` §21.6.
+
 ### 2026-09-12 — The obligation stays with the customer; Managed is a separate line
 
 Boundary on the outcome-delivery principle above. The outcome must be verifiable and the bookkeeping obligation stays with the bookkeeping entity — a finished outcome means the work is done and evidenced, not that responsibility transferred. A service line where Handymate undertakes the work as an engagement is a separate regulated business with its own liability and insurance (roadmap §17.1), never a SaaS tier.
