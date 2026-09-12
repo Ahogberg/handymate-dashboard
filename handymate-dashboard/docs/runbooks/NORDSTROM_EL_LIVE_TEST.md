@@ -2,7 +2,11 @@
 
 ## Status
 
-Körningen är förberedd på `codex/brain-visibility-weekend-20260910`. Inte livekörd eller godkänd ännu. Inga lösenord har lästs eller ändrats. Lokalt verifierat: 17 isolerade säkerhets-/konfigurationsfall, 12 befintliga CI-kontrakt, Playwrights testupptäckt och TypeScript. Inga lokala webbläsarprov påstås vara utförda.
+**Uppdaterat 2026-09-12:** [Körning 34720493107](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720493107) startades via GitHub CLI på merge-commit `fc586381aa7bc2defd0dc2ebe4dcb327d04b694b`, med `customer_journey=true` och `create_draft=false`. Testkonfigurationen passerade. Den breda produktionssviten och tvåtenantprovet hoppades över enligt plan.
+
+**BLOCKERAD före autentisering:** `/api/health` svarade HTTP 302. Ett separat anrop utan inloggningsuppgifter bekräftade att omdirigeringen går till Vercels `/sso-api`. Previewns åtkomstskydd blockerar alltså runnern. Inga appcredentials skickades, inget utkast skapades och inget företags-/sessions-/UI-bevis erhölls. Testkontots lösenords giltighet är fortfarande okänd; att konfigurationen passerade bevisar bara att ett värde fanns.
+
+Nästa steg är att ordna godkänd åtkomst till rätt preview och köra samma avgränsade prov på aktuell branch-commit. Skyddet har inte ändrats eller kringgåtts. Ett lyckat bygge ersätter inte detta prov. Release kvar på HOLD.
 
 ## Redan förifyllt
 
@@ -31,7 +35,7 @@ Detta väljer **endast** Nordström Els lästest. Den breda produktionssviten oc
 
 För att också prova ett sparat utkast, använd samma kommando med `-f create_draft=true`. Detta skapar högst ett märkt utkast för samma GitHub-run-ID, utan kund, lead, affär eller betalplan. Två syntetiska arbetstimmar à 100 kr ger 250 kr inklusive moms; detta är testdata, aldrig föreslagna kundpriser. Utkastet lämnas kvar för granskning. Ingen automatisk radering görs. Vid tappat svar görs ingen andra automatisk POST; omkörning söker efter samma markör först. Separata nya körningar skapar separata utkast.
 
-GitHub-anslutningen i denna Codex-session kan läsa körningar och starta om befintliga jobb, men saknar verktyg för en ny workflow_dispatch och för att konfigurera secrets. GitHub CLI är inte installerat här. Därför behöver första starten göras enligt kommandot ovan; därefter kan Codex läsa resultaten genom anslutningen.
+GitHub-anslutningen kan läsa körningar och starta om befintliga jobb, men saknar verktyg för en ny workflow_dispatch och för att konfigurera secrets. GitHub CLI är nu tillgängligt och användes för starten ovan. Den återstående spärren är verifierad previewåtkomst, inte möjlighet att starta workflowen.
 
 ## Vad testet bevisar
 

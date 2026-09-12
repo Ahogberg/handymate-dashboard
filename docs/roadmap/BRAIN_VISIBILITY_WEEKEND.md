@@ -15,7 +15,27 @@
 
 # 0. Uppdraget
 
-## Make Handymate’s existing intelligence impossible for the customer to miss.
+## Readiness-pass 2026-09-12 — aktuell verifiering för PR #38
+
+Detta statusavsnitt kompletterar historiken nedan. Det uppgraderar inte äldre slice-/providerbevis.
+
+**DONE:** Riktig tvåföräldersmerge `fc586381aa7bc2defd0dc2ebe4dcb327d04b694b` förenar PR-head `6885379c9596619ac4a795e706d4052b9ac7616e` med main `f709bbe15d8e6151b21a0fe51e8b7378423c2694`. Main är därmed helt inkluderad. Brain Visibility-state är bevarat; Mission Control/heron ligger först och avlastningslänken under heron. Revenue OS, säljöverlämning och mains strategidokument är bevarade. Båda grenarnas kontraktslistor ingår.
+
+**REGRESSION FIX:** CI på den verkliga kombinationen fångade ett gammalt krav i `tests/sprint/onboarding-seeding.cjs`: checklistmallar skulle fortfarande seedas trots mains uttryckliga borttagning. Rättningen `743a12679ff1a19c06ab3b43b0cc15dfbd727ae7` bevarar fel-/återhämtningsproven för övriga standarddata och verifierar att checklistmallar varken läses eller skrivs under seedningen. Standardmallarna fortsätter komma från befintlig GET/kodkälla. Ingen produktmotor eller feature tillagd.
+
+**VERIFIED på kodversion `743a12679ff1a19c06ab3b43b0cc15dfbd727ae7`:**
+
+- Alla fem PR-workflows och motsvarande push-körningar gröna; båda Vercel-previewbyggen gröna. [Kontraktsgrind 34720582150](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720582150): TypeScript, 2 093 godkända Playwright-kontrakt, en befintlig skip, kundunderlag, sex kundutfall, aktivitetens kolumnkontrakt, mejlgränser samt livetestets 17 policyprov.
+- Lokalt: separat typkontroll och `npm run build` exit 0; 58 riktade Home/Quote/hero/veckovärde-regressioner samt veckorapportens harness för atomär reservation, fel, återförsök och okänd leverans. Provider/db är isolerade i dessa tester. Windows-svitens miljöfel (grep/radslut) omtestades godkänt med Git-verktyg och repoexakta LF-filer; inga produktkodändringar behövdes.
+- Inga öppna inline-granskningstrådar. GitHub rapporterar PR:n konfliktfri. Detta är integrations-/kodbevis, inte fullständig kundresa.
+
+**LIVE BLOCKED, observerat:** [Nordström El-körning 34720493107](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720493107) startades på merge-versionen med läsläge (`create_draft=false`). Konfigurationen passerade, men `/api/health` gav 302 till Vercels SSO innan credentials skickades. Ingen appinloggning, företagskontroll, navigering eller utkastskapning genomfördes. CLI-start fungerar nu; previewåtkomst är den konkreta kvarvarande spärren för detta prov. Se `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`.
+
+**STATUS:** Kodintegrationen är CI-grön och redo för mergegranskning. Full slice-DoD och produktionsrelease kvar på **HOLD**: godkänd autentiserad kundresa, företags-/rollbyte, verkliga providerkvitton och tidigare dokumenterade migrations-/mobil-/launchkrav är inte stängda av detta pass. Ingen merge till main eller produktionsdeploy utförd. PR:n behålls som draft tills de beslutade acceptansgrindarna är uppfyllda. Före merge ska kontrollerna även vara gröna på dokumentationscommitten som innehåller detta avsnitt.
+
+**NEXT:** Ordna godkänd previewåtkomst och kör det avgränsade läsprovet igen på aktuell head. Genomför därefter återstående uttryckliga kundrese-/providerprov enligt respektive runbook; kringgå inte skyddet och tolka inte grön CI som leveransbevis.
+
+## Make Handymate's existing intelligence impossible for the customer to miss.
 
 Handymate ska inte bara **vara intelligent i backend**.
 

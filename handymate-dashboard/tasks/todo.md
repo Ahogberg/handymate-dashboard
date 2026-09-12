@@ -2,9 +2,11 @@
 
 - [x] Hämta aktuell main och PR #38, skapa separat arbetskopia och riktig merge.
 - [x] Bevara Brain Visibility-state, Mission Control först och båda grenarnas testlistor.
-- [ ] Kör typkontroll, Home/Quote-kontrakt och produktionsbygge på kombinationen.
-- [ ] Publicera synkad branch och verifiera samtliga PR-kontroller på aktuell commit.
-- [ ] Uppdatera Brain Visibility/release-bevis och redovisa kvarstående livegrindar.
+- [x] Kör typkontroll, Home/Quote-kontrakt och produktionsbygge på kombinationen.
+- [x] Publicera synkad branch och verifiera samtliga PR-kontroller på kodversion 743a12679.
+- [x] Uppdatera Brain Visibility/release-bevis och redovisa kvarstående livegrindar.
+
+Review: 2 093 CI-kontrakt (en befintlig skip), samtliga fem workflows och båda previewbyggen gröna. Lokalt tsc/build exit 0, 58 Home/Quote-test och veckorapportharness godkända. Checklistseedningens äldre test uppdaterat till mains kodkälla. Liveförsök 34720493107 blockerat före login av Vercel SSO (302); release HOLD. Slutlig dokumentationshead kontrolleras separat före överlämning.
 
 Styrdokument: `docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md` i reporoten. Ingen ny feature eller produktionsrelease ingår.
 
