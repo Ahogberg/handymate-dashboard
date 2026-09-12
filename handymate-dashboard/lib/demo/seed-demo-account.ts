@@ -196,7 +196,7 @@ export async function resetDemoAccount(
       finished_at: new Date().toISOString(),
       ok: false,
       error_text: `delete_transaction_failed: ${orsak}`,
-      reset_version: 'v229',
+      reset_version: 'v229',  // RPC:ns egen version — v233 rörde bara TS och kolumner
     })
     if (auditInsertError) {
       console.error('[demo-reset] kunde inte auditlogga rollback:', auditInsertError.message)
@@ -204,6 +204,15 @@ export async function resetDemoAccount(
     return { error: 'Kunde inte radera det gamla demoläget. Inga gamla demorader ändrades.' }
   }
 
+  /**
+   * Avslutar auditen som misslyckad.
+   *
+   * `error_text` bär BÅDE koden och den riktiga orsaken (2026-09-12).
+   * Tidigare sparades bara koden, och en 'defaults_seed_failed' i tabellen
+   * sa ingenting om vilken av nio delseeders som föll eller varför —
+   * orsaken låg bara i Vercels loggar. Samma blindhet som v229 stängde
+   * ett steg tidigare i kedjan.
+   */
   async function failReset(message: string, errorCode = 'seed_failed'): Promise<DemoResetError> {
     const { error: auditError } = await supabase
       .from('demo_reset_audit')
@@ -211,7 +220,7 @@ export async function resetDemoAccount(
         actor_user_id: actorUserId,
         finished_at: new Date().toISOString(),
         ok: false,
-        error_text: errorCode,
+        error_text: `${errorCode}: ${(message || 'okänt fel utan meddelande').slice(0, 450)}`,
       })
       .eq('id', resetAuditId)
       .eq('business_id', businessId)
@@ -254,7 +263,7 @@ export async function resetDemoAccount(
     // Ett halvt seedat demokonto är värre än ett tomt: presentatören ser en
     // yta som saknar hälften av det den lovar, utan att veta vilken hälft.
     return failReset(
-      `Grundinställningarna kunde inte seedas (${defaultsResultat.failed} av ${defaultsResultat.total} misslyckades).`,
+      `Grundinställningarna kunde inte seedas (${defaultsResultat.failed} av ${defaultsResultat.total} misslyckades): ${defaultsResultat.reasons.join(' | ')}`,
       'defaults_seed_failed',
     )
   }

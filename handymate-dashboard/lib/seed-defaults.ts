@@ -1,6 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
-import { getChecklistsForBranch } from '@/lib/checklist-defaults'
 import { applyHourlyRateToDefaults, getStarterProducts } from '@/lib/product-defaults'
 import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
@@ -42,7 +41,25 @@ export async function seedAllDefaults(
     seedLeadScoringRules(supabase, businessId),
     seedPipelineStages(supabase, businessId),
     seedQuoteStandardTexts(supabase, businessId, branch),
-    seedChecklistTemplates(supabase, businessId, branch),
+    // checklist_template SEEDAS INTE (2026-09-12). Två skäl, båda mätta:
+    //
+    //   1. Seedaren nedan kunde aldrig lyckas. Den skrev `category` och
+    //      `is_default`, och tabellen har ingen av dem (kolumnerna är id,
+    //      business_id, name, description, branch, items, is_system,
+    //      created_at — kontrollerat mot information_schema). Varje anrop
+    //      kastade 42703, och seedAllDefaults räknade det som ett
+    //      misslyckande. I produktion: noll företagsegna rader någonsin,
+    //      på något konto.
+    //   2. Även en RÄTTAD seedare hade gjort skada. GET
+    //      /api/checklists/templates lägger redan till branschens
+    //      standardmallar ur koden (getChecklistsForBranch) ovanpå de
+    //      företagsegna raderna. Seedade kopior hade alltså visats i
+    //      DUBBEL uppsättning i projektvyn.
+    //
+    // Öppen produktfråga, inte en bugg: ska kunden få EGNA, redigerbara
+    // kopior av standardmallarna? I så fall måste GET sluta syntetisera
+    // dem när företagsegna rader finns. Det är ett beslut, inte en
+    // rättning, och det tas inte två dygn före lansering.
     seedProducts(supabase, businessId, productBranches, hourlyRate),
     // UX5: ALLA branscher (inte bara huvud-) — el+bygg får båda urvalen.
     seedReservations(supabase, businessId, productBranches),
@@ -56,7 +73,19 @@ export async function seedAllDefaults(
       failed.map(r => (r as PromiseRejectedResult).reason))
   }
 
-  return { total: results.length, succeeded: results.length - failed.length, failed: failed.length }
+  // `reasons` (2026-09-12): tidigare returnerades bara ANTALET. Orsakerna
+  // gick till console.error, alltså till Vercels loggar — och en
+  // demoåterställning som föll gav en auditrad med texten
+  // 'defaults_seed_failed' och inget mer. Det tog en databasjakt över nio
+  // tabeller att hitta att checklist_template var den som föll, på en
+  // kolumn som inte fanns. Anropare kan nu spara orsaken där felet syns.
+  const reasons = failed.map(r => {
+    const skal = (r as PromiseRejectedResult).reason
+    const text = skal?.message || String(skal || 'okänt fel')
+    return text.slice(0, 200)
+  })
+
+  return { total: results.length, succeeded: results.length - failed.length, failed: failed.length, reasons }
 }
 
 /**
@@ -245,29 +274,6 @@ async function seedQuoteStandardTexts(supabase: SupabaseClient, businessId: stri
   if (writeError) throw writeError
 }
 
-async function seedChecklistTemplates(supabase: SupabaseClient, businessId: string, branch: string) {
-  const { data: existing, error: readError } = await supabase
-    .from('checklist_template')
-    .select('id')
-    .eq('business_id', businessId)
-    .limit(1)
-
-  if (readError) throw readError
-  if (existing && existing.length > 0) return
-
-  const templates = getChecklistsForBranch(branch)
-  const { error: writeError } = await supabase.from('checklist_template').insert(
-    templates.map((t, i) => ({
-      id: `ct_${businessId}_${i}`,
-      business_id: businessId,
-      name: t.name,
-      category: t.category,
-      items: t.items,
-      is_default: true,
-    }))
-  )
-  if (writeError) throw writeError
-}
 
 /**
  * Seedar produktbanken (`products`) — den tabell offert-editorn, produktbanks-
