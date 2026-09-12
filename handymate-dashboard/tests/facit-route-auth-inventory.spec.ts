@@ -215,5 +215,8 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // Ingen tenant-kontext finns: raden skapas av säljaren och läses av ett
   // PROSPEKT som ännu inte har ett konto. Skrivvägen (POST /api/sales-case)
   // bär standardgrinden och räknas därför inte här → 155.
-  expect(utanStandard.length).toBeLessThanOrEqual(155)
+  // 2026-09-12 (Revenue OS V1): admin/revenue — plattformsadmin via
+  // isAdmin(request), service-role bakom admin-grinden och ingen kundtenant-
+  // kontext. Den interna säljytan arbetar med husets GTM-data → 156.
+  expect(utanStandard.length).toBeLessThanOrEqual(156)
 })
