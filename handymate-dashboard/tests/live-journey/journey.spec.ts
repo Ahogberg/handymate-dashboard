@@ -1,21 +1,31 @@
 import { test, expect, type APIResponse } from '@playwright/test'
-const { configuration, verifyTenant, browserRequestAllowed } = require('./policy.cjs')
+const { configuration, verifyTenant, browserRequestAllowed, protectionHeaders } = require('./policy.cjs')
 
 // No service-role key, no persisted session, no provider send or decision endpoint.
 // This proves app authentication/session, API draft persistence and UI reopening;
 // it does not prove keyboard-based login or quote creation through the editor.
 test('Nordström El: session → navigering → valt utkast → återöppning', async ({ page, context }, info) => {
   const cfg = configuration(process.env)
+  const headersFor = (url: string): Record<string, string> => protectionHeaders(url, cfg.origin, process.env.VERCEL_AUTOMATION_BYPASS_SECRET)
   const json = async (response: APIResponse, label: string) => {
     expect(response.ok(), `${label}: HTTP ${response.status()}`).toBe(true)
     return response.json()
   }
-  const get = (path: string) => context.request.get(cfg.origin + path, { maxRedirects: 0 })
+  const request = async (path: string, options: Parameters<typeof context.request.fetch>[1] = {}) => {
+    try {
+      return await context.request.fetch(cfg.origin + path, { ...options, maxRedirects: 0, headers: headersFor(cfg.origin + path) })
+    } catch {
+      // Playwright transport errors may include request headers. Never publish
+      // those errors in HTML artifacts, where CI log masking does not apply.
+      throw new Error('Testversionens API-anrop misslyckades; transportdetaljer utelämnas för att skydda inloggningsuppgifter.')
+    }
+  }
+  const get = (path: string) => request(path)
   const health = await json(await get('/api/health'), 'Testversionens hälsa')
   expect(health.version, 'Fel driftsatt kodversion; inga inloggningsuppgifter skickas').toBe(cfg.version)
 
-  const auth = await json(await context.request.post(cfg.origin + '/api/auth', {
-    maxRedirects: 0,
+  const auth = await json(await request('/api/auth', {
+    method: 'POST',
     data: { action: 'login', data: { email: process.env.LIVE_TEST_EMAIL, password: process.env.LIVE_TEST_PASSWORD } },
   }), 'Inloggning')
   expect(auth.success).toBe(true)
@@ -24,9 +34,18 @@ test('Nordström El: session → navigering → valt utkast → återöppning', 
   await checkTenant()
 
   const blocked = new Set<string>()
-  await context.route('**/*', route => {
+  await context.route('**/*', async route => {
     const r = route.request()
-    if (browserRequestAllowed(r.url(), r.method(), cfg.origin)) return route.continue()
+    if (browserRequestAllowed(r.url(), r.method(), cfg.origin)) {
+      // Never forward the automation credential through an HTTP redirect.
+      // A redirect is fulfilled as-is; its destination must pass this guard again.
+      try {
+        const response = await route.fetch({ maxRedirects: 0, headers: { ...r.headers(), ...headersFor(r.url()) } })
+        return await route.fulfill({ response })
+      } catch {
+        return route.abort('failed') // do not expose transport headers in artifacts
+      }
+    }
     const u = new URL(r.url())
     if (u.origin === cfg.origin && !['GET', 'HEAD'].includes(r.method())) blocked.add(`${r.method()} ${u.pathname}`)
     return route.abort('blockedbyclient')
@@ -69,8 +88,8 @@ test('Nordström El: session → navigering → valt utkast → återöppning', 
     if (!quote) {
       // Exactly one request. A timeout must be investigated/reconciled on rerun,
       // never followed by an automatic second POST.
-      const result = await json(await context.request.post(cfg.origin + '/api/quotes', {
-        maxRedirects: 0,
+      const result = await json(await request('/api/quotes', {
+        method: 'POST',
         data: { title, description: 'Syntetiskt testutkast. Ingen kund, affär eller leverans.', status: 'draft', customer_id: null,
           vat_rate: 25, quote_items: [{ item_type: 'item', description: 'TEST — arbetstid', quantity: 2, unit: 'tim', unit_price: 100,
             labor_amount: 200, material_amount: 0, is_rot_eligible: false, is_rut_eligible: false }] },

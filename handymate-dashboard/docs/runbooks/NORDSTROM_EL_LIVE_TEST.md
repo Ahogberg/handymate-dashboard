@@ -2,6 +2,12 @@
 
 ## Status
 
+**Uppdatering 2026-09-13:** Autentiserad `vercel curl` når rätt previews `/api/health` och bekräftar version `7e07a3b`. Vercels skyddsinställning är fortsatt `all_except_custom_domains`. En befintlig automation-bypass-nyckel finns i projektet. GitHub-testet kan nu läsa `VERCEL_AUTOMATION_BYPASS_SECRET` från miljön `live-test`, men nyckeln är ännu inte överförd dit och den autentiserade kundresan är inte omkörd.
+
+Nyckeln ska sparas som krypterad environment-secret i `Ahogberg/handymate-dashboard`, inte i kod, URL, rapport eller logg. Den ger plattformsåtkomst till projektets skyddade deployments; testkoden skickar den bara till det exakt valda originet. API-anrop följer inga redirects. Browsern hämtar endast godkända samma-origin-anrop utan automatisk redirect och granskar destinationsanrop separat. Transportfel återges utan headers i rapporterna. Appens login-, versions-, företags- och skrivgrindar gäller fortfarande. Vercels rekommenderade header är dokumenterad i [Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation).
+
+Hälsorutten svarade `degraded`: sparad kreditkontroll från 2026-09-12 05:05 UTC rapporterar slut Anthropic-kredit, 7 kr hos 46elks och Stripe i testläge. Detta är återläst kontrollstatus, inte en färsk provider-/saldoverifiering. Sådana livekrav kvarstår separat.
+
 **Uppdaterat 2026-09-12:** [Körning 34720493107](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720493107) startades via GitHub CLI på merge-commit `fc586381aa7bc2defd0dc2ebe4dcb327d04b694b`, med `customer_journey=true` och `create_draft=false`. Testkonfigurationen passerade. Den breda produktionssviten och tvåtenantprovet hoppades över enligt plan.
 
 **BLOCKERAD före autentisering:** `/api/health` svarade HTTP 302. Ett separat anrop utan inloggningsuppgifter bekräftade att omdirigeringen går till Vercels `/sso-api`. Previewns åtkomstskydd blockerar alltså runnern. Inga appcredentials skickades, inget utkast skapades och inget företags-/sessions-/UI-bevis erhölls. Testkontots lösenords giltighet är fortfarande okänd; att konfigurationen passerade bevisar bara att ett värde fanns.

@@ -23,5 +23,9 @@ function browserRequestAllowed(url, method, origin) {
   if (u.origin !== origin) return false // no third-party HTTP from this test
   return !/^\/api\/(cron|debug)(\/|$)/.test(u.pathname)
 }
-module.exports = { configuration, verifyTenant, browserRequestAllowed }
+function protectionHeaders(url, origin, secret) {
+  assert.equal(new URL(url).origin, origin, 'Previewnyckeln får bara skickas till testversionens origin')
+  return secret ? { 'x-vercel-protection-bypass': secret } : {}
+}
+module.exports = { configuration, verifyTenant, browserRequestAllowed, protectionHeaders }
 if (require.main === module) { configuration(process.env); console.log('Testkonfiguration finns; inga hemligheter visas.') }

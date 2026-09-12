@@ -1,7 +1,15 @@
 const { test } = require('node:test')
 const assert = require('node:assert/strict')
-const { configuration, verifyTenant, browserRequestAllowed } = require('./policy.cjs')
+const { configuration, verifyTenant, browserRequestAllowed, protectionHeaders } = require('./policy.cjs')
 const env = { LIVE_TEST_BASE_URL: 'https://handymate-test.vercel.app', LIVE_TEST_COMMIT_SHA: 'a'.repeat(40), LIVE_TEST_BUSINESS_ID: 'test-business', LIVE_TEST_EMAIL: 'fixture@example.invalid', LIVE_TEST_PASSWORD: 'fixture-only' }
+test('automation access is optional and restricted to the exact preview origin', () => {
+  const origin = env.LIVE_TEST_BASE_URL
+  assert.deepEqual(protectionHeaders(origin + '/api/health', origin, undefined), {})
+  assert.deepEqual(protectionHeaders(origin + '/api/health', origin, 'fixture-only'), { 'x-vercel-protection-bypass': 'fixture-only' })
+  for (const url of ['https://external.invalid', 'https://handymate-test.vercel.app.evil.invalid', 'https://another.vercel.app', 'http://handymate-test.vercel.app']) {
+    assert.throws(() => protectionHeaders(url, origin, 'fixture-only'))
+  }
+})
 test('read-only is default; draft requires explicit true', () => {
   assert.equal(configuration(env).createDraft, false)
   assert.equal(configuration({ ...env, LIVE_TEST_CREATE_DRAFT: 'true' }).createDraft, true)
