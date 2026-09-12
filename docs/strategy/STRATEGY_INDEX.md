@@ -42,6 +42,36 @@ The expansion test is not "can we add this feature?" but:
 
 > **Does Handymate already own, or naturally deserve to own, the data and workflow behind something the customer currently pays another vendor to do?**
 
+### AI-native outcome delivery
+
+Handymate should not stop at giving trades companies better AI tools. Over time the platform should increasingly **deliver finished business outcomes**, with agents and deterministic systems doing the work and humans reviewing only the exceptions that genuinely require judgment.
+
+```text
+Traditional SaaS
+  customer receives a tool
+  -> customer or external firm still performs the work
+
+Handymate target state
+  operational truth enters Handymate
+  -> agents + deterministic engines execute the workflow
+  -> rulebooks/integrity checks verify the result
+  -> exceptions are escalated
+  -> customer receives the finished outcome
+```
+
+This is a product and operating-model principle, not a mandate to disguise manual services as software. The system must deliberately collapse the service overhead as it matures: structured intake, explicit scope, machine-readable rules, confidence/risk gates, exception review and visible delivery state.
+
+The model provider is not the moat. The durable moat is the combination of:
+
+- proprietary operational context;
+- domain rulebooks defining what "correct" means;
+- real customer edge cases;
+- Golden Paths and regression tests;
+- shadow/integrity divergences and their resolutions;
+- accumulated automation policies and outcome history.
+
+Every material production mistake that teaches Handymate a new domain rule should, where appropriate, become a permanent rule, test or integrity check. The desired long-term effect is that the human-review percentage falls as the rulebook grows while accountability and auditability increase.
+
 High-priority adjacent vertical order currently:
 
 ```text
@@ -147,10 +177,14 @@ Roadmap §16 (PMF first) and orchestration §10 (spend reasoning capacity on the
 
 Merchant-of-record model, Pay-vs-Ledger sprint order, whether Handymate files the momsdeklaration, and the pilot cut-over fiscal-year boundary are recorded as open in `FINANCIAL_KERNEL_ARCHITECTURE.md` §38. Implementation agents state the blocker and stop rather than choosing a convenient answer.
 
+### 2026-09-12 — Finished outcomes, not just AI tools
+
+Handymate's target operating model is AI-native outcome delivery: customers increasingly buy completed administrative and financial outcomes rather than software they must operate line-by-line. Agents and deterministic systems perform the routine work; rulebooks and integrity systems verify it; humans handle exceptions. This principle applies first and most concretely to Accounting, but should guide future service-like verticals where Handymate already owns the underlying operational context.
+
 ---
 
 ## North Star
 
 > **Handymate — The operating system for the trades.**
 
-The moat is not any individual module. It is the closed loop from demand and quote assumptions through operational execution, money movement, accounting truth and realized profitability back into better future decisions.
+The moat is not any individual module. It is the closed loop from demand and quote assumptions through operational execution, money movement, accounting truth and realized profitability back into better future decisions — plus the rulebook of real edge cases that lets Handymate increasingly deliver those outcomes without proportional human headcount.
