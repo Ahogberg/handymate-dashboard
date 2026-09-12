@@ -41,6 +41,71 @@ Target end-state for a typical small trade/service company:
 
 External accounting/revision partners remain possible without requiring a separate operational system.
 
+### 2.1 Target operating model: finished financial outcomes
+
+Handymate Accounting is **not primarily a bookkeeping tool**. Its target state is a software-operated accounting service: financial work is completed automatically from operational truth, verified by deterministic rules and integrity checks, and escalated to humans only when an exception requires judgment.
+
+The customer should increasingly experience outcomes such as:
+
+```text
+Books are current
+Bank is reconciled
+VAT is prepared correctly
+Supplier invoices are booked
+Customer payments are matched
+Two exceptions require review
+```
+
+—not a queue of bookkeeping tasks they must perform themselves.
+
+The operating model is:
+
+```text
+INTAKE
+Operational truth already exists in Handymate
+(project, customer, quote, time, material, invoice, supplier, payment)
+        |
+        v
+ENGINE
+Financial Kernel + Ledger + agents/classifiers
+        |
+        v
+RULEBOOK
+Country pack + posting rules + company policy + Golden Paths
+        |
+        v
+VERIFICATION
+Reconciliation + Financial Integrity Engine + shadow comparisons
+        |
+        +--------------------+
+        |                    |
+        v                    v
+high-confidence           exception / judgment
+verified outcome          -> human review
+        |                    |
+        +---------+----------+
+                  v
+DELIVERY
+Karin + Economy surfaces report the completed outcome and remaining exceptions
+```
+
+This model creates an important product constraint: **human review is an exception path, not the normal delivery path.** High-risk work can and should require review until confidence is earned, but the architecture must not assume that a human will permanently inspect every transaction after automation runs. Otherwise Handymate becomes a traditional accounting service with better internal tools rather than a scalable AI-native service.
+
+The review percentage should shrink through learning:
+
+```text
+real exception
+  -> domain analysis
+  -> rulebook/posting-policy improvement
+  -> Golden Path or regression test
+  -> integrity/shadow check
+  -> future equivalent cases handled automatically when safe
+```
+
+The model provider is not the accounting moat. The moat is the accumulated definition of **what correct means for trades businesses**: country-pack rules, real edge cases, posting-rule versions, shadow divergences, resolved exceptions, regression tests, operational context and outcome history.
+
+This does not remove accountability. The opposite is required: every automated financial outcome must remain explainable, auditable and reversible through the explicit controls defined in the Financial Kernel architecture.
+
 ## 3. Important legal/product distinction
 
 A bookkeeping system is not made valid because an auditor approves the software. The system and the customer's use of it must comply with applicable bookkeeping legislation and generally accepted accounting principles.
@@ -278,7 +343,6 @@ The customer should interact with exceptions, not perform bookkeeping line-by-li
 The Swedish pack should eventually cover at minimum the list below. The authoritative and more
 detailed scope is `docs/strategy/FINANCIAL_KERNEL_ARCHITECTURE.md` §15 and §36; this list is a
 summary and must not be treated as complete on its own.
-
 
 - BAS-compatible chart of accounts
 - Swedish VAT codes and reporting
@@ -601,6 +665,8 @@ Lead acquisition
 
 This allows Handymate to understand *why* the company makes or loses money, not merely record that it happened.
 
+A second layer of moat is the **accounting rulebook** accumulated from real usage: every verified exception, shadow divergence, country-pack correction and regression test increases Handymate's ability to deliver correct financial outcomes without proportional human review. A competitor can access similar foundation models; it cannot instantly reproduce years of trades-specific correctness history.
+
 Future examples:
 
 - Detect that bathroom projects have lower margins than service work.
@@ -726,4 +792,4 @@ product.
 
 ### Guiding principle
 
-**Do not build a better place to manually do bookkeeping. Build a system where bookkeeping is the verified financial consequence of work Handymate
+**Do not build a better place to manually do bookkeeping. Build a system where bookkeeping is the verified financial consequence of work Handymate already understands — and where the customer increasingly receives a finished financial outcome instead of another workflow to operate.**

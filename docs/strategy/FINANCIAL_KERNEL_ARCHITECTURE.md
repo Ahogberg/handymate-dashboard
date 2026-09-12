@@ -2269,3 +2269,159 @@ it is the reason validation matters.
 | 2026-09-11 | Original blueprint. | — |
 | 2026-09-12 | Added §39: the end state is a finished financial outcome, bounded by the obligation staying with the customer, exception-based review being a measured target rather than a description of today, and §31's rollout gates remaining intact. | AI-native services thesis (Isenberg 2026-09-11) reviewed against the codebase |
 | 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
+
+---
+
+## 40. AI-native Accounting Outcome Delivery Contract
+
+This section is a **binding product-architecture rule** for Handymate Accounting. The target system is not a bookkeeping UI where AI prepares suggestions and a human permanently reviews every transaction. The target is verified financial outcomes delivered from operational truth, with human review reserved for exceptions that require judgment or elevated risk handling.
+
+### 40.1 Outcome, not tool usage, is the product target
+
+The desired customer experience is increasingly:
+
+```text
+Books current                 ✓
+Bank reconciled               ✓
+Supplier invoices booked      ✓
+Customer payments matched     ✓
+VAT prepared                  ✓
+Needs review                  2 items
+```
+
+not:
+
+```text
+Here are 87 AI-generated bookkeeping suggestions.
+Please approve them one by one.
+```
+
+Detailed journals, vouchers and accounting controls remain available to accountants and auditors, but routine customers should consume **completed outcomes and exceptions**, not bookkeeping work queues.
+
+### 40.2 Delivery architecture
+
+The accounting delivery loop is:
+
+```text
+Operational truth
+(project/customer/quote/time/material/invoice/supplier/payment)
+        |
+        v
+Financial Kernel
+        |
+        v
+Deterministic Ledger rules + bounded AI classification
+        |
+        v
+Rulebook / Country Pack / company policy
+        |
+        v
+Reconciliation + Financial Integrity Engine
+        |
+        +-------------------------+
+        |                         |
+        v                         v
+verified, within policy       exception / uncertainty / high risk
+        |                         |
+        |                         v
+        |                    human review
+        |                         |
+        +-------------+-----------+
+                      v
+              completed financial outcome
+                      |
+                      v
+                Karin / Economy UI
+```
+
+Human review is therefore a first-class safety path, but it must not become an implicit permanent dependency for all transactions.
+
+### 40.3 The rulebook is durable product infrastructure
+
+For Accounting, the "rulebook" is not a prompt file. It is the combined, versioned body of evidence that defines what correct means:
+
+- Global Ledger invariants;
+- country-pack rules;
+- company accounting policy;
+- posting-rule versions;
+- Golden Paths;
+- regression tests;
+- shadow/integrity comparison rules;
+- documented exception resolutions;
+- professional accounting decisions and provenance;
+- confidence and approval policies.
+
+A material real-world mistake or divergence should, where appropriate, become a durable addition to this rulebook rather than a one-off manual fix.
+
+### 40.4 Exception-to-automation flywheel
+
+The intended learning loop is:
+
+```text
+new real-world exception
+  -> classify root cause
+  -> obtain professional/domain decision where needed
+  -> update rule/policy
+  -> add regression/Golden Path/integrity check
+  -> replay or re-verify affected cases
+  -> future equivalent cases auto-handle when policy allows
+```
+
+The metric to optimize is **not maximum autonomy at any cost**. It is safe growth in the proportion of financial work that can be completed without human intervention while correctness, traceability and customer accountability remain intact.
+
+Track at minimum:
+
+```text
+straight-through processing rate
+human-review rate
+exception rate by category
+false-auto-post rate
+false-review / unnecessary-escalation rate
+repeat-divergence rate
+mean time to resolve exception
+percentage of resolved exceptions converted into durable tests/rules
+```
+
+### 40.5 Model capability is replaceable; correctness history is not
+
+Do not make the moat depend on a specific foundation model.
+
+The durable financial moat is:
+
+```text
+Handymate operational context
++ Financial Kernel history
++ trades-specific country/domain rules
++ real edge cases
++ professional decisions
++ shadow divergences
++ regression corpus
++ outcome feedback
+```
+
+A model/provider can be swapped or improved underneath this system. The accumulated definition of correctness must remain Handymate-owned and portable across model runtimes.
+
+### 40.6 Review-layer scaling rule
+
+A managed or human-assisted Accounting offering is allowed and may be strategically valuable, but its economics must improve with automation rather than scale linearly with headcount.
+
+Therefore:
+
+- low-confidence, novel, regulated/high-risk or policy-required cases may require human review;
+- reviewers should receive a bounded exception with evidence, not reconstruct the entire transaction manually;
+- the resolution must feed the rulebook where generalizable;
+- operational dashboards must distinguish straight-through work from reviewed work;
+- no implementation may claim "autonomous accounting" while silently routing all transactions through human approval.
+
+### 40.7 Relationship to shadow and integrity architecture
+
+`FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` is the first concrete implementation of this learning model. During migration it asks whether Handymate agrees with an independent reference; after Fortnox cut-over the same machinery evolves into a permanent Financial Integrity Engine that asks whether Ledger, bank, payments, receivables, payables, VAT and source documents agree with each other.
+
+Every meaningful divergence should be treated as both:
+
+1. a current correctness issue to resolve, and
+2. potential training material for the deterministic rulebook/regression corpus.
+
+### 40.8 Final outcome-delivery rule
+
+> **Handymate Accounting should increasingly sell and deliver "the financial work is done and verified", not "here is software that helps you do the financial work". Agents and deterministic systems perform the routine work; humans review exceptions; the rulebook grows from every verified edge case.**
