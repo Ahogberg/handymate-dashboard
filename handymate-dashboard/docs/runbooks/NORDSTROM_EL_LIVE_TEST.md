@@ -2,6 +2,12 @@
 
 ## Status
 
+**Senaste verifiering 2026-09-13:** Efter användarens uttryckliga godkännande sparades projektets befintliga automationsnyckel som krypterad `VERCEL_AUTOMATION_BYPASS_SECRET` i GitHub-miljön `live-test`. [Körning 34721809781](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34721809781) på `e44b2b71aa01726bd4a207797baec8931ab79225` passerade Vercels skydd och nådde appen, men stoppades före appinloggning av **HTTP 503** från `/api/health`. Vercel-åtkomst är därmed verifierad; kontots lösenord, session, företag och browserresa är fortfarande inte verifierade. Inget utkast eller utskick gjordes.
+
+Separat autentiserad hälsoläsning bekräftar version `e44b2b7`, databas `ok` och `credit_watch=error`. Den sparade providerkontrollen är från 2026-09-12 05:05 UTC, så kontrollera/uppdatera den mot aktuell providerstatus innan något saldobesked betraktas som färskt. Hälsogrinden har inte försvagats. Nästa steg: utred/förnya kreditkontrollen, åtgärda faktisk kreditbrist om den kvarstår och kör lästestet igen efter godkänd hälsa.
+
+Teststödet är verifierat med TypeScript, 18 lokala policyprov, 11 CI-kontrakt och testupptäckt. Alla vanliga PR-/push-workflows och båda previewbyggen passerade på `e44b2b71a`. Full kundrese-/releaseacceptans kvar på HOLD.
+
 **Uppdatering 2026-09-13:** Autentiserad `vercel curl` når rätt previews `/api/health` och bekräftar version `7e07a3b`. Vercels skyddsinställning är fortsatt `all_except_custom_domains`. En befintlig automation-bypass-nyckel finns i projektet. GitHub-testet kan nu läsa `VERCEL_AUTOMATION_BYPASS_SECRET` från miljön `live-test`, men nyckeln är ännu inte överförd dit och den autentiserade kundresan är inte omkörd.
 
 Nyckeln ska sparas som krypterad environment-secret i `Ahogberg/handymate-dashboard`, inte i kod, URL, rapport eller logg. Den ger plattformsåtkomst till projektets skyddade deployments; testkoden skickar den bara till det exakt valda originet. API-anrop följer inga redirects. Browsern hämtar endast godkända samma-origin-anrop utan automatisk redirect och granskar destinationsanrop separat. Transportfel återges utan headers i rapporterna. Appens login-, versions-, företags- och skrivgrindar gäller fortfarande. Vercels rekommenderade header är dokumenterad i [Protection Bypass for Automation](https://vercel.com/docs/deployment-protection/methods-to-bypass-deployment-protection/protection-bypass-automation).

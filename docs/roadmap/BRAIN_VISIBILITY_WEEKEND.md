@@ -17,6 +17,8 @@
 
 ## Readiness-pass 2026-09-12 — aktuell verifiering för PR #38
 
+**Senare verifiering 2026-09-13:** Vercel-åtkomsten är nu inkopplad med uttryckligt godkänd automationsnyckel i GitHub `live-test`. [Körning 34721809781](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34721809781), kodversion `e44b2b71a`, når appen men stoppas före login av hälsoruttens HTTP 503 (`credit_watch=error`, lagrad kreditkontroll från 12 september 05:05 UTC). Det tidigare SSO-hindret nedan är löst. Ingen autentiserad kundresa eller providerverifiering påstås. Alla vanliga CI-flöden och båda previewbyggen är gröna på den nya testkoden. Aktuell detaljerad status finns i `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`; release kvar på HOLD.
+
 Detta statusavsnitt kompletterar historiken nedan. Det uppgraderar inte äldre slice-/providerbevis.
 
 **DONE:** Riktig tvåföräldersmerge `fc586381aa7bc2defd0dc2ebe4dcb327d04b694b` förenar PR-head `6885379c9596619ac4a795e706d4052b9ac7616e` med main `f709bbe15d8e6151b21a0fe51e8b7378423c2694`. Main är därmed helt inkluderad. Brain Visibility-state är bevarat; Mission Control/heron ligger först och avlastningslänken under heron. Revenue OS, säljöverlämning och mains strategidokument är bevarade. Båda grenarnas kontraktslistor ingår.
