@@ -1,236 +1,455 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getAdminSupabase, isAdmin, logAdminAction } from '@/lib/admin-auth'
+import { createHash } from 'crypto'
+import { requireRevenue } from '@/lib/revenue/auth'
+import {
+  casePayload,
+  followupBody,
+  makeBrief,
+  normalizeOrg,
+  safeUrl,
+  text,
+  STAGES,
+} from '@/lib/revenue/domain'
+import { fetchCandidates } from '@/lib/revenue/source'
 
-const ACCOUNT_SELECT = `
-  id, company_name, org_number, website, industry, employee_count, city,
-  owner_email, source, source_url,
-  icp_score, pain_score, timing_score, growth_score, warmth_score, ability_to_pay_score, total_score,
-  why_now, pain_hypothesis, personalization_hook, recommended_channel, recommended_cta,
-  status, lost_reason, next_action, next_action_at, last_contact_at, notes,
-  created_at, updated_at
-`
-
-const ALLOWED_STAGES = new Set([
-  'identified', 'contacted', 'conversation', 'audit_booked', 'demo', 'proposal',
-  'verbal_commit', 'won', 'lost', 'nurture',
-])
-
-const ALLOWED_LOST_REASONS = new Set([
-  'no_pain', 'not_now', 'price', 'implementation_risk', 'wrong_person', 'already_solved',
-  'fortnox_dependency', 'ai_trust', 'competitor', 'no_response', 'other',
-])
-
-function boundedInt(value: unknown, min: number, max: number) {
-  const n = Number(value ?? 0)
-  if (!Number.isFinite(n)) return min
-  return Math.max(min, Math.min(max, Math.round(n)))
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+const UUID =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
+function id(value: unknown) {
+  if (typeof value !== 'string' || !UUID.test(value))
+    throw new Error('Ogiltig identifierare.')
+  return value
 }
-
-async function requireAdmin(request: NextRequest) {
-  const admin = await isAdmin(request)
-  if (!admin.isAdmin) return { admin, response: NextResponse.json({ error: 'Admin access required' }, { status: 403 }) }
-  return { admin, response: null }
+function date(value: unknown) {
+  if (value == null || value === '') return null
+  const d = new Date(String(value))
+  if (!Number.isFinite(d.getTime())) throw new Error('Ogiltigt datum.')
+  return d.toISOString()
 }
-
-/** GET /api/admin/revenue — seller queue + lightweight GTM metrics */
-export async function GET(request: NextRequest) {
-  const { response } = await requireAdmin(request)
-  if (response) return response
-
-  const supabase = getAdminSupabase()
-  const { searchParams } = new URL(request.url)
-  const owner = searchParams.get('owner')
-
-  let query = supabase
-    .from('revenue_accounts')
-    .select(ACCOUNT_SELECT)
-    .order('total_score', { ascending: false })
-    .limit(250)
-
-  if (owner && owner !== 'all') query = query.eq('owner_email', owner)
-
-  const [{ data: accounts, error }, { data: signals }, { data: opportunities }] = await Promise.all([
-    query,
-    supabase
-      .from('revenue_signals')
-      .select('id, account_id, signal_type, title, detail, strength, source, source_url, observed_at')
-      .order('observed_at', { ascending: false })
-      .limit(100),
-    supabase
-      .from('revenue_opportunities')
-      .select('id, account_id, plan, billing_preference, expected_arr_sek, stage, probability, owner_email, next_step, next_step_at')
-      .limit(250),
-  ])
-
-  if (error) {
-    // Most useful failure before the SQL migration has been applied.
-    return NextResponse.json({
-      error: error.message,
-      setup_required: error.code === '42P01' || error.message?.includes('revenue_accounts'),
-    }, { status: 500 })
-  }
-
-  const rows = accounts || []
-  const now = Date.now()
-  const queue = [...rows]
-    .filter((a: any) => !['won', 'lost'].includes(a.status))
-    .sort((a: any, b: any) => {
-      const aDue = a.next_action_at ? new Date(a.next_action_at).getTime() <= now : false
-      const bDue = b.next_action_at ? new Date(b.next_action_at).getTime() <= now : false
-      if (aDue !== bDue) return aDue ? -1 : 1
-      return (b.total_score || 0) - (a.total_score || 0)
-    })
-    .slice(0, 30)
-
-  const stageCounts = rows.reduce((acc: Record<string, number>, row: any) => {
-    acc[row.status] = (acc[row.status] || 0) + 1
-    return acc
-  }, {})
-
-  const owners = Array.from(new Set(rows.map((a: any) => a.owner_email).filter(Boolean))).sort()
-  const won = rows.filter((a: any) => a.status === 'won').length
-  const active = rows.filter((a: any) => !['won', 'lost', 'nurture'].includes(a.status)).length
-  const highPriority = rows.filter((a: any) => a.total_score >= 75 && !['won', 'lost'].includes(a.status)).length
-  const stale = rows.filter((a: any) => {
-    if (['won', 'lost', 'nurture'].includes(a.status)) return false
-    if (!a.last_contact_at) return false
-    return now - new Date(a.last_contact_at).getTime() > 7 * 24 * 60 * 60 * 1000
-  }).length
-
-  return NextResponse.json({
-    accounts: rows,
-    queue,
-    signals: signals || [],
-    opportunities: opportunities || [],
-    owners,
-    metrics: { total: rows.length, active, high_priority: highPriority, stale, won, stage_counts: stageCounts },
+function failure(error: unknown, status = 500) {
+  console.error('[revenue]', error instanceof Error ? error.message : error)
+  return NextResponse.json(
+    {
+      error:
+        status === 500
+          ? 'Kunde inte slutföra åtgärden. Försök igen.'
+          : error instanceof Error
+            ? error.message
+            : 'Kunde inte slutföra åtgärden.',
+    },
+    { status },
+  )
+}
+type Context = NonNullable<Awaited<ReturnType<typeof requireRevenue>>>
+async function account(ctx: Context, accountId: string) {
+  let q = ctx.db.from('revenue_accounts').select('*').eq('id', accountId)
+  if (!ctx.manager) q = q.eq('owner_email', ctx.email)
+  const { data, error } = await q.maybeSingle()
+  if (error) throw error
+  return data
+}
+async function command(
+  ctx: Context,
+  requestId: string,
+  type: string,
+  input: Record<string, unknown>,
+) {
+  const { data, error } = await ctx.db.rpc('revenue_v2_command', {
+    p_actor: ctx.userId,
+    p_email: ctx.email,
+    p_manager: ctx.manager,
+    p_request: requestId,
+    p_command: type,
+    p_input: input,
+  })
+  if (error) throw error
+  return data
+}
+async function refreshBrief(ctx: Context, accountId: string) {
+  const a = await account(ctx, accountId)
+  if (!a) throw new Error('Företaget är inte tillgängligt.')
+  const { data, error } = await ctx.db
+    .from('revenue_signals')
+    .select('id,title,detail,source_url,observed_at,signal_type')
+    .eq('account_id', accountId)
+    .order('observed_at', { ascending: false })
+    .limit(50)
+  if (error) throw error
+  await command(ctx, crypto.randomUUID(), 'research', {
+    account_id: accountId,
+    ...makeBrief(a.company_name, data || []),
   })
 }
 
-/** POST /api/admin/revenue — create account, signal or activity */
-export async function POST(request: NextRequest) {
-  const { admin, response } = await requireAdmin(request)
-  if (response) return response
-
-  const body = await request.json()
-  const type = body.type || 'account'
-  const supabase = getAdminSupabase()
-
-  if (type === 'account') {
-    if (!String(body.company_name || '').trim()) {
-      return NextResponse.json({ error: 'company_name is required' }, { status: 400 })
+export async function GET(request: NextRequest) {
+  try {
+    const ctx = await requireRevenue(request)
+    if (!ctx)
+      return NextResponse.json(
+        { error: 'Du saknar åtkomst till säljarbetet.' },
+        { status: 403 },
+      )
+    const params = request.nextUrl.searchParams
+    if (params.has('account_id')) {
+      const accountId = id(params.get('account_id'))
+      const a = await account(ctx, accountId)
+      if (!a)
+        return NextResponse.json(
+          { error: 'Företaget är inte tillgängligt.' },
+          { status: 404 },
+        )
+      const results = await Promise.all([
+        ctx.db
+          .from('revenue_contacts')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('created_at', { ascending: false })
+          .limit(100),
+        ctx.db
+          .from('revenue_activities')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('occurred_at', { ascending: false })
+          .limit(100),
+        ctx.db
+          .from('revenue_signals')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('observed_at', { ascending: false })
+          .limit(50),
+        ctx.db
+          .from('revenue_sessions')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+        ctx.db
+          .from('revenue_followup_drafts')
+          .select('*')
+          .eq('account_id', accountId)
+          .order('created_at', { ascending: false })
+          .limit(50),
+      ])
+      for (const result of results) if (result.error) throw result.error
+      return NextResponse.json(
+        {
+          account: a,
+          contacts: results[0].data,
+          activities: results[1].data,
+          signals: results[2].data,
+          sessions: results[3].data,
+          drafts: results[4].data,
+          manager: ctx.manager,
+        },
+        { headers: { 'Cache-Control': 'private, no-store' } },
+      )
     }
-
-    const payload = {
-      company_name: String(body.company_name).trim(),
-      org_number: body.org_number || null,
-      website: body.website || null,
-      industry: body.industry || null,
-      employee_count: body.employee_count ? Number(body.employee_count) : null,
-      city: body.city || null,
-      owner_email: body.owner_email || admin.email || null,
-      source: body.source || 'manual',
-      source_url: body.source_url || null,
-      icp_score: boundedInt(body.icp_score, 0, 25),
-      pain_score: boundedInt(body.pain_score, 0, 20),
-      timing_score: boundedInt(body.timing_score, 0, 20),
-      growth_score: boundedInt(body.growth_score, 0, 15),
-      warmth_score: boundedInt(body.warmth_score, 0, 10),
-      ability_to_pay_score: boundedInt(body.ability_to_pay_score, 0, 10),
-      why_now: body.why_now || null,
-      pain_hypothesis: body.pain_hypothesis || null,
-      personalization_hook: body.personalization_hook || null,
-      recommended_channel: body.recommended_channel || null,
-      recommended_cta: body.recommended_cta || 'Admin Leak Audit',
-      next_action: body.next_action || null,
-      next_action_at: body.next_action_at || null,
-      notes: body.notes || null,
-      created_by: admin.userId || null,
-    }
-
-    const { data, error } = await supabase.from('revenue_accounts').insert(payload).select(ACCOUNT_SELECT).single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    if (admin.userId) await logAdminAction('revenue_account_created', admin.userId, null, { account_id: data.id, company_name: data.company_name })
-    return NextResponse.json({ account: data }, { status: 201 })
+    const offset = Number(params.get('offset') || 0)
+    if (!Number.isInteger(offset) || offset < 0)
+      return failure(new Error('Ogiltig sida.'), 400)
+    const { data, error } = await ctx.db.rpc('revenue_v2_overview', {
+      p_email: ctx.email,
+      p_manager: ctx.manager,
+      p_search: text(params.get('q') || '', 200),
+      p_offset: offset,
+    })
+    if (error) throw error
+    let runQuery = ctx.db
+      .from('revenue_source_runs')
+      .select('id,source,status,imported,error,started_at,finished_at')
+      .order('started_at', { ascending: false })
+      .limit(5)
+    if (!ctx.manager) runQuery = runQuery.eq('actor_id', ctx.userId)
+    const runs = await runQuery
+    if (runs.error) throw runs.error
+    return NextResponse.json(
+      {
+        ...data,
+        manager: ctx.manager,
+        email: ctx.email,
+        source_runs: runs.data,
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  } catch (error) {
+    return failure(error)
   }
-
-  if (type === 'signal') {
-    if (!body.account_id || !body.signal_type || !body.title) {
-      return NextResponse.json({ error: 'account_id, signal_type and title are required' }, { status: 400 })
-    }
-    const { data, error } = await supabase.from('revenue_signals').insert({
-      account_id: body.account_id,
-      signal_type: body.signal_type,
-      title: body.title,
-      detail: body.detail || null,
-      strength: boundedInt(body.strength || 1, 1, 5),
-      source: body.source || 'manual',
-      source_url: body.source_url || null,
-      observed_at: body.observed_at || new Date().toISOString(),
-    }).select().single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-    return NextResponse.json({ signal: data }, { status: 201 })
-  }
-
-  if (type === 'activity') {
-    if (!body.account_id || !body.activity_type) {
-      return NextResponse.json({ error: 'account_id and activity_type are required' }, { status: 400 })
-    }
-    const occurredAt = body.occurred_at || new Date().toISOString()
-    const { data, error } = await supabase.from('revenue_activities').insert({
-      account_id: body.account_id,
-      activity_type: body.activity_type,
-      outcome: body.outcome || null,
-      summary: body.summary || null,
-      seller_email: admin.email || null,
-      occurred_at: occurredAt,
-    }).select().single()
-    if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-    await supabase.from('revenue_accounts').update({ last_contact_at: occurredAt, updated_at: new Date().toISOString() }).eq('id', body.account_id)
-    return NextResponse.json({ activity: data }, { status: 201 })
-  }
-
-  return NextResponse.json({ error: 'Unknown type' }, { status: 400 })
 }
 
-/** PATCH /api/admin/revenue — update account/pipeline/next action */
-export async function PATCH(request: NextRequest) {
-  const { admin, response } = await requireAdmin(request)
-  if (response) return response
-
-  const body = await request.json()
-  if (!body.id) return NextResponse.json({ error: 'id is required' }, { status: 400 })
-
-  const patch: Record<string, unknown> = { updated_at: new Date().toISOString() }
-  const textFields = [
-    'company_name', 'org_number', 'website', 'industry', 'city', 'owner_email', 'source', 'source_url',
-    'why_now', 'pain_hypothesis', 'personalization_hook', 'recommended_channel', 'recommended_cta',
-    'next_action', 'next_action_at', 'last_contact_at', 'notes',
-  ]
-  for (const key of textFields) if (key in body) patch[key] = body[key] || null
-
-  if ('employee_count' in body) patch.employee_count = body.employee_count ? Number(body.employee_count) : null
-  if ('icp_score' in body) patch.icp_score = boundedInt(body.icp_score, 0, 25)
-  if ('pain_score' in body) patch.pain_score = boundedInt(body.pain_score, 0, 20)
-  if ('timing_score' in body) patch.timing_score = boundedInt(body.timing_score, 0, 20)
-  if ('growth_score' in body) patch.growth_score = boundedInt(body.growth_score, 0, 15)
-  if ('warmth_score' in body) patch.warmth_score = boundedInt(body.warmth_score, 0, 10)
-  if ('ability_to_pay_score' in body) patch.ability_to_pay_score = boundedInt(body.ability_to_pay_score, 0, 10)
-
-  if ('status' in body) {
-    if (!ALLOWED_STAGES.has(body.status)) return NextResponse.json({ error: 'Invalid status' }, { status: 400 })
-    patch.status = body.status
+export async function POST(request: NextRequest) {
+  try {
+    const ctx = await requireRevenue(request)
+    if (!ctx)
+      return NextResponse.json(
+        { error: 'Du saknar åtkomst till säljarbetet.' },
+        { status: 403 },
+      )
+    if (
+      request.headers.get('origin') &&
+      request.headers.get('origin') !== request.nextUrl.origin
+    )
+      return NextResponse.json({ error: 'Ogiltigt ursprung.' }, { status: 403 })
+    const raw = await request.text()
+    if (raw.length > 100000)
+      return failure(new Error('För mycket innehåll.'), 413)
+    let body: Record<string, unknown>
+    try {
+      body = JSON.parse(raw)
+      if (!body || Array.isArray(body) || typeof body !== 'object')
+        throw new Error()
+    } catch {
+      return failure(new Error('Ogiltigt innehåll.'), 400)
+    }
+    const type = text(body.type, 40)
+    const requestId = id(body.request_id)
+    if (type === 'import_source') {
+      const term = text(body.term, 100)
+      if (!term) return failure(new Error('Ange ett hantverksyrke.'), 400)
+      // A run ID claims this import. A running/failed retry never silently reports success.
+      const run = await ctx.db.from('revenue_source_runs').insert({
+        id: requestId,
+        actor_id: ctx.userId,
+        source: `Platsbanken: ${term}`,
+        status: 'running',
+      })
+      if (run.error) {
+        if (run.error.code === '23505') {
+          const prior = await ctx.db
+            .from('revenue_source_runs')
+            .select('status,imported,error')
+            .eq('id', requestId)
+            .eq('actor_id', ctx.userId)
+            .maybeSingle()
+          if (prior.error) throw prior.error
+          if (prior.data?.status === 'succeeded')
+            return NextResponse.json({
+              ok: true,
+              imported: prior.data.imported,
+            })
+          return failure(
+            new Error(
+              'Importen har redan startats. Uppdatera översikten innan du försöker igen.',
+            ),
+            409,
+          )
+        }
+        throw run.error
+      }
+      let imported = 0
+      try {
+        const candidates = await fetchCandidates(term)
+        for (const candidate of candidates) {
+          // Stable request UUID per run+advertisement; import RPC also deduplicates org and external ID across runs.
+          const hash = createHash('sha256')
+            .update(`${requestId}:${candidate.external_id}`)
+            .digest('hex')
+          const childId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-8${hash.slice(17, 20)}-${hash.slice(20, 32)}`
+          try {
+            const result = await command(ctx, childId, 'import', candidate)
+            await refreshBrief(ctx, result.account_id)
+            imported++
+          } catch (error) {
+            const code = (error as { code?: string }).code
+            // Existing ownership and suppression are exclusions, not provider failures.
+            if (code === '42501' || code === '22023') continue
+            throw error
+          }
+        }
+        const done = await ctx.db
+          .from('revenue_source_runs')
+          .update({
+            status: 'succeeded',
+            imported,
+            finished_at: new Date().toISOString(),
+          })
+          .eq('id', requestId)
+        if (done.error) throw done.error
+        return NextResponse.json({ ok: true, imported })
+      } catch (error) {
+        const reason =
+          error instanceof Error
+            ? error.message
+            : 'Importen avbröts. Redan sparade företag finns kvar.'
+        const failed = await ctx.db
+          .from('revenue_source_runs')
+          .update({
+            status: 'failed',
+            imported,
+            error: reason,
+            finished_at: new Date().toISOString(),
+          })
+          .eq('id', requestId)
+        if (failed.error)
+          console.error('[revenue] source status failed', failed.error.message)
+        return failure(
+          new Error(
+            `${reason} ${imported} företag behandlades före avbrottet.`,
+          ),
+          502,
+        )
+      }
+    }
+    if (type === 'create') {
+      const input = {
+        company_name: text(body.company_name, 200),
+        org_number: normalizeOrg(body.org_number),
+        industry: text(body.industry, 200),
+        city: text(body.city, 200),
+        source: 'manual',
+      }
+      if (!input.company_name)
+        return failure(new Error('Företagsnamn krävs.'), 400)
+      return NextResponse.json(await command(ctx, requestId, type, input))
+    }
+    const accountId = id(body.account_id)
+    const a = await account(ctx, accountId)
+    if (!a)
+      return NextResponse.json(
+        { error: 'Företaget är inte tillgängligt.' },
+        { status: 404 },
+      )
+    let input: Record<string, unknown> = { account_id: accountId }
+    if (type === 'contact') {
+      input = {
+        ...input,
+        name: text(body.name, 200),
+        email: text(body.email, 320).toLowerCase(),
+        phone: text(body.phone, 60),
+        role: text(body.role, 200),
+        source_url: safeUrl(body.source_url),
+        contact_basis: text(body.contact_basis, 40),
+      }
+      if (
+        !input.name ||
+        ![
+          'public_business_contact',
+          'public_professional_role',
+          'warm_intro',
+          'inbound',
+          'customer_referral',
+        ].includes(String(input.contact_basis))
+      )
+        return failure(new Error('Ange namn och kontaktgrund.'), 400)
+      if (
+        input.email &&
+        !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(input.email))
+      )
+        return failure(new Error('Ogiltig e-postadress.'), 400)
+      if (
+        String(input.contact_basis).startsWith('public_') &&
+        !input.source_url
+      )
+        return failure(
+          new Error('Ange källan till den offentliga kontaktuppgiften.'),
+          400,
+        )
+    } else if (type === 'activity') {
+      const activityType = text(body.activity_type, 30),
+        outcome = text(body.outcome, 40),
+        summary = text(body.summary, 5000)
+      if (
+        !['call', 'email', 'meeting', 'audit', 'demo', 'note'].includes(
+          activityType,
+        ) ||
+        ![
+          'connected',
+          'no_response',
+          'replied',
+          'declined',
+          'pause',
+          'opt_out',
+          'completed',
+        ].includes(outcome)
+      )
+        return failure(new Error('Välj aktivitet och utfall.'), 400)
+      if (!summary) return failure(new Error('Beskriv vad som hände.'), 400)
+      input = {
+        ...input,
+        activity_type: activityType,
+        outcome,
+        summary,
+        occurred_at: date(body.occurred_at),
+        next_action: text(body.next_action, 1000),
+        next_action_at: date(body.next_action_at),
+      }
+      if (
+        body.make_draft === true &&
+        activityType !== 'note' &&
+        !['replied', 'declined', 'pause', 'opt_out'].includes(outcome)
+      )
+        input.draft_body = followupBody(a.company_name, summary)
+    } else if (type === 'next') {
+      const stage = text(body.status, 40)
+      if (
+        !Object.prototype.hasOwnProperty.call(STAGES, stage) ||
+        !Number.isInteger(body.version)
+      )
+        return failure(new Error('Ogiltigt steg eller inaktuell version.'), 400)
+      input = {
+        ...input,
+        status: stage,
+        version: body.version,
+        contact_state: text(body.contact_state, 40),
+        next_action: text(body.next_action, 1000),
+        next_action_at: date(body.next_action_at),
+        lost_reason: text(body.lost_reason, 40) || null,
+      }
+      if (
+        !['active', 'paused', 'opted_out'].includes(String(input.contact_state))
+      )
+        return failure(new Error('Ogiltig kontaktstatus.'), 400)
+      if (ctx.manager && body.owner_email !== undefined) {
+        const email = text(body.owner_email, 320).toLowerCase()
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
+          return failure(new Error('Ange säljarens e-postadress.'), 400)
+        input.owner_email = email
+      }
+    } else if (type === 'research') {
+      await refreshBrief(ctx, accountId)
+      return NextResponse.json({ ok: true })
+    } else if (type === 'case') {
+      const sessionId = id(body.session_id)
+      const session = await ctx.db
+        .from('revenue_sessions')
+        .select('meeting_date,version')
+        .eq('id', sessionId)
+        .eq('account_id', accountId)
+        .maybeSingle()
+      if (session.error) throw session.error
+      if (!session.data) return failure(new Error('Genomgången saknas.'), 404)
+      const payload = casePayload(a, body, session.data.meeting_date)
+      input = {
+        ...input,
+        session_id: sessionId,
+        session_version: body.session_version,
+        payload,
+        business_id: ctx.businessId,
+        draft_body: followupBody(
+          a.company_name,
+          payload.goal?.quote || payload.goal?.name || '',
+          `${request.nextUrl.origin}/case/{{CASE_TOKEN}}`,
+        ),
+      }
+    } else if (type === 'draft') {
+      const content = text(body.body, 10000)
+      if (!content)
+        return failure(new Error('Utkastet får inte vara tomt.'), 400)
+      input = { ...input, draft_id: id(body.draft_id), body: content }
+    } else if (type !== 'session')
+      return failure(new Error('Okänd åtgärd.'), 400)
+    return NextResponse.json(await command(ctx, requestId, type, input))
+  } catch (error) {
+    const code = (error as { code?: string })?.code
+    if (code === '42501')
+      return failure(new Error('Du saknar åtkomst till företaget.'), 403)
+    if (code === 'PT409' || code === '40001' || code === '23505')
+      return failure(
+        new Error('Uppgifterna ändrades eller finns redan. Uppdatera sidan.'),
+        409,
+      )
+    if (code === '22023' || code?.startsWith('22') || code?.startsWith('23'))
+      return failure(new Error((error as { message: string }).message), 400)
+    return failure(error, error instanceof Error ? 400 : 500)
   }
-  if ('lost_reason' in body) {
-    if (body.lost_reason && !ALLOWED_LOST_REASONS.has(body.lost_reason)) return NextResponse.json({ error: 'Invalid lost_reason' }, { status: 400 })
-    patch.lost_reason = body.lost_reason || null
-  }
-
-  const supabase = getAdminSupabase()
-  const { data, error } = await supabase.from('revenue_accounts').update(patch).eq('id', body.id).select(ACCOUNT_SELECT).single()
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 })
-
-  if (admin.userId) await logAdminAction('revenue_account_updated', admin.userId, null, { account_id: body.id, keys: Object.keys(patch) })
-  return NextResponse.json({ account: data })
 }
