@@ -76,6 +76,7 @@ Files changed
   handymate-dashboard/sql/v235_financial_events.sql
   handymate-dashboard/lib/financial-kernel/events/types.ts
   handymate-dashboard/tests/financial-kernel-events-sql.spec.ts
+  handymate-dashboard/lib/account/radera.ts (required retention classification only)
   handymate-dashboard/package.json (registration)
   .github/workflows/contracts.yml (registration)
   docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md (brief and this handoff)
@@ -109,6 +110,11 @@ DDL deviations from the proposal, with reasons
   SECURITY DEFINER still appends as the migration owner; service_role can read and
   execute the RPC but cannot write directly. Header records the mandated lock order.
   No other DDL behavior was changed.
+Scope deviation required by the existing CI contract
+  lib/account/radera.ts now classifies financial_events in BEHALLS. The existing
+  kontoradering completeness gate failed because every new business_id table must
+  be classified. This implements C2's retain-history requirement without changing
+  deletion logic or selecting retention/anonymisation policy. Seven files in total.
 Known unresolved questions / limits of evidence
   PGlite is single-session: 200 ordered appends and lock placement are verified,
   not competing transactions' commit order. C3 must add a multi-connection Postgres
@@ -116,6 +122,9 @@ Known unresolved questions / limits of evidence
   UPDATE/DELETE normally fail at the privilege boundary for service_role. The
   trigger is separately proven as owner and with test-only temporary grants.
   TRUNCATE is prevented by grants, not by a trigger against a database administrator.
+  Correction to the brief's deletion assumption: the existing account deletion path
+  soft-deletes business_config. RESTRICT rejects a hard DELETE, as tested, but does
+  not itself block that existing soft-delete flow. Track G remains necessary.
   The append RPC preserves the proposal's retry semantics: event type, payload,
   amount and currency are compared; other envelope fields on a replay do not replace
   the first event. Payload-shape/business semantics are future writers' responsibility.
@@ -133,8 +142,8 @@ Human accounting review required? yes/no — and by whom, by name
   No for C2 storage mechanics. Named accountant still required for R0/C1b/C9.
 ```
 
-Verification: 13 new C2 tests, including the eleven brief invariants; 48 tests in
-the combined C2/C0/C1/schema/dead-code/CI-registration pass. TypeScript and remote
+Verification: 13 new C2 tests, including the eleven brief invariants; 77 tests in
+the combined C2/C0/C1/schema/dead-code/CI-registration/account-deletion pass. TypeScript and remote
 CI status are recorded on the PR. Claude review of dimensions A and C is pending.
 
 ### C1 — Money primitives (Codex, 2026-09-13)
