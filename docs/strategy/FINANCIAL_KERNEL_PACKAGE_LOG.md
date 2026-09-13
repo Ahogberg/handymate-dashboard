@@ -31,7 +31,7 @@ Rules that keep this file honest:
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
 | C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema + append RPC | Codex | **implemented — awaiting Claude A+C review** | review before merge; migration unapplied |
+| C2 | `financial_events` schema + append RPC | Codex | **reviewed — all three findings corrected** | migration unapplied |
 | C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
 | C4 | Receivables + allocations behind flag | Codex | not started | C1, C2, C3 |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
@@ -109,7 +109,7 @@ DDL deviations from the proposal, with reasons
   service default grants before the migration and proves this failure/correction.
   SECURITY DEFINER still appends as the migration owner; service_role can read and
   execute the RPC but cannot write directly. Header records the mandated lock order.
-  No other DDL behavior was changed.
+  Claude review corrections: removed FORCE RLS so the non-bypass owner can append; RPC now returns a flat row with TEXT seq/amount_minor; replay comparison also guards correlation, source, causation and effective_date. Actor and occurred_at deliberately remain first-write values on retry.
 Scope deviation required by the existing CI contract
   lib/account/radera.ts now classifies financial_events in BEHALLS. The existing
   kontoradering completeness gate failed because every new business_id table must
@@ -125,12 +125,12 @@ Known unresolved questions / limits of evidence
   Correction to the brief's deletion assumption: the existing account deletion path
   soft-deletes business_config. RESTRICT rejects a hard DELETE, as tested, but does
   not itself block that existing soft-delete flow. Track G remains necessary.
-  The append RPC preserves the proposal's retry semantics: event type, payload,
-  amount and currency are compared; other envelope fields on a replay do not replace
+  The append RPC compares event type, payload,
+  amount, currency and chain identity; retry actor and occurred_at do not replace
   the first event. Payload-shape/business semantics are future writers' responsibility.
-  Row mappers require string BIGINT transport, rejecting number input. C3 must use
-  a lossless transport adapter: whole-row JSONB/PostgREST numeric serialization is
-  not proof of exact BIGINT transport. Payload amounts remain the brief's number
+  Row mappers require string BIGINT transport, rejecting number input. The RPC supplies
+  text fields and is tested through to_jsonb plus JSON.parse, for append and replay. Raw table JSON is
+  still unsafe: future read views/RPCs must cast both BIGINT columns. Payload amounts remain the brief's number
   minor units; their owning packages must enforce the safe integer bound.
 Open decisions encountered and left unresolved
   D1-D4, R0 and C1b remain unchanged. No retention/anonymisation decision made.
@@ -142,9 +142,9 @@ Human accounting review required? yes/no — and by whom, by name
   No for C2 storage mechanics. Named accountant still required for R0/C1b/C9.
 ```
 
-Verification: 13 new C2 tests, including the eleven brief invariants; 77 tests in
+Verification: 15 C2 tests, including the eleven brief invariants; 79 tests in
 the combined C2/C0/C1/schema/dead-code/CI-registration/account-deletion pass. TypeScript and remote
-CI status are recorded on the PR. Claude review of dimensions A and C is pending.
+CI status are recorded on the PR. Claude review of dimensions A and C is recorded below; its HIGH and two MEDIUM findings are corrected.
 
 ### C1 — Money primitives (Codex, 2026-09-13)
 
@@ -623,6 +623,23 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 | accepted | `equals`/`compare` throw on currency mismatch rather than returning `false`. Brief-mandated; a filter across currencies must group by currency first. | — |
 
 ---
+
+### C2 — `financial_events` (PR #50), Claude review 2026-09-13, orchestration §6 A + C
+
+Verified locally on `codex/financial-kernel-c2` head `1ec1c34`: the 13 C2 tests plus contract,
+Money, schema and account-deletion suites green (64). Two probes beyond the suite: the migration
+deployed by a role without BYPASSRLS that owns the objects, then the RPC called as
+`service_role`; and `to_jsonb` of the RPC result followed by `JSON.parse`. Codex's two DDL
+deviations (service_role REVOKE ALL + GRANT SELECT; `financial_events` in `BEHALLS`) are correct.
+No BLOCKER.
+
+| Sev | Finding | Status |
+|---|---|---|
+| HIGH | `FORCE ROW LEVEL SECURITY` makes the only write path depend on the deploying role having BYPASSRLS. Proven: with a NOBYPASSRLS owner the append fails with an RLS violation; without FORCE it succeeds. The superuser PGlite harness cannot see this. Origin: the Claude DDL proposal, not Codex. Fix: drop FORCE, document why, add the non-bypass owner probe as a test. | resolved in PR #50: non-bypass deployer owns the tested objects; FORCE removed |
+| MEDIUM | RPC returns BIGINT inside a composite; PostgREST serialises it as a JSON number and `JSON.parse` loses digits above 2^53 (proven: …993 → …992). Return a flat row with `seq` and `amount_minor` as TEXT now, while the migration is unapplied. Any future PostgREST read of the table must cast the same two columns. | resolved in PR #50 with regression tests |
+| MEDIUM | Idempotency replay compares type/payload/amount/currency only; a replay with a different `correlation_id`, source, `causation_id` or `effective_date` silently returns the original. Add those four to the comparison; deliberately exclude `occurred_at` and actor. | resolved in PR #50 with regression tests |
+| accepted | Sequence gaps on failed inserts; single-session PGlite cannot prove concurrent commit order (C3 must, with the Postgres CI service); `hashtext` collisions only over-serialise; account deletion soft-deletes `business_config` so the RESTRICT FK does not fire on that path, track G remains open. | — |
+
 
 ## 6. Amendment log
 

@@ -5,6 +5,9 @@
 -- seq is an ordering cursor per business, NOT gapless. One RPC statement per
 -- event; batching is C3. PGlite tests sequential order, not concurrent commits.
 -- business_config deletion is deliberately RESTRICT; retention is track G.
+-- RLS is enabled, not forced: SECURITY DEFINER uses the table owner's RLS
+-- exemption, so the deployer needs neither superuser nor BYPASSRLS. Non-owner
+-- readers still use tenant policies; app writes are restricted to this RPC.
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.financial_events (
@@ -68,7 +71,6 @@ CREATE TRIGGER financial_events_no_update_delete
   FOR EACH ROW EXECUTE FUNCTION public.financial_events_immutable();
 
 ALTER TABLE public.financial_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.financial_events FORCE ROW LEVEL SECURITY;
 CREATE POLICY financial_events_tenant_read
   ON public.financial_events FOR SELECT TO authenticated
   USING (public.is_business_member(business_id));
@@ -100,9 +102,17 @@ CREATE OR REPLACE FUNCTION public.append_financial_event(
   p_payload         JSONB,
   p_actor_type      TEXT,
   p_actor_id        TEXT
-) RETURNS TABLE (event public.financial_events, inserted BOOLEAN)
+) RETURNS TABLE (
+  id TEXT, seq TEXT, business_id TEXT, schema_version INTEGER, event_type TEXT,
+  occurred_at TIMESTAMPTZ, effective_date DATE, source_type TEXT, source_id TEXT,
+  correlation_id TEXT, causation_id TEXT, idempotency_key TEXT,
+  currency TEXT, amount_minor TEXT, payload JSONB, actor_type TEXT, actor_id TEXT,
+  created_at TIMESTAMPTZ, inserted BOOLEAN
+)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE existing public.financial_events%ROWTYPE;
+DECLARE
+  existing public.financial_events%ROWTYPE;
+  was_inserted BOOLEAN := false;
 BEGIN
   IF p_business_id IS NULL OR p_business_id = '' THEN
     RAISE EXCEPTION 'financial_event_business_required' USING ERRCODE = 'check_violation';
@@ -110,27 +120,42 @@ BEGIN
   -- Lock order rule 1: business lock before anything else.
   PERFORM pg_advisory_xact_lock(hashtext('financial:' || p_business_id));
 
-  SELECT * INTO existing FROM public.financial_events
-   WHERE business_id = p_business_id AND idempotency_key = p_idempotency_key;
+  SELECT * INTO existing FROM public.financial_events AS stored
+   WHERE stored.business_id = p_business_id AND stored.idempotency_key = p_idempotency_key;
   IF FOUND THEN
-    IF existing.event_type <> p_event_type OR existing.payload <> COALESCE(p_payload, '{}'::jsonb)
+    -- Preserve the original actor and occurred_at on retry: a system may retry
+    -- a user's operation later. Economic content and chain identity cannot drift.
+    IF existing.event_type IS DISTINCT FROM p_event_type OR existing.payload IS DISTINCT FROM COALESCE(p_payload, '{}'::jsonb)
        OR existing.amount_minor IS DISTINCT FROM p_amount_minor
-       OR existing.currency IS DISTINCT FROM p_currency THEN
+       OR existing.currency IS DISTINCT FROM p_currency
+       OR existing.correlation_id IS DISTINCT FROM p_correlation_id
+       OR existing.source_type IS DISTINCT FROM p_source_type
+       OR existing.source_id IS DISTINCT FROM p_source_id
+       OR existing.causation_id IS DISTINCT FROM p_causation_id
+       OR existing.effective_date IS DISTINCT FROM p_effective_date THEN
       RAISE EXCEPTION 'financial_event_idempotency_conflict' USING ERRCODE = 'unique_violation',
         DETAIL = existing.id;
     END IF;
-    event := existing; inserted := false; RETURN NEXT; RETURN;
-  END IF;
-
-  INSERT INTO public.financial_events (
+  ELSE
+    INSERT INTO public.financial_events (
     business_id, schema_version, event_type, occurred_at, effective_date, source_type, source_id,
     correlation_id, causation_id, idempotency_key, currency, amount_minor, payload, actor_type, actor_id
   ) VALUES (
     p_business_id, p_schema_version, p_event_type, p_occurred_at, p_effective_date, p_source_type, p_source_id,
     p_correlation_id, p_causation_id, p_idempotency_key, p_currency, p_amount_minor,
     COALESCE(p_payload, '{}'::jsonb), p_actor_type, p_actor_id
-  ) RETURNING * INTO event;
-  inserted := true; RETURN NEXT;
+    ) RETURNING * INTO existing;
+    was_inserted := true;
+  END IF;
+  -- BIGINT must be text BEFORE PostgREST serializes the row to JSON. This same
+  -- projection applies to both first append and replay. Future read RPCs/views
+  -- must likewise expose seq and amount_minor as text, never raw JSON numbers.
+  RETURN QUERY SELECT existing.id, existing.seq::text, existing.business_id,
+    existing.schema_version, existing.event_type, existing.occurred_at,
+    existing.effective_date, existing.source_type, existing.source_id,
+    existing.correlation_id, existing.causation_id, existing.idempotency_key,
+    existing.currency, existing.amount_minor::text, existing.payload,
+    existing.actor_type, existing.actor_id, existing.created_at, was_inserted;
 END $fn$;
 
 REVOKE ALL ON FUNCTION public.append_financial_event(

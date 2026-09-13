@@ -27,6 +27,7 @@ test.beforeAll(async () => {
   test.setTimeout(60_000)
   db = new PGlite()
   await db.exec(`CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
+    CREATE ROLE deployer NOSUPERUSER NOBYPASSRLS;
     CREATE SCHEMA auth;
     CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS
       $$ SELECT nullif(current_setting('request.jwt.claim.sub', true), '')::uuid $$;
@@ -35,14 +36,17 @@ test.beforeAll(async () => {
     INSERT INTO business_config VALUES ('a', NULL), ('b', '${userB}');
     INSERT INTO business_users VALUES ('a', '${userA}', true);
     GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO service_role;
-    ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;`)
+    GRANT USAGE, CREATE ON SCHEMA public TO deployer;
+    GRANT REFERENCES ON business_config TO deployer;
+    ALTER DEFAULT PRIVILEGES FOR ROLE deployer IN SCHEMA public GRANT ALL ON TABLES TO service_role;
+    ALTER DEFAULT PRIVILEGES FOR ROLE deployer IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;`)
   const tenantSql = readFileSync('sql/testbed_tenant_isolation.sql', 'utf8')
   const helper = tenantSql.match(/CREATE OR REPLACE FUNCTION public\.is_business_member[\s\S]*?\$function\$;/)
   if (!helper) throw Error('Missing real membership function')
   await db.exec(helper[0])
   await db.exec('REVOKE ALL ON FUNCTION public.is_business_member(text) FROM PUBLIC, anon; GRANT EXECUTE ON FUNCTION public.is_business_member(text) TO authenticated, service_role;')
-  await db.exec(migration())
+  await db.exec('SET ROLE deployer')
+  try { await db.exec(migration()) } finally { await db.exec('RESET ROLE') }
 })
 test.afterAll(async () => { await db?.close() })
 test.beforeEach(async () => { await db.exec('BEGIN') })
@@ -61,11 +65,11 @@ async function append(overrides: Partial<Input> = {}) {
   const args = [v.business_id, v.event_type, v.schema_version, v.occurred_at, v.effective_date,
     v.source_type, v.source_id, v.correlation_id, v.causation_id, v.idempotency_key,
     v.currency, v.amount_minor, JSON.stringify(v.payload), v.actor_type, v.actor_id]
-  // Explicit text projections prevent a JSONB conversion from rounding BIGINT.
-  const r = await db.query<{ id: string; seq: string; amount_minor: string | null; inserted: boolean }>(
-    `SELECT (event).id, (event).seq::text, (event).amount_minor::text, inserted
-     FROM public.append_financial_event($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)`, args)
-  return r.rows[0]
+  // Exercise whole-row JSON serialization, as PostgREST does. No test-side casts.
+  const r = await db.query<{ wire: string }>(
+    `SELECT to_jsonb(r)::text AS wire
+     FROM public.append_financial_event($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) r`, args)
+  return JSON.parse(r.rows[0].wire) as FinancialEventRow & { inserted: boolean }
 }
 async function rejects(run: () => Promise<unknown>, message: RegExp) {
   await db.exec('SAVEPOINT rejected_call')
@@ -73,8 +77,11 @@ async function rejects(run: () => Promise<unknown>, message: RegExp) {
   finally { await db.exec('ROLLBACK TO SAVEPOINT rejected_call; RELEASE SAVEPOINT rejected_call') }
 }
 async function role(name: 'service_role' | 'anon' | 'authenticated', run: () => Promise<void>) {
+  await db.exec('SAVEPOINT role_scope')
   await db.exec(`SET LOCAL ROLE ${name}`)
-  try { await run() } finally { await db.exec('RESET ROLE') }
+  try { await run() }
+  catch (error) { await db.exec('ROLLBACK TO SAVEPOINT role_scope'); throw error }
+  finally { await db.exec('RESET ROLE; RELEASE SAVEPOINT role_scope') }
 }
 async function count() { return (await db.query<{ n: number }>('SELECT count(*)::int n FROM financial_events')).rows[0].n }
 
@@ -92,6 +99,26 @@ test('2: changed payload or monetary identity under one key fails without insert
     await rejects(() => append(change as Partial<Input>), /financial_event_idempotency_conflict/)
   }
   expect(await count()).toBe(1)
+})
+test('replay rejects changed chain identity but preserves the original actor and occurrence time', async () => {
+  const first = await append()
+  const parent = await append({ idempotency_key: 'parent' })
+  for (const change of [{ correlation_id: 'fin_other' }, { source_type: 'other' }, { source_id: 'other' },
+    { causation_id: parent.id }, { effective_date: '2026-09-11' }, { effective_date: null }]) {
+    await rejects(() => append(change), /financial_event_idempotency_conflict/)
+  }
+  await append({ idempotency_key: 'child', causation_id: parent.id, effective_date: null })
+  await rejects(() => append({ idempotency_key: 'child', causation_id: null, effective_date: null }), /financial_event_idempotency_conflict/)
+  await rejects(() => append({ idempotency_key: 'child', causation_id: parent.id }), /financial_event_idempotency_conflict/)
+  expect(await append({ occurred_at: '2026-09-14T00:00:00Z', actor_type: 'user', actor_id: userA }))
+    .toEqual({ ...first, inserted: false })
+  expect(await count()).toBe(3)
+})
+test('migration owner needs neither superuser nor BYPASSRLS for service-only append', async () => {
+  const owner = await db.query<{ rolname: string; rolsuper: boolean; rolbypassrls: boolean; relrowsecurity: boolean; relforcerowsecurity: boolean }>(
+    "SELECT r.rolname, r.rolsuper, r.rolbypassrls, c.relrowsecurity, c.relforcerowsecurity FROM pg_class c JOIN pg_roles r ON r.oid=c.relowner WHERE c.oid='public.financial_events'::regclass")
+  expect(owner.rows[0]).toEqual({ rolname: 'deployer', rolsuper: false, rolbypassrls: false, relrowsecurity: true, relforcerowsecurity: false })
+  await role('service_role', async () => { expect((await append()).inserted).toBe(true) })
 })
 test('3: CHECK list exactly equals catalog; undocumented event rejected', async () => {
   const block = migration().match(/CHECK \(event_type IN \(([\s\S]*?)\)\)/)?.[1]
@@ -170,11 +197,14 @@ test('9: 200 per-business appends have increasing cursors; advisory lock precede
   expect(lock).toBeLessThan(sql.indexOf('INSERT INTO public.financial_events'))
 })
 test('10: signed BIGINT above JS safe integer preserves all digits through the envelope', async () => {
+  await db.exec("SELECT setval('financial_events_seq_seq', 9007199254740992)")
   for (const amount of ['9007199254740993', '-9007199254740993', '9223372036854775807', '-9223372036854775808']) {
     const event = await append({ amount_minor: amount, idempotency_key: amount })
     expect(event.amount_minor).toBe(amount)
-    const row = { ...input(), id: event.id, seq: event.seq, amount_minor: event.amount_minor, created_at: '2026-09-13T13:00:00Z' }
-    const envelope = envelopeFromRow(row)
+    expect(typeof event.seq).toBe('string')
+    expect(BigInt(event.seq) > BigInt(Number.MAX_SAFE_INTEGER)).toBe(true)
+    expect(await append({ amount_minor: amount, idempotency_key: amount })).toEqual({ ...event, inserted: false })
+    const envelope = envelopeFromRow(event)
     expect(envelope.amount?.amountMinor.toString()).toBe(amount)
     expect(rowFromEnvelope(envelope).amount_minor).toBe(amount)
   }
