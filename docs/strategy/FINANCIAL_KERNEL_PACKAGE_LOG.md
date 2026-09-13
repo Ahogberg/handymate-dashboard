@@ -288,7 +288,7 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 - **Deviation — wall-clock lease checks:** uses `clock_timestamp()` so a transaction opened before expiry cannot acknowledge after expiry using its old `now()`. PostgreSQL test covers this.
 - **Deviation — validation:** ack validates renewal duration, fail validates a positive threshold and first-pending-event order, and resume rejects whitespace/empty actor and reason. Both mutation paths lock the cursor before the delivery row.
 - **Golden paths / invariants:** lease takeover and stale-worker fencing; ordered ack; crash/redelivery evidence; failure/halt/resume; tenant and consumer separation; client privilege denial; lossless publication; key formats; timeout; lost-lease stop; ambiguous ack response. Real PostgreSQL suite covers writer blocking/commit order, two-session claim race and wall-clock expiry. Local PostgreSQL tests skip explicitly without the isolated test URL.
-- **Validation:** local checks and remote CI results recorded below when complete. Acceptance is not claimed from PGlite alone.
+- **Validation:** local `tsc --noEmit` passed; all 12 C3 SQL/consumer tests passed, as did C0/C1/C2 and relevant schema/dead-code/account-deletion/CI contracts (CI registration formatting corrected and rerun). Real PostgreSQL: [job 103803680559](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34786815349/job/103803680559) at implementation `b6abf0e6e` ran all three C3 concurrency cases, with **51 passed and no skips** including existing follow-up/report tests. Full PR checks remain the final CI gate; Claude A/B/C review remains required before merge.
 - **Known limitations:** handler timeout stops awaiting, not arbitrary side effects. C5 handlers must deduplicate by eventId; domain database effects and acknowledgement must share a domain RPC when atomicity is needed. A lease token fences cursor mutations, not an external provider. Resume's immutable audit record remains TODO(C4). The empty bridge must not be scheduled until C5 supplies mappings.
 - **Open decisions:** R0/P0 left unresolved; no accounting policy selected. Reverse charge, cash basis, ROT/RUT and cut-over are unaffected because this package transports events and computes/posts no tax or accounting entries. No human accounting approval required for these transport primitives; later policy packages still require the named consultant.
 
@@ -322,7 +322,7 @@ two-mode harness: PGlite locally, a real Postgres service in CI via `FOLLOWUP_TE
 | **`bridge-automation.ts` is created empty and registered as a consumer name.** | It is the one file the contract test allows to call `fireEvent()`; creating it now pins the location. Its first mapping (`receivable_settled{customer}` → `payment_received`) is C5. |
 
 Lock-order rule from C2 applies unchanged: business advisory lock → domain row locks →
-append. `claim_financial_events` locks only the cursor row (`FOR UPDATE SKIP LOCKED`); it never
+append. `claim_financial_events` briefly locks only the cursor row (`FOR UPDATE`) to acquire a durable lease; it never
 takes the business advisory lock, so a consumer cannot deadlock a writer.
 
 ### Scope
