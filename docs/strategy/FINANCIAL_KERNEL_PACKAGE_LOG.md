@@ -29,7 +29,7 @@ Rules that keep this file honest:
 |---|---|---|---|---|
 | P0 | Merchant-of-record decision (D1) | Owner (Andreas) | **open** | — |
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
-| C1 | Money primitives | Codex | **ready — brief in §3** | — |
+| C1 | Money primitives | Codex | **implemented — awaiting Claude dimension A review** | review before merge |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
 | C2 | `financial_events` schema | Codex | not started (brief sketch in §4) | C1 |
 | C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
@@ -54,6 +54,59 @@ is briefed.
 ---
 
 ## 2. Handoffs
+
+### C1 — Money primitives (Codex, 2026-09-13)
+
+```text
+Package / scope
+  C1 only: isolated exact Money mechanisms, no production callers.
+Files changed
+  handymate-dashboard/lib/financial-kernel/money.ts
+  handymate-dashboard/tests/financial-kernel-money.spec.ts
+  handymate-dashboard/package.json (test registration)
+  .github/workflows/contracts.yml (test registration)
+  docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md (this handoff)
+Architecture sections relied on
+  ARCHITECTURE.md FK.0–FK.6; blueprint §5; orchestration §5 C1, §6 A, §7, §9.
+Canonical events touched
+  None. C0 catalog and contract test unchanged.
+DB/RPC changes
+  None.
+Feature flags
+  None; no caller imports Money into production code.
+Golden paths added/updated
+  Pure arithmetic examples for VAT (including zero rate), ROT split and credit notes.
+  These are numeric examples, not posting, accounting-method or end-to-end proofs.
+Invariants affected
+  All eleven brief invariants covered before implementation was added. Initial test
+  collection failed because money.ts did not exist. 13 Money tests now pass, including
+  600 seeded allocations with exact integer error bounds and amounts beyond safe Number.
+  JSON-safe factory values are frozen, with a non-enumerable local toJSON hook.
+  No global BigInt prototype change. Explicit rounding has compile-time assertions.
+Known unresolved questions
+  Implementation choices for review: DOWN truncates toward zero, UP away from zero;
+  HALF_UP ties away from zero. Negative allocation mirrors positive allocation with
+  stable index tie-breaking. Empty/all-zero/negative weights throw even for zero money.
+  fromDecimalString rejects exponent notation, whitespace and plus signs, accepts only
+  redundant zero digits beyond currency precision. fromJSON requires exactly two own
+  keys. fromLegacyNumber rounds the Number's shortest decimal representation with
+  bigint arithmetic, including exponent notation; cannot recover previously lost digits.
+  toLegacyNumber is explicitly lossy and rejects infinity overflow. Factory-created
+  Money values serialize directly; a hand-written structural object containing bigint
+  must be passed through money() or the exported toJSON() before JSON.stringify.
+Open decisions encountered (parent §38) and left unresolved
+  None required by C1; D1–D4 remain open. C1b rounding account/policy remains unselected.
+Swedish regime coverage: reverse charge / cash basis / ROT-RUT / cut-over
+  No posting or invoice behavior. Zero-rate multiplication, ROT shares and signed
+  credits tested as arithmetic only. Regime eligibility, recognition timing and cut-over
+  remain the owning packages' responsibility; no accounting rule is implied here.
+Human accounting review required? yes/no — and by whom, by name
+  No for C1 numeric mechanisms. C1b/C9 still require a named accountant.
+```
+
+Local verification: 41 tests passed across Money, event-contract, schema-contract,
+dead-code-paths, apply-payment-decision and fortnox-row-builder. TypeScript and remote
+CI results are recorded on the PR. Await Claude review against dimension A before merge.
 
 ### C0 — architecture contract (Claude, 2026-09-13)
 
