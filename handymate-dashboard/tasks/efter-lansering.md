@@ -242,6 +242,38 @@ punkter som redan står i tabellen.
   `learning_events`, ägaren beslutar om den blir permanent. Samma
   bevisregel som kunskapsbasen: mönster kräver bekräftelse.
 
+## Adminbehörigheten — fyra punkter utan plats i ordningen (2026-09-13)
+
+Står här för att inte tappas, **inte** inplacerade i tabellen ovan. Ordningen
+i tabellen är er prioritering och renumreras inte av det här avsnittet;
+Andreas avgör var de fyra hör hemma.
+
+**Läget som lanseras.** Grinden till alla 37 adminrutter är
+`email.endsWith('@handymate.se') || ADMIN_EMAILS.includes(email)`
+(`lib/admin-auth.ts:35`). Andreas och Christoffer har varsitt
+@handymate.se-konto utan kopplat företag, och de tar sig in genom att gå
+direkt till `/admin`. `andreashogberg93@gmail.com` ligger kvar i
+`ADMIN_EMAILS` som reservnyckel. Inget av detta ändras före lansering
+(beslut Andreas 2026-09-13). Christoffer ska veta att en inloggning med
+@handymate.se-kontot ersätter hans Bee Service-session i samma webbläsare.
+
+1. **Inloggningsrutten ljuger.** `app/api/auth/route.ts:331` svarar 401
+   "Inget företag kopplat till kontot" när kontot saknar företag — men
+   `signInWithPassword` har redan lyckats och satt sessionskakan, och
+   `app/login/page.tsx` loggar inte ut vid fel. Användaren *är* alltså
+   inloggad och ser ändå ett felmeddelande. Rätt beteende: ett
+   @handymate.se-konto utan företag får `success` och skickas till `/admin`.
+2. **`isAdminEmail()` som delat predikat.** Samma e-postlogik finns
+   duplicerad i `lib/admin-auth.ts:35` och `lib/auth/superadmin.ts:54`. Två
+   kopior av en behörighetsgrind är en kopia för mycket. (`isSuperAdmin()`
+   används idag av noll adminrutter — avgör samtidigt om den ska bort.)
+3. **Bort med `ADMIN_EMAILS`** när punkt 1 är på plats och båda
+   @handymate.se-kontona är provade. Då är domänen den enda grinden.
+4. **Kontraktsprov som låser grinden** — ett prov som fallerar om en
+   icke-@handymate.se-adress släpps in — plus rättning av
+   `docs/PRODUCTION_SETUP.md:50` och `docs/launch/GO_NO_GO.md:15`, som båda
+   beskriver `ADMIN_EMAILS` som vägen in.
+
 ## Beslutat men litet (halv dag var)
 - **Ett morgonmejl i stället för tre** (räddningskö, driftlarm, kreditbevakning). Rött i ämnesraden bara när något stoppar kunder, annars tystnad. Beslut Andreas 2026-09-05.
 
