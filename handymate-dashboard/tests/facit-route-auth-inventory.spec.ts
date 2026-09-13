@@ -39,6 +39,8 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
   standardgrind: /getAuthenticatedBusiness\(/,
   cron_hemlighet: /verifyCronSecret\(/,
   plattformsadmin: /\bisAdmin\(request\)/,
+  // Serververifierad getUser + intern säljroll; beteende i tests/revenue/auth.cjs och routes.cjs.
+  revenue_saljare: /requireRevenue\(request\)/,
   superadmin: /isSuperAdmin\(|superadmin/i,
   aktuell_anvandare: /getCurrentUser\(/,
   agare_admin: /isOwnerOrAdmin\(/,

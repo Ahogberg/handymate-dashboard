@@ -1,3 +1,15 @@
+# Revenue OS v2 — 2026-09-13
+
+- [x] Läs aktuell main, strategi, befintlig kod och verkligt databasschema.
+- [x] 1. Säljarvardag: verifierad behörighet, kontakter, historik, nästa aktivitet, korrekt kö.
+- [x] 2. Förberedelse: Platsbanken som första källa, idempotent import, källbelagd brief och samtalsunderlag.
+- [x] 3. Genomgång från företaget, beständigt mötesdatum, personligt case och befintlig onboardingförifyllning.
+- [x] 4. Uppföljningsutkast, förfallna aktiviteter, tydliga fel och stopp vid svar/nej/paus.
+- [x] Verifiera SQL/API/UI, typkontroll och produktionsbygge.
+- [ ] Publicera branch och draft-PR: Andreas har uttryckligen godkänt offentlig publicering; publicering pågår.
+
+Plan och acceptans: [revenue-os-v2.md](revenue-os-v2.md). Utskick sker inte automatiskt.
+
 # PR #38 readiness-pass 2026-09-12
 
 - [x] Hämta aktuell main och PR #38, skapa separat arbetskopia och riktig merge.
