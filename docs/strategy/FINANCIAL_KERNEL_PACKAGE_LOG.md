@@ -875,7 +875,12 @@ emitting `supplier_payment_settled` and `payable_settled`. Both today's writers 
 `supplier_invoices.status='paid'` (the Fortnox supplier sync and `PATCH /api/supplier-invoices`)
 become callers in C5s. Golden path 20 is the acceptance replay.
 
-**C5 — `applyInvoicePayment()` facade.** Behind `financial_kernel_enabled`: `send-invoice` calls
+**C5 — `applyInvoicePayment()` facade.** Two requirements from the C3 and C4 reviews before
+anything else: the bridge's `payment_received` idempotency marker is **per `receivable_id`**, not
+per `eventId` — a reversal followed by a re-settlement produces a second, distinct
+`receivable_settled` (C4 keys it by the causing event), and the customer must not be thanked
+twice; and the marker is written before the SMS is sent, in the same transaction as ack where
+the handler writes to the database. Behind `financial_kernel_enabled`: `send-invoice` calls
 `issue_invoice_receivables`; every payment source calls `record_payment_settlement` +
 `allocate_payment` and derives the legacy transition from the RPC's `{receivable_settled,
 component}`: customer settled → `to_customer_paid` (ROT) or `to_paid`; tax settled → `settled`;
@@ -930,6 +935,25 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 | LOW | Callers will hold VAT rates as `25` and ROT as `30`; a `ratioFromPercent` helper belongs in the first caller package (C4), not here. | note for C4 |
 | accepted | `fromLegacyNumber` interprets the number's shortest decimal representation (so `1.005` → `1.01` under HALF_UP, `0.1 + 0.2` → `0.30`). That is the right reading of a legacy `NUMERIC` column that passed through a JS number. Documented in the source. | — |
 | accepted | `equals`/`compare` throw on currency mismatch rather than returning `false`. Brief-mandated; a filter across currencies must group by currency first. | — |
+
+### C4 — receivables, payments, allocations (PR #56), Claude review 2026-09-14, orchestration §6 A + B + C + E
+
+Verified locally on `codex/financial-kernel-c4`: 24 C4 tests plus every kernel, schema, retention
+and side-door suite green (121); my own 32-probe script from the brief re-run against the
+implemented migration with identical results; an extra probe of the legacy ROT fallback
+(`customer_pays = total`, deduction 0 → one component, as `getCustomerShare`). Golden paths 1, 4,
+5, 7, 10, 12, 19, 30, 34, 36, 37 replay through the RPCs with matching event sequences. No BLOCKER,
+no HIGH. Six of Codex's seven deviations are improvements: composite tenant FK to `invoice`, the
+exact `getCustomerShare` fallback, `receivable_id` in creation payloads, null-safe idempotency
+identity, `p_currency` asserted inside the transaction, settlement keys that survive a
+reverse-and-resettle cycle.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | Payload `*_minor` fields are now written as strings while §FK.1 said integers, and `types.ts` was widened to `number \| string`. A contract cannot be both. Decision (C0 owner): **strings**, for the same reason every RPC returns text and the mirror column does — no `Number()` on money anywhere. §FK.1 amended in PR #57; `types.ts` must narrow to `string` (drop the union) in #56 before merge; the fixture payloads in `golden-paths.ts` are metadata and may stay numeric. | contract amended; narrow the union |
+| MEDIUM | Reverse-then-resettle emits a second `receivable_settled` (correct: the earlier event is immutable). The bridge must therefore dedupe `payment_received` per `receivable_id`, not per `eventId`. Written into the C5 sketch. | C5 requirement |
+| LOW | `CREATE UNIQUE INDEX` on `public.invoice` inside the migration takes a SHARE lock on the legacy table for its duration. Trivial at today's row counts; run outside peak hours and note it in the apply checklist. | note |
+| LOW | Currency is hard-coded `'SEK'` in `issue_invoice_receivables`. Correct for the SE pack; when `invoice` gains a currency column (C7 or C9) it must come from there. | note |
 
 ### C3 — outbox, leases, ordered ack (PR #54), Claude review 2026-09-14, orchestration §6 A + B + C
 
