@@ -787,9 +787,25 @@ Three ways forward, and the choice is the owner's, not an implementer's:
 3. **Defer S2 until the kernel's own integrity engine can substitute for the external
    reference** at Levels 2–4 (§16), comparing Handymate against itself rather than against
    Fortnox.
+4. **Run an open-source ledger as a second, independent reference for Levels 2–3.**
+   Proposed 2026-09-13, not yet decided. An Odoo Community instance with the core `l10n_se`
+   localisation (LGPL-3: a 282-account BAS chart, Swedish tax templates including
+   reverse-charge construction VAT, and the VAT-return box mapping 05–62) is fed the same
+   source documents — invoices, supplier invoices, payments — through its own posting logic.
+   Its journal entries and account balances become a reference snapshot exactly as a Fortnox
+   export would (§3), so Levels 2 and 3 get a real comparison partner without any customer
+   re-OAuth and without the Fortnox licence blocker. It is *not* accountant-grade truth: Odoo's
+   Swedish rules are community-maintained and must themselves be checked in the manual
+   rulebook track. It is a second independent derivation, which is what §7 asks for. The
+   reference-adapter boundary (§3) already allows more than one reference; Fortnox stays the
+   Level 1 reference for payment truth. Cost: one hosted Odoo per pilot cohort and an adapter
+   that pushes documents in and reads `account.move` lines out. See
+   `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §3 for the evaluation.
 
 Option 2 is the only one that is reachable without external dependencies, and it is
 compatible with this document provided the reduction is written down rather than assumed.
+Option 4 is a complement to option 2, not a replacement: it raises the ceiling from Level 1
+to Level 3 while R0 remains the only source of VAT truth.
 
 ### 21.6 Decision 2026-09-12 — option 2, with the VAT gap covered elsewhere
 

@@ -502,6 +502,11 @@ updated_at)` and at-least-once delivery, and `bridge-automation.ts` as the one p
 includes duplicate delivery and crash-after-commit. Whether one RPC may append several events
 atomically is C3's first decision; the advisory lock in C2 makes either answer safe.
 
+**Open-source inputs.** Before C4b, C9, C10, C11, C13 or C14 is briefed, read
+`OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §5: it names the reference data (Odoo core `l10n_se`,
+LGPL), the official schemas (HUS v6, camt.053/054, SIE 4/5) and the licence rules (AGPL and
+GPL code is read, never copied).
+
 **C1b — rounding policy.** Cannot start until a named accounting consultant confirms the
 rounding account (parent §5 proposes 3740; that is a proposal). Add the person's name to §1 of
 this file when they exist.
