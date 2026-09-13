@@ -29,7 +29,8 @@ test('nytt konto: Lisa → Karin → Daniel → Matte; Hanna och push visas inte
   expect(primary?.agent).toBe('lisa')
   expect(secondary.map(t => t.agent)).toEqual(['karin', 'daniel'])
   // Default-etiketterna (LiveTourens mock) är exakt de tre första öppna uppgifterna
-  expect([primary!.label, ...secondary.map(t => t.label)]).toEqual([...KOM_IGANG_DEFAULT_LABELS])
+  const web = visibleKomIgangTasks(deriveKomIgangTasks({ ...tomt, planningStart: { teamConfirmed: false, calendarStarted: false } }))
+  expect([web.primary!.label, ...web.secondary.map(t => t.label)]).toEqual([...KOM_IGANG_DEFAULT_LABELS])
 })
 
 test('klara uppgifter faller bort ur det synliga; nästa i prioriteten tar över som primär', () => {
@@ -76,4 +77,30 @@ test('rutten läser signalerna ur riktiga tabeller och behåller de tre booleane
   expect(rail).toContain('fallbackTasks(data)')
   expect(kod('app/onboarding/components/Step6LiveTour.tsx')).toContain('KOM_IGANG_DEFAULT_LABELS.map')
   expect(KOM_IGANG_HEADING).toBe('Nästa steg för ditt företag')
+})
+
+test('planeringsstart: team först, kalender därefter i samma begränsade rail', () => {
+  const start = { ...tomt, planningStart: { teamConfirmed: false, calendarStarted: false } }
+  const tasks = deriveKomIgangTasks(start)
+  expect(tasks.some(t => t.key === 'planning_team' && !t.klar)).toBe(true)
+  expect(tasks.some(t => t.key === 'planning_calendar')).toBe(false)
+  const next = deriveKomIgangTasks({ ...start, planningStart: { teamConfirmed: true, calendarStarted: false } })
+  expect(next.find(t => t.key === 'planning_team')?.klar).toBe(true)
+  expect(next.find(t => t.key === 'planning_calendar')?.href).toBe('/dashboard/schedule#planning-start')
+  expect(visibleKomIgangTasks(next).secondary.length).toBeLessThanOrEqual(2)
+  const done = deriveKomIgangTasks({ ...start, planningStart: { teamConfirmed: true, calendarStarted: true } })
+  expect(done.filter(t => t.key.startsWith('planning_')).every(t => t.klar)).toBe(true)
+})
+
+test('målprioritet finns kvar och planering kommer tidigt; gamla konsumenter får inga nya mejluppgifter', () => {
+  const planningStart = { teamConfirmed: false, calendarStarted: false }
+  const moreWork = deriveKomIgangTasks({ ...tomt, firstFocus: 'fler_jobb', planningStart,
+    kundinflode: { any_lead_verified: false, any_channel_verified: false, fler_jobb: true, kanaler: '' } })
+  expect(moreWork.slice(0, 2).map(t => t.key)).toEqual(['kundinflode', 'planning_team'])
+  expect(deriveKomIgangTasks(tomt).some(t => t.key.startsWith('planning_'))).toBe(false)
+})
+
+// Kör de riktiga API-funktionerna med isolerad databas/transport även i kontraktsgrinden.
+test('planeringsstartens läsare och API håller tenant, roll, datakvalitet och sparbevis', () => {
+  require('child_process').execFileSync(process.execPath, ['tests/onboarding/planning-start.cjs'], { cwd: ROOT, stdio: 'pipe' })
 })

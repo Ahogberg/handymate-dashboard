@@ -1491,6 +1491,16 @@ Färdig betyder att varje steg har en synlig nästa handling och en sparad kvitt
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
 utskick, fakturasändning, main-merge eller produktionsmigration ingår.
 
+# Team- och kalenderstart — 2026-09-13
+- [x] Inventera befintlig KomIgangRail, delade signaler, team och persondag.
+- [x] Lägg två sekventiella startuppgifter i befintlig rail; behåll målprioritering.
+- [x] Bekräfta team/ensamföretag och första planerade veckan på befintliga sidor.
+- [x] Verifiera tenant/roll, läsfel, tom vecka, inbjudna och återförsök.
+- [x] Dokumentera gränsen mot beläggningsvarningen och skapa granskbar PR.
+
+Verifiering och kvarstående integrations-/bygggrindar dokumenterade i
+`../docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md`, avgränsad uppdatering 2026-09-13.
+
 ## Brain Visibility — projektbeslut 2026-09-10
 
 - [x] Inventera ProjectApprovalsBlock, ProjectTodoBlock och befintlig approvals-GET.
@@ -1506,3 +1516,21 @@ Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabelle
 - [x] Återanvänd gemensam presentation och ta bort obestyrkt sändningslöfte.
 - [x] Verifiera typetiketter/knappar med isolerade presentationsprov och typkontroll.
 - [ ] Publicera i PR38 och kontrollera verklig granskningsdialog utan att bekräfta sändning.
+
+## PR #42 — konflikträttning 2026-09-13
+
+- [x] Jämför PR-head 51e28b4d med aktuell main 41b2eb6d.
+- [x] Behåll båda oberoende tilläggen i tasks/todo.md. Produktkoden sammanfogas utan konflikt.
+- [x] Dokumentera tidigare inloggat persistensprov och återställt skapandedatum.
+- [x] 56 riktade kontrakt och separat typkontroll gröna före byggkontrollen.
+- [x] Rätta main-versionens otillåtna route-export i min-garanti; behåll värde och beräkning.
+- [x] Nytt produktionsbygge och adoption-provets 21 tester gröna efter exporträttningen.
+Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
+
+## PR #42 — andra main-sammanfogningen 2026-09-13
+
+- [x] Inventera main e51654f9 och PR-head b211b68a.
+- [x] Behåll både planeringsstart och Financial Kernel-kontraktet i ARCHITECTURE.md.
+- [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
+- Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
+Publicering och aktuell mergestatus dokumenteras i PR #42.

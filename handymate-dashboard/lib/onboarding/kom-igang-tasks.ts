@@ -1,3 +1,4 @@
+import type { PlanningStartSignals } from './planning-start'
 import { firstFocusOption } from './first-focus'
 import { buildFirstMissionPrompt } from './first-mission-handoff'
 /**
@@ -9,7 +10,7 @@ import { buildFirstMissionPrompt } from './first-mission-handoff'
  * systemet vet att den är klar (klar-regeln är signalen — aldrig ett
  * kryss användaren själv sätter).
  *
- * Fast prioritet: Lisa → Karin → Daniel → Matte → Hanna → push. Max EN
+ * Grundprioritet: Lisa → planeringsstart (webb) → Karin → Daniel → Matte. Max EN
  * primär + två sekundära visas; resten väntar. Pushen föreslås BARA när
  * ett riktigt kort väntar — annars finns inget att få notis om.
  *
@@ -18,6 +19,8 @@ import { buildFirstMissionPrompt } from './first-mission-handoff'
  */
 export interface KomIgangSignals {
   firstFocus?: unknown
+  /** Endast webbrailen: uttrycklig startbekräftelse, aldrig beläggningsbevis. */
+  planningStart?: PlanningStartSignals
   /** Testsamtal genomfört eller minst en inspelning. */
   ring_test: boolean
   /** Fortnox kopplat ELLER minst en faktura. */
@@ -57,7 +60,7 @@ export interface KomIgangSignals {
 export type KomIgangAgent = 'lisa' | 'karin' | 'daniel' | 'matte' | 'hanna'
 
 export interface KomIgangTask {
-  key: 'ring' | 'karin_data' | 'daniel_quote' | 'matte_mission' | 'hanna_segment' | 'pwa' | 'kundinflode'
+  key: 'ring' | 'karin_data' | 'daniel_quote' | 'matte_mission' | 'hanna_segment' | 'pwa' | 'kundinflode' | 'planning_team' | 'planning_calendar'
   agent: KomIgangAgent
   label: string
   /** Vad som låses upp — en mening. */
@@ -77,8 +80,8 @@ export const KOM_IGANG_MAX_VISIBLE = 3
  */
 export const KOM_IGANG_DEFAULT_LABELS: ReadonlyArray<string> = [
   'Ring ditt nummer — hör Lisa fånga samtalet',
+  'Lägg till teamet — eller bekräfta att du jobbar själv',
   'Koppla Fortnox eller skicka din första faktura så Karin kan bevaka betalningarna',
-  'Gör klart din första offert',
 ]
 
 export const KOM_IGANG_HEADING = 'Nästa steg för ditt företag'
@@ -106,6 +109,17 @@ export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
       minuter: 2, href: '/dashboard/settings/phone', klar: s.ring_test,
     },
     ...(inflode && !s.kundinflode?.fler_jobb ? [inflode] : []),
+    ...(s.planningStart ? [{
+      key: 'planning_team' as const, agent: 'matte' as const,
+      label: 'Lägg till teamet — eller bekräfta att du jobbar själv',
+      varde: 'Lägg till dem som arbetar i firman. De behöver inte ha accepterat inbjudan för att du ska kunna planera.',
+      minuter: 3, href: '/dashboard/team#planning-start', klar: s.planningStart.teamConfirmed,
+    }, ...(s.planningStart.teamConfirmed ? [{
+      key: 'planning_calendar' as const, agent: 'matte' as const,
+      label: 'Lägg in nästa veckas jobb och kontrollera planeringen',
+      varde: 'Koppla jobben till rätt person och tid, och lägg in känd frånvaro. En kalenderkoppling betyder inte att alla jobb är med.',
+      minuter: 5, href: '/dashboard/schedule#planning-start', klar: s.planningStart.calendarStarted,
+    }] : [])] : []),
     {
       key: 'karin_data', agent: 'karin',
       label: 'Koppla Fortnox eller skicka din första faktura så Karin kan bevaka betalningarna',
@@ -151,10 +165,10 @@ export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
   const focus = firstFocusOption(s.firstFocus)
   if (!focus) return eligible
   const order: KomIgangTask['key'][] = focus.id === 'fler_jobb'
-    ? ['kundinflode', 'matte_mission', 'ring', 'daniel_quote', 'karin_data']
+    ? ['kundinflode', 'planning_team', 'planning_calendar', 'matte_mission', 'ring', 'daniel_quote', 'karin_data']
     : focus.id === 'mindre_admin'
-      ? ['matte_mission', 'daniel_quote', 'ring', 'karin_data', 'kundinflode']
-      : ['matte_mission', 'karin_data', 'daniel_quote', 'ring', 'kundinflode']
+      ? ['matte_mission', 'planning_team', 'planning_calendar', 'daniel_quote', 'ring', 'karin_data', 'kundinflode']
+      : ['matte_mission', 'karin_data', 'planning_team', 'planning_calendar', 'daniel_quote', 'ring', 'kundinflode']
   return eligible.sort((a, b) => {
     const rank = (key: KomIgangTask['key']) => order.includes(key) ? order.indexOf(key) : order.length
     return rank(a.key) - rank(b.key)
