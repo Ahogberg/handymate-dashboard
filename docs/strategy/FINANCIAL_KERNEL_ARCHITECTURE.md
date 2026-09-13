@@ -2191,6 +2191,16 @@ and the customer's perception of "Handymate replaced Fortnox" is anchored on the
 
 *Recommendation:* decide explicitly. Do not let it default to produce-only by omission.
 
+*Input 2026-09-13 (fact, not a decision):* Skatteverket's **API för Momsdeklaration 1.0**
+went live in November 2025 as a partner API (OAuth2 with certificate or e-legitimation).
+It lets a system create and manage the return's basis, retrieve submitted returns and
+decisions — but **signing still happens at Skatteverket, by the taxpayer; it cannot be done
+through the API**. So "file" in the strong sense is not available to any software vendor.
+The realistic options are therefore *produce-only* or *prepare-and-submit with the customer
+signing at Skatteverket*, and the second keeps the obligation with the customer (§40.1) by
+construction. Vertel's AGPL Odoo module already integrates this API, which is evidence the
+partner agreement is obtainable for a small vendor. See `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §4.
+
 **Status: open.**
 
 ### 38.4 Cut-over fiscal-year boundary for the first pilots — D4
@@ -2422,6 +2432,7 @@ it is the reason validation matters.
 | 2026-09-11 | Original blueprint. | — |
 | 2026-09-12 | Added §39 (outcome-delivery contract) and §40 (its three limits: the obligation stays with the customer, the review share is a measured number not a direction, and §31's rollout gates remain intact). | AI-native services thesis (Isenberg 2026-09-11), reviewed against the codebase |
 | 2026-09-13 | Package C0 executed: §7 event names finalized into `handymate-dashboard/ARCHITECTURE.md` §FK.1 (canonical from now on), `payment_processing` renamed `payment_processing_started`, CI contract test added. | `FINANCIAL_KERNEL_PACKAGE_LOG.md` C0 |
+| 2026-09-13 | §38.3: recorded Skatteverket's Momsdeklaration API (live 2025-11) as factual input to D3; signing stays with the taxpayer. | `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` |
 | 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
 
 ---
