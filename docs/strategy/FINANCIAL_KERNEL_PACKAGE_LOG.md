@@ -31,7 +31,7 @@ Rules that keep this file honest:
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
 | C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema + append RPC | Codex | **ready — brief in §3** (Claude track A done) | — |
+| C2 | `financial_events` schema + append RPC | Codex | **reviewed — all three findings corrected** | migration unapplied |
 | C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
 | C4 | Receivables + allocations behind flag | Codex | not started | C1, C2, C3 |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
@@ -64,6 +64,86 @@ Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind t
 ---
 
 ## 2. Handoffs
+
+### C2 — financial event store (Codex, 2026-09-13)
+
+```text
+Package / scope
+  C2 only: immutable financial_events schema, service-only append RPC, typed
+  envelope/row conversion, and executable tests against the real migration.
+Files changed
+  handymate-dashboard/sql/v235_financial_events.sql
+  handymate-dashboard/lib/financial-kernel/events/types.ts
+  handymate-dashboard/tests/financial-kernel-events-sql.spec.ts
+  handymate-dashboard/lib/account/radera.ts (required retention classification only)
+  handymate-dashboard/package.json (registration)
+  .github/workflows/contracts.yml (registration)
+  docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md (brief and this handoff)
+Architecture sections relied on
+  ARCHITECTURE.md FK.1-FK.2; blueprint 6, 7, 8, 21, 26, 36.2;
+  orchestration 5 C2, 6 A+C, 7, 9; this log's C2 brief.
+Canonical events touched
+  All 32 names in the database CHECK, exact parity tested against catalog.ts.
+  Nine C4 payloads typed verbatim from FK.1; other payloads are never.
+DB/RPC changes
+  financial_events, indexes/constraints, immutable trigger, append_financial_event.
+  NOT APPLIED to any remote/test/production environment. No backfill or caller.
+Feature flags
+  None. C4 still owns financial_kernel_enabled; no behavior switched on.
+Golden paths added/updated
+  Isolated database proofs for repeat append, conflicting retry, same-tenant
+  causation and rejected cross-tenant chains, membership reads, immutable history,
+  client denial, safe BIGINT transport and transaction rollback.
+Invariants affected
+  All eleven brief invariants, plus retention FK and unsafe numeric transport.
+  Tests were written first; collection failed before types.ts existed. After
+  installing the proposed DDL verbatim the inherited-service-grants test failed;
+  it passes with the correction below. Real is_business_member body is extracted
+  from the repository migration; auth.uid and tenant tables are isolated fixtures.
+DDL deviations from the proposal, with reasons
+  Replaced service_role's UPDATE/DELETE/TRUNCATE revoke with REVOKE ALL then
+  GRANT SELECT, and revoked sequence rights from PUBLIC/anon/authenticated/service_role.
+  Reason: inherited/default INSERT and sequence grants otherwise bypass the RPC,
+  business lock and idempotency checks. The harness deliberately installs broad
+  service default grants before the migration and proves this failure/correction.
+  SECURITY DEFINER still appends as the migration owner; service_role can read and
+  execute the RPC but cannot write directly. Header records the mandated lock order.
+  Claude review corrections: removed FORCE RLS so the non-bypass owner can append; RPC now returns a flat row with TEXT seq/amount_minor; replay comparison also guards correlation, source, causation and effective_date. Actor and occurred_at deliberately remain first-write values on retry.
+Scope deviation required by the existing CI contract
+  lib/account/radera.ts now classifies financial_events in BEHALLS. The existing
+  kontoradering completeness gate failed because every new business_id table must
+  be classified. This implements C2's retain-history requirement without changing
+  deletion logic or selecting retention/anonymisation policy. Seven files in total.
+Known unresolved questions / limits of evidence
+  PGlite is single-session: 200 ordered appends and lock placement are verified,
+  not competing transactions' commit order. C3 must add a multi-connection Postgres
+  concurrency proof before a consumer relies on seq. Sequence gaps are intentional.
+  UPDATE/DELETE normally fail at the privilege boundary for service_role. The
+  trigger is separately proven as owner and with test-only temporary grants.
+  TRUNCATE is prevented by grants, not by a trigger against a database administrator.
+  Correction to the brief's deletion assumption: the existing account deletion path
+  soft-deletes business_config. RESTRICT rejects a hard DELETE, as tested, but does
+  not itself block that existing soft-delete flow. Track G remains necessary.
+  The append RPC compares event type, payload,
+  amount, currency and chain identity; retry actor and occurred_at do not replace
+  the first event. Payload-shape/business semantics are future writers' responsibility.
+  Row mappers require string BIGINT transport, rejecting number input. The RPC supplies
+  text fields and is tested through to_jsonb plus JSON.parse, for append and replay. Raw table JSON is
+  still unsafe: future read views/RPCs must cast both BIGINT columns. Payload amounts remain the brief's number
+  minor units; their owning packages must enforce the safe integer bound.
+Open decisions encountered and left unresolved
+  D1-D4, R0 and C1b remain unchanged. No retention/anonymisation decision made.
+Swedish regime coverage: reverse charge / cash basis / ROT-RUT / cut-over
+  Payload fields retain regime/method/tax-reduction and separate receivable
+  components. No posting, VAT calculation, accounting rule or historical replay.
+  RESTRICT intentionally exposes account-retention work to track G.
+Human accounting review required? yes/no — and by whom, by name
+  No for C2 storage mechanics. Named accountant still required for R0/C1b/C9.
+```
+
+Verification: 15 C2 tests, including the eleven brief invariants; 79 tests in
+the combined C2/C0/C1/schema/dead-code/CI-registration/account-deletion pass. TypeScript and remote
+CI status are recorded on the PR. Claude review of dimensions A and C is recorded below; its HIGH and two MEDIUM findings are corrected.
 
 ### C1 — Money primitives (Codex, 2026-09-13)
 
@@ -540,6 +620,23 @@ No BLOCKER.
 | accepted | Sequence gaps on failed inserts; single-session PGlite cannot prove concurrent commit order (C3 must, with the Postgres CI service); `hashtext` collisions only over-serialise; account deletion soft-deletes `business_config` so the RESTRICT FK does not fire on that path, track G remains open. | — |
 
 ---
+
+### C2 — `financial_events` (PR #50), Claude review 2026-09-13, orchestration §6 A + C
+
+Verified locally on `codex/financial-kernel-c2` head `1ec1c34`: the 13 C2 tests plus contract,
+Money, schema and account-deletion suites green (64). Two probes beyond the suite: the migration
+deployed by a role without BYPASSRLS that owns the objects, then the RPC called as
+`service_role`; and `to_jsonb` of the RPC result followed by `JSON.parse`. Codex's two DDL
+deviations (service_role REVOKE ALL + GRANT SELECT; `financial_events` in `BEHALLS`) are correct.
+No BLOCKER.
+
+| Sev | Finding | Status |
+|---|---|---|
+| HIGH | `FORCE ROW LEVEL SECURITY` makes the only write path depend on the deploying role having BYPASSRLS. Proven: with a NOBYPASSRLS owner the append fails with an RLS violation; without FORCE it succeeds. The superuser PGlite harness cannot see this. Origin: the Claude DDL proposal, not Codex. Fix: drop FORCE, document why, add the non-bypass owner probe as a test. | resolved in PR #50: non-bypass deployer owns the tested objects; FORCE removed |
+| MEDIUM | RPC returns BIGINT inside a composite; PostgREST serialises it as a JSON number and `JSON.parse` loses digits above 2^53 (proven: …993 → …992). Return a flat row with `seq` and `amount_minor` as TEXT now, while the migration is unapplied. Any future PostgREST read of the table must cast the same two columns. | resolved in PR #50 with regression tests |
+| MEDIUM | Idempotency replay compares type/payload/amount/currency only; a replay with a different `correlation_id`, source, `causation_id` or `effective_date` silently returns the original. Add those four to the comparison; deliberately exclude `occurred_at` and actor. | resolved in PR #50 with regression tests |
+| accepted | Sequence gaps on failed inserts; single-session PGlite cannot prove concurrent commit order (C3 must, with the Postgres CI service); `hashtext` collisions only over-serialise; account deletion soft-deletes `business_config` so the RESTRICT FK does not fire on that path, track G remains open. | — |
+
 
 ## 6. Amendment log
 
