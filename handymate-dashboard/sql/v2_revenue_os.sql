@@ -10,33 +10,56 @@ create unique index if not exists revenue_accounts_normalized_org_uidx
 alter table public.revenue_signals add column if not exists external_id text;
 create unique index if not exists revenue_signals_external_uidx on public.revenue_signals(source,external_id) where external_id is not null;
 create table if not exists public.revenue_contacts (
-  id uuid primary key default gen_random_uuid(), account_id uuid not null references public.revenue_accounts(id) on delete cascade,
-  name text not null, email text, phone text, role text, source_url text,
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.revenue_accounts(id) on delete cascade,
+  name text not null,
+  email text,
+  phone text,
+  role text,
+  source_url text,
   contact_basis text not null check (contact_basis in ('public_business_contact','public_professional_role','warm_intro','inbound','customer_referral')),
   created_at timestamptz not null default now()
 );
 create table if not exists public.revenue_sessions (
-  id uuid primary key default gen_random_uuid(), account_id uuid not null references public.revenue_accounts(id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.revenue_accounts(id) on delete cascade,
   meeting_date date not null default (now() at time zone 'Europe/Stockholm')::date,
-  payload jsonb not null default '{}'::jsonb, case_token text unique references public.sales_case(token),
-  version integer not null default 0, created_by uuid not null, created_at timestamptz not null default now()
+  payload jsonb not null default '{}'::jsonb,
+  case_token text unique references public.sales_case(token),
+  version integer not null default 0,
+  created_by uuid not null,
+  created_at timestamptz not null default now()
 );
 create table if not exists public.revenue_followup_drafts (
-  id uuid primary key default gen_random_uuid(), account_id uuid not null references public.revenue_accounts(id) on delete cascade,
-  body text not null, status text not null default 'draft' check(status in ('draft','approved','cancelled')),
-  account_version integer not null, created_at timestamptz not null default now(), approved_at timestamptz, approved_by uuid
+  id uuid primary key default gen_random_uuid(),
+  account_id uuid not null references public.revenue_accounts(id) on delete cascade,
+  body text not null,
+  status text not null default 'draft' check(status in ('draft','approved','cancelled')),
+  account_version integer not null,
+  created_at timestamptz not null default now(),
+  approved_at timestamptz,
+  approved_by uuid
 );
 create table if not exists public.revenue_commands (
-  request_id uuid primary key, actor_id uuid not null, command text not null, input jsonb not null,
-  result jsonb not null, created_at timestamptz not null default now()
+  request_id uuid primary key,
+  actor_id uuid not null,
+  command text not null,
+  input jsonb not null,
+  result jsonb not null,
+  created_at timestamptz not null default now()
 );
 create index if not exists revenue_contacts_account_idx on public.revenue_contacts(account_id);
 create index if not exists revenue_sessions_account_idx on public.revenue_sessions(account_id,created_at desc);
 create index if not exists revenue_followups_account_idx on public.revenue_followup_drafts(account_id,created_at desc);
 create table if not exists public.revenue_source_runs (
-  id uuid primary key default gen_random_uuid(), actor_id uuid not null, source text not null,
-  status text not null check(status in ('running','succeeded','failed')), imported integer not null default 0,
-  error text, started_at timestamptz not null default now(), finished_at timestamptz
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid not null,
+  source text not null,
+  status text not null check(status in ('running','succeeded','failed')),
+  imported integer not null default 0,
+  error text,
+  started_at timestamptz not null default now(),
+  finished_at timestamptz
 );
 
 alter table public.revenue_contacts enable row level security;

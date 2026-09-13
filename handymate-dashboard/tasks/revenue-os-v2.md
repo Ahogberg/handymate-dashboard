@@ -49,3 +49,18 @@ Ingen produktionsmigration, merge, ändrade roller eller verkliga utskick har gj
 ## Publiceringsstatus
 
 Implementation committad lokalt som 343a7217504c80cbad39dc6961be1b83010619e0 på codex/revenue-os-v2. Push stoppades av automatisk godkännandegranskning: intern implementation till offentlig GitHub-destination var inte uttryckligt godkänd. GitHub-metadata bekräftar att Ahogberg/handymate-dashboard är public och att den anslutna användaren har admin/push-rättigheter. Ingen alternativ publiceringsväg användes. Andreas har därefter uttryckligen godkänt offentlig push och draft-PR. Publicering återupptagen med detta godkännande; merge och produktionsaktivering ingår inte.
+
+
+## Mergeberedskap — acceptanspass 2026-09-13
+
+PR #45 publicerad på codex/revenue-os-v2. Första head 8240a36 hade grön Revenue-CI, UI-/first-value-prov och båda Vercel-byggen, men kontraktsgrinden föll på kolumnvakten. Orsak: CREATE TABLE hade flera kolumner per rad medan vakten läser första kolumnen på varje rad. Migrationen är nu formaterad med en kolumn per rad; inga schemaegenskaper ändrade och inget testundantag infört. Alla 15 kolumnprov samt hela test:revenue-v2 (identitet/källa/domän, 16 SQL-scenarier och 13 handler-/onboardingkontroller) passerar efter rättningen. Ny CI ska verifieras på publicerad head.
+
+Liveacceptans är fortfarande blockerad:
+- Preview /admin/revenue omdirigerar testwebbläsaren till Vercel-inloggning före Handymate.
+- Vercel-anslutningen svarar 403 för team_opH37UaLKvP9JSqhTwesGtD7: anslutningen måste autentiseras för rätt team innan skyddad preview kan användas. Inga skydd har ändrats.
+- Separata Supabase-branchen eoodwyfxrdjmlqaealhj är aktiv men saknar revenue_accounts, revenue_sessions och sales_case. Ingen migration installerad där i detta pass.
+- Produktion har revenue_accounts men saknar revenue_sessions. Verifierat via läsfråga; ingen produktionsmigration installerad.
+- Läsande rollinventering: sju bekräftade interna standardledare, noll bekräftade användare med explicit revenue_role=seller. Två separata säljaridentiteter behövs för det riktiga ägarskapsprovet. Inga befintliga roller har ändrats.
+- Verklig fetchCandidates('elektriker') från arbetsmiljön nådde sin åttasekunderstimeout. Detta säger inget säkert om Vercels nätverk; källa från driftsmiljön återstår.
+
+Beslut: HOLD för produktionsmerge. Nästa steg är Vercel-åtkomst till rätt team, testdatabas med granskade beroendemigrationer och två separata test-säljaridentiteter. Därefter genomförs den tidigare specificerade sparade rundresan och liveimporten. Inga verkliga meddelanden, rolländringar eller merge genomförda.

@@ -6,7 +6,10 @@
 - [x] 3. Genomgång från företaget, beständigt mötesdatum, personligt case och befintlig onboardingförifyllning.
 - [x] 4. Uppföljningsutkast, förfallna aktiviteter, tydliga fel och stopp vid svar/nej/paus.
 - [x] Verifiera SQL/API/UI, typkontroll och produktionsbygge.
-- [ ] Publicera branch och draft-PR: Andreas har uttryckligen godkänt offentlig publicering; publicering pågår.
+- [x] Publicera branch och draft-PR: PR #45.
+- [x] Rätta CI-felet: SQL-formatet läses av befintlig kolumnvakt; 15 prov och hela Revenue-sviten gröna lokalt.
+- [ ] Verifiera preview, roller, personligt case/onboarding och verklig källa.
+- [x] Dokumentera bevis och kvarvarande hinder före produktionsmerge i revenue-os-v2.md.
 
 Plan och acceptans: [revenue-os-v2.md](revenue-os-v2.md). Utskick sker inte automatiskt.
 
