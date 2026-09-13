@@ -16,6 +16,7 @@ import {
   AlertTriangle,
   Award,
 } from 'lucide-react'
+import { PlanningStart } from '@/components/onboarding/PlanningStart'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { useBusiness } from '@/lib/BusinessContext'
 import { supabase } from '@/lib/supabase'
@@ -1041,6 +1042,8 @@ export default function TeamPage() {
             </button>
           )}
         </div>
+
+        <PlanningStart step="team" refreshKey={JSON.stringify(members.map(m => [m.id, m.is_active]))} />
 
         {/* Empty state */}
         {showEmptyState ? (

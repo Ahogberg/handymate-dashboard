@@ -1,3 +1,18 @@
+# Revenue OS v2 — 2026-09-13
+
+- [x] Läs aktuell main, strategi, befintlig kod och verkligt databasschema.
+- [x] 1. Säljarvardag: verifierad behörighet, kontakter, historik, nästa aktivitet, korrekt kö.
+- [x] 2. Förberedelse: Platsbanken som första källa, idempotent import, källbelagd brief och samtalsunderlag.
+- [x] 3. Genomgång från företaget, beständigt mötesdatum, personligt case och befintlig onboardingförifyllning.
+- [x] 4. Uppföljningsutkast, förfallna aktiviteter, tydliga fel och stopp vid svar/nej/paus.
+- [x] Verifiera SQL/API/UI, typkontroll och produktionsbygge.
+- [x] Publicera branch och draft-PR: PR #45.
+- [x] Rätta CI-felet: SQL-formatet läses av befintlig kolumnvakt; 15 prov och hela Revenue-sviten gröna lokalt.
+- [ ] Verifiera preview, roller, personligt case/onboarding och verklig källa.
+- [x] Dokumentera bevis och kvarvarande hinder före produktionsmerge i revenue-os-v2.md.
+
+Plan och acceptans: [revenue-os-v2.md](revenue-os-v2.md). Utskick sker inte automatiskt.
+
 # PR #38 readiness-pass 2026-09-12
 
 - [x] Hämta aktuell main och PR #38, skapa separat arbetskopia och riktig merge.
@@ -1491,6 +1506,16 @@ Färdig betyder att varje steg har en synlig nästa handling och en sparad kvitt
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
 utskick, fakturasändning, main-merge eller produktionsmigration ingår.
 
+# Team- och kalenderstart — 2026-09-13
+- [x] Inventera befintlig KomIgangRail, delade signaler, team och persondag.
+- [x] Lägg två sekventiella startuppgifter i befintlig rail; behåll målprioritering.
+- [x] Bekräfta team/ensamföretag och första planerade veckan på befintliga sidor.
+- [x] Verifiera tenant/roll, läsfel, tom vecka, inbjudna och återförsök.
+- [x] Dokumentera gränsen mot beläggningsvarningen och skapa granskbar PR.
+
+Verifiering och kvarstående integrations-/bygggrindar dokumenterade i
+`../docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md`, avgränsad uppdatering 2026-09-13.
+
 ## Brain Visibility — projektbeslut 2026-09-10
 
 - [x] Inventera ProjectApprovalsBlock, ProjectTodoBlock och befintlig approvals-GET.
@@ -1506,3 +1531,21 @@ Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabelle
 - [x] Återanvänd gemensam presentation och ta bort obestyrkt sändningslöfte.
 - [x] Verifiera typetiketter/knappar med isolerade presentationsprov och typkontroll.
 - [ ] Publicera i PR38 och kontrollera verklig granskningsdialog utan att bekräfta sändning.
+
+## PR #42 — konflikträttning 2026-09-13
+
+- [x] Jämför PR-head 51e28b4d med aktuell main 41b2eb6d.
+- [x] Behåll båda oberoende tilläggen i tasks/todo.md. Produktkoden sammanfogas utan konflikt.
+- [x] Dokumentera tidigare inloggat persistensprov och återställt skapandedatum.
+- [x] 56 riktade kontrakt och separat typkontroll gröna före byggkontrollen.
+- [x] Rätta main-versionens otillåtna route-export i min-garanti; behåll värde och beräkning.
+- [x] Nytt produktionsbygge och adoption-provets 21 tester gröna efter exporträttningen.
+Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
+
+## PR #42 — andra main-sammanfogningen 2026-09-13
+
+- [x] Inventera main e51654f9 och PR-head b211b68a.
+- [x] Behåll både planeringsstart och Financial Kernel-kontraktet i ARCHITECTURE.md.
+- [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
+- Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
+Publicering och aktuell mergestatus dokumenteras i PR #42.
