@@ -52,6 +52,16 @@ test('Nordström El: session → navigering → valt utkast → återöppning', 
   const checkTenant = async () => verifyTenant(await json(await get('/api/me'), 'Sessionskontroll'), cfg)
   await checkTenant()
 
+  // Optional read-only activation proof for the authenticated pilot company.
+  if (process.env.LIVE_TEST_REPORT_PROJECT_ID) {
+    const projectId = process.env.LIVE_TEST_REPORT_PROJECT_ID
+    expect(projectId).toMatch(/^[a-zA-Z0-9_-]{1,128}$/)
+    const date = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Stockholm' }).format(new Date())
+    const reports = await json(await get(`/api/day-close?view=reports&projectId=${encodeURIComponent(projectId)}&date=${date}`), 'Rapportpilotens läsning')
+    expect(reports.enabled, 'Rapportkontinuitet ska vara aktiverad för testföretaget').toBe(true)
+    expect(Array.isArray(reports.reports)).toBe(true)
+  }
+
   const blocked = new Set<string>()
   await context.route('**/*', async route => {
     const r = route.request()

@@ -866,6 +866,9 @@ async function handleConfirmedExternalAction(
 
   const supabase = getServerSupabase()
   if (pending.workReport) {
+    if (pending.workReport.journal && !reportContinuityEnabled(businessId)) {
+      return NextResponse.json({error:'Återupptagning är inte aktiverad.'},{status:503})
+    }
     const user = await getCurrentUser(request, businessId)
     const response = await confirmWorkReport(pending, supabase, businessId, user, executeSharedTool)
     if (pending.threadId) await saveThreadMessage({ threadId: pending.threadId, businessId, role: 'assistant', agent: 'lars', content: response.reply })
@@ -1008,7 +1011,7 @@ export async function POST(request: NextRequest) {
     // Ett tappat HTTP-svar får inte starta om AI-turen. Mobilen återanvänder
     // samma beständiga UUID; om servern redan tog emot rapporten returneras
     // exakt den lagrade planen och en ny kortlivad granskningssignatur.
-    if (workReport && stableReportRequestId && reportContinuityEnabled()) {
+    if (workReport && stableReportRequestId && reportContinuityEnabled(businessId)) {
       const recovered = await recoverReportSessionForRequest(supabase,businessId,workReport,stableReportRequestId)
       if (recovered) {
         const pending = recovered.pending_confirmation
@@ -1453,7 +1456,7 @@ export async function POST(request: NextRequest) {
         if (workReport) {
           const action = prepareWorkReportAction(turn.pendingExternal.toolName, turn.pendingExternal.toolInput, workReport)
           await bokforMatteUsage(`matte_${thread?.id || businessId}_${Date.now()}`)
-          const pending = reportContinuityEnabled()
+          const pending = reportContinuityEnabled(businessId)
             ? await createReportSession(supabase,businessId,workReport,thread?.id || null,[action,...(turn.pendingExternal.remaining || [])],stableReportRequestId)
             : pendingWorkReport(action, workReport, businessId, thread?.id || null, turn.pendingExternal.remaining || [])
           return NextResponse.json({ messages: [], current_agent: 'lars', thread_id: thread?.id || null, reply: pending.summary, action: null, pending_confirmation: pending })
