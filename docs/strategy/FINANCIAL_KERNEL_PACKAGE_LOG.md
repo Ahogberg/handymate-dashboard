@@ -729,6 +729,22 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 | accepted | `fromLegacyNumber` interprets the number's shortest decimal representation (so `1.005` → `1.01` under HALF_UP, `0.1 + 0.2` → `0.30`). That is the right reading of a legacy `NUMERIC` column that passed through a JS number. Documented in the source. | — |
 | accepted | `equals`/`compare` throw on currency mismatch rather than returning `false`. Brief-mandated; a filter across currencies must group by currency first. | — |
 
+### C3 — outbox, leases, ordered ack (PR #54), Claude review 2026-09-14, orchestration §6 A + B + C
+
+Verified locally on `codex/financial-kernel-c3` head `671a831`: 12 outbox tests plus contract,
+C2, schema and account-deletion suites green (64); the three real-Postgres tests read and
+matched to their claims (advisory wait before seq allocation, single owner in a claim race,
+wall-clock lease expiry). No BLOCKER, no HIGH. Codex's deviations (attempt registered before
+the handler with `attempt_token`; `failures` separate from `attempts`; fail drops the lease;
+`clock_timestamp()`; status behind a text-returning RPC) are all improvements over the brief.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | A lease expiring mid-handler makes the next worker re-run the handler; the delivery ledger cannot protect the *side effect* because `delivered_at` is set only at ack. Requirement for C5: the bridge writes its own idempotency marker per `eventId` before firing anything, in the same transaction as ack when it writes to the database. Put the requirement in `bridge-automation.ts` and the C5 brief. | raised on PR #54; C5 requirement |
+| LOW | Handlers get no `AbortSignal`; on timeout they keep running in the background. | note for C5 |
+| LOW | `claim` counts the whole backlog to test emptiness; `EXISTS` suffices. | note |
+| LOW | PR #53 edits the same lines in `package.json`, `contracts.yml` and this file; merge #53 first, then bring main into #54. | process |
+
 ### C3 brief (first version), Codex review 2026-09-13 — two BLOCKERs, both accepted
 
 Codex reviewed Claude's C3 brief before implementing and reproduced two defects with runnable
