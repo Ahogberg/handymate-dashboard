@@ -2,7 +2,7 @@
   "artboards": [
     { "file": "Main.dc.html", "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Hero — desktop" },
     { "file": "Mobil.dc.html", "x": 1560, "y": 0, "w": 390, "h": 844, "title": "Hero — mobil" },
-    { "file": "Accounting.dc.html", "x": 0, "y": 1060, "w": 1440, "h": 620, "title": "Sektionen under heron" }
+    { "file": "Accounting.dc.html", "x": 0, "y": 1060, "w": 1440, "h": 520, "title": "Sektionen under heron" }
   ],
   "annotations": [
     { "id": "platsraknaren", "x": 0, "y": -150, "w": 460, "text": "Platsräknaren är en tweak här (tagna platser / totalt).\nI skarp drift måste talet komma från grinden — annars ingen siffra alls.\nMätt 2026-09-13: 1 av 20 tagna." },
