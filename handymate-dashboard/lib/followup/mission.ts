@@ -11,7 +11,7 @@ export async function attachMissionFollowups(db:SupabaseClient,businessId:string
  if(rows.error||runner.error||!Array.isArray(rows.data)||rows.data.length>50)throw Error('Uppdragets planerade uppföljningar kunde inte kontrolleras.')
  const healthy=runner.data?.enabled===true&&Date.parse(runner.data.last_tick_at)>Date.now()-300000
  const active=rows.data.filter(x=>['scheduled','prepared'].includes(x.state))
- const followups=rows.data.map(x=>({id:x.id,quoteId:x.quote_id,dueAt:x.due_at,label:followupLabels[x.state]||'Behöver kontrolleras',detail:followupReasons[x.reason||'']||'Kontrollen görs från den planerade tiden.'}))
+ const followups=rows.data.map(x=>({id:x.id,quoteId:x.quote_id,dueAt:x.due_at,state:x.state,label:followupLabels[x.state]||'Behöver kontrolleras',detail:followupReasons[x.reason||'']||'Kontrollen görs från den planerade tiden.'}))
  if(handover.state==='recorded'&&active.length)return {...handover,followups,headline:healthy?'Teamet har nästa steg planerat':'Nästa körning behöver kontrolleras',nextStep:healthy?'Daniel förbereder offertuppföljningarna vid de sparade tiderna. Du granskar innan SMS skickas.':'Planerna finns sparade, men körarens senaste kontroll är för gammal. Räkna inte med utförd uppföljning.',state:healthy?'recorded':'needs_attention'}
  return {...handover,followups}
 }

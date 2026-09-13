@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { getGoogleTokens, getCalendarList } from '@/lib/google-calendar'
+import { getGoogleTokens, getCalendarList, verifyGoogleRefreshAccount } from '@/lib/google-calendar'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser } from '@/lib/permissions'
+import { googleReconnection } from '@/lib/google/reconnection'
 import { verifyOAuthState } from '@/lib/google/oauth-state'
 
 export const dynamic = 'force-dynamic'
@@ -59,6 +61,11 @@ export async function GET(request: NextRequest) {
       return errorRedirect('Logga in på samma konto som startade Google-kopplingen och försök igen')
     }
 
+    const currentUser = await getCurrentUser(request, sessionBusiness.business_id)
+    if (!currentUser || currentUser.id !== state.user_id) {
+      return errorRedirect('Logga in som användaren som startade Google-kopplingen.')
+    }
+
     // Exchange code for tokens
     let tokens
     try {
@@ -83,16 +90,28 @@ export async function GET(request: NextRequest) {
     const supabase = getServerSupabase()
 
     // Check if connection already exists for this user
-    const { data: existing } = await supabase
+    const { data: existing, error: existingError } = await supabase
       .from('calendar_connection')
-      .select('id')
+      .select('id, account_email, refresh_token, calendar_id')
+      .eq('business_id', state.business_id)
       .eq('business_user_id', state.user_id)
       .eq('provider', 'google')
       .maybeSingle()
 
+    if (existingError) return errorRedirect('Kunde inte kontrollera befintlig Google-koppling.')
+    const retainedAccountVerified = !tokens.refresh_token && !!existing?.refresh_token
+      ? await verifyGoogleRefreshAccount(existing.refresh_token, tokens.subject) : false
+    let scopeFields
+    try {
+      scopeFields = googleReconnection({ email: tokens.email, refreshToken: tokens.refresh_token,
+        scopes: tokens.scopes, existing, retainedAccountVerified })
+    } catch (error) {
+      return errorRedirect(error instanceof Error ? error.message : 'Google-kopplingen kunde inte verifieras.')
+    }
+
     const coreFields = {
       account_email: tokens.email,
-      calendar_id: primaryCalendarId,
+      calendar_id: existing?.calendar_id || primaryCalendarId,
       access_token: tokens.access_token,
       token_expires_at: new Date(tokens.expiry_date).toISOString(),
     }
@@ -111,20 +130,19 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      // Endast kalenderscope begärs — Gmail kräver dyr säkerhetsaudit
-      const { error: updateErr } = await supabase
+      // Permissions are derived from verified Google token information.
+      const { data: updated, error: updateErr } = await supabase
         .from('calendar_connection')
-        .update({ ...coreFields, ...refreshTokenField, gmail_scope_granted: false, gmail_send_scope_granted: false })
+        .update({ ...coreFields, ...refreshTokenField, ...scopeFields })
         .eq('id', existing.id)
+        .eq('business_id', state.business_id)
+        .eq('business_user_id', state.user_id)
+        .eq('account_email', existing.account_email)
+        .select('id').maybeSingle()
 
+      if (!updated && !updateErr) return errorRedirect('Google-kopplingen ändrades under anslutningen. Försök igen.')
       if (updateErr) return errorRedirect('Kunde inte uppdatera anslutningen: ' + updateErr.message)
     } else {
-      if (!hasNewRefreshToken) {
-        console.warn('[google/callback] Ny koppling saknar refresh_token — kan inte förnyas automatiskt vid utgång', {
-          businessId: state.business_id,
-        })
-      }
-
       const id = `gcal_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
       const { error: insertErr } = await supabase
         .from('calendar_connection')
@@ -135,8 +153,7 @@ export async function GET(request: NextRequest) {
           provider: 'google',
           ...coreFields,
           ...refreshTokenField,
-          gmail_scope_granted: false,
-          gmail_send_scope_granted: false,
+          ...scopeFields,
         })
 
       if (insertErr) return errorRedirect('Kunde inte spara anslutningen: ' + insertErr.message)

@@ -370,12 +370,13 @@ test.describe('konsumenterna läser fail-safe', () => {
     expect(s).toContain('entity.confirmedFacts.length > 0')
   })
 
-  test('läs-API:et för kundkortet är fail-safe (try/catch → tom lista)', () => {
+  test('läs-API:et för kundkortet skiljer läsfel från verifierat tom lista', () => {
     const s = read('app/api/customers/[id]/facts/route.ts')
     expect(s).toContain('getAuthenticatedBusiness')
     expect(s).toContain('superseded_by')
     expect(s, 'inget try/catch runt frågan').toContain('catch')
-    expect(s).toContain('facts: []')
+    expect(s).toContain("{ error: 'Kundminnet kunde inte läsas.' }, { status: 500 }")
+    expect(s).not.toContain('facts: []')
   })
 
   test('tidslinjens källa har egen try/catch och rätt event-form', () => {

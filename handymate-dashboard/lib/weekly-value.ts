@@ -65,6 +65,7 @@ export async function getWeeklyValue(
   supabase: SupabaseClient,
   businessId: string,
   rangeDays: number = ROLLING_DAYS,
+  opts: { failOnReadError?: boolean } = {},
 ): Promise<WeeklyValue> {
   const sinceIso = new Date(Date.now() - rangeDays * 24 * 3600_000).toISOString()
 
@@ -97,6 +98,11 @@ export async function getWeeklyValue(
       .contains('context', { earned_autonomy: true }),
   ])
 
+  if (opts.failOnReadError) {
+    const readError = runsRes.error || logsRes.error || leadsRes.error || autonomousRes.error
+    if (readError) throw new Error(`weekly_value_read_failed: ${readError.message}`)
+  }
+
   const runs = runsRes.data || []
   const logs = logsRes.data || []
   const leads = leadsRes.data || []
@@ -123,7 +129,10 @@ export async function getWeeklyValue(
   // Händelser (accepterad offert / betald faktura) senaste 7 dagarna,
   // attribuerade till godkända outbound-kort. Bokningsattributioner (0 kr)
   // hålls utanför radlistan — de är händelser, inte kronor.
-  const recovered = await getRecoveredRevenue(supabase, businessId, { sinceDays: rangeDays })
+  const recovered = await getRecoveredRevenue(supabase, businessId, {
+    sinceDays: rangeDays,
+    failOnReadError: opts.failOnReadError,
+  })
   const confirmedItems: WeeklyValue['confirmed_items'] = recovered.attributions
     .filter((a) => a.amount_kr > 0)
     .map((a) => ({

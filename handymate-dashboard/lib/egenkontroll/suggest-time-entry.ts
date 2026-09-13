@@ -199,6 +199,32 @@ export function findProjectsMissingTimeEntry(
   return Array.from(byProject.values())
 }
 
+export type TimeEntryGapEvidence =
+  | { applicable: false; missing: false }
+  | { applicable: true; missing: boolean }
+
+/**
+ * Tolkar läsresultatet för en projektsidas gårdagskontroll.
+ * null betyder att någon av de nödvändiga läsningarna inte gick att bevisa.
+ */
+export function deriveTimeEntryGapEvidence(
+  bookings: BookingForTimeMatch[] | null,
+  timeEntries: TimeEntryForTimeMatch[] | null,
+  referenceDate: string,
+): TimeEntryGapEvidence | null {
+  if (bookings == null || timeEntries == null) return null
+
+  const applicable = bookings.some(
+    booking => !!booking.project_id && booking.job_status === COMPLETED_JOB_STATUS,
+  )
+  if (!applicable) return { applicable: false, missing: false }
+
+  return {
+    applicable: true,
+    missing: findProjectsMissingTimeEntry(bookings, timeEntries, referenceDate).length > 0,
+  }
+}
+
 function minutesBetween(startIso: string, endIso: string): number {
   const ms = new Date(endIso).getTime() - new Date(startIso).getTime()
   if (!Number.isFinite(ms) || ms <= 0) return 0

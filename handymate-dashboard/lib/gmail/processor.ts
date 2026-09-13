@@ -1,3 +1,4 @@
+import { findGmailMessage, gmailIdentity } from './message-identity'
 /**
  * Gmail inbound email processor.
  * Matches incoming mail to existing customers/leads, stores in email_conversations,
@@ -158,13 +159,7 @@ export async function processInboundEmail(
   // komplett för både agentkontext och ett framtida revisionsspår. Inga
   // events triggas för utgående — automationer ska reagera på KUNDENS mejl.
   if (isFromOwner(message, ownerEmail)) {
-    const { data: existingOut, error: duplicateError } = await supabase
-      .from('email_conversations')
-      .select('id')
-      .eq('business_id', businessId)
-      .eq('gmail_message_id', message.messageId)
-      .maybeSingle()
-    if (duplicateError) throw new Error('Tidigare mejl kunde inte kontrolleras.')
+    const existingOut = await findGmailMessage(supabase, businessId, ownerEmail, message.messageId)
     if (existingOut) return { stored: false, reason: 'duplicate' }
 
     const toEmail = extractEmail(message.to || '')
@@ -176,6 +171,7 @@ export async function processInboundEmail(
       business_id: businessId,
       gmail_thread_id: message.threadId,
       gmail_message_id: message.messageId,
+      ...gmailIdentity(ownerEmail, message.messageId),
       customer_id: match.customer_id,
       lead_id: match.lead_id,
       matched_by: `outbound_${match.matched_by}`,
@@ -194,14 +190,7 @@ export async function processInboundEmail(
   }
 
   // 2. Dedup check
-  const { data: existing, error: duplicateError } = await supabase
-    .from('email_conversations')
-    .select('id')
-    .eq('business_id', businessId)
-      .eq('gmail_message_id', message.messageId)
-    .maybeSingle()
-
-  if (duplicateError) throw new Error('Tidigare mejl kunde inte kontrolleras.')
+  const existing = await findGmailMessage(supabase, businessId, ownerEmail, message.messageId)
   if (existing) {
     return { stored: false, reason: 'duplicate' }
   }
@@ -237,6 +226,7 @@ export async function processInboundEmail(
       business_id: businessId,
       gmail_thread_id: message.threadId,
       gmail_message_id: message.messageId,
+      ...gmailIdentity(ownerEmail, message.messageId),
       customer_id: match.customer_id,
       lead_id: match.lead_id,
       matched_by: match.matched_by,

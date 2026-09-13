@@ -61,6 +61,20 @@ test.describe('tomt underlag', () => {
 })
 
 test.describe('uteslutning ur nämnaren', () => {
+  test('ingen tillämplig bokning utelämnar tidrapportdelen men markerar kontrollen bedömd', () => {
+    const r = beraknaFakturaberedskap(
+      input({ tidrapportGap: { applicable: false, missing: false }, milestones: delmoment(1, 2) }),
+    )
+    expect(r!.delar.map(d => d.key)).toEqual(['delmoment'])
+    expect(r!.tidrapportBedömd).toBe(true)
+  })
+
+  test('okänd tidrapportläsning kan inte ge ett fullständigt readiness-bevis', () => {
+    const r = beraknaFakturaberedskap(input({ milestones: delmoment(2, 2) }))
+    expect(r!.pct).toBe(100)
+    expect(r!.tidrapportBedömd).toBe(false)
+  })
+
   test('bara delmoment finns → en enda del, pct = andelen klara', () => {
     const r = beraknaFakturaberedskap(input({ milestones: delmoment(2, 4) }))
     expect(r).not.toBeNull()

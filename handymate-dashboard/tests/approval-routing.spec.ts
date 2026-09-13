@@ -52,10 +52,10 @@ test('project Fortnox sync requires a same-business owner/admin even on legacy a
 })
 
 test.describe('getRoutingBucket', () => {
-  test("okänd/ej listad approval_type → 'any'", () => {
-    expect(getRoutingBucket('send_sms')).toBe('any')
-    expect(getRoutingBucket('create_booking')).toBe('any')
-    expect(getRoutingBucket('nagot_helt_pahittat')).toBe('any')
+  test("okänd typ kräver ägare/admin; kända typer behåller sin grind", () => {
+    expect(getRoutingBucket('send_sms')).toBe('project_team')
+    expect(getRoutingBucket('create_booking')).toBe('owner_admin')
+    expect(getRoutingBucket('nagot_helt_pahittat')).toBe('owner_admin')
   })
 
   test('Etapp 3b: tabellen fylld — routade typer mappar till sina buckets', () => {
@@ -75,15 +75,13 @@ test.describe('getRoutingBucket', () => {
     // (se git-historik för denna fil om det behöver spåras).
     expect(getRoutingBucket('create_ata_draft')).toBe('project_team')
 
-    // Typer som planfilens fulla Etapp 3b-tabell pekar mot buckets som INTE
-    // finns i RoutingRole än (can_see_financials, can_create_invoices) är
-    // medvetet utanför denna körnings scope → oförändrat 'any'.
-    expect(getRoutingBucket('send_invoice')).toBe('any')
-    expect(getRoutingBucket('price_adjustment')).toBe('any')
+    // Ekonomikort täcks nu uttryckligen av rätt ekonomibehörighet.
+    expect(getRoutingBucket('send_invoice')).toBe('can_create_invoices')
+    expect(getRoutingBucket('price_adjustment')).toBe('can_see_financials')
   })
 
-  test('tom sträng → any', () => {
-    expect(getRoutingBucket('')).toBe('any')
+  test('tom sträng → owner_admin', () => {
+    expect(getRoutingBucket('')).toBe('owner_admin')
   })
 })
 
@@ -129,10 +127,10 @@ test.describe('canActOnApproval — four_eyes_quote självgodkännande-spärr', 
 })
 
 test.describe('canActOnApproval — bucket-grenar utan DB-behov', () => {
-  test("'any' → alltid true, oavsett behörigheter", () => {
+  test("legacy any ger inte medarbetare rätt att skicka projektlösa SMS", () => {
     const user = makeUser()
     const approval: ApprovalRoutingRow = { approval_type: 'send_sms', business_id: 'biz_1', routing_role: 'any' }
-    return canActOnApproval(null as any, user, approval).then((r) => expect(r).toBe(true))
+    return canActOnApproval(null as any, user, approval).then((r) => expect(r).toBe(false))
   })
 
   test("'owner_admin' → owner klarar", () => {
@@ -171,7 +169,7 @@ test.describe('canActOnApproval — bucket-grenar utan DB-behov', () => {
     expect(await canActOnApproval(null as any, cannotApprove, approval)).toBe(false)
   })
 
-  test("'project_team' → payload saknar project_id → true (kan inte routa mot namnlöst projekt)", () => {
+  test("project_team utan projekt nekas för medarbetare", () => {
     const user = makeUser()
     const approval: ApprovalRoutingRow = {
       approval_type: 'egenkontroll_foto',
@@ -179,7 +177,7 @@ test.describe('canActOnApproval — bucket-grenar utan DB-behov', () => {
       routing_role: 'project_team',
       payload: {},
     }
-    return canActOnApproval(null as any, user, approval).then((r) => expect(r).toBe(true))
+    return canActOnApproval(null as any, user, approval).then((r) => expect(r).toBe(false))
   })
 
   test("'project_team' → see_all_projects-behörighet klarar utan DB-anrop", () => {

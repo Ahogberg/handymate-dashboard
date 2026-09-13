@@ -1,3 +1,15 @@
+# PR #38 readiness-pass 2026-09-12
+
+- [x] Hämta aktuell main och PR #38, skapa separat arbetskopia och riktig merge.
+- [x] Bevara Brain Visibility-state, Mission Control först och båda grenarnas testlistor.
+- [x] Kör typkontroll, Home/Quote-kontrakt och produktionsbygge på kombinationen.
+- [x] Publicera synkad branch och verifiera samtliga PR-kontroller på kodversion 743a12679.
+- [x] Uppdatera Brain Visibility/release-bevis och redovisa kvarstående livegrindar.
+
+Review: 2 093 CI-kontrakt (en befintlig skip), samtliga fem workflows och båda previewbyggen gröna. Lokalt tsc/build exit 0, 58 Home/Quote-test och veckorapportharness godkända. Checklistseedningens äldre test uppdaterat till mains kodkälla. Liveförsök 34720493107 blockerat före login av Vercel SSO (302); release HOLD. Slutlig dokumentationshead kontrolleras separat före överlämning.
+
+Styrdokument: `docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md` i reporoten. Ingen ny feature eller produktionsrelease ingår.
+
 # Aktiv sprint 2026-09-09
 - [x] Gmail: avstängning, full sidläsning, stabil startpunkt och ingen cursor vid fel.
 - [x] Gmail: säkra dubblett-/kunduppslag och verifiera fel/återförsök i faktiska helpers.
@@ -1478,3 +1490,19 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 Färdig betyder att varje steg har en synlig nästa handling och en sparad kvittens.
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
 utskick, fakturasändning, main-merge eller produktionsmigration ingår.
+
+## Brain Visibility — projektbeslut 2026-09-10
+
+- [x] Inventera ProjectApprovalsBlock, ProjectTodoBlock och befintlig approvals-GET.
+- [x] Filtrera projekt före paginering med tenant/routing kvar.
+- [x] Visa laddning, läsfel, delvis lista och verifierat tomt läge sanningsenligt.
+- [x] Verifiera route, pagination och sena svar i isolerade regressioner, samt CI och inloggad preview med reload. Verkligt företagsbyte/mobil återstår.
+
+Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabeller, inga verkliga godkännanden eller utskick i testet.
+
+## Brain Visibility — projektkortens handlingar 2026-09-10
+
+- [x] Bekräfta gemensam approvalDisplay och faktisk review-preflight.
+- [x] Återanvänd gemensam presentation och ta bort obestyrkt sändningslöfte.
+- [x] Verifiera typetiketter/knappar med isolerade presentationsprov och typkontroll.
+- [ ] Publicera i PR38 och kontrollera verklig granskningsdialog utan att bekräfta sändning.

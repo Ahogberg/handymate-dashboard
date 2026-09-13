@@ -2,8 +2,6 @@ import { hydrateStandardProducts } from '@/lib/quotes/hydrate-standard-products'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { getFeatureLimit, PlanType } from '@/lib/feature-gates'
-import { getAllDefaultTemplateNames } from '@/lib/quote-template-defaults'
 
 // Auth via request.headers — kräver force-dynamic mot Full Route Cache
 // (2026-08-22-klassen, se CLAUDE.md).
@@ -67,29 +65,7 @@ export async function POST(request: NextRequest) {
 
     const supabase = getServerSupabase()
 
-    // Plan-based limit check. Seedade branschmallar (lib/quote-template-
-    // defaults.ts, hämtade via /api/quote-templates/seed — som inserterar
-    // direkt och alltså aldrig går via denna vakt) ska inte äta användarens
-    // kvot, annars blockeras "Spara som mall" direkt efter att man hämtat
-    // branschmallarna. Ingen ny DB-kolumn för detta (se plan-dokumentet) —
-    // vi räknar bort mallar vars namn matchar en känd seed-mall istället.
-    const plan = ((business as any).subscription_plan || 'starter') as PlanType
-    const limit = getFeatureLimit(plan, 'quote_templates')
-    if (limit !== null) {
-      const seedNames = new Set(getAllDefaultTemplateNames())
-      const { data: existingNames } = await supabase
-        .from('quote_templates')
-        .select('name')
-        .eq('business_id', business.business_id)
-      const nonSeedCount = (existingNames || []).filter((row: { name: string }) => !seedNames.has(row.name)).length
-      if (nonSeedCount >= limit) {
-        return NextResponse.json(
-          { error: `Maxgränsen på ${limit} offertmallar nådd. Uppgradera för obegränsat.` },
-          { status: 403 }
-        )
-      }
-    }
-
+    // Offertmallar har inget antalstak (Andreas 2026-09-11).
     const body = await request.json()
 
     const id = 'qtpl_' + Math.random().toString(36).substr(2, 9)

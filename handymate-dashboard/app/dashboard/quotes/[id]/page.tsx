@@ -522,7 +522,7 @@ export default function QuoteDetailPage() {
             plats på varje sida. Renderar null tills verklighetskontrollen
             säger att en rad är motiverad (utkast, ≥3 liknande jobb, varning). */}
         <DanielAgentrad quoteId={quoteId} quoteStatus={quote.status} />
-        <QuoteHandoff key={`${business.business_id}:${quoteId}`} quoteId={quoteId} revision={`${quote.status}:${quote.sent_at}`} />
+        <QuoteHandoff key={`${business.business_id}:${quoteId}`} businessId={business.business_id} quoteId={quoteId} revision={`${quote.status}:${quote.sent_at}`} />
 
         {/* ETAPP 4, punkt 1: dokumentet i centrum — bred vänsterkolumn för
             A4-dokumentet (samma motor/iframe som skaparen/PDF:en), smal

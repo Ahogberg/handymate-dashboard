@@ -12,6 +12,16 @@
 
 ## 0. Releasebeslut — sammanfattning
 
+### Tillägg 2026-09-12: PR #38 synkad och kodverifierad
+
+**Uppdatering 2026-09-13:** SSO-åtkomsten är löst för det godkända GitHub-lästestet. Körning `34721809781` når appen på `e44b2b71a` men stoppas före login av HTTP 503 från hälsorutten: den sparade kreditkontrollen rapporterar fel. Inga kundåtgärder gjorda. Se `docs/runbooks/NORDSTROM_EL_LIVE_TEST.md` för aktuell orsak och nästa steg. Vanlig CI och båda previewbyggen är gröna på testkoden; kundrese-/releasegrinden kvarstår.
+
+PR #38 inkluderar main `f709bbe15d8e6151b21a0fe51e8b7378423c2694` genom riktig merge. Kodversion `743a12679ff1a19c06ab3b43b0cc15dfbd727ae7` har alla fem PR-workflows och båda previewbyggen gröna. [Kontraktsgrinden](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720582150) verifierar bland annat 2 093 kontrakt (en befintlig skip), TypeScript och sex kundutfall. Lokalt produktionsbygge och 58 riktade Home/Quote-regressioner passerar. Mains borttagna checklistseedning är bevarad och dess äldre testkrav rättat.
+
+Den autentiserade resan är **inte godkänd**. [Läskörning 34720493107](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34720493107) stoppades före login: previewns hälsorutt omdirigerar till Vercels SSO. Inga appcredentials skickades eller kunddata skapades. Nästa förvillkor är godkänd previewåtkomst; se `docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`.
+
+Kodens integrationsgrind är grön. Release kvar på **HOLD**, och PR:n kvar som draft: live-/provider-, migrations- och mobilgrindarna är separata. Ingen merge eller produktionsdeploy gjord. Övriga uppgifter nedan är historisk inventering från 11 september och har inte omverifierats i detta avgränsade pass. Aktuella bevis och versionsreferenser finns i reporotens `docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md`, avsnitt 0.
+
 **Rekommendation: lansera inte hela produkten 14 september. Webben kan vara redo. iOS-appen kan det inte.**
 
 Den bindande begränsningen är varken kod eller Stripe. Den är Apples granskningstid:

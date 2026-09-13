@@ -40,6 +40,7 @@ export async function GET(request: NextRequest) {
     const status = request.nextUrl.searchParams.get('status') || 'pending'
     const approvalType = request.nextUrl.searchParams.get('approval_type')
     const recordingId = request.nextUrl.searchParams.get('recording_id')
+    const projectId = request.nextUrl.searchParams.get('project_id')
     const limitParam = request.nextUrl.searchParams.get('limit')
     const limit = limitParam ? Math.min(Math.max(parseInt(limitParam, 10) || 0, 1), 200) : 100
 
@@ -83,6 +84,10 @@ export async function GET(request: NextRequest) {
       query = query.eq('approval_type', approvalType)
     }
     if (recordingId) query = query.contains('payload', { recording_id: recordingId })
+    // Project Brain must page the project's rows, not page the tenant-wide
+    // queue and discard unrelated rows in the browser. Keep this before the
+    // query is awaited so PostgREST applies it before range pagination.
+    if (projectId) query = query.contains('payload', { project_id: projectId })
 
     const { data, error } = await query
 
