@@ -12,6 +12,7 @@
 - [`FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md`](FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md) — normative companion to the architecture's §20: automated shadow verification, the S1/S2 evidence split, divergence lifecycle, migration-readiness gate and the permanent Financial Integrity Engine. **§21 records which comparison levels are reachable with the current Fortnox OAuth grant — only Level 1 — and what the rest would cost.**
 - [`FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md`](FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md) — execution contract for how Codex and Claude divide, implement, review and merge Financial Kernel work. Mandatory reading for implementation agents.
 - [`FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md`](FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md) — permanent adversarial review record (2026-09-11). Its accepted findings are already normative in the two documents above; it preserves the reasoning so a constraint is not silently reversed. **Implementation agents do not need to read it.**
+- [`FINANCIAL_KERNEL_PACKAGE_LOG.md`](FINANCIAL_KERNEL_PACKAGE_LOG.md) — live package board, handoff blocks and the brief for the next implementation package. The canonical event catalogue, envelope rules, feature flags and module ownership live in `handymate-dashboard/ARCHITECTURE.md` §FK.0–FK.6 and are enforced by `tests/financial-kernel-event-contract.spec.ts`.
 
 ### Business / platform strategy
 
@@ -235,6 +236,10 @@ Taking a handful of pilot companies' running bookkeeping by hand, in the existin
 ### 2026-09-11 — Four decisions deliberately left open
 
 Merchant-of-record model, Pay-vs-Ledger sprint order, whether Handymate files the momsdeklaration, and the pilot cut-over fiscal-year boundary are recorded as open in `FINANCIAL_KERNEL_ARCHITECTURE.md` §38. Implementation agents state the blocker and stop rather than choosing a convenient answer.
+
+### 2026-09-13 — Financial event names are locked in ARCHITECTURE.md and enforced by CI
+
+Package C0 moved the Financial Kernel's 32 event names, envelope rules, nine per-business flags and module ownership into `handymate-dashboard/ARCHITECTURE.md` §FK.0–FK.6. From now on a kernel event name that is not in that table fails `test:contracts`. The blueprint proposes; ARCHITECTURE.md decides. Implementation starts with Codex Package C1 (Money) per `FINANCIAL_KERNEL_PACKAGE_LOG.md`; the PMF gate from orchestration §2 still governs anything that changes production behaviour.
 
 ### 2026-09-12 — Finished outcomes, not just AI tools
 
