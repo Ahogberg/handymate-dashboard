@@ -42,7 +42,7 @@ export async function loadQuoteSetup(db: SupabaseClient, businessId: string): Pr
     jobTypes: jobs.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.name.localeCompare(b.name, 'sv'))
       .map(j => ({ id: j.id, slug: j.slug, name: j.name })),
     templates: templates.map(toSetupTemplate).sort((a, b) => a.name.localeCompare(b.name, 'sv')),
-    products: products.map(p => ({ id: p.id, name: String(p.name || ''), unit: typeof p.unit === 'string' ? p.unit : '',
+    products: products.map(p => ({ id: p.id, category: p.category, laborShare: typeof p.default_labor_share === 'number' ? p.default_labor_share : null, name: String(p.name || ''), unit: typeof p.unit === 'string' ? p.unit : '',
       salesPrice: Number.isFinite(Number(p.sales_price)) && p.sales_price !== null ? Number(p.sales_price) : null })),
   }
 }

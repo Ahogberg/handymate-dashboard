@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       const names = Array.isArray(config?.specialties) && config.specialties.length ? config.specialties : (config?.services_offered || [])
       return NextResponse.json({ jobTypes: await ensureOnboardingJobTypes(db, business.business_id, names) })
     }
-    const template = await writeJobStandard(getServerSupabase(), business.business_id, body, (business as any).subscription_plan || 'starter')
+    const template = await writeJobStandard(getServerSupabase(), business.business_id, body)
     return NextResponse.json({ template })
   } catch (error) { return failure(error) }
 }

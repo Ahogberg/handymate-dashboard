@@ -20,6 +20,7 @@ const prepareContext = {exports:{},require(name){
   if(name.includes('artifact-write'))return {approvalArtifactId:()=> 'new'}
   if(name.includes('build-card'))return {normalizeDueDateIso:v=>v||null}
   if(name.includes('action-contract'))return {classify:()=> 'EXECUTABLE'}
+  if(name.includes('explainability'))return {withApprovalEvidence:prepared=>prepared}
   return {}
 }}
 vm.runInNewContext(compile(fs.readFileSync('lib/approvals/prepare-review.ts','utf8')),prepareContext)

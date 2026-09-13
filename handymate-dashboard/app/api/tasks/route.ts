@@ -3,7 +3,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { getCurrentUser } from '@/lib/permissions'
-import { resolveTaskScope, taskListOrFilter, canSeeTask, canEditTask } from '@/lib/tasks/visibility'
+import { resolveTaskScope, taskListOrFilter, taskPrivacyOrFilter, canSeeTask, canEditTask, type TaskScope } from '@/lib/tasks/visibility'
 
 // Helper: log task activity
 async function logTaskActivity(
@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
   const projectId = searchParams.get('project_id')
   const taskId = searchParams.get('id')
   const includeActivities = searchParams.get('include_activities') === 'true'
+  const openSummary = searchParams.get('open_summary') === 'true'
 
   // Single task with activities
   if (taskId && includeActivities) {
@@ -85,17 +86,33 @@ export async function GET(request: NextRequest) {
   // Nyckel-mixen i task-tabellen (Bee-buggfix): assigned_to = business_users.id,
   // created_by = auth user_id. Synlighetsregeln bor i lib/tasks/visibility.ts
   // (2026-08-28): ägare/admin ser allt, anställd ser egna + projekt hen leder.
-  const currentUser = await getCurrentUser(request).catch(() => null)
-  const scope = await resolveTaskScope(supabase, auth.business_id, currentUser ? { id: currentUser.id, role: currentUser.role } : null, userId)
+  let currentUser
+  try { currentUser = await getCurrentUser(request) } catch {
+    if (openSummary) return NextResponse.json({ error: 'Uppgiftsbehörigheten kunde inte kontrolleras.' }, { status: 503 })
+    currentUser = null
+  }
+  if (openSummary && !currentUser) return NextResponse.json({ error: 'Uppgiftsbehörigheten kunde inte kontrolleras.' }, { status: 503 })
+  let scope: TaskScope
+  try { scope = await resolveTaskScope(supabase, auth.business_id, currentUser ? { id: currentUser.id, role: currentUser.role } : null, userId, openSummary) } catch {
+    return NextResponse.json({ error: 'Uppgiftsbehörigheten kunde inte kontrolleras.' }, { status: 503 })
+  }
   const memberId = scope.memberId
 
   let query = supabase
     .from('task')
     .select('*')
     .eq('business_id', auth.business_id)
-    .order('created_at', { ascending: false })
 
-  if (status && status !== 'all') query = query.eq('status', status)
+  if (openSummary) {
+    query = query.in('status', ['pending', 'in_progress'])
+      .order('due_date', { ascending: true, nullsFirst: false })
+      .order('due_time', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true })
+  } else {
+    query = query.order('created_at', { ascending: false })
+  }
+
+  if (!openSummary && status && status !== 'all') query = query.eq('status', status)
   if (customerId) query = query.eq('customer_id', customerId)
   if (dealId) query = query.eq('deal_id', dealId)
   if (projectId) query = query.eq('project_id', projectId)
@@ -111,6 +128,7 @@ export async function GET(request: NextRequest) {
     const orFilter = taskListOrFilter(scope)
     if (orFilter) query = query.or(orFilter)
   }
+  if (openSummary) query = query.or(taskPrivacyOrFilter(scope)).limit(4)
 
   const { data, error } = await query
 
@@ -139,7 +157,9 @@ export async function GET(request: NextRequest) {
     assigned_user: t.assigned_to ? userMap[t.assigned_to] || null : null,
   }))
 
-  return NextResponse.json({ tasks: enrichedTasks, scope: scope.mode })
+  return NextResponse.json(openSummary
+    ? { tasks: enrichedTasks.slice(0, 3), has_more: enrichedTasks.length > 3, scope: scope.mode }
+    : { tasks: enrichedTasks, scope: scope.mode })
 }
 
 export async function POST(request: NextRequest) {

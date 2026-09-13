@@ -2,7 +2,8 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { Zap, Loader2, ArrowRight, Mail, Lock } from 'lucide-react'
+import Image from 'next/image'
+import { Loader2, ArrowRight, Mail, Lock } from 'lucide-react'
 
 function LoginForm() {
   const router = useRouter()
@@ -59,9 +60,7 @@ function LoginForm() {
         {/* Logo */}
         <div className="text-center mb-8">
           <a href="https://handymate.se" className="inline-block">
-            <div className="w-16 h-16 bg-primary-700 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary-600/10">
-              <Zap className="w-8 h-8 text-white" />
-            </div>
+            <Image src="/logo.png" alt="Handymate" width={112} height={112} priority className="mx-auto mb-2 object-contain" />
           </a>
           <h1 className="text-3xl font-bold text-gray-900">Logga in</h1>
           <p className="text-gray-500 mt-2">Välkommen tillbaka!</p>

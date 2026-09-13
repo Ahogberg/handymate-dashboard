@@ -3,6 +3,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { arTestNamn } from '@/lib/testdata'
 
+export const dynamic = 'force-dynamic'
+
 export async function GET(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -35,7 +37,7 @@ export async function GET(request: NextRequest) {
     const weekAgo = new Date()
     weekAgo.setDate(weekAgo.getDate() - 7)
 
-    const { data: pipelineActivities } = await supabase
+    const { data: pipelineActivities, error: pipelineError } = await supabase
       .from('pipeline_activity')
       .select('id, activity_type, description, triggered_by, ai_confidence, ai_reason, created_at')
       .eq('business_id', business.business_id)
@@ -44,9 +46,9 @@ export async function GET(request: NextRequest) {
       .order('created_at', { ascending: false })
       .limit(20)
 
-    const { data: commLogs } = await supabase
+    const { data: commLogs, error: commError } = await supabase
       .from('communication_log')
-      .select('id, channel, message, ai_reason, status, created_at')
+      .select('id, channel, message, status, created_at')
       .eq('business_id', business.business_id)
       .gte('created_at', weekAgo.toISOString())
       .order('created_at', { ascending: false })
@@ -93,6 +95,8 @@ export async function GET(request: NextRequest) {
         created_at: a.created_at,
         source: 'automation' as const,
         auto: true,
+        verified: a.automation_type === 'veckorapport' && a.status === 'success' && a.action === 'sent'
+          && typeof a.metadata?.elks_id === 'string' && a.metadata.elks_id.length > 0,
       })),
       ...(ruleLogs || []).map((a: any) => ({
         id: a.id,
@@ -104,6 +108,7 @@ export async function GET(request: NextRequest) {
         source: 'rule' as const,
         agent_id: a.agent_id || undefined,
         auto: !a.approval_id,
+        verified: false,
       })),
       ...(pipelineActivities || []).map((a: any) => ({
         id: a.id,
@@ -114,16 +119,18 @@ export async function GET(request: NextRequest) {
         created_at: a.created_at,
         source: 'pipeline' as const,
         auto: true,
+        verified: false,
       })),
       ...(commLogs || []).map((a: any) => ({
         id: a.id,
         type: 'sms',
         action: a.channel,
-        description: a.ai_reason || a.message?.substring(0, 80),
+        description: a.message?.substring(0, 80),
         status: a.status === 'sent' || a.status === 'delivered' ? 'success' : a.status === 'failed' ? 'failed' : 'skipped',
         created_at: a.created_at,
         source: 'communication' as const,
         auto: true,
+        verified: a.status === 'delivered',
       })),
     ]
 
@@ -134,7 +141,15 @@ export async function GET(request: NextRequest) {
     // de göms vid läsning så digest och Klart idag aldrig visar dem.
     const utanTestdata = merged.filter((r) => !arTestNamn(r.description))
 
-    return NextResponse.json({ data: utanTestdata.slice(0, limit) })
+    return NextResponse.json({
+      data: utanTestdata.slice(0, limit),
+      completeness: {
+        automation: 'complete',
+        rules: ruleErr ? 'unavailable' : 'complete',
+        pipeline: pipelineError ? 'unavailable' : 'complete',
+        communication: commError ? 'unavailable' : 'complete',
+      },
+    }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

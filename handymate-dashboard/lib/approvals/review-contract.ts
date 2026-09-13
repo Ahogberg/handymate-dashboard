@@ -1,3 +1,5 @@
+import type { ApprovalEvidence } from './explainability'
+
 /** Shared wire contract. No secret, database access or client-supplied preview. */
 export interface ApprovalReview {
   title: string
@@ -9,6 +11,7 @@ export interface ApprovalReview {
   open?: { label: string; path: string }
   choices?: { id: string; label: string; description: string; defaultSelected: boolean; required?: boolean }[]
   blockedReason?: string
+  evidence?: ApprovalEvidence
 }
 
 // Every mutation that does not yet have a complete execution-bound preview
@@ -21,13 +24,13 @@ export const REVIEWABLE_MESSAGE_TYPES = [
 ] as const
 
 export const INTERNAL_REVIEW: Record<string, { label: string; effect: string; required: string[]; fields: Record<string, string> }> = {
-  meeting_followup: { label: 'Skapa uppgiften', effect: 'Skapar en intern uppgift som hela teamet kan se.', required: ['title'], fields: { title: 'Uppgift', description: 'Beskrivning', source_text: 'Ur mötet', due_date: 'Senast', priority: 'Prioritet' } },
-  project_log_note: { label: 'Spara i dagboken', effect: 'Sparar samtalssammanfattningen i projektets dagbok.', required: ['project_id', 'recording_id', 'summary'], fields: { project_name: 'Projekt', summary: 'Anteckning', call_date: 'Samtalsdatum' } },
-  create_quote_draft: { label: 'Skapa offertutkast', effect: 'AI skapar och sparar ett offertutkast utifrån underlaget. Utkastet behöver granskas separat före utskick.', required: ['description'], fields: { description: 'Underlag', job_description: 'Arbete', customer_reply_pending: 'Kundens önskemål' } },
-  create_ata_draft: { label: 'Skapa ÄTA-utkast', effect: 'AI skapar ett ÄTA-utkast för projektet, eller ett offertutkast om projekt saknas. Utkastet behöver granskas separat före utskick.', required: ['description'], fields: { project_name: 'Projekt', description: 'Underlag', source_text: 'Källa' } },
-  price_adjustment: { label: 'Ändra timpriset', effect: 'Ersätter prislistans ordinarie timpris med det föreslagna priset.', required: ['price_list_id', 'suggested_rate'], fields: { price_list_name: 'Prislista', current_rate: 'Tidigare timpris', suggested_rate: 'Nytt timpris (kr)' } },
-  playbook_pattern_confirmation: { label: 'Spara företagets arbetssätt', effect: 'Sparar mönstret i företagets kunskap. Kan skapa ett separat förslag om att prova arbetssättet.', required: ['pattern_text', 'job_type'], fields: { job_type: 'Jobbtyp', pattern_text: 'Arbetssätt', sample_count: 'Antal underlag' } },
-  playbook_kickoff_suggestion: { label: 'Skapa kontrollpunkten', effect: 'Skapar en kontrollpunkt på projektet och kan koppla projektet till ett aktivt försök med arbetssättet.', required: ['project_id', 'pattern_text'], fields: { project_name: 'Projekt', job_type: 'Jobbtyp', pattern_text: 'Kontrollpunkt' } },
+  meeting_followup: { label: 'Skapa uppgiften', effect: 'När du bekräftar skapas en intern uppgift som hela teamet kan se.', required: ['title'], fields: { title: 'Uppgift', description: 'Beskrivning', source_text: 'Ur mötet', due_date: 'Senast', priority: 'Prioritet' } },
+  project_log_note: { label: 'Spara i dagboken', effect: 'När du bekräftar sparas samtalssammanfattningen i projektets dagbok.', required: ['project_id', 'recording_id', 'summary'], fields: { project_name: 'Projekt', summary: 'Anteckning', call_date: 'Samtalsdatum' } },
+  create_quote_draft: { label: 'Skapa offertutkast', effect: 'När du bekräftar skapar och sparar AI ett offertutkast utifrån underlaget. Utkastet behöver granskas separat före utskick.', required: ['description'], fields: { description: 'Underlag', job_description: 'Arbete', customer_reply_pending: 'Kundens önskemål' } },
+  create_ata_draft: { label: 'Skapa ÄTA-utkast', effect: 'När du bekräftar skapar AI ett ÄTA-utkast för projektet, eller ett offertutkast om projekt saknas. Utkastet behöver granskas separat före utskick.', required: ['description'], fields: { project_name: 'Projekt', description: 'Underlag', source_text: 'Källa' } },
+  price_adjustment: { label: 'Ändra timpriset', effect: 'När du bekräftar ersätts prislistans ordinarie timpris med det föreslagna priset.', required: ['price_list_id', 'suggested_rate'], fields: { price_list_name: 'Prislista', current_rate: 'Tidigare timpris', suggested_rate: 'Nytt timpris (kr)' } },
+  playbook_pattern_confirmation: { label: 'Spara företagets arbetssätt', effect: 'När du bekräftar sparas mönstret i företagets kunskap. Det kan skapa ett separat förslag om att prova arbetssättet.', required: ['pattern_text', 'job_type'], fields: { job_type: 'Jobbtyp', pattern_text: 'Arbetssätt', sample_count: 'Antal underlag' } },
+  playbook_kickoff_suggestion: { label: 'Skapa kontrollpunkten', effect: 'När du bekräftar skapas en kontrollpunkt på projektet, som kan kopplas till ett aktivt försök med arbetssättet.', required: ['project_id', 'pattern_text'], fields: { project_name: 'Projekt', job_type: 'Jobbtyp', pattern_text: 'Kontrollpunkt' } },
 }
 
 export function buildApprovalReview(approval: {
@@ -81,8 +84,8 @@ export function buildApprovalReview(approval: {
   review.messages = [{ channel: type === 'send_email' ? 'E-post' : 'SMS', recipients: recipients as string[], text,
     ...(typeof subject === 'string' ? { subject } : {}) }]
   review.effect = type === 'seasonal_campaign'
-    ? `Kampanjen köas för utskick via SMS till ${recipients.length} mottagare. Utskicket börjar vid nästa kampanjkörning.`
-    : `Meddelandet skickas nu via ${type === 'send_email' ? 'e-post' : 'SMS'}.`
+    ? `När du bekräftar köas kampanjen för utskick via SMS till ${recipients.length} mottagare. Utskicket börjar vid nästa kampanjkörning.`
+    : `När du bekräftar skickas meddelandet via ${type === 'send_email' ? 'e-post' : 'SMS'}.`
   review.confirmLabel = type === 'seasonal_campaign' ? 'Bekräfta och köa utskicket' : 'Bekräfta och skicka'
   return review
 }

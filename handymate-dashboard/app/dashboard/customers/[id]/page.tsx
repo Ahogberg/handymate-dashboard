@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft,
@@ -47,6 +47,8 @@ import { sendSiteVisitSms } from '@/lib/sms/site-visit-confirm'
 import Link from 'next/link'
 import CustomerTimeline from '@/components/CustomerTimeline'
 import CustomerPreparations from '@/components/customer-preparation/CustomerPreparations'
+import CustomerMemory from '@/components/customers/CustomerMemory'
+import CustomerOpenWorkSummary from '@/components/customers/CustomerOpenWorkSummary'
 import { CopyId } from '@/components/CopyId'
 import { normalizeSwedishPhone, formatSwedishPhone } from '@/lib/phone-normalize'
 import AddressAutocomplete from '@/components/AddressAutocomplete'
@@ -79,16 +81,6 @@ interface Customer {
   sms_opt_out?: boolean
   sms_opt_out_at?: string | null
   sms_opt_out_source?: string | null
-}
-
-interface CustomerFact {
-  id: string
-  fact_type: 'preference' | 'constraint' | 'commitment' | 'contact'
-  content: string
-  evidence_quote: string | null
-  confidence: number | null
-  created_at: string
-  confirmed_at: string | null
 }
 
 interface CustomerDocument {
@@ -216,15 +208,14 @@ interface AgreementType {
   is_active: boolean
 }
 
-// Customer Facts V1 — svenska badge-etiketter per fact_type, teal-tema.
-const FACT_TYPE_BADGE: Record<string, { label: string; className: string }> = {
-  preference: { label: 'Preferens', className: 'bg-teal-50 text-teal-700' },
-  constraint: { label: 'Förutsättning', className: 'bg-amber-50 text-amber-700' },
-  commitment: { label: 'Löfte', className: 'bg-primary-50 text-primary-700' },
-  contact: { label: 'Kontakt', className: 'bg-gray-100 text-gray-700' },
+export default function CustomerDetailPage() {
+  const params = useParams()
+  const business = useBusiness()
+  const customerId = (params as any)?.id as string
+  return <CustomerDetailContent key={`${business?.business_id || ''}:${customerId}`} />
 }
 
-export default function CustomerDetailPage() {
+function CustomerDetailContent() {
   const { openFilePreview } = useFilePreview()
   const params = useParams()
   const router = useRouter()
@@ -242,6 +233,8 @@ export default function CustomerDetailPage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [documents, setDocuments] = useState<CustomerDocument[]>([])
   const [loading, setLoading] = useState(true)
+  const [coreReadError, setCoreReadError] = useState(false)
+  const fetchSequence = useRef(0)
   const [activeTab, setActiveTab] = useState<'timeline' | 'bookings' | 'documents' | 'tasks' | 'projects'>(initialTab)
   const [projects, setProjects] = useState<Project[]>([])
   const [quotes, setQuotes] = useState<Quote[]>([])
@@ -249,7 +242,6 @@ export default function CustomerDetailPage() {
   const [deals, setDeals] = useState<Deal[]>([])
   const [serviceAgreements, setServiceAgreements] = useState<ServiceAgreement[]>([])
   const [referrals, setReferrals] = useState<{ leadsCount: number; wonDealsCount: number; wonValueSum: number } | null>(null)
-  const [customerFacts, setCustomerFacts] = useState<CustomerFact[]>([])
 
   // Edit mode
   const [isEditing, setIsEditing] = useState(false)
@@ -272,6 +264,7 @@ export default function CustomerDetailPage() {
   const [newTaskTitle, setNewTaskTitle] = useState('')
   const [newTaskDueDate, setNewTaskDueDate] = useState(() => new Date().toISOString().split('T')[0])
   const [taskSaving, setTaskSaving] = useState(false)
+  const [tasksReadError, setTasksReadError] = useState(false)
 
   // Timeline is now handled by CustomerTimeline component
 
@@ -287,44 +280,56 @@ export default function CustomerDetailPage() {
   }, [customerId])
 
   async function fetchData() {
+    const sequence = ++fetchSequence.current
+    setLoading(true)
+    setCoreReadError(false)
+    setCustomer(null); setActivities([]); setBookings([]); setProjects([]); setQuotes([]); setInvoices([]); setDeals([]); setTasks([]); setTasksReadError(false)
     // Hämta kund
-    const { data: customerData } = await supabase
+    const { data: customerData, error: customerError } = await supabase
       .from('customer')
       .select('*')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .single()
 
     // Hämta aktiviteter
-    const { data: activityData } = await supabase
+    const { data: activityData, error: activityError } = await supabase
       .from('customer_activity')
       .select('*')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
       .limit(50)
 
     // Hämta bokningar (direkt via kund + via kundens projekt)
-    const { data: bookingData } = await supabase
+    const { data: bookingData, error: bookingError } = await supabase
       .from('booking')
       .select('*')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .order('scheduled_start', { ascending: false })
 
     // Hämta projektbokningar som inte redan finns via customer_id
     // Sanering 2026-08-05: tabellen heter project (PK project_id) — det
     // gamla namnet projects gjorde att projektbokningar aldrig hittades.
-    const projectIds = (await supabase
+    const projectIdResult = await supabase
       .from('project')
       .select('id:project_id')
       .eq('customer_id', customerId)
-    ).data?.map((p: any) => p.id) || []
+      .eq('business_id', business.business_id)
+    const projectIds = projectIdResult.data?.map((p: any) => p.id) || []
 
     let projectBookings: any[] = []
+    let projectBookingError: unknown = null
     if (projectIds.length > 0) {
-      const { data: pb } = await supabase
+      const { data: pb, error: pbError } = await supabase
         .from('booking')
         .select('*')
         .in('project_id', projectIds)
+        .eq('business_id', business.business_id)
+        .is('customer_id', null)
         .order('scheduled_start', { ascending: false })
+      projectBookingError = pbError
       const existingIds = new Set((bookingData || []).map((b: any) => b.booking_id))
       projectBookings = (pb || []).filter((b: any) => !existingIds.has(b.booking_id))
     }
@@ -332,32 +337,39 @@ export default function CustomerDetailPage() {
       .sort((a: any, b: any) => new Date(b.scheduled_start).getTime() - new Date(a.scheduled_start).getTime())
 
     // Hämta projekt (project, inte projects; budget-kolumnen heter budget_amount)
-    const { data: projectData } = await supabase
+    const { data: projectData, error: projectError } = await supabase
       .from('project')
       .select('id:project_id, name, status, created_at, completed_at, budget:budget_amount')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
     // Hämta offerter
-    const { data: quoteData } = await supabase
+    const { data: quoteData, error: quoteError } = await supabase
       .from('quotes')
       .select('id:quote_id, title, status, total_amount:total, created_at, sent_at, signed_at, quote_number')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
     // Hämta fakturor
-    const { data: invoiceData } = await supabase
+    const { data: invoiceData, error: invoiceError } = await supabase
       .from('invoice')
       .select('id:invoice_id, invoice_number, status, total_amount:total, due_date, paid_at, created_at')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
 
     // Hämta deals
-    const { data: dealData } = await supabase
+    const { data: dealData, error: dealError } = await supabase
       .from('deal')
-      .select('id, title, stage_id, value, created_at, deal_number, stage:pipeline_stage(label, slug)')
+      .select('id, title, stage_id, value, created_at, deal_number, stage:pipeline_stage(label:name, slug)')
       .eq('customer_id', customerId)
+      .eq('business_id', business.business_id)
       .order('created_at', { ascending: false })
+
+    if (sequence !== fetchSequence.current) return
+    setCoreReadError(Boolean(customerError || activityError || bookingError || projectIdResult.error || projectBookingError || projectError || quoteError || invoiceError || dealError))
 
     setCustomer(customerData)
     setActivities(activityData || [])
@@ -415,6 +427,7 @@ export default function CustomerDetailPage() {
         }
       } catch { /* project_document table may not exist */ }
     }
+    if (sequence !== fetchSequence.current) return
     setDocuments(allDocs)
 
     // Fetch tasks
@@ -422,10 +435,10 @@ export default function CustomerDetailPage() {
       const taskRes = await fetch(`/api/tasks?customer_id=${customerId}`)
       if (taskRes.ok) {
         const taskData = await taskRes.json()
-        setTasks(taskData.tasks || [])
-      }
+        if (sequence === fetchSequence.current) setTasks(taskData.tasks || [])
+      } else if (sequence === fetchSequence.current) setTasksReadError(true)
     } catch {
-      // Tasks table may not exist yet
+      if (sequence === fetchSequence.current) setTasksReadError(true)
     }
 
     // Fetch referral attribution (nice-to-have — fail-soft till null döljer kortet)
@@ -433,31 +446,17 @@ export default function CustomerDetailPage() {
       const refRes = await fetch(`/api/customers/${customerId}/referrals`)
       if (refRes.ok) {
         const refData = await refRes.json()
-        setReferrals(refData)
+        if (sequence === fetchSequence.current) setReferrals(refData)
       } else {
-        setReferrals(null)
+        if (sequence === fetchSequence.current) setReferrals(null)
       }
     } catch {
-      setReferrals(null)
-    }
-
-    // Customer Facts V1 (2026-08-12): fail-soft precis som referrals — en
-    // tom lista döljer bara sektionen, kraschar aldrig kundkortet.
-    try {
-      const factsRes = await fetch(`/api/customers/${customerId}/facts`)
-      if (factsRes.ok) {
-        const factsData = await factsRes.json()
-        setCustomerFacts(factsData.facts || [])
-      } else {
-        setCustomerFacts([])
-      }
-    } catch {
-      setCustomerFacts([])
+      if (sequence === fetchSequence.current) setReferrals(null)
     }
 
     await fetchServiceAgreements()
 
-    setLoading(false)
+    if (sequence === fetchSequence.current) setLoading(false)
   }
 
   // Email threads and thread messages are now handled by CustomerTimeline component
@@ -644,25 +643,6 @@ export default function CustomerDetailPage() {
     fetchData()
   }
 
-  // Customer Facts V1 — "ta bort"-vägen (2026-08-12). Optimistisk borttagning
-  // ur listan direkt vid klick; misslyckas anropet rullas listan tillbaka och
-  // ett toast-fel visas. Servern sätter superseded_by till radens eget id
-  // (app/api/customers/[id]/facts/route.ts) — ingen hård DELETE.
-  async function deleteFact(factId: string) {
-    const tidigare = customerFacts
-    setCustomerFacts(tidigare.filter(f => f.id !== factId))
-    try {
-      const res = await fetch(`/api/customers/${customerId}/facts?factId=${factId}`, { method: 'DELETE' })
-      if (!res.ok) {
-        setCustomerFacts(tidigare)
-        mainToast.error('Kunde inte ta bort faktumet')
-      }
-    } catch {
-      setCustomerFacts(tidigare)
-      mainToast.error('Kunde inte ta bort faktumet')
-    }
-  }
-
   async function deleteDocument(docId: string) {
     if (!confirm('Ta bort detta dokument?')) return
     const doc = documents.find(d => d.id === docId)
@@ -770,7 +750,7 @@ export default function CustomerDetailPage() {
   if (!customer) {
     return (
       <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen flex items-center justify-center">
-        <div className="text-gray-500">Kunden hittades inte</div>
+        <div className="text-center text-gray-500"><p>{coreReadError ? 'Kunden kunde inte läsas.' : 'Kunden hittades inte'}</p>{coreReadError && <button type="button" onClick={fetchData} className="mt-2 min-h-11 font-semibold text-primary-700">Försök igen</button>}</div>
       </div>
     )
   }
@@ -782,6 +762,7 @@ export default function CustomerDetailPage() {
         <div className="absolute top-0 right-1/4 w-[500px] h-[500px] bg-primary-50 rounded-full blur-[128px]"></div>
         <div className="absolute bottom-1/4 left-1/4 w-[400px] h-[400px] bg-primary-50 rounded-full blur-[128px]"></div>
       </div>
+      {coreReadError && <div role="alert" className="relative z-10 mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">Delar av kundunderlaget kunde inte läsas. Antal och tomma listor kan inte bekräftas.<button type="button" onClick={fetchData} className="ml-2 min-h-11 font-semibold text-primary-700">Försök igen</button></div>}
 
       <div className="relative max-w-6xl mx-auto">
         {/* Header */}
@@ -874,58 +855,8 @@ export default function CustomerDetailPage() {
               </div>
             )}
 
-            {/* Det här vet Handymate — Customer Facts V1 (2026-08-12).
-                Explicit sagda kundfakta godkända via kort i Inkorgen.
-                Sektionen renderas inte alls när listan är tom. */}
-            {customerFacts.length > 0 && (
-              <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
-                <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-4">Det här vet Handymate</h2>
-                <div className="space-y-3">
-                  {customerFacts.map(fact => {
-                    const badge = FACT_TYPE_BADGE[fact.fact_type] || FACT_TYPE_BADGE.preference
-                    const datum = fact.confirmed_at || fact.created_at
-                    return (
-                      <div key={fact.id} className="p-3 bg-gray-50 rounded-xl group">
-                        <div className="flex items-center justify-between gap-2 mb-1.5">
-                          <div className="flex items-center gap-2">
-                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${badge.className}`}>
-                              {badge.label}
-                            </span>
-                            {datum && (
-                              <span className="text-xs text-gray-400">
-                                {new Date(datum).toLocaleDateString('sv-SE')}
-                              </span>
-                            )}
-                          </div>
-                          <button
-                            type="button"
-                            onClick={() => deleteFact(fact.id)}
-                            className="p-1 text-gray-300 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all min-w-[28px] min-h-[28px] flex items-center justify-center"
-                            title="Ta bort"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        <p className="text-sm text-gray-900">{fact.content}</p>
-                        {fact.evidence_quote && (
-                          // Explainability (2026-08-13): samma citat som redan visades,
-                          // bara tydligt märkt som BEVIS istället för en bar kursiv rad.
-                          // Visas fortfarande alltid — att gömma bakom ett expand/collapse
-                          // hade varit en transparens-regression, inte en förbättring.
-                          <div className="mt-2 pl-3 border-l-2 border-primary-200 bg-primary-50/40 rounded-r-lg py-1.5 pr-2">
-                            <p className="flex items-center gap-1 text-[10px] font-medium text-primary-700 uppercase tracking-wide mb-0.5">
-                              <MessageSquare className="w-3 h-3" />
-                              Varför vet Handymate detta?
-                            </p>
-                            <p className="text-xs text-gray-600 italic">"{fact.evidence_quote}"</p>
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              </div>
-            )}
+            <CustomerMemory key={`${business?.business_id || ''}:${customerId}`} customerId={customerId} />
+            <CustomerOpenWorkSummary key={`open:${business?.business_id || ''}:${customerId}`} customerId={customerId} />
 
             {/* Kundinfo */}
             <div className="bg-white rounded-xl border border-[#E2E8F0] p-4 sm:p-6">
@@ -1250,29 +1181,29 @@ export default function CustomerDetailPage() {
               
               <div className="grid grid-cols-2 gap-3">
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{projects.length}</p>
+                  <p className="text-xl font-bold text-gray-900">{coreReadError ? '—' : projects.length}</p>
                   <p className="text-xs text-gray-400">Projekt</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{quotes.length}</p>
+                  <p className="text-xl font-bold text-gray-900">{coreReadError ? '—' : quotes.length}</p>
                   <p className="text-xs text-gray-400">Offerter</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{invoices.length}</p>
+                  <p className="text-xl font-bold text-gray-900">{coreReadError ? '—' : invoices.length}</p>
                   <p className="text-xs text-gray-400">Fakturor</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
                   <p className="text-xl font-bold text-primary-700">
-                    {invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_amount || 0), 0).toLocaleString('sv-SE')} kr
+                    {coreReadError ? '—' : `${invoices.filter(i => i.status === 'paid').reduce((s, i) => s + (i.total_amount || 0), 0).toLocaleString('sv-SE')} kr`}
                   </p>
                   <p className="text-xs text-gray-400">Totalt betalt</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{bookings.length}</p>
+                  <p className="text-xl font-bold text-gray-900">{coreReadError ? '—' : bookings.length}</p>
                   <p className="text-xs text-gray-400">Bokningar</p>
                 </div>
                 <div className="p-3 bg-gray-50 rounded-xl text-center">
-                  <p className="text-xl font-bold text-gray-900">{activities.filter(a => a.activity_type.includes('call') || a.activity_type.includes('sms')).length}</p>
+                  <p className="text-xl font-bold text-gray-900">{coreReadError ? '—' : activities.filter(a => a.activity_type.includes('call') || a.activity_type.includes('sms')).length}</p>
                   <p className="text-xs text-gray-400">Kontakter</p>
                 </div>
               </div>
@@ -1301,7 +1232,7 @@ export default function CustomerDetailPage() {
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Bokningar ({bookings.length})
+                Bokningar ({coreReadError ? '—' : bookings.length})
               </button>
               <button
                 onClick={() => setActiveTab('documents')}
@@ -1321,7 +1252,7 @@ export default function CustomerDetailPage() {
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Projekt & Affärer ({projects.length + quotes.length + invoices.length})
+                Projekt & Affärer ({coreReadError ? '—' : projects.length + quotes.length + invoices.length})
               </button>
               <button
                 onClick={() => setActiveTab('tasks')}
@@ -1331,7 +1262,7 @@ export default function CustomerDetailPage() {
                     : 'bg-gray-100 text-gray-500 hover:text-gray-900'
                 }`}
               >
-                Uppgifter ({tasks.filter(t => t.status !== 'done').length})
+                Uppgifter ({tasksReadError ? '—' : tasks.filter(t => t.status !== 'done').length})
               </button>
             </div>
 
@@ -1362,10 +1293,10 @@ export default function CustomerDetailPage() {
                 {bookings.length === 0 ? (
                   <div className="p-8 text-center">
                     <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-400">Inga bokningar</p>
-                    <Link href="/dashboard/bookings" className="text-sm text-primary-700 hover:text-primary-700 mt-2 inline-block">
+                    <p className="text-gray-400">{coreReadError ? 'Bokningslistan kunde inte bekräftas' : 'Inga bokningar'}</p>
+                    {!coreReadError && <Link href="/dashboard/bookings" className="text-sm text-primary-700 hover:text-primary-700 mt-2 inline-block">
                       Skapa första bokningen →
-                    </Link>
+                    </Link>}
                   </div>
                 ) : (
                   <div className="divide-y divide-gray-200">
@@ -1561,7 +1492,7 @@ export default function CustomerDetailPage() {
                   </div>
                   {projects.length === 0 ? (
                     <div className="p-8 text-center">
-                      <p className="text-gray-400 text-sm">Inga projekt</p>
+                      <p className="text-gray-400 text-sm">{coreReadError ? 'Projektlistan kunde inte bekräftas' : 'Inga projekt'}</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-100">
@@ -1605,7 +1536,7 @@ export default function CustomerDetailPage() {
                   </div>
                   {quotes.length === 0 ? (
                     <div className="p-8 text-center">
-                      <p className="text-gray-400 text-sm">Inga offerter</p>
+                      <p className="text-gray-400 text-sm">{coreReadError ? 'Offertlistan kunde inte bekräftas' : 'Inga offerter'}</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-100">
@@ -1646,7 +1577,7 @@ export default function CustomerDetailPage() {
                   </div>
                   {invoices.length === 0 ? (
                     <div className="p-8 text-center">
-                      <p className="text-gray-400 text-sm">Inga fakturor</p>
+                      <p className="text-gray-400 text-sm">{coreReadError ? 'Fakturalistan kunde inte bekräftas' : 'Inga fakturor'}</p>
                     </div>
                   ) : (
                     <div className="divide-y divide-gray-100">
@@ -1714,7 +1645,7 @@ export default function CustomerDetailPage() {
                 {tasks.length === 0 ? (
                   <div className="p-8 text-center">
                     <CheckSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-400">Inga uppgifter ännu</p>
+                    <p className="text-gray-400">{tasksReadError ? 'Uppgiftslistan kunde inte läsas' : 'Inga uppgifter ännu'}</p>
                     <p className="text-xs text-gray-400 mt-1">Skapa en uppgift ovan för att komma igång</p>
                   </div>
                 ) : (

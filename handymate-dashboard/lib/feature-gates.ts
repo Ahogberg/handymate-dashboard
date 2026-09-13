@@ -160,7 +160,8 @@ export const FEATURE_GATES: Record<string, FeatureGate> = {
     key: 'quote_templates',
     name: 'Offertmallar',
     plans: ['starter', 'professional', 'business'],
-    limit: { starter: 5, professional: null, business: null },
+    // Andreas 2026-09-11: offertmallar har inget antalstak, även för legacy-konton.
+    limit: { starter: null, professional: null, business: null },
   },
   ai_photo_quote: {
     key: 'ai_photo_quote',

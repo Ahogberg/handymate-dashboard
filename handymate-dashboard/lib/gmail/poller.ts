@@ -1,3 +1,4 @@
+import { findGmailMessage } from './message-identity'
 /**
  * Gmail Polling Motor.
  * Polls Gmail API for new messages using History API (incremental)
@@ -174,9 +175,7 @@ export async function pollGmailForBusiness(
       await checkActive()
       // Previously stored messages need no provider/AI work on a retry. Scope
       // the evidence to this company; another company's row is not a receipt.
-      const { data: existing, error: existingError } = await supabase.from('email_conversations')
-        .select('id').eq('business_id', connection.business_id).eq('gmail_message_id', id).maybeSingle()
-      if (existingError) throw new Error('Tidigare sparade mejl kunde inte kontrolleras.')
+      const existing = await findGmailMessage(supabase, connection.business_id, connection.account_email, id)
       if (existing) { processed++; continue }
       let data
       try { ({ data } = await gmail.users.messages.get({ userId: 'me', id, format: 'full' })) }

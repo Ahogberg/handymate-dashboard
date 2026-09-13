@@ -6,6 +6,8 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
+import ts from 'typescript'
+import { NextRequest, NextResponse } from 'next/server'
 import {
   emptyTimelineProjectContext,
   resolveTimelineProject,
@@ -14,6 +16,30 @@ import { groupTimelineItemsByProject } from '../components/CustomerTimeline'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+
+function timelineGet(options: { smsError?: boolean; contextError?: boolean }) {
+  const booking = { booking_id: 'book-ok', business_id: 'tenant-a', customer_id: 'cust', project_id: null, status: 'confirmed', job_status: 'scheduled', notes: 'Besök', scheduled_start: '2026-09-12T10:00:00Z', completed_at: null, created_at: '2026-09-10T10:00:00Z' }
+  function query(table: string) {
+    let rows: any[] = table === 'customer' ? [{ customer_id: 'cust', business_id: 'tenant-a', phone_number: '+46700000000', email: null }] : table === 'booking' ? [booking] : []
+    let error: any = table === 'sms_conversation' && options.smsError ? { message: 'sms failed' } : table === 'project' && options.contextError ? { message: 'context failed' } : null
+    const q: any = {
+      select() { return q }, eq(key: string, value: unknown) { rows = rows.filter(row => row[key] === value); return q },
+      in(key: string, values: unknown[]) { rows = rows.filter(row => values.includes(row[key])); return q },
+      is(key: string, value: unknown) { rows = rows.filter(row => row[key] == value); return q }, not() { return q }, like() { return q }, or() { return q }, gte() { return q },
+      order() { return q }, limit(value: number) { rows = rows.slice(0, value); return q }, maybeSingle() { return Promise.resolve({ data: rows[0] || null, error }) }, single() { return Promise.resolve({ data: rows[0] || null, error }) },
+      then(resolve: (value: any) => void) { resolve({ data: rows, error }) },
+    }
+    return q
+  }
+  const code = ts.transpileModule(read('app/api/customers/[id]/timeline/route.ts'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
+  const deps: Record<string, any> = {
+    'next/server': { NextResponse }, '@/lib/auth': { getAuthenticatedBusiness: async () => ({ business_id: 'tenant-a' }) }, '@/lib/supabase': { getServerSupabase: () => ({ from: query }) },
+    '@/lib/voice/find-customer-by-phone': { phoneCandidates: (phone: string) => [phone] },
+    '@/lib/customers/timeline-project-context': { emptyTimelineProjectContext: () => ({ projects: {}, dealToProject: {}, leadToProject: {}, quoteToProject: {}, invoiceToProject: {}, bookingToProject: {} }), resolveTimelineProject: () => null },
+  }
+  const module = { exports: {} as any }; new Function('require', 'module', 'exports', code)((name: string) => deps[name], module, module.exports)
+  return module.exports.GET as (request: NextRequest, context: { params: { id: string } }) => Promise<Response>
+}
 
 function context() {
   const value = emptyTimelineProjectContext()
@@ -51,6 +77,19 @@ test.describe('projektresolvern är fail-closed', () => {
     expect(resolveTimelineProject({ project_id: 'proj_annan_tenant' }, ctx)).toBeNull()
     expect(resolveTimelineProject({}, ctx)).toBeNull()
   })
+})
+
+test('actual timeline GET retains a booking and reports a failed SMS source', async () => {
+  const response = await timelineGet({ smsError: true })(new NextRequest('https://test/api/customers/cust/timeline?filter=all'), { params: { id: 'cust' } })
+  expect(response.status).toBe(200)
+  const body = await response.json()
+  expect(body.events.some((event: any) => event.id === 'book_book-ok')).toBe(true)
+  expect(body.incomplete_sources).toContain('SMS-konversationer')
+})
+
+test('actual timeline GET fails closed when project context cannot be read', async () => {
+  const response = await timelineGet({ contextError: true })(new NextRequest('https://test/api/customers/cust/timeline?filter=all'), { params: { id: 'cust' } })
+  expect(response.status).toBe(503)
 })
 
 test('projektkontextens samtliga uppslag är tenant- och kundfiltrerade', () => {
@@ -106,4 +145,3 @@ test('projektgrupper sorteras på senaste aktivitet och övrig dialog ligger sis
   expect(groups[0].channels).toEqual(['E-post'])
   expect(groups[1].channels).toEqual(['SMS'])
 })
-

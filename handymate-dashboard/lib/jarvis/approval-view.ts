@@ -8,7 +8,7 @@
  * Rena funktioner — tests/approval-view.spec.ts.
  */
 
-import { classify } from '@/lib/approvals/action-contract'
+import { classify, type ActionClass } from '@/lib/approvals/action-contract'
 import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 
 interface ApprovalLike {
@@ -52,7 +52,7 @@ export const TYPE_LABEL: Record<string, string> = {
   send_invoice: 'Faktura',
   create_booking: 'Bokning',
   lead_review: 'Ny lead',
-  quote_nudge: 'Manuell åtgärd',
+  quote_nudge: 'Offertuppföljning',
   review_request: 'Recension',
   manual_project_create: 'Skapa projekt',
   autonomy_offer: 'Förtroende',
@@ -175,6 +175,7 @@ export interface ApprovalDisplay {
   type_label: string
   agent: string
   approve_label: string
+  action_class?: ActionClass | null
 }
 
 export function approvalDisplay(approval: ApprovalLike): ApprovalDisplay {
@@ -182,5 +183,6 @@ export function approvalDisplay(approval: ApprovalLike): ApprovalDisplay {
     type_label: typeLabel(approval.approval_type),
     agent: agentForApproval(approval),
     approve_label: approveLabel(approval.approval_type, approval.payload ?? null),
+    action_class: classify(approval.approval_type),
   }
 }

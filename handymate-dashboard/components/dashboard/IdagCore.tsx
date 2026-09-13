@@ -21,6 +21,8 @@ import { AGENT_INFO } from '@/components/dashboard/agentPersonas'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { approvalPreview, isEditable, buildApprovalEdit } from '@/lib/jarvis/approval-preview'
 import { cardContext } from '@/lib/jarvis/card-context'
+import { APPROVAL_EDIT_REVIEW_LABEL, AUTONOMY_REVIEW_LABEL, approvalPresentation } from '@/lib/approvals/presentation'
+import type { ApprovalDisplay } from '@/lib/jarvis/approval-view'
 
 /**
  * IdagCore — kärnstacken i nya Idag-vyn (2026-07-11, från Idag-vy.html-designen).
@@ -55,6 +57,7 @@ interface Approval {
   risk_level: string | null
   created_at: string
   expires_at: string
+  display?: ApprovalDisplay
 }
 
 interface DoneRow {
@@ -91,51 +94,12 @@ interface IdagCoreProps {
   economics: Economics | null
 }
 
-function getAgentKey(approval: Approval): string {
-  const routed = (approval.payload?.routed_agent as string) || (approval.payload?.agent_id as string) || null
-  if (routed && AGENT_INFO[routed]) return routed
-  const t = approval.approval_type
-  if (t.includes('invoice') || t.includes('payment') || t === 'profitability_warning') return 'karin'
-  if (t.includes('campaign') || t.includes('neighbour') || t.includes('reactivat') || t.includes('review')) return 'hanna'
-  if (t.includes('quote') || t.includes('lead') || t.includes('pipeline')) return 'daniel'
-  if (t.includes('booking') || t.includes('project') || t.includes('dispatch') || t.includes('job_report') || t.includes('warranty')) return 'lars'
-  if (t.includes('call') || t.includes('sms')) return 'lisa'
-  return 'matte'
-}
-
 function getRecipient(approval: Approval): string {
   const pl = approval.payload as any
   if (pl.customer_name) return String(pl.customer_name)
   if (pl.parsed?.name) return String(pl.parsed.name)
   if (pl.to) return String(pl.to)
   return ''
-}
-
-const TYPE_LABEL: Record<string, string> = {
-  send_sms: 'SMS',
-  send_quote: 'Offert',
-  send_invoice: 'Faktura',
-  create_booking: 'Bokning',
-  lead_review: 'Ny lead',
-  quote_nudge: 'Manuell åtgärd',
-  review_request: 'Recension',
-  manual_project_create: 'Skapa projekt',
-  autonomy_offer: 'Förtroende',
-  confirm_payment: 'Betalning',
-  review_auto_invoice: 'Faktura',
-  publish_microsite: 'Hemsida',
-  // Egenkontroll-agenten (etapp 1b, tasks/easoft-gap-plan.md).
-  egenkontroll_foto: 'Egenkontroll',
-  egenkontroll_avvikelse: 'Egenkontroll-avvikelse',
-  // Checklistförslag vid projektskapande (etapp 1d, tasks/easoft-gap-plan.md).
-  checklist_forslag: 'Checklista',
-  // Tidrapport-förslag (etapp 2a, tasks/easoft-gap-plan.md) — projektnivå,
-  // inte person (se lib/egenkontroll/suggest-time-entry.ts).
-  tidrapport_forslag: 'Tidrapport',
-  // Auto-offertutkast från kvalificerad lead (etapp 2a, tasks/value-chain-plan.md).
-  create_quote_draft: 'Offertutkast',
-  // ÄTA-kedjan (etapp 2b, tasks/value-chain-plan.md).
-  create_ata_draft: 'ÄTA-förslag',
 }
 
 function timeAgo(iso: string): string {
@@ -331,7 +295,7 @@ export default function IdagCore({
         }
       } | null
       const execution = result?.execution
-      const agentKey = getAgentKey(approval)
+      const agentKey = approvalPresentation(approval).agent
 
       // Ärendet är avgjort i DB — plocka bort från kö-listan på riktigt.
       setApprovals(prev => prev.filter(a => a.id !== approval.id))
@@ -531,9 +495,9 @@ export default function IdagCore({
                   onClick={() => setExpandedIds(prev => new Set(prev).add(approval.id))}
                   className="w-full bg-white border border-[#E2E8F0] rounded-xl px-4 py-3 min-h-[44px] flex items-center gap-3 text-left hover:border-primary-200 transition-colors"
                 >
-                  <AgentAvatar agentKey={getAgentKey(approval)} size="sm" />
+                  <AgentAvatar agentKey={approvalPresentation(approval).agent} size="sm" />
                   <span className="flex-1 min-w-0 text-sm text-gray-600 truncate">
-                    <b className="font-semibold text-gray-900">{AGENT_INFO[getAgentKey(approval)].name}</b>
+                    <b className="font-semibold text-gray-900">{AGENT_INFO[approvalPresentation(approval).agent].name}</b>
                     {' · '}{approval.title}
                   </span>
                   <ChevronDown className="w-4 h-4 text-gray-300 flex-shrink-0" />
@@ -768,14 +732,15 @@ function QueueCard({
   onApproveEdited: () => void
   onReject: () => void
 }) {
-  const agentKey = getAgentKey(approval)
+  const presentation = approvalPresentation(approval)
+  const agentKey = presentation.agent
   const agent = AGENT_INFO[agentKey]
   const isAutonomy = approval.approval_type === 'autonomy_offer'
   const preview = approvalPreview(approval).text
   const recipient = getRecipient(approval)
   const context = cardContext(approval.payload)
   const editable = isEditable(approval)
-  const label = TYPE_LABEL[approval.approval_type] || approval.approval_type
+  const label = presentation.type_label
 
   return (
     <div className={`rounded-xl border p-4 ${
@@ -786,7 +751,7 @@ function QueueCard({
       <div className="flex items-center gap-2.5 mb-2">
         <AgentAvatar agentKey={agentKey} />
         <span className="text-xs text-gray-500 flex-1 min-w-0 truncate">
-          <b className="font-semibold text-gray-900">{agent.name}</b> · {agent.role} föreslår
+          <b className="font-semibold text-gray-900">{agent.name}</b> · {agent.role}
         </span>
         <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-primary-50 text-primary-700">{label}</span>
         <span className="text-xs text-gray-400">{timeAgo(approval.created_at)}</span>
@@ -829,7 +794,7 @@ function QueueCard({
               className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               <Check className="w-4 h-4" />
-              Ja, kör automatiskt
+              {AUTONOMY_REVIEW_LABEL}
             </button>
             <button
               onClick={onReject}
@@ -845,7 +810,7 @@ function QueueCard({
               className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               <Check className="w-4 h-4" />
-              Spara &amp; godkänn
+              {APPROVAL_EDIT_REVIEW_LABEL}
             </button>
             <button
               onClick={onCancelEdit}
@@ -861,7 +826,7 @@ function QueueCard({
               className="inline-flex items-center gap-1.5 h-9 px-4 bg-primary-700 hover:bg-primary-800 text-white text-sm font-semibold rounded-lg transition-colors"
             >
               <Check className="w-4 h-4" />
-              Godkänn
+              {presentation.approve_label}
             </button>
             {editable && (
               <button
@@ -900,4 +865,3 @@ function QueueCard({
     </div>
   )
 }
-

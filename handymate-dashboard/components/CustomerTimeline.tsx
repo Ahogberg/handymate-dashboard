@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   PhoneIncoming,
   PhoneOutgoing,
@@ -133,6 +133,11 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
   const [events, setEvents] = useState<TimelineEvent[]>([])
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
+  const [readError, setReadError] = useState(false)
+  const [loadMoreError, setLoadMoreError] = useState(false)
+  const readSequence = useRef(0)
+  const activeRequest = useRef<AbortController | null>(null)
+  const [incompleteSources, setIncompleteSources] = useState<string[]>([])
   const [filter, setFilter] = useState<TimelineFilter>('all')
   const [view, setView] = useState<TimelineView>('projects')
   const [hasMore, setHasMore] = useState(false)
@@ -147,14 +152,20 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
   const [threadLoading, setThreadLoading] = useState(false)
 
   const fetchTimeline = useCallback(async (currentFilter: TimelineFilter, offset = 0) => {
+    const sequence = ++readSequence.current
+    activeRequest.current?.abort()
+    const controller = new AbortController()
+    activeRequest.current = controller
     const isMore = offset > 0
-    if (isMore) setLoadingMore(true)
-    else setLoading(true)
+    if (isMore) { setLoadingMore(true); setLoadMoreError(false) }
+    else { setLoading(true); setReadError(false); setLoadMoreError(false); setIncompleteSources([]) }
 
     try {
-      const res = await fetch(`/api/customers/${customerId}/timeline?filter=${currentFilter}&offset=${offset}&limit=${TIMELINE_PAGE_SIZE}`)
+      const res = await fetch(`/api/customers/${customerId}/timeline?filter=${currentFilter}&offset=${offset}&limit=${TIMELINE_PAGE_SIZE}`, { signal: controller.signal })
       if (!res.ok) throw new Error()
       const data = await res.json()
+      if (sequence !== readSequence.current) return
+      if (!Array.isArray(data.events) || !Array.isArray(data.incomplete_sources || [])) throw new Error()
 
       if (isMore) {
         setEvents(prev => [...prev, ...(data.events || [])])
@@ -163,11 +174,12 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
       }
       setHasMore(data.has_more || false)
       setTotal(data.total || 0)
+      setIncompleteSources(data.incomplete_sources || [])
     } catch {
-      if (!isMore) setEvents([])
+      if (sequence !== readSequence.current) return
+      if (!isMore) { setEvents([]); setReadError(true) } else setLoadMoreError(true)
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (sequence === readSequence.current) { setLoading(false); setLoadingMore(false) }
     }
   }, [customerId])
 
@@ -187,6 +199,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
   useEffect(() => {
     fetchTimeline(filter)
     if (customerEmail) fetchEmailThreads()
+    return () => { activeRequest.current?.abort(); readSequence.current += 1 }
   }, [filter, fetchTimeline, fetchEmailThreads, customerEmail])
 
   async function fetchThreadMsgs(threadId: string) {
@@ -343,6 +356,8 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
     )
   }
 
+  if (readError) return <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">Historiken kunde inte läsas.<button type="button" onClick={() => fetchTimeline(filter)} className="ml-2 min-h-11 font-semibold text-primary-700">Försök igen</button></div>
+
   return (
     <div className="space-y-3">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
@@ -351,7 +366,7 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
           <p className="text-xs text-gray-500 mt-0.5">
             {view === 'projects'
               ? 'Samlat per projekt när kopplingen kan bevisas.'
-              : 'Alla händelser i tidsordning.'}
+              : 'Hämtade händelser i tidsordning.'}
           </p>
         </div>
         <div className="inline-flex self-start rounded-xl border border-gray-200 bg-gray-50 p-1" aria-label="Välj tidslinjevy">
@@ -379,6 +394,8 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
           </button>
         </div>
       </div>
+      {incompleteSources.length > 0 && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Delar av historiken kunde inte läsas. Visade händelser är tillgängliga, men listan är inte komplett.</div>}
+      {loadMoreError && <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">Fler händelser kunde inte läsas.<button type="button" onClick={() => fetchTimeline(filter, events.length)} className="ml-2 min-h-11 font-semibold text-primary-700">Försök igen</button></div>}
 
       {/* Filters */}
       <div className="flex gap-1.5 flex-wrap">

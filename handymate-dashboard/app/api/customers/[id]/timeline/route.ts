@@ -38,14 +38,16 @@ export async function GET(
 
   const supabase = getServerSupabase()
   const events: TimelineEvent[] = []
+  const incompleteSources: string[] = []
 
   // Fetch customer phone for SMS matching
-  const { data: customer } = await supabase
+  const { data: customer, error: customerError } = await supabase
     .from('customer')
     .select('phone_number, email')
     .eq('customer_id', customerId)
     .eq('business_id', businessId)
     .single()
+  if (customerError || !customer) return NextResponse.json({ error: 'Kundens historik kunde inte läsas.' }, { status: customerError?.code === 'PGRST116' ? 404 : 503 })
 
   const customerPhone = customer?.phone_number || null
   // Kundminne-revisionen (2026-09-02, gap 1): skrivarna sparar alltid E.164,
@@ -88,6 +90,9 @@ export async function GET(
       .eq('customer_id', customerId)
       .limit(100),
   ])
+  if ([projectContextRows, dealContextRows, quoteContextRows, invoiceContextRows, bookingContextRows].some(result => result.error)) {
+    return NextResponse.json({ error: 'Kundens projektkopplingar kunde inte läsas.' }, { status: 503 })
+  }
 
   const projectContext = emptyTimelineProjectContext()
   for (const project of projectContextRows.data || []) {
@@ -132,7 +137,8 @@ export async function GET(
     else if (filter === 'sms') actQuery = actQuery.like('activity_type', 'sms_%')
     else if (filter === 'notes') actQuery = actQuery.eq('activity_type', 'note_added')
 
-    const { data: acts } = await actQuery
+    const { data: acts, error: actsError } = await actQuery
+    if (actsError) incompleteSources.push('Samtal, SMS och anteckningar')
 
     for (const a of acts || []) {
       events.push({
@@ -154,13 +160,14 @@ export async function GET(
 
   // ── 2. sms_conversation — SMS history ─────────────────────────
   if ((filter === 'all' || filter === 'sms') && smsPhoneCandidates.length > 0) {
-    const { data: smsRows } = await supabase
+    const { data: smsRows, error: smsRowsError } = await supabase
       .from('sms_conversation')
       .select('id, role, content, created_at')
       .eq('business_id', businessId)
       .in('phone_number', smsPhoneCandidates)
       .order('created_at', { ascending: false })
       .limit(50)
+    if (smsRowsError) incompleteSources.push('SMS-konversationer')
 
     for (const s of smsRows || []) {
       events.push({
@@ -176,13 +183,14 @@ export async function GET(
 
   // ── 3. conversations (vapi/46elks) ────────────────────────────
   if (filter === 'all' || filter === 'calls') {
-    const { data: convos } = await supabase
+    const { data: convos, error: convosError } = await supabase
       .from('conversations')
       .select('conversation_id, type, phone_number, content, metadata, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(30)
+    if (convosError) incompleteSources.push('Konversationer')
 
     for (const c of convos || []) {
       events.push({
@@ -205,7 +213,7 @@ export async function GET(
 
   // ── 3b. call_recording — riktiga samtal + platsbesök/möten ────
   if (filter === 'all' || filter === 'calls') {
-    const { data: recordings } = await supabase
+    const { data: recordings, error: recordingsError } = await supabase
       .from('call_recording')
       // v180 project_id is optional during manual deployment; DTO below is explicit.
       .select('*')
@@ -213,6 +221,7 @@ export async function GET(
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(30)
+    if (recordingsError) incompleteSources.push('Inspelade samtal och möten')
 
     for (const r of recordings || []) {
       const arMote = r.source === 'site_visit'
@@ -236,13 +245,14 @@ export async function GET(
 
   // ── 3c. email_conversations — e-post, båda riktningar ─────────
   if ((filter === 'all' || filter === 'email') ) {
-    const { data: emails } = await supabase
+    const { data: emails, error: emailsError } = await supabase
       .from('email_conversations')
       .select('id, direction, subject, body_text, received_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('received_at', { ascending: false })
       .limit(50)
+    if (emailsError) incompleteSources.push('E-post')
 
     for (const e of emails || []) {
       const utgaende = e.direction === 'outbound'
@@ -259,13 +269,14 @@ export async function GET(
 
   // ── 3d. customer_message — portal-tråden ──────────────────────
   if (filter === 'all' || filter === 'portal') {
-    const { data: portalMsgs } = await supabase
+    const { data: portalMsgs, error: portalMsgsError } = await supabase
       .from('customer_message')
       .select('id, direction, message, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(50)
+    if (portalMsgsError) incompleteSources.push('Portalmeddelanden')
 
     for (const p of portalMsgs || []) {
       const utgaende = p.direction === 'outbound'
@@ -285,7 +296,7 @@ export async function GET(
   // samma utskick även i sms_conversation; dubbletten tas bort mekaniskt
   // längre ned så den mer precisa sms_log-raden (med projektkedja) vinner.
   if ((filter === 'all' || filter === 'sms')) {
-    const { data: smsLogRows } = await supabase
+    const { data: smsLogRows, error: smsLogRowsError } = await supabase
       .from('sms_log')
       .select('sms_id, message, message_type, related_id, status, sent_at')
       .eq('business_id', businessId)
@@ -294,6 +305,7 @@ export async function GET(
       .in('status', ['sent', 'delivered'])
       .order('sent_at', { ascending: false })
       .limit(50)
+    if (smsLogRowsError) incompleteSources.push('Utgående SMS')
 
     for (const s of smsLogRows || []) {
       events.push({
@@ -314,15 +326,16 @@ export async function GET(
 
   // ── 3f. quote_tracking_events — kunden öppnade offerten ───────
   if (filter === 'all' || filter === 'quotes') {
-    const { data: quoteIdRows } = await supabase
+    const { data: quoteIdRows, error: quoteIdRowsError } = await supabase
       .from('quotes')
       .select('quote_id, quote_number')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
+    if (quoteIdRowsError) incompleteSources.push('Offertöppningar')
     const quoteIds = (quoteIdRows || []).map((q: any) => q.quote_id)
     if (quoteIds.length > 0) {
       const nummerAv = new Map((quoteIdRows || []).map((q: any) => [q.quote_id, q.quote_number]))
-      const { data: views } = await supabase
+      const { data: views, error: viewsError } = await supabase
         .from('quote_tracking_events')
         .select('id, quote_id, event_type, created_at')
         .eq('business_id', businessId)
@@ -330,6 +343,7 @@ export async function GET(
         .eq('event_type', 'opened')
         .order('created_at', { ascending: false })
         .limit(30)
+      if (viewsError) incompleteSources.push('Offertöppningar')
       for (const v of views || []) {
         events.push({
           id: `qtrack_${v.id}`,
@@ -352,13 +366,14 @@ export async function GET(
       customerPhone ? `visitor_phone.eq.${customerPhone}` : null,
       customer?.email ? `visitor_email.eq.${customer.email}` : null,
     ].filter(Boolean).join(',')
-    const { data: widgetConvos } = await supabase
+    const { data: widgetConvos, error: widgetConvosError } = await supabase
       .from('widget_conversation')
       .select('id, messages, message_count, created_at')
       .eq('business_id', businessId)
       .or(orVillkor)
       .order('created_at', { ascending: false })
       .limit(5)
+    if (widgetConvosError) incompleteSources.push('Webbchatt')
 
     for (const w of widgetConvos || []) {
       const msgs = Array.isArray(w.messages) ? w.messages : []
@@ -379,13 +394,14 @@ export async function GET(
 
   // ── 4. quotes — Offerter ──────────────────────────────────────
   if (filter === 'all' || filter === 'quotes') {
-    const { data: quotes } = await supabase
+    const { data: quotes, error: quotesError } = await supabase
       .from('quotes')
       .select('quote_id, status, total, customer_pays, rot_rut_type, valid_until, created_at, sent_at, accepted_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (quotesError) incompleteSources.push('Offerter')
 
     for (const q of quotes || []) {
       // Creation event
@@ -444,13 +460,14 @@ export async function GET(
 
   // ── 5. invoices — Fakturor ────────────────────────────────────
   if (filter === 'all' || filter === 'invoices') {
-    const { data: invoices } = await supabase
+    const { data: invoices, error: invoicesError } = await supabase
       .from('invoice')
       .select('invoice_id, invoice_number, project_id, status, total, due_date, rot_rut_type, created_at, sent_at, paid_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (invoicesError) incompleteSources.push('Fakturor')
 
     for (const inv of invoices || []) {
       events.push({
@@ -497,13 +514,14 @@ export async function GET(
 
   // ── 6. bookings — Bokningar ───────────────────────────────────
   if (filter === 'all' || filter === 'bookings') {
-    const { data: bookingRows } = await supabase
+    const { data: bookingRows, error: bookingRowsError } = await supabase
       .from('booking')
       .select('booking_id, project_id, status, job_status, notes, scheduled_start, completed_at, created_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (bookingRowsError) incompleteSources.push('Bokningar')
 
     for (const b of bookingRows || []) {
       events.push({
@@ -530,13 +548,14 @@ export async function GET(
 
   // ── 7. leads — Lead-händelser ─────────────────────────────────
   if (filter === 'all' || filter === 'leads') {
-    const { data: leads } = await supabase
+    const { data: leads, error: leadsError } = await supabase
       .from('leads')
       .select('lead_id, status, score, urgency, job_type, source, notes, created_at, converted_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(10)
+    if (leadsError) incompleteSources.push('Leads')
 
     for (const l of leads || []) {
       // Kundminne-revisionen (2026-09-02, gap 5): kundens egna ord från
@@ -569,21 +588,23 @@ export async function GET(
   // ── 8. lead_activities ────────────────────────────────────────
   if (filter === 'all' || filter === 'leads') {
     // Get lead IDs for this customer
-    const { data: customerLeads } = await supabase
+    const { data: customerLeads, error: customerLeadsError } = await supabase
       .from('leads')
       .select('lead_id')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
 
     const leadIds = (customerLeads || []).map((l: any) => l.lead_id)
+    if (customerLeadsError) incompleteSources.push('Leadkopplingar')
 
     if (leadIds.length > 0) {
-      const { data: leadActs } = await supabase
+      const { data: leadActs, error: leadActsError } = await supabase
         .from('lead_activities')
         .select('activity_id, lead_id, activity_type, description, metadata, created_at')
         .in('lead_id', leadIds)
         .order('created_at', { ascending: false })
         .limit(30)
+      if (leadActsError) incompleteSources.push('Leadhistorik')
 
       for (const la of leadActs || []) {
         events.push({
@@ -601,12 +622,13 @@ export async function GET(
   // ── 9. agent_runs — Agent-actions ─────────────────────────────
   if (filter === 'all' || filter === 'agent') {
     // Agent runs linked via conversations or trigger_data
-    const { data: agentRuns } = await supabase
+    const { data: agentRuns, error: agentRunsError } = await supabase
       .from('agent_runs')
       .select('run_id, trigger_type, trigger_data, final_response, tool_calls, duration_ms, created_at')
       .eq('business_id', businessId)
       .order('created_at', { ascending: false })
       .limit(50)
+    if (agentRunsError) incompleteSources.push('Agenthistorik')
 
     for (const ar of agentRuns || []) {
       // Check if agent run relates to this customer
@@ -640,7 +662,7 @@ export async function GET(
 
   // ── 10. time_entry — Tidrapportering ──────────────────────────
   if (filter === 'all' || filter === 'time') {
-    const { data: timeEntries } = await supabase
+    const { data: timeEntries, error: timeEntriesError } = await supabase
       .from('time_entry')
       // `notes:description` — ALIAS. Tabellen har `description`, aldrig `notes`
       // (sql/new_tables.sql:14). Frågan bad om `notes`, PostgREST svarade 42703,
@@ -651,6 +673,7 @@ export async function GET(
       .eq('customer_id', customerId)
       .order('work_date', { ascending: false })
       .limit(20)
+    if (timeEntriesError) incompleteSources.push('Tidrapporter')
 
     for (const te of timeEntries || []) {
       const hours = te.duration_minutes ? Math.floor(te.duration_minutes / 60) : 0
@@ -677,13 +700,14 @@ export async function GET(
   if (filter === 'all' || filter === 'projects') {
     // Sanering 2026-08-05: project (PK project_id, budget_amount) — gamla
     // namnet projects gjorde att projekt-händelser aldrig syntes i timelinen.
-    const { data: projects } = await supabase
+    const { data: projects, error: projectsError } = await supabase
       .from('project')
       .select('id:project_id, name, status, created_at, completed_at, budget:budget_amount')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (projectsError) incompleteSources.push('Projekt')
 
     for (const p of projects || []) {
       events.push({
@@ -724,6 +748,7 @@ export async function GET(
         .limit(20)
 
       if (logErr) console.error('[timeline] byggdagbok:', logErr.message)
+      if (logErr) incompleteSources.push('Byggdagbok')
 
       for (const le of logEntries || []) {
         const proj = (projects || []).find((p: any) => p.id === le.order_id)
@@ -742,13 +767,14 @@ export async function GET(
 
   // ── 12. deals — Pipeline-händelser ──────────────────────────
   if (filter === 'all' || filter === 'leads') {
-    const { data: dealRows } = await supabase
+    const { data: dealRows, error: dealRowsError } = await supabase
       .from('deal')
       .select('id, title, deal_number, stage_id, value, created_at, stage:pipeline_stage(name)')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .order('created_at', { ascending: false })
       .limit(10)
+    if (dealRowsError) incompleteSources.push('Affärer')
 
     for (const d of dealRows || []) {
       events.push({
@@ -785,6 +811,7 @@ export async function GET(
       ])
 
       if (actsRes.error) console.error('[timeline] ärendehändelser:', actsRes.error.message)
+      if (actsRes.error || stagesRes.error) incompleteSources.push('Ärendehistorik')
 
       const stegNamn = new Map<string, string>(
         (stagesRes.data || []).map((s: any) => [s.id, s.name]),
@@ -825,6 +852,7 @@ export async function GET(
 
       if (factsErr) {
         console.error('[timeline] kundfakta:', factsErr.message)
+        incompleteSources.push('Kundfakta')
       } else {
         for (const f of facts || []) {
           events.push({
@@ -839,6 +867,7 @@ export async function GET(
       }
     } catch (err) {
       console.error('[timeline] kundfakta oväntat fel:', err)
+      incompleteSources.push('Kundfakta')
     }
   }
 
@@ -880,6 +909,7 @@ export async function GET(
     offset,
     limit,
     has_more: offset + limit < total,
+    incomplete_sources: Array.from(new Set(incompleteSources)),
   })
 }
 

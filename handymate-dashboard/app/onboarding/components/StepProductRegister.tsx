@@ -173,7 +173,7 @@ export default function StepProductRegister({ onFirstQuote, onNext, onBack, data
 
             {error && <FallbackNote text={error} />}
 
-            <JobTypeQuoteSetup syncOnboarding initialJobTypes={data.quoteJobTypes?.length ? data.quoteJobTypes : (data.specialties || []).map(slugifyJobType)} initialSelection={data.firstQuoteSelection}
+            <JobTypeQuoteSetup trade={data.trade} syncOnboarding initialJobTypes={data.quoteJobTypes?.length ? data.quoteJobTypes : (data.specialties || []).map(slugifyJobType)} initialSelection={data.firstQuoteSelection}
               refreshKey={setupRefresh} onBusyChange={setSetupBusy} onChange={(selection, jobTypes) => setData(d => ({ ...d, quoteJobTypes: jobTypes, firstQuoteSelection: selection }))} />
 
             <button type="button" className="obi-choice" onClick={() => setShowCatalog(true)} style={{ marginBottom: 12 }}>
