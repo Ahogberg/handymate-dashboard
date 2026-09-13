@@ -31,8 +31,8 @@ Rules that keep this file honest:
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
 | C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema + append RPC | Codex | **reviewed — all three findings corrected** | migration unapplied |
-| C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
+| C2 | `financial_events` schema + append RPC | Codex | **done 2026-09-13** (PR #50 merged; HIGH + 2 MEDIUM corrected; migration not yet applied to any environment) | — |
+| C3 | Outbox/inbox/idempotency primitives | Codex | **ready — brief in §3** | — |
 | C4 | Receivables + allocations behind flag | Codex | not started | C1, C2, C3 |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
 | C5 | `applyInvoicePayment()` compatibility facade | Codex | not started | C4 |
@@ -280,10 +280,11 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 ## 3. Next package — Codex brief: C3 outbox, inbox and consumer cursors
 
 > The C2 brief (proposed DDL, track A decisions) is retired to git history (commit `80dcad8`);
-> its outcome is the C2 handoff in §2 and the C2 review in §5. **C3 starts only after PR #50
-> has merged with the three review findings fixed**: no `FORCE ROW LEVEL SECURITY`; the RPC
+> its outcome is the C2 handoff in §2 and the C2 review in §5. **Prerequisite met 2026-09-13:**
+> PR #50 merged with the three review findings fixed (no `FORCE ROW LEVEL SECURITY`; the RPC
 > returns a flat row with `seq` and `amount_minor` as TEXT; the replay comparison includes
-> `correlation_id`, `source_type`, `source_id`, `causation_id`, `effective_date`.
+> `correlation_id`, `source_type`, `source_id`, `causation_id`, `effective_date`). Verified on
+> `main` at `45d89d2`. The migration exists on `main` but has not been applied to any environment.
 
 Read first: `handymate-dashboard/ARCHITECTURE.md` §FK.2–FK.3 and §FK.5, blueprint §6
 ("Transactional outbox"), §8, §21, orchestration §5 C3, §6 A+B+C, §9; then in the repo:
