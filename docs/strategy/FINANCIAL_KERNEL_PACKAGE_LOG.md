@@ -31,7 +31,7 @@ Rules that keep this file honest:
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
 | C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema + append RPC | Codex | **done 2026-09-13** (PR #50 merged; HIGH + 2 MEDIUM corrected; migration not yet applied to any environment) | — |
+| C2 | `financial_events` schema + append RPC | Codex | **done 2026-09-13** (PR #50 merged; HIGH + 2 MEDIUM corrected) | — |
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
@@ -46,6 +46,21 @@ Rules that keep this file honest:
 | C13 | VAT return primitives | Codex | not started | C9, D3 (file vs produce) |
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
+
+**Deployment state (2026-09-14):** `v235`–`v238` are applied to the production Supabase
+project (Handymate, eu-west-1). Verified read-only the same day: the seven `financial_*` tables
+exist with RLS enabled and no FORCE; every kernel RPC is SECURITY DEFINER with
+`search_path = public, pg_temp` and EXECUTE only for `postgres` and `service_role` (the three
+internal helpers `financial_lock`, `financial_append`, `assert_financial_consumer_lease` are
+`postgres` only); `business_config.financial_kernel_enabled` defaults false and is true for
+**0** businesses; `accounting_method` and `invoice.vat_regime` carry their defaults; the
+`v237` backfill left **0** paid/customer_paid invoices with `paid_amount IS NULL`;
+`financial_events` and `financial_receivables` are empty. Supabase security advisors report
+two INFO items that are by design (`financial_event_consumers` and `financial_event_deliveries`
+have RLS enabled and no policy: status is read through `get_financial_consumer_status`) and
+one WARN that C5's `v239` fixes (`financial_events_immutable()` and
+`financial_receivable_json()` have no pinned `search_path`; neither is SECURITY DEFINER, so
+this is hardening, not exposure). `v239` is not yet written.
 
 Parallel Claude analysis tracks (orchestration §4): **A done** (C2 brief), **B done**
 (`FINANCIAL_KERNEL_CALL_SITE_MAP.md`), **C done** (18 of 40 golden paths executable as data in
@@ -403,6 +418,10 @@ package.json, .github/workflows/contracts.yml, docs (handoff)
 Migration `v239`: `financial_bridge_markers (business_id, receivable_id, marker, delivered_at, source, PRIMARY KEY (business_id, receivable_id, marker))`
 with `marker = 'payment_received'` for now; RPC `record_bridge_marker(...)` returning whether it
 was new. Grants as in v236.
+`v239` also pins the search path of the two v235/v238 helpers the Supabase advisor flagged
+(`ALTER FUNCTION public.financial_events_immutable() SET search_path = public, pg_temp;` and the
+same for `public.financial_receivable_json(public.financial_receivables)`), and the v235/v238
+files in the repo get the same `SET search_path` so PGlite and production agree.
 
 ### Invariants (tests first)
 
@@ -599,22 +618,6 @@ No BLOCKER.
 
 ---
 
-### C2 — `financial_events` (PR #50), Claude review 2026-09-13, orchestration §6 A + C
-
-Verified locally on `codex/financial-kernel-c2` head `1ec1c34`: the 13 C2 tests plus contract,
-Money, schema and account-deletion suites green (64). Two probes beyond the suite: the migration
-deployed by a role without BYPASSRLS that owns the objects, then the RPC called as
-`service_role`; and `to_jsonb` of the RPC result followed by `JSON.parse`. Codex's two DDL
-deviations (service_role REVOKE ALL + GRANT SELECT; `financial_events` in `BEHALLS`) are correct.
-No BLOCKER.
-
-| Sev | Finding | Status |
-|---|---|---|
-| HIGH | `FORCE ROW LEVEL SECURITY` makes the only write path depend on the deploying role having BYPASSRLS. Proven: with a NOBYPASSRLS owner the append fails with an RLS violation; without FORCE it succeeds. The superuser PGlite harness cannot see this. Origin: the Claude DDL proposal, not Codex. Fix: drop FORCE, document why, add the non-bypass owner probe as a test. | resolved in PR #50: non-bypass deployer owns the tested objects; FORCE removed |
-| MEDIUM | RPC returns BIGINT inside a composite; PostgREST serialises it as a JSON number and `JSON.parse` loses digits above 2^53 (proven: …993 → …992). Return a flat row with `seq` and `amount_minor` as TEXT now, while the migration is unapplied. Any future PostgREST read of the table must cast the same two columns. | resolved in PR #50 with regression tests |
-| MEDIUM | Idempotency replay compares type/payload/amount/currency only; a replay with a different `correlation_id`, source, `causation_id` or `effective_date` silently returns the original. Add those four to the comparison; deliberately exclude `occurred_at` and actor. | resolved in PR #50 with regression tests |
-| accepted | Sequence gaps on failed inserts; single-session PGlite cannot prove concurrent commit order (C3 must, with the Postgres CI service); `hashtext` collisions only over-serialise; account deletion soft-deletes `business_config` so the RESTRICT FK does not fire on that path, track G remains open. | — |
-
 
 ## 6. Amendment log
 
@@ -626,3 +629,7 @@ No BLOCKER.
 | 2026-09-13 | Tracks C and D delivered: executable golden paths + SE ledger review. | Tracks C, D |
 | 2026-09-13 | Track B delivered as `FINANCIAL_KERNEL_CALL_SITE_MAP.md`; board updated. | Track B |
 | 2026-09-13 | C3 brief written (outbox = events table, cursor per business/consumer, delivery ledger, halt-never-skip, two-connection proof). C2 brief retired to git history. C4 sketched. | Package C3 prep |
+| 2026-09-13 | C3 brief corrected after Codex's review (lease tokens, ordered ack enforced in SQL, attempt timestamps, status RPC); the review is recorded in §5. | Codex review of the C3 brief |
+| 2026-09-14 | C3 marked done (PR #54, review in §5). C4 brief written (receivables, payments, allocations, adjustments; DDL verified in PGlite with 32 probes). C3 brief retired to git history. C5 sketched. | Package C4 prep |
+| 2026-09-14 | C4 marked done (PR #56, review in §5; §FK.1 amended to decimal-string payload amounts in PR #57). C5 brief written (frozen legacy path, kernel branch as projection writer, inline effects behind a bridge marker, interim SE rounding policy, idempotency keys per source, lazy/eager issuance, immutable `invoice_number`). C4 brief retired to git history. C5b sketched. | Package C5 prep |
+| 2026-09-14 | `v235`–`v238` applied to production; read-only verification recorded under §1 "Deployment state". Duplicate C2 review block in §5 removed. `v239` gains the advisor's `search_path` pin for two helpers. | Owner deploy, Supabase advisors |
