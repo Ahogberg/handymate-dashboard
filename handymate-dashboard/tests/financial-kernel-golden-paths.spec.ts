@@ -59,7 +59,7 @@ test('allokeringar överstiger aldrig betalningen; överskott är kundtillgodoha
   for (const g of GOLDEN_PATHS) {
     const settled = new Map<string, Money>()
     for (const e of g.events) if (e.t === 'payment_settled') settled.set(String(e.p?.payment_id), sek(e.amt!))
-    for (const [pid, allocated] of allocationsByPayment(g)) {
+    for (const [pid, allocated] of Array.from(allocationsByPayment(g).entries())) {
       expect(settled.has(pid), `${g.id}: allokering utan settlement ${pid}`).toBe(true)
       expect(compare(allocated, settled.get(pid)!), `${g.id}: ${pid} överallokerad`).toBeLessThanOrEqual(0)
     }
