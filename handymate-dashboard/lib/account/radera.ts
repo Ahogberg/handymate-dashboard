@@ -107,6 +107,8 @@ export const BEHALLS: string[] = [
   // Financial Kernel C2: oföränderlig ekonomisk historik enligt kontraktet.
   // Raderas aldrig här; retention/anonymisering måste utredas i spår G.
   'financial_events',
+  'financial_event_consumers',
+  'financial_event_deliveries',
 
   // Fakturan är själva bokföringsverifikationen. Bokföringslagen kräver 7
   // års sparande, och den bär MEDVETET kundens namn/telefon/adress/

@@ -282,6 +282,21 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 
 ---
 
+### C3 implementation handoff — Codex, 2026-09-14
+
+- **Package / scope:** C3, based on corrected brief `28baf4fe8` (PR #53). Library primitives only; no runner, production caller, migration execution or feature flag.
+- **Files changed:** v236 migration; `events/publish.ts`, `consume.ts`, `bridge-automation.ts`; outbox SQL and PostgreSQL concurrency specs; package/workflow registrations; this handoff. `lib/account/radera.ts` additionally classifies the two retained kernel tables, as required by the existing account-deletion completeness gate.
+- **Architecture:** ARCHITECTURE FK.2–FK.3/FK.5; blueprint §6/§8/§21; orchestration C3 and §9. Events table remains the outbox. No canonical event names changed.
+- **DB/RPC:** cursor leases and delivery ledger, claim/ack/fail/release/resume, private lease guard and service-only status view. Added service-only `begin_financial_event_attempt` and `get_financial_consumer_status` to satisfy the RPC-only TypeScript boundary.
+- **Deviation — attempt evidence:** timestamps on ack/fail alone cannot prove a crash before ack. The loop records an attempt before the handler. `attempt_token` makes that registration idempotent within a lease; a new lease records redelivery. Separate `failures` counts actual failures for the halt threshold. Ack retries do not inflate either counter. Failure closes the lease so a replayed failure cannot increment twice.
+- **Deviation — status transport:** a service-only RPC reads halt state from the view and returns last_seq/backlog as TEXT. The existing KernelDb contract has no table-query API. The view also explicitly revokes service default privileges before granting SELECT.
+- **Deviation — wall-clock lease checks:** uses `clock_timestamp()` so a transaction opened before expiry cannot acknowledge after expiry using its old `now()`. PostgreSQL test covers this.
+- **Deviation — validation:** ack validates renewal duration, fail validates a positive threshold and first-pending-event order, and resume rejects whitespace/empty actor and reason. Both mutation paths lock the cursor before the delivery row.
+- **Golden paths / invariants:** lease takeover and stale-worker fencing; ordered ack; crash/redelivery evidence; failure/halt/resume; tenant and consumer separation; client privilege denial; lossless publication; key formats; timeout; lost-lease stop; ambiguous ack response. Real PostgreSQL suite covers writer blocking/commit order, two-session claim race and wall-clock expiry. Local PostgreSQL tests skip explicitly without the isolated test URL.
+- **Validation:** local `tsc --noEmit` passed; all 12 C3 SQL/consumer tests passed, as did C0/C1/C2 and relevant schema/dead-code/account-deletion/CI contracts (CI registration formatting corrected and rerun). Real PostgreSQL: [job 103803680559](https://github.com/Ahogberg/handymate-dashboard/actions/runs/34786815349/job/103803680559) at implementation `b6abf0e6e` ran all three C3 concurrency cases, with **51 passed and no skips** including existing follow-up/report tests. Full PR checks remain the final CI gate; Claude A/B/C review remains required before merge.
+- **Known limitations:** handler timeout stops awaiting, not arbitrary side effects. C5 handlers must deduplicate by eventId; domain database effects and acknowledgement must share a domain RPC when atomicity is needed. A lease token fences cursor mutations, not an external provider. Resume's immutable audit record remains TODO(C4). The empty bridge must not be scheduled until C5 supplies mappings.
+- **Open decisions:** R0/P0 left unresolved; no accounting policy selected. Reverse charge, cash basis, ROT/RUT and cut-over are unaffected because this package transports events and computes/posts no tax or accounting entries. No human accounting approval required for these transport primitives; later policy packages still require the named consultant.
+
 ## 3. Next package — Codex brief: C3 outbox, inbox and consumer cursors
 
 > The C2 brief (proposed DDL, track A decisions) is retired to git history (commit `80dcad8`);
@@ -312,7 +327,7 @@ two-mode harness: PGlite locally, a real Postgres service in CI via `FOLLOWUP_TE
 | **`bridge-automation.ts` is created empty and registered as a consumer name.** | It is the one file the contract test allows to call `fireEvent()`; creating it now pins the location. Its first mapping (`receivable_settled{customer}` → `payment_received`) is C5. |
 
 Lock-order rule from C2 applies unchanged: business advisory lock → domain row locks →
-append. `claim_financial_events` locks only the cursor row (`FOR UPDATE SKIP LOCKED`); it never
+append. `claim_financial_events` briefly locks only the cursor row (`FOR UPDATE`) to acquire a durable lease; it never
 takes the business advisory lock, so a consumer cannot deadlock a writer.
 
 ### Scope
@@ -675,6 +690,15 @@ Orchestration §7 block under §2, same PR. Claude reviews against §6 A, B and 
 ---
 
 ## 4. Queued after C3 — sketch only, briefed when C3 merges
+
+**C5 brief requirement from PR #54 review (MEDIUM):** before firing any automation,
+the bridge must persist its own idempotency marker per `eventId`. Database effects,
+the marker and acknowledgement must share a transaction. Test lease expiry mid-handler
+with a second worker and prove that no duplicate thank-you SMS is dispatched. The delivery
+ledger's `delivered_at` is set too late to guard the side effect. For external sends,
+define durable dispatch/retry semantics as well: a marker persisted before a crash must
+not suppress a notification that was never sent. The requirement is also pinned in
+`bridge-automation.ts`; implementing the mapping remains C5, not C3.
 
 **C4 — receivables and allocations behind `financial_kernel_enabled`.** Needs Claude track B
 (the call-site map, `FINANCIAL_KERNEL_CALL_SITE_MAP.md`) and track C's golden paths first.
