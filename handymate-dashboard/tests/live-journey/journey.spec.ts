@@ -55,11 +55,12 @@ test('Nordström El: session → navigering → valt utkast → återöppning', 
   const blocked = new Set<string>()
   await context.route('**/*', async route => {
     const r = route.request()
-    if (browserRequestAllowed(r.url(), r.method(), cfg.origin)) {
+    if (browserRequestAllowed(r.url(), r.method(), cfg.origin, r.postData())) {
       // Never forward the automation credential through an HTTP redirect.
       // A redirect is fulfilled as-is; its destination must pass this guard again.
       try {
-        const response = await route.fetch({ maxRedirects: 0, headers: { ...r.headers(), ...headersFor(r.url()) } })
+        // headers() omits cookies; preserve the authenticated browser session.
+        const response = await route.fetch({ maxRedirects: 0, headers: { ...await r.allHeaders(), ...headersFor(r.url()) } })
         return await route.fulfill({ response })
       } catch {
         return route.abort('failed') // do not expose transport headers in artifacts

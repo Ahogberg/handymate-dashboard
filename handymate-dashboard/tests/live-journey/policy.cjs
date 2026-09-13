@@ -16,11 +16,20 @@ function verifyTenant(profile, config) {
   assert.equal(profile?.user?.business_id, config.businessId, 'Fel användarmedlemskap')
   assert.equal(profile?.business?.business_name, 'Nordström El AB', 'Sessionen är inte Nordström El')
 }
-function browserRequestAllowed(url, method, origin) {
+function browserRequestAllowed(url, method, origin, postData) {
   const u = new URL(url)
   // The UI is observed only; draft creation is a separate guarded API action.
-  if (!['GET', 'HEAD'].includes(method)) return false
   if (u.origin !== origin) return false // no third-party HTTP from this test
+  // useAuth reads the current session through this POST action. No other
+  // auth action (login, logout, password reset, etc.) may pass the browser guard.
+  if (method === 'POST' && u.pathname === '/api/auth' && !u.search) {
+    try {
+      const body = JSON.parse(postData)
+      return body !== null && !Array.isArray(body) &&
+        Object.keys(body).length === 1 && body.action === 'check'
+    } catch { return false }
+  }
+  if (!['GET', 'HEAD'].includes(method)) return false
   return !/^\/api\/(cron|debug)(\/|$)/.test(u.pathname)
 }
 function protectionHeaders(url, origin, secret) {

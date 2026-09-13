@@ -30,3 +30,15 @@ test('browser may read same origin but cannot send, approve, pay, run cron or co
   for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) assert.equal(browserRequestAllowed(origin + '/api/quotes', method, origin), false)
   for (const url of [origin + '/api/cron/anything', origin + '/api/debug/sms', 'https://external.invalid/api/auth']) assert.equal(browserRequestAllowed(url, 'GET', origin), false)
 })
+
+test('browser allows only the exact read-only auth check POST', () => {
+  const origin = configuration(env).origin
+  const body = JSON.stringify({ action: 'check' })
+  assert.equal(browserRequestAllowed(origin + '/api/auth', 'POST', origin, body), true)
+  for (const data of [undefined, '', '{', 'null', '[]', '{}', JSON.stringify({ action: 'login' }), JSON.stringify({ action: 'logout' }), JSON.stringify({ action: 'forgot_password' }), JSON.stringify({ action: 'check', data: {} })]) {
+    assert.equal(browserRequestAllowed(origin + '/api/auth', 'POST', origin, data), false)
+  }
+  for (const url of ['https://external.invalid/api/auth', origin + '/api/auth?x=1', origin + '/api/auth/logout', origin + '/api/quotes']) {
+    assert.equal(browserRequestAllowed(url, 'POST', origin, body), false)
+  }
+})
