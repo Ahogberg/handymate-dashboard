@@ -111,7 +111,12 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 
 > ⚠️ **KRITISK REGEL:** Inga event får uppfinnas lokalt av en terminal.
 > Nya event läggs till i denna lista FÖRST, sedan implementeras de.
-> Namnkonvention: `snake_case`, `verb_substantiv`, alltid på engelska.
+> Namnkonvention: `snake_case`, `substantiv_particip` (`quote_sent`, `payment_received`), alltid på engelska.
+>
+> Listan nedan är **automationsmotorns** event (`fireEvent()` i `lib/automation-engine.ts`).
+> Financial Kernels durabla ekonomiska event är ett eget kontrakt med egen tabell och
+> egen katalog — se avsnittet *Financial Kernel — kontrakt* längst ned. De två listorna
+> får inte dela namn, och kernel-event får aldrig gå genom `fireEvent()`.
 
 | Event | Triggas när | Primär payload | Finns |
 |-------|-------------|----------------|-------|
@@ -723,3 +728,191 @@ vara bekräftat före kalendern. Kalenderbekräftelsen namnger en specifik
 nästa vecka; startsteget är en engångsuppgift, ingen veckovis checklista.
 Dessa uppgifter läggs bara till i webbrailen, inte i livscykelutskicken.
 Den nya 70-procentsgrinden aktiveras inte av startbekräftelserna.
+
+---
+
+## Financial Kernel — kontrakt (Paket C0, 2026-09-13)
+
+> **Status:** kontrakt, ingen kod med beteende. Detta avsnitt är den kanoniska källan för
+> Financial Kernels eventnamn, kuvert, flaggor och modulägande. Blueprinten
+> `docs/strategy/FINANCIAL_KERNEL_ARCHITECTURE.md` förklarar *varför*; om den och detta
+> avsnitt skiljer sig i ett **namn** vinner detta avsnitt, i **domänregler** vinner blueprinten.
+> Exekveringsordning och paketägande: `docs/strategy/FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md`.
+> Paketstatus och handoff: `docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md`.
+>
+> **Grindas av CI:** `tests/financial-kernel-event-contract.spec.ts` läser tabellen i FK.1 och
+> failar när ett eventnamn finns i kernel-kod, i `lib/financial-kernel/events/catalog.ts`
+> eller i en migration utan att stå här. Lägg till raden först, koda sedan.
+
+### FK.0 Fyra regler som gäller allt nedan
+
+1. **Ett ekonomiskt event, många projektioner.** Fakturastatus, `paid_amount`, bokföring och
+   avstämning är projektioner av samma event — aldrig oberoende slutsatser.
+2. **Kernel-event går aldrig genom `fireEvent()`.** De persisteras i `financial_events`
+   (FK.2). Automationsmotorn nås bara via bryggan (FK.3).
+3. **Ingen toleranskonstant i kernel-vägen.** `TOLERANCE_KR = 1` i
+   `lib/invoices/payment-decision.ts` är legacy och stannar där. En differens inom
+   landspaketets avrundningspolicy blir en explicit bokföringsrad, en utanför blir ett
+   avstämningsundantag.
+4. **Fyra beslut är ägarens, inte implementerarens** (blueprint §38: merchant-of-record,
+   Pay-före-Ledger, momsdeklaration fil/producera, cut-over-räkenskapsår). Den som stöter på
+   ett av dem stannar och säger det. Ingen "bekväm default".
+
+### FK.1 Kanonisk eventkatalog
+
+Alla event: `snake_case`, `substantiv_particip`, engelska. `Finns` är ❌ på samtliga rader
+tills paketet som inför eventet mergas — då byts markeringen i **samma PR**. Kolumnen
+*Paket* pekar på orkestreringsdokumentets paket som äger första implementationen.
+
+Belopp i payload är alltid **minor units** (öre) som heltal, aldrig `number` med decimaler,
+och alltid med `currency`. Fält märkta † är obligatoriska från dag ett därför att det svenska
+landspaketet inte kan fyllas på i efterhand utan migration (blueprint §15.1–15.2).
+
+**Fordran (kommersiell)**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `invoice_issued` | En faktura får sitt nummer och ställs ut (skickas eller importeras redan utställd). Inte när ett utkast skapas — det är automationsmotorns `invoice_created`. | `{ invoice_id, invoice_number, customer_id, project_id?, currency, total_minor, vat_regime†: 'standard'\|'reverse_charge_construction', accounting_method†: 'accrual'\|'cash', issued_date, due_date, tax_reduction?: 'rot'\|'rut' }` | C4 | ❌ |
+| `invoice_credited` | En kreditfaktura ställs ut mot en faktura. | `{ invoice_id, credit_invoice_id, currency, amount_minor, issued_date }` | C4 | ❌ |
+| `receivable_created` | En fordranskomponent skapas. En ROT/RUT-faktura ger två: kundens del och Skatteverkets. | `{ receivable_id, invoice_id, component: 'customer'\|'tax_authority', owner: 'business'\|'factor', currency, amount_minor, due_date }` | C4 | ❌ |
+| `receivable_adjusted` | Komponentens belopp eller ägare ändras utan betalning. Täcker kredit, avskrivning, påminnelseavgift, ränta, avrundning och ägarbyte (factoring). | `{ receivable_id, reason: 'credit'\|'write_off'\|'dunning_fee'\|'interest'\|'rounding'\|'ownership_transfer', delta_minor?, owner_after? }` | C4 / C14 | ❌ |
+| `receivable_settled` | En komponent är fullt allokerad. | `{ receivable_id, invoice_id, component, settled_at }` | C4 | ❌ |
+
+**Pay (pengarörelse)** — gäller *alla* betalningar, även manuell "markera betald" (`provider: 'manual'`) och Fortnox-import (`provider: 'fortnox'`). Det finns ingen sidoväg där en betalning uppdaterar en faktura utan att bli ett `payment_settled` (blueprint §18.2).
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `payment_intent_created` | En betalningsavsikt skapas (Pay-länk, Swish-QR, kortsession). | `{ payment_intent_id, invoice_id?, receivable_ids[], currency, amount_minor, provider, method }` | C7 | ❌ |
+| `payment_initiated` | En betalning existerar hos leverantören eller registreras manuellt. Tillstånd `created → pending`. | `{ payment_id, payment_intent_id?, provider, provider_ref?, direction: 'inbound'\|'outbound', currency, amount_minor }` | C4 (manual/fortnox), C7 | ❌ |
+| `payment_authorized` | Leverantören har reserverat beloppet. Tillstånd `→ authorized`. | `{ payment_id, provider_ref }` | C7 | ❌ |
+| `payment_processing_started` | Leverantören bearbetar/kapar betalningen. Tillstånd `→ processing`. | `{ payment_id, provider_ref }` | C7 | ❌ |
+| `payment_settled` | Pengarna är faktiskt mottagna eller (för manuell/Fortnox) registrerade som mottagna. Tillstånd `→ settled`. | `{ payment_id, currency, amount_minor, fee_minor?, settled_at, evidence: 'provider'\|'manual'\|'fortnox'\|'bank' }` | C4, C7 | ❌ |
+| `payment_failed` | Betalningen misslyckades slutgiltigt. | `{ payment_id, reason_code, provider_reason? }` | C7 | ❌ |
+| `payment_cancelled` | Betalningen avbröts före settlement. | `{ payment_id, cancelled_by: 'customer'\|'business'\|'provider'\|'system' }` | C7 | ❌ |
+| `payment_refunded` | Hel eller delvis återbetalning är genomförd. `partial` avgör tillstånd `partially_refunded` / `refunded`. | `{ payment_id, refund_id, currency, amount_minor, partial: boolean, authorized_by }` | C7 | ❌ |
+| `payment_disputed` | Chargeback/tvist öppnad hos leverantören. | `{ payment_id, dispute_id, currency, amount_minor, provider_ref }` | C7 | ❌ |
+| `payout_created` | Leverantören har skapat en utbetalning till företagets bankkonto. | `{ payout_id, provider, currency, amount_minor, fee_minor?, payment_ids[] }` | C7 | ❌ |
+| `payout_settled` | Utbetalningen har nått banken. | `{ payout_id, banked_at, bank_transaction_id? }` | C7 / C11 | ❌ |
+
+**Allokering och avstämning**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `payment_allocated` | En settlad betalning knyts till en fordranskomponent. Summan av allokeringar får aldrig överstiga betalningen. | `{ allocation_id, payment_id, receivable_id, currency, amount_minor }` | C4 | ❌ |
+| `payment_allocation_reversed` | En allokering backas (felallokering, kredit, återbetalning). | `{ allocation_id, reason }` | C4 | ❌ |
+| `bank_transaction_imported` | En banktransaktion (eller leverantörs-utbetalningsrad) är importerad som bevis. | `{ bank_transaction_id, source: 'bank'\|'provider'\|'manual', currency, amount_minor, banked_at, external_ref }` | C11 | ❌ |
+| `reconciliation_matched` | Matcharen har knutit en banktransaktion till en betalning, utbetalning eller leverantörsbetalning. | `{ match_id, bank_transaction_id, matched_type: 'payment'\|'payout'\|'supplier_payment', matched_id, currency, amount_minor, partial: boolean }` | C11 | ❌ |
+| `reconciliation_unmatched` | Matcharen lämnade en banktransaktion utan match och öppnade ett undantag. | `{ bank_transaction_id, exception_id, reason }` | C11 | ❌ |
+| `reconciliation_reversed` | En match backas. | `{ match_id, reason }` | C11 | ❌ |
+
+**Ledger (bokföring) och shadow**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `journal_entry_posted` | En verifikation är atomärt bokförd med balanserade rader. Verifikationsnumret tilldelas i samma transaktion (blueprint §36.1). | `{ journal_entry_id, journal_type, voucher_series, voucher_number, effective_date, period_id, rule_id, rule_version, source_event_id }` | C8 | ❌ |
+| `journal_entry_reversed` | En verifikation vänds med en ny verifikation. Bokförd historik ändras aldrig på plats. | `{ journal_entry_id, reversal_entry_id, reason }` | C8 | ❌ |
+| `period_locked` | En räkenskapsperiod låses för bokföring. | `{ period_id, fiscal_year_id, locked_by }` | C8 | ❌ |
+| `period_unlocked` | En låst period öppnas igen (privilegierad, alltid auditerad). | `{ period_id, fiscal_year_id, unlocked_by, reason }` | C8 | ❌ |
+| `payment_divergence_detected` | Shadow-jämförelsen ser att kernelns betalningstillstånd skiljer sig från referensen. `phase` är obligatorisk: en S1-grön period är inte bevis (blueprint §20.1). | `{ divergence_id, comparison_run_id, phase†: 'S1'\|'S2', invoice_id?, payment_id?, severity }` | C6 | ❌ |
+| `accounting_divergence_detected` | Shadow-jämförelsen ser att bokförings- eller aggregatstillstånd skiljer sig från referensen. | `{ divergence_id, comparison_run_id, phase†: 'S1'\|'S2', level: 1\|2\|3\|4, severity }` | C12 | ❌ |
+
+**Leverantör / AP**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `supplier_invoice_approved` | En leverantörsfaktura är attesterad och blir en skuld. | `{ supplier_invoice_id, supplier_id, currency, amount_minor, vat_regime†, due_date }` | C9 | ❌ |
+| `payable_created` | Skuldposten skapas. | `{ payable_id, supplier_invoice_id, currency, amount_minor, due_date }` | C9 | ❌ |
+| `supplier_payment_settled` | En utgående betalning till leverantör är genomförd. Är ett `payment_settled` med `direction: 'outbound'` i Pay; detta event är projektionen mot skulden. | `{ payment_id, supplier_invoice_id, currency, amount_minor, settled_at }` | C9 / C11 | ❌ |
+| `payable_settled` | Skuldposten är fullt betald. | `{ payable_id, supplier_invoice_id, settled_at }` | C9 | ❌ |
+
+**Reserverade namn — inte kanoniska.** Får inte förekomma i kod förrän de flyttats upp i en
+tabell ovan i samma PR som inför dem: `opening_balance_posted`, `cutover_recorded`,
+`vat_return_prepared`, `receivable_written_off`, `shadow_phase_flipped`. De finns här bara så att
+nästa paket inte hittar på ett annat namn för samma sak.
+
+### FK.2 Kuvert, nycklar och tid
+
+Tabellen heter `financial_events` (införs i Paket C2, inte tidigare). Alla event delar kuvertet
+i blueprint §7. Bindande fältregler:
+
+| Fält | Regel |
+|------|-------|
+| `schema_version` | Heltal per `event_type`, startar på `1`. Höjs bara när payloadens form ändras bakåtinkompatibelt; konsumenter måste kunna läsa alla versioner som finns i tabellen. |
+| `business_id` | Från autentiserad session eller betrodd mappning (webhook → `provider_ref` → business). Aldrig från klientpayload. |
+| `idempotency_key` | `UNIQUE (business_id, idempotency_key)`. Format `<domän>:<källa>:<id>[:<diskriminator>]`, t.ex. `provider_event:stripe:evt_123`, `allocation:pay_1:rec_2:12500`, `fortnox_import:<biz>:<doc>:<version>`. Samma nyckel fem gånger = ett event. |
+| `correlation_id` | En per ekonomisk kedja: `fin_invoice_<invoice_id>`, `fin_supplier_invoice_<id>`, `fin_payment_<payment_id>` (betalning utan faktura), `fin_bank_<bank_transaction_id>`, `fin_journal_<journal_entry_id>` (manuell verifikation). Rotobjektet bestämmer prefixet. |
+| `causation_id` | `event_id` för eventet som orsakade detta. `NULL` bara för rotevent i kedjan. |
+| `occurred_at` | När det hände i källsystemet. `effective_date` är bokföringsdatum enligt landspaketet. `created_at` är när Handymate persisterade raden. De tre är aldrig samma fält (blueprint §26). |
+| `actor` | `system \| user \| provider \| import \| agent`. En agent som skapar ett ekonomiskt event är `agent` med `actor_id` = agentens id, aldrig `system`. |
+| `amount` / `currency` | Speglar payloadens huvudbelopp för index/sök. Källan är payloaden. |
+
+Atomära skrivningar går via Postgres-RPC, aldrig via flera klientanrop (blueprint §6):
+`record_payment_settlement`, `allocate_payment`, `post_journal_entry`, `record_provider_event`.
+Varje RPC validerar tenant + tillstånd, skriver objektet, skriver eventet/outboxraden och
+returnerar resultatet i **en** transaktion. Namnen är reserverade här så att paketen C2–C8 inte
+döper dem olika.
+
+### FK.3 Bryggan till automationsmotorn — bindande
+
+`payment_received` (§4) behåller sin nuvarande betydelse: *kunden har gjort sitt*. Bryggan
+`lib/financial-kernel/events/bridge-automation.ts` är det **enda** stället i kernel-kod som får
+anropa `fireEvent()`, och den får bara skicka namn ur tabellen i §4.
+
+```text
+receivable_settled { component: 'customer' }   → fireEvent('payment_received')   ✅
+receivable_settled { component: 'tax_authority' } → ingenting                     ✅ (inget andra tack-SMS när Skatteverket betalar)
+payment_settled                                  → ingenting                     ✅ (pengar ≠ kunden klar; allokering avgör)
+```
+
+Detta är blueprint §18.5 och golden path 34, inte en försiktighetsnot. Legacy-övergångarna
+`to_paid` och `to_customer_paid` i `payment-decision.ts` motsvarar exakt "kundkomponenten
+settlad"; `settled` motsvarar "skattekomponenten settlad" och avfyrar inget.
+
+### FK.4 Feature-flaggor — per företag, kolumner på `business_config`
+
+Alla flaggor är `BOOLEAN NOT NULL DEFAULT false`. Default = dagens beteende, alltid. Ingen
+flagga införs före paketet som läser den.
+
+| Kolumn | Betyder | Läses av | Införs i |
+|--------|---------|----------|----------|
+| `financial_kernel_enabled` | Kernel skriver `financial_events` och fordrans-/allokeringsobjekt för företaget. Infrastruktur, inte en produkt. | C4, C5 | C4 |
+| `shadow_payments_enabled` | Kernel körs parallellt med legacy för betalningar; divergenser loggas, rättas aldrig automatiskt. | C6 | C6 |
+| `shadow_payment_phase` | `'S1' \| 'S2'`, `NULL` när shadow är av. S1 = Fortnox är fortfarande betalningskälla (grön bevisar bara synken). S2 = Handymate är källa. Flippen är daterad i `shadow_payment_phase_changed_at`. **Inte en boolean** — det är hela poängen. | C6, C12 | C6 |
+| `handymate_pay_enabled` | Kunden kan ta betalt via Handymate Pay. Produkträttighet. | C7 | C7 |
+| `handymate_ledger_enabled` | Kunden ser bokföring/Ledger-ytor. Produkträttighet — grindar UI, aldrig kernelns korrekthet (blueprint §35.5). | C10 | C10 |
+| `shadow_accounting_enabled` | Ledger körs i skuggan mot Fortnox-referens. | C12 | C12 |
+| `auto_post_accounting_enabled` | Deterministiska bokföringsregler får bokföra utan mänskligt godkännande inom policy. | C8, C9 | C9 |
+| `bank_reconciliation_enabled` | Bank-/avstämningsytor synliga för kunden. Produkträttighet. | C11 | C11 |
+| `auto_reconcile_enabled` | Matcharen får bekräfta matchningar inom policy utan granskning. | C11 | C11 |
+
+**Skuggningens räckvidd (beslut 2026-09-12, shadow-arkitekturen §21.6):** Fortnox-scopen
+(`FORTNOX_SCOPES` i `app/api/integrations/fortnox/connect/route.ts`) saknar `bookkeeping`, så
+jämförelsen når bara **nivå 1** (faktura, leverantörsfaktura, betalning, saldon). Nivå 2–4 i
+`accounting_divergence_detected.level` persisteras som `unsupported` med orsak, aldrig som
+gröna. Scopen läggs inte tillbaka (kräver ny OAuth per kund). Momsen och verifikatnivån får
+därför sitt facit från den manuella regelboksrundan (roadmap §21.2), inte från skuggningen.
+
+Utrullningsordning per företag (aldrig big bang):
+`legacy → kernel shadow (S1) → S2 → kernel kanonisk + legacy-projektion → Pay live → Ledger shadow → Ledger kanonisk med Fortnox-skugga → Handymate-only`.
+
+### FK.5 Modulägande
+
+Mappar och vem som äger dem. En primitiv har en implementationsägare (Codex) och flera
+granskare (Claude). Två agenter bygger aldrig konkurrerande versioner av samma primitiv.
+
+| Mapp | Innehåll | Får aldrig |
+|------|----------|------------|
+| `lib/financial-kernel/` | `money.ts`, `events/` (catalog, types, publish, consume, outbox, bridge-automation), `receivables/`, `allocations/`, `audit/`, `integrity/` | importera från `lib/payments/providers/*` eller `lib/ledger/country-packs/*` |
+| `lib/payments/` | tjänst, tillståndsmaskin, intents, refunds, payouts, `providers/<provider>/adapter.ts` | skriva till journaler; läcka leverantörsspecifik status utanför `providers/` |
+| `lib/ledger/` | posting engine, journals, periods, reports, reversals, `country-packs/se/` | läsa leverantörsobjekt direkt; ha en toleranskonstant |
+| `lib/reconciliation/` | service, matcher, projections | ändra betalnings- eller fordranstillstånd utan att gå via kernelns RPC |
+| `app/api/payments/`, `app/api/accounting/`, `app/api/reconciliation/`, `app/api/webhooks/payments/[provider]/` | HTTP-ytor | innehålla domänlogik |
+
+Legacy-filer som blir fasad, inte ersätts: `lib/invoices/apply-payment.ts` (C5),
+`lib/invoices/payment-decision.ts` (behålls oförändrad för icke-kernel-företag),
+`lib/fortnox/sync-payments.ts` (blir referensadapter i S2).
+
+### FK.6 Vad Paket C0 uttryckligen inte gjorde
+
+Ingen tabell, ingen RPC, ingen flagga, ingen Money-klass, inget beteende. Nästa paket är C1
+(Money) — se `docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md` för Codex-briefen.

@@ -86,6 +86,8 @@ jobs:
           tests/dead-code-paths.spec.ts
           tests/permission-contract.spec.ts
           tests/schema-contract.spec.ts
+          tests/financial-kernel-event-contract.spec.ts
+          tests/financial-kernel-money.spec.ts
           tests/facit-ci-grind.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts

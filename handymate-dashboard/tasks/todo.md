@@ -1526,3 +1526,11 @@ Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabelle
 - [x] Rätta main-versionens otillåtna route-export i min-garanti; behåll värde och beräkning.
 - [x] Nytt produktionsbygge och adoption-provets 21 tester gröna efter exporträttningen.
 Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
+
+## PR #42 — andra main-sammanfogningen 2026-09-13
+
+- [x] Inventera main e51654f9 och PR-head b211b68a.
+- [x] Behåll både planeringsstart och Financial Kernel-kontraktet i ARCHITECTURE.md.
+- [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
+- Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
+Publicering och aktuell mergestatus dokumenteras i PR #42.

@@ -4,6 +4,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
 import { getKnowledgeForBranch } from '@/lib/knowledge-defaults'
 import { isSuperAdmin, IMPERSONATION_COOKIE } from '@/lib/auth/superadmin'
+import { isAdminEmail } from '@/lib/auth/admin-email'
 import { claimPartnerAttribution, isPartnerReferralCode } from '@/lib/partners/attribution'
 
 /**
@@ -331,6 +332,20 @@ if (action === 'login') {
   }
 
   if (!business) {
+    // Adminkonton (@handymate.se) har inget företag och ska inte ha det —
+    // de är till för adminytan, skilda från produkttestandet och från
+    // Christoffers egen firma. Före 2026-09-13 föll de hit och fick 401
+    // "Inget företag kopplat till kontot" trots att signInWithPassword redan
+    // lyckats och satt sessionskakan: användaren VAR inloggad och fick ändå
+    // ett felmeddelande, och enda vägen in var att själv skriva /admin i
+    // adressfältet. Nu pekas de dit istället.
+    if (isAdminEmail(authData.user.email)) {
+      return NextResponse.json({
+        success: true,
+        isAdmin: true,
+        redirect: '/admin',
+      })
+    }
     return NextResponse.json({ error: 'Inget företag kopplat till kontot' }, { status: 401 })
   }
 

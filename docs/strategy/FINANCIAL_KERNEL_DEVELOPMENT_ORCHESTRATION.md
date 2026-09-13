@@ -321,6 +321,10 @@ posting rule. Runs in parallel with C0–C4; it does not block them.
 
 ### Package C0 — architecture contract only
 
+**Status: done 2026-09-13 (Claude).** Handoff and the Codex brief for C1 are in
+`FINANCIAL_KERNEL_PACKAGE_LOG.md`. The canonical contract now lives in
+`handymate-dashboard/ARCHITECTURE.md` under "Financial Kernel — kontrakt" (§FK.0–FK.6).
+
 Before production Financial Kernel code:
 
 - read `handymate-dashboard/ARCHITECTURE.md`;
@@ -738,3 +742,4 @@ This development model is working when:
 |---|---|---|
 | 2026-09-11 | Original execution plan. | — |
 | 2026-09-11 | Resolved the priority conflict with roadmap §16 (§2); strengthened the domain-expert rule (§3); expanded Claude D and added Claude G (§4); added Packages P0, C1b, C4b, C13, C14 and expanded C0, C5, C6, C9, C10 (§5); added review dimension E (§6); extended the handoff contract (§7) and the merge gates (§9); reordered capacity priorities (§10). | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
+| 2026-09-13 | Package C0 marked done; package status and handoffs tracked from now on in `FINANCIAL_KERNEL_PACKAGE_LOG.md`. | C0 |

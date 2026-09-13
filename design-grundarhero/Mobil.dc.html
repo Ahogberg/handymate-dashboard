@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; }
+    a { color: #5eead4; text-decoration: none; }
+    a:hover { color: #2DD4BF; }
+  </style>
+</helmet>
+
+<div style="width: 390px; min-height: 844px; background: #0f2e2a; color: #fff; position: relative; overflow: hidden; padding: 28px 20px 40px; box-sizing: border-box">
+  <div style="position: absolute; inset: auto -30% -40% 20%; height: 320px; background: radial-gradient(closest-side, rgba(20,184,166,0.18), transparent); pointer-events: none"></div>
+
+  <div style="position: relative; z-index: 1; display: flex; flex-direction: column; gap: 0">
+    <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 34px; font-weight: 700; line-height: 1.08; letter-spacing: -0.02em; color: #fff; margin: 0 0 12px">Vi tar risken. <span style="color: #5eead4">Du tar jobben.</span></h1>
+
+    <p style="font-size: 15px; line-height: 1.5; color: rgba(255,255,255,0.7); margin: 0 0 16px; text-wrap: pretty">Handymate fångar samtalen du missar, skriver offerten samma dag och håller ordning på ROT, ÄTA och fakturor. Du gör hantverket.</p>
+
+    <p style="font-size: 15px; line-height: 1.6; color: rgba(255,255,255,0.9); margin: 0 0 20px; text-wrap: pretty">Vi söker <strong style="font-weight: 700; color: #fff">{{platser}} grundarkunder</strong>. Priset låst för alltid, vi flyttar in er, och ni betalar bara om ni faktiskt använder det.</p>
+
+    <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 52px; padding: 0 24px; border-radius: 12px; background: linear-gradient(135deg, #0f766e, #14b8a6); color: #fff; font-weight: 500; font-size: 16px; box-shadow: 0 8px 24px rgba(15,118,110,0.3); margin-bottom: 10px">Ta en av platserna</a>
+    <a href="#" style="display: flex; align-items: center; justify-content: center; min-height: 48px; padding: 0 20px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.22); color: #fff; font-weight: 500; font-size: 15px; margin-bottom: 16px">Se hur det fungerar</a>
+
+    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 22px">
+      <div style="display: flex; gap: 3px">
+        <sc-for list="{{platsprickar}}" as="prick" hint-placeholder-count="20">
+          <span style="width: 6px; height: 6px; border-radius: 50%; background: {{prick.farg}}"></span>
+        </sc-for>
+      </div>
+      <span style="font-size: 12px; color: rgba(255,255,255,0.55)">{{raknartext}}</span>
+    </div>
+
+    <div style="display: flex; flex-direction: column; gap: 10px">
+      <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 18px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 6px">Använd det. Annars kostar det inget.</div>
+        <p style="font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,0.72); margin: 0 0 12px">Handymate gör åtta saker för dig — ta emot ett samtal, skicka en offert, fakturera, rapportera från bygget. Gör minst fyra av dem på 30 dagar.</p>
+        <p style="font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,0.72); margin: 0">Inte värt pengarna ändå? Säg till före dag 90 — hela året tillbaka.</p>
+      </div>
+      <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 16px; padding: 18px">
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 18px; font-weight: 600; color: #fff; margin-bottom: 6px">Igång inom en vecka.</div>
+        <p style="font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,0.72); margin: 0">Vi flyttar in kunder, jobb och priser. Inte igång på sju dagar? Vi jobbar gratis tills du är det.</p>
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{
+  "platser": {"editor": "int", "default": 20, "min": 5, "max": 50, "section": "Platser"},
+  "tagnaPlatser": {"editor": "int", "default": 1, "min": 0, "max": 50, "section": "Platser"},
+  "$preview": {"width": 390, "height": 844}
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const platser = this.props.platser ?? 20
+    const tagna = Math.min(this.props.tagnaPlatser ?? 1, platser)
+    const platsprickar = []
+    for (let i = 0; i < platser; i++) {
+      platsprickar.push({ farg: i < tagna ? '#5eead4' : 'rgba(255,255,255,0.22)' })
+    }
+    const kvar = platser - tagna
+    const raknartext = kvar <= 0 ? 'Platserna är tagna' : 'Plats ' + (tagna + 1) + ' av ' + platser
+    return { platser, platsprickar, raknartext }
+  }
+}
+</script>
+</body>
+</html>

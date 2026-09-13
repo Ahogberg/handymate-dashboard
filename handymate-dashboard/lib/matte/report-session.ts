@@ -3,7 +3,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { BusinessUser } from '@/lib/permissions'
 import { loadWorkReportContext, workReportSummary, WorkReportError, type WorkReportAction, type WorkReportContext } from './work-report'
 import { pendingWorkReport } from './work-report-confirmation'
-export const reportContinuityEnabled = () => process.env.WORK_REPORT_CONTINUITY_ENABLED === 'true'
+export function reportContinuityEnabled(businessId: string): boolean {
+ if (!businessId) return false
+ const pilotIds = (process.env.WORK_REPORT_CONTINUITY_BUSINESS_IDS || '').split(',').map(id => id.trim()).filter(Boolean)
+ // A configured pilot list takes precedence, even if the global flag is true.
+ return pilotIds.length > 0 ? pilotIds.includes(businessId) : process.env.WORK_REPORT_CONTINUITY_ENABLED === 'true'
+}
 export const REPORT_SESSION_FIELDS = 'id,project_id,work_date,thread_id,parts,completed,receipts,state,claimed_at,last_error,created_at,expires_at'
 export function reportRequestId(value: unknown): string | null {
  const text=typeof value==='string'?value.trim().toLowerCase():''

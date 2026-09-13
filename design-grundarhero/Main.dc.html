@@ -1,0 +1,124 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; }
+    a { color: #5eead4; text-decoration: none; }
+    a:hover { color: #2DD4BF; }
+  </style>
+</helmet>
+
+<div style="min-height: 900px; background: #0f2e2a; color: #fff; display: flex; align-items: center; position: relative; overflow: hidden; padding: 32px 0 48px">
+  <div style="position: absolute; inset: auto -20% -60% 40%; height: 420px; background: radial-gradient(closest-side, rgba(20,184,166,0.18), transparent); pointer-events: none"></div>
+
+  <div style="position: relative; z-index: 1; width: 100%; max-width: 1280px; margin: 0 auto; padding: 0 24px">
+    <div style="display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 48px; align-items: center">
+
+      <div>
+        <h1 style="font-family: 'Space Grotesk', sans-serif; font-size: 58px; font-weight: 700; line-height: 1.06; letter-spacing: -0.02em; color: #fff; max-width: 14ch; margin: 0 0 14px">Vi tar risken. <span style="color: #5eead4">Du tar jobben.</span></h1>
+
+        <p style="font-size: 18px; line-height: 1.5; color: rgba(255,255,255,0.7); max-width: 46ch; margin: 0 0 18px; text-wrap: pretty">Handymate fångar samtalen du missar, skriver offerten samma dag och håller ordning på ROT, ÄTA och fakturor. Du gör hantverket.</p>
+
+        <p style="font-size: 16px; line-height: 1.6; color: rgba(255,255,255,0.9); max-width: 48ch; margin: 0 0 22px; text-wrap: pretty">Vi söker <strong style="font-weight: 700; color: #fff">{{platser}} grundarkunder</strong>. Ni får priset låst för alltid, vi flyttar in er, och ni betalar bara om ni faktiskt använder det.</p>
+
+        <div style="display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 12px">
+          <a href="#" style="display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 28px; border-radius: 12px; background: linear-gradient(135deg, #0f766e, #14b8a6); color: #fff; font-family: 'DM Sans', sans-serif; font-weight: 500; font-size: 16px; box-shadow: 0 8px 24px rgba(15,118,110,0.3)">Ta en av platserna</a>
+          <a href="#" style="display: inline-flex; align-items: center; justify-content: center; height: 52px; padding: 0 24px; border-radius: 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.22); color: #fff; font-weight: 500; font-size: 16px">Se hur det fungerar</a>
+        </div>
+
+        <sc-if value="{{visaRaknare}}" hint-placeholder-val="{{ true }}">
+          <div style="display: flex; align-items: center; gap: 10px; margin-top: 16px">
+            <div style="display: flex; gap: 4px">
+              <sc-for list="{{platsprickar}}" as="prick" hint-placeholder-count="20">
+                <span style="width: 7px; height: 7px; border-radius: 50%; background: {{prick.farg}}"></span>
+              </sc-for>
+            </div>
+            <span style="font-size: 13px; color: rgba(255,255,255,0.55)">{{raknartext}}</span>
+          </div>
+        </sc-if>
+      </div>
+
+      <div style="display: flex; flex-direction: column; gap: 14px">
+
+        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 24px">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 600; letter-spacing: -0.01em; color: #fff; margin-bottom: 8px">Använd det. Annars kostar det inget.</div>
+          <p style="font-size: 14px; line-height: 1.55; color: rgba(255,255,255,0.72); margin: 0 0 14px; text-wrap: pretty">Handymate gör åtta saker för dig. Gör minst fyra av dem under dina första 30 dagar — och tycker du ändå inte att det är värt pengarna, säg till före dag 90 så får du hela året tillbaka.</p>
+
+          <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 7px 16px; padding: 14px 0; border-top: 1px solid rgba(255,255,255,0.1)">
+            <sc-for list="{{sakerna}}" as="sak" hint-placeholder-count="8">
+              <div style="display: flex; align-items: center; gap: 8px">
+                <span style="width: 7px; height: 7px; border-radius: 2px; background: {{sak.farg}}; flex-shrink: 0"></span>
+                <span style="font-size: 13px; line-height: 1.35; color: {{sak.textfarg}}">{{sak.namn}}</span>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1)">
+            <span style="font-size: 13px; color: rgba(255,255,255,0.55)">Du ser din egen räknare i appen — samma siffra som vi ser</span>
+          </div>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); border-radius: 18px; padding: 24px">
+          <div style="font-family: 'Space Grotesk', sans-serif; font-size: 21px; font-weight: 600; letter-spacing: -0.01em; color: #fff; margin-bottom: 8px">Igång inom en vecka.</div>
+          <p style="font-size: 14px; line-height: 1.55; color: rgba(255,255,255,0.72); margin: 0; text-wrap: pretty">Vi flyttar in dina kunder, jobb och priser. Är du inte igång inom sju dagar jobbar vi gratis tills du är det.</p>
+        </div>
+
+        <div style="display: flex; align-items: center; gap: 10px; padding: 0 4px">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#5eead4" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 4v5c0 4.5-3 8.3-7 9-4-0.7-7-4.5-7-9V7l7-4z"></path><path d="M9 12l2 2 4-4"></path></svg>
+          <span style="font-size: 13px; color: rgba(255,255,255,0.5)">Priset du börjar med är låst så länge årsavtalet löper</span>
+        </div>
+
+      </div>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script data-props='{
+  "platser": {"editor": "int", "default": 20, "min": 5, "max": 50, "section": "Platser"},
+  "tagnaPlatser": {"editor": "int", "default": 1, "min": 0, "max": 50, "section": "Platser"},
+  "visaRaknare": {"editor": "boolean", "default": true, "section": "Platser"},
+  "ytorAnvanda": {"editor": "int", "default": 4, "min": 0, "max": 8, "section": "Garanti"}
+}'>
+class Component extends DCLogic {
+  renderVals() {
+    const platser = this.props.platser ?? 20
+    const tagna = Math.min(this.props.tagnaPlatser ?? 1, platser)
+    const anvanda = Math.min(this.props.ytorAnvanda ?? 4, 8)
+    const platsprickar = []
+    for (let i = 0; i < platser; i++) {
+      platsprickar.push({ farg: i < tagna ? '#5eead4' : 'rgba(255,255,255,0.22)' })
+    }
+    // Samma åtta som lib/admin/adoption.ts YTOR, i kundens ord. Listan och
+    // appens räknare måste säga samma sak — det är villkoret kunden bedöms på.
+    const namn = [
+      'Lisa tog ett samtal',
+      'Kund tillagd',
+      'Offert skickad',
+      'Jobb skapat',
+      'Faktura skickad',
+      'Tid eller ÄTA från bygget',
+      'Godkänt ett förslag',
+      'Frågat Matte',
+    ]
+    const sakerna = namn.map((n, i) => ({
+      namn: n,
+      farg: i < anvanda ? '#5eead4' : 'rgba(255,255,255,0.2)',
+      textfarg: i < anvanda ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.55)',
+    }))
+    const kvar = platser - tagna
+    const raknartext = kvar <= 0
+      ? 'Platserna är tagna'
+      : 'Plats ' + (tagna + 1) + ' av ' + platser + ' · priset höjs när de är tagna'
+    return { platser, platsprickar, sakerna, raknartext, visaRaknare: this.props.visaRaknare ?? true }
+  }
+}
+</script>
+</body>
+</html>

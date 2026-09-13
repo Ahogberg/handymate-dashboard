@@ -1502,6 +1502,22 @@ Och sedan gå tillbaka till sitt riktiga arbete.
 ## Detta avsnitt SKA uppdateras löpande av varje session
 
 
+### PR #42 — ny main-konflikt 2026-09-13
+
+Main `e51654f9` förs in ovanpå PR-head `b211b68a`. Enda konflikten ligger
+i `ARCHITECTURE.md`: planeringsstart och Financial Kernel-kontraktet har
+lagts till på samma plats. Båda avsnitten behålls. Financial Kernel-avsnittet
+är oförändrat mot main, och startnudgarnas produktionskod är oförändrad mot
+den tidigare verifierade PR-versionen. Ingen databasändring eller live-
+kvittens skrivs i detta pass.
+
+52 riktade kontraktsprov är gröna (planeringsstart, first-focus,
+onboarding-lifecycle, admin-email-gate, Financial Kernel events och Money).
+Kompilering och byggverktygets typkontroll är gröna. Det fulla lokala bygget
+körs om efter ENOTEMPTY i den genererade `.next/export`-mappen.
+Slutresultat och CI/preview-status för den publicerade committen följs i
+PR #42 innan den görs redo för merge. Detta är ingen merge till main.
+
 ### Avgränsad uppdatering 2026-09-13 — startnudgar för team och kalender
 
 **Gren:** `codex/team-calendar-start-nudges-20260913`, bas `082bb028`.
