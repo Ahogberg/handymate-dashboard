@@ -383,7 +383,13 @@ interface FinancialEvent<T> {
 
 ### Proposed event families
 
-Final names must be entered in `ARCHITECTURE.md` first.
+**Final names were entered in `handymate-dashboard/ARCHITECTURE.md` §FK.1 on 2026-09-13
+(Package C0).** That table is canonical; this list is kept in sync with it and
+`tests/financial-kernel-event-contract.spec.ts` fails if the two drift. One name changed on
+finalization: `payment_processing` became `payment_processing_started`, because every other
+event is `noun_past-participle` and a present participle reads as a state, not an event.
+Every event carries `vat_regime` and `accounting_method` where it describes an invoice
+(§15.1–15.2), and `phase` where it describes a shadow divergence (§20.1).
 
 Commercial/receivable:
 
@@ -401,7 +407,7 @@ Pay:
 payment_intent_created
 payment_initiated
 payment_authorized
-payment_processing
+payment_processing_started
 payment_settled
 payment_failed
 payment_cancelled
@@ -2202,6 +2208,7 @@ businesses can be pilots at all.
 |---|---|---|
 | 2026-09-11 | Original blueprint. | — |
 | 2026-09-11 | Added §5 rounding rules, §15.1–15.4 (reverse-charge VAT, cash basis, VAT return, SIE timing), §18.3–18.5 (tolerance removal, opening balances, automation semantics), §20.1 (shadow phase S1/S2), golden paths 31–40, Sprint −1, §36 statutory requirements, §37 receivables lifecycle, §38 open decisions; extended §29–§31. | Review F1–F14, `FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md` |
+| 2026-09-13 | Package C0 executed: §7 event names finalized into `handymate-dashboard/ARCHITECTURE.md` §FK.1 (canonical from now on), `payment_processing` renamed `payment_processing_started`, CI contract test added. | `FINANCIAL_KERNEL_PACKAGE_LOG.md` C0 |
 
 ---
 
