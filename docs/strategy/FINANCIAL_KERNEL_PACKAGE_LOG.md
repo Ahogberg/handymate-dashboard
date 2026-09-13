@@ -326,32 +326,58 @@ docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md                          (handoff 
 No caller outside `lib/financial-kernel/`. No flag. Nothing under `lib/invoices/*`,
 `lib/automation-engine.ts` or `app/api/*` is touched.
 
+### Correction 2026-09-13 — two blocking defects in the first C3 proposal (found by Codex)
+
+Codex reviewed the first version of this brief with runnable reproductions and found two
+defects that would have lost events. Both are real and both were Claude's error:
+
+1. **A row lock cannot protect a batch handled in application code.** `claim_financial_events`
+   took `FOR UPDATE SKIP LOCKED` on the cursor row, but an RPC is its own transaction: the lock
+   is released when the call returns, before the handler runs. Two workers could claim the same
+   batch. *Fix:* the claim is a **lease** written into the row (`lease_token`,
+   `lease_expires_at`), visible state instead of a transaction lock. Ack and fail require the
+   token. An expired lease can be taken over; the old worker's next ack then fails with
+   `financial_consumer_lease_lost` and it stops.
+2. **Ack could jump the cursor past unhandled events.** `ack_financial_event` advanced
+   `last_seq` to the acked event's `seq` whenever it was higher. Acking event 3 first would
+   skip 1 and 2 forever. *Fix:* the database enforces order: an ack is accepted only when no
+   event of that business exists with `last_seq < seq < acked.seq`; otherwise
+   `financial_consumer_ack_out_of_order`. Application discipline is no longer load-bearing.
+
+Also added on Codex's request: `first_attempt_at`/`last_attempt_at` on deliveries, a status view
+for halted consumers and backlog, and lease release. The DDL below replaces the earlier one in
+full; the earlier one is in git history and must not be implemented.
+
 ### Proposed DDL (implement as written; deviations in the handoff with reasons)
 
 ```sql
 BEGIN;
 
 CREATE TABLE IF NOT EXISTS public.financial_event_consumers (
-  business_id      TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
-  consumer         TEXT        NOT NULL CHECK (consumer ~ '^[a-z][a-z0-9_-]{2,63}$'),
-  last_seq         BIGINT      NOT NULL DEFAULT 0,
-  updated_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
-  halted_at        TIMESTAMPTZ NULL,
-  halted_event_id  TEXT        NULL,
-  halted_reason    TEXT        NULL,
+  business_id       TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
+  consumer          TEXT        NOT NULL CHECK (consumer ~ '^[a-z][a-z0-9_-]{2,63}$'),
+  last_seq          BIGINT      NOT NULL DEFAULT 0,
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  lease_token       TEXT        NULL,
+  lease_expires_at  TIMESTAMPTZ NULL,
+  halted_at         TIMESTAMPTZ NULL,
+  halted_event_id   TEXT        NULL,
+  halted_reason     TEXT        NULL,
   PRIMARY KEY (business_id, consumer),
   FOREIGN KEY (business_id, halted_event_id) REFERENCES public.financial_events(business_id, id),
-  CHECK ((halted_at IS NULL) = (halted_event_id IS NULL))
+  CHECK ((halted_at IS NULL) = (halted_event_id IS NULL)),
+  CHECK ((lease_token IS NULL) = (lease_expires_at IS NULL))
 );
 
 CREATE TABLE IF NOT EXISTS public.financial_event_deliveries (
-  business_id   TEXT        NOT NULL,
-  consumer      TEXT        NOT NULL,
-  event_id      TEXT        NOT NULL,
-  attempts      INTEGER     NOT NULL DEFAULT 0 CHECK (attempts >= 0),
-  delivered_at  TIMESTAMPTZ NULL,
-  last_error    TEXT        NULL,
-  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  business_id       TEXT        NOT NULL,
+  consumer          TEXT        NOT NULL,
+  event_id          TEXT        NOT NULL,
+  attempts          INTEGER     NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  first_attempt_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_attempt_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  delivered_at      TIMESTAMPTZ NULL,
+  last_error        TEXT        NULL,
   PRIMARY KEY (business_id, consumer, event_id),
   FOREIGN KEY (business_id, consumer) REFERENCES public.financial_event_consumers(business_id, consumer),
   FOREIGN KEY (business_id, event_id) REFERENCES public.financial_events(business_id, id)
@@ -359,33 +385,62 @@ CREATE TABLE IF NOT EXISTS public.financial_event_deliveries (
 
 ALTER TABLE public.financial_event_consumers  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.financial_event_deliveries ENABLE ROW LEVEL SECURITY;
--- No client policy at all: these are kernel-internal. service_role reads for observability.
 REVOKE ALL ON TABLE public.financial_event_consumers, public.financial_event_deliveries FROM PUBLIC, anon, authenticated, service_role;
 GRANT SELECT ON TABLE public.financial_event_consumers, public.financial_event_deliveries TO service_role;
 
--- Claim: lock this consumer's cursor row, return the next batch strictly after last_seq.
--- Returns nothing while another worker holds the row (SKIP LOCKED) or the consumer is halted.
+-- Observability: backlog and halts per (business, consumer). Read by ops tooling as service_role.
+CREATE OR REPLACE VIEW public.financial_consumer_status AS
+  SELECT c.business_id, c.consumer, c.last_seq,
+         (SELECT count(*) FROM public.financial_events e WHERE e.business_id = c.business_id AND e.seq > c.last_seq) AS backlog,
+         c.lease_expires_at IS NOT NULL AND c.lease_expires_at > now() AS lease_active,
+         c.lease_expires_at, c.halted_at, c.halted_event_id, c.halted_reason, c.updated_at
+    FROM public.financial_event_consumers c;
+REVOKE ALL ON public.financial_consumer_status FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON public.financial_consumer_status TO service_role;
+
+-- Claim = take a lease on the cursor and return the next batch. The lease, not a row lock,
+-- is what excludes other workers, because it survives the end of this call.
 CREATE OR REPLACE FUNCTION public.claim_financial_events(
-  p_business_id TEXT, p_consumer TEXT, p_limit INTEGER
+  p_business_id TEXT, p_consumer TEXT, p_limit INTEGER, p_lease_seconds INTEGER
 ) RETURNS TABLE (
+  lease_token TEXT,
   id TEXT, seq TEXT, business_id TEXT, schema_version INTEGER, event_type TEXT,
   occurred_at TIMESTAMPTZ, effective_date DATE, source_type TEXT, source_id TEXT,
   correlation_id TEXT, causation_id TEXT, idempotency_key TEXT,
   currency TEXT, amount_minor TEXT, payload JSONB, actor_type TEXT, actor_id TEXT, created_at TIMESTAMPTZ
 ) LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE cursor_row public.financial_event_consumers%ROWTYPE;
+DECLARE cursor_row public.financial_event_consumers%ROWTYPE; v_token TEXT; v_count INTEGER;
 BEGIN
   IF p_limit IS NULL OR p_limit < 1 OR p_limit > 500 THEN
     RAISE EXCEPTION 'financial_consumer_bad_limit' USING ERRCODE = 'check_violation';
   END IF;
+  IF p_lease_seconds IS NULL OR p_lease_seconds < 5 OR p_lease_seconds > 3600 THEN
+    RAISE EXCEPTION 'financial_consumer_bad_lease' USING ERRCODE = 'check_violation';
+  END IF;
   INSERT INTO public.financial_event_consumers (business_id, consumer)
     VALUES (p_business_id, p_consumer) ON CONFLICT DO NOTHING;
+  -- Short row lock only to serialise concurrent claim calls; released at return by design.
   SELECT * INTO cursor_row FROM public.financial_event_consumers c
-    WHERE c.business_id = p_business_id AND c.consumer = p_consumer
-    FOR UPDATE SKIP LOCKED;
-  IF NOT FOUND OR cursor_row.halted_at IS NOT NULL THEN RETURN; END IF;
+    WHERE c.business_id = p_business_id AND c.consumer = p_consumer FOR UPDATE;
+  IF cursor_row.halted_at IS NOT NULL THEN RETURN; END IF;
+  IF cursor_row.lease_expires_at IS NOT NULL AND cursor_row.lease_expires_at > now() THEN RETURN; END IF;
+
+  SELECT count(*) INTO v_count FROM public.financial_events e
+   WHERE e.business_id = p_business_id AND e.seq > cursor_row.last_seq;
+  IF v_count = 0 THEN
+    UPDATE public.financial_event_consumers c SET lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+     WHERE c.business_id = p_business_id AND c.consumer = p_consumer;
+    RETURN;
+  END IF;
+
+  v_token := gen_random_uuid()::TEXT;
+  -- Alias required: RETURNS TABLE declares business_id/consumer as OUT parameters.
+  UPDATE public.financial_event_consumers c
+     SET lease_token = v_token, lease_expires_at = now() + make_interval(secs => p_lease_seconds), updated_at = now()
+   WHERE c.business_id = p_business_id AND c.consumer = p_consumer;
+
   RETURN QUERY
-    SELECT e.id, e.seq::text, e.business_id, e.schema_version, e.event_type, e.occurred_at, e.effective_date,
+    SELECT v_token, e.id, e.seq::text, e.business_id, e.schema_version, e.event_type, e.occurred_at, e.effective_date,
            e.source_type, e.source_id, e.correlation_id, e.causation_id, e.idempotency_key,
            e.currency, e.amount_minor::text, e.payload, e.actor_type, e.actor_id, e.created_at
       FROM public.financial_events e
@@ -394,56 +449,87 @@ BEGIN
      LIMIT p_limit;
 END $fn$;
 
--- Ack: record delivery and advance the cursor, but only forward and only to a seq that exists
--- for this business. Called once per successfully handled event, in the handler's own transaction
--- when the handler writes to the database, otherwise immediately after.
-CREATE OR REPLACE FUNCTION public.ack_financial_event(
-  p_business_id TEXT, p_consumer TEXT, p_event_id TEXT
-) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE v_seq BIGINT; v_last BIGINT;
+-- Shared guard: the caller must hold the live lease.
+CREATE OR REPLACE FUNCTION public.assert_financial_consumer_lease(
+  p_business_id TEXT, p_consumer TEXT, p_lease_token TEXT
+) RETURNS public.financial_event_consumers LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE cursor_row public.financial_event_consumers%ROWTYPE;
 BEGIN
+  SELECT * INTO cursor_row FROM public.financial_event_consumers c
+   WHERE c.business_id = p_business_id AND c.consumer = p_consumer FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_consumer_unknown' USING ERRCODE = 'foreign_key_violation'; END IF;
+  IF p_lease_token IS NULL OR cursor_row.lease_token IS DISTINCT FROM p_lease_token
+     OR cursor_row.lease_expires_at IS NULL OR cursor_row.lease_expires_at <= now() THEN
+    RAISE EXCEPTION 'financial_consumer_lease_lost' USING ERRCODE = 'lock_not_available';
+  END IF;
+  RETURN cursor_row;
+END $fn$;
+
+-- Ack: strictly in order. The acked event must be the FIRST unacknowledged event of this
+-- business; otherwise the call raises and nothing moves. Renews the lease.
+CREATE OR REPLACE FUNCTION public.ack_financial_event(
+  p_business_id TEXT, p_consumer TEXT, p_event_id TEXT, p_lease_token TEXT, p_lease_seconds INTEGER
+) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE cursor_row public.financial_event_consumers%ROWTYPE; v_seq BIGINT;
+BEGIN
+  cursor_row := public.assert_financial_consumer_lease(p_business_id, p_consumer, p_lease_token);
   SELECT e.seq INTO v_seq FROM public.financial_events e
    WHERE e.business_id = p_business_id AND e.id = p_event_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'financial_consumer_unknown_event' USING ERRCODE = 'foreign_key_violation'; END IF;
-  SELECT c.last_seq INTO v_last FROM public.financial_event_consumers c
-   WHERE c.business_id = p_business_id AND c.consumer = p_consumer FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'financial_consumer_unknown' USING ERRCODE = 'foreign_key_violation'; END IF;
+
   INSERT INTO public.financial_event_deliveries (business_id, consumer, event_id, attempts, delivered_at)
     VALUES (p_business_id, p_consumer, p_event_id, 1, now())
     ON CONFLICT (business_id, consumer, event_id) DO UPDATE
       SET delivered_at = COALESCE(public.financial_event_deliveries.delivered_at, now()),
-          attempts = public.financial_event_deliveries.attempts + 1, updated_at = now();
-  IF v_seq > v_last THEN
-    UPDATE public.financial_event_consumers SET last_seq = v_seq, updated_at = now()
-     WHERE business_id = p_business_id AND consumer = p_consumer;
-    RETURN true;
+          attempts = public.financial_event_deliveries.attempts + 1, last_attempt_at = now();
+
+  IF v_seq <= cursor_row.last_seq THEN RETURN false; END IF;   -- redelivery, handled idempotently
+  IF EXISTS (SELECT 1 FROM public.financial_events e
+              WHERE e.business_id = p_business_id AND e.seq > cursor_row.last_seq AND e.seq < v_seq) THEN
+    RAISE EXCEPTION 'financial_consumer_ack_out_of_order' USING ERRCODE = 'check_violation', DETAIL = p_event_id;
   END IF;
-  RETURN false;   -- already past it: a redelivery that the handler handled idempotently
+  UPDATE public.financial_event_consumers
+     SET last_seq = v_seq, lease_expires_at = now() + make_interval(secs => p_lease_seconds), updated_at = now()
+   WHERE business_id = p_business_id AND consumer = p_consumer;
+  RETURN true;
 END $fn$;
 
--- Failure: count the attempt; at the threshold halt the consumer for this business. Never advances.
+-- Failure: count the attempt; at the threshold halt the consumer and drop the lease. Never advances.
 CREATE OR REPLACE FUNCTION public.fail_financial_event(
-  p_business_id TEXT, p_consumer TEXT, p_event_id TEXT, p_error TEXT, p_max_attempts INTEGER
+  p_business_id TEXT, p_consumer TEXT, p_event_id TEXT, p_lease_token TEXT, p_error TEXT, p_max_attempts INTEGER
 ) RETURNS TABLE (attempts INTEGER, halted BOOLEAN)
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
 DECLARE v_attempts INTEGER;
 BEGIN
+  PERFORM public.assert_financial_consumer_lease(p_business_id, p_consumer, p_lease_token);
   INSERT INTO public.financial_event_deliveries (business_id, consumer, event_id, attempts, last_error)
     VALUES (p_business_id, p_consumer, p_event_id, 1, left(p_error, 2000))
     ON CONFLICT (business_id, consumer, event_id) DO UPDATE
       SET attempts = public.financial_event_deliveries.attempts + 1,
-          last_error = left(p_error, 2000), updated_at = now()
+          last_error = left(p_error, 2000), last_attempt_at = now()
     RETURNING public.financial_event_deliveries.attempts INTO v_attempts;
   IF v_attempts >= p_max_attempts THEN
     UPDATE public.financial_event_consumers
-       SET halted_at = now(), halted_event_id = p_event_id, halted_reason = left(p_error, 2000), updated_at = now()
+       SET halted_at = now(), halted_event_id = p_event_id, halted_reason = left(p_error, 2000),
+           lease_token = NULL, lease_expires_at = NULL, updated_at = now()
      WHERE business_id = p_business_id AND consumer = p_consumer AND halted_at IS NULL;
     attempts := v_attempts; halted := true; RETURN NEXT; RETURN;
   END IF;
   attempts := v_attempts; halted := false; RETURN NEXT;
 END $fn$;
 
--- Resume: explicit, audited, privileged. Clears the halt; the same event is redelivered first.
+-- Release: end of batch. Idempotent; a lost lease releases nothing and returns false.
+CREATE OR REPLACE FUNCTION public.release_financial_consumer_lease(
+  p_business_id TEXT, p_consumer TEXT, p_lease_token TEXT
+) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+BEGIN
+  UPDATE public.financial_event_consumers
+     SET lease_token = NULL, lease_expires_at = NULL, updated_at = now()
+   WHERE business_id = p_business_id AND consumer = p_consumer AND lease_token = p_lease_token;
+  RETURN FOUND;
+END $fn$;
+
+-- Resume: explicit, audited, privileged. Clears the halt; the halted event is redelivered first.
 CREATE OR REPLACE FUNCTION public.resume_financial_consumer(
   p_business_id TEXT, p_consumer TEXT, p_actor_id TEXT, p_reason TEXT
 ) RETURNS BOOLEAN LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
@@ -453,32 +539,38 @@ BEGIN
   END IF;
   UPDATE public.financial_event_consumers
      SET halted_at = NULL, halted_event_id = NULL,
-         halted_reason = 'resumed by ' || p_actor_id || ': ' || left(p_reason, 500), updated_at = now()
+         halted_reason = 'resumed by ' || p_actor_id || ': ' || left(p_reason, 500),
+         lease_token = NULL, lease_expires_at = NULL, updated_at = now()
    WHERE business_id = p_business_id AND consumer = p_consumer AND halted_at IS NOT NULL;
   RETURN FOUND;
 END $fn$;
 
-REVOKE ALL ON FUNCTION public.claim_financial_events(TEXT, TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.ack_financial_event(TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.fail_financial_event(TEXT, TEXT, TEXT, TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.claim_financial_events(TEXT, TEXT, INTEGER, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.assert_financial_consumer_lease(TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON FUNCTION public.ack_financial_event(TEXT, TEXT, TEXT, TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.fail_financial_event(TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.release_financial_consumer_lease(TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON FUNCTION public.resume_financial_consumer(TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.claim_financial_events(TEXT, TEXT, INTEGER) TO service_role;
-GRANT EXECUTE ON FUNCTION public.ack_financial_event(TEXT, TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION public.fail_financial_event(TEXT, TEXT, TEXT, TEXT, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.claim_financial_events(TEXT, TEXT, INTEGER, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.ack_financial_event(TEXT, TEXT, TEXT, TEXT, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.fail_financial_event(TEXT, TEXT, TEXT, TEXT, TEXT, INTEGER) TO service_role;
+GRANT EXECUTE ON FUNCTION public.release_financial_consumer_lease(TEXT, TEXT, TEXT) TO service_role;
 GRANT EXECUTE ON FUNCTION public.resume_financial_consumer(TEXT, TEXT, TEXT, TEXT) TO service_role;
 
 COMMIT;
 ```
 
-**Verified 2026-09-13 before briefing:** the DDL above was executed in PGlite on top of
-`v235` and probed (17 cases): claim returns the first three in `seq` order and nothing beyond
-the cursor; ack advances only forward and returns `false` for an older event; ack of another
-business's event raises `financial_consumer_unknown_event`; five failures halt the consumer,
-claim then returns nothing while business B is unaffected; resume without a reason raises;
-after resume the halted event is redelivered first; `limit > 500` raises; `service_role`
-cannot insert into the cursor table but can claim; `authenticated` can neither claim nor read.
-Not probed here: `SKIP LOCKED` across sessions and the commit-order proof — both need two
-connections (invariants 1 and 8, the Postgres CI job).
+**Verified 2026-09-13 (corrected version) in PGlite on top of `v235` from `main`, 24 probes:**
+worker A claims three; B's claim returns nothing while A's lease is live; acking the second
+event before the first raises `financial_consumer_ack_out_of_order` and `last_seq` stays 0;
+in-order acks advance; re-acking a delivered event returns `false`; after the lease is expired
+(superuser test hook) B gets the same batch with a new token and A's ack and fail both raise
+`financial_consumer_lease_lost`; the status view shows backlog 2 and an active lease; release
+is idempotent; five failures halt the consumer and drop its lease; a halted consumer claims
+nothing while business B is unaffected; resume redelivers the halted event first; a lease under
+5 s is rejected; `service_role` cannot call the lease assertion but can read the status view;
+`authenticated` cannot read the view. Still needing two sessions (Postgres CI job): the
+commit-order proof and a genuinely concurrent claim race.
 
 Note the deliberate asymmetry: `resume_financial_consumer` writes the actor and reason into the
 row itself, because the kernel has no audit table yet (C4 `audit/`). When it exists, resume
@@ -507,11 +599,19 @@ export function idempotencyKey(domain: string, source: string, id: string, discr
 
 // consume.ts
 export interface FinancialEventHandler { readonly consumer: string; handle(e: FinancialEventEnvelope, db: KernelDb): Promise<void> }
-export interface ConsumeResult { claimed: number; delivered: number; failed: number; halted: boolean }
-export async function consumeOnce(db: KernelDb, businessId: string, handler: FinancialEventHandler, opts?: { limit?: number; maxAttempts?: number }): Promise<ConsumeResult>
-// claim → for each event in seq order: if a delivery with delivered_at exists, ack (idempotent redelivery) and continue;
-// else handler.handle(); on success ack; on throw fail_financial_event and STOP the batch (never continue past a failure).
+export interface ConsumeResult { claimed: number; delivered: number; failed: number; halted: boolean; leaseLost: boolean }
+export async function consumeOnce(db: KernelDb, businessId: string, handler: FinancialEventHandler,
+  opts?: { limit?: number; maxAttempts?: number; leaseSeconds?: number; handlerTimeoutMs?: number }): Promise<ConsumeResult>
+// claim(limit, leaseSeconds) → keep the lease token; for each event IN SEQ ORDER:
+//   if a delivery with delivered_at exists → ack (idempotent redelivery) and continue;
+//   else handler.handle() under handlerTimeoutMs (must be well below leaseSeconds);
+//   on success → ack(token) (renews lease); on throw → fail(token) and STOP the batch;
+//   on financial_consumer_lease_lost from ack/fail → STOP immediately, leaseLost: true, record nothing else.
+// finally release(token). A handler that writes to the database should do so in a transaction
+// that also performs the ack; the RPC allows it because the lease, not a lock, is the guard.
 export const MAX_ATTEMPTS_DEFAULT = 5
+export const LEASE_SECONDS_DEFAULT = 60
+export const HANDLER_TIMEOUT_MS_DEFAULT = 20_000
 
 // bridge-automation.ts
 export const AUTOMATION_BRIDGE_CONSUMER = 'automation-bridge'
@@ -523,17 +623,37 @@ touches `amount_minor` as a number (the C2 source-scan test pattern applies here
 
 ### Invariants (tests first)
 
-1. Claim returns events strictly after `last_seq`, in `seq` order, capped by `limit`; a second claim in the same transaction returns nothing (row locked); a claim from another session returns nothing (SKIP LOCKED) rather than the same batch.
-2. Ack advances the cursor only forward; acking an older event returns `false` and leaves `last_seq`; acking an unknown event or a foreign business's event raises.
-3. Crash-after-handle-before-ack: the event is claimed again on the next `consumeOnce`; the handler sees it twice; the delivery row shows the redelivery. This is the at-least-once proof.
-4. Handler failure: `attempts` increments, cursor does not move, the batch stops at that event, later events in the batch are not handled; at `maxAttempts` the consumer is halted, `claim` returns nothing, and `consumeOnce` reports `halted: true`.
-5. Resume requires actor and reason; after resume the halted event is the first redelivered.
-6. A halted consumer for business A does not affect consumer state for business B, nor other consumers for A.
-7. `anon`/`authenticated` cannot call any of the four RPCs nor read either table; `service_role` can read both tables and cannot INSERT/UPDATE them directly.
-8. **Two-connection commit-order proof** (real Postgres job): connection 1 `BEGIN`, appends event X for business A and holds the transaction open; connection 2 appends event Y for A — it must block (advisory lock) and, after 1 commits, receive a higher `seq`; a consumer polling throughout never observes Y before X. Skipped with a clear message when the database URL env var is absent, and registered in the `durable-followup-postgres` CI job so it runs in CI.
-9. `appendFinancialEvent` round-trips a payload with `amount` above `2^53` through the fake `KernelDb` (which returns text bigints) without loss; the source-scan assertion forbids `Number(` on `amount_minor`/`seq` in `publish.ts`/`consume.ts`.
-10. The contract test still passes: `bridge-automation.ts` exists and contains no `fireEvent(` call yet; no event-like literal outside the catalogue.
+1. **Lease excludes a second worker:** after worker A claims, worker B's claim returns nothing
+   while the lease is live; after the lease expires (test: set `lease_expires_at` in the past
+   as superuser), B's claim returns the same batch with a new token, and A's subsequent ack or
+   fail raises `financial_consumer_lease_lost`. Proven in PGlite with two tokens; proven across
+   two sessions in the Postgres CI job.
+2. **Ack is strictly ordered:** acking the second event before the first raises
+   `financial_consumer_ack_out_of_order` and `last_seq` does not move; acking in order advances;
+   acking an event at or below `last_seq` returns `false` (redelivery).
+3. Crash-after-handle-before-ack: after lease expiry the event is claimed again; the handler
+   sees it twice; the delivery row shows the redelivery. At-least-once proof.
+4. Handler failure: `attempts` increments, cursor does not move, the batch stops; at
+   `maxAttempts` the consumer halts, its lease is dropped, `claim` returns nothing,
+   `financial_consumer_status.halted_at` is set, and `consumeOnce` reports `halted: true`.
+5. Resume requires actor and reason; after resume the halted event is redelivered first.
+6. A halt or lease for business A does not affect business B, nor other consumers of A.
+7. `anon`/`authenticated` cannot call any RPC nor read either table or the status view;
+   `service_role` can read all three and cannot INSERT/UPDATE the tables directly;
+   `assert_financial_consumer_lease` is not callable by `service_role` either.
+8. **Two-connection commit-order proof** (real Postgres job): connection 1 `BEGIN`, appends
+   event X for business A and holds the transaction open; connection 2 appends event Y for A —
+   it must block (advisory lock) and, after 1 commits, receive a higher `seq`; a consumer
+   polling throughout never observes Y before X. Skipped with a clear message when the
+   database URL env var is absent, registered in the `durable-followup-postgres` CI job.
+9. `appendFinancialEvent` round-trips a payload with `amount` above `2^53` through the fake
+   `KernelDb` without loss; the source-scan assertion forbids `Number(` on `amount_minor`/`seq`
+   in `publish.ts`/`consume.ts`.
+10. The contract test still passes: `bridge-automation.ts` exists and contains no `fireEvent(`
+    call yet; no event-like literal outside the catalogue.
 11. `idempotencyKey` and `correlationId` reject empty segments and produce exactly the FK.2 formats.
+12. `financial_consumer_status.backlog` equals the count of events above `last_seq`, and
+    `lease_active` flips to false at expiry without any write.
 
 ### Acceptance (orchestration §5 C3 + §9)
 
@@ -603,6 +723,22 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 | LOW | Callers will hold VAT rates as `25` and ROT as `30`; a `ratioFromPercent` helper belongs in the first caller package (C4), not here. | note for C4 |
 | accepted | `fromLegacyNumber` interprets the number's shortest decimal representation (so `1.005` → `1.01` under HALF_UP, `0.1 + 0.2` → `0.30`). That is the right reading of a legacy `NUMERIC` column that passed through a JS number. Documented in the source. | — |
 | accepted | `equals`/`compare` throw on currency mismatch rather than returning `false`. Brief-mandated; a filter across currencies must group by currency first. | — |
+
+### C3 brief (first version), Codex review 2026-09-13 — two BLOCKERs, both accepted
+
+Codex reviewed Claude's C3 brief before implementing and reproduced two defects with runnable
+tests: (1) `claim_financial_events` relied on a row lock that is released when the RPC returns,
+so two workers could process the same batch; (2) `ack_financial_event` could advance the cursor
+past unhandled events. Both were Claude's errors in the proposal. The brief in §3 is rewritten:
+leases instead of locks, database-enforced ack order, delivery timestamps, a status view, and
+lease release. Corrected DDL re-verified in PGlite (24 probes). Review-of-the-reviewer is the
+orchestration working as intended (§1: parallel reasoning, serialised ownership).
+
+| Sev | Finding | Status |
+|---|---|---|
+| BLOCKER | Row lock does not survive the RPC; batch can be double-claimed. | fixed in the brief (lease) |
+| BLOCKER | Ack can skip events. | fixed in the brief (ordered ack enforced in SQL) |
+| MEDIUM | Retry log lacked attempt timestamps; halted consumers had no reporting surface. | fixed (`first/last_attempt_at`, `financial_consumer_status`) |
 
 ### C2 — `financial_events` (PR #50), Claude review 2026-09-13, orchestration §6 A + C
 
