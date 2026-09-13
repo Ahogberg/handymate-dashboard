@@ -21,8 +21,27 @@ test('Nordström El: session → navigering → valt utkast → återöppning', 
     }
   }
   const get = (path: string) => request(path)
-  const health = await json(await get('/api/health'), 'Testversionens hälsa')
+
+  // /api/health is also the release provider gate. A genuine provider-credit
+  // outage must keep release degraded, but it must not prevent this deliberately
+  // read-only UI/session proof from verifying Home/Quote state. Credentials are
+  // still withheld unless we reached the exact expected version, the database is
+  // healthy and every non-provider precondition is green. We do not weaken the
+  // health route itself or reinterpret provider readiness as passing.
+  const healthResponse = await get('/api/health')
+  expect([200, 503], `Testversionens hälsa: HTTP ${healthResponse.status()}`).toContain(healthResponse.status())
+  const health = await healthResponse.json()
   expect(health.version, 'Fel driftsatt kodversion; inga inloggningsuppgifter skickas').toBe(cfg.version)
+  expect(health?.checks?.database, 'Databasen måste vara frisk före inloggning').toBe('ok')
+  const healthErrors = Object.entries(health?.checks ?? {})
+    .filter(([, status]) => status === 'error')
+    .map(([key]) => key)
+  const nonProviderErrors = healthErrors.filter(key => key !== 'credit_watch')
+  expect(nonProviderErrors, `Icke-providerfel i hälsogrinden: ${nonProviderErrors.join(', ')}`).toEqual([])
+  if (healthResponse.status() === 503) {
+    expect(healthErrors.length > 0 && healthErrors.every(key => key === 'credit_watch'),
+      `503 får bara tolereras i läsprovet när credit_watch ensam är röd; fel: ${healthErrors.join(', ')}`).toBe(true)
+  }
 
   const auth = await json(await request('/api/auth', {
     method: 'POST',
@@ -126,6 +145,7 @@ test('Nordström El: session → navigering → valt utkast → återöppning', 
   await info.attach('bevis', { contentType: 'application/json', body: Buffer.from(JSON.stringify({
     origin: cfg.origin, observedVersion: health.version, runnerCommit: process.env.GITHUB_SHA,
     businessId: cfg.businessId, draftRequested: cfg.createDraft, quoteId,
-    blockedBrowserWrites: Array.from(blocked), limitation: 'Inga externa leveranskvitton; UI-skrivningar blockeras. Utkast skapas via appens API och återöppnas i UI.',
+    healthStatus: health.status, healthErrors,
+    blockedBrowserWrites: Array.from(blocked), limitation: 'Inga externa leveranskvitton; UI-skrivningar blockeras. Providerfel i credit_watch kan tolereras endast för detta läsprov och kvarstår som separat releaseblocker. Utkast skapas via appens API och återöppnas i UI.',
   }, null, 2)) })
 })
