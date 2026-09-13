@@ -767,6 +767,9 @@ tills paketet som inför eventet mergas — då byts markeringen i **samma PR**.
 Belopp i payload är alltid **minor units** (öre) som heltal, aldrig `number` med decimaler,
 och alltid med `currency`. Fält märkta † är obligatoriska från dag ett därför att det svenska
 landspaketet inte kan fyllas på i efterhand utan migration (blueprint §15.1–15.2).
+Källan för †-fälten från C4: `invoice.vat_regime` (default `'standard'`) och
+`business_config.accounting_method` (default `'accrual'`), båda införda i C4 som minsta möjliga
+datamodelländring; evidens för köparstatus och UI för regimval är C9.
 
 **Fordran (kommersiell)**
 
@@ -775,15 +778,15 @@ landspaketet inte kan fyllas på i efterhand utan migration (blueprint §15.1–
 | `invoice_issued` | En faktura får sitt nummer och ställs ut (skickas eller importeras redan utställd). Inte när ett utkast skapas — det är automationsmotorns `invoice_created`. | `{ invoice_id, invoice_number, customer_id, project_id?, currency, total_minor, vat_regime†: 'standard'\|'reverse_charge_construction', accounting_method†: 'accrual'\|'cash', issued_date, due_date, tax_reduction?: 'rot'\|'rut' }` | C4 | ❌ |
 | `invoice_credited` | En kreditfaktura ställs ut mot en faktura. | `{ invoice_id, credit_invoice_id, currency, amount_minor, issued_date }` | C4 | ❌ |
 | `receivable_created` | En fordranskomponent skapas. En ROT/RUT-faktura ger två: kundens del och Skatteverkets. | `{ receivable_id, invoice_id, component: 'customer'\|'tax_authority', owner: 'business'\|'factor', currency, amount_minor, due_date }` | C4 | ❌ |
-| `receivable_adjusted` | Komponentens belopp eller ägare ändras utan betalning. Täcker kredit, avskrivning, påminnelseavgift, ränta, avrundning och ägarbyte (factoring). | `{ receivable_id, reason: 'credit'\|'write_off'\|'dunning_fee'\|'interest'\|'rounding'\|'ownership_transfer', delta_minor?, owner_after? }` | C4 / C14 | ❌ |
-| `receivable_settled` | En komponent är fullt allokerad. | `{ receivable_id, invoice_id, component, settled_at }` | C4 | ❌ |
+| `receivable_adjusted` | Komponentens belopp eller ägare ändras utan betalning. Täcker kredit, avskrivning, påminnelseavgift, ränta, avrundning, ägarbyte (factoring) och omklassning mellan komponenter (Skatteverket betalar mindre än begärt: resten flyttar till kunden). Omklassning ger två event, ett per komponent. | `{ receivable_id, reason: 'credit'\|'write_off'\|'dunning_fee'\|'interest'\|'rounding'\|'ownership_transfer'\|'reclassification', delta_minor?, owner_after?, from_component?, to_component? }` | C4 / C14 | ❌ |
+| `receivable_settled` | En komponent är fullt allokerad, eller nollställd av en **avrundningsjustering** på en komponent som har allokering (golden path 36). Kredit, avskrivning och omklassning nollställer utan detta event: komponenten blir `closed`, inte `settled`, och bryggan tiger (golden path 10). | `{ receivable_id, invoice_id, component, settled_at }` | C4 | ❌ |
 
 **Pay (pengarörelse)** — gäller *alla* betalningar, även manuell "markera betald" (`provider: 'manual'`) och Fortnox-import (`provider: 'fortnox'`). Det finns ingen sidoväg där en betalning uppdaterar en faktura utan att bli ett `payment_settled` (blueprint §18.2).
 
 | Event | Triggas när | Primär payload | Paket | Finns |
 |-------|-------------|----------------|-------|-------|
 | `payment_intent_created` | En betalningsavsikt skapas (Pay-länk, Swish-QR, kortsession). | `{ payment_intent_id, invoice_id?, receivable_ids[], currency, amount_minor, provider, method }` | C7 | ❌ |
-| `payment_initiated` | En betalning existerar hos leverantören eller registreras manuellt. Tillstånd `created → pending`. | `{ payment_id, payment_intent_id?, provider, provider_ref?, direction: 'inbound'\|'outbound', currency, amount_minor }` | C4 (manual/fortnox), C7 | ❌ |
+| `payment_initiated` | En betalning existerar hos leverantören eller registreras manuellt. Tillstånd `created → pending`. `provider` är `'manual'`, `'fortnox'`, `'skatteverket'` (ROT/RUT-utbetalning) eller en PSP-identifierare (C7). | `{ payment_id, payment_intent_id?, provider, provider_ref?, direction: 'inbound'\|'outbound', currency, amount_minor }` | C4 (manual/fortnox/skatteverket), C7 | ❌ |
 | `payment_authorized` | Leverantören har reserverat beloppet. Tillstånd `→ authorized`. | `{ payment_id, provider_ref }` | C7 | ❌ |
 | `payment_processing_started` | Leverantören bearbetar/kapar betalningen. Tillstånd `→ processing`. | `{ payment_id, provider_ref }` | C7 | ❌ |
 | `payment_settled` | Pengarna är faktiskt mottagna eller (för manuell/Fortnox) registrerade som mottagna. Tillstånd `→ settled`. | `{ payment_id, currency, amount_minor, fee_minor?, settled_at, evidence: 'provider'\|'manual'\|'fortnox'\|'bank' }` | C4, C7 | ❌ |
