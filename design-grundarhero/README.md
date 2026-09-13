@@ -24,6 +24,13 @@ skugga, 12px-radier) så skissen går att föra in utan omtolkning.
 | `Accounting.dc.html` | Sektionen under heron — vad priset gäller, och bokföringen |
 | `canvas.json` | Layout och anteckningar |
 
+**"Ytor" är internt och står inte i kundtext** (Andreas 2026-09-13: det säger
+inget). Villkoret uttrycks i stället som "Handymate gör åtta saker för dig —
+gör minst fyra av dem", med de åtta namngivna i samma ordalydelse som
+`lib/admin/adoption.ts` YTOR och kundens egen räknare på
+`/dashboard/min-garanti`. Ändras listan på ett ställe måste den ändras på
+båda — det är villkoret kunden bedöms på.
+
 Platsräknaren är en reglage här (tagna av totalt) för att kunna se hur olika
 lägen känns. **I skarp drift måste talet komma från grinden
 (`lib/billing/founders-offer.ts`) — annars ingen siffra alls.**
