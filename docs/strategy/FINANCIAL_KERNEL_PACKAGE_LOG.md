@@ -29,9 +29,9 @@ Rules that keep this file honest:
 |---|---|---|---|---|
 | P0 | Merchant-of-record decision (D1) | Owner (Andreas) | **open** | — |
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
-| C1 | Money primitives | Codex | **reviewed — MEDIUM corrected; merge gates pending** | CI |
+| C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema | Codex | not started (brief sketch in §4) | C1 |
+| C2 | `financial_events` schema + append RPC | Codex | **reviewed — all three findings corrected** | migration unapplied |
 | C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
 | C4 | Receivables + allocations behind flag | Codex | not started | C1, C2, C3 |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
@@ -65,6 +65,86 @@ Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind t
 ---
 
 ## 2. Handoffs
+
+### C2 — financial event store (Codex, 2026-09-13)
+
+```text
+Package / scope
+  C2 only: immutable financial_events schema, service-only append RPC, typed
+  envelope/row conversion, and executable tests against the real migration.
+Files changed
+  handymate-dashboard/sql/v235_financial_events.sql
+  handymate-dashboard/lib/financial-kernel/events/types.ts
+  handymate-dashboard/tests/financial-kernel-events-sql.spec.ts
+  handymate-dashboard/lib/account/radera.ts (required retention classification only)
+  handymate-dashboard/package.json (registration)
+  .github/workflows/contracts.yml (registration)
+  docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md (brief and this handoff)
+Architecture sections relied on
+  ARCHITECTURE.md FK.1-FK.2; blueprint 6, 7, 8, 21, 26, 36.2;
+  orchestration 5 C2, 6 A+C, 7, 9; this log's C2 brief.
+Canonical events touched
+  All 32 names in the database CHECK, exact parity tested against catalog.ts.
+  Nine C4 payloads typed verbatim from FK.1; other payloads are never.
+DB/RPC changes
+  financial_events, indexes/constraints, immutable trigger, append_financial_event.
+  NOT APPLIED to any remote/test/production environment. No backfill or caller.
+Feature flags
+  None. C4 still owns financial_kernel_enabled; no behavior switched on.
+Golden paths added/updated
+  Isolated database proofs for repeat append, conflicting retry, same-tenant
+  causation and rejected cross-tenant chains, membership reads, immutable history,
+  client denial, safe BIGINT transport and transaction rollback.
+Invariants affected
+  All eleven brief invariants, plus retention FK and unsafe numeric transport.
+  Tests were written first; collection failed before types.ts existed. After
+  installing the proposed DDL verbatim the inherited-service-grants test failed;
+  it passes with the correction below. Real is_business_member body is extracted
+  from the repository migration; auth.uid and tenant tables are isolated fixtures.
+DDL deviations from the proposal, with reasons
+  Replaced service_role's UPDATE/DELETE/TRUNCATE revoke with REVOKE ALL then
+  GRANT SELECT, and revoked sequence rights from PUBLIC/anon/authenticated/service_role.
+  Reason: inherited/default INSERT and sequence grants otherwise bypass the RPC,
+  business lock and idempotency checks. The harness deliberately installs broad
+  service default grants before the migration and proves this failure/correction.
+  SECURITY DEFINER still appends as the migration owner; service_role can read and
+  execute the RPC but cannot write directly. Header records the mandated lock order.
+  Claude review corrections: removed FORCE RLS so the non-bypass owner can append; RPC now returns a flat row with TEXT seq/amount_minor; replay comparison also guards correlation, source, causation and effective_date. Actor and occurred_at deliberately remain first-write values on retry.
+Scope deviation required by the existing CI contract
+  lib/account/radera.ts now classifies financial_events in BEHALLS. The existing
+  kontoradering completeness gate failed because every new business_id table must
+  be classified. This implements C2's retain-history requirement without changing
+  deletion logic or selecting retention/anonymisation policy. Seven files in total.
+Known unresolved questions / limits of evidence
+  PGlite is single-session: 200 ordered appends and lock placement are verified,
+  not competing transactions' commit order. C3 must add a multi-connection Postgres
+  concurrency proof before a consumer relies on seq. Sequence gaps are intentional.
+  UPDATE/DELETE normally fail at the privilege boundary for service_role. The
+  trigger is separately proven as owner and with test-only temporary grants.
+  TRUNCATE is prevented by grants, not by a trigger against a database administrator.
+  Correction to the brief's deletion assumption: the existing account deletion path
+  soft-deletes business_config. RESTRICT rejects a hard DELETE, as tested, but does
+  not itself block that existing soft-delete flow. Track G remains necessary.
+  The append RPC compares event type, payload,
+  amount, currency and chain identity; retry actor and occurred_at do not replace
+  the first event. Payload-shape/business semantics are future writers' responsibility.
+  Row mappers require string BIGINT transport, rejecting number input. The RPC supplies
+  text fields and is tested through to_jsonb plus JSON.parse, for append and replay. Raw table JSON is
+  still unsafe: future read views/RPCs must cast both BIGINT columns. Payload amounts remain the brief's number
+  minor units; their owning packages must enforce the safe integer bound.
+Open decisions encountered and left unresolved
+  D1-D4, R0 and C1b remain unchanged. No retention/anonymisation decision made.
+Swedish regime coverage: reverse charge / cash basis / ROT-RUT / cut-over
+  Payload fields retain regime/method/tax-reduction and separate receivable
+  components. No posting, VAT calculation, accounting rule or historical replay.
+  RESTRICT intentionally exposes account-retention work to track G.
+Human accounting review required? yes/no — and by whom, by name
+  No for C2 storage mechanics. Named accountant still required for R0/C1b/C9.
+```
+
+Verification: 15 C2 tests, including the eleven brief invariants; 79 tests in
+the combined C2/C0/C1/schema/dead-code/CI-registration/account-deletion pass. TypeScript and remote
+CI status are recorded on the PR. Claude review of dimensions A and C is recorded below; its HIGH and two MEDIUM findings are corrected.
 
 ### C1 — Money primitives (Codex, 2026-09-13)
 
@@ -198,103 +278,309 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 
 ---
 
-## 3. Next package — Codex brief: C1 Money primitives
+## 3. Next package — Codex brief: C2 `financial_events` schema + append RPC
 
-Read first, in this order: `handymate-dashboard/ARCHITECTURE.md` §FK.0–FK.6,
-`FINANCIAL_KERNEL_ARCHITECTURE.md` §5 (all of it, including "Rounding differences are postings,
-never tolerances"), `FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md` §5 C1, §6 A, §9.
-Then the legacy code you are **not** allowed to change but must understand:
-`lib/invoices/customer-share.ts`, `lib/invoices/payment-decision.ts`, `lib/invoices/fortnox-rows.ts`.
+Read first, in this order: `handymate-dashboard/ARCHITECTURE.md` §FK.1–FK.2 (the table and
+the envelope rules are the contract), `FINANCIAL_KERNEL_ARCHITECTURE.md` §6, §7, §8, §21, §26,
+§36.2, orchestration §5 C2, §6 A+C, §9. Then the repo conventions this brief was derived from:
+`sql/v231_sales_case.sql` (RLS shape), `sql/v97_atomic_quote_signing.sql` (RPC grants),
+`sql/testbed_tenant_isolation.sql` (`is_business_member`), `tests/sprint/invoice-acceptance-sql.cjs`
+and `tests/helpers/job-standard-db.ts` (PGlite harness with the real migration and an
+`auth.uid()` stub), `tasks/lessons.md` 2026-09-06 (every `.rpc('x')` needs `CREATE FUNCTION x`).
+
+### Claude track A — schema and tenant review (2026-09-13)
+
+This is the proposed DDL. Codex implements it as written; deviations go in the handoff block
+with a reason. Decisions embedded here, so they are not re-litigated in code review:
+
+| Decision | Why |
+|---|---|
+| Ids are `TEXT DEFAULT gen_random_uuid()::TEXT`, `business_id TEXT` | Repo convention (145 tables). Not ULID: ordering comes from `seq`, not from the id. |
+| `seq BIGSERIAL` + per-business advisory lock in the append RPC | Gives consumers a cursor whose order equals commit order **per business**. Without the lock a lower `seq` can become visible after a higher one and a cursor-based consumer skips it forever. C3 builds on this; the table is the outbox. |
+| `amount_minor BIGINT` + `currency`, not `NUMERIC(20,4)` | C0 fixed payload amounts as integer minor units; the mirror column follows. Postgres returns BIGINT as a string in node-postgres: always `money(BigInt(row.amount_minor), row.currency)`, never `Number()`. This closes the C0 "known unresolved question". |
+| `event_type` CHECK constraint listing the catalogue | Adding an event now requires a migration. That friction is the point of C0. The contract test already scans any migration mentioning `financial_events`. |
+| Composite FK `(business_id, causation_id) → (business_id, id)` | Tenant integrity of the causation chain enforced by the database, not by application code. |
+| No UPDATE/DELETE, ever: trigger + REVOKE from `service_role` too | Immutability is the invariant everything else rests on (parent §22 Ledger). Corrections are new events. |
+| `business_id` FK → `business_config` **ON DELETE RESTRICT** | Räkenskapsinformation must be retained (parent §36.2). The existing deletion path `lib/account/radera.ts` will fail once a business has events. That is correct and deliberate; the retention/anonymisation design is Claude track G's question, not C2's. Do not change to CASCADE. |
+| RLS: SELECT for active members via `is_business_member`; no INSERT policy for `authenticated` | Writes go only through the RPC as `service_role`. Finer `see_financials`-style permission stays application-level as today (`lib/auth/record-ownership.ts`). |
+| Idempotent append returns the existing row, but a **different payload under the same key raises** `financial_event_idempotency_conflict` | Same pattern as `invoice_request_changed` in the invoice-acceptance RPC. Silent success on changed content hides a bug. |
+
+Concurrency and deadlock rules that later RPCs must follow (write them in the migration header):
+
+1. Lock order is always: business advisory lock (`pg_advisory_xact_lock(hashtext('financial:' || business_id))`) → domain row locks (`invoice`, `payment` …) → insert event. Every RPC in C3–C8 takes the advisory lock first through `append_financial_event`, or takes it itself before any row lock. Never the reverse.
+2. `seq` is not gapless. Consumers use it as an ordering cursor only.
+3. The RPC is one statement per event. Batching several events in one RPC is a C3 decision.
+
+Migration/backfill: none. No historical events are synthesised (parent §18.4). The table starts empty for every business and stays empty until `financial_kernel_enabled` (C4).
 
 ### Scope
 
-One file with pure functions and one browserless test file. Nothing else.
-
 ```text
-handymate-dashboard/lib/financial-kernel/money.ts          (new)
-handymate-dashboard/tests/financial-kernel-money.spec.ts   (new; add to test:contracts in
-                                                            package.json and to the browserless
-                                                            list in .github/workflows/contracts.yml,
-                                                            directly after financial-kernel-event-contract.spec.ts)
+handymate-dashboard/sql/v235_financial_events.sql                      (new)
+handymate-dashboard/lib/financial-kernel/events/types.ts               (new; envelope + payload map)
+handymate-dashboard/tests/financial-kernel-events-sql.spec.ts          (new; PGlite, runs the real migration)
+handymate-dashboard/package.json, .github/workflows/contracts.yml      (register the test after financial-kernel-money.spec.ts)
+docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md                          (handoff block)
 ```
 
-No import from `lib/invoices/*`, `lib/fortnox/*` or anything outside `lib/financial-kernel/`.
-No caller of `money.ts` anywhere yet — that starts in C4. Existing invoice arithmetic is
-untouched (orchestration C1: "must not alter existing invoice calculations globally").
+No publish/consume code, no outbox worker, no caller. No flag column. Nothing under
+`lib/invoices/*` is touched.
 
-### Contract (fixed — internals are yours)
+### Proposed DDL (implement as written)
+
+```sql
+BEGIN;
+
+CREATE TABLE IF NOT EXISTS public.financial_events (
+  id               TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  seq              BIGSERIAL   NOT NULL,
+  business_id      TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
+  schema_version   INTEGER     NOT NULL CHECK (schema_version >= 1),
+  event_type       TEXT        NOT NULL CHECK (event_type IN (
+    -- generated from lib/financial-kernel/events/catalog.ts; the contract test verifies parity
+    'invoice_issued', 'invoice_credited', 'receivable_created', 'receivable_adjusted', 'receivable_settled',
+    'payment_intent_created', 'payment_initiated', 'payment_authorized', 'payment_processing_started',
+    'payment_settled', 'payment_failed', 'payment_cancelled', 'payment_refunded', 'payment_disputed',
+    'payout_created', 'payout_settled',
+    'payment_allocated', 'payment_allocation_reversed', 'bank_transaction_imported',
+    'reconciliation_matched', 'reconciliation_unmatched', 'reconciliation_reversed',
+    'journal_entry_posted', 'journal_entry_reversed', 'period_locked', 'period_unlocked',
+    'payment_divergence_detected', 'accounting_divergence_detected',
+    'supplier_invoice_approved', 'payable_created', 'supplier_payment_settled', 'payable_settled'
+  )),
+  occurred_at      TIMESTAMPTZ NOT NULL,
+  effective_date   DATE        NULL,
+  source_type      TEXT        NOT NULL CHECK (source_type <> ''),
+  source_id        TEXT        NOT NULL CHECK (source_id <> ''),
+  correlation_id   TEXT        NOT NULL CHECK (correlation_id LIKE 'fin\_%'),
+  causation_id     TEXT        NULL,
+  idempotency_key  TEXT        NOT NULL CHECK (idempotency_key <> ''),
+  currency         TEXT        NULL CHECK (currency ~ '^[A-Z]{3}$'),
+  amount_minor     BIGINT      NULL,
+  payload          JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  actor_type       TEXT        NOT NULL CHECK (actor_type IN ('system','user','provider','import','agent')),
+  actor_id         TEXT        NULL,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (business_id, id),
+  UNIQUE (business_id, idempotency_key),
+  UNIQUE (seq),
+  FOREIGN KEY (business_id, causation_id) REFERENCES public.financial_events(business_id, id),
+  CHECK ((currency IS NULL) = (amount_minor IS NULL)),
+  CHECK (actor_type NOT IN ('user','agent') OR actor_id IS NOT NULL),
+  CHECK (jsonb_typeof(payload) = 'object')
+);
+
+CREATE INDEX IF NOT EXISTS idx_financial_events_business_seq
+  ON public.financial_events (business_id, seq);
+CREATE INDEX IF NOT EXISTS idx_financial_events_correlation
+  ON public.financial_events (business_id, correlation_id, seq);
+CREATE INDEX IF NOT EXISTS idx_financial_events_type_time
+  ON public.financial_events (business_id, event_type, occurred_at);
+CREATE INDEX IF NOT EXISTS idx_financial_events_source
+  ON public.financial_events (business_id, source_type, source_id);
+
+-- Immutable. Corrections are new events; there is no second path.
+CREATE OR REPLACE FUNCTION public.financial_events_immutable() RETURNS trigger
+LANGUAGE plpgsql AS $fn$
+BEGIN
+  RAISE EXCEPTION 'financial_events_immutable' USING ERRCODE = 'restrict_violation';
+END $fn$;
+DROP TRIGGER IF EXISTS financial_events_no_update_delete ON public.financial_events;
+CREATE TRIGGER financial_events_no_update_delete
+  BEFORE UPDATE OR DELETE ON public.financial_events
+  FOR EACH ROW EXECUTE FUNCTION public.financial_events_immutable();
+
+ALTER TABLE public.financial_events ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.financial_events FORCE ROW LEVEL SECURITY;
+CREATE POLICY financial_events_tenant_read
+  ON public.financial_events FOR SELECT TO authenticated
+  USING (public.is_business_member(business_id));
+CREATE POLICY financial_events_service_role
+  ON public.financial_events FOR ALL TO service_role
+  USING (true) WITH CHECK (true);
+REVOKE ALL ON TABLE public.financial_events FROM PUBLIC, anon, authenticated;
+GRANT SELECT ON TABLE public.financial_events TO authenticated;
+REVOKE UPDATE, DELETE, TRUNCATE ON TABLE public.financial_events FROM service_role;
+
+-- The only write path. Idempotent per (business_id, idempotency_key); a repeat with a
+-- different payload is a bug and raises rather than silently succeeding.
+CREATE OR REPLACE FUNCTION public.append_financial_event(
+  p_business_id     TEXT,
+  p_event_type      TEXT,
+  p_schema_version  INTEGER,
+  p_occurred_at     TIMESTAMPTZ,
+  p_effective_date  DATE,
+  p_source_type     TEXT,
+  p_source_id       TEXT,
+  p_correlation_id  TEXT,
+  p_causation_id    TEXT,
+  p_idempotency_key TEXT,
+  p_currency        TEXT,
+  p_amount_minor    BIGINT,
+  p_payload         JSONB,
+  p_actor_type      TEXT,
+  p_actor_id        TEXT
+) RETURNS TABLE (event public.financial_events, inserted BOOLEAN)
+LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE existing public.financial_events%ROWTYPE;
+BEGIN
+  IF p_business_id IS NULL OR p_business_id = '' THEN
+    RAISE EXCEPTION 'financial_event_business_required' USING ERRCODE = 'check_violation';
+  END IF;
+  -- Lock order rule 1: business lock before anything else.
+  PERFORM pg_advisory_xact_lock(hashtext('financial:' || p_business_id));
+
+  SELECT * INTO existing FROM public.financial_events
+   WHERE business_id = p_business_id AND idempotency_key = p_idempotency_key;
+  IF FOUND THEN
+    IF existing.event_type <> p_event_type OR existing.payload <> COALESCE(p_payload, '{}'::jsonb)
+       OR existing.amount_minor IS DISTINCT FROM p_amount_minor
+       OR existing.currency IS DISTINCT FROM p_currency THEN
+      RAISE EXCEPTION 'financial_event_idempotency_conflict' USING ERRCODE = 'unique_violation',
+        DETAIL = existing.id;
+    END IF;
+    event := existing; inserted := false; RETURN NEXT; RETURN;
+  END IF;
+
+  INSERT INTO public.financial_events (
+    business_id, schema_version, event_type, occurred_at, effective_date, source_type, source_id,
+    correlation_id, causation_id, idempotency_key, currency, amount_minor, payload, actor_type, actor_id
+  ) VALUES (
+    p_business_id, p_schema_version, p_event_type, p_occurred_at, p_effective_date, p_source_type, p_source_id,
+    p_correlation_id, p_causation_id, p_idempotency_key, p_currency, p_amount_minor,
+    COALESCE(p_payload, '{}'::jsonb), p_actor_type, p_actor_id
+  ) RETURNING * INTO event;
+  inserted := true; RETURN NEXT;
+END $fn$;
+
+REVOKE ALL ON FUNCTION public.append_financial_event(
+  TEXT, TEXT, INTEGER, TIMESTAMPTZ, DATE, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, JSONB, TEXT, TEXT
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.append_financial_event(
+  TEXT, TEXT, INTEGER, TIMESTAMPTZ, DATE, TEXT, TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, JSONB, TEXT, TEXT
+) TO service_role;
+
+COMMIT;
+```
+
+**Verified 2026-09-13 before briefing:** the DDL above was executed verbatim in PGlite with a
+`business_config`/`business_users`/`is_business_member`/`auth.uid()` stub, and probed: same key
+twice → one row and `inserted=false`; changed payload → `financial_event_idempotency_conflict`;
+event type outside the catalogue, `correlation_id` without prefix, currency without amount → check
+violations; cross-tenant `causation_id` → FK violation, same-tenant accepted; UPDATE/DELETE →
+`financial_events_immutable` even as `service_role`; TRUNCATE denied; `anon`/`authenticated`
+denied on the RPC and on direct INSERT; a member sees only its own business, a non-member
+nothing; `amount_minor` above `MAX_SAFE_INTEGER` round-trips as a string. With the file placed
+as `sql/v235_financial_events.sql` the event-contract gate passes. Failed inserts consume `seq`
+values (gaps are expected, rule 2).
+
+The `correlation_id LIKE 'fin\_%'` check enforces the prefix rule from §FK.2. A cross-tenant
+`causation_id` fails the composite FK; a `causation_id` for an event that does not exist fails
+the same FK. Both are the intended behaviour: the RPC does not pre-validate them, the
+constraint does.
+
+### `types.ts` (contract fixed — internals are yours)
 
 ```ts
-type CurrencyCode = 'SEK' | 'EUR' | 'NOK' | 'DKK'           // extend by adding to a table, never by widening to string
-interface Money { readonly amountMinor: bigint; readonly currency: CurrencyCode }
+import type { FinancialEventType } from './catalog'
 
-type RoundingMode = 'HALF_UP' | 'HALF_EVEN' | 'DOWN' | 'UP'  // always explicit; no default parameter
+export type FinancialActorType = 'system' | 'user' | 'provider' | 'import' | 'agent'
 
-money(amountMinor: bigint | number, currency): Money           // number accepted only if Number.isSafeInteger; else throws
-fromDecimalString(s: string, currency): Money                  // '125.00', '-0.5', '1234.5600' -> exact; more decimals than the currency allows -> throws (no silent rounding)
-toDecimalString(m: Money): string                               // '125.00' — always the currency's minor digits
-fromLegacyNumber(n: number, currency, rounding: RoundingMode): Money
-                                                                // THE ONLY float entry point. Rounds to minor units with the given mode.
-                                                                // Documented as the boundary from legacy `number` kr columns.
-toLegacyNumber(m: Money): number                                // for feeding legacy projections during migration; documented as lossy-by-design in name
+export interface FinancialEventEnvelope<T extends FinancialEventType = FinancialEventType> {
+  readonly eventId: string
+  readonly seq: bigint
+  readonly schemaVersion: number
+  readonly eventType: T
+  readonly businessId: string
+  readonly occurredAt: string          // ISO 8601 with offset
+  readonly effectiveDate?: string      // YYYY-MM-DD
+  readonly source: { readonly type: string; readonly id: string }
+  readonly correlationId: string       // 'fin_…'
+  readonly causationId?: string
+  readonly idempotencyKey: string
+  readonly amount?: Money              // from money.ts; built with money(BigInt(row.amount_minor), row.currency)
+  readonly actor: { readonly type: FinancialActorType; readonly id?: string }
+  readonly payload: FinancialEventPayloads[T]
+  readonly createdAt: string
+}
 
-add(a, b) / subtract(a, b) / negate(m) / sum(ms: Money[], currency)   // currency mismatch throws; sum of [] is zero in the given currency
-multiply(m, ratio: { numerator: bigint; denominator: bigint }, rounding: RoundingMode): Money
-                                                                // e.g. VAT 25% = 25/100, ROT 30% of labour = 30/100
-allocate(m, weights: bigint[]): Money[]                         // largest-remainder; parts sum EXACTLY to m; order-stable; zero weights get zero
-compare(a, b): -1 | 0 | 1  /  equals(a, b)  /  isZero  /  isNegative   // exact. No tolerance parameter exists.
-toJSON(m): { amount: string; currency: CurrencyCode }           // decimal string, never BigInt
-fromJSON(v: unknown): Money                                     // validates shape; throws on anything else
+export interface FinancialEventPayloads {
+  // Typed now: the events C4 will emit first, fields per ARCHITECTURE.md §FK.1.
+  invoice_issued: { invoice_id: string; invoice_number: string; customer_id: string; project_id?: string;
+    currency: string; total_minor: number; vat_regime: 'standard' | 'reverse_charge_construction';
+    accounting_method: 'accrual' | 'cash'; issued_date: string; due_date: string; tax_reduction?: 'rot' | 'rut' }
+  invoice_credited: { … }
+  receivable_created: { … }
+  receivable_adjusted: { … }
+  receivable_settled: { … }
+  payment_initiated: { … }
+  payment_settled: { … }
+  payment_allocated: { … }
+  payment_allocation_reversed: { … }
+  // Typed by the owning package when it is briefed. `never` makes an early caller fail to compile.
+  payment_intent_created: never
+  …
+}
+
+export type FinancialEventRow = { /* one field per column, snake_case, amount_minor: string */ }
+export function envelopeFromRow(row: FinancialEventRow): FinancialEventEnvelope
+export function rowFromEnvelope(e: Omit<FinancialEventEnvelope, 'eventId' | 'seq' | 'createdAt'>): Omit<FinancialEventRow, 'id' | 'seq' | 'created_at'>
 ```
 
-Minor-unit digits per currency live in one table in the file (SEK/EUR/NOK/DKK all 2). An
-unknown currency throws at construction; nothing defaults to SEK.
+Payload field lists come from §FK.1 verbatim; amounts in payloads are `number` minor units
+(JSON-safe, see C0 handoff) and the envelope's `amount` is a `Money`. Do not add fields that
+are not in §FK.1; if one is missing, add it to §FK.1 first in the same PR.
 
-### Invariants (write them as tests before the implementation)
+### Invariants (write them as tests before the migration)
 
-1. `0.1 + 0.2` style errors are impossible: `add(fromDecimalString('0.10'), fromDecimalString('0.20'))` equals `fromDecimalString('0.30')` exactly.
-2. `allocate` never loses or invents an öre: for random amounts and weights, `sum(parts)` equals the input exactly, and every part differs from its ideal share by at most one minor unit.
-3. `multiply` without a rounding mode does not compile (type-level), and `HALF_UP` vs `HALF_EVEN` are observably different on `x.xx5` cases — include the case that differs.
-4. Currency mismatch throws on every binary operation, including `sum` and `compare`.
-5. `fromDecimalString('1.005', 'SEK')` throws; it does not round.
-6. `toJSON`/`fromJSON` round-trips every value, including negatives and zero, and `JSON.stringify` of a Money never produces a BigInt error.
-7. `fromLegacyNumber(1234.5600000001, 'SEK', 'HALF_UP')` equals `fromDecimalString('1234.56')`, and the function is the only place in the file where a `number` is converted arithmetically.
-8. VAT worked example: `multiply(fromDecimalString('99.99'), 25/100, HALF_UP)` is `25.00`; `HALF_EVEN` gives the same here — add a case where they differ.
-9. ROT worked example: labour `10000.00`, ROT 30% → customer `7000.00`, tax authority `3000.00`, and `allocate` of the total by weights [70, 30] gives the same two numbers.
-10. Negative Money is legal (credit notes) and `negate(negate(m))` equals `m`.
-11. No comparison tolerance constant exists in the file — grep for `TOLERANCE`, `EPSILON`, `Math.abs(` and assert absence in the test (a source-scanning assertion, the repo's facit pattern).
+Harness: PGlite with the pattern in `tests/helpers/job-standard-db.ts` (roles + `auth.uid()`
+stub via `current_setting('request.jwt.claim.sub', true)`), executing `sql/v235_financial_events.sql`
+verbatim. A minimal `business_config(business_id TEXT PRIMARY KEY)` and `business_users`
+fixture, plus `is_business_member` from `sql/testbed_tenant_isolation.sql`.
 
-### Acceptance (orchestration §5 C1 + §9)
+1. Same key twice → one row, second call returns `inserted = false` and the same `id`.
+2. Same key, different payload → raises `financial_event_idempotency_conflict`; row count unchanged.
+3. `event_type` not in the catalogue → check violation. The contract test additionally proves the CHECK list equals `catalog.ts`.
+4. `causation_id` of another business's event → FK violation. Same business → accepted, and the chain is walkable by `correlation_id`.
+5. `UPDATE` and `DELETE` raise `financial_events_immutable` even as `service_role`; `TRUNCATE` is denied.
+6. `anon` and `authenticated` cannot call `append_financial_event` (permission denied) and cannot `INSERT` directly.
+7. With `auth.uid()` set to a member of business A: `SELECT` sees A's events and none of B's. A non-member sees nothing.
+8. `currency` without `amount_minor` (or vice versa) → check violation; `actor_type = 'agent'` without `actor_id` → check violation; `correlation_id` without `fin_` prefix → check violation.
+9. `seq` strictly increases in call order for one business across 200 appends.
+10. `amount_minor` round-trips through `money(BigInt(row.amount_minor), currency)` for a value above `Number.MAX_SAFE_INTEGER`, proving no `Number()` in the read path.
+11. `envelopeFromRow(rowFromEnvelope(e))` round-trips for every typed event with a fixture payload.
 
-- exact minor-unit/decimal conversion; currency required; explicit rounding; no floating-point
-  canonical storage; serialization contract tested — all as tests above.
-- `npx tsc --noEmit` clean; `npx playwright test tests/financial-kernel-money.spec.ts tests/financial-kernel-event-contract.spec.ts --no-deps --project=chromium` green.
-- Diff touches only the files listed under Scope plus the two registration edits.
-- No `number` arithmetic on amounts anywhere except inside `fromLegacyNumber`/`toLegacyNumber`.
+### Acceptance (orchestration §5 C2 + §9)
+
+- The five contract tests and the Money tests still pass; the event-contract test's migration scan finds only catalogue names in `v235`.
+- `npx tsc --noEmit` clean; the new spec green in the browserless CI list.
+- Diff touches only the files under Scope.
+- `.rpc('append_financial_event')` is **not** called anywhere yet (C3), so the lessons.md rule about unmigrated RPCs is satisfied trivially; note in the handoff that the migration has not been applied to any environment.
+- No comparison tolerance; no `Number()` on `amount_minor`; no UPDATE path.
 
 ### Not in this package
 
-Rounding **policy** (which differences are absorbed and on which account) — that is C1b and
-needs a named accountant. `money.ts` provides the mechanism (explicit modes, exact allocate),
-never a policy. Do not add a "rounding difference" helper that picks an account.
+Publish/consume/outbox worker and consumer cursors (C3). Any caller (C4). The flag column
+`financial_kernel_enabled` (C4). Retention/anonymisation on account deletion (Claude track G
+question; the RESTRICT FK makes it visible, it does not solve it).
 
 ### Handoff back
 
-Fill in the orchestration §7 block under §2 of this file, in the same PR. Then Claude reviews
-against §6 dimension A before merge.
+Fill in the orchestration §7 block under §2 of this file in the same PR, including any
+deviation from the DDL above and why. Claude reviews against §6 A and C before merge.
 
 ---
 
-## 4. Queued after C1 — sketch only, briefed when C1 merges
+## 4. Queued after C2 — sketch only, briefed when C2 merges
 
-**C2 — `financial_events` schema.** Migration `sql/v2xx_financial_events.sql` matching parent
-§6 exactly: `UNIQUE (business_id, idempotency_key)`, indexes on `(business_id, correlation_id)`,
-`(business_id, event_type, occurred_at)`, `(business_id, source_type, source_id)`; RLS by
-`business_id` following the pattern in the newest `sql/v23x_*.sql` files; `event_type` CHECK
-constraint generated from `catalog.ts` (the contract test already scans any migration that
-mentions `financial_events`). `lib/financial-kernel/events/types.ts` with the envelope from
-parent §7 typed against `FinancialEventType`. No publish, no consume — that is C3. Claude track
-A (schema/RLS review) should run on the proposed migration before it is applied anywhere.
+**C3 — outbox/inbox/idempotency primitives.** `lib/financial-kernel/events/publish.ts`
+(TS wrapper over `append_financial_event`, returning the envelope), `consume.ts` with a
+per-consumer cursor table `financial_event_consumers (business_id, consumer, last_seq,
+updated_at)` and at-least-once delivery, and `bridge-automation.ts` as the one permitted
+`fireEvent()` call site (empty until C5; the contract test already polices it). Acceptance
+includes duplicate delivery and crash-after-commit. Whether one RPC may append several events
+atomically is C3's first decision; the advisory lock in C2 makes either answer safe.
 
 **C1b — rounding policy.** Cannot start until a named accounting consultant confirms the
 rounding account (parent §5 proposes 3740; that is a proposal). Add the person's name to §1 of
@@ -338,9 +624,27 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 
 ---
 
+### C2 — `financial_events` (PR #50), Claude review 2026-09-13, orchestration §6 A + C
+
+Verified locally on `codex/financial-kernel-c2` head `1ec1c34`: the 13 C2 tests plus contract,
+Money, schema and account-deletion suites green (64). Two probes beyond the suite: the migration
+deployed by a role without BYPASSRLS that owns the objects, then the RPC called as
+`service_role`; and `to_jsonb` of the RPC result followed by `JSON.parse`. Codex's two DDL
+deviations (service_role REVOKE ALL + GRANT SELECT; `financial_events` in `BEHALLS`) are correct.
+No BLOCKER.
+
+| Sev | Finding | Status |
+|---|---|---|
+| HIGH | `FORCE ROW LEVEL SECURITY` makes the only write path depend on the deploying role having BYPASSRLS. Proven: with a NOBYPASSRLS owner the append fails with an RLS violation; without FORCE it succeeds. The superuser PGlite harness cannot see this. Origin: the Claude DDL proposal, not Codex. Fix: drop FORCE, document why, add the non-bypass owner probe as a test. | resolved in PR #50: non-bypass deployer owns the tested objects; FORCE removed |
+| MEDIUM | RPC returns BIGINT inside a composite; PostgREST serialises it as a JSON number and `JSON.parse` loses digits above 2^53 (proven: …993 → …992). Return a flat row with `seq` and `amount_minor` as TEXT now, while the migration is unapplied. Any future PostgREST read of the table must cast the same two columns. | resolved in PR #50 with regression tests |
+| MEDIUM | Idempotency replay compares type/payload/amount/currency only; a replay with a different `correlation_id`, source, `causation_id` or `effective_date` silently returns the original. Add those four to the comparison; deliberately exclude `occurred_at` and actor. | resolved in PR #50 with regression tests |
+| accepted | Sequence gaps on failed inserts; single-session PGlite cannot prove concurrent commit order (C3 must, with the Postgres CI service); `hashtext` collisions only over-serialise; account deletion soft-deletes `business_config` so the RESTRICT FK does not fire on that path, track G remains open. | — |
+
+
 ## 6. Amendment log
 
 | Date | Change | Source |
 |---|---|---|
 | 2026-09-13 | Created with C0 handoff and C1 brief. | Package C0 |
 | 2026-09-13 | Folded in the 2026-09-12 decisions (shadow Level 1, obligation boundary, R0 manual rulebook track); noted PR #12 as C4 input; added §5 review record with the C1 review. | PR #47, C1 review |
+| 2026-09-13 | C1 marked done (PR #49). Claude track A delivered as the C2 brief: proposed DDL, RLS, immutability, append RPC, lock order, migration risk. C3 sketched. The C1 brief is retired to git history; its handoff and review stand in §2 and §5. | Package C2 prep |
