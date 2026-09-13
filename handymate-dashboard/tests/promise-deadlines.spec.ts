@@ -241,13 +241,15 @@ test.describe('godkännandet aktiverar löftet (app/api/approvals/[id]/route.ts,
     expect(line).toContain('normalizeDueDateIso(pl.due_date_iso)')
   })
 
-  test('en omigrerad miljö (42703 på due_at/promise_status) kör om UTAN de nya kolumnerna — fäller aldrig bekräftelsen', () => {
+  test('ett skrivfel får inte tyst ta bort det granskade löftesdatumet och rapportera framgång', () => {
     const s = read(ROUTE)
     const i = s.indexOf("case 'customer_fact':")
-    const gren = s.slice(i, i + 3500)
-    expect(gren).toContain("factErr.code === '42703'")
-    expect(gren).toContain('delete factInsert.due_at')
-    expect(gren).toContain('delete factInsert.promise_status')
+    const gren = s.slice(i, s.indexOf('\n      case ', i + 1))
+    expect(gren).toContain("insertApprovalArtifact(supabaseCF, 'customer_fact'")
+    expect(gren).toContain('if (factErr || !fact)')
+    expect(gren).toContain("ok: false, error: 'Kunde inte spara — försök igen om en stund'")
+    expect(gren).not.toContain('delete factInsert.due_at')
+    expect(gren).not.toContain('delete factInsert.promise_status')
   })
 })
 

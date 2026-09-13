@@ -38,6 +38,7 @@ export function getGoogleAuthUrl(state: string): string {
   return client.generateAuthUrl({
     access_type: 'offline',
     scope: SCOPES,
+    include_granted_scopes: true,
     state,
     prompt: 'consent',
   })
@@ -51,11 +52,15 @@ export async function getGoogleTokens(code: string): Promise<{
   refresh_token: string
   expiry_date: number
   email: string
+  subject: string
+  scopes: string[]
 }> {
   const client = getGoogleAuthClient()
   const { tokens } = await client.getToken(code)
 
+  if (!tokens.access_token) throw new Error('Google lämnade ingen åtkomsttoken.')
   client.setCredentials(tokens)
+  const tokenInfo = await client.getTokenInfo(tokens.access_token)
 
   // Get user email
   const oauth2 = google.oauth2({ version: 'v2', auth: client })
@@ -66,7 +71,22 @@ export async function getGoogleTokens(code: string): Promise<{
     refresh_token: tokens.refresh_token!,
     expiry_date: tokens.expiry_date || Date.now() + 3600 * 1000,
     email: userInfo.email || '',
+    subject: tokenInfo.sub || '',
+    scopes: tokenInfo.scopes,
   }
+}
+
+/** Verify retained credentials against Google's stable subject before reusing them. */
+export async function verifyGoogleRefreshAccount(refreshToken: string, subject: string): Promise<boolean> {
+  if (!subject) return false
+  try {
+    const client = getGoogleAuthClient()
+    client.setCredentials({ refresh_token: refreshToken })
+    const { credentials } = await client.refreshAccessToken()
+    if (!credentials.access_token) return false
+    const info = await client.getTokenInfo(credentials.access_token)
+    return info.sub === subject
+  } catch { return false }
 }
 
 /**

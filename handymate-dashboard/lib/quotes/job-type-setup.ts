@@ -28,6 +28,8 @@ export interface SetupTemplate {
 }
 
 export interface SetupProduct {
+  category?: string
+  laborShare?: number | null
   id: string
   name: string
   unit: string
@@ -134,4 +136,10 @@ export function toSetupTemplate(row: Record<string, unknown>): SetupTemplate {
         linkedProductId: typeof item.linked_product_id === 'string' ? item.linked_product_id : null }]
     }),
   }
+}
+
+/** Explicit product metadata only: fixed-price labor can be included without an hourly row. */
+export function hasLaborCost(rows: SetupRow[]): boolean {
+  return rows.some(({ product, status }) => status !== 'unit_mismatch' && product &&
+    (product.category === 'arbete' || (typeof product.laborShare === 'number' && product.laborShare > 0 && product.laborShare <= 1)))
 }

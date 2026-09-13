@@ -3,6 +3,7 @@
 import { CheckCircle, Clock, Link2, Loader2, PenTool } from 'lucide-react'
 import { formatDate } from '../helpers'
 import type { Quote } from '../types'
+import { signatureLabel } from '@/lib/quotes/signature-label'
 
 interface QuoteSignatureCardProps {
   quote: Quote
@@ -22,9 +23,8 @@ interface QuoteSignatureCardProps {
  * signeringslänken genereras/kopieras — headerns tidigare dubblerande
  * "Signeringslänk"-knapp är borttagen. Gren 3 anropar onGenerateSignLink
  * (samma /api/quotes/sign-link "get or create" som headerknappen gjorde
- * tidigare — flippar draft→sent automatiskt om det behövs, se
- * app/api/quotes/sign-link/route.ts) — efter lyckat anrop kör page.tsx
- * fetchQuote() på nytt och kortet flippar automatiskt till gren 2.
+ * tidigare). Efter lyckat anrop läses offerten om. En skapad länk
+ * räcker inte för att säga att offerten skickats till kunden.
  */
 export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink, onGenerateSignLink, generatingSignLink }: QuoteSignatureCardProps) {
   // 1. Signerad
@@ -50,10 +50,9 @@ export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink, onGenerat
     )
   }
 
-  // 2. Väntar på signering — sign_token räcker (sign-link-routen garanterar
-  // redan att status blir 'sent' om den var 'draft', se filkommentaren ovan;
-  // ett statusvillkor här skulle bara riskera att dölja kortet felaktigt).
+  // A token proves only that a link exists, not that the customer received it.
   if (quote.sign_token) {
+    const label = signatureLabel(quote)
     return (
       <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5 sm:p-6">
         <div className="flex items-center gap-3 mb-3">
@@ -61,8 +60,8 @@ export function QuoteSignatureCard({ quote, portalUrl, onCopySignLink, onGenerat
             <Clock className="w-4.5 h-4.5" />
           </div>
           <div>
-            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">Väntar på signering</p>
-            <p className="text-sm font-semibold text-slate-900">Kunden har inte signerat än</p>
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber-700">{label.title}</p>
+            <p className="text-sm font-semibold text-slate-900">{label.description}</p>
           </div>
         </div>
 

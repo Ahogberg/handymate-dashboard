@@ -97,6 +97,12 @@ const NAV: NavItem[] = [
       // just nu"-bandet; menyposten är vägen dit för den som står på Översikt.
       { label: 'Pengar på bordet', href: '/dashboard/pengar' },
       { label: 'Månadsrapport', href: '/dashboard/monthly-review' },
+      // Din användning (2026-09-13). Grundarerbjudandets användningsvillkor
+      // mäter fyra av åtta ytor på 30 dagar. Måttet räknades redan i
+      // lib/admin/adoption.ts men bara internt — kunden kunde inte se
+      // villkoret den bedöms på. Ägare/admin via OWNER_ADMIN_ONLY_CHILDREN
+      // nedan: det är firmans avtalsvillkor, inte en arbetsyta.
+      { label: 'Din användning', href: '/dashboard/min-garanti' },
       // Karins bolagskalender (2026-08-07). Ligger bredvid Månadsrapport —
       // samma sorts ägaröverblick. Döljs för alla utom ägare och admin via
       // OWNER_ADMIN_ONLY_CHILDREN nedan; moms och bokslut är inget en montör
@@ -659,7 +665,7 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
    */
   // Pengar på bordet är ekonomi: /api/dashboard/pengar svarar 403 för anställda.
   // Utan grinden hade en montör sett en menypost som bara leder till ett fel.
-  const OWNER_ADMIN_ONLY_CHILDREN = new Set(['/dashboard/karin', '/dashboard/pengar'])
+  const OWNER_ADMIN_ONLY_CHILDREN = new Set(['/dashboard/karin', '/dashboard/pengar', '/dashboard/min-garanti'])
 
   /**
    * Lanseringsfilter — gäller ALLA roller, även ägaren.

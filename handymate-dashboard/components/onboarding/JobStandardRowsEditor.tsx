@@ -1,5 +1,6 @@
 'use client'
 
+import type { TradeStartPackage } from '@/lib/onboarding/trade-start-packages'
 import { useRef, useState } from 'react'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
 import { sameUnit } from '@/lib/quotes/job-type-setup'
@@ -7,6 +8,7 @@ import { ProductEditorModal } from '@/app/dashboard/settings/products/components
 import type { SetupProduct, SetupTemplate } from '@/lib/quotes/job-type-setup'
 
 interface Props {
+  starterPackage?: TradeStartPackage
   template: SetupTemplate
   products: SetupProduct[]
   busy: boolean
@@ -16,11 +18,12 @@ interface Props {
 }
 
 /** Artikeln är gemensam; bara standardmängden hör till jobbtypen. */
-export function JobStandardRowsEditor({ template, products, busy, onWrite, onRefresh, onBusyChange }: Props) {
+export function JobStandardRowsEditor({ template, products, busy, onWrite, onRefresh, onBusyChange, starterPackage }: Props) {
   const [productId, setProductId] = useState('')
   const [quantity, setQuantity] = useState('1')
   const [search, setSearch] = useState('')
   const [creating, setCreating] = useState(false)
+  const [articleDraft, setArticleDraft] = useState<{ name: string; unit: string; description: string; category: 'arbete' | 'material'; laborShare: number } | undefined>()
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const lock = useRef(false)
@@ -47,6 +50,19 @@ export function JobStandardRowsEditor({ template, products, busy, onWrite, onRef
   return <section className="job-standard-editor" aria-label="Standardrader för jobbet">
     <h4>Vad brukar ingå?</h4>
     <p className="job-setup-caption">Börja gärna med 3–5 återkommande nyckelartiklar. Det är en genväg, inte ett krav.</p>
+    {starterPackage && <div className="job-setup-note">
+      <strong>Artikelidéer för {starterPackage.name}</strong>
+      <p>Återanvänd dina befintliga artiklar i listan nedan. Saknas en artikel kan du förbereda ett förslag här och sätta eget pris. Material behöver specificeras; inga förslag läggs till automatiskt.</p>
+      <div className="job-setup-jobs">
+        {[starterPackage.labor, ...starterPackage.materials].map((name, index) => <button type="button" key={name} disabled={busy || saving} onClick={() => {
+          setArticleDraft({ name, unit: index === 0 ? 'tim' : 'st', category: index === 0 ? 'arbete' : 'material', laborShare: index === 0 ? 1 : 0, description: index === 0
+            ? 'Arbetstid. Ange företagets pris; omfattning och timmar bedöms för varje uppdrag.'
+            : 'Specificera produkt, variant och rätt enhet innan artikeln används.' })
+          setCreating(true)
+        }}>Förbered {name.toLocaleLowerCase('sv')}</button>)}
+      </div>
+      <p className="job-setup-caption">Fastpris: lägg inte till arbetstimmar för arbete som redan ingår. Samordning, maskin, resa och underentreprenad tas bara med när de uttryckligen ingår i ert upplägg.</p>
+    </div>}
     {template.items.map(item => <StandardQuantityRow key={`${template.id}:${template.updatedAt}:${item.index}`} description={item.description}
       unit={item.unit} quantity={item.quantity ?? 1} busy={busy || saving}
       product={products.find(p => p.id === item.linkedProductId && sameUnit(p.unit, item.unit))}
@@ -69,11 +85,11 @@ export function JobStandardRowsEditor({ template, products, busy, onWrite, onRef
         <button type="submit" className="job-setup-primary" disabled={busy || saving || !productId || !Number.isFinite(amount) || amount <= 0}>Lägg till rad</button>
       </div>
     </form>
-    <button type="button" className="job-setup-text-button" disabled={busy || saving} onClick={() => setCreating(true)}>+ Skapa egen artikel</button>
+    <button type="button" className="job-setup-text-button" disabled={busy || saving} onClick={() => { setArticleDraft(undefined); setCreating(true) }}>+ Skapa egen artikel</button>
     <p className="job-setup-caption">Artikelpriset delas av alla jobb som använder artikeln. Standardmängden gäller bara det här jobbet.</p>
     <p className="job-setup-caption">Ändringar gäller kommande offerter. Redan skapade offerter behåller sina rader och priser.</p>
     {error && <p role="alert" className="job-setup-error">{error}</p>}
-    {creating && <ProductEditorModal product={null} categories={[]} saving={saving} onSave={createProduct} onClose={() => { if (!saving) setCreating(false) }} onError={setError} />}
+    {creating && <ProductEditorModal product={null} initialValues={articleDraft} categories={[]} saving={saving} onSave={createProduct} onClose={() => { if (!saving) setCreating(false) }} onError={setError} />}
   </section>
 }
 

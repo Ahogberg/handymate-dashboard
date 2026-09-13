@@ -256,10 +256,16 @@ Recommended principle:
 Working example:
 
 ```text
-Founding Core Price Protection: up to 3 years
+Founding Core Price Protection: lifetime (beslut 2026-09-13)
 ```
 
-Exact duration and contract wording remain a commercial decision.
+**RÄTTAT 2026-09-13.** Den här sektionen sa tidigare `up to 3 years`, vilket
+avvek från skarp kod: `lib/billing/founders-offer.ts` har sagt "låser sitt pris
+för alltid" sedan 2026-08-19, med bannertexten facit-låst i
+`tests/founders-offer.spec.ts`. Beslutet är livstid på **Core** — se
+`handymate-dashboard/docs/gtm/grundarerbjudandet-beslut-2026-09-13.md`.
+Gränsen nedan (låset gäller Core, inte varje framtida modul) är det som gör
+livstid hållbart och ska stå i avtalstexten.
 
 ### Critical boundary
 

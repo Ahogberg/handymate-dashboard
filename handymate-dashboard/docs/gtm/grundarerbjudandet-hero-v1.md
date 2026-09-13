@@ -1,6 +1,7 @@
 # Grundarerbjudandet — herosektion vid lansering
 
 **Status: UTKAST för Andreas granskning (2026-09-12). Publiceras INTE före villkoren i §9.**
+**2026-09-13: tre val i den här texten är avgjorda i [grundarerbjudandet-beslut-2026-09-13.md](./grundarerbjudandet-beslut-2026-09-13.md) — antal platser, vilken garanti som gäller och Accounting-konstruktionen. Vid konflikt gäller beslutsfilen.**
 Ersätter nedräkningssektionen (`#lanseringHero` i `handymate-landing/index.html`) den dag lanseringen sker.
 Bygger vidare på [grundarprogrammet.md](./grundarprogrammet.md) och dess regel: **garantin får aldrig föregå sina bevis.**
 

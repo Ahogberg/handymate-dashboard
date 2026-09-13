@@ -1,5 +1,6 @@
 'use client'
 
+import { getTradeStartPackage } from '@/lib/onboarding/trade-start-packages'
 import { useState } from 'react'
 import { slugifyJobType } from '@/lib/job-types'
 import { ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
@@ -72,7 +73,8 @@ export default function Step3HowYouWork({ busy = false, error, onNext, onBack, d
     }
     return null
   }
-  const extraSpecs = selected.filter(s => !specs.includes(s))
+  const visibleSpecs = showMoreJobs ? specs : specs.slice(0, trade === 'other' ? 0 : 5)
+  const extraSpecs = selected.filter(s => !visibleSpecs.includes(s))
 
   const toggleDay = (i: number) => {
     const next = [...days]
@@ -115,7 +117,7 @@ export default function Step3HowYouWork({ busy = false, error, onNext, onBack, d
             </span>
           </div>
           <div className="ob-chip-grid">
-            {(showMoreJobs ? specs : specs.slice(0, 8)).map(s => (
+            {visibleSpecs.map(s => (
               <button
                 type="button"
                 key={s}
@@ -123,12 +125,12 @@ export default function Step3HowYouWork({ busy = false, error, onNext, onBack, d
                 onClick={() => toggleSpec(s)}
               >
                 {selected.includes(s) && <Check size={14} />}
-                {s}
+                <span>{s}{getTradeStartPackage(trade, s) && <small style={{ display: 'block', fontWeight: 400, marginTop: 4 }}>{getTradeStartPackage(trade, s)?.scope}</small>}</span>
               </button>
             ))}
           </div>
 
-          {specs.length > 8 && <button type="button" className="ob-chip" onClick={() => setShowMoreJobs(v => !v)}>{showMoreJobs ? 'Visa färre' : 'Visa fler jobbtyper'}</button>}
+          {(specs.length > 5 || trade === 'other') && <button type="button" className="ob-chip" onClick={() => setShowMoreJobs(v => !v)}>{showMoreJobs ? 'Visa färre' : 'Visa fler jobbtyper'}</button>}
           <form onSubmit={e => {
             e.preventDefault()
             const name = customJob.trim()
@@ -140,7 +142,7 @@ export default function Step3HowYouWork({ busy = false, error, onNext, onBack, d
             <input id="custom-onboarding-job" value={customJob} maxLength={80} onChange={e => setCustomJob(e.target.value)} placeholder="Saknas något? Skriv egen jobbtyp" style={{ minWidth: 0, flex: 1, padding: 10, border: '1px solid var(--ob-border)', borderRadius: 10 }} />
             <button type="submit" className="ob-chip" disabled={!/[a-zåäö0-9]/i.test(customJob)}>Lägg till</button>
           </form>
-          <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Börja med dina vanligaste jobb. Du kan lägga till fler och ändra dem i Inställningar senare.</p>
+          <p style={{ fontSize: 13, color: 'var(--ob-muted)' }}>Välj gärna 3–5 jobbtyper att börja med. En enda räcker om du är specialist. Du kan lägga till egna jobb och ändra urvalet senare.</p>
 
           {/* Extra-specialiteter från andra branscher */}
           {extraSpecs.length > 0 && (

@@ -402,13 +402,14 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
     }
 
     // Hämta befintlig bokning för att behålla duration
-    const { data: currentBooking } = await supabase
+    const { data: currentBooking, error: bookingReadError } = await supabase
       .from('booking')
       .select('scheduled_start, scheduled_end')
       .eq('booking_id', bookingId)
+      .eq('business_id', businessId)
       .single()
 
-    if (!currentBooking) {
+    if (bookingReadError || !currentBooking) {
       return { success: false, error: 'Kunde inte hitta bokningen' }
     }
 
@@ -434,7 +435,7 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
     const newScheduledEnd = new Date(newScheduledStart.getTime() + durationMs)
 
     // Uppdatera bokningen
-    const { error: updateError } = await supabase
+    const { data: updatedBooking, error: updateError } = await supabase
       .from('booking')
       .update({
         scheduled_start: newScheduledStart.toISOString(),
@@ -442,8 +443,13 @@ async function rescheduleBooking(supabase: SupabaseClient, suggestion: any, acti
         notes: `${actionData.reason ? `Ombokad: ${actionData.reason}` : 'Ombokad via AI-förslag'}`
       })
       .eq('booking_id', bookingId)
+      .eq('business_id', businessId)
+      .select('booking_id')
+      .maybeSingle()
 
-    if (updateError) throw updateError
+    if (updateError || !updatedBooking) {
+      return { success: false, error: updateError?.message || 'Kunde inte uppdatera bokningen' }
+    }
 
     // Skicka bekräftelse-SMS om vi har telefonnummer
     const phoneNumber = actionData.phone_number ||
