@@ -47,10 +47,9 @@ Rules that keep this file honest:
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
 
-Parallel Claude analysis tracks (orchestration §4: A schema/RLS, B call-site map, C golden
-paths, D Swedish ledger review, E Pay threat model, F adversarial review, G statutory) are
-**not started** and can run alongside C1–C3. Track B is the one C5 depends on; run it before C4
-is briefed.
+Parallel Claude analysis tracks (orchestration §4): **A done** (C2 brief), **B done**
+(`FINANCIAL_KERNEL_CALL_SITE_MAP.md`, 2026-09-13); C, D, E, F, G not started. C and D are next;
+D now has Odoo's `l10n_se` reference data to work from.
 
 Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind the board:
 
@@ -549,4 +548,5 @@ No BLOCKER.
 | 2026-09-13 | Created with C0 handoff and C1 brief. | Package C0 |
 | 2026-09-13 | Folded in the 2026-09-12 decisions (shadow Level 1, obligation boundary, R0 manual rulebook track); noted PR #12 as C4 input; added §5 review record with the C1 review. | PR #47, C1 review |
 | 2026-09-13 | C1 marked done (PR #49). Claude track A delivered as the C2 brief: proposed DDL, RLS, immutability, append RPC, lock order, migration risk. C3 sketched. The C1 brief is retired to git history; its handoff and review stand in §2 and §5. | Package C2 prep |
+| 2026-09-13 | Track B delivered as `FINANCIAL_KERNEL_CALL_SITE_MAP.md`; board updated. | Track B |
 | 2026-09-13 | C3 brief written (outbox = events table, cursor per business/consumer, delivery ledger, halt-never-skip, two-connection proof). C2 brief retired to git history. C4 sketched. | Package C3 prep |
