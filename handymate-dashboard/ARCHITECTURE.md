@@ -874,6 +874,13 @@ flagga införs före paketet som läser den.
 | `bank_reconciliation_enabled` | Bank-/avstämningsytor synliga för kunden. Produkträttighet. | C11 | C11 |
 | `auto_reconcile_enabled` | Matcharen får bekräfta matchningar inom policy utan granskning. | C11 | C11 |
 
+**Skuggningens räckvidd (beslut 2026-09-12, shadow-arkitekturen §21.6):** Fortnox-scopen
+(`FORTNOX_SCOPES` i `app/api/integrations/fortnox/connect/route.ts`) saknar `bookkeeping`, så
+jämförelsen når bara **nivå 1** (faktura, leverantörsfaktura, betalning, saldon). Nivå 2–4 i
+`accounting_divergence_detected.level` persisteras som `unsupported` med orsak, aldrig som
+gröna. Scopen läggs inte tillbaka (kräver ny OAuth per kund). Momsen och verifikatnivån får
+därför sitt facit från den manuella regelboksrundan (roadmap §21.2), inte från skuggningen.
+
 Utrullningsordning per företag (aldrig big bang):
 `legacy → kernel shadow (S1) → S2 → kernel kanonisk + legacy-projektion → Pay live → Ledger shadow → Ledger kanonisk med Fortnox-skugga → Handymate-only`.
 

@@ -319,7 +319,13 @@ function authHelper(serverUser: Record<string, any> | null) {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText
   const superExports: Record<string, any> = {}
-  new Function('require', 'exports', superCode)(require, superExports)
+  // superadmin.ts kompileras fristående, så dess egna relativa importer måste
+  // slås upp mot lib/auth/ — annars letar testfilens require i tests/ och
+  // modulen kastar. Den riktiga modulen laddas, ingen attrapp: e-postgrinden
+  // (isAdminEmail) är just det de fyra proven nedan ska pröva på riktigt.
+  const superRequire = (id: string) =>
+    id.startsWith('.') ? require(path.join(ROOT, 'lib/auth', id)) : require(id)
+  new Function('require', 'exports', superCode)(superRequire, superExports)
   const db = {
     auth: { getUser: async () => ({ data: { user: serverUser }, error: serverUser ? null : new Error('invalid token') }) },
     from(table: string) {

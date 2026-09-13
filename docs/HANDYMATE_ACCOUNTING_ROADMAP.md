@@ -475,6 +475,53 @@ Recommended responsibilities:
 
 AI coding agents implement and test rules; humans define and validate accounting truth.
 
+### 13.1 Opening questions, split by role
+
+> Added 2026-09-12. Ask the right person. The two lists above are not interchangeable, and
+> the gaps that matter most — reverse-charge construction VAT and cash-basis accounting
+> (§10, `FINANCIAL_KERNEL_ARCHITECTURE.md` §15.1–15.2) — belong to the consultant, not the
+> auditor.
+
+**Before either conversation:** a question list is the weaker instrument. An auditor asked
+*"how is reverse charge posted?"* gives the textbook answer, which is already in the BAS
+documentation. What cannot be read up is which cases actually occur in a Swedish trades
+company.
+
+**The most valuable single artifact is a SIE4 export of a pilot customer's last closed
+fiscal year.** Every posting they made, in a standard format, one click for them. It shows
+empirically which VAT regimes, accounts and scenarios occur in a real elfirma, and it is the
+seed of the rulebook (§21.2). Ask for that first.
+
+#### To the auditor — controls and evidence
+
+1. What must we be able to show you for **a single voucher** so you can review it without
+   asking us anything?
+2. For an AI-suggested posting: is rule id + rule version + who approved it enough, or do
+   you need the model's underlying evidence?
+3. What do system documentation and processing history need to contain to hold up in a
+   review?
+4. **What would make you reject a system like ours?**
+5. Correction by reversal rather than amendment — are there cases where that is not enough?
+
+#### To the operational accounting consultant — posting truth
+
+1. Reverse-charge construction VAT: how do you determine **in practice** whether the buyer
+   is a construction company, and what happens when it is wrong?
+2. Cash basis: what must the system produce in December for a company using it?
+3. ROT/RUT: when do you know the Skatteverket share is actually coming, and what do you do
+   when it deviates?
+4. Which five mistakes do you see most often in trades companies' bookkeeping?
+5. Öresavrundning, credit notes, partial payments — which of these cause the most trouble?
+
+#### Two cautions
+
+- **A pilot customer's auditor works for the customer, not for Handymate.** Asking them to
+  specify our product is unpaid consulting from someone with a duty elsewhere, and if
+  Handymate replaces part of what a byrå does, their incentive is not neutral. Be explicit:
+  a short conversation is a favour, deeper work is engaged and paid.
+- §3 still holds: **a bookkeeping system is not made valid because an auditor approves the
+  software.** An auditor's blessing is useful input; it is not a compliance story.
+
 ## 14. Development model with Codex + Claude
 
 Suggested parallel workstreams after launch:
@@ -605,6 +652,44 @@ Professional Accounting/Review
 
 The pricing ceiling should rise materially once a customer can cancel other systems and reduce recurring accounting administration. Validate willingness-to-pay with real customers before locking the final packaging.
 
+### 17.1 Managed Accounting is a separate line, never a tier
+
+> Added 2026-09-12.
+
+There are two distinct products and they must not share a price list.
+
+```text
+Handymate Accounting            software
+  The system does the bookkeeping. The customer, or their accounting
+  consultant, owns review and remains the bookkeeping entity.
+
+Handymate Accounting Managed    regulated service engagement
+  Handymate undertakes to keep the running bookkeeping finished, with
+  human review of what the system flags.
+```
+
+The second is not a higher tier of the first. It is a **redovisningsbyrå**, with the
+economics and obligations that follow:
+
+- Professional liability and indemnity insurance, not a SaaS SLA.
+- Reko and the practice standards an accounting consultant works under.
+- Its own definition of done, its own engagement terms, and its own margin model — the
+  cost of the reviewing person dominates, not inference cost.
+- The customer is still the bookkeeping entity (§3). Handymate performs the work; the
+  obligation does not transfer. That boundary is the whole reason the two lines are
+  separate, and it is where service firms in this field get into trouble.
+
+Price the software line against replaced software and owner time. Price the managed line
+against what a byrå charges, minus the review hours the system removes — and staff it
+before selling it.
+
+**The review layer is a hiring constraint before it is a software one.** "One accounting
+professional handles 200 companies instead of 30" assumes a person competent enough to
+judge the exceptions and comfortable enough to trust the system for everything else.
+That person is the same bottleneck that caps every accounting firm today. At 200 companies
+per reviewer, one person's sick leave is a business-continuity event, not a margin
+question. Model the redundancy before the ratio.
+
 ## 18. Strategic moat
 
 The long-term moat is not the ledger itself. Double-entry accounting is commoditized logic.
@@ -674,6 +759,59 @@ After the current launch and once prioritization allows:
 10. Launch a controlled Handymate Accounting beta.
 11. Migrate a small number of professionally reviewed pilot customers.
 12. Only then begin broad Fortnox replacement messaging.
+
+## 21. Notes on the operating model
+
+> Added 2026-09-12, after reviewing the AI-native services thesis (Isenberg, 2026-09-11)
+> against the actual codebase. §2.1 states the operating model; this section records four
+> things that follow from it and are easy to lose.
+
+### 21.1 Intake is the only stage that is structurally hard to copy
+
+Of the five stages in §2.1, four are reproducible by a competitor with the same models and
+enough patience. The rulebook takes time but is buildable. The engine is commodity. The
+review layer is hiring. Delivery is UI.
+
+**Intake is the exception.** A standalone AI bookkeeping service has to ask what the
+purchase was for, which project it belongs to, who the customer is and why the payment
+happened. Handymate does not ask, because the economic event was created by the
+operational work — the invoice already knows its project, quote, time entries, material
+rows and ROT share when it is born (`lib/invoices/create-invoice.ts`).
+
+That is the advantage worth protecting, and it argues for the sequencing in §16: the
+operational platform earns the data, and the data is what makes the accounting cheap.
+
+### 21.2 The rulebook can start before the ledger exists
+
+§2.1 describes the exception-to-automation loop as something the running system produces.
+It does not have to wait for the system. Taking a handful of pilot companies' running
+bookkeeping **by hand** — in the existing external system if necessary — produces rulebook
+entries before there is code that can be wrong about them.
+
+It needs no Fortnox partner licence, no migration and no kernel. It is the cheapest way to
+make §10 and `FINANCIAL_KERNEL_ARCHITECTURE.md` §36 concrete, and it is worth doing while
+the contracts are still being specified.
+
+### 21.3 The review layer is a hiring constraint before it is a software one
+
+"One accounting professional handles 200 companies instead of 30" assumes a person
+competent enough to judge the exceptions and comfortable enough to trust the system for
+everything else. That person is the same bottleneck that caps every accounting firm today.
+At 200 companies per reviewer, one person's sick leave is a business-continuity event, not
+a margin question. Model the redundancy before quoting the ratio, and see §17.1 for why
+that offering is a separate line.
+
+### 21.4 Where the thesis does not support the strategy
+
+The generic argument for AI-native services is an argument for **narrow**: one unit, one
+niche, depth in a single rulebook. Handymate's vertical expansion is the opposite shape —
+Accounting, then Pay, Procurement, Payroll, Capital, Insurance.
+
+Those are in mild tension, and the tension should not be papered over. Handymate's answer
+is that the shared operational dataset makes each new vertical cheaper than it would be
+standalone. **That is a bet, not a conclusion the thesis endorses.** Each vertical still
+needs its own rulebook at full depth, or it will be a shallow version of a specialist's
+product.
 
 ---
 

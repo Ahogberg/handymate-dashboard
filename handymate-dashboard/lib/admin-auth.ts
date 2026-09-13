@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs'
 import { cookies } from 'next/headers'
+import { isAdminEmail } from './auth/admin-email'
 
 function getSupabaseAdmin() {
   return createClient(
@@ -10,12 +11,10 @@ function getSupabaseAdmin() {
   )
 }
 
-// List of admin emails from environment variable
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '').split(',').map(e => e.trim().toLowerCase()).filter(Boolean)
-
 /**
  * Check if the current user is an admin
- * Admin = email ends with @handymate.se OR is in ADMIN_EMAILS env variable
+ * Grinden bor i lib/auth/admin-email.ts — en definition, delad med
+ * isSuperAdmin() och med inloggningsrutten.
  */
 export async function isAdmin(request: NextRequest): Promise<{ isAdmin: boolean; userId?: string; email?: string }> {
   try {
@@ -31,8 +30,7 @@ export async function isAdmin(request: NextRequest): Promise<{ isAdmin: boolean;
     const email = session.user.email?.toLowerCase() || ''
     const userId = session.user.id
 
-    // Check if email ends with @handymate.se or is in admin list
-    const isAdminUser = email.endsWith('@handymate.se') || ADMIN_EMAILS.includes(email)
+    const isAdminUser = isAdminEmail(email)
 
     return {
       isAdmin: isAdminUser,
