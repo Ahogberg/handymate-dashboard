@@ -90,6 +90,8 @@ jobs:
           tests/financial-kernel-money.spec.ts
           tests/financial-kernel-events-sql.spec.ts
           tests/financial-kernel-outbox-sql.spec.ts
+          tests/financial-kernel-golden-paths.spec.ts
+          tests/betalsanning-sidodorrar.spec.ts
           tests/facit-ci-grind.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts

@@ -48,8 +48,13 @@ Rules that keep this file honest:
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
 
 Parallel Claude analysis tracks (orchestration §4): **A done** (C2 brief), **B done**
-(`FINANCIAL_KERNEL_CALL_SITE_MAP.md`, 2026-09-13); C, D, E, F, G not started. C and D are next;
-D now has Odoo's `l10n_se` reference data to work from.
+(`FINANCIAL_KERNEL_CALL_SITE_MAP.md`), **C done** (18 of 40 golden paths executable as data in
+`tests/financial-kernel/golden-paths.ts`, consistency-checked by
+`tests/financial-kernel-golden-paths.spec.ts` in `test:contracts`; remaining 22 listed by the
+spec), **D done** (`FINANCIAL_KERNEL_SE_LEDGER_REVIEW.md`, 23 questions for the consultant);
+E, F, G not started. Two findings for C4 from C/D: `receivable_adjusted.reason` needs
+`reclassification` (ROT partial payout), and legacy marks any non-ROT partial payment `paid`
+(golden paths 4 and 37) — C5 must decide whether the facade preserves that.
 
 Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind the board:
 
@@ -686,6 +691,15 @@ Orchestration §7 block under §2, same PR. Claude reviews against §6 A, B and 
 
 ## 4. Queued after C3 — sketch only, briefed when C3 merges
 
+**C5 brief requirement from PR #54 review (MEDIUM):** before firing any automation,
+the bridge must persist its own idempotency marker per `eventId`. Database effects,
+the marker and acknowledgement must share a transaction. Test lease expiry mid-handler
+with a second worker and prove that no duplicate thank-you SMS is dispatched. The delivery
+ledger's `delivered_at` is set too late to guard the side effect. For external sends,
+define durable dispatch/retry semantics as well: a marker persisted before a crash must
+not suppress a notification that was never sent. The requirement is also pinned in
+`bridge-automation.ts`; implementing the mapping remains C5, not C3.
+
 **C4 — receivables and allocations behind `financial_kernel_enabled`.** Needs Claude track B
 (the call-site map, `FINANCIAL_KERNEL_CALL_SITE_MAP.md`) and track C's golden paths first.
 Tables `receivables`, `payments`, `payment_allocations`; domain RPCs `record_payment_settlement`
@@ -738,6 +752,22 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 | LOW | Callers will hold VAT rates as `25` and ROT as `30`; a `ratioFromPercent` helper belongs in the first caller package (C4), not here. | note for C4 |
 | accepted | `fromLegacyNumber` interprets the number's shortest decimal representation (so `1.005` → `1.01` under HALF_UP, `0.1 + 0.2` → `0.30`). That is the right reading of a legacy `NUMERIC` column that passed through a JS number. Documented in the source. | — |
 | accepted | `equals`/`compare` throw on currency mismatch rather than returning `false`. Brief-mandated; a filter across currencies must group by currency first. | — |
+
+### C3 — outbox, leases, ordered ack (PR #54), Claude review 2026-09-14, orchestration §6 A + B + C
+
+Verified locally on `codex/financial-kernel-c3` head `671a831`: 12 outbox tests plus contract,
+C2, schema and account-deletion suites green (64); the three real-Postgres tests read and
+matched to their claims (advisory wait before seq allocation, single owner in a claim race,
+wall-clock lease expiry). No BLOCKER, no HIGH. Codex's deviations (attempt registered before
+the handler with `attempt_token`; `failures` separate from `attempts`; fail drops the lease;
+`clock_timestamp()`; status behind a text-returning RPC) are all improvements over the brief.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | A lease expiring mid-handler makes the next worker re-run the handler; the delivery ledger cannot protect the *side effect* because `delivered_at` is set only at ack. Requirement for C5: the bridge writes its own idempotency marker per `eventId` before firing anything, in the same transaction as ack when it writes to the database. Put the requirement in `bridge-automation.ts` and the C5 brief. | raised on PR #54; C5 requirement |
+| LOW | Handlers get no `AbortSignal`; on timeout they keep running in the background. | note for C5 |
+| LOW | `claim` counts the whole backlog to test emptiness; `EXISTS` suffices. | note |
+| LOW | PR #53 edits the same lines in `package.json`, `contracts.yml` and this file; merge #53 first, then bring main into #54. | process |
 
 ### C3 brief (first version), Codex review 2026-09-13 — two BLOCKERs, both accepted
 
@@ -797,5 +827,6 @@ No BLOCKER.
 | 2026-09-13 | Created with C0 handoff and C1 brief. | Package C0 |
 | 2026-09-13 | Folded in the 2026-09-12 decisions (shadow Level 1, obligation boundary, R0 manual rulebook track); noted PR #12 as C4 input; added §5 review record with the C1 review. | PR #47, C1 review |
 | 2026-09-13 | C1 marked done (PR #49). Claude track A delivered as the C2 brief: proposed DDL, RLS, immutability, append RPC, lock order, migration risk. C3 sketched. The C1 brief is retired to git history; its handoff and review stand in §2 and §5. | Package C2 prep |
+| 2026-09-13 | Tracks C and D delivered: executable golden paths + SE ledger review. | Tracks C, D |
 | 2026-09-13 | Track B delivered as `FINANCIAL_KERNEL_CALL_SITE_MAP.md`; board updated. | Track B |
 | 2026-09-13 | C3 brief written (outbox = events table, cursor per business/consumer, delivery ledger, halt-never-skip, two-connection proof). C2 brief retired to git history. C4 sketched. | Package C3 prep |

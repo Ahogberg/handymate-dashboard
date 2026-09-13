@@ -1,4 +1,5 @@
 import { getServerSupabase } from '@/lib/supabase'
+import { CUSTOMER_SETTLED_STATUSES } from '@/lib/invoices/status'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 
 /**
@@ -64,7 +65,10 @@ export async function getCustomerRotRutUsage(
     .select('rot_rut_type, rot_rut_deduction, status, is_credit_note')
     .eq('customer_id', customerId)
     .eq('business_id', businessId)
-    .in('status', ['sent', 'paid', 'overdue'])
+    // 2026-09-13: customer_paid (kunden har betalat sin del, Skatteverket
+    // väntar) räknades inte — utrymmet underskattades och nästa faktura kunde
+    // överskrida årstaket. Nu samma sanning som resten av appen (status.ts).
+    .in('status', ['sent', 'overdue', ...CUSTOMER_SETTLED_STATUSES])
     .gte('invoice_date', `${currentYear}-01-01`)
     .lte('invoice_date', `${currentYear}-12-31`)
   if (opts.excludeInvoiceId) {
