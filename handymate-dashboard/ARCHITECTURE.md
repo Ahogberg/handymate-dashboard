@@ -712,3 +712,14 @@ app/api/billing/
 | `sql/v33_sprint2.sql` | attachment_count på email_conversations, booking-index |
 | `sql/v34_agent_architecture.sql` | routed_agent på pending_approvals, invoice/quotes/leads-index |
 | `sql/v36_stripe_elements.sql` | is_pilot-kolumn, subscription_status default, pilot-konton |
+
+## Team- och kalenderstart (2026-09-13)
+Efter onboarding återanvänds KomIgangRail. `planning_team_start` och
+`planning_calendar_start` i business_preferences är användarbekräftelser,
+inte bevis på verifierad arbetstid eller aktuell beläggning. Skrivning går
+via ägar-/adminskyddad `/api/onboarding/planning-start`, med serverhärlett
+företag och jämförelse mot det underlag användaren fick se. Teamet måste
+vara bekräftat före kalendern. Kalenderbekräftelsen namnger en specifik
+nästa vecka; startsteget är en engångsuppgift, ingen veckovis checklista.
+Dessa uppgifter läggs bara till i webbrailen, inte i livscykelutskicken.
+Den nya 70-procentsgrinden aktiveras inte av startbekräftelserna.

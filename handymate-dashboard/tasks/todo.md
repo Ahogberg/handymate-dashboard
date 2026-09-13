@@ -1478,3 +1478,13 @@ Befintlig autonomi får ingen ny genväg. Release efter granskad diff och gröna
 Färdig betyder att varje steg har en synlig nästa handling och en sparad kvittens.
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
 utskick, fakturasändning, main-merge eller produktionsmigration ingår.
+
+# Team- och kalenderstart — 2026-09-13
+- [x] Inventera befintlig KomIgangRail, delade signaler, team och persondag.
+- [x] Lägg två sekventiella startuppgifter i befintlig rail; behåll målprioritering.
+- [x] Bekräfta team/ensamföretag och första planerade veckan på befintliga sidor.
+- [x] Verifiera tenant/roll, läsfel, tom vecka, inbjudna och återförsök.
+- [x] Dokumentera gränsen mot beläggningsvarningen och skapa granskbar PR.
+
+Verifiering och kvarstående integrations-/bygggrindar dokumenterade i
+`../docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md`, avgränsad uppdatering 2026-09-13.

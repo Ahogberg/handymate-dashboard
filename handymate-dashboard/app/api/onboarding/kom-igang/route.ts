@@ -4,6 +4,9 @@ import { getServerSupabase } from '@/lib/supabase'
 import { deriveKomIgangTasks, type KomIgangTask } from '@/lib/onboarding/kom-igang-tasks'
 import { hamtaKomIgangSignals } from '@/lib/onboarding/kom-igang-signals'
 
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+import { loadPlanningStart } from '@/lib/onboarding/planning-start-data'
+
 export const dynamic = 'force-dynamic'
 
 /**
@@ -52,6 +55,12 @@ export async function GET(request: NextRequest) {
     const forsta_artefakten = (meetingRes.count ?? 0) > 0 || (quoteRes.count ?? 0) > 0
     const pwa = baseSignals.pwa
 
+    // Bara produktens startyta får de nya uppgifterna; inga nya mejlnudges.
+    const user = await getCurrentUser(request)
+    if (user && user.business_id === businessId && isOwnerOrAdmin(user)) {
+      const { view } = await loadPlanningStart(supabase, businessId)
+      baseSignals.planningStart = view
+    }
     const tasks: KomIgangTask[] = deriveKomIgangTasks(baseSignals)
 
     return NextResponse.json({ ring_test, forsta_artefakten, pwa, tasks })

@@ -1464,6 +1464,58 @@ Och sedan gå tillbaka till sitt riktiga arbete.
 # 27. CURRENT PROGRAM STATE
 ## Detta avsnitt SKA uppdateras löpande av varje session
 
+
+### Avgränsad uppdatering 2026-09-13 — startnudgar för team och kalender
+
+**Gren:** `codex/team-calendar-start-nudges-20260913`, bas `082bb028`.
+
+**REUSED:** `KomIgangRail`, `deriveKomIgangTasks`, Team, Resursplanering,
+`business_preferences`, serverns företags-/rollkontroll och svenska datumhjälpare.
+Befintliga startnudgar: testsamtal, fakturadata/Fortnox, första offert,
+första uppdraget med Matte, kundsegment, kundinflöde och push när ett riktigt
+kort väntar. Railen visar en primär och högst två sekundära uppgifter under
+kontots första 30 dagar; kundens valda mål styr prioriteten.
+
+**NEW:** Två sekventiella uppgifter i samma rail. Teamet bekräftas i Team,
+med ”Jag jobbar själv” för en person; inbjudna räknas utan accepterat konto.
+Kalendersteget leder till Resursplanering och kräver att den utpekade nästa
+veckan visas och att användaren bekräftar kända jobb/frånvaro. Ingen
+automatisk klar-markering på kalenderkoppling, ett jobb eller tom kalender.
+En uttryckligen tom vecka får bekräftas. Fel person/ofullständiga tider,
+ändrat läst underlag, läsfel och trunkerade svar blockerar bekräftelse.
+
+**TRUTH:** Engångsstart för användningen, inte ett nytt återkommande
+veckokrav. Sparade kvittenser betyder inte att arbetstider är verifierade
+eller att framtida veckor är kompletta. Ingen ny mejl-/pushnudge, AI-körning,
+extern kommunikation eller ändring av beslutsräknaren.
+
+**VERIFIED:** 65 riktade kontraktstester inklusive faktisk route-/reader-
+harness; två browserprov av riktig komponent vid 375/1280 px med isolerad
+transport. TypeScript och `next build` gröna med 12 GB heap (befintliga
+metadata-/Sentry-varningar kvar). Databasens kolumner och unik
+preference-nyckel verifierade läsande; motsvarande urval provade i Nordström
+El AB (två aktiva medlemmar, inget startkvitto, inga poster i provveckan).
+Inga kunddata ändrades.
+
+**NOT PROVEN:** Inloggad rundresa och persistering av nya kvittenser mot
+riktig databas, native mobil och deploy är separata grindar. PR hålls draft
+tills kvarstående integrationsprov är gröna.
+
+**BELÄGGNINGSBESLUT:** Andreas valde under 70 % nästa kalendervecka från
+onsdag. Förslag: lugnt kort, ingen push, dölj vid 75 %, avfärdande per
+utpekad vecka. Ej aktiverat här. Repoverkligheten innehåller fortfarande
+en äldre 40 %-trigger i week-capacity, bokningstak i nämnaren och fasta
+8-timmarsdagar i personkapacitet. Att byta en konstant till 70 skulle
+inte genomföra beslutets beräkning och skydd. Nästa kapacitetsslice måste
+verifiera arbetstid/deltid/frånvaro, datakompletthet och färskhet och hålla
+kundens startbekräftelse skild från aktuell veckas beläggningsunderlag.
+
+**ÖVRIGA NUDGYTOR:** FirstQuoteGuide/WorkSampleResume i offertbyggaren,
+MalNudge i månadsgenomgången, samt äldre OnboardingChecklist under
+/dashboard/oversikt. Den äldre checklistans ”Bjud in kollega” länkar till
+referral och är inte ett personalsteg. Nytt arbete återanvänder huvudsidans
+KomIgangRail och skapar inte en tredje checklista.
+
 ### PROGRAM
 Brain Visibility Weekend
 
