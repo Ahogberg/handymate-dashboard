@@ -31,7 +31,7 @@ Rules that keep this file honest:
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
 | C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema + append RPC | Codex | **ready — brief in §3** (Claude track A done) | — |
+| C2 | `financial_events` schema + append RPC | Codex | **implemented — awaiting Claude A+C review** | review before merge; migration unapplied |
 | C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
 | C4 | Receivables + allocations behind flag | Codex | not started | C1, C2, C3 |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
@@ -65,6 +65,77 @@ Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind t
 ---
 
 ## 2. Handoffs
+
+### C2 — financial event store (Codex, 2026-09-13)
+
+```text
+Package / scope
+  C2 only: immutable financial_events schema, service-only append RPC, typed
+  envelope/row conversion, and executable tests against the real migration.
+Files changed
+  handymate-dashboard/sql/v235_financial_events.sql
+  handymate-dashboard/lib/financial-kernel/events/types.ts
+  handymate-dashboard/tests/financial-kernel-events-sql.spec.ts
+  handymate-dashboard/package.json (registration)
+  .github/workflows/contracts.yml (registration)
+  docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md (brief and this handoff)
+Architecture sections relied on
+  ARCHITECTURE.md FK.1-FK.2; blueprint 6, 7, 8, 21, 26, 36.2;
+  orchestration 5 C2, 6 A+C, 7, 9; this log's C2 brief.
+Canonical events touched
+  All 32 names in the database CHECK, exact parity tested against catalog.ts.
+  Nine C4 payloads typed verbatim from FK.1; other payloads are never.
+DB/RPC changes
+  financial_events, indexes/constraints, immutable trigger, append_financial_event.
+  NOT APPLIED to any remote/test/production environment. No backfill or caller.
+Feature flags
+  None. C4 still owns financial_kernel_enabled; no behavior switched on.
+Golden paths added/updated
+  Isolated database proofs for repeat append, conflicting retry, same-tenant
+  causation and rejected cross-tenant chains, membership reads, immutable history,
+  client denial, safe BIGINT transport and transaction rollback.
+Invariants affected
+  All eleven brief invariants, plus retention FK and unsafe numeric transport.
+  Tests were written first; collection failed before types.ts existed. After
+  installing the proposed DDL verbatim the inherited-service-grants test failed;
+  it passes with the correction below. Real is_business_member body is extracted
+  from the repository migration; auth.uid and tenant tables are isolated fixtures.
+DDL deviations from the proposal, with reasons
+  Replaced service_role's UPDATE/DELETE/TRUNCATE revoke with REVOKE ALL then
+  GRANT SELECT, and revoked sequence rights from PUBLIC/anon/authenticated/service_role.
+  Reason: inherited/default INSERT and sequence grants otherwise bypass the RPC,
+  business lock and idempotency checks. The harness deliberately installs broad
+  service default grants before the migration and proves this failure/correction.
+  SECURITY DEFINER still appends as the migration owner; service_role can read and
+  execute the RPC but cannot write directly. Header records the mandated lock order.
+  No other DDL behavior was changed.
+Known unresolved questions / limits of evidence
+  PGlite is single-session: 200 ordered appends and lock placement are verified,
+  not competing transactions' commit order. C3 must add a multi-connection Postgres
+  concurrency proof before a consumer relies on seq. Sequence gaps are intentional.
+  UPDATE/DELETE normally fail at the privilege boundary for service_role. The
+  trigger is separately proven as owner and with test-only temporary grants.
+  TRUNCATE is prevented by grants, not by a trigger against a database administrator.
+  The append RPC preserves the proposal's retry semantics: event type, payload,
+  amount and currency are compared; other envelope fields on a replay do not replace
+  the first event. Payload-shape/business semantics are future writers' responsibility.
+  Row mappers require string BIGINT transport, rejecting number input. C3 must use
+  a lossless transport adapter: whole-row JSONB/PostgREST numeric serialization is
+  not proof of exact BIGINT transport. Payload amounts remain the brief's number
+  minor units; their owning packages must enforce the safe integer bound.
+Open decisions encountered and left unresolved
+  D1-D4, R0 and C1b remain unchanged. No retention/anonymisation decision made.
+Swedish regime coverage: reverse charge / cash basis / ROT-RUT / cut-over
+  Payload fields retain regime/method/tax-reduction and separate receivable
+  components. No posting, VAT calculation, accounting rule or historical replay.
+  RESTRICT intentionally exposes account-retention work to track G.
+Human accounting review required? yes/no — and by whom, by name
+  No for C2 storage mechanics. Named accountant still required for R0/C1b/C9.
+```
+
+Verification: 13 new C2 tests, including the eleven brief invariants; 48 tests in
+the combined C2/C0/C1/schema/dead-code/CI-registration pass. TypeScript and remote
+CI status are recorded on the PR. Claude review of dimensions A and C is pending.
 
 ### C1 — Money primitives (Codex, 2026-09-13)
 
