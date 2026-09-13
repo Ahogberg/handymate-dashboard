@@ -764,8 +764,11 @@ Alla event: `snake_case`, `substantiv_particip`, engelska. `Finns` är ❌ på s
 tills paketet som inför eventet mergas — då byts markeringen i **samma PR**. Kolumnen
 *Paket* pekar på orkestreringsdokumentets paket som äger första implementationen.
 
-Belopp i payload är alltid **minor units** (öre) som heltal, aldrig `number` med decimaler,
-och alltid med `currency`. Fält märkta † är obligatoriska från dag ett därför att det svenska
+Belopp i payload är alltid **minor units** (öre) som **decimalsträng av ett heltal** (`"1250000"`),
+aldrig ett JSON-tal och aldrig `number` med decimaler, och alltid med `currency`. Ändrat
+2026-09-14 (C4): ett JSON-tal tappar siffror över 2^53 genom PostgREST och `JSON.parse`, och
+kerneln har regeln att aldrig läsa ett belopp som `number`; strängen gör payloaden konsekvent
+med spegelkolumnen `amount_minor` och varje RPC-retur. Konsumenter parsar med `money(BigInt(s), currency)`. Fält märkta † är obligatoriska från dag ett därför att det svenska
 landspaketet inte kan fyllas på i efterhand utan migration (blueprint §15.1–15.2).
 Källan för †-fälten från C4: `invoice.vat_regime` (default `'standard'`) och
 `business_config.accounting_method` (default `'accrual'`), båda införda i C4 som minsta möjliga
