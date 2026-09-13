@@ -57,7 +57,7 @@ function input(overrides: Partial<Input> = {}): Input {
   return { business_id: 'a', event_type: 'payment_settled', schema_version: 1,
     occurred_at: '2026-09-13T12:00:00Z', effective_date: '2026-09-12', source_type: 'payment', source_id: 'p1',
     correlation_id: 'fin_payment_p1', causation_id: null, idempotency_key: 'manual:p1', currency: 'SEK', amount_minor: '100',
-    payload: { payment_id: 'p1', currency: 'SEK', amount_minor: 100, settled_at: '2026-09-13T12:00:00Z', evidence: 'manual' },
+    payload: { payment_id: 'p1', currency: 'SEK', amount_minor: '100', settled_at: '2026-09-13T12:00:00Z', evidence: 'manual' },
     actor_type: 'system', actor_id: null, ...overrides }
 }
 async function append(overrides: Partial<Input> = {}) {
@@ -213,14 +213,14 @@ test('10: signed BIGINT above JS safe integer preserves all digits through the e
 })
 
 const payloads = {
-  invoice_issued: { invoice_id: 'i', invoice_number: '1', customer_id: 'c', project_id: 'p', currency: 'SEK', total_minor: 100, vat_regime: 'standard', accounting_method: 'cash', issued_date: '2026-09-13', due_date: '2026-10-13', tax_reduction: 'rot' },
-  invoice_credited: { invoice_id: 'i', credit_invoice_id: 'credit', currency: 'SEK', amount_minor: -100, issued_date: '2026-09-13' },
-  receivable_created: { receivable_id: 'r', invoice_id: 'i', component: 'customer', owner: 'business', currency: 'SEK', amount_minor: 100, due_date: '2026-10-13' },
+  invoice_issued: { invoice_id: 'i', invoice_number: '1', customer_id: 'c', project_id: 'p', currency: 'SEK', total_minor: '100', vat_regime: 'standard', accounting_method: 'cash', issued_date: '2026-09-13', due_date: '2026-10-13', tax_reduction: 'rot' },
+  invoice_credited: { invoice_id: 'i', credit_invoice_id: 'credit', currency: 'SEK', amount_minor: '-100', issued_date: '2026-09-13' },
+  receivable_created: { receivable_id: 'r', invoice_id: 'i', component: 'customer', owner: 'business', currency: 'SEK', amount_minor: '100', due_date: '2026-10-13' },
   receivable_adjusted: { receivable_id: 'r', reason: 'ownership_transfer', owner_after: 'factor' },
   receivable_settled: { receivable_id: 'r', invoice_id: 'i', component: 'tax_authority', settled_at: '2026-09-13T12:00:00Z' },
-  payment_initiated: { payment_id: 'p', provider: 'manual', direction: 'inbound', currency: 'SEK', amount_minor: 100 },
-  payment_settled: { payment_id: 'p', currency: 'SEK', amount_minor: 100, fee_minor: 0, settled_at: '2026-09-13T12:00:00Z', evidence: 'manual' },
-  payment_allocated: { allocation_id: 'al', payment_id: 'p', receivable_id: 'r', currency: 'SEK', amount_minor: 100 },
+  payment_initiated: { payment_id: 'p', provider: 'manual', direction: 'inbound', currency: 'SEK', amount_minor: '100' },
+  payment_settled: { payment_id: 'p', currency: 'SEK', amount_minor: '100', fee_minor: '0', settled_at: '2026-09-13T12:00:00Z', evidence: 'manual' },
+  payment_allocated: { allocation_id: 'al', payment_id: 'p', receivable_id: 'r', currency: 'SEK', amount_minor: '100' },
   payment_allocation_reversed: { allocation_id: 'al', reason: 'wrong allocation' },
 } satisfies Pick<FinancialEventPayloads, 'invoice_issued' | 'invoice_credited' | 'receivable_created' | 'receivable_adjusted' | 'receivable_settled' | 'payment_initiated' | 'payment_settled' | 'payment_allocated' | 'payment_allocation_reversed'>
 test('11: every typed payload round-trips every envelope field and optional null', () => {
