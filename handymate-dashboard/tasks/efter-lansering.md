@@ -242,37 +242,44 @@ punkter som redan står i tabellen.
   `learning_events`, ägaren beslutar om den blir permanent. Samma
   bevisregel som kunskapsbasen: mönster kräver bekräftelse.
 
-## Adminbehörigheten — fyra punkter utan plats i ordningen (2026-09-13)
+## Adminbehörigheten (2026-09-13) — tre av fyra gjorda före lansering
 
-Står här för att inte tappas, **inte** inplacerade i tabellen ovan. Ordningen
-i tabellen är er prioritering och renumreras inte av det här avsnittet;
-Andreas avgör var de fyra hör hemma.
+**Läget.** Grinden till alla 37 adminrutter är `isAdminEmail()` i
+`lib/auth/admin-email.ts`: adressen slutar på @handymate.se, eller finns i
+`ADMIN_EMAILS`. Andreas och Christoffer har varsitt @handymate.se-konto utan
+kopplat företag. `andreashogberg93@gmail.com` ligger kvar i `ADMIN_EMAILS`
+som reservnyckel. Christoffer ska veta att en inloggning med @handymate.se
+ersätter hans Bee Service-session i samma webbläsare.
 
-**Läget som lanseras.** Grinden till alla 37 adminrutter är
-`email.endsWith('@handymate.se') || ADMIN_EMAILS.includes(email)`
-(`lib/admin-auth.ts:35`). Andreas och Christoffer har varsitt
-@handymate.se-konto utan kopplat företag, och de tar sig in genom att gå
-direkt till `/admin`. `andreashogberg93@gmail.com` ligger kvar i
-`ADMIN_EMAILS` som reservnyckel. Inget av detta ändras före lansering
-(beslut Andreas 2026-09-13). Christoffer ska veta att en inloggning med
-@handymate.se-kontot ersätter hans Bee Service-session i samma webbläsare.
+**Gjort 2026-09-13** (beslut Andreas samma dag: vägen in byggdes direkt i
+stället för att vänta):
 
-1. **Inloggningsrutten ljuger.** `app/api/auth/route.ts:331` svarar 401
-   "Inget företag kopplat till kontot" när kontot saknar företag — men
-   `signInWithPassword` har redan lyckats och satt sessionskakan, och
-   `app/login/page.tsx` loggar inte ut vid fel. Användaren *är* alltså
-   inloggad och ser ändå ett felmeddelande. Rätt beteende: ett
-   @handymate.se-konto utan företag får `success` och skickas till `/admin`.
-2. **`isAdminEmail()` som delat predikat.** Samma e-postlogik finns
-   duplicerad i `lib/admin-auth.ts:35` och `lib/auth/superadmin.ts:54`. Två
-   kopior av en behörighetsgrind är en kopia för mycket. (`isSuperAdmin()`
-   används idag av noll adminrutter — avgör samtidigt om den ska bort.)
-3. **Bort med `ADMIN_EMAILS`** när punkt 1 är på plats och båda
-   @handymate.se-kontona är provade. Då är domänen den enda grinden.
-4. **Kontraktsprov som låser grinden** — ett prov som fallerar om en
-   icke-@handymate.se-adress släpps in — plus rättning av
-   `docs/PRODUCTION_SETUP.md:50` och `docs/launch/GO_NO_GO.md:15`, som båda
-   beskriver `ADMIN_EMAILS` som vägen in.
+- ~~Inloggningsrutten ljuger.~~ `app/api/auth/route.ts` svarade 401 "Inget
+  företag kopplat till kontot" åt ett adminkonto — trots att
+  `signInWithPassword` redan lyckats och satt sessionskakan, så användaren
+  *var* inloggad och fick ändå ett fel. Nu svarar den `success` med
+  `redirect: '/admin'`, och `app/login/page.tsx` följer den anvisningen
+  (ett `?redirect=` under `/admin` respekteras, annars vinner serverns —
+  den sparade adressen är nästan alltid `/dashboard`, en sida adminkontot
+  inte kan visa och som skickar tillbaka till inloggningen).
+- ~~`isAdminEmail()` som delat predikat.~~ Låg duplicerad i
+  `lib/admin-auth.ts` och `lib/auth/superadmin.ts`; nu en definition i
+  `lib/auth/admin-email.ts` som båda och inloggningsrutten delar.
+  `isSuperAdmin()` behåller sin app_metadata-väg ovanpå.
+- ~~Kontraktsprov som låser grinden.~~ `tests/admin-email-gate.spec.ts`
+  (10 prov): domänen måste *avsluta* adressen, `ADMIN_EMAILS` är en exakt
+  lista utan delsträngsmatchning, och listan läses vid anrop i stället för
+  vid modulladdning. `docs/launch/GO_NO_GO.md` säger nu att ett adminkonto
+  utan firma landar på `/admin` och att det är väntat.
+
+**Kvar — en punkt, utan plats i ordningen ovan.** Tabellen är er prioritering
+och renumreras inte av det här avsnittet; Andreas avgör när den här görs.
+
+1. **Bort med `ADMIN_EMAILS`** när båda @handymate.se-kontona är körda ett tag
+   och reservnyckeln inte behövs. Då är domänen den enda grinden. Provet
+   ovan täcker redan att grinden stänger när variabeln tas bort, utan ny
+   deploy. Rätta samtidigt `docs/PRODUCTION_SETUP.md` (raden som listar
+   `ADMIN_EMAILS` bland de valfria variablerna).
 
 ## Beslutat men litet (halv dag var)
 - **Ett morgonmejl i stället för tre** (räddningskö, driftlarm, kreditbevakning). Rött i ämnesraden bara när något stoppar kunder, annars tystnad. Beslut Andreas 2026-09-05.

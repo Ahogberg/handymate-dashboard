@@ -38,7 +38,16 @@ function LoginForm() {
         throw new Error(result.error || 'Fel e-post eller lösenord')
       }
 
-      const redirect = searchParams?.get('redirect') || '/dashboard'
+      // Serverns redirect vinner över ?redirect= när den finns. Den sätts
+      // bara för adminkonton utan företag, och just för dem är den sparade
+      // adressen nästan alltid /dashboard — en sida de inte kan visa, som
+      // skickar tillbaka hit igen. Undantaget är en adminsida de faktiskt
+      // var på väg till: den respekteras.
+      const requested = searchParams?.get('redirect') || ''
+      const serverRedirect: string = result.redirect || ''
+      const redirect = serverRedirect
+        ? (requested.startsWith('/admin') ? requested : serverRedirect)
+        : (requested || '/dashboard')
       router.push(redirect)
 
     } catch (err: any) {

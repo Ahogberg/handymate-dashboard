@@ -13,7 +13,8 @@ beslutsgrind.
 Efter deploy:
 
 1. Logga in på `https://app.handymate.se` med ett `@handymate.se`-konto eller
-   en adress som finns i `ADMIN_EMAILS`.
+   en adress som finns i `ADMIN_EMAILS`. Ett adminkonto utan kopplad firma
+   landar direkt på `/admin` — det är väntat, inte ett fel.
 2. Öppna `https://app.handymate.se/api/admin/launch-readiness`.
 3. Spara hela JSON-svaret tillsammans med release-SHA och klockslag.
 4. Kör från repo-roten:
