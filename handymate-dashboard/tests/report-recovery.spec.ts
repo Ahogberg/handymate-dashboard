@@ -62,7 +62,7 @@ test('different member/company and removed assignment cannot read or resume; dis
  expect((await db.query('SELECT * FROM project_material')).rows).toHaveLength(0)
 })
 test('actual report HTTP route authenticates, scopes recovery to server identity and never writes artifacts on resume',async()=>{
- const old=process.env.WORK_REPORT_CONTINUITY_ENABLED;process.env.WORK_REPORT_CONTINUITY_ENABLED='true'
+ const old=process.env.WORK_REPORT_CONTINUITY_ENABLED,oldPilot=process.env.WORK_REPORT_CONTINUITY_BUSINESS_IDS;process.env.WORK_REPORT_CONTINUITY_ENABLED='true';delete process.env.WORK_REPORT_CONTINUITY_BUSINESS_IDS
  try{
   const first=await createReportSession(client,'b',ctx,null,actions)
   const {NextRequest,NextResponse}=require('next/server')
@@ -75,7 +75,16 @@ test('actual report HTTP route authenticates, scopes recovery to server identity
   const valid=await route({business_id:'b'},user).POST(request());expect(valid.status).toBe(200);expect(valid.headers.get('cache-control')).toBe('no-store');expect((await valid.json()).pending_confirmation.report_id).toBe(first.report_id)
   expect((await db.query('SELECT * FROM project_material')).rows).toHaveLength(0)
   process.env.WORK_REPORT_CONTINUITY_ENABLED='false';expect((await route({business_id:'b'},user).POST(request())).status).toBe(503)
- }finally{if(old===undefined)delete process.env.WORK_REPORT_CONTINUITY_ENABLED;else process.env.WORK_REPORT_CONTINUITY_ENABLED=old}
+  process.env.WORK_REPORT_CONTINUITY_BUSINESS_IDS=' b , '
+  expect((await route({business_id:'b'},user).POST(request())).status).toBe(200)
+  const foreign={...user,business_id:'other',id:'other-user'}
+  const spoofed=new NextRequest('https://test/api/day-close',{method:'POST',body:JSON.stringify({action:'resume',id:first.report_id,business_id:'b'})})
+  expect((await route({business_id:'other'},foreign).POST(spoofed)).status).toBe(503)
+  const hidden=await route({business_id:'other'},foreign).GET(new NextRequest('https://test/api/day-close?view=reports&business_id=b'))
+  expect(await hidden.json()).toEqual({enabled:false,reports:[]})
+  process.env.WORK_REPORT_CONTINUITY_ENABLED='true'
+  expect((await route({business_id:'other'},foreign).POST(spoofed)).status).toBe(503)
+ }finally{if(old===undefined)delete process.env.WORK_REPORT_CONTINUITY_ENABLED;else process.env.WORK_REPORT_CONTINUITY_ENABLED=old;if(oldPilot===undefined)delete process.env.WORK_REPORT_CONTINUITY_BUSINESS_IDS;else process.env.WORK_REPORT_CONTINUITY_BUSINESS_IDS=oldPilot}
 })
 test('material stable identity also handles concurrent inserts and keeps different reports separate',async()=>{
  const write=writers(),context={workReport:{...ctx,stableArtifacts:true},confirmationId:'same-confirmation'}
