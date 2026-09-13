@@ -1,0 +1,64 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <style>
+    body { margin: 0; font-family: 'DM Sans', system-ui, sans-serif; }
+    a { color: #0f766e; text-decoration: none; }
+    a:hover { color: #134e4a; }
+  </style>
+</helmet>
+
+<div style="width: 1440px; background: #f8fafc; color: #1e293b; padding: 72px 0">
+  <div style="max-width: 1280px; margin: 0 auto; padding: 0 24px">
+
+    <div style="font: 500 14px 'DM Sans', sans-serif; letter-spacing: 0.14em; color: #0f766e; text-transform: uppercase; margin-bottom: 12px">Det som ingår — och det som kommer</div>
+    <h2 style="font-family: 'Space Grotesk', sans-serif; font-size: 38px; font-weight: 700; letter-spacing: -0.02em; color: #0f172a; margin: 0 0 12px">Priset låses på det du köper i dag.</h2>
+    <p style="font-size: 17px; line-height: 1.55; color: #475569; max-width: 62ch; margin: 0 0 36px; text-wrap: pretty">Grundarpriset gäller Core — teamet, telefonen, offerterna, projekten och fakturorna. Nya delar av Handymate får sin egen prissättning, och som grundarkund får du dem till halva priset.</p>
+
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px">
+
+      <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M8.5 12.5l2.5 2.5 4.5-5"></path></svg>
+          <span style="font: 600 11px 'DM Sans', sans-serif; letter-spacing: 0.12em; color: #0f766e; text-transform: uppercase">Ingår i dag</span>
+        </div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; color: #0f172a; margin-bottom: 10px">Core</div>
+        <p style="font-size: 14.5px; line-height: 1.55; color: #475569; margin: 0">Teamet som svarar i telefonen, följer upp offerter, håller ordning på projekt, ÄTA och ROT, och ser till att fakturorna går ut och kommer in.</p>
+        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f1f5f9; font-size: 14px; color: #0f172a; font-weight: 500">Priset låst för alltid</div>
+      </div>
+
+      <div style="background: #fff; border: 1px solid #e2e8f0; border-radius: 18px; padding: 26px; box-shadow: 0 2px 8px rgba(15,23,42,0.05)">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#64748B" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><path d="M12 8v4l2.5 2"></path></svg>
+          <span style="font: 600 11px 'DM Sans', sans-serif; letter-spacing: 0.12em; color: #64748B; text-transform: uppercase">Kommer</span>
+        </div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; color: #0f172a; margin-bottom: 10px">Bokföringen</div>
+        <p style="font-size: 14.5px; line-height: 1.55; color: #475569; margin: 0">Handymate bokför det arbete du redan lagt in — och räknar fram momsen ur underlaget i stället för ur en kontoutdragsgissning.</p>
+        <div style="margin-top: 16px; padding-top: 14px; border-top: 1px solid #f1f5f9; font-size: 14px; color: #0f172a; font-weight: 500">Halva priset för dig, för alltid</div>
+      </div>
+
+      <div style="background: #f0fdf9; border: 1px solid #99f6e4; border-radius: 18px; padding: 26px">
+        <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 14px">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0f766e" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l7 4v5c0 4.5-3 8.3-7 9-4-0.7-7-4.5-7-9V7l7-4z"></path></svg>
+          <span style="font: 600 11px 'DM Sans', sans-serif; letter-spacing: 0.12em; color: #0f766e; text-transform: uppercase">Vad vi inte lovar</span>
+        </div>
+        <div style="font-family: 'Space Grotesk', sans-serif; font-size: 20px; font-weight: 600; color: #0f172a; margin-bottom: 10px">Ett datum vi inte äger</div>
+        <p style="font-size: 14.5px; line-height: 1.55; color: #334155; margin: 0">Bokföringen får ett datum när den är granskad av en revisor, inte innan. Vi säljer Handymate på det du får i dag — resten är en uppsida, inte ett skäl att köpa.</p>
+      </div>
+
+    </div>
+  </div>
+</div>
+</x-dc>
+<script data-dc-script>
+class Component extends DCLogic {}
+</script>
+</body>
+</html>
