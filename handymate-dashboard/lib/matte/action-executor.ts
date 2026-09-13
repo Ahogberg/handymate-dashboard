@@ -9,6 +9,7 @@ import type { TimeSlot } from './calendar-slots'
 import { suggestAtaDraft } from '@/lib/ata/suggest-ata-draft'
 import { createLeadAndDeal } from '@/lib/leads/golden-path'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
+import { applyInvoicePayment } from '@/lib/invoices/apply-payment'
 
 export async function executeMatteActions(
   decision: MatteDecision,
@@ -106,12 +107,25 @@ async function executeDirectAction(
     }
 
     case 'mark_invoice_paid': {
+      // 2026-09-13 (call-site-kartan, tier 1 #1): tidigare en rå update av
+      // status/paid_at som hoppade över betalbeslutet — en ROT-faktura blev
+      // "paid" utan att Skatteverkets del fanns, utan paid_amount och utan
+      // post-payment-automationerna. Nu samma kärna som mark-paid-routen.
+      // Aktören är en agent; kärnan har inget aktörsfält ännu (kernel C4),
+      // därför markedByUserId: null och paidVia 'matte'.
       if (action.params.invoice_id) {
-        await supabase
-          .from('invoice')
-          .update({ status: 'paid', paid_at: new Date().toISOString() })
-          .eq('invoice_id', action.params.invoice_id as string)
-          .eq('business_id', businessId)
+        const result = await applyInvoicePayment({
+          businessId,
+          invoiceId: action.params.invoice_id as string,
+          source: 'manual',
+          paidVia: 'matte',
+          markedByUserId: null,
+        })
+        if (!result.ok) {
+          console.error('[Matte] mark_invoice_paid misslyckades:', result.error)
+        } else if (result.already_paid) {
+          console.log('[Matte] mark_invoice_paid: fakturan var redan betald', action.params.invoice_id)
+        }
       }
       break
     }
