@@ -364,6 +364,23 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Missing invoice_id' }, { status: 400 })
     }
 
+    // 2026-09-13 (call-site-kartan, tier 1 #2): betalt-tillstånd får ALDRIG
+    // sättas här. Den här vägen satte bara paid_at — aldrig paid_amount, aldrig
+    // customer_paid för ROT/RUT, inga automationer. Betalning går genom
+    // betalkärnan: POST /api/invoices/[id]/mark-paid (eller PATCH .../status).
+    if (fields.status === 'paid' || fields.status === 'customer_paid') {
+      return NextResponse.json(
+        { error: 'Betalning registreras via POST /api/invoices/[id]/mark-paid, inte via PUT' },
+        { status: 400 },
+      )
+    }
+    if (fields.paid_amount !== undefined || fields.paid_at !== undefined || fields.settled_at !== undefined) {
+      return NextResponse.json(
+        { error: 'Betalfält (paid_amount, paid_at, settled_at) ägs av betalkärnan' },
+        { status: 400 },
+      )
+    }
+
     // Build updates from provided fields
     const updates: Record<string, any> = {}
     const allowedFields = [
@@ -436,10 +453,6 @@ export async function PUT(request: NextRequest) {
       }
       updates.rot_rut_deduction = serverAvdrag
       updates.customer_pays = totalInkl - serverAvdrag
-    }
-
-    if (fields.status === 'paid' && !fields.paid_at) {
-      updates.paid_at = new Date().toISOString()
     }
 
     const { data: invoice, error } = await supabase

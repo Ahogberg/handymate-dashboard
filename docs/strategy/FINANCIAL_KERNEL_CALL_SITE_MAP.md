@@ -131,6 +131,12 @@ that went through Tier 1 bypass #2.
 
 ## 5. Fix now, independent of the kernel (launch-blocker audit material)
 
+> **Status 2026-09-13:** all four fixed in PR #53, locked by
+> `tests/betalsanning-sidodorrar.spec.ts` in `test:contracts`. A fifth item followed from #2:
+> invoices marked paid through the old PUT path carry `paid_amount = NULL`; the idempotent
+> backfill `sql/v237_backfill_paid_amount.sql` fills them (run after deploy, not applied by
+> the PR).
+
 These are correctness bugs in production behaviour and belong to the pre-launch audit that
 orchestration §2 prioritises, not to a kernel package. Each is small and local.
 
