@@ -185,3 +185,61 @@ test.describe('källskanning — adminvyn', () => {
     expect(s).toContain('ADOPTIONSYTOR')
   })
 })
+
+test.describe('kundens egen räknare — /api/min-garanti', () => {
+  // 2026-09-13. Grundarerbjudandets användningsgaranti lovar "fyra av åtta
+  // ytor på 30 dagar". Måttet fanns i lib/admin/adoption.ts men varje läsare
+  // var intern (admin, kronorna, launch-desk): kunden kunde inte se det
+  // villkor den bedöms på. Heroutkastets §9 gjorde ytan till ett
+  // publiceringsvillkor, och det här facit håller den ärlig.
+  const rutt = kod('app/api/min-garanti/route.ts')
+  const sida = kod('app/dashboard/min-garanti/page.tsx')
+  const meny = kod('components/Sidebar.tsx')
+  const utanKommentarer = (s: string) =>
+    s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
+
+  test('EN räkning — rutten använder admins funktioner, inte en egen variant', () => {
+    // Två räknare som kan glida isär är värre än ingen: det är skillnaden
+    // som blir tvisten.
+    const ren = utanKommentarer(rutt)
+    expect(ren).toContain('computeAdoption')
+    expect(ren).toContain('hamtaAdoptionHandelser')
+    expect(ren).toContain("from '@/lib/admin/adoption'")
+  })
+
+  test('tröskeln och fönstret kommer ur modulens konstanter, aldrig ur en siffra i rutten', () => {
+    const ren = utanKommentarer(rutt)
+    expect(ren).toContain('ADOPTION_TROSKEL')
+    expect(ren).toContain('ADOPTION_FONSTER_DAGAR')
+    // En hårdkodad 4 eller 30 i svaret skulle kunna säga något annat än
+    // det admin räknar.
+    expect(ren).not.toMatch(/troskel:\s*\d/)
+    expect(ren).not.toMatch(/fonsterDagar:\s*\d/)
+  })
+
+  test('grindad på ägare/admin och force-dynamic', () => {
+    const ren = utanKommentarer(rutt)
+    expect(ren).toContain('getAuthenticatedBusiness')
+    expect(ren).toContain('isOwnerOrAdmin')
+    expect(ren).toContain("export const dynamic = 'force-dynamic'")
+    // Menyposten ska döljas för samma roller som rutten 403:ar.
+    expect(utanKommentarer(meny)).toMatch(/OWNER_ADMIN_ONLY_CHILDREN[^)]*min-garanti/)
+  })
+
+  test('ingen påhittad nedräkning innan fönstret börjat', () => {
+    const ren = utanKommentarer(rutt)
+    expect(ren).toMatch(/dagarKvarIFonstret\s*=\s*\n?\s*adoption\.dag == null \? null/)
+    expect(ren).toMatch(/dagarKvarTillBeslut\s*=\s*\n?\s*adoption\.dag == null \? null/)
+  })
+
+  test('sidan visar ett MÅTT, aldrig sin egen version av garantitexten', () => {
+    // Avtalets ordalydelse bor i avtalet och på landningssidan. En
+    // produktyta som formulerar om ett villkor är hur två sanningar uppstår.
+    const ren = utanKommentarer(sida)
+    for (const lovord of ['pengarna tillbaka', 'hela året', 'återbetal', 'garanterar', 'vi betalar']) {
+      expect(ren.toLowerCase(), `sidan lovar något: ${lovord}`).not.toContain(lovord)
+    }
+    // Och den ska visa VILKA ytor som räknas, inte bara en siffra.
+    expect(ren).toContain('y.etikett')
+  })
+})
