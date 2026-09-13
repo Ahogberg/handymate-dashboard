@@ -9,6 +9,7 @@
 - [`../HANDYMATE_ACCOUNTING_ROADMAP.md`](../HANDYMATE_ACCOUNTING_ROADMAP.md) — strategic roadmap for replacing Fortnox/Bokio-class accounting for Handymate's core customer segment, including Global Ledger, country packs, shadow accounting, rollout and pricing implications.
 - [`../HANDYMATE_VERTICAL_EXPANSION_STRATEGY.md`](../HANDYMATE_VERTICAL_EXPANSION_STRATEGY.md) — vertical expansion thesis: Pay, Supply/Procurement, Payroll, Capital, Fleet, Insurance, People/Capacity Network and Marketplace.
 - [`FINANCIAL_KERNEL_ARCHITECTURE.md`](FINANCIAL_KERNEL_ARCHITECTURE.md) — implementation blueprint tying Handymate Pay and Ledger together with durable financial events, payments, allocations, reconciliation, posting engine, Fortnox shadow mode and migration from current invoice/payment code.
+- [`FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md`](FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md) — normative companion to the architecture's §20: automated shadow verification, the S1/S2 evidence split, divergence lifecycle, migration-readiness gate and the permanent Financial Integrity Engine. **§21 records which comparison levels are reachable with the current Fortnox OAuth grant — only Level 1 — and what the rest would cost.**
 - [`FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md`](FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md) — execution contract for how Codex and Claude divide, implement, review and merge Financial Kernel work. Mandatory reading for implementation agents.
 - [`FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md`](FINANCIAL_KERNEL_ARCHITECTURE_REVIEW.md) — permanent adversarial review record (2026-09-11). Its accepted findings are already normative in the two documents above; it preserves the reasoning so a constraint is not silently reversed. **Implementation agents do not need to read it.**
 - [`FINANCIAL_KERNEL_PACKAGE_LOG.md`](FINANCIAL_KERNEL_PACKAGE_LOG.md) — live package board, handoff blocks and the brief for the next implementation package. The canonical event catalogue, envelope rules, feature flags and module ownership live in `handymate-dashboard/ARCHITECTURE.md` §FK.0–FK.6 and are enforced by `tests/financial-kernel-event-contract.spec.ts`.
@@ -89,6 +90,15 @@ Core / PMF
 
 This order is directional rather than a fixed launch commitment. Real customer demand, retention data and unit economics after launch decide actual prioritization.
 
+### Note on the breadth of that order
+
+The order above is broad by design, and that is in **mild tension** with the case for
+AI-native service delivery below, which argues that the defensible asset is depth in one
+narrow rulebook. Handymate's answer is that the shared operational dataset makes each new
+vertical cheaper than a standalone specialist's. That is a bet, not a settled conclusion:
+each vertical still needs its own rulebook at full depth. Do not cite the AI-native
+services thesis as support for the breadth — it argues the opposite.
+
 ## Internal GTM operating principle
 
 Handymate's own go-to-market should use the same intelligence philosophy as the customer product: surface the best next actions rather than forcing humans to inspect raw data.
@@ -96,6 +106,30 @@ Handymate's own go-to-market should use the same intelligence philosophy as the 
 The internal Revenue OS should combine evidence-backed market signals, transparent account scoring, seller actions, pipeline outcomes and retained-customer quality into one learning loop. Astra may research, summarize and recommend; durable facts, stages and approved seller actions remain explicit system state.
 
 **Binding seller UX rule:** Andreas, Christopher and future sellers should not start from a blank CRM card. The system should answer which account to work now, why now, what evidence supports that priority, and what next action is recommended.
+
+## Product principle — the boundary on outcome delivery
+
+> Adopted 2026-09-12. The direction is stated under **AI-native outcome delivery** above.
+> This is the clause that makes it usable, and it is the half that gets dropped when the
+> principle is quoted.
+
+**Handymate delivers finished business outcomes where the outcome is verifiable and the
+obligation stays with the customer. Where the obligation would move to Handymate, that is
+a separate, regulated service line with its own economics and its own liability — never a
+tier in the SaaS price list.**
+
+Without the second sentence the principle approves everything.
+
+Two further limits, both written out in full in `FINANCIAL_KERNEL_ARCHITECTURE.md` §40:
+
+- **The review share is a measured number, not a direction.** Earned autonomy today covers
+  four action types behind a hardcoded allowlist after a 15-approval streak. Any claim about
+  an automation share must name the measured figure and the date.
+- **Marginal cost is metered, not zero.** The existing cost guard produces a real
+  per-business COGS figure. Price against it.
+
+Read §39, §40 and `../HANDYMATE_ACCOUNTING_ROADMAP.md` §17.1 and §21 before quoting the
+ambition anywhere customer-facing.
 
 ## Architectural rule for financial expansion
 
@@ -182,6 +216,22 @@ Fortnox is currently the source of payment truth and syncs into Handymate. Until
 ### 2026-09-11 — Specify now, implement after PMF
 
 Roadmap §16 (PMF first) and orchestration §10 (spend reasoning capacity on the kernel now) are not in conflict. Specification, review, contracts and executable golden paths carry no production risk and proceed now; implementation, shadow mode and pilots are gated by PMF evidence. Available model capacity is a reason to specify more, never a reason to ship finance code earlier.
+
+### 2026-09-12 — Shadow runs at Level 1; the VAT gap is covered by the manual rulebook track
+
+`bookkeeping` scope is not requested, so no pilot business has to re-OAuth and no added Fortnox licence cost is triggered. S2 compares objects — invoice, supplier invoice, payment, balances — and Levels 2–4 are persisted as unsupported with the reason rather than as passing. §13's readiness gate is reduced accordingly, recorded with an owner and a date. Because VAT and voucher level then have no external evidence, the manual bookkeeping track (roadmap §21.2) is a condition of this decision, not an option. See `FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` §21.6.
+
+### 2026-09-12 — The obligation stays with the customer; Managed is a separate line
+
+Boundary on the outcome-delivery principle above. The outcome must be verifiable and the bookkeeping obligation stays with the bookkeeping entity — a finished outcome means the work is done and evidenced, not that responsibility transferred. A service line where Handymate undertakes the work as an engagement is a separate regulated business with its own liability and insurance (roadmap §17.1), never a SaaS tier.
+
+### 2026-09-12 — Exception-based review is a measured target, not a description of today
+
+Earned autonomy currently covers four action types behind a hardcoded allowlist after a 15-approval streak. Any claim about an automation share must name the measured figure and the date. Marginal cost is metered by the existing cost guard, not assumed to be zero. See `FINANCIAL_KERNEL_ARCHITECTURE.md` §39.2.
+
+### 2026-09-12 — Start the rulebook before the ledger
+
+Taking a handful of pilot companies' running bookkeeping by hand, in the existing external system if needed, produces rulebook entries before there is code that can be wrong about them. No Fortnox partner licence, no migration, no kernel required. See roadmap §21.2.
 
 ### 2026-09-11 — Four decisions deliberately left open
 

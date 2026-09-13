@@ -45,11 +45,22 @@ Rules that keep this file honest:
 | C12 | Fortnox shadow verifier | Codex | not started | C6, C8 |
 | C13 | VAT return primitives | Codex | not started | C9, D3 (file vs produce) |
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
+| R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
 
 Parallel Claude analysis tracks (orchestration §4: A schema/RLS, B call-site map, C golden
 paths, D Swedish ledger review, E Pay threat model, F adversarial review, G statutory) are
 **not started** and can run alongside C1–C3. Track B is the one C5 depends on; run it before C4
 is briefed.
+
+Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind the board:
+
+- **Shadow reaches Level 1 only.** The Fortnox grant has no `bookkeeping` scope and it will
+  not be re-added (shadow architecture §21.6). C6 and C12 compare objects and balances;
+  Levels 2–4 are persisted as `unsupported` with reason. A green C12 run is therefore not
+  VAT or voucher evidence. R0 is what produces that evidence, which is why R0 is on the
+  board as a condition for C9 rather than as a nice-to-have.
+- **The obligation never moves to Handymate** (parent §40.1). No package may describe its
+  output as Handymate "taking over" bookkeeping. Finished means done and evidenced.
 
 ---
 
@@ -238,10 +249,45 @@ this file when they exist.
 
 **P0 — merchant-of-record.** Owner decision. Does not block C1–C4. Blocks C9.
 
+**Input to the C4 brief from an unmerged branch.** PR #12 (`codex/payment-plan-invoicing`,
+draft, flags off, migration v214 never applied) designed stage invoicing against a payment
+plan: server-computed integer öre with cumulative rounding, ROT split per stage, a final
+settlement invoice that nets earlier stages, full credit only, a credit register, and an
+atomic Fortnox export claim. The C4 brief must state whether the receivable model treats each
+stage as its own `invoice_issued` + `receivable_created` (the catalogue's assumption) and how
+"remaining amount goes back to the final settlement" after a credit is expressed with
+`receivable_adjusted`. Read `handymate-dashboard/tasks/payment-plan-invoicing.md` on that
+branch before writing C4; do not merge #12 into the kernel path as-is.
+
 ---
 
-## 5. Amendment log
+## 5. Review record
+
+Findings that a review left open, or accepted with a note, so that a merge does not erase
+them. BLOCKER/HIGH must be resolved before merge; MEDIUM before the feature flag; LOW is
+tracked.
+
+### C1 — Money primitives (PR #49), Claude review 2026-09-13, orchestration §6 A
+
+Verified locally on `codex/financial-kernel-c1` head `dca5fbf`: 13 Money tests + 5 contract
+tests green, plus 18 adversarial probes (exponent notation both signs, float noise, negative
+ties in all four modes, more weights than units, weights beyond 2^128, VAT split by weights,
+leading zeros, 30-digit decimals, structural objects without `money()`, symbol keys in JSON,
+mutation of a frozen value). No BLOCKER, no HIGH.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | `toLegacyNumber` silently changes digits above `Number.MAX_SAFE_INTEGER` minor units (9007199254740993 öre → `90071992547409.94`). "Lossy by design" covers *bigint → number*, not *different digits*. Throw `RangeError` beyond the safe range and add the test. | raised on PR #49 |
+| LOW | `HALF_UP` is ties-away-from-zero, so a credit note rounds symmetrically with its invoice. Correct as mechanism; C1b must state the policy for negative amounts explicitly rather than inherit it. | note for C1b |
+| LOW | Callers will hold VAT rates as `25` and ROT as `30`; a `ratioFromPercent` helper belongs in the first caller package (C4), not here. | note for C4 |
+| accepted | `fromLegacyNumber` interprets the number's shortest decimal representation (so `1.005` → `1.01` under HALF_UP, `0.1 + 0.2` → `0.30`). That is the right reading of a legacy `NUMERIC` column that passed through a JS number. Documented in the source. | — |
+| accepted | `equals`/`compare` throw on currency mismatch rather than returning `false`. Brief-mandated; a filter across currencies must group by currency first. | — |
+
+---
+
+## 6. Amendment log
 
 | Date | Change | Source |
 |---|---|---|
 | 2026-09-13 | Created with C0 handoff and C1 brief. | Package C0 |
+| 2026-09-13 | Folded in the 2026-09-12 decisions (shadow Level 1, obligation boundary, R0 manual rulebook track); noted PR #12 as C4 input; added §5 review record with the C1 review. | PR #47, C1 review |
