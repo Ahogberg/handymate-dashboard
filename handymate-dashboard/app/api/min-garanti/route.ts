@@ -46,7 +46,7 @@ export const dynamic = 'force-dynamic'
  */
 
 /** Dagen beslutet senast ska fattas, räknat från onboardingens slut. */
-export const BESLUTSFONSTER_DAGAR = 90
+const BESLUTSFONSTER_DAGAR = 90
 
 export async function GET(request: NextRequest) {
   try {
