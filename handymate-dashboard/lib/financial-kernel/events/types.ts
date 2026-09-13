@@ -6,19 +6,19 @@ export type FinancialActorType = 'system' | 'user' | 'provider' | 'import' | 'ag
 /** FK.1 payloads owned by C4. Other packages must define their payload before use. */
 export interface FinancialEventPayloads {
   invoice_issued: { invoice_id: string; invoice_number: string; customer_id: string; project_id?: string;
-    currency: string; total_minor: number; vat_regime: 'standard' | 'reverse_charge_construction';
+    currency: string; total_minor: number | string; vat_regime: 'standard' | 'reverse_charge_construction';
     accounting_method: 'accrual' | 'cash'; issued_date: string; due_date: string; tax_reduction?: 'rot' | 'rut' }
-  invoice_credited: { invoice_id: string; credit_invoice_id: string; currency: string; amount_minor: number; issued_date: string }
+  invoice_credited: { invoice_id: string; credit_invoice_id: string; currency: string; amount_minor: number | string; issued_date: string }
   receivable_created: { receivable_id: string; invoice_id: string; component: 'customer' | 'tax_authority';
-    owner: 'business' | 'factor'; currency: string; amount_minor: number; due_date: string }
-  receivable_adjusted: { receivable_id: string; reason: 'credit' | 'write_off' | 'dunning_fee' | 'interest' | 'rounding' | 'ownership_transfer';
-    delta_minor?: number; owner_after?: 'business' | 'factor' }
+    owner: 'business' | 'factor'; currency: string; amount_minor: number | string; due_date: string }
+  receivable_adjusted: { receivable_id: string; reason: 'credit' | 'write_off' | 'dunning_fee' | 'interest' | 'rounding' | 'ownership_transfer' | 'reclassification';
+    delta_minor?: number | string; owner_after?: 'business' | 'factor'; from_component?: 'customer' | 'tax_authority'; to_component?: 'customer' | 'tax_authority' }
   receivable_settled: { receivable_id: string; invoice_id: string; component: 'customer' | 'tax_authority'; settled_at: string }
   payment_initiated: { payment_id: string; payment_intent_id?: string; provider: string; provider_ref?: string;
-    direction: 'inbound' | 'outbound'; currency: string; amount_minor: number }
-  payment_settled: { payment_id: string; currency: string; amount_minor: number; fee_minor?: number;
+    direction: 'inbound' | 'outbound'; currency: string; amount_minor: number | string }
+  payment_settled: { payment_id: string; currency: string; amount_minor: number | string; fee_minor?: number | string;
     settled_at: string; evidence: 'provider' | 'manual' | 'fortnox' | 'bank' }
-  payment_allocated: { allocation_id: string; payment_id: string; receivable_id: string; currency: string; amount_minor: number }
+  payment_allocated: { allocation_id: string; payment_id: string; receivable_id: string; currency: string; amount_minor: number | string }
   payment_allocation_reversed: { allocation_id: string; reason: string }
   payment_intent_created: never
   payment_authorized: never
