@@ -35,7 +35,7 @@ Rules that keep this file honest:
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
-| C5 | `applyInvoicePayment()` compatibility facade | Codex | **ready — brief in §3** | — |
+| C5 | `applyInvoicePayment()` compatibility facade | Codex | **brief correction required — not implemented** | command identity, Fortnox evidence, historical part-payments and crash recovery; see §5 C5 |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
@@ -513,6 +513,26 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 Findings that a review left open, or accepted with a note, so that a merge does not erase
 them. BLOCKER/HIGH must be resolved before merge; MEDIUM before the feature flag; LOW is
 tracked.
+
+### C5 brief (PR #59), Codex review 2026-09-14 — correction required
+
+PR #59 merged at `b949c7635` after all checks passed. Before changing legacy callers, six
+diagnostic probes against real C4 RPCs and the real Fortnox caller reproduced contract gaps.
+The probes pass by demonstrating the counterexamples, **not** C5 acceptance. Full evidence,
+proposed correction boundaries and handoff: [C5 brief review](FINANCIAL_KERNEL_C5_BRIEF_REVIEW.md).
+
+| Sev | Finding | Status |
+|---|---|---|
+| BLOCKER B1 | Deriving key/amount/target from current open components turns a duplicate customer payment into a distinct tax payment; fresh default timestamps also conflict on explicit-amount retries. | Stable command identity and persisted original parameters required. |
+| BLOCKER B2 | Real Fortnox caller omits Balance/DocumentNumber and passes cumulative amounts; distinct provider snapshots can produce identical facade arguments. | Explicit observation and reconciliation contract needed; caller is currently outside allowed edits. |
+| BLOCKER B3 | Lazy issuance loses existing legacy paid amounts; an old customer_paid invoice's tax settlement is applied to a newly opened customer component. | Opening-balance prerequisite or explicit cut-over exclusion/routing required. |
+| HIGH B4 | Retry after committed allocation has no "settled now" outcome; pre-effect marker or early paid return can permanently suppress undelivered effects after a crash. | Recoverable command outcome and durable effect intent/completion contract required; do not label the proposed marker exactly-once delivery. |
+| MEDIUM M1 | Existing flag helper calls a kernel RPC even when disabled; it cannot meet the proposed zero-RPC and pre-migration dispatch requirement. | Separate application dispatch flag reader, with explicit pre-migration handling. |
+
+Only this review, package-log status and diagnostic tests are changed. No application code,
+remote migration or flag activation. The §3 proposal is preserved so the contract owner can
+revise the exact assumptions; it is not an approved implementation algorithm while these
+findings remain open.
 
 ### C1 — Money primitives (PR #49), Claude review 2026-09-13, orchestration §6 A
 
