@@ -29,7 +29,7 @@ Rules that keep this file honest:
 |---|---|---|---|---|
 | P0 | Merchant-of-record decision (D1) | Owner (Andreas) | **open** | — |
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
-| C1 | Money primitives | Codex | **implemented — awaiting Claude dimension A review** | review before merge |
+| C1 | Money primitives | Codex | **reviewed — MEDIUM corrected; merge gates pending** | CI |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
 | C2 | `financial_events` schema | Codex | not started (brief sketch in §4) | C1 |
 | C3 | Outbox/inbox/idempotency primitives | Codex | not started | C2 |
@@ -90,7 +90,7 @@ Golden paths added/updated
   These are numeric examples, not posting, accounting-method or end-to-end proofs.
 Invariants affected
   All eleven brief invariants covered before implementation was added. Initial test
-  collection failed because money.ts did not exist. 13 Money tests now pass, including
+  collection failed because money.ts did not exist. 14 Money tests now pass, including
   600 seeded allocations with exact integer error bounds and amounts beyond safe Number.
   JSON-safe factory values are frozen, with a non-enumerable local toJSON hook.
   No global BigInt prototype change. Explicit rounding has compile-time assertions.
@@ -102,7 +102,7 @@ Known unresolved questions
   redundant zero digits beyond currency precision. fromJSON requires exactly two own
   keys. fromLegacyNumber rounds the Number's shortest decimal representation with
   bigint arithmetic, including exponent notation; cannot recover previously lost digits.
-  toLegacyNumber is explicitly lossy and rejects infinity overflow. Factory-created
+  toLegacyNumber is explicitly lossy and rejects minor units beyond the safe integer range. Factory-created
   Money values serialize directly; a hand-written structural object containing bigint
   must be passed through money() or the exported toJSON() before JSON.stringify.
 Open decisions encountered (parent §38) and left unresolved
@@ -115,9 +115,9 @@ Human accounting review required? yes/no — and by whom, by name
   No for C1 numeric mechanisms. C1b/C9 still require a named accountant.
 ```
 
-Local verification: 41 tests passed across Money, event-contract, schema-contract,
-dead-code-paths, apply-payment-decision and fortnox-row-builder. TypeScript and remote
-CI results are recorded on the PR. Await Claude review against dimension A before merge.
+Local verification after the review correction: 53 tests passed across Money, event-contract, schema-contract,
+dead-code-paths, apply-payment-decision, fortnox-row-builder and facit-ci-grind. TypeScript and remote
+CI results are recorded on the PR. Claude dimension A review is recorded in §5; its MEDIUM finding is corrected.
 
 ### C0 — architecture contract (Claude, 2026-09-13)
 
@@ -330,7 +330,7 @@ mutation of a frozen value). No BLOCKER, no HIGH.
 
 | Sev | Finding | Status |
 |---|---|---|
-| MEDIUM | `toLegacyNumber` silently changes digits above `Number.MAX_SAFE_INTEGER` minor units (9007199254740993 öre → `90071992547409.94`). "Lossy by design" covers *bigint → number*, not *different digits*. Throw `RangeError` beyond the safe range and add the test. | raised on PR #49 |
+| MEDIUM | `toLegacyNumber` silently changes digits above `Number.MAX_SAFE_INTEGER` minor units (9007199254740993 öre → `90071992547409.94`). "Lossy by design" covers *bigint → number*, not *different digits*. Throw `RangeError` beyond the safe range and add the test. | resolved in PR #49: symmetric safe-range guard and boundary regression test (red before fix, green after) |
 | LOW | `HALF_UP` is ties-away-from-zero, so a credit note rounds symmetrically with its invoice. Correct as mechanism; C1b must state the policy for negative amounts explicitly rather than inherit it. | note for C1b |
 | LOW | Callers will hold VAT rates as `25` and ROT as `30`; a `ratioFromPercent` helper belongs in the first caller package (C4), not here. | note for C4 |
 | accepted | `fromLegacyNumber` interprets the number's shortest decimal representation (so `1.005` → `1.01` under HALF_UP, `0.1 + 0.2` → `0.30`). That is the right reading of a legacy `NUMERIC` column that passed through a JS number. Documented in the source. | — |

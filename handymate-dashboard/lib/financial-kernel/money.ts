@@ -100,9 +100,10 @@ export function fromLegacyNumber(n: number, currency: CurrencyCode, rounding: Ro
 
 /** Lossy-by-design legacy projection boundary; never feed back into canonical math. */
 export function toLegacyNumber(m: Money): number {
-  const result = Number(toDecimalString(m))
-  if (!Number.isFinite(result)) throw new RangeError('Amount exceeds finite legacy number range')
-  return result
+  validate(m)
+  const limit = BigInt(Number.MAX_SAFE_INTEGER)
+  if (m.amountMinor > limit || m.amountMinor < -limit) throw new RangeError('Amount exceeds safe legacy number range')
+  return Number(toDecimalString(m))
 }
 
 export function add(a: Money, b: Money): Money {

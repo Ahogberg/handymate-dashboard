@@ -109,6 +109,16 @@ test('7: legacy conversion rounds the shortest decimal representation, including
   expect(() => toLegacyNumber(money(b('1' + '0'.repeat(400)), 'SEK'))).toThrow()
 })
 
+test('legacy projections reject minor units outside the safe integer range on both sides', () => {
+  const limit = b(Number.MAX_SAFE_INTEGER)
+  for (const amount of [limit, limit - b(1), -limit, -limit + b(1)]) {
+    expect(Number.isFinite(toLegacyNumber(money(amount, 'SEK')))).toBe(true)
+  }
+  for (const amount of [limit + b(1), limit + b(2), -limit - b(1), -limit - b(2)]) {
+    expect(() => toLegacyNumber(money(amount, 'SEK'))).toThrow(RangeError)
+  }
+})
+
 test('8: VAT ratios are exact mechanisms, including zero VAT and midpoint differences', () => {
   for (const mode of ['HALF_UP', 'HALF_EVEN'] as const) {
     expect(multiply(sek('99.99'), { numerator: b(25), denominator: b(100) }, mode)).toEqual(sek('25.00'))
