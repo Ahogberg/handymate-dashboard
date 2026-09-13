@@ -390,6 +390,16 @@ GRANT EXECUTE ON FUNCTION public.resume_financial_consumer(TEXT, TEXT, TEXT, TEX
 COMMIT;
 ```
 
+**Verified 2026-09-13 before briefing:** the DDL above was executed in PGlite on top of
+`v235` and probed (17 cases): claim returns the first three in `seq` order and nothing beyond
+the cursor; ack advances only forward and returns `false` for an older event; ack of another
+business's event raises `financial_consumer_unknown_event`; five failures halt the consumer,
+claim then returns nothing while business B is unaffected; resume without a reason raises;
+after resume the halted event is redelivered first; `limit > 500` raises; `service_role`
+cannot insert into the cursor table but can claim; `authenticated` can neither claim nor read.
+Not probed here: `SKIP LOCKED` across sessions and the commit-order proof — both need two
+connections (invariants 1 and 8, the Postgres CI job).
+
 Note the deliberate asymmetry: `resume_financial_consumer` writes the actor and reason into the
 row itself, because the kernel has no audit table yet (C4 `audit/`). When it exists, resume
 must also append an audit record; put a `TODO(C4)` there, not a silent gap.
