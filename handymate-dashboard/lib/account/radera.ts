@@ -107,6 +107,10 @@ export const BEHALLS: string[] = [
   // Financial Kernel C2: oföränderlig ekonomisk historik enligt kontraktet.
   // Raderas aldrig här; retention/anonymisering måste utredas i spår G.
   'financial_events',
+  'financial_receivables',
+  'financial_payments',
+  'financial_payment_allocations',
+  'financial_receivable_adjustments',
   'financial_event_consumers',
   'financial_event_deliveries',
 
