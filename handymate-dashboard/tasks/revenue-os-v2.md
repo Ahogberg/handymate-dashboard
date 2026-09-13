@@ -64,3 +64,17 @@ Liveacceptans är fortfarande blockerad:
 - Verklig fetchCandidates('elektriker') från arbetsmiljön nådde sin åttasekunderstimeout. Detta säger inget säkert om Vercels nätverk; källa från driftsmiljön återstår.
 
 Beslut: HOLD för produktionsmerge. Nästa steg är Vercel-åtkomst till rätt team, testdatabas med granskade beroendemigrationer och två separata test-säljaridentiteter. Därefter genomförs den tidigare specificerade sparade rundresan och liveimporten. Inga verkliga meddelanden, rolländringar eller merge genomförda.
+
+## Fortsatt acceptans 2026-09-13
+
+Vercel-åtkomst verifierad via den lokalt autentiserade CLI:n för `andreas-projects-f2b98374`; appanslutningen ger fortfarande tom teamlista. Testprojektet `handymate-vision-test` byggdes om från 67bf1b77. Andreas godkände uttryckligen att dess befintliga skyddade Supabase-servernycklar även används i preview. Produktionsprojektet `handymate-dashboard` har inte ändrats.
+
+Testbranchen fick Revenue v1, sales_case och Revenue v2. Fyra särskilda testidentiteter skapades i testbranchen: ledare, två säljare och vanlig kund. Befintliga personers roller ändrades inte. RLS och service_role-åtkomst verifierades. Inga meddelanden skickades.
+
+På skyddad Next-preview passerade riktig lösenordsinloggning för samtliga identiteter. Ledaren ser båda säljarnas företag; säljarna ser bara sina egna och nekas annan säljares läs- och skrivvägar. Vanlig kund och anonym nekas Revenue. Separata webbläsare verifierade rollvyerna. Sparad genomgång återöppnades i separat kundwebbläsare och rätt företagsnamn följde med till onboarding, även efter omladdning. Mötesdatum och återförsök verifierades. Betalning och registrering slutfördes inte.
+
+Verklig Platsbanken-import från Vercel lyckades: 29 behandlade annonser, 29 unika annons-ID:n, daterade källor och genererade researchunderlag. Samma import-ID återanvändes utan dubbletter.
+
+Ett extra liveprov hittade en felväg som isolerade SQL-/handlerprov inte avslöjade: nytt godkännande av ett stoppat utkast timeoutade efter 60 sekunder. Databasen behöll utkastet som cancelled. Business-konflikterna använde SQLSTATE 40001, vilket PostgREST representerar som HTTP 500. Med explicit PT409 svarade samma databasväg inom cirka två sekunder. Migrationen använder nu PT409 för utkast- och versionskonflikter och handlern mappar detta till HTTP 409. Gamla 40001-koder stöds fortsatt i handlern. SQL-proven kontrollerar nu felkoden; handlerproven täcker nytt godkännande, återspelat godkännande, stale account och stale case.
+
+Efter denna rättning måste den nya publicerade headens CI, previewbygge och konfliktprov verifieras. Produktion saknar fortfarande v2-migrationen. Merge och produktionsaktivering är fortsatt separata steg och har inte genomförts.

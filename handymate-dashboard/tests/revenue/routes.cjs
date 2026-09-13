@@ -128,6 +128,25 @@ async function main() {
     ),
   )
   checks++
+  // Exercise domain conflicts through the real handler and PostgreSQL adapter.
+  // PT409 must remain a prompt conflict, not become a generic server failure.
+  const draft = detail.drafts[0]
+  const approval = {
+    type: 'draft', account_id: a, draft_id: draft.id,
+    body: draft.body, request_id: randomUUID(),
+  }
+  assert.equal((await post(approval)).status, 200)
+  assert.equal((await post({
+    type: 'activity', account_id: a, activity_type: 'call',
+    outcome: 'replied', summary: 'Kunden har svarat',
+  })).status, 200)
+  assert.equal((await post(approval)).status, 409)
+  assert.equal((await post({ ...approval, request_id: randomUUID() })).status, 409)
+  assert.equal((await post({
+    type: 'next', account_id: a, version: 0, status: 'contacted', contact_state: 'active',
+  })).status, 409)
+  assert.equal((await post({ ...caseBody, request_id: randomUUID() })).status, 409)
+  checks += 6
   h.ctx.manager = false
   h.ctx.email = 'other@handymate.se'
   assert.equal(

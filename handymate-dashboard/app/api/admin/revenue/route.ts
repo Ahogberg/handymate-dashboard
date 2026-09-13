@@ -443,7 +443,7 @@ export async function POST(request: NextRequest) {
     const code = (error as { code?: string })?.code
     if (code === '42501')
       return failure(new Error('Du saknar åtkomst till företaget.'), 403)
-    if (code === '40001' || code === '23505')
+    if (code === 'PT409' || code === '40001' || code === '23505')
       return failure(
         new Error('Uppgifterna ändrades eller finns redan. Uppdatera sidan.'),
         409,

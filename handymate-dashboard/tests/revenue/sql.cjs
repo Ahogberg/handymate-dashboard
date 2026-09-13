@@ -185,7 +185,7 @@ test('approval is not a send and a reply invalidates approval', async () => {
       draft_id: draftId,
       body: 'För gammalt',
     }),
-    /inte längre aktuellt/,
+    { code: 'PT409', message: /inte längre aktuellt/ },
   )
   await assert.rejects(
     cmd(
@@ -193,7 +193,7 @@ test('approval is not a send and a reply invalidates approval', async () => {
       { account_id: accountId, draft_id: draftId, body: 'Granskat' },
       approveId,
     ),
-    /inte längre aktuellt/,
+    { code: 'PT409', message: /inte längre aktuellt/ },
   )
   assert.equal(
     (
@@ -212,7 +212,7 @@ test('case rejects missing optimistic version and stale save', async () => {
       payload: {},
       draft_body: 'x',
     }),
-    /ändrades/,
+    { code: 'PT409', message: /ändrades/ },
   )
   await assert.rejects(
     cmd('case', {
@@ -222,13 +222,13 @@ test('case rejects missing optimistic version and stale save', async () => {
       payload: {},
       draft_body: 'x',
     }),
-    /ändrades/,
+    { code: 'PT409', message: /ändrades/ },
   )
 })
 test('account updates conflict rather than lose newer activity', async () => {
   await assert.rejects(
     cmd('next', { account_id: accountId, version: 0, status: 'contacted' }),
-    /ändrades/,
+    { code: 'PT409', message: /ändrades/ },
   )
 })
 test('pausing clears next action and removes company from queue', async () => {

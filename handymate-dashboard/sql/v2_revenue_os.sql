@@ -70,6 +70,7 @@ alter table public.revenue_source_runs enable row level security;
 revoke all on public.revenue_contacts,public.revenue_sessions,public.revenue_followup_drafts,public.revenue_commands,public.revenue_source_runs from anon,authenticated;
 grant all on public.revenue_contacts,public.revenue_sessions,public.revenue_followup_drafts,public.revenue_commands,public.revenue_source_runs to service_role;
 
+-- Expected business conflicts use PT409 so PostgREST returns HTTP 409, not a transaction rollback/server error.
 -- Internal command boundary. Actor and role are supplied ONLY by the verified server.
 -- Account lock serializes activity, response/stop, session publishing and draft approval.
 create or replace function public.revenue_v2_command(p_actor uuid, p_email text, p_manager boolean, p_request uuid, p_command text, p_input jsonb)
@@ -94,7 +95,7 @@ begin
       select * into d from public.revenue_followup_drafts where id=(prior.result->>'id')::uuid;
       if exists(select 1 from public.gtm_suppression g where right(regexp_replace(g.org_number,'[^0-9]','','g'),10)=a.org_number or exists(select 1 from public.revenue_contacts c where c.account_id=a.id and ((g.email is not null and lower(g.email)=lower(c.email)) or (g.phone is not null and regexp_replace(g.phone,'[^0-9]','','g')=regexp_replace(c.phone,'[^0-9]','','g'))))) then raise exception 'Företaget eller kontakten är spärrad.' using errcode='22023'; end if;
       if d.status<>'approved' or d.account_version<>a.version or a.contact_state<>'active' or a.status in ('won','lost','nurture') then
-        raise exception 'Utkastet är inte längre aktuellt.' using errcode='40001';
+        raise exception 'Utkastet är inte längre aktuellt.' using errcode='PT409';
       end if;
     end if;
     return prior.result;
@@ -149,7 +150,7 @@ begin
     end if;
     result:=jsonb_build_object('account_id',a.id,'id',row_id);
   elsif p_command='next' then
-    if (p_input->>'version')::integer is distinct from a.version then raise exception 'Företaget ändrades. Uppdatera sidan.' using errcode='40001'; end if;
+    if (p_input->>'version')::integer is distinct from a.version then raise exception 'Företaget ändrades. Uppdatera sidan.' using errcode='PT409'; end if;
     stage:=coalesce(p_input->>'status',a.status);
     state:=coalesce(p_input->>'contact_state',a.contact_state);
     if a.contact_state='opted_out' and state<>'opted_out' then raise exception 'Kontaktspärren måste hanteras separat.' using errcode='22023'; end if;
@@ -168,7 +169,7 @@ begin
   elsif p_command='case' then
     select * into s from public.revenue_sessions where id=(p_input->>'session_id')::uuid and account_id=a.id for update;
     if not found then raise exception 'Genomgången saknas.' using errcode='22023'; end if;
-    if s.version is distinct from (p_input->>'session_version')::integer then raise exception 'Genomgången ändrades. Uppdatera sidan.' using errcode='40001'; end if;
+    if s.version is distinct from (p_input->>'session_version')::integer then raise exception 'Genomgången ändrades. Uppdatera sidan.' using errcode='PT409'; end if;
     payload:=jsonb_set(p_input->'payload','{meeting}',jsonb_build_object('iso',s.meeting_date::text,'date',s.meeting_date::text));
     -- Re-publishing issues a new immutable snapshot. Existing links keep their original meeting data.
     new_token:=gen_random_uuid()::text;
@@ -192,7 +193,7 @@ begin
     result:=jsonb_build_object('account_id',a.id,'session_id',s.id,'token',new_token);
   elsif p_command='draft' then
     select * into d from public.revenue_followup_drafts where id=(p_input->>'draft_id')::uuid and account_id=a.id for update;
-    if not found or d.status='cancelled' or d.account_version<>a.version or a.contact_state<>'active' or a.status in ('won','lost','nurture') then raise exception 'Utkastet är inte längre aktuellt.' using errcode='40001'; end if;
+    if not found or d.status='cancelled' or d.account_version<>a.version or a.contact_state<>'active' or a.status in ('won','lost','nurture') then raise exception 'Utkastet är inte längre aktuellt.' using errcode='PT409'; end if;
     if exists(select 1 from public.gtm_suppression g where right(regexp_replace(g.org_number,'[^0-9]','','g'),10)=a.org_number or exists(select 1 from public.revenue_contacts c where c.account_id=a.id and ((g.email is not null and lower(g.email)=lower(c.email)) or (g.phone is not null and regexp_replace(g.phone,'[^0-9]','','g')=regexp_replace(c.phone,'[^0-9]','','g'))))) then raise exception 'Företaget eller kontakten är spärrad.' using errcode='22023'; end if;
     update public.revenue_followup_drafts set body=p_input->>'body',status='approved',approved_at=now(),approved_by=p_actor where id=d.id;
     result:=jsonb_build_object('account_id',a.id,'id',d.id);
