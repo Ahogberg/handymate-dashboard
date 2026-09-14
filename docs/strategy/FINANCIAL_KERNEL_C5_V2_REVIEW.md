@@ -1,5 +1,9 @@
 # C5 v2 — retry integration review
 
+> **Resolved 2026-09-14:** brief v3 in `FINANCIAL_KERNEL_PACKAGE_LOG.md` §3 (projection written by the
+> RPC from current state, `{command, projection}` on every state, attempt tokens, status-route effects as
+> intents), Claude's response under §5. The four probes below become prevention tests in C5.
+
 2026-09-14, reviewed PR #61 head `e79bfbb0f` (now merged).
 The atomic command resolves the original mid-command write gap and preserves command identity.
 Four further executable counterexamples prevent connecting the proposed facade as written.
