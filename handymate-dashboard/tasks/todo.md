@@ -2,8 +2,8 @@
 
 - [x] Read PR #66 review, C5 contract and current main.
 - [x] Reproduce and fix approval allocation/no-op, legacy replay and post-delivery issuance errors (78 targeted tests green).
-- [ ] Run relevant regression/contract suites, TypeScript and build.
-- [ ] Update C5 package handoff and existing PR #66; leave v239 and flags undeployed.
+- [x] Run relevant regression/contract suites (78 passed), TypeScript (8 GiB heap) and production build.
+- [x] Update C5 package handoff and existing PR #66; v239 and flags remain undeployed. Current-head CI is recorded on the PR.
 
 ---
 

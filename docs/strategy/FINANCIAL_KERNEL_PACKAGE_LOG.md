@@ -425,7 +425,10 @@ Evidence
 : The test DB uses per-RPC savepoints to reproduce PostgREST transaction boundaries inside
   its outer rollback; invoice NUMERIC transport is adapted to PostgREST's JSON numbers.
   The frozen legacy body is independently byte-identical to current main `db8b772` via AST.
-  TypeScript, build and current-head CI results are pending and will be recorded on #66.
+  TypeScript passes with an 8 GiB Node heap (the default heap was exhausted). The local
+  production build passes; this checkout has no live integration credentials, so its
+  prerender logs include missing Supabase configuration. This is compilation/build evidence,
+  not an authenticated integration test. Final current-head CI is recorded on #66.
 
 Contract / remaining work
 : No event, SQL/RPC definition, feature flag or accounting policy change. Relies on FK.3,
