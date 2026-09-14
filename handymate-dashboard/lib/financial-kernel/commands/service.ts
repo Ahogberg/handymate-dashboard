@@ -9,8 +9,8 @@ export interface PaymentCommandOutcome {
     receivables: { id: string; component: string; status: string; outstanding_minor: string }[] }
 }
 export interface EffectClaim {
-  id: string; command_id: string; effect: string; attempts: number; attempt_token: string;
-  context: { source: 'manual' | 'status_patch' | 'customer_confirmed' | 'fortnox'; approvalFollowUps?: {
+  id: string; command_id: string | null; effect: string; attempts: number; attempt_token: string;
+  context: { source: 'manual' | 'status_patch' | 'customer_confirmed' | 'fortnox' | 'bridge'; approvalFollowUps?: {
     approvalId: string; updateWorkflows: boolean; prepareCustomerMessages: boolean; runAutomationRules: boolean
   }; paidAmountMinor: string }
 }
@@ -31,4 +31,39 @@ export async function claimEffectIntents(db: KernelDb, businessId: string, invoi
 export async function finishEffectIntent(db: KernelDb, businessId: string, intent: EffectClaim, status: 'sent' | 'failed' | 'skipped', result: unknown, error?: string) {
   return domainRpc(db, 'finish_effect_intent', { p_business_id: businessId, p_intent_id: intent.id, p_attempt_token: intent.attempt_token,
     p_status: status, p_result: result, p_error: error ?? null })
+}
+
+
+export async function ensureEffectIntents(db: KernelDb, businessId: string, receivableId: string,
+  eventId: string, effects: string[], context: Record<string, unknown>) {
+  return domainRpc(db, 'ensure_effect_intents', { p_business_id: businessId, p_receivable_id: receivableId,
+    p_source_event_id: eventId, p_effects: effects, p_context: context })
+}
+async function listRpc<T>(db: KernelDb, name: string, args: Record<string, unknown>): Promise<T[]> {
+  const { data, error } = await db.rpc(name, args)
+  if (error) throw new Error(error.message)
+  if (!Array.isArray(data)) throw new TypeError('Invalid list RPC response')
+  return data as T[]
+}
+export function listOwedEffectIntents(db: KernelDb, businessId: string) {
+  return listRpc<{ invoice_id: string; owed: number; stale: number }>(db, 'list_owed_effect_intents', {
+    p_business_id: businessId, p_max_attempts: 3, p_stale_minutes: 10, p_limit: 50,
+  })
+}
+export interface UnresolvedEffectIntent {
+  id: string; invoice_id: string; receivable_id: string; effect: string; status: 'unknown' | 'failed';
+  attempts: number; last_error: string | null; command_id: string | null; source_event_id: string | null;
+  claimed_at: string | null; finished_at: string | null;
+  resolution: { at: string; by: string; from: string; to: string; reason: string }[] | null
+}
+export function listUnresolvedEffectIntents(db: KernelDb, businessId: string) {
+  return listRpc<UnresolvedEffectIntent>(db, 'list_unresolved_effect_intents', {
+    p_business_id: businessId, p_max_attempts: 3, p_limit: 100,
+  })
+}
+export type EffectResolution = 'delivered' | 'abandon' | 'retry'
+export function resolveEffectIntent(db: KernelDb, businessId: string, intentId: string,
+  resolution: EffectResolution, actorId: string, reason: string) {
+  return domainRpc(db, 'resolve_effect_intent', { p_business_id: businessId, p_intent_id: intentId,
+    p_resolution: resolution, p_actor_id: actorId, p_reason: reason, p_max_attempts: 3 })
 }

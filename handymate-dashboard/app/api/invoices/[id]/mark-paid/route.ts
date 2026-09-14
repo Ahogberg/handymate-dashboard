@@ -1,4 +1,4 @@
-import { paymentCommandId } from '@/lib/invoices/payment-command-key'
+import { paymentCommandId, InvalidPaymentCommandKey } from '@/lib/invoices/payment-command-key'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -78,6 +78,7 @@ export async function POST(
       message,
     })
   } catch (err: any) {
+    if (err instanceof InvalidPaymentCommandKey) return NextResponse.json({ error: err.message }, { status: 400 })
     console.error('[mark-paid] error:', err)
     return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })
   }

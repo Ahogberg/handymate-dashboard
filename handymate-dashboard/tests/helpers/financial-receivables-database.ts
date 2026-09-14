@@ -23,7 +23,7 @@ export async function receivablesDatabase() {
   const helper=readFileSync('sql/testbed_tenant_isolation.sql','utf8').match(/CREATE OR REPLACE FUNCTION public\.is_business_member[\s\S]*?\$function\$;/)
   if (!helper) throw Error('Missing membership function')
   await db.exec(helper[0]); await db.exec('SET ROLE deployer')
-  for(const file of ['v235_financial_events.sql','v236_financial_event_consumers.sql','v238_financial_receivables.sql','v239_financial_payment_commands.sql']) await db.exec(readFileSync('sql/'+file,'utf8'))
+  for(const file of ['v235_financial_events.sql','v236_financial_event_consumers.sql','v238_financial_receivables.sql','v239_financial_payment_commands.sql','v240_financial_bridge_intents.sql']) await db.exec(readFileSync('sql/'+file,'utf8'))
   await db.exec('RESET ROLE')
   const rpc:KernelDb={async rpc(name,args){
     if(!/^[a-z_]+$/.test(name)||Object.keys(args).some(k=>!/^p_[a-z_]+$/.test(k))) throw Error('Unsafe test RPC')

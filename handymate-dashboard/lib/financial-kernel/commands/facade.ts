@@ -4,8 +4,8 @@ import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { kernelDb } from '../kernel-db'
 import { fromLegacyNumber, money, toLegacyNumber } from '../money'
 import { seRoundingMaxMinor } from '../policies/se-rounding'
-import { executePaymentCommand, claimEffectIntents, finishEffectIntent, type PaymentCommandOutcome } from './service'
-import { runPaymentEffect } from '../effects/runners'
+import { executePaymentCommand, type PaymentCommandOutcome } from './service'
+import { sweepInvoiceIntents } from '../effects/sweep'
 
 export function paymentEffectSet(opts:ApplyPaymentOptions):string[] {
   const reviewed=opts.approvalFollowUps
@@ -50,18 +50,7 @@ export async function applyKernelPayment(opts:ApplyPaymentOptions):Promise<Apply
       effectsSuppressed:[],intentsUnknown:projection.intents_unknown}}
   }
   if(command.state==='provider_below_kernel' && !command.replayed) await rapporteraTystFel(sb,businessId,'financial-kernel:provider-below-kernel','Leverantörens betalda belopp är lägre än kerneln',{invoiceId,commandId:command.command_id})
-  const claims=await claimEffectIntents(db,businessId,invoiceId)
-  for(const id of claims.unknown_ids || []) await rapporteraTystFel(sb,businessId,'financial-kernel:effect-unknown','Utskicksutfallet måste kontrolleras manuellt',{invoiceId,intentId:id})
-  const effects:PaymentEffect[]=[]
-  for(const intent of claims.claimed) {
-    let result:PaymentEffect
-    try {result=await runPaymentEffect(businessId,invoiceId,intent)}
-    catch(error){result={effect:intent.effect,status:'failed',message:error instanceof Error?error.message:String(error)}}
-    // A lost finish response leaves the attempt intact; never turn transport uncertainty into a second send.
-    await finishEffectIntent(db,businessId,intent,result.status==='failed'?'failed':result.status==='skipped'?'skipped':'sent',result,result.message)
-    effects.push(result)
-    if(result.status==='failed' && intent.attempts>=3) await rapporteraTystFel(sb,businessId,'financial-kernel:effect-exhausted',result.message || 'Efterbetalningseffekt misslyckades',{invoiceId,intentId:intent.id})
-  }
+  const { effects, markedUnknown } = await sweepInvoiceIntents(businessId, invoiceId, { db, sb })
   for(const effect of command.effects_suppressed || []) effects.push({effect,status:'skipped',message:'Efterbetalningseffekten har redan registrerats för fordran'})
   const reviewed=opts.approvalFollowUps
   if(reviewed) {
@@ -75,7 +64,7 @@ export async function applyKernelPayment(opts:ApplyPaymentOptions):Promise<Apply
   return {ok:true,already_paid:command.state==='already_paid' || undefined,status:projection.status ?? projection.derived_status ?? undefined,
     transition,paid_at:projection.paid_at ?? undefined,paid_amount:kr(projection.recorded_minor),remaining_rot_kr:tax?kr(tax.outstanding_minor):0,effects,
     kernel:{commandId:command.command_id,paymentId:command.payment_id,replayed:command.replayed,unallocatedMinor:projection.unallocated_minor,
-      effectsSuppressed:command.effects_suppressed || [],intentsUnknown:projection.intents_unknown+claims.marked_unknown}}
+      effectsSuppressed:command.effects_suppressed || [],intentsUnknown:projection.intents_unknown+markedUnknown}}
 }
 
 async function currentInvoiceNoop(sb:ReturnType<typeof getServerSupabase>,businessId:string,invoiceId:string):Promise<ApplyPaymentResult> {

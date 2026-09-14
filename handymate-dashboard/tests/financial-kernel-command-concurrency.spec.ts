@@ -25,6 +25,7 @@ test.beforeAll(async () => {
   await pool.query(scoped(readFileSync('sql/v236_financial_event_consumers.sql','utf8')))
   await pool.query(scoped(readFileSync('sql/v238_financial_receivables.sql','utf8')))
   await pool.query(scoped(readFileSync('sql/v239_financial_payment_commands.sql','utf8')))
+  await pool.query(scoped(readFileSync('sql/v240_financial_bridge_intents.sql','utf8')))
 })
 test.afterAll(async () => {
   await pool?.end()
@@ -61,4 +62,20 @@ test('delayed finish waits for a newer claim and cannot change its attempt',asyn
  expect(row).toEqual({status:'attempting',attempts:2,attempt_token:second.attempt_token})
  expect((await claim(a,'finish')).rows[0].value.claimed).toEqual([])
  }finally{await b.query('ROLLBACK');await pending?.catch(()=>{});await close()}
+})
+
+
+test('two sweepers serialize claims and each intent is dispatched once',async()=>{
+ const {a,b,close}=await clients('sweep');let pending:ReturnType<typeof claim>|undefined
+ try {
+  await a.query('SET ROLE service_role');await command(a,'sweep')
+  await a.query('BEGIN');const first=(await claim(a,'sweep')).rows[0].value
+  await b.query('SET ROLE service_role');const pid=(await b.query('SELECT pg_backend_pid() pid')).rows[0].pid
+  pending=claim(b,'sweep');void pending.catch(()=>{})
+  await expect.poll(async()=>(await pool.query('SELECT wait_event FROM pg_stat_activity WHERE pid=$1',[pid])).rows[0]?.wait_event).toBe('advisory')
+  await a.query('COMMIT');const second=(await pending).rows[0].value
+  expect(first.claimed).toHaveLength(1);expect(second.claimed).toEqual([])
+  const dispatched=[...first.claimed,...second.claimed].map((i:any)=>i.id)
+  expect(new Set(dispatched).size).toBe(dispatched.length)
+ } finally {await a.query('ROLLBACK');await pending?.catch(()=>{});await close()}
 })

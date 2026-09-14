@@ -1,4 +1,4 @@
-import { paymentCommandId } from '@/lib/invoices/payment-command-key'
+import { paymentCommandId, InvalidPaymentCommandKey } from '@/lib/invoices/payment-command-key'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -134,6 +134,7 @@ export async function PATCH(
     })
 
   } catch (error: any) {
+    if (error instanceof InvalidPaymentCommandKey) return NextResponse.json({ error: error.message }, { status: 400 })
     console.error('Update invoice status error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }

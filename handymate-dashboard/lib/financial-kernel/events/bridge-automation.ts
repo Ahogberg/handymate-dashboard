@@ -1,19 +1,21 @@
 import type { FinancialEventHandler } from './consume'
+import type { FinancialEventPayloads } from './types'
+import { ensureEffectIntents } from '../commands/service'
 
 export const AUTOMATION_BRIDGE_CONSUMER = 'automation-bridge'
-/**
- * C5 owns mappings and scheduling. This placeholder has no callers or side effects.
- * TODO(C5): before firing any automation, persist the bridge's own idempotency marker
- * per receivable_id for payment_received (C4 review): reversal and re-settlement create
- * distinct events but must not thank the customer twice. The delivery ledger still tracks
- * eventId. Database effects, marker and ack must share a transaction. The delivery
- * ledger alone cannot protect side effects when a lease expires mid-handler.
- * External delivery also needs durable dispatch/retry semantics: a marker alone must
- * not turn a crash before sending into a permanently lost notification.
- */
+export const BRIDGE_EFFECTS = [
+  'pipeline', 'project_check', 'project_stage', 'smart_communication', 'payment_received_rules', 'portal_message',
+] as const
+
+/** Database-only and idempotent even if a timed-out handler outlives its lease. */
 export const automationBridge: FinancialEventHandler = {
   consumer: AUTOMATION_BRIDGE_CONSUMER,
-  async handle(event) {
-    switch (event.eventType) { default: return }
+  async handle(event, db) {
+    if (event.eventType !== 'receivable_settled') return
+    const payload = event.payload as FinancialEventPayloads['receivable_settled']
+    if (payload.component !== 'customer') return
+    const receivableId = payload.receivable_id
+    if (typeof receivableId !== 'string' || !receivableId) throw new TypeError('Missing receivable_id')
+    await ensureEffectIntents(db, event.businessId, receivableId, event.eventId, [...BRIDGE_EFFECTS], { source: 'bridge' })
   },
 }

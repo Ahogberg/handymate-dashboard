@@ -27,7 +27,7 @@ function leaseLost(error: unknown): boolean { return error instanceof Error && e
  * A handler may not outlive its lease and assume that it still owns the cursor.
  */
 export async function consumeOnce(db: KernelDb, businessId: string, handler: FinancialEventHandler,
-  opts: { limit?: number; maxAttempts?: number; leaseSeconds?: number; handlerTimeoutMs?: number } = {}): Promise<ConsumeResult> {
+  opts: { limit?: number; maxAttempts?: number; leaseSeconds?: number; handlerTimeoutMs?: number; shouldStop?: () => boolean } = {}): Promise<ConsumeResult> {
   const limit = opts.limit ?? 50, maxAttempts = opts.maxAttempts ?? MAX_ATTEMPTS_DEFAULT
   const leaseSeconds = opts.leaseSeconds ?? LEASE_SECONDS_DEFAULT
   const timeout = opts.handlerTimeoutMs ?? HANDLER_TIMEOUT_MS_DEFAULT
@@ -47,6 +47,7 @@ export async function consumeOnce(db: KernelDb, businessId: string, handler: Fin
   const owned = { ...base, p_lease_token: token }
   try {
     for (const row of batch) {
+      if (opts.shouldStop?.()) break
       const eventArgs = { ...owned, p_event_id: row.id }
       const attempt = rows<{ delivered_at: string | null }>(await invoke(db, 'begin_financial_event_attempt', eventArgs))[0]
       if (!attempt) throw new TypeError('Missing attempt response')
