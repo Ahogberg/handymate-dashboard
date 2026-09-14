@@ -1507,9 +1507,16 @@ export default function AgentDashboardPage() {
 // ─── Automation Value Widget ─────────────────────────────────
 
 function AutomationValueWidget() {
+  // 2026-09-14 (ROI-audit P0): pengar och tid visas ALDRIG som en summa.
+  // `confirmed_value` är bekräftade kronor ur faktura-/offertrader;
+  // `estimated_minutes` är en synlig uppskattning, aldrig omräknad till kr.
   const [data, setData] = useState<{
-    total_value: number
-    items: Array<{ type: string; label: string; amount: number; status: string; date?: string }>
+    confirmed_value: number
+    paid_value: number
+    signed_quote_value: number
+    estimated_minutes: number
+    estimate_basis: string
+    items: Array<{ type: string; label: string; amount?: number; minutes?: number; status: string; date?: string }>
     pending_count: number
   } | null>(null)
   const [expanded, setExpanded] = useState(false)
@@ -1523,8 +1530,9 @@ function AutomationValueWidget() {
 
   if (!data) return null
 
-  const hasValue = data.total_value > 0 || data.items.length > 0
-  const confirmedItems = data.items.filter(i => i.status === 'confirmed')
+  const hasValue = data.confirmed_value > 0 || data.estimated_minutes > 0 || data.items.length > 0
+  const moneyItems = data.items.filter(i => i.status === 'confirmed')
+  const timeItems = data.items.filter(i => i.status === 'estimated')
 
   return (
     <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mb-6">
@@ -1534,25 +1542,47 @@ function AutomationValueWidget() {
             <p className="text-xs text-gray-400 mb-1">Senaste 7 dagarna</p>
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-primary-700">
-                {data.total_value.toLocaleString('sv-SE')} kr
+                {data.confirmed_value.toLocaleString('sv-SE')} kr
               </span>
-              <span className="text-sm text-gray-500">genererat automatiskt</span>
+              <span className="text-sm text-gray-500">bekräftat ur fakturor och offerter</span>
             </div>
+            {data.paid_value > 0 && data.signed_quote_value > 0 && (
+              <p className="text-xs text-gray-500 mt-1">
+                {data.paid_value.toLocaleString('sv-SE')} kr betalt · {data.signed_quote_value.toLocaleString('sv-SE')} kr signerade offerter
+              </p>
+            )}
+            {data.estimated_minutes > 0 && (
+              <p className="text-xs text-gray-400 mt-1" title={data.estimate_basis}>
+                ≈ {data.estimated_minutes} min sparade (uppskattning, inte mätt)
+              </p>
+            )}
             {data.pending_count > 0 && (
               <p className="text-xs text-gray-400 mt-1">{data.pending_count} leads under bevakning...</p>
             )}
           </button>
-          {expanded && confirmedItems.length > 0 && (
+          {expanded && (moneyItems.length > 0 || timeItems.length > 0) && (
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              {confirmedItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
+              {moneyItems.map((item, i) => (
+                <div key={`m${i}`} className="flex items-center justify-between text-sm">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className="text-emerald-500">✅</span>
                     <span className="text-gray-700 truncate">{item.label}</span>
                   </div>
-                  <span className="font-medium text-gray-900 shrink-0 ml-2">{item.amount.toLocaleString('sv-SE')} kr</span>
+                  <span className="font-medium text-gray-900 shrink-0 ml-2">{(item.amount ?? 0).toLocaleString('sv-SE')} kr</span>
                 </div>
               ))}
+              {timeItems.map((item, i) => (
+                <div key={`t${i}`} className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="text-gray-400">⏱</span>
+                    <span className="text-gray-500 truncate">{item.label}</span>
+                  </div>
+                  <span className="text-gray-500 shrink-0 ml-2">≈ {item.minutes ?? 0} min</span>
+                </div>
+              ))}
+              {timeItems.length > 0 && (
+                <p className="text-[11px] text-gray-400 pt-1">{data.estimate_basis}</p>
+              )}
             </div>
           )}
         </>

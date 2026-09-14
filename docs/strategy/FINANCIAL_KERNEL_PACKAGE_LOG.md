@@ -36,8 +36,8 @@ Rules that keep this file honest:
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
 | C5 | `applyInvoicePayment()` compatibility facade | Codex | **done 2026-09-14** (PR #66 merged; Claude review A/B/C/E: no BLOCKER, 3 MEDIUM resolved and re-verified; 4 LOW carried into C5b) | — |
-| C5b | Consumer bridge, shared sweep and human recovery | Codex | **implemented — review pending**; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md) | Claude §6 A/B/C + CI |
-| C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
+| C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
+| C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **ready — brief in §3** (v242 draft verified in PGlite, 40 checks) | flip itself: PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
 | C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
@@ -439,647 +439,438 @@ Contract / remaining work
   R0/P0/C1b and owner decisions remain unchanged. **No v239 in production and no feature
   flag activation before C5 merge and the owner's C6 pilot selection.**
 
-## 3. Next package — Codex brief: C5 v3 the compatibility facade around `applyInvoicePayment()`
+## 3. Next package — Codex brief: C6 shadow payment mode (S1 for one pilot business)
 
-> **v3, 2026-09-14.** v2 (PR #61) was reviewed by Codex in PR #62 with four further executable
-> counterexamples ([C5 v2 review](FINANCIAL_KERNEL_C5_V2_REVIEW.md)): R1 obsolete projection on
-> replay, R2 route-owned thank-you SMS outside the intent protocol, R3 finish without attempt
-> identity, R4 incomplete no-op outcomes. All four accepted; response in §5. v3 changes: **the
-> legacy invoice columns are projected by the RPC itself from current kernel state under the
-> invoice row lock** (never from command history), **every response is `{command, projection}`
-> for every state**, **claim mints an attempt token that finish must present**, and **the status
-> route's after-payment effects become intents under the flag**. v1 (PR #59) → v2 (PR #61) fixed
-> B1–B4 and M1 (command identity, atomic RPC, provider observation, persisted legacy routing,
-> intents, dispatch flag reader); those decisions stand. Unchanged throughout: legacy body frozen
-> byte-for-byte, flag default off and set for nobody, non-ROT partial payment stays open under the
-> flag (golden paths 4/37), overpayment stays unallocated (GP7), interim rounding is an explicit
-> posting, `invoice_number` immutable once receivables exist.
-> **Prerequisite met:** `main` carries C0–C4; v235–v238 are applied in production (§1).
+> Goal: the first flag flip becomes a *phase* that is explicit, dated, auditable and reversible with a
+> reason, and every day the kernel's view of each pilot invoice is compared with Fortnox at Level 1 and
+> with the legacy columns the facade projects. Divergences are recorded, confirmed on a second sighting,
+> reported, and closed only with provenance. Nothing is auto-corrected. Nothing here is a readiness
+> score: S1 evidence proves the sync works, not that the kernel is right (shadow architecture §2).
+> The flip itself is the owner's action, after PMF (orchestration §2); C6 builds the machinery.
 
-Read first: `FINANCIAL_KERNEL_C5_BRIEF_REVIEW.md`, `FINANCIAL_KERNEL_C5_V2_REVIEW.md` and their probe
-specs `tests/financial-kernel-c5-brief-probes.spec.ts`, `tests/financial-kernel-c5-v2-brief-probes.spec.ts`
-(the faults, to be converted into prevention tests); `FINANCIAL_KERNEL_CALL_SITE_MAP.md` §1, §2 (tier 1–3), §4; blueprint §18.1–18.5, §20.1,
-§21; orchestration §5 C5, §6 A+B+C+E, §9; `ARCHITECTURE.md` §FK.3; golden paths 1, 4, 5, 7, 12,
-30, 34, 36, 37. Legacy code you change: `lib/invoices/apply-payment.ts`,
-`lib/invoices/send-invoice.ts` (`recordInvoiceDeliveryOutcome`), `lib/invoices/sync-to-fortnox.ts`
-(receipt update ~:413), `lib/fortnox/sync-payments.ts` (observation only), the four callers under
-"Callers" below. Code you read but do not change: `lib/invoices/payment-decision.ts`,
-`lib/invoices/customer-share.ts`, `lib/fortnox/classify-payment.ts`. Test patterns:
-`tests/project-invoice-journey.spec.ts` (transpile + injected `deps`),
-`tests/helpers/financial-receivables-database.ts` (PGlite with the real v235–v238; add `status`,
-`paid_amount`, `paid_at`, `settled_at`, `paid_via`, `manual_paid_marked_at`, `manual_paid_by_user_id`
-to its `invoice` fixture, and v239).
-
-### What changed from v1, and why
-
-| Finding (PR #60) | v1 | v2 |
-|---|---|---|
-| **B1** command identity derived from state | key carried the derived amount and component; a retry after the customer settled became a Skatteverket payment; a fresh default timestamp conflicted in C4 | **Identity is a caller-supplied command key.** Target, amount and `settled_at` are resolved once inside `execute_payment_command`, persisted on the command row in the same transaction as the kernel writes, and every replay of the key returns the stored outcome without touching the kernel, whatever the caller sends now. A *different* key on a `customer_paid` invoice is the Skatteverket payment, which is what legacy means by a second call (mark-paid route doc comment) — now explicit and auditable instead of implicit. |
-| **B2** Fortnox evidence not passed | key needed `DocumentNumber` and `Balance` that the caller never sends; cumulative `Total − Balance` treated as a new payment | `syncFortnoxPaymentsForBusiness` passes a **provider observation** (document identity, cumulative paid, observed at) next to the untouched legacy arguments. Under the flag the RPC records **new money = snapshot − everything the kernel already holds for the invoice**; zero or negative deltas record nothing and are stored on the command row for C11. Legacy branch ignores the observation. |
-| **B3** lazy issuance on part-paid invoices | issued both components fully open, so the next payment was mis-targeted | **Routing rule, persisted:** an invoice with legacy payment evidence (`paid_amount > 0` or status `customer_paid`/`paid`) and no kernel receivables is `legacy_routed` — the facade runs the frozen legacy body for it, forever, until C4b imports its opening balance. No receivable is invented from legacy status. |
-| **B4** no recovery protocol | app-side steps between RPCs; pre-send marker could suppress a never-sent effect; early `paid` return on retry | Issuance, settlement, allocations, rounding, outcome **and effect intents commit in one transaction**; there is no state between them to recover. Effects are **intent rows** (`pending → attempting → sent/failed/skipped`, stale attempts → `unknown` and reported to a human); a retried request finishes what a crashed one owed; the intent row is the marker C5b's bridge checks, so a marker exists only together with the obligation it records. No exactly-once claim for external sends: at-most-once per attempt, never silently lost. |
-| **M1** flag helper calls a kernel RPC | dispatch used the C4 helper | New `readKernelDispatchFlag` reads the column directly; absent column/row → `false`; other errors throw. The C4 helper stays for kernel callers. |
-
-### What changed from v2, and why
-
-| Finding (PR #62) | v2 | v3 |
-|---|---|---|
-| **R1** immutable outcome replayed as projection | the facade rewrote `invoice.status/paid_amount` from the command's stored `receivables`/`recorded_minor`; a replay of the customer command after the tax command downgraded a paid invoice; app-side writes could also arrive out of order | **The RPC writes the projection**, from `financial_invoice_projection()` (current receivables, Σ settled inbound payments, derived status) under the `invoice … FOR UPDATE` lock it already holds, in the same transaction as the kernel writes. A replay writes nothing and returns the current projection. There is no app-side projection write, so no ordering problem exists. |
-| **R2** route-owned SMS re-fired on replay | "thank-you SMS untouched" plus "same transition on replay" | The status route's block (thank-you SMS + scheduled review request) is extracted verbatim into `lib/invoices/payment-thanks.ts`. Flag off: the route calls it exactly as today. Flag on: the facade owns it as intents `invoice_paid_thanks` and `review_request_schedule` for source `status_patch`, and the route skips its block when `result.kernel` is present. Crash before dispatch → intent `pending` → swept by the next call. |
-| **R3** finish had no attempt identity | `finish` checked only `status = 'attempting'`; a late duplicate finish failed a newer attempt | `claim` mints `attempt_token` per claimed intent; `finish` requires the exact token. Foreign or stale token → `financial_effect_attempt_stale`, no mutation. Same token, same terminal status → idempotent; different status → `financial_effect_attempt_finished`. A late finish for an attempt already marked `unknown` is accepted and resolves it (`was_unknown`). |
-| **R4** no-op outcomes lacked projection fields; `already_paid` skipped the sweep | `no_new_money`/`provider_below_kernel`/`already_paid` returned state only | Every state returns `{command, projection}`; `projection.intents_owed`/`intents_unknown` tell the facade what to sweep; the facade sweeps on **every** kernel-branch call, including `already_paid`, `no_new_money` and replays. `already_paid` and `no_new_money` also (re)write the projection, which repairs one a crashed request never got to. |
+Read first: `FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` §2, §5–§9, §11, §17, §21.6 (the 2026-09-12 decision:
+Level 1 only, Levels 2–4 persisted as *unsupported*), orchestration §5 C6 (S1/S2 stored per business and
+shown wherever divergence metrics appear), `sql/v238`–`v240`, `lib/financial-kernel/{flags,dispatch-flag}.ts`,
+`lib/fortnox/classify-payment.ts` (the payment classes Fortnox can express: `cancelled | paid | customer_paid |
+overdue | unchanged`), `lib/fortnox/sync-payments.ts` (Fortnox → facade, `source:'fortnox'`, every two hours),
+`lib/fortnox.ts` `getFortnoxInvoice` (`Total`, `TotalToPay`, `Balance`, `FullyPaid`, `Cancelled`, `TaxReduction`),
+`financial_invoice_projection` in v239 (`receivables`, `recorded_minor`, `derived_status`), the C5b cron
+`app/api/cron/financial-kernel/route.ts`, `lib/financial-kernel/admin.ts` and `FinancialKernelSection.tsx`.
 
 ### Claude decisions embedded in this brief
 
 | Decision | Why |
 |---|---|
-| **The legacy path is preserved byte-for-byte** in `applyInvoicePaymentLegacy`; the export dispatches on `readKernelDispatchFlag(businessId)` and on the RPC's routing outcome. Flag off → zero kernel RPCs and one extra `business_config` read. | Orchestration C5. Facit test compares the legacy function source with `main`. |
-| **One command = one atomic RPC.** `execute_payment_command` (v239) does routing, lazy issuance, settlement, allocation, rounding, outcome and intents under the business lock, in one transaction, keyed by `(business_id, command_key)`. | B1 + B4. Verified in PGlite (below). The same RPC is what C5b's runner and C7's provider adapter will call, so the command table becomes the audit trail of "who asked for what". |
-| **Callers own identity.** Every caller passes `commandKey` (table under "Callers"). HTTP routes accept a client `Idempotency-Key` header or body `command_id`; when absent the route mints one and echoes it in the response. | B1. A retry (same key) is idempotent by construction; a new key is a new command, as legacy semantics require. |
-| **Resolution order for a command without an observation:** explicit `target` (+ optional amount) → explicit `amount` (allocate customer → tax_authority → unallocated) → neither: the next open component, customer first, for its full outstanding. Persisted once. | Mirrors `decidePaymentOutcome` including the ROT `total − 0.5` case, but never re-derived on replay. |
-| **Provider snapshot rule:** with an observation the target is the invoice and the amount is `snapshot_paid − kernel_recorded`; `≤ 0` records nothing (`no_new_money` / `provider_below_kernel`, the latter reported once via `rapporteraTystFel`, reconciliation is C11). | B2. Manual-then-provider confirms without double counting; overpayment observed by the provider stays unallocated. |
-| **Routing:** no receivables + legacy evidence → `legacy_routed`, run the frozen body. Eager issuance in `recordInvoiceDeliveryOutcome` obeys the same rule (a resend of a part-paid invoice issues nothing). | B3. C4b replaces this with opening balances; until then flagged businesses keep legacy behaviour on their old paper. |
-| **Effects run inline, from intents.** Intents are created in the kernel transaction only when the **customer component settled in this command**, one per `(receivable_id, effect)` ever (a reversal + re-settlement gets `effects_suppressed`, C4 review). Dispatch: `claim_effect_intents` (max 3 attempts, 10 min stale; mints an `attempt_token` per claim) → run → `finish_effect_intent(id, attempt_token, status)`. **Every** kernel-branch call sweeps that invoice's owed intents, whatever the command's state. | B4, R3, R4. `runPostPaymentAutomations` gets an additive `only?: string[]` so one effect can run alone; legacy callers unchanged. |
-| **`unknown` is a human's**: an attempt that did not finish within 10 minutes is never auto-retried (the SMS may have gone out); it is reported via `rapporteraTystFel('financial-kernel:effect-unknown', …)` with the intent id. C5b adds the periodic sweeper and the admin surface. | Honest at-most-once for external sends. |
-| **Interim SE rounding policy** `INTERIM_SE_ROUNDING_MAX_MINOR = 100n` in `lib/financial-kernel/policies/se-rounding.ts`, passed to the RPC as `p_rounding_max_minor`; the RPC applies it **only to components this command paid into, only when nothing is left unallocated**, as an `adjust_receivable{rounding}` posting. | Same as v1, now a policy argument; the reviewer checks no TypeScript comparison uses the constant. |
-| **Projection is written by the RPC**, never by the app: `financial_project_invoice()` sets `status` (all components settled/closed → `paid`; customer settled, tax open → `customer_paid`; customer open → unchanged), `paid_amount = round(recorded_minor / 100, 2)` (every settled inbound payment the kernel holds for the invoice, allocated or not), `paid_at`/`paid_via` when the customer settled in this command, `settled_at` when the invoice becomes `paid`, `manual_paid_marked_at/by` when a component settled and the source is not Fortnox — all under the invoice row lock, in the command transaction. Replays write nothing. Atomic with the kernel, so the v1 "not atomic, C6 compares" acceptance is withdrawn. | R1. Same columns as legacy so every reader in the call-site map keeps working. A reversal (C4 RPC) does not re-project; reopening a paid invoice is C14's. |
-| **Kernel branch never reads `invoice.status` to decide.** `already_paid` comes from the RPC (`state = 'already_paid'`: nothing open). The legacy-shaped `transition` is derived from `command.settled_now` (history, stable on replay) and `status` from `projection` (current). A replay returns the stored transition for the caller's message but never writes and never re-fires an effect: effects only come from intents. | B4, R1, R2. |
-| **Status route after-payment effects become intents under the flag.** `lib/invoices/payment-thanks.ts` exports `sendPaymentThanks(...)` (the SMS) and `scheduleReviewRequest(...)` (the `pending_approvals` row), both moved verbatim from the route. Flag off → the route calls them in its existing block. Flag on → the facade includes `invoice_paid_thanks` and `review_request_schedule` in the effect set for `status_patch`, dispatches them through intents, and the route skips its block when `result.kernel` is set. | R2. Replaces v1's "SMS untouched". The mark-paid route has no route-owned effects; approvals and Fortnox already run everything through the core. |
-| **`invoice_number` immutable once receivables exist** (Fortnox receipt update under the flag, `sync-to-fortnox.ts`), **non-ROT partial stays open under the flag**, **overpayment unallocated**. | Unchanged from v1; not challenged. |
+| **Phase is a history table, not a column.** `financial_kernel_rollout` (append-only: `phase`, `previous_phase`, `actor`, `reason`, `changed_at`); current phase = latest row, default `off`. `set_financial_kernel_phase(business, phase, actor, reason)` is from now on the **only writer** of `business_config.financial_kernel_enabled` (`S1` → true, `off` → false, same phase → no-op). `S2` is refused (`financial_kernel_phase_reserved`) until the S2 definition exists (after two clean S1 weeks, separate amendment). | Shadow §2: per business, explicit, dated, auditable, reversible only with reason. A raw column update leaves no trace; the RPC does. |
+| **Kill switch = `set_financial_kernel_phase(..., 'off', actor, reason)`.** Every caller returns to the frozen legacy body on the next call (C5 dispatch flag); projected columns stay valid (C5 invariant). Intents already owed are **not abandoned**: `list_financial_kernel_work()` returns `consume` (flag on) and `sweep` (flag on **or** owed intents) per business, and the C5b cron switches from its `business_config` query to this RPC. The RPC's response carries `owed_intents` so the operator sees what is still in flight. | Today the cron ignores flag-off businesses, so a kill switch would silently strand pending thanks-SMS. An intent is a committed obligation created while the flag was on. |
+| **Level 1 only, exact, no tolerances.** Pure engine `compareInvoiceLevel1(handymate, snapshot)` → `{result, differences[]}` with `result ∈ match | divergent | reference_missing`; amounts compared in öre as strings; a 1–100 öre difference is recorded as `ROUNDING_DIVERGENCE` (severity `low`), never suppressed. Levels 2–4 are written once per run as `unsupported` with the reason `bookkeeping scope not granted` (§21.6). | Shadow §7 and §17: no monetary tolerances; unsupported is recorded, not implied. |
+| **Dimensions and kinds (comparison_version 1):** (a) settlement state — `classifyFortnoxPayment` class vs `derived_status` (`paid`/`customer_paid`/`null`=open; `cancelled` vs a voided receivable) → `PAYMENT_DIVERGENCE`, `critical`; (b) amounts — Fortnox `Total` vs the sum of receivable amounts, `TotalToPay` vs the customer receivable, and for class `paid` Fortnox `Balance` = 0 vs open kernel amount 0 → `RECEIVABLE_BALANCE_DIVERGENCE`, `high` (or `ROUNDING_DIVERGENCE` when ≤ 100 öre); (c) invoice has `fortnox_document_number` but Fortnox returns 404 → `MISSING_REFERENCE_ENTRY`, `high`; no document number or fetch error → `reference_missing` (`REFERENCE_DATA_UNAVAILABLE`, `medium`); (d) invoice sent after the phase started with no kernel receivables → `MISSING_HANDYMATE_ENTRY`, `high`; (e) **Level 0, internal**: `invoice.status`/`paid_amount` vs `derived_status`/`recorded_minor` → `PROJECTION_DIVERGENCE`, `critical` (the facade broke its own invariant). Severity policy lives in one versioned TS table. | Shadow §6 Level 1 dimensions and §8 taxonomy, reduced to what the Fortnox grant can express. (e) is the C5 invariant checked against production data every day. |
+| **Eventual consistency by sighting count, not by tolerance.** A divergence is `open` on first sighting, `confirmed` on the second consecutive daily sighting (`seen_count ≥ 2`), reported once through `rapporteraTystFel('financial-kernel:shadow-divergence')` when confirmed, and shown in admin as *ny* / *bekräftad*. A later `match` on the same object closes every open divergence on it with `resolution_type = superseded_by_match` and the comparison id as provenance. The run is scheduled 30 minutes after the Fortnox payment sync so lag is the exception. | Shadow §9 (retry before alarm) and §11 (no closing without provenance). A payment Fortnox saw after the last sync would otherwise page every night. |
+| **Reference snapshots are append-only** (`financial_shadow_snapshots`, one row per fetch incl. `not_found`/`error`); each comparison points at the snapshot it used. | Shadow §5: a later observation never rewrites the snapshot an earlier comparison used. |
+| **Nothing in `lib/financial-kernel/shadow/**` may call the facade, any kernel command RPC or write `invoice`.** The daily run reads; the only writes are the shadow tables through their RPCs. | Shadow §17: no auto-correction in either direction. |
+| **Admin, not customer.** Phase control (off/S1 with a required reason), shadow status per business (phase, since when, last run, open divergences by severity, confirmed count, the *unsupported* levels listed), the divergence list with resolve (type + reason). All behind `financialKernelAdmin`. No customer-facing surface. | S1 numbers are not customer value and must not be read as kernel correctness. |
 
-### Command keys per caller
+### v242 — implement as written (deviations in the handoff with reasons)
 
-| Source | Caller | `commandKey` | Target / amount |
-|---|---|---|---|
-| `manual` | `POST /api/invoices/[id]/mark-paid` | `manual:<invoice_id>:<client key>` — client key = `Idempotency-Key` header or body `command_id`, sanitised to `[A-Za-z0-9._-]{1,120}`; absent → `crypto.randomUUID()` minted by the route and echoed as `command_id` in the JSON response | body `amount` → explicit amount; else next open component |
-| `status_patch` | `PATCH /api/invoices/[id]/status` (`status: 'paid'`) | `status_patch:<invoice_id>:<client key or minted uuid>` | body `paid_amount` → explicit; else next open component |
-| `manual` | `lib/matte/action-executor.ts` `mark_invoice_paid` | `manual:<invoice_id>:matte:<sha256(channel|from|receivedAt) first 32 hex>` from the `IncomingSignal` (it has no id) | next open component |
-| `customer_confirmed` | `app/api/approvals/[id]/route.ts` `confirm_payment` | `customer_confirmed:<approval_id>` | `target: 'customer'`, `reviewed.amount` if present |
-| `fortnox` | `lib/fortnox/sync-payments.ts` | `fortnox_import:<invoice_id>:<document_number>:<paid_minor>` | `providerObservation` (below); `amount` argument kept as today for the legacy branch |
-
-UI: `app/dashboard/invoices/page.tsx` `handleMarkPaid` and the status modal in
-`app/dashboard/invoices/[id]/page.tsx` send `Idempotency-Key: crypto.randomUUID()` generated per
-click. Server-side minting keeps old clients and curl working (no retry protection, exactly as today).
-
-**Provider observation** (`providerObservation` on `ApplyPaymentOptions`, optional, ignored by the
-legacy branch):
-
-```ts
-{ provider: 'fortnox', documentNumber: string, total?: number, balance?: number, fullyPaid?: boolean,
-  paidMinor: string /* decimal string of öre: Money.fromLegacyNumber(paidSoFarFromFortnox(fn) ?? fallback) */,
-  paidFrom: 'total_minus_balance' | 'local_invoice_total' | 'local_customer_share', observedAt: string }
-```
-
-`paidMinor` fallbacks mirror the caller today: classifier `paid` without `Total`/`Balance` → the
-local invoice total; classifier `customer_paid` without them → `getCustomerShare(inv)`.
-
-### v239 — implement as written (deviations in the handoff with reasons)
+Verified in PGlite on top of `v235`–`v240` (`probe12.cjs`, 40 checks: phase default/reserved/reason/no-op/flip
+and history; work list before and after a kill switch with one owed intent; run refused while off; comparisons
+need a running run and non-empty differences; first sighting open, second confirmed + reportable, reported once;
+`reference_missing` → one `medium` divergence; `unsupported` writes no divergence; match closes with provenance;
+manual resolve requires reason and type and refuses a closed row; close/record after close refused; rollout,
+snapshots, comparisons immutable; snapshot check constraint; no RPC touches `public.invoice`; every RPC
+service_role-only; RLS on all six tables; member insert and member RPC denied).
 
 ```sql
--- v239_financial_payment_commands.sql — DRAFT for the C5 brief v3 (Claude, 2026-09-14; v2 corrected after PR #62 R1–R4).
--- Verified in PGlite on top of v235–v238 (probe8.cjs). Codex implements as written; deviations in the handoff.
+-- v242_financial_kernel_shadow.sql — DRAFT for the C6 brief (Claude, 2026-09-14).
+-- Verified in PGlite on top of v235–v240 (probe12.cjs). Codex implements as written; deviations in the handoff.
+-- Shadow architecture §2 (S1/S2), §5 (persistence), §7 (no tolerances), §9 (eventual consistency), §11 (lifecycle), §17 (safety).
+-- v241 is reserved for the Customer Value package (value_events).
 BEGIN;
 
--- Supabase advisor WARN (production check 2026-09-14): pin search_path on the two v235/v238 helpers.
-ALTER FUNCTION public.financial_events_immutable() SET search_path = public, pg_temp;
-ALTER FUNCTION public.financial_receivable_json(public.financial_receivables) SET search_path = public, pg_temp;
-
--- ── Payment commands: one row per command identity, written in the same transaction as the kernel writes ──
-CREATE TABLE IF NOT EXISTS public.financial_payment_commands (
-  id            TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
-  business_id   TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
-  command_key   TEXT        NOT NULL CHECK (command_key ~ '^[a-z_]+:\S+$' AND length(command_key) <= 400),
-  invoice_id    TEXT        NOT NULL,
-  source        TEXT        NOT NULL CHECK (source IN ('manual', 'status_patch', 'customer_confirmed', 'fortnox')),
-  route         TEXT        NOT NULL CHECK (route IN ('kernel', 'legacy')),
-  state         TEXT        NOT NULL CHECK (state IN ('executed', 'already_paid', 'legacy_routed', 'no_new_money', 'provider_below_kernel')),
-  target        TEXT        NULL CHECK (target IS NULL OR target IN ('customer', 'tax_authority', 'invoice')),
-  amount_minor  BIGINT      NULL CHECK (amount_minor IS NULL OR amount_minor > 0),
-  currency      TEXT        NOT NULL DEFAULT 'SEK' CHECK (currency ~ '^[A-Z]{3}$'),
-  settled_at    TIMESTAMPTZ NOT NULL,
-  provider      TEXT        NOT NULL CHECK (provider IN ('manual', 'fortnox')),
-  method        TEXT        NULL,
-  evidence      TEXT        NOT NULL CHECK (evidence IN ('manual', 'fortnox')),
-  observation   JSONB       NULL,
-  payment_id    TEXT        NULL,
-  outcome       JSONB       NOT NULL,
-  actor_type    TEXT        NOT NULL,
-  actor_id      TEXT        NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (id),
-  UNIQUE (business_id, id),
-  UNIQUE (business_id, command_key),
-  FOREIGN KEY (business_id, payment_id) REFERENCES public.financial_payments(business_id, id),
-  CHECK ((state = 'executed') = (payment_id IS NOT NULL)),
-  CHECK ((state = 'executed') = (amount_minor IS NOT NULL))
+-- ── 1. Phase per business: explicit, dated, auditable, reversible with reason (§2, §14) ──
+-- business_config.financial_kernel_enabled stays the dispatch switch and is written ONLY by set_financial_kernel_phase.
+CREATE TABLE IF NOT EXISTS public.financial_kernel_rollout (
+  id             TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id    TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  phase          TEXT        NOT NULL CHECK (phase IN ('off','S1','S2')),
+  previous_phase TEXT        NOT NULL CHECK (previous_phase IN ('off','S1','S2')),
+  actor          TEXT        NOT NULL CHECK (actor <> ''),
+  reason         TEXT        NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  changed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id)
 );
-CREATE INDEX IF NOT EXISTS idx_financial_payment_commands_invoice ON public.financial_payment_commands (business_id, invoice_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_financial_kernel_rollout_latest ON public.financial_kernel_rollout (business_id, changed_at DESC);
 
--- ── Effect intents: durable "we owe this side effect" rows; the marker the C5b bridge checks ──
-CREATE TABLE IF NOT EXISTS public.financial_effect_intents (
-  id            TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
-  business_id   TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
-  command_id    TEXT        NOT NULL,
-  invoice_id    TEXT        NOT NULL,
-  receivable_id TEXT        NOT NULL,
-  effect        TEXT        NOT NULL CHECK (effect ~ '^[a-z_]{2,40}$'),
-  status        TEXT        NOT NULL CHECK (status IN ('pending', 'attempting', 'sent', 'failed', 'skipped', 'unknown')),
-  attempts      INT         NOT NULL DEFAULT 0 CHECK (attempts >= 0),
-  attempt_token TEXT        NULL,
-  claimed_at    TIMESTAMPTZ NULL,
-  finished_at   TIMESTAMPTZ NULL,
-  last_error    TEXT        NULL,
-  result        JSONB       NULL,
-  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (id),
-  UNIQUE (business_id, id),
-  UNIQUE (business_id, command_id, effect),
-  UNIQUE (business_id, receivable_id, effect),
-  FOREIGN KEY (business_id, command_id) REFERENCES public.financial_payment_commands(business_id, id),
-  FOREIGN KEY (business_id, receivable_id) REFERENCES public.financial_receivables(business_id, id),
-  CHECK ((status = 'attempting') = (claimed_at IS NOT NULL AND finished_at IS NULL) OR status IN ('sent', 'failed', 'skipped', 'unknown')),
-  CHECK ((status = 'pending') = (attempt_token IS NULL)),
-  CHECK ((status IN ('sent', 'failed', 'skipped', 'unknown')) = (finished_at IS NOT NULL))
+-- ── 2. Reference snapshots: append-only, versioned; a later observation never rewrites an earlier one (§5) ──
+CREATE TABLE IF NOT EXISTS public.financial_shadow_snapshots (
+  id             TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id    TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  provider       TEXT        NOT NULL CHECK (provider IN ('fortnox')),
+  object_type    TEXT        NOT NULL CHECK (object_type IN ('invoice')),
+  external_id    TEXT        NOT NULL,
+  invoice_id     TEXT        NULL,
+  fetch_status   TEXT        NOT NULL CHECK (fetch_status IN ('ok','not_found','error')),
+  snapshot       JSONB       NULL,
+  error          TEXT        NULL,
+  schema_version INT         NOT NULL DEFAULT 1,
+  observed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id),
+  CHECK ((fetch_status = 'ok') = (snapshot IS NOT NULL))
 );
-CREATE INDEX IF NOT EXISTS idx_financial_effect_intents_open ON public.financial_effect_intents (business_id, invoice_id)
-  WHERE status IN ('pending', 'attempting', 'failed');
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_snapshots_object ON public.financial_shadow_snapshots (business_id, object_type, external_id, observed_at DESC);
 
-DO $rls$ DECLARE t TEXT; BEGIN
-  FOREACH t IN ARRAY ARRAY['financial_payment_commands', 'financial_effect_intents'] LOOP
+-- ── 3. Comparison runs and comparisons (§5, §6) ──
+CREATE TABLE IF NOT EXISTS public.financial_shadow_runs (
+  id                 TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id        TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  phase              TEXT        NOT NULL CHECK (phase IN ('S1','S2')),
+  trigger_type       TEXT        NOT NULL CHECK (trigger_type IN ('cron','manual')),
+  comparison_version INT         NOT NULL,
+  status             TEXT        NOT NULL DEFAULT 'running' CHECK (status IN ('running','completed','failed')),
+  counts             JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  started_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at       TIMESTAMPTZ NULL,
+  PRIMARY KEY (business_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_runs_latest ON public.financial_shadow_runs (business_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.financial_shadow_comparisons (
+  id                 TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id        TEXT        NOT NULL,
+  run_id             TEXT        NOT NULL,
+  phase              TEXT        NOT NULL CHECK (phase IN ('S1','S2')),
+  level              INT         NOT NULL CHECK (level BETWEEN 1 AND 4),
+  object_type        TEXT        NOT NULL CHECK (object_type IN ('invoice','ledger','aggregate','report')),
+  invoice_id         TEXT        NULL,
+  snapshot_id        TEXT        NULL,
+  result             TEXT        NOT NULL CHECK (result IN ('match','divergent','reference_missing','unsupported')),
+  comparison_version INT         NOT NULL,
+  handymate          JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  differences        JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  checked_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id),
+  FOREIGN KEY (business_id, run_id) REFERENCES public.financial_shadow_runs(business_id, id),
+  FOREIGN KEY (business_id, snapshot_id) REFERENCES public.financial_shadow_snapshots(business_id, id),
+  CHECK ((result = 'divergent') = (jsonb_array_length(differences) > 0)),
+  CHECK ((object_type = 'invoice') = (invoice_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_comparisons_run ON public.financial_shadow_comparisons (business_id, run_id);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_comparisons_invoice ON public.financial_shadow_comparisons (business_id, invoice_id, checked_at DESC) WHERE invoice_id IS NOT NULL;
+
+-- ── 4. Divergences: one OPEN row per (object, kind); sightings accumulate; closed only with provenance (§8, §11) ──
+CREATE TABLE IF NOT EXISTS public.financial_shadow_divergences (
+  id              TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id     TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  phase           TEXT        NOT NULL CHECK (phase IN ('S1','S2')),
+  kind            TEXT        NOT NULL CHECK (kind IN ('PAYMENT_DIVERGENCE','RECEIVABLE_BALANCE_DIVERGENCE','ROUNDING_DIVERGENCE',
+                                                     'MISSING_HANDYMATE_ENTRY','MISSING_REFERENCE_ENTRY','REFERENCE_DATA_UNAVAILABLE','PROJECTION_DIVERGENCE')),
+  severity        TEXT        NOT NULL CHECK (severity IN ('info','low','medium','high','critical')),
+  object_type     TEXT        NOT NULL,
+  invoice_id      TEXT        NULL,
+  comparison_id   TEXT        NOT NULL,
+  expected        JSONB       NULL,
+  actual          JSONB       NULL,
+  seen_count      INT         NOT NULL DEFAULT 1,
+  first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  confirmed_at    TIMESTAMPTZ NULL,
+  reported_at     TIMESTAMPTZ NULL,
+  status          TEXT        NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved')),
+  root_cause_code TEXT        NULL,
+  PRIMARY KEY (business_id, id),
+  FOREIGN KEY (business_id, comparison_id) REFERENCES public.financial_shadow_comparisons(business_id, id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_financial_shadow_divergence_open ON public.financial_shadow_divergences (business_id, object_type, COALESCE(invoice_id,''), kind) WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_divergences_open ON public.financial_shadow_divergences (business_id, severity, last_seen_at DESC) WHERE status = 'open';
+
+CREATE TABLE IF NOT EXISTS public.financial_shadow_resolutions (
+  id              TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id     TEXT        NOT NULL,
+  divergence_id   TEXT        NOT NULL,
+  resolution_type TEXT        NOT NULL CHECK (resolution_type IN ('superseded_by_match','accepted','fixed','reference_error','duplicate')),
+  reason          TEXT        NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  resolved_by     TEXT        NOT NULL CHECK (resolved_by <> ''),
+  fix_reference   TEXT        NULL,
+  resolved_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id),
+  FOREIGN KEY (business_id, divergence_id) REFERENCES public.financial_shadow_divergences(business_id, id)
+);
+
+-- ── 5. Immutability: rollout, snapshots, comparisons and resolutions are history; runs/divergences change only via the RPCs ──
+DO $do$ DECLARE t TEXT; BEGIN
+  FOREACH t IN ARRAY ARRAY['financial_kernel_rollout','financial_shadow_snapshots','financial_shadow_comparisons','financial_shadow_resolutions'] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', t || '_immutable', t);
+    EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.financial_events_immutable()', t || '_immutable', t);
+  END LOOP;
+END $do$;
+
+-- ── 6. RLS: members read, nobody writes through the API; service_role via RPC ──
+DO $do$ DECLARE t TEXT; BEGIN
+  FOREACH t IN ARRAY ARRAY['financial_kernel_rollout','financial_shadow_snapshots','financial_shadow_runs','financial_shadow_comparisons','financial_shadow_divergences','financial_shadow_resolutions'] LOOP
     EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
     EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_tenant_read', t);
     EXECUTE format('CREATE POLICY %I ON public.%I FOR SELECT TO authenticated USING (public.is_business_member(business_id))', t || '_tenant_read', t);
-    EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated, service_role', t);
-    EXECUTE format('GRANT SELECT ON TABLE public.%I TO authenticated, service_role', t);
+    EXECUTE format('REVOKE ALL ON public.%I FROM anon, authenticated', t);
+    EXECUTE format('GRANT SELECT ON public.%I TO authenticated', t);
+    EXECUTE format('GRANT ALL ON public.%I TO service_role', t);
   END LOOP;
-END $rls$;
+END $do$;
 
+-- ── 7. Phase read + write ──
+CREATE OR REPLACE FUNCTION public.financial_kernel_phase(p_business_id TEXT)
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT COALESCE((SELECT phase FROM public.financial_kernel_rollout r WHERE r.business_id = p_business_id ORDER BY changed_at DESC, id DESC LIMIT 1), 'off')
+$fn$;
 
--- ── Projection helpers (R1): the legacy invoice columns are a projection of CURRENT kernel state, written under the
--- invoice row lock inside the command transaction. Command history never drives a write. ──
-CREATE OR REPLACE FUNCTION public.financial_invoice_projection(p_business_id TEXT, p_invoice_id TEXT)
+-- The only writer of business_config.financial_kernel_enabled from now on. 'S2' is reserved until the S2 definition exists (brief: after two clean S1 weeks).
+CREATE OR REPLACE FUNCTION public.set_financial_kernel_phase(p_business_id TEXT, p_phase TEXT, p_actor TEXT, p_reason TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE recs JSONB; v_recorded BIGINT; v_allocated BIGINT; v_open INT; v_customer_open BOOLEAN; v_status TEXT; v_owed INT; v_unknown INT;
+DECLARE v_prev TEXT; v_owed INT; v_id TEXT;
 BEGIN
-  SELECT jsonb_agg(public.financial_receivable_json(x) ORDER BY x.component), count(*) FILTER (WHERE x.status = 'open'),
-         bool_or(x.component = 'customer' AND x.status = 'open')
-    INTO recs, v_open, v_customer_open
-    FROM public.financial_receivables x WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id;
-  SELECT COALESCE(sum(p.amount_minor), 0), COALESCE(sum(p.allocated_minor), 0) INTO v_recorded, v_allocated FROM public.financial_payments p
-    WHERE p.business_id = p_business_id AND p.correlation_id = 'fin_invoice_' || p_invoice_id AND p.status = 'settled' AND p.direction = 'inbound';
-  SELECT count(*) FILTER (WHERE i.status IN ('pending', 'failed', 'attempting')), count(*) FILTER (WHERE i.status = 'unknown') INTO v_owed, v_unknown
-    FROM public.financial_effect_intents i WHERE i.business_id = p_business_id AND i.invoice_id = p_invoice_id;
-  v_status := CASE WHEN recs IS NULL THEN NULL WHEN v_open = 0 THEN 'paid' WHEN NOT v_customer_open THEN 'customer_paid' ELSE NULL END;
-  RETURN jsonb_build_object('receivables', COALESCE(recs, '[]'::jsonb), 'recorded_minor', v_recorded::text,
-    'unallocated_minor', (v_recorded - v_allocated)::text, 'derived_status', v_status,
-    'intents_owed', v_owed, 'intents_unknown', v_unknown);
-END $fn$;
-
-CREATE OR REPLACE FUNCTION public.financial_project_invoice(
-  p_business_id TEXT, p_invoice_id TEXT, p_settled_now TEXT[], p_settled_at TIMESTAMPTZ, p_source TEXT, p_paid_via TEXT, p_marked_by TEXT
-) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE proj JSONB; v_customer_now BOOLEAN := 'customer' = ANY(COALESCE(p_settled_now, '{}')); v_any_now BOOLEAN := COALESCE(array_length(p_settled_now, 1), 0) > 0; v_status TEXT;
-BEGIN
-  proj := public.financial_invoice_projection(p_business_id, p_invoice_id);
-  UPDATE public.invoice i SET
-      paid_amount = round((proj->>'recorded_minor')::numeric / 100, 2),
-      status = COALESCE(proj->>'derived_status', i.status),
-      paid_at = CASE WHEN v_customer_now THEN p_settled_at ELSE i.paid_at END,
-      paid_via = CASE WHEN v_customer_now THEN p_paid_via ELSE i.paid_via END,
-      settled_at = CASE WHEN proj->>'derived_status' = 'paid' AND i.settled_at IS NULL THEN p_settled_at ELSE i.settled_at END,
-      manual_paid_marked_at = CASE WHEN v_any_now AND p_source <> 'fortnox' THEN now() ELSE i.manual_paid_marked_at END,
-      manual_paid_by_user_id = CASE WHEN v_any_now AND p_source <> 'fortnox' THEN p_marked_by ELSE i.manual_paid_by_user_id END
-    WHERE i.business_id = p_business_id AND i.invoice_id = p_invoice_id
-    RETURNING i.status INTO v_status;
-  RETURN proj || jsonb_build_object('status', v_status, 'written', true);
-END $fn$;
-
--- ── RPC 1: execute (or replay) one payment command atomically ──
--- Identity = (business_id, command_key). Parameters are resolved ONCE and persisted with the outcome
--- in the same transaction as issuance, settlement, allocations, rounding and effect intents.
--- A replay returns the stored outcome and never touches the kernel again.
-CREATE OR REPLACE FUNCTION public.execute_payment_command(
-  p_business_id TEXT, p_command_key TEXT, p_invoice_id TEXT, p_source TEXT,
-  p_target TEXT, p_amount_minor BIGINT, p_settled_at TIMESTAMPTZ,
-  p_provider TEXT, p_method TEXT, p_evidence TEXT, p_observation JSONB,
-  p_rounding_max_minor BIGINT, p_effects TEXT[], p_paid_via TEXT, p_marked_by TEXT, p_actor_type TEXT, p_actor_id TEXT
-) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE
-  cmd public.financial_payment_commands%ROWTYPE;
-  inv RECORD; r RECORD;
-  v_target TEXT; v_amount BIGINT; v_state TEXT := 'executed';
-  v_recorded BIGINT; v_snapshot BIGINT; v_delta BIGINT;
-  pay JSONB; al JSONB; adj JSONB; recs JSONB;
-  v_unallocated BIGINT; v_alloc BIGINT; v_open_count INT;
-  v_settled_now TEXT[] := '{}'; v_touched TEXT[] := '{}'; v_suppressed TEXT[] := '{}';
-  v_allocations JSONB := '[]'; v_adjustments JSONB := '[]'; v_intents JSONB := '[]';
-  v_customer_rec TEXT; v_effect TEXT; v_intent_id TEXT; v_cmd_id TEXT; v_outcome JSONB;
-  v_settled_at TIMESTAMPTZ := COALESCE(p_settled_at, now());
-  proj JSONB;
-BEGIN
+  IF p_phase = 'S2' THEN RAISE EXCEPTION 'financial_kernel_phase_reserved' USING ERRCODE = 'check_violation'; END IF;
+  IF p_phase NOT IN ('off','S1') THEN RAISE EXCEPTION 'financial_kernel_phase_invalid' USING ERRCODE = 'check_violation'; END IF;
+  IF p_actor IS NULL OR p_actor = '' OR p_reason IS NULL OR length(p_reason) < 3 THEN RAISE EXCEPTION 'financial_kernel_phase_reason_required' USING ERRCODE = 'check_violation'; END IF;
   PERFORM public.financial_lock(p_business_id);
-  IF p_command_key IS NULL OR p_command_key = '' THEN RAISE EXCEPTION 'financial_command_key_required' USING ERRCODE = 'check_violation'; END IF;
-  IF p_source NOT IN ('manual', 'status_patch', 'customer_confirmed', 'fortnox') THEN RAISE EXCEPTION 'financial_command_source_invalid' USING ERRCODE = 'check_violation'; END IF;
-
-  -- Replay: identity wins over everything the caller sends now.
-  SELECT * INTO cmd FROM public.financial_payment_commands c WHERE c.business_id = p_business_id AND c.command_key = p_command_key;
-  IF FOUND THEN
-    IF cmd.invoice_id <> p_invoice_id OR cmd.source <> p_source THEN
-      RAISE EXCEPTION 'financial_command_conflict' USING ERRCODE = 'unique_violation', DETAIL = cmd.id;
-    END IF;
-    PERFORM 1 FROM public.invoice i WHERE i.invoice_id = p_invoice_id AND i.business_id = p_business_id FOR UPDATE;
-    RETURN jsonb_build_object(
-      'command', cmd.outcome || jsonb_build_object('replayed', true, 'command_id', cmd.id,
-        'intents', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', i.id, 'effect', i.effect, 'status', i.status, 'attempts', i.attempts) ORDER BY i.effect), '[]'::jsonb)
-                      FROM public.financial_effect_intents i WHERE i.business_id = p_business_id AND i.command_id = cmd.id)),
-      'projection', public.financial_invoice_projection(p_business_id, p_invoice_id) || jsonb_build_object('written', false));
+  PERFORM 1 FROM public.business_config WHERE business_id = p_business_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'business_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
+  v_prev := public.financial_kernel_phase(p_business_id);
+  SELECT count(*) INTO v_owed FROM public.financial_effect_intents i WHERE i.business_id = p_business_id AND i.status IN ('pending','failed','attempting','unknown');
+  IF v_prev = p_phase THEN
+    RETURN jsonb_build_object('phase', v_prev, 'changed', false, 'owed_intents', v_owed);
   END IF;
+  INSERT INTO public.financial_kernel_rollout (business_id, phase, previous_phase, actor, reason)
+    VALUES (p_business_id, p_phase, v_prev, p_actor, p_reason) RETURNING id INTO v_id;
+  UPDATE public.business_config SET financial_kernel_enabled = (p_phase <> 'off') WHERE business_id = p_business_id;
+  RETURN jsonb_build_object('phase', p_phase, 'previous_phase', v_prev, 'changed', true, 'rollout_id', v_id, 'owed_intents', v_owed);
+END $fn$;
 
-  SELECT i.invoice_id, i.status, i.paid_amount, i.total INTO inv
-    FROM public.invoice i WHERE i.invoice_id = p_invoice_id AND i.business_id = p_business_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'financial_invoice_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
+-- Businesses the kernel cron must visit: dispatch on (consume + sweep) OR owed intents left behind by a kill switch (sweep only).
+CREATE OR REPLACE FUNCTION public.list_financial_kernel_work()
+RETURNS TABLE (business_id TEXT, phase TEXT, consume BOOLEAN, sweep BOOLEAN) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT b.business_id, public.financial_kernel_phase(b.business_id), b.financial_kernel_enabled,
+         b.financial_kernel_enabled OR EXISTS (SELECT 1 FROM public.financial_effect_intents i WHERE i.business_id = b.business_id AND i.status IN ('pending','failed','attempting'))
+    FROM public.business_config b
+   WHERE b.financial_kernel_enabled OR EXISTS (SELECT 1 FROM public.financial_effect_intents i WHERE i.business_id = b.business_id AND i.status IN ('pending','failed','attempting'))
+   ORDER BY b.business_id
+$fn$;
 
-  -- Routing (B3): an invoice with legacy payment evidence and no kernel receivables stays on the legacy path
-  -- until C4b imports its opening balance. The decision is persisted so every later command on it agrees.
-  IF NOT EXISTS (SELECT 1 FROM public.financial_receivables x WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id) THEN
-    IF COALESCE(inv.paid_amount, 0) > 0 OR inv.status IN ('customer_paid', 'paid') THEN
-      v_outcome := jsonb_build_object('route', 'legacy', 'state', 'legacy_routed', 'reason', 'legacy_payment_evidence',
-        'legacy_status', inv.status, 'legacy_paid_amount', inv.paid_amount);
-      INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, settled_at, provider, method, evidence, observation, outcome, actor_type, actor_id)
-        VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'legacy', 'legacy_routed', v_settled_at, p_provider, p_method, p_evidence, p_observation, v_outcome, p_actor_type, p_actor_id)
-        RETURNING id INTO v_cmd_id;
-      RETURN jsonb_build_object('command', v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', '[]'::jsonb, 'effects_suppressed', '[]'::jsonb),
-        'projection', jsonb_build_object('written', false, 'receivables', '[]'::jsonb, 'recorded_minor', '0', 'unallocated_minor', '0', 'derived_status', NULL, 'intents_owed', 0, 'intents_unknown', 0));
-    END IF;
-    PERFORM public.issue_invoice_receivables(p_business_id, p_invoice_id, p_actor_type, p_actor_id);
+-- ── 8. Shadow run lifecycle ──
+CREATE OR REPLACE FUNCTION public.open_shadow_run(p_business_id TEXT, p_trigger_type TEXT, p_comparison_version INT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE v_phase TEXT; v_id TEXT;
+BEGIN
+  v_phase := public.financial_kernel_phase(p_business_id);
+  IF v_phase = 'off' THEN RAISE EXCEPTION 'financial_shadow_phase_off' USING ERRCODE = 'check_violation'; END IF;
+  INSERT INTO public.financial_shadow_runs (business_id, phase, trigger_type, comparison_version) VALUES (p_business_id, v_phase, p_trigger_type, p_comparison_version) RETURNING id INTO v_id;
+  RETURN jsonb_build_object('run_id', v_id, 'phase', v_phase);
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.close_shadow_run(p_business_id TEXT, p_run_id TEXT, p_status TEXT, p_counts JSONB)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE r public.financial_shadow_runs%ROWTYPE;
+BEGIN
+  IF p_status NOT IN ('completed','failed') THEN RAISE EXCEPTION 'financial_shadow_run_status_invalid' USING ERRCODE = 'check_violation'; END IF;
+  UPDATE public.financial_shadow_runs SET status = p_status, counts = COALESCE(p_counts, '{}'::jsonb), completed_at = now()
+    WHERE business_id = p_business_id AND id = p_run_id AND status = 'running' RETURNING * INTO r;
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_shadow_run_not_running' USING ERRCODE = 'check_violation'; END IF;
+  RETURN to_jsonb(r);
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.record_shadow_snapshot(p_business_id TEXT, p_provider TEXT, p_object_type TEXT, p_external_id TEXT, p_invoice_id TEXT, p_fetch_status TEXT, p_snapshot JSONB, p_error TEXT)
+RETURNS TEXT LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  INSERT INTO public.financial_shadow_snapshots (business_id, provider, object_type, external_id, invoice_id, fetch_status, snapshot, error)
+    VALUES (p_business_id, p_provider, p_object_type, p_external_id, p_invoice_id, p_fetch_status, p_snapshot, p_error) RETURNING id
+$fn$;
+
+-- One comparison → its divergence sightings. A match closes every open divergence on the object with provenance (§11).
+-- Severity is the engine's (versioned in TS); the RPC stores, counts, confirms on the second consecutive sighting (§9) and never edits invoice.
+CREATE OR REPLACE FUNCTION public.record_shadow_comparison(
+  p_business_id TEXT, p_run_id TEXT, p_level INT, p_object_type TEXT, p_invoice_id TEXT, p_snapshot_id TEXT,
+  p_result TEXT, p_handymate JSONB, p_differences JSONB
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE run public.financial_shadow_runs%ROWTYPE; v_cmp TEXT; d JSONB; v_div public.financial_shadow_divergences%ROWTYPE; v_out JSONB := '[]'; v_closed INT := 0;
+BEGIN
+  SELECT * INTO run FROM public.financial_shadow_runs WHERE business_id = p_business_id AND id = p_run_id;
+  IF NOT FOUND OR run.status <> 'running' THEN RAISE EXCEPTION 'financial_shadow_run_not_running' USING ERRCODE = 'check_violation'; END IF;
+  IF p_result = 'divergent' AND (p_differences IS NULL OR jsonb_typeof(p_differences) <> 'array' OR jsonb_array_length(p_differences) = 0) THEN
+    RAISE EXCEPTION 'financial_shadow_differences_required' USING ERRCODE = 'check_violation'; END IF;
+  INSERT INTO public.financial_shadow_comparisons (business_id, run_id, phase, level, object_type, invoice_id, snapshot_id, result, comparison_version, handymate, differences)
+    VALUES (p_business_id, p_run_id, run.phase, p_level, p_object_type, p_invoice_id, p_snapshot_id, p_result, run.comparison_version, COALESCE(p_handymate,'{}'::jsonb), COALESCE(p_differences,'[]'::jsonb))
+    RETURNING id INTO v_cmp;
+  IF p_result = 'match' THEN
+    FOR v_div IN SELECT * FROM public.financial_shadow_divergences x WHERE x.business_id = p_business_id AND x.object_type = p_object_type AND COALESCE(x.invoice_id,'') = COALESCE(p_invoice_id,'') AND x.status = 'open' FOR UPDATE LOOP
+      UPDATE public.financial_shadow_divergences SET status = 'resolved' WHERE business_id = p_business_id AND id = v_div.id;
+      INSERT INTO public.financial_shadow_resolutions (business_id, divergence_id, resolution_type, reason, resolved_by, fix_reference)
+        VALUES (p_business_id, v_div.id, 'superseded_by_match', 'Objektet stämde vid en senare jämförelse', 'shadow-run', v_cmp);
+      v_closed := v_closed + 1;
+    END LOOP;
+    RETURN jsonb_build_object('comparison_id', v_cmp, 'divergences', v_out, 'closed', v_closed);
   END IF;
-
-  SELECT count(*) INTO v_open_count FROM public.financial_receivables x
-    WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open';
-  IF v_open_count = 0 THEN
-    v_outcome := jsonb_build_object('route', 'kernel', 'state', 'already_paid', 'settled_now', '[]'::jsonb);
-    INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, settled_at, provider, method, evidence, observation, outcome, actor_type, actor_id)
-      VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'kernel', 'already_paid', v_settled_at, p_provider, p_method, p_evidence, p_observation, v_outcome, p_actor_type, p_actor_id)
-      RETURNING id INTO v_cmd_id;
-    -- Projection is (re)written even here: it is idempotent and repairs a projection a crashed request never wrote.
-    proj := public.financial_project_invoice(p_business_id, p_invoice_id, '{}', v_settled_at, p_source, p_paid_via, p_marked_by);
-    RETURN jsonb_build_object('command', v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', '[]'::jsonb, 'effects_suppressed', '[]'::jsonb), 'projection', proj);
+  IF p_result = 'reference_missing' THEN
+    p_differences := jsonb_build_array(jsonb_build_object('kind','REFERENCE_DATA_UNAVAILABLE','severity','medium','expected',NULL,'actual',NULL));
   END IF;
-
-  -- Resolve target and amount ONCE (B1). Persisted below; a replay never re-derives.
-  IF p_observation IS NOT NULL THEN
-    -- Provider snapshot (B2): new money = cumulative paid per provider − everything the kernel already holds for the invoice.
-    v_target := 'invoice';
-    v_snapshot := (p_observation->>'paid_minor')::bigint;
-    IF v_snapshot IS NULL OR v_snapshot < 0 THEN RAISE EXCEPTION 'financial_observation_paid_minor_required' USING ERRCODE = 'check_violation'; END IF;
-    SELECT COALESCE(sum(p.amount_minor), 0) INTO v_recorded FROM public.financial_payments p
-      WHERE p.business_id = p_business_id AND p.correlation_id = 'fin_invoice_' || p_invoice_id AND p.status = 'settled' AND p.direction = 'inbound';
-    v_delta := v_snapshot - v_recorded;
-    IF v_delta <= 0 THEN
-      v_state := CASE WHEN v_delta = 0 THEN 'no_new_money' ELSE 'provider_below_kernel' END;
-      v_outcome := jsonb_build_object('route', 'kernel', 'state', v_state, 'snapshot_paid_minor', v_snapshot::text,
-        'kernel_recorded_minor', v_recorded::text, 'delta_minor', v_delta::text, 'settled_now', '[]'::jsonb);
-      INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, target, settled_at, provider, method, evidence, observation, outcome, actor_type, actor_id)
-        VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'kernel', v_state, 'invoice', v_settled_at, p_provider, p_method, p_evidence, p_observation, v_outcome, p_actor_type, p_actor_id)
-        RETURNING id INTO v_cmd_id;
-      proj := public.financial_project_invoice(p_business_id, p_invoice_id, '{}', v_settled_at, p_source, p_paid_via, p_marked_by);
-      RETURN jsonb_build_object('command', v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', '[]'::jsonb, 'effects_suppressed', '[]'::jsonb), 'projection', proj);
-    END IF;
-    v_amount := v_delta;
-  ELSIF p_target IS NOT NULL THEN
-    IF p_target NOT IN ('customer', 'tax_authority') THEN RAISE EXCEPTION 'financial_command_target_invalid' USING ERRCODE = 'check_violation'; END IF;
-    v_target := p_target;
-    SELECT (x.amount_minor + x.adjusted_minor - x.allocated_minor) INTO v_amount FROM public.financial_receivables x
-      WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.component = p_target AND x.status = 'open';
-    IF NOT FOUND THEN RAISE EXCEPTION 'financial_command_target_not_open' USING ERRCODE = 'check_violation'; END IF;
-    IF p_amount_minor IS NOT NULL THEN v_amount := p_amount_minor; END IF;
-  ELSIF p_amount_minor IS NOT NULL THEN
-    v_target := 'invoice'; v_amount := p_amount_minor;
-  ELSE
-    -- Legacy "no amount" = the next open component, customer first. Resolved under the lock, persisted once.
-    SELECT x.component, (x.amount_minor + x.adjusted_minor - x.allocated_minor) INTO v_target, v_amount FROM public.financial_receivables x
-      WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open'
-      ORDER BY CASE x.component WHEN 'customer' THEN 0 ELSE 1 END LIMIT 1;
-  END IF;
-  IF v_amount IS NULL OR v_amount <= 0 THEN RAISE EXCEPTION 'financial_command_amount_invalid' USING ERRCODE = 'check_violation'; END IF;
-
-  pay := public.record_payment_settlement(p_business_id, p_provider, NULL, 'inbound', p_method, 'SEK', v_amount, NULL, p_evidence, v_settled_at,
-    'fin_invoice_' || p_invoice_id, p_command_key, p_actor_type, p_actor_id);
-  v_unallocated := (pay->>'unallocated_minor')::bigint;
-
-  FOR r IN SELECT x.id, x.component, (x.amount_minor + x.adjusted_minor - x.allocated_minor) AS outstanding FROM public.financial_receivables x
-             WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open' AND (v_target = 'invoice' OR x.component = v_target)
-             ORDER BY CASE x.component WHEN 'customer' THEN 0 ELSE 1 END
-  LOOP
-    EXIT WHEN v_unallocated <= 0;
-    v_alloc := LEAST(v_unallocated, r.outstanding);
-    al := public.allocate_payment(p_business_id, pay->>'payment_id', r.id, v_alloc, p_command_key || ':alloc:' || r.component, p_actor_type, p_actor_id);
-    v_unallocated := v_unallocated - v_alloc;
-    v_touched := v_touched || r.component;
-    v_allocations := v_allocations || jsonb_build_object('component', r.component, 'receivable_id', r.id, 'amount_minor', v_alloc::text);
-    IF (al->>'receivable_settled')::boolean THEN v_settled_now := v_settled_now || r.component; END IF;
+  IF p_result = 'unsupported' THEN RETURN jsonb_build_object('comparison_id', v_cmp, 'divergences', v_out, 'closed', 0); END IF;
+  FOR d IN SELECT * FROM jsonb_array_elements(p_differences) LOOP
+    INSERT INTO public.financial_shadow_divergences (business_id, phase, kind, severity, object_type, invoice_id, comparison_id, expected, actual)
+      VALUES (p_business_id, run.phase, d->>'kind', d->>'severity', p_object_type, p_invoice_id, v_cmp, d->'expected', d->'actual')
+    ON CONFLICT (business_id, object_type, (COALESCE(invoice_id,'')), kind) WHERE status = 'open' DO UPDATE SET
+      seen_count = public.financial_shadow_divergences.seen_count + 1, last_seen_at = now(), comparison_id = EXCLUDED.comparison_id,
+      severity = EXCLUDED.severity, expected = EXCLUDED.expected, actual = EXCLUDED.actual, phase = EXCLUDED.phase,
+      confirmed_at = COALESCE(public.financial_shadow_divergences.confirmed_at, now())
+    RETURNING * INTO v_div;
+    v_out := v_out || jsonb_build_object('id', v_div.id, 'kind', v_div.kind, 'severity', v_div.severity, 'seen_count', v_div.seen_count,
+      'confirmed', v_div.confirmed_at IS NOT NULL, 'report', v_div.confirmed_at IS NOT NULL AND v_div.reported_at IS NULL);
   END LOOP;
-
-  -- Interim SE rounding policy (C1b replaces the value): only components this command paid into, only when the
-  -- payment is fully allocated, only a shortfall within the policy. An explicit adjustment posting, never a comparison.
-  IF v_unallocated = 0 AND COALESCE(p_rounding_max_minor, 0) > 0 THEN
-    FOR r IN SELECT x.id, x.component, (x.amount_minor + x.adjusted_minor - x.allocated_minor) AS outstanding FROM public.financial_receivables x
-               WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open' AND x.component = ANY(v_touched)
-    LOOP
-      IF r.outstanding > 0 AND r.outstanding <= p_rounding_max_minor THEN
-        adj := public.adjust_receivable(p_business_id, r.id, 'rounding', -r.outstanding, NULL, 'payment_command', p_command_key,
-          p_command_key || ':rounding:' || r.component, p_actor_type, p_actor_id);
-        v_adjustments := v_adjustments || jsonb_build_object('component', r.component, 'receivable_id', r.id, 'delta_minor', (-r.outstanding)::text);
-        IF (adj->>'receivable_settled')::boolean THEN v_settled_now := v_settled_now || r.component; END IF;
-      END IF;
-    END LOOP;
-  END IF;
-
-  -- History only: what THIS command did. Current state lives in the projection (R1).
-  v_outcome := jsonb_build_object('route', 'kernel', 'state', 'executed', 'payment_id', pay->>'payment_id', 'amount_minor', v_amount::text,
-    'target', v_target, 'settled_now', to_jsonb(v_settled_now), 'allocations', v_allocations, 'adjustments', v_adjustments,
-    'payment_unallocated_minor', v_unallocated::text);
-  INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, target, amount_minor, settled_at, provider, method, evidence, observation, payment_id, outcome, actor_type, actor_id)
-    VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'kernel', 'executed', v_target, v_amount, v_settled_at, p_provider, p_method, p_evidence, p_observation, pay->>'payment_id', v_outcome, p_actor_type, p_actor_id)
-    RETURNING id INTO v_cmd_id;
-
-  -- Effect intents (B4): owed only when the CUSTOMER component settled in this command; one per receivable and effect, ever.
-  IF 'customer' = ANY(v_settled_now) AND p_effects IS NOT NULL THEN
-    SELECT x.id INTO v_customer_rec FROM public.financial_receivables x
-      WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.component = 'customer';
-    FOREACH v_effect IN ARRAY p_effects LOOP
-      v_intent_id := NULL;
-      INSERT INTO public.financial_effect_intents (business_id, command_id, invoice_id, receivable_id, effect, status)
-        VALUES (p_business_id, v_cmd_id, p_invoice_id, v_customer_rec, v_effect, 'pending')
-        ON CONFLICT (business_id, receivable_id, effect) DO NOTHING RETURNING id INTO v_intent_id;
-      IF v_intent_id IS NULL THEN v_suppressed := v_suppressed || v_effect;
-      ELSE v_intents := v_intents || jsonb_build_object('id', v_intent_id, 'effect', v_effect, 'status', 'pending', 'attempts', 0); END IF;
-    END LOOP;
-  END IF;
-
-  proj := public.financial_project_invoice(p_business_id, p_invoice_id, v_settled_now, v_settled_at, p_source, p_paid_via, p_marked_by);
-  RETURN jsonb_build_object('command', v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', v_intents, 'effects_suppressed', to_jsonb(v_suppressed)), 'projection', proj);
+  RETURN jsonb_build_object('comparison_id', v_cmp, 'divergences', v_out, 'closed', 0);
 END $fn$;
 
--- ── RPC 2: claim the intents owed on an invoice (pending, or failed below the retry cap). Stale attempts become 'unknown'.
--- Every claim mints an attempt token (R3); only that token can finish the attempt. ──
-CREATE OR REPLACE FUNCTION public.claim_effect_intents(p_business_id TEXT, p_invoice_id TEXT, p_max_attempts INT, p_stale_minutes INT)
+CREATE OR REPLACE FUNCTION public.mark_shadow_divergences_reported(p_business_id TEXT, p_ids TEXT[])
+RETURNS INT LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  WITH u AS (UPDATE public.financial_shadow_divergences SET reported_at = now() WHERE business_id = p_business_id AND id = ANY(p_ids) AND reported_at IS NULL AND confirmed_at IS NOT NULL RETURNING 1)
+  SELECT count(*)::int FROM u
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.resolve_shadow_divergence(p_business_id TEXT, p_divergence_id TEXT, p_resolution_type TEXT, p_reason TEXT, p_actor TEXT, p_fix_reference TEXT, p_root_cause_code TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE v_unknown INT; v_claimed JSONB;
+DECLARE v_div public.financial_shadow_divergences%ROWTYPE; v_res TEXT;
 BEGIN
-  PERFORM public.financial_lock(p_business_id);
-  UPDATE public.financial_effect_intents SET status = 'unknown', finished_at = clock_timestamp(),
-      last_error = 'attempt did not finish within ' || p_stale_minutes || ' min; delivery unknown, needs a human'
-    WHERE business_id = p_business_id AND invoice_id = p_invoice_id AND status = 'attempting'
-      AND claimed_at < clock_timestamp() - make_interval(mins => p_stale_minutes);
-  GET DIAGNOSTICS v_unknown = ROW_COUNT;
-  WITH c AS (
-    UPDATE public.financial_effect_intents SET status = 'attempting', attempts = attempts + 1, attempt_token = gen_random_uuid()::text,
-        claimed_at = clock_timestamp(), finished_at = NULL
-      WHERE business_id = p_business_id AND invoice_id = p_invoice_id
-        AND (status = 'pending' OR (status = 'failed' AND attempts < p_max_attempts))
-      RETURNING id, command_id, receivable_id, effect, attempts, attempt_token)
-  SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.effect), '[]'::jsonb) INTO v_claimed FROM c;
-  RETURN jsonb_build_object('claimed', v_claimed, 'marked_unknown', v_unknown);
+  IF p_resolution_type NOT IN ('accepted','fixed','reference_error','duplicate') THEN RAISE EXCEPTION 'financial_shadow_resolution_invalid' USING ERRCODE = 'check_violation'; END IF;
+  IF p_actor IS NULL OR p_actor = '' OR p_reason IS NULL OR length(p_reason) < 3 THEN RAISE EXCEPTION 'financial_shadow_reason_required' USING ERRCODE = 'check_violation'; END IF;
+  SELECT * INTO v_div FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND id = p_divergence_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_shadow_divergence_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
+  IF v_div.status <> 'open' THEN RAISE EXCEPTION 'financial_shadow_divergence_not_open' USING ERRCODE = 'check_violation'; END IF;
+  UPDATE public.financial_shadow_divergences SET status = 'resolved', root_cause_code = p_root_cause_code WHERE business_id = p_business_id AND id = p_divergence_id;
+  INSERT INTO public.financial_shadow_resolutions (business_id, divergence_id, resolution_type, reason, resolved_by, fix_reference)
+    VALUES (p_business_id, p_divergence_id, p_resolution_type, p_reason, p_actor, p_fix_reference) RETURNING id INTO v_res;
+  RETURN jsonb_build_object('divergence_id', p_divergence_id, 'resolution_id', v_res, 'status', 'resolved');
 END $fn$;
 
--- ── RPC 3: finish one claimed attempt. The token identifies the attempt; a stale or foreign token never mutates a later attempt. ──
--- A late finish carrying the token of an attempt already marked 'unknown' is accepted: the worker now reports what happened.
--- A repeated finish with the same token and the same status is idempotent; a different status for a finished attempt is an error.
-CREATE OR REPLACE FUNCTION public.finish_effect_intent(p_business_id TEXT, p_intent_id TEXT, p_attempt_token TEXT, p_status TEXT, p_result JSONB, p_error TEXT)
-RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE i public.financial_effect_intents%ROWTYPE;
-BEGIN
-  IF p_status NOT IN ('sent', 'failed', 'skipped') THEN RAISE EXCEPTION 'financial_effect_status_invalid' USING ERRCODE = 'check_violation'; END IF;
-  IF p_attempt_token IS NULL OR p_attempt_token = '' THEN RAISE EXCEPTION 'financial_effect_attempt_token_required' USING ERRCODE = 'check_violation'; END IF;
-  SELECT * INTO i FROM public.financial_effect_intents x WHERE x.business_id = p_business_id AND x.id = p_intent_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'financial_effect_intent_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
-  IF i.attempt_token IS DISTINCT FROM p_attempt_token THEN RAISE EXCEPTION 'financial_effect_attempt_stale' USING ERRCODE = 'check_violation', DETAIL = i.status; END IF;
-  IF i.status IN ('sent', 'failed', 'skipped') THEN
-    IF i.status = p_status THEN RETURN jsonb_build_object('id', i.id, 'status', i.status, 'attempt', i.attempts, 'idempotent', true); END IF;
-    RAISE EXCEPTION 'financial_effect_attempt_finished' USING ERRCODE = 'check_violation', DETAIL = i.status;
-  END IF;
-  UPDATE public.financial_effect_intents SET status = p_status, finished_at = clock_timestamp(), result = p_result, last_error = p_error
-    WHERE business_id = p_business_id AND id = p_intent_id;
-  RETURN jsonb_build_object('id', i.id, 'status', p_status, 'attempt', i.attempts, 'idempotent', false, 'was_unknown', i.status = 'unknown');
-END $fn$;
+CREATE OR REPLACE FUNCTION public.list_shadow_divergences(p_business_id TEXT, p_status TEXT, p_limit INT)
+RETURNS SETOF public.financial_shadow_divergences LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT * FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND status = COALESCE(p_status,'open')
+   ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, last_seen_at DESC
+   LIMIT LEAST(GREATEST(COALESCE(p_limit,100),1),500)
+$fn$;
 
-REVOKE ALL ON FUNCTION public.financial_invoice_projection(TEXT, TEXT) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.financial_project_invoice(TEXT, TEXT, TEXT[], TIMESTAMPTZ, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated, service_role;
-REVOKE ALL ON FUNCTION public.execute_payment_command(TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB, BIGINT, TEXT[], TEXT, TEXT, TEXT, TEXT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.claim_effect_intents(TEXT, TEXT, INT, INT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.finish_effect_intent(TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.execute_payment_command(TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB, BIGINT, TEXT[], TEXT, TEXT, TEXT, TEXT) TO service_role;
-GRANT EXECUTE ON FUNCTION public.claim_effect_intents(TEXT, TEXT, INT, INT) TO service_role;
-GRANT EXECUTE ON FUNCTION public.finish_effect_intent(TEXT, TEXT, TEXT, TEXT, JSONB, TEXT) TO service_role;
+CREATE OR REPLACE FUNCTION public.financial_shadow_status(p_business_id TEXT)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT jsonb_build_object(
+    'phase', public.financial_kernel_phase(p_business_id),
+    'phase_since', (SELECT changed_at FROM public.financial_kernel_rollout r WHERE r.business_id = p_business_id ORDER BY changed_at DESC, id DESC LIMIT 1),
+    'last_run', (SELECT to_jsonb(r) FROM public.financial_shadow_runs r WHERE r.business_id = p_business_id ORDER BY started_at DESC LIMIT 1),
+    'open', (SELECT COALESCE(jsonb_object_agg(severity, n), '{}'::jsonb) FROM (SELECT severity, count(*) n FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND status = 'open' GROUP BY severity) s),
+    'open_confirmed', (SELECT count(*) FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND status = 'open' AND confirmed_at IS NOT NULL),
+    'unsupported_levels', '[2,3,4]'::jsonb)
+$fn$;
+
+-- ── 9. Privileges: service_role only, like every kernel RPC ──
+DO $do$ DECLARE f TEXT; BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'financial_kernel_phase(TEXT)', 'set_financial_kernel_phase(TEXT,TEXT,TEXT,TEXT)', 'list_financial_kernel_work()',
+    'open_shadow_run(TEXT,TEXT,INT)', 'close_shadow_run(TEXT,TEXT,TEXT,JSONB)', 'record_shadow_snapshot(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,JSONB,TEXT)',
+    'record_shadow_comparison(TEXT,TEXT,INT,TEXT,TEXT,TEXT,TEXT,JSONB,JSONB)', 'mark_shadow_divergences_reported(TEXT,TEXT[])',
+    'resolve_shadow_divergence(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT)', 'list_shadow_divergences(TEXT,TEXT,INT)', 'financial_shadow_status(TEXT)'] LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon, authenticated', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO service_role', f);
+  END LOOP;
+END $do$;
 
 COMMIT;
 ```
 
-**Verified 2026-09-14 in PGlite on v235–v238 + this draft (`probe8.cjs`, 48 checks; `probe9.cjs`, 6
-privilege denials).** PR #60 probes 1–5 as before: same key with a fresh timestamp or a different
-body → same `payment_id`; rollback mid-command leaves nothing; old `customer_paid` invoice →
-`legacy_routed`, zero receivables; two Fortnox observations → two payments, repeats replay,
-manual-then-provider → `no_new_money`, provider below → nothing recorded. **PR #62 R1:** after
-command A (customer) the invoice row is `customer_paid`/9 500 with `paid_at`, `paid_via`,
-`manual_paid_by_user_id`; after B (tax) it is `paid`/12 500 with `settled_at`; a **replay of A
-after B** returns history `settled_now = ['customer']` but `projection.derived_status = 'paid'`,
-`recorded_minor 1250000`, `written = false`, and the row stays `paid`/12 500. **R4:**
-`no_new_money` returns both receivables, `recorded_minor`, `derived_status 'customer_paid'`
-and `intents_owed 6`; `already_paid` returns the projection and the owed count. **R3:** every
-claimed intent carries an `attempt_token`; finishing with the same token and status twice is
-idempotent; a different status for a finished attempt → `financial_effect_attempt_finished`; a
-foreign token → `financial_effect_attempt_stale`; worker one's late finish (token 1) after worker
-two claimed (token 2) is rejected and the row stays `attempting/2`; nothing else is claimable
-while attempt 2 runs; token 2 finishes; a late finish for an attempt marked `unknown` is
-accepted with `was_unknown = true`; a `failed` effect is claimable for attempts 1–3 and never a
-fourth time. Golden paths: GP36 `total − 0,50` → both settled, one rounding adjustment −50 on
-tax, `paid_amount 12 499,50`; 1,00 short → settled; 1,01 → open; untouched components never
-rounded; overpayment → `paid`, `paid_amount 10 100`, `unallocated 10000`. Reversal +
-re-settlement → all six effects suppressed. Cross-tenant → `financial_invoice_not_found`;
-`anon`, `authenticated` and `service_role` are all denied on the two projection helpers
-(owner only); `authenticated` cannot execute the command RPC nor insert into the tables.
-Not proven in PGlite: two connections racing on the same key, and A's delayed finish arriving
-while B holds a claim, on real Postgres (invariants 14 and 17).
-
-### Facade algorithm (kernel branch)
+### Runtime shape
 
 ```text
-applyInvoicePayment(opts):
-  if not readKernelDispatchFlag(opts.businessId): return applyInvoicePaymentLegacy(opts)     -- frozen, zero kernel RPCs
-  return applyInvoicePaymentKernel(opts)
+cron  /api/cron/financial-kernel-shadow        30 4 * * *   (Fortnox payment sync runs 0 */2; 04:30 compares against a state ≤ 30 min old)
+      CRON_SECRET, force-dynamic, 240 s budget, business rotation as in the C5b cron
+      for each business in list_financial_kernel_work() with phase ≠ off and Fortnox connected:
+        run = open_shadow_run(business, 'cron', COMPARISON_VERSION)
+        invoices = rows with kernel receivables ∪ rows sent after phase_since with fortnox_document_number ∪ open receivables   (cap 200 per run, least recently compared first)
+        for each invoice:
+          snapshot = getFortnoxInvoice(document_number) → record_shadow_snapshot(ok | not_found | error)     (no document number → no fetch, snapshot NULL)
+          handymate = financial_invoice_projection + invoice columns (status, paid_amount, total, customer_pays, rot_rut_type, sent_at)
+          {result, differences} = compareInvoiceLevel1(handymate, snapshot)                                 (pure; versioned severity table)
+          out = record_shadow_comparison(business, run, 1, 'invoice', invoice_id, snapshot_id, result, handymate, differences)
+          collect out.divergences where report = true
+        record_shadow_comparison(..., level 2/3/4, object_type ledger/aggregate/report, 'unsupported', {reason})   once each per run
+        rapporteraTystFel('financial-kernel:shadow-divergence', <n confirmed, worst severity>) then mark_shadow_divergences_reported(ids)
+        close_shadow_run(business, run, 'completed' | 'failed', counts)
 
-applyInvoicePaymentKernel(opts):
-  invoice := same select as legacy (customer_id, numbers for messages)  -- not found → legacy error shape; NEVER used to decide
-  cmd := { key: opts.commandKey (required under the flag; throw 'financial_command_key_required' if missing),
-           source, target?, amountMinor? (Money.fromLegacyNumber(opts.amount)), settledAt: opts.paidAt ?? now,
-           provider/method/evidence per source, observation?: opts.providerObservation,
-           roundingMaxMinor: INTERIM_SE_ROUNDING_MAX_MINOR, effects: effectSetFor(opts),
-           paidVia: opts.paidVia ?? legacy default per source, markedBy: opts.markedByUserId }
-  { command, projection } := kernelDb.rpc('execute_payment_command', cmd)
-  if command.route == 'legacy':            return applyInvoicePaymentLegacy(opts)   -- log once per invoice: legacy_routed until C4b
-  -- from here the invoice row is already projected by the RPC; the app writes nothing to `invoice`
-  if command.state == 'provider_below_kernel' and not command.replayed: rapporteraTystFel(...) once
-  effects := sweepIntents(businessId, invoiceId, opts)     -- ALWAYS: claim_effect_intents(3, 10) → run each → finish(id, attempt_token, status)
-                                                            -- newly 'unknown' intents (claim.marked_unknown) → rapporteraTystFel once each
-  effects += legacy 'skipped' rows for effects excluded by review choices, as legacy reports them
-  transition := derive(command.settled_now, projection)     -- table below; 'none' for already_paid / no_new_money / provider_below_kernel
-  if command.state == 'already_paid': return { ok, already_paid: true, status: 'paid', transition: 'none', paid_at, effects }
-  return legacy ApplyPaymentResult { ok, status: projection.status, transition, paid_at, paid_amount: kr(projection.recorded_minor),
-           remaining_rot_kr: kr(outstanding of tax component), effects }
-         + kernel: { commandId, paymentId, replayed, unallocatedMinor: projection.unallocated_minor, effectsSuppressed, intentsUnknown }
+cron  /api/cron/financial-kernel               business list from list_financial_kernel_work(): consume when consume, sweep when sweep
+
+admin GET  /api/admin/financial-kernel/shadow?business=…                 → financial_shadow_status + list_shadow_divergences('open')
+      POST /api/admin/financial-kernel/phase        {business, phase, reason}          → set_financial_kernel_phase (actor = admin user id)
+      POST /api/admin/financial-kernel/shadow/[id]/resolve {business, type, reason, fix_reference?, root_cause_code?}
+      POST /api/admin/financial-kernel/shadow/run   {business}                        → one manual run (trigger_type 'manual'), same code path as the cron
 ```
-
-Source → provider/evidence: `manual`/`status_patch` → `'manual'`/`'manual'`; `customer_confirmed`
-→ `'manual'` with `method: 'customer_confirmed'`; `fortnox` → `'fortnox'`/`'fortnox'`.
-
-Effect set (`p_effects`): `['pipeline','project_check','project_stage','smart_communication','payment_received_rules','portal_message']`
-for an unreviewed call, plus `['invoice_paid_thanks','review_request_schedule']` when `source =
-'status_patch'` (R2); for `approvalFollowUps` the same gating as legacy (`updateWorkflows` false →
-drop the first three; `runAutomationRules` false → drop `payment_received_rules`; customer
-messages become `portal_message` and `review_request` approval artifacts when
-`prepareCustomerMessages`). Effects dropped by review are reported `skipped` in `effects[]`
-exactly as legacy, without an intent row. Intent runners: one function per effect name in
-`lib/financial-kernel/effects/runners.ts`, each calling the legacy code (`runPostPaymentAutomations({ only })`,
-`sendPortalNotification`, `preparePaymentCustomerMessages`, `sendPaymentThanks`,
-`scheduleReviewRequest`) and mapping the legacy `PaymentEffect.status` to `sent`/`failed`/`skipped`.
-
-### Legacy transition derived from the outcome
-
-| `command.settled_now` contains | `projection.derived_status` | Transition | Status returned |
-|---|---|---|---|
-| customer | `paid` | `to_paid` | `paid` |
-| customer | `customer_paid` | `to_customer_paid` | `customer_paid` |
-| customer, tax_authority | `paid` | `to_paid` | `paid` |
-| tax_authority only | `paid` | `settled` | `paid` |
-| nothing | any | `none` | `projection.status` (unchanged by the command; only `paid_amount` moved) |
-
-`transition` is history (stable on replay, so the caller's message is stable); `status` is
-current. A replay of the customer command after the tax command therefore returns
-`transition 'to_customer_paid'` with `status 'paid'` — and writes nothing, fires nothing.
-`customerJustSettled` for effect purposes no longer exists app-side: intents were created by
-the RPC iff the customer component settled in that command.
 
 ### Scope
 
 ```text
-lib/invoices/apply-payment.ts                       (dispatch + kernel branch; legacy body moved verbatim to applyInvoicePaymentLegacy;
-                                                     ApplyPaymentOptions += commandKey?, providerObservation?; runPostPaymentAutomations += only?)
-lib/invoices/send-invoice.ts                        (eager issuance on delivered, under flag, routing rule)
-lib/invoices/sync-to-fortnox.ts                     (invoice_number immutable after issuance, under flag)
-lib/fortnox/sync-payments.ts                        (providerObservation + commandKey on both applyInvoicePayment calls; nothing else)
-app/api/invoices/[id]/mark-paid/route.ts            (commandKey from header/body or minted; echoed)
-app/api/invoices/[id]/status/route.ts               (same, source status_patch; after-payment block → payment-thanks.ts; skipped when result.kernel)
-lib/invoices/payment-thanks.ts                      (new; sendPaymentThanks + scheduleReviewRequest moved verbatim from the route)
-lib/financial-kernel/effects/runners.ts             (new; one runner per effect name, maps legacy PaymentEffect.status → sent/failed/skipped)
-app/api/approvals/[id]/route.ts                     (commandKey customer_confirmed:<approval_id>, target 'customer')
-lib/matte/action-executor.ts                        (commandKey from the signal)
-app/dashboard/invoices/page.tsx, app/dashboard/invoices/[id]/page.tsx   (Idempotency-Key header)
-lib/financial-kernel/dispatch-flag.ts               (new; readKernelDispatchFlag)
-lib/financial-kernel/policies/se-rounding.ts        (new; interim policy constant + function)
-lib/financial-kernel/commands/service.ts            (new; executePaymentCommand, claimEffectIntents, finishEffectIntent — typed wrappers, strings for money)
-lib/financial-kernel/kernel-db.ts                   (new; KernelDb adapter over the service-role client — the only place the two meet)
-sql/v239_financial_payment_commands.sql             (as above)
-tests/helpers/financial-receivables-database.ts     (+ invoice.status/paid_amount/paid_at/settled_at/paid_via/manual_paid_*, + v239)
-tests/financial-kernel-c5-brief-probes.spec.ts      (rewritten: each probe asserts prevention; registered in test:contracts)
-tests/financial-kernel-c5-v2-brief-probes.spec.ts   (rewritten the same way: R1 projection, R2 route SMS once, R3 stale finish, R4 no-op projection;
-                                                     it loads the v3 SQL from this file and fails today on the two new RPC parameters — expected until rewritten)
-tests/financial-kernel-facade.spec.ts               (new; PGlite + injected legacy deps; golden paths under both flag states)
-tests/financial-kernel-facade-legacy-frozen.spec.ts (new; legacy source identical to main; flag-off makes no kernel RPC, also pre-v239 schema)
-package.json, .github/workflows/contracts.yml, docs (handoff)
+sql/v242_financial_kernel_shadow.sql                       (as above)
+lib/financial-kernel/phase.ts                              (readPhase, setPhase over the RPCs; typed phases 'off' | 'S1' | 'S2')
+lib/financial-kernel/shadow/compare.ts                     (pure Level 1 engine + SEVERITY table + COMPARISON_VERSION = 1)
+lib/financial-kernel/shadow/run.ts                         (runShadowForBusiness: fetch, snapshot, compare, record, report; injectable Fortnox reader and clock)
+lib/financial-kernel/shadow/service.ts                     (typed RPC wrappers)
+app/api/cron/financial-kernel-shadow/route.ts
+app/api/cron/financial-kernel/route.ts                     (business list via list_financial_kernel_work; consume/sweep per flags)
+app/api/admin/financial-kernel/{phase, shadow, shadow/[id]/resolve, shadow/run}/route.ts
+app/admin/components/FinancialKernelSection.tsx            (phase control, shadow status, divergence list; Swedish labels: Fas, Avvikelser, Bekräftad, Ny, Ej stödd nivå)
+vercel.json                                                (30 4 * * *)
+tests/financial-kernel-shadow-sql.spec.ts                  (PGlite: the 40 probe checks as assertions)
+tests/financial-kernel-shadow-compare.spec.ts              (fixtures: paid, customer_paid ROT, cancelled, open, 404, no document number, rounding 1–100 öre, projection mismatch, missing handymate entry)
+tests/financial-kernel-shadow-run.spec.ts                  (stubbed Fortnox: budget, cap, phase filter, report-once rule, no facade/command call (spy), no invoice write)
+tests/financial-kernel-admin-shadow.spec.ts                (auth, reason required, actor = user id, phase S2 refused → 400)
+tests/cron-auth (+1 = 50), tests/route-auth inventory (+4), docs (handoff here, §2)
 ```
 
 ### Invariants (tests first)
 
-1. **Legacy frozen:** flag off → identical results and identical `invoice` writes to `main` for
-   every existing test in `apply-payment-decision.spec.ts`, `facit-invoice-customer-paid.spec.ts`,
-   `fortnox-classify-payment.spec.ts`; the `KernelDb` fake is never called; the legacy function's
-   source equals the pre-C5 body (facit); the dispatch read tolerates a `business_config` without
-   the column (pre-v238 deploy) and answers `false`.
-2. **Command identity (from Codex probes 1 and 2):** the same `commandKey` twice, with a fresh
-   default `paidAt` and even with a different `amount`, yields one payment, one allocation set,
-   one intent set, one `payment_received`; the second call reports `kernel.replayed = true` and
-   the same transition. A different key on the resulting `customer_paid` ROT invoice records the
-   tax payment with `transition 'settled'` and no intents.
-3. **Atomic kernel step (from probe 3):** a fault injected after `execute_payment_command`
-   returns (between intents, after an intent send) leaves the kernel and the projected invoice
-   row consistent; the retried request returns the same transition and finishes only the intents
-   still `pending`/`failed`; no intent is dispatched twice; a stale `attempting` intent becomes
-   `unknown` and is reported once, never re-sent automatically.
-4. **Fortnox observation (from probe 4):** two distinct balances produce two distinct
-   observations and keys; `syncFortnoxPaymentsForBusiness` through the flagged facade on the
-   classifier's fixtures produces today's counters; a second run with the same observation is a
-   replay with no new payment; manual-then-provider is `no_new_money`; flag off → the legacy
-   branch receives exactly today's arguments plus the ignored observation.
-5. **Routing (from probe 5):** an invoice `customer_paid` with `paid_amount 9500` and no
-   receivables goes to the legacy body under the flag, settles as today, and never gets receivables
-   from the facade; the routing outcome is persisted on the command row.
-6. **Dispatch flag (from probe 6):** flag off → zero `rpc()` calls; the C4 helper is untouched.
-7. **Equivalence table:** golden paths 1, 5, 12, 30, 34, 36 → same `status`, transition sequence
-   and `payment_received` count as `legacyStatus`/`legacyPaymentReceived`; 4, 7, 37 → the
-   documented divergence, named as intended in the test.
-8. **Rounding boundary:** 0,01 and 1,00 short → settled with a `receivable_adjusted{rounding}` of
-   exactly that amount; 1,01 → open, no adjustment; ROT `total − 0,50` → customer 9 500, tax
-   2 999,50 + rounding 0,50, `paid`, one `payment_received`; a component the command did not pay
-   into is never rounded.
-9. **Approval path:** `customer_confirmed` keeps preparing the separate approval cards; key is
-   the approval id; a redelivered approval is a replay.
-10. **Issuance:** first payment on a never-paid invoice issues with `issued_date = invoice_date`;
-    `recordInvoiceDeliveryOutcome` success under the flag issues once and only when the routing
-    rule allows; failure and flag off issue nothing.
-11. **Number immutability:** under the flag with receivables present the Fortnox receipt update
-    leaves `invoice_number`; otherwise as today.
-12. **Marker semantics for C5b:** an intent row exists for `(customer receivable, effect)` before
-    any effect runs (it is created in the RPC transaction; asserted by reading the table before the
-    first runner is invoked); reversal + re-settlement yields `effects_suppressed` for all effects
-    and no second thank-you.
-13. **Contract test still green:** `fireEvent` only in `apply-payment.ts` and the bridge; no
-    undocumented event name; no `Number(` on minor amounts in new kernel files; the rounding
-    constant appears only as an RPC argument (source-scan).
-14. **Postgres CI:** two connections executing the same `commandKey` concurrently → one payment,
-    one outcome, both callers see the same `command_id`.
-15. **R1 projection (from PR #62 test 1):** A (customer) → B (tax) → replay A: the invoice row is
-    `paid`/12 500 before and after the replay; the replay returns `transition 'to_customer_paid'`
-    with `status 'paid'` and `kernel.replayed = true`; the facade never writes `invoice` (spy on
-    the service client: zero `from('invoice').update` calls in the kernel branch). Postgres CI:
-    A and B on two connections in either order end with the row `paid`/12 500.
-16. **R2 route SMS (from test 4):** the real status route with the flag on, the same
-    `Idempotency-Key` twice → `sendSmsViaElks` once and one `scheduled_review_request` row; a fault
-    injected after the RPC and before dispatch → zero sends, then the retry sends once; flag off →
-    the route's block behaves exactly as today (same fixtures as `facit-invoice-customer-paid`).
-17. **R3 attempt identity (from test 3):** worker one's finish with token 1 after worker two's
-    claim is rejected with `financial_effect_attempt_stale` and the row stays `attempting/2`; the
-    same finish twice with the current token is idempotent; a foreign token never mutates;
-    Postgres CI: the delayed finish arrives on a second connection while the first holds the claim.
-18. **R4 complete outcomes (from test 2):** through the actual facade, `no_new_money`,
-    `provider_below_kernel` and `already_paid` return `status` and `paid_amount` from the
-    projection, `transition 'none'`, and still sweep owed intents (a pending intent left by a
-    crashed earlier command is dispatched by the no-op call).
+1. `financial_kernel_phase` defaults to `off`; `set_financial_kernel_phase` refuses `S2`, an empty actor or a
+   reason shorter than 3 characters; `S1` sets the flag true and appends one history row; the same phase again
+   changes nothing; `off` sets the flag false, keeps the history and returns `owed_intents`.
+2. No other code path writes `business_config.financial_kernel_enabled` (source scan over `lib/`, `app/`, `sql/v242`).
+3. After a kill switch with owed intents, the C5b cron still sweeps that business (`sweep = true`) and no
+   longer consumes (`consume = false`); the two-sweeper race and the C5b suites stay green.
+4. `open_shadow_run` refuses phase `off`; `record_shadow_comparison` and `close_shadow_run` refuse a run that
+   is not `running`; `divergent` requires at least one difference.
+5. First sighting → `open`, `seen_count 1`, not reported; second → `confirmed_at` set, `report = true` once;
+   third → `report = false`; `mark_shadow_divergences_reported` only marks confirmed rows.
+6. A `match` closes every open divergence on the object with `superseded_by_match` and the comparison id;
+   a manual resolve requires type and reason, records the actor, and refuses an already-resolved row.
+7. `reference_missing` records exactly one `REFERENCE_DATA_UNAVAILABLE` (`medium`); `unsupported` records the
+   comparison and no divergence; every run writes Levels 2–4 as `unsupported`.
+8. The engine is exact: 1 öre is a `ROUNDING_DIVERGENCE`, 101 öre a `RECEIVABLE_BALANCE_DIVERGENCE`; no
+   constant named tolerance/epsilon/margin exists under `lib/financial-kernel/shadow/`.
+9. The engine maps every `FortnoxPaymentClass` and every `derived_status`; a class the engine does not know
+   is `reference_missing` with `error`, never `match`.
+10. The run never calls `applyInvoicePayment`, `execute_payment_command` or any C4 RPC, and never writes
+    `invoice` (spy + source scan + the probe's `prosrc` scan).
+11. Rollout, snapshots, comparisons and resolutions are immutable; every RPC is service_role-only; RLS read
+    for members on all six tables; a member's insert and RPC call are denied.
+12. Every status payload and every admin view carries the phase; the admin section shows *Ej stödd nivå 2–4*
+    next to any divergence count, and never a percentage.
+13. `tests/cron-auth` counts 50 and the route-auth inventory includes the four admin routes.
 
-### Acceptance (orchestration §5 C5 + §9)
+### Acceptance (orchestration §5 C6 + §9)
 
-All existing invoice/payment suites green unchanged; all kernel suites green including the
-rewritten probes; `tsc` clean; the flag defaults false and no business has it set; the diff
-outside the listed legacy files is additive; handoff states which golden paths diverge and why,
-and lists every caller with its key.
+All C3/C4/C5/C5b suites unchanged and green; new suites green; `tsc` clean; the handoff shows one full local
+run against a stubbed Fortnox with at least one confirmed divergence and one `superseded_by_match`; v242 not
+applied anywhere by the PR; no business flipped.
 
 ### Not in this package
 
-The consumer runner, the event-driven bridge, the periodic intent sweeper and the admin surface
-for `unknown` intents (C5b). Re-projecting an invoice after a reversal reopens a component (C14). Real rounding policy and account
-(C1b). Opening balances and the end of `legacy_routed` (C4b). Refund of unallocated overpayment
-(C7/C14). Reconciliation of `provider_below_kernel` (C11). Supplier side (C4s). Any flag flip
-for any business (C6).
+S2 definition and the S1 → S2 flip. Readiness metrics and the migration gate (C12, on Level 1 only until the
+scope question is reopened). Supplier invoices/payables (C4s). Reusing the sync's own Fortnox observation as a
+snapshot (queued optimisation). Any customer-facing number.
 
 ### Handoff back
 
-Orchestration §7 block under §2, same PR, including the list of behaviours that differ under
-the flag and the conversion table probe → prevention test (ten probes across PR #60 and #62).
-Claude reviews against §6 A, B, C, E with B as the centre.
+Same §7 block as before, under §2. Claude reviews against orchestration §6 A + B + C + E. Owner-side before
+the flip: v239 + v240 + v242 applied, the two crons live, Fortnox connected for the pilot, pilot named in the
+reason.
 
----
-
-## 4. Queued after C5 — sketch only, briefed when C5 merges
+## 4. Queued — sketch only
 
 **C5 brief requirement from PR #54 review (MEDIUM):** before firing any automation,
 the bridge must persist its own payment_received idempotency marker per `receivable_id` (C4 review supersedes the C3 per-event proposal). Database effects,
@@ -1097,15 +888,7 @@ emitting `supplier_payment_settled` and `payable_settled`. Both today's writers 
 `supplier_invoices.status='paid'` (the Fortnox supplier sync and `PATCH /api/supplier-invoices`)
 become callers in C5s. Golden path 20 is the acceptance replay.
 
-**C5b — consumer runner and event-driven bridge.** A cron route (with the repo's cron-auth
-contract) that runs `consumeOnce` for `automation-bridge` per flagged business; the bridge maps
-`receivable_settled{customer}` → the same effects the facade runs inline, guarded by
-`financial_effect_intents` (brief v2: an intent row for the receivable and effect means the
-inline path owns delivery and the bridge stays silent; no row means a producer that is not the
-facade — ROT decision import, PSP webhooks in C7 — and the bridge creates the intents and
-dispatches them). Adds the periodic sweeper for `pending`/`failed` intents and the admin surface
-for `unknown` ones. Moves the thank-you SMS out of `[id]/status/route.ts` into the bridge.
-Handler gets an `AbortSignal` (C3 review).
+**C6 — shadow payment mode.** Briefed in §3 (2026-09-14). S2 definition follows two clean S1 weeks.
 
 **Open-source inputs.** Before C4b, C9, C10, C11, C13 or C14 is briefed, read
 `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §5: it names the reference data (Odoo core `l10n_se`,
@@ -1131,6 +914,21 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 ---
 
 ## 5. Review record
+
+### C5b — intent bridge, shared sweep and human recovery (PR #71), Claude review 2026-09-14, orchestration §6 A + B + C
+
+Verified locally on `codex/financial-kernel-c5b` head `d02f1978`: 185 tests green (bridge, sweeper,
+admin-intents, effects-runners, command-concurrency incl. the two-sweeper race, C5/C4/C3 suites, legacy
+apply-payment facit, cron-auth 49, route-auth inventory 161), `tsc` clean. v240 read in full: bridge is a
+DB-only producer keyed by (receivable, effect) with facade-owned suppression, amount from active allocations,
+reopened receivable acknowledged; admin RPCs service_role-only with actor + reason; claim bounds at the RPC
+boundary. Handoff deviations 1–6 accepted as improvements. No BLOCKER, no MEDIUM. Merged the same day.
+
+| Sev | Finding | Status |
+|---|---|---|
+| LOW | `sweepInvoiceIntents` calls `finishEffectIntent` outside the try/catch: one thrown finish aborts the loop and the other claimed intents on the invoice age into `unknown` (never a duplicate send; they land in the admin queue instead of the next tick). | open — carry to C6; per-intent try/catch + `rapporteraTystFel` |
+| LOW | Runners use reason `Betal-markering` for `source === 'bridge'`. | open — cosmetic, next touch of `runners.ts` |
+| LOW | `consumeOnce` limit 100 per business per run; a backlog after halt/resume drains over several ticks. | noted for the pilot |
 
 ### C5 — compatibility facade (PR #66), Claude review 2026-09-14, orchestration §6 A + B + C + E
 
@@ -1321,3 +1119,5 @@ No BLOCKER.
 | 2026-09-14 | C5 brief v2 after Codex review PR #60 (B1–B4, M1 accepted): command identity + atomic `execute_payment_command`, provider observation, persisted legacy routing, effect intents, dispatch flag reader; v239 draft embedded and verified in PGlite (34 checks). v1 retired to git history. Response recorded in §5. | Package C5 prep v2 |
 | 2026-09-14 | C5 brief v3 after Codex review PR #62 (R1–R4 accepted): projection written by the RPC from current state under the invoice lock, `{command, projection}` on every state, attempt tokens on claim/finish, status-route effects as intents; v239 draft re-verified in PGlite (48 checks + 6 privilege denials). v2 retired to git history. Response in §5. | Package C5 prep v3 |
 | 2026-09-14 | C5 implementation reviewed (PR #66): no BLOCKER, 3 MEDIUM (approval target + amount, legacy-routed replay, eager-issuance throw after delivery), 4 LOW. Same day: the three MEDIUM resolved on #66 and re-verified; board row left to #66. | C5 review |
+| 2026-09-14 | C5 merged (PR #66) and the review log (PR #67). C5b brief written: DB-only bridge producing intents via `ensure_effect_intents`, cron consumer + sweeper, human resolution of `unknown`/exhausted intents, admin surface, the four C5 LOWs; v240 draft embedded and verified in PGlite (24 checks). C5 v3 brief retired to git history. C6 sketched in §4. | Package C5b prep |
+| 2026-09-14 | C5b reviewed and merged (PR #71; review in §5, 3 LOW carried to C6). C6 brief written: phase history + `set_financial_kernel_phase` as the only flag writer, kill switch that keeps sweeping owed intents, Level 1 exact comparison with sighting-count confirmation, Levels 2–4 as `unsupported`, admin surface; v242 draft embedded and verified in PGlite (40 checks). C5b brief retired to git history. | Package C6 prep |

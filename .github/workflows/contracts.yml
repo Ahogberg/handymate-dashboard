@@ -102,6 +102,7 @@ jobs:
           tests/financial-kernel-golden-path-replay.spec.ts
           tests/financial-kernel-golden-paths.spec.ts
           tests/betalsanning-sidodorrar.spec.ts
+          tests/automation-value-honesty.spec.ts
           tests/facit-ci-grind.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts
