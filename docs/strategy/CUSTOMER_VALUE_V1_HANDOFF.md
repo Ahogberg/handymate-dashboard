@@ -1,6 +1,6 @@
 # Customer Value V1 — Codex handoff
 
-Status: implemented; validation results tracked in the PR. Not deployed; v241 has not been applied.
+Status: implemented in PR #72; final CI results tracked on the PR. Not deployed; v241 has not been applied.
 Base: C5b main `9d363a25`. The V1 brief and V0 code remain in PR #70; this branch does not copy
 V0 or merge that branch. Attach this handoff to §2 of CUSTOMER_VALUE_PACKAGE_LOG when #70 lands.
 
@@ -78,7 +78,10 @@ The migration creates no nightly schedule: run the explicit, bounded seed once d
 - SQL tests: source/event rollback, tenant membership reads, denied direct writes/RPC execution,
   reserved stages, invalid evidence, idempotent backfill, immutable history, four earned keys,
   direct tenant-filtered timestamp pairs, more than one page of time events.
-- TypeScript/build and final CI results are recorded on the PR's current commit.
+- Local TypeScript: exit 0 (8 GiB heap). Production `next build`: exit 0, compiled successfully.
+  No Supabase keys were supplied to the local prerender environment.
+- Two added tests pass: weekly response compatibility and exact bigint read transport;
+  all six method-3 tests pass after the bigint change. Final CI is recorded on PR #72.
 
 After review: merge code, validate v241 on staging with the source schema, dry-run/backfill each
 business in pages, compare both methods for representative months, investigate intended/unintended
