@@ -8,6 +8,7 @@ on:
       - 'handymate-dashboard/app/case/**'
       - 'handymate-dashboard/components/revenue/**'
       - 'handymate-dashboard/sql/v2_revenue_os.sql'
+      - 'handymate-dashboard/sql/v2_revenue_outreach.sql'
       - 'handymate-dashboard/tests/revenue/**'
       - '.github/workflows/revenue-v2.yml'
   workflow_dispatch:

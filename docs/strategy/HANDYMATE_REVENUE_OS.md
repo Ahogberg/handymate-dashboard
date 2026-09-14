@@ -566,3 +566,74 @@ V1 is successful when both founders can use the same system daily to answer:
 ## 23. Final rule
 
 > **Revenue OS is not a CRM database and Astra is not an email generator. Revenue OS is Handymate's internal learning-and-execution system for turning market signals into retained customers, then turning every sales outcome into a better next decision.**
+
+
+## 24. Launch distribution and first-contact pilot — 2026-09-14
+
+The launch motion combines targeted founder/seller outreach, Christopher's VSL and
+short product demonstrations, and partner distribution into the existing Sales
+Experience. Prioritize recognition among Swedish trades-company owners. Firman is
+the launch offer; sell only workflows that have passed their launch acceptance.
+
+### Implemented in the first-contact increment
+
+The account panel offers three message hypotheses (evening admin, quote follow-up,
+team coordination) and two CTAs (permission to show an example; a 20-minute Admin
+Leak Audit). Templates are deterministic and versioned `first-contact-v1`.
+
+The server uses a dated HTTPS hiring signal from the last 90 days if available;
+otherwise it uses a neutral introduction. External titles never become instructions
+or unverified claims in the message. The source URL/date/ID and variant are saved in
+an internal activity alongside the durable draft. Editing/approval uses the existing
+Revenue v2 path. Preparing a draft does not advance the pipeline, update last contact,
+or erase the seller's next action. A new draft supersedes prior active drafts.
+
+This is a manual first-contact pilot, not automated distribution or a conversion
+experiment engine. A saved variant indicates preparation, not exposure. Actual
+message edits, sends, replies and downstream wins must be linked before claiming
+conversion by variant. No provider or paid subscription is required for this slice.
+
+### Pilot operating rhythm
+
+1. Choose the two trades with the strongest verified launch journey. Research 100
+   companies per segment, deduplicated by organization number and seller ownership.
+2. Start with one CTA and compare two message angles within the same segment. Do
+   not change audience, angle and CTA simultaneously and attribute the result to copy.
+3. Sellers review source, recipient/contact eligibility and wording before sending.
+   Log actual contact and next action. Replies and objections inform the next call,
+   the Sales Experience path and next week's product demonstration.
+4. Review positive replies per contacted company, held qualified meetings, wins,
+   activated customers and total acquisition cost including seller time weekly.
+   Show counts and denominators; small samples are learning, not proof of a winner.
+5. Increase volume only when replies can be handled promptly and the acquisition
+   cost, activation, bounce and complaint data support expansion. Prepared/approved
+   drafts and email opens are not customer or delivery evidence.
+
+### Next implementation slices, in order
+
+- **Distribution adapter:** evaluate one sending provider (Smartlead candidate).
+  Explicit sender/contact selection; provider terms; eligible recipients; reviewed
+  approval; bounded daily limits; central suppression; immutable message/variant
+  snapshot. One provider receipt per send identity. Unknown delivery outcome requires
+  reconciliation before retry. Approval never means sent. No domain rotation to
+  bypass blocks. Provider account and sending identity remain unconfigured.
+- **Reply ingestion:** verified webhook or authenticated mailbox ingestion, event
+  deduplication, routing to current seller, stop queued follow-ups on response,
+  refusal or opt-out; manual fallback. Never auto-send replies or silently promote
+  opportunities based on a classifier.
+- **Experiments and attribution:** persist segment, source, owner, exact sent copy,
+  variant and timestamps; join held meetings, paid and activated customers. Track
+  edited copy separately. Distinguish paying customers from manually marked won.
+- **Content/partner distribution:** connect the VSL and short clips to selected
+  Sales Experience paths. Track partner/campaign source through case and onboarding;
+  retain creation-time meeting date. No fabricated testimonials or savings.
+- **Additional data:** test Vainu on an ICP sample; add Clay only when data completion
+  is the bottleneck. Importing a contact does not establish permission to email it.
+
+### Release prerequisite
+
+Read-only production schema inspection on 2026-09-14 found Revenue v1 tables but
+not the v2 account columns, contacts, drafts or commands. Main containing v2 code
+is not proof that v2 is activated. Apply and verify `v2_revenue_os.sql` under its
+existing rollout plan, then `v2_revenue_outreach.sql`, before releasing this slice.
+The first-contact increment does not apply either migration to production.
