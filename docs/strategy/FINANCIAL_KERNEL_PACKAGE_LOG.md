@@ -37,7 +37,7 @@ Rules that keep this file honest:
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
 | C5 | `applyInvoicePayment()` compatibility facade | Codex | **done 2026-09-14** (PR #66 merged; Claude review A/B/C/E: no BLOCKER, 3 MEDIUM resolved and re-verified; 4 LOW carried into C5b) | — |
 | C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
-| C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **ready — brief in §3** (v242 draft verified in PGlite, 40 checks) | flip itself: PMF gate (orchestration §2) + owner pilot decision |
+| C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **implemented — review pending** ([C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md); no production activation) | flip itself: PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
 | C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
@@ -85,6 +85,11 @@ Two constraints from the 2026-09-12 decisions (PR #47, merged 2026-09-13) bind t
 ---
 
 ## 2. Handoffs
+
+### C6 — phase control and Level 1 shadow (Codex, 2026-09-14)
+
+Implementation, file scope, deviations, local evidence and owner gates: [C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md). All canonical events unchanged; no production migration or business activation. Claude A/B/C/E review remains required.
+
 
 ### C2 — financial event store (Codex, 2026-09-13)
 

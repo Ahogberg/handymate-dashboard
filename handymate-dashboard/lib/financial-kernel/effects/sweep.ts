@@ -23,8 +23,16 @@ export async function sweepInvoiceIntents(businessId: string, invoiceId: string,
     catch (error) {
       result = { effect: intent.effect, status: 'failed', message: error instanceof Error ? error.message : String(error) }
     }
-    await finishEffectIntent(db, businessId, intent,
+    try {
+      await finishEffectIntent(db, businessId, intent,
       result.status === 'failed' ? 'failed' : result.status === 'skipped' ? 'skipped' : 'sent', result, result.message)
+    } catch (error) {
+      // The provider may already have delivered. Keep this attempt uncertain and continue the other claims.
+      await rapporteraTystFel(sb, businessId, 'financial-kernel:effect-finish-failed',
+        error instanceof Error ? error.message : String(error), { invoiceId, intentId: intent.id })
+      effects.push({ effect: intent.effect, status: 'failed', message: 'Leveranskvittensen kunde inte sparas; kontrollera utfallet manuellt.' })
+      continue
+    }
     effects.push(result)
     if (result.status === 'failed' && intent.attempts >= 3) {
       await rapporteraTystFel(sb, businessId, 'financial-kernel:effect-exhausted',

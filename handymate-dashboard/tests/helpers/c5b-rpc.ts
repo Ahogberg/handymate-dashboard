@@ -8,7 +8,7 @@ export function c5bRpc(f: Awaited<ReturnType<typeof receivablesDatabase>>): Kern
     await f.db.exec('SAVEPOINT rpc_call')
     try {
       const parameters = Object.keys(args).map((key,i) => `${key}=>$${i+1}`).join(',')
-      const set = ['claim_financial_events','begin_financial_event_attempt','fail_financial_event','get_financial_consumer_status'].includes(name)
+      const set = ['claim_financial_events','begin_financial_event_attempt','fail_financial_event','get_financial_consumer_status','list_shadow_candidates','list_financial_kernel_work','list_shadow_divergences'].includes(name)
       const rows = (await f.db.query<{value:unknown}>(set ? `SELECT to_jsonb(r) value FROM ${name}(${parameters}) r` : `SELECT ${name}(${parameters}) value`, Object.values(args))).rows
       return {data:set ? rows.map(row=>row.value) : rows[0]?.value,error:null}
     } catch(error) {

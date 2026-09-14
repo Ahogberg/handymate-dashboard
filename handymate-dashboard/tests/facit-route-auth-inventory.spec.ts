@@ -223,5 +223,5 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // isAdmin(request), service-role bakom admin-grinden och ingen kundtenant-
   // kontext. Den interna säljytan arbetar med husets GTM-data → 156.
   // C5b: four superadmin endpoints and one verifyCronSecret cron; no public endpoints.
-  expect(utanStandard.length).toBeLessThanOrEqual(161)
+  expect(utanStandard.length).toBeLessThanOrEqual(166)
 })

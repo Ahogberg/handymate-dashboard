@@ -108,6 +108,12 @@ export const BEHALLS: string[] = [
   // Raderas aldrig här; retention/anonymisering måste utredas i spår G.
   'financial_payment_commands',
   'financial_effect_intents',
+  'financial_kernel_rollout',
+  'financial_shadow_snapshots',
+  'financial_shadow_runs',
+  'financial_shadow_comparisons',
+  'financial_shadow_divergences',
+  'financial_shadow_resolutions',
   'financial_events',
   'financial_receivables',
   'financial_payments',

@@ -10,7 +10,7 @@ test.afterEach(async()=>{await f.db.exec('ROLLBACK; RESET ROLE')})
 const prepare=()=>domain(f.db,'execute_payment_command',['a','manual:payment','i','manual',null,null,null,'manual','manual','manual',null,100,['portal_message'],'manual',null,'system',null])
 function harness(fail=false) {
   const sends:string[]=[],reports:string[]=[],calls:string[]=[]
-  const db=c5bRpc(f), rpc={async rpc(name:string,args:Record<string,unknown>){calls.push(name);return db.rpc(name,args)}}
+  const db=c5bRpc(f), rpc={async rpc(name:string,args:Record<string,unknown>){calls.push(name);if(name==='list_financial_kernel_work')return {data:[{business_id:'a',phase:'S1',consume:true,sweep:true,owed_intents:1}],error:null};return db.rpc(name,args)}}
   const sb={from(table:string){
     const q={select:()=>q,eq:()=>q,order:async()=>({data:[{business_id:'a'}],error:null})};return q
   }}
@@ -43,12 +43,12 @@ test('cron rejects bad secrets before any query or RPC and valid secret runs con
     expect(result.ok).toBe(true);expect(result.swept).toBe(1);expect(result.businesses).toBe(1);expect(h.sends).toHaveLength(1)
   } finally {if(previous===undefined)delete process.env.CRON_SECRET;else process.env.CRON_SECRET=previous}
 })
-test('cron never touches flag-off businesses and stops before starting work past budget',async()=>{
-  const calls:any[]=[],rpc={rpc:async(...args:any[])=>{calls.push(args);throw Error('unexpected RPC')}}
+test('cron stops before starting work past budget after reading the authoritative work list',async()=>{
+  const calls:any[]=[]
   let time=0
-  const sb={from(){const q={select:()=>q,eq:(key:string,value:unknown)=>{expect(key).toBe('financial_kernel_enabled');expect(value).toBe(true);return q},order:async()=>{time=240001;return {data:[{business_id:'enabled'}],error:null}}};return q}}
-  const load=c5Modules({'@/lib/supabase':{getServerSupabase:()=>sb},'@/lib/financial-kernel/kernel-db':{kernelDb:()=>rpc},
+  const rpc={rpc:async(name:string)=>{calls.push(name);expect(name).toBe('list_financial_kernel_work');time=240001;return {data:[{business_id:'enabled',consume:true,sweep:true,phase:'S1',owed_intents:0}],error:null}}}
+  const load=c5Modules({'@/lib/supabase':{getServerSupabase:()=>({})},'@/lib/financial-kernel/kernel-db':{kernelDb:()=>rpc},
     '@/lib/cron/verify-secret':{verifyCronSecret:()=>true},'@/lib/observability/driftlarm':{},'../effects/runners':{}})
   const old=Date.now;Date.now=()=>time
-  try {const result=await (await load('app/api/cron/financial-kernel/route.ts').GET(new Request('https://test/cron'))).json();expect(result.skipped).toBe(1);expect(result.budgetExhausted).toBe(true);expect(calls).toEqual([])}finally{Date.now=old}
+  try {const result=await (await load('app/api/cron/financial-kernel/route.ts').GET(new Request('https://test/cron'))).json();expect(result.skipped).toBe(1);expect(result.budgetExhausted).toBe(true);expect(calls).toEqual(['list_financial_kernel_work'])}finally{Date.now=old}
 })

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import FinancialKernelShadowSection from './FinancialKernelShadowSection'
 import type { UnresolvedEffectIntent, EffectResolution } from '@/lib/financial-kernel/commands/service'
 
 const effectNames: Record<string, string> = {
@@ -19,6 +20,7 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
   const [error, setError] = useState(''), [receipt, setReceipt] = useState('')
   const [decision, setDecision] = useState<{ id: string; resolution: EffectResolution | 'resume' } | null>(null)
   const [reason, setReason] = useState('')
+  const [shadowBusy, setShadowBusy] = useState(false)
   const generation = useRef(0)
   async function refresh(id: string) {
     const current = ++generation.current
@@ -57,7 +59,7 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
     <h2 className="text-lg font-semibold text-gray-900">Ekonomikärnan — utskick som kräver beslut</h2>
     <p className="mt-2 text-sm text-gray-600">Kontrollera leveransen innan du väljer ett nytt försök. Ett tidigare utskick kan redan ha nått kunden.</p>
     <label className="mt-4 block text-sm font-medium">Företag
-      <select value={businessId} disabled={busy} onChange={event => setBusinessId(event.target.value)} className="mt-1 w-full rounded-lg border p-2">
+      <select value={businessId} disabled={busy || shadowBusy} onChange={event => setBusinessId(event.target.value)} className="mt-1 w-full rounded-lg border p-2">
         <option value="">Välj företag</option>
         {businesses.map(business => <option key={business.business_id} value={business.business_id}>{business.business_name}</option>)}
       </select>
@@ -82,5 +84,6 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
       <label className="mt-2 block text-sm">Skäl till beslutet<textarea required maxLength={500} disabled={busy} value={reason} onChange={event => setReason(event.target.value)} className="mt-1 block w-full rounded-lg border p-2" /></label>
       <div className="mt-3 flex gap-3"><button type="submit" disabled={busy || !reason.trim()} className="rounded-lg bg-teal-700 px-4 py-2 text-sm text-white disabled:opacity-50">{busy ? 'Sparar…' : 'Spara beslut'}</button><button type="button" disabled={busy} onClick={() => setDecision(null)} className="text-sm">Stäng</button></div>
     </form>}
+    {businessId && <FinancialKernelShadowSection key={businessId} businessId={businessId} onBusyChange={setShadowBusy} />}
   </section>
 }

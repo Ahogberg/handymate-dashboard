@@ -6,6 +6,7 @@ import { kernelDb } from '@/lib/financial-kernel/kernel-db'
 import { consumeOnce } from '@/lib/financial-kernel/events/consume'
 import { automationBridge } from '@/lib/financial-kernel/events/bridge-automation'
 import { listOwedEffectIntents } from '@/lib/financial-kernel/commands/service'
+import { listFinancialKernelWork } from '@/lib/financial-kernel/shadow/service'
 import { sweepInvoiceIntents } from '@/lib/financial-kernel/effects/sweep'
 
 export const dynamic = 'force-dynamic'
@@ -16,10 +17,9 @@ export async function GET(request: Request) {
   const deadline = Date.now() + 240_000
   const shouldStop = () => Date.now() >= deadline
   const sb = getServerSupabase(), db = kernelDb()
-  const { data, error } = await sb.from('business_config').select('business_id')
-    .eq('financial_kernel_enabled', true).order('business_id')
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const all = data || []
+  let all
+  try { all = await listFinancialKernelWork(db) }
+  catch (error) { return NextResponse.json({ error: error instanceof Error ? error.message : String(error) }, { status: 500 }) }
   // Rotate the first business between scheduled runs so a busy tenant cannot starve the tail.
   const offset = all.length ? Math.floor(Date.now() / 600_000) % all.length : 0
   const businesses = [...all.slice(offset), ...all.slice(0, offset)]
@@ -30,6 +30,7 @@ export async function GET(request: Request) {
     const businessId = business.business_id
     summary.businesses++
     try {
+      if (business.consume) {
       const result = await consumeOnce(db, businessId, automationBridge, { limit: 100, shouldStop })
       summary.consumed += result.delivered
       if (result.halted) {
@@ -37,7 +38,9 @@ export async function GET(request: Request) {
         await rapporteraTystFel(sb, businessId, 'financial-kernel:consumer-halted',
           'Betalningsuppföljningen är pausad och behöver granskas av en administratör', { consumer: automationBridge.consumer })
       }
+      }
       if (shouldStop()) break
+      if (!business.sweep) continue
       const owed = await listOwedEffectIntents(db, businessId)
       for (const row of owed) {
         if (shouldStop()) break

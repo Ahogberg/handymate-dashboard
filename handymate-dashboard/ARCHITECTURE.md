@@ -881,7 +881,7 @@ settlement-event för återöppnade fordringar kvitteras utan nya intents. Brygg
 belopp bygger på aktiva allokeringar till fakturan, även utan fakturans correlation-id.
 Okända och uttömda utskick kräver superadminbeslut med skäl; ingen automatisk retry.
 
-### FK.4 Feature-flaggor — per företag, kolumner på `business_config`
+### FK.4 Feature-flaggor och daterad fas — per företag
 
 Alla flaggor är `BOOLEAN NOT NULL DEFAULT false`. Default = dagens beteende, alltid. Ingen
 flagga införs före paketet som läser den.
@@ -889,8 +889,7 @@ flagga införs före paketet som läser den.
 | Kolumn | Betyder | Läses av | Införs i |
 |--------|---------|----------|----------|
 | `financial_kernel_enabled` | Kernel skriver `financial_events` och fordrans-/allokeringsobjekt för företaget. Infrastruktur, inte en produkt. | C4, C5 | C4 |
-| `shadow_payments_enabled` | Kernel körs parallellt med legacy för betalningar; divergenser loggas, rättas aldrig automatiskt. | C6 | C6 |
-| `shadow_payment_phase` | `'S1' \| 'S2'`, `NULL` när shadow är av. S1 = Fortnox är fortfarande betalningskälla (grön bevisar bara synken). S2 = Handymate är källa. Flippen är daterad i `shadow_payment_phase_changed_at`. **Inte en boolean** — det är hela poängen. | C6, C12 | C6 |
+| `financial_kernel_rollout` (historik) | Senaste daterade fasen är `off`, `S1` eller reserverad `S2`. Ersätter de tidigare föreslagna kolumnerna `shadow_payments_enabled`/`shadow_payment_phase`. Endast `set_financial_kernel_phase` skriver dispatchflaggan; aktör och skäl krävs. S1 bevisar synken, inte oberoende ekonomisk korrekthet. S2 nekas tills separat beslut. | C6, C12 | C6 |
 | `handymate_pay_enabled` | Kunden kan ta betalt via Handymate Pay. Produkträttighet. | C7 | C7 |
 | `handymate_ledger_enabled` | Kunden ser bokföring/Ledger-ytor. Produkträttighet — grindar UI, aldrig kernelns korrekthet (blueprint §35.5). | C10 | C10 |
 | `shadow_accounting_enabled` | Ledger körs i skuggan mot Fortnox-referens. | C12 | C12 |
