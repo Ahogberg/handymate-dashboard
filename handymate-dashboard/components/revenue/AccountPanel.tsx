@@ -3,6 +3,7 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { sendRevenue } from '@/lib/revenue/client'
+import { OUTREACH_ANGLES, OUTREACH_CTAS } from '@/lib/revenue/outreach'
 import {
   STAGES,
   type Account,
@@ -132,7 +133,7 @@ export function AccountPanel({
     e.preventDefault()
     const form = new FormData(e.currentTarget)
     const input: Record<string, unknown> = Object.fromEntries(form)
-    if (type === 'next') input.version = data?.account.version
+    if (type === 'next' || type === 'outreach') input.version = data?.account.version
     if (type === 'activity') input.make_draft = form.get('make_draft') === 'on'
     const r = await act(type, input)
     if (r && type === 'contact') e.currentTarget?.reset()
@@ -258,6 +259,32 @@ export function AccountPanel({
                   )}
                 </div>
               ))}
+            </section>
+            <section className="rounded-2xl border bg-white p-5">
+              <h3 className="font-semibold">Första kontakten</h3>
+              <p className="mt-2 text-sm text-slate-600">
+                Välj ett behov att pröva och ett tydligt nästa steg. En aktuell
+                rekryteringskälla används när den finns; annars blir inledningen neutral.
+              </p>
+              {data.account.contact_state === 'active' && data.account.status === 'identified' && !data.account.last_contact_at ? (
+                <form onSubmit={(e) => submit(e, 'outreach')} className="mt-3 space-y-3">
+                  <label className="block text-sm">Budskap att pröva
+                    <select name="angle" aria-label="Budskap att pröva" className={field}>
+                      {Object.entries(OUTREACH_ANGLES).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </label>
+                  <label className="block text-sm">Nästa steg i mejlet
+                    <select name="cta" aria-label="Nästa steg i mejlet" className={field}>
+                      {Object.entries(OUTREACH_CTAS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+                    </select>
+                  </label>
+                  <p className="text-xs text-slate-500">
+                    Ett nytt utkast ersätter tidigare aktuella utkast. Granska text,
+                    kontaktgrund och avsändare innan du skickar manuellt.
+                  </p>
+                  <button disabled={busy} className={button}>Förbered första mejlet</button>
+                </form>
+              ) : <p className="mt-3 text-sm text-slate-600">Första kontakten är inte aktuell. Följ upp befintlig dialog eller kontaktstatus.</p>}
             </section>
             <section className="rounded-2xl border bg-white p-5">
               <h3 className="font-semibold">Nästa steg</h3>
@@ -491,7 +518,7 @@ export function AccountPanel({
               ))}
             </section>
             <section className="space-y-4 rounded-2xl border bg-white p-5">
-              <h3 className="font-semibold">Uppföljningsutkast</h3>
+              <h3 className="font-semibold">Mejlutkast</h3>
               <p className="text-xs text-slate-500">
                 Godkänn och kopiera för manuell sändning. Godkänt betyder inte
                 skickat.
@@ -565,6 +592,7 @@ function DraftEditor({
             : 'Utkast att granska'}
         </span>
         <textarea
+          aria-label="Mejltext"
           className={field}
           rows={9}
           value={body}

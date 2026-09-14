@@ -2506,3 +2506,27 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **VERIFIED:** Read-only uppslag bekräftar Nordström El AB, `biz_al7pjuu5smi`, med det tidigare testkontot. Lokala 17 policytester och 12 CI-kontrakt, testupptäckt samt typkontroll. **NOT VERIFIED:** Ingen autentiserad livekörning genomförd. Aktuellt lösenord i GitHub och åtkomst till preview inte verifierade. Browser fortfarande blockerad; ingen ny omgång browserförsök gjord här.
 
 **CUSTOMER IMPACT:** Återanvändbar testkörning för session, navigering och verkligt sparat/återöppnat utkast. **RISKS:** API-inloggning/skapande ersätter inte hela formulärresan; testutkast lämnas kvar; preview kan använda proddata. **STATUS CHANGES:** Release kvar på HOLD. **NEXT ACTION:** Följ `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`: använd befintlig secret om giltig, starta manuellt från arbetsgrenen, läs verkligt resultat och åtgärda observerade fel. GitHub-anslutningen saknar ny workflow_dispatch och secret-administration; första starten behöver göras i GitHub/CLI.
+
+
+### Revenue OS förstakontakt — 2026-09-14
+
+**DONE:** Tre budskapshypoteser och två CTA-val i företagspanelen, källbelagt
+förstakontaktsutkast samt sparad variant/källnotering. Strategi §24 beskriver pilot,
+utskicksadapter, svarshantering, attribution och VSL/partnerdistribution.
+**REUSED:** Revenue v2:s roller, ägarskap, aktiviteter, utkast och granskningsflöde.
+**NEW:** Versionsstyrd textgenerator och låst service-only RPC för utkastberedning.
+**VERIFIED:** Revenue-kontrakt, 16 SQL-scenarier, 19 befintliga handlerprov, nya
+förstakontaktsprov, faktisk lokal React/handler/PostgreSQL-resa i 375/1280px och
+typkontroll. Skärmbilder granskade. Produktionsschema läst utan kunddata.
+**NOT VERIFIED:** Driftsatt inloggad acceptans. Produktionsbygget avslutades med
+exit 0 (befintliga miljö-/dynamikmeddelanden under statisk generering). Inga mejl skickade, ingen produktionsmigration.
+**CUSTOMER IMPACT:** Efter aktivering kan säljaren förbereda första mejlet direkt
+från företagets underlag och välja budskap/CTA. Förberedelse räknas inte som kontakt.
+**RISKS:** Produktion saknar ännu v2-kolumner/tabeller; migrationerna måste införas i
+ordning. Manuell sändning/svarshantering kvarstår; ingen konverteringsvinnare påstås.
+**STATUS CHANGES:** Ingen liveförmåga uppgraderas.
+**NEXT ACTION:** Inför v2 och förstakontaktsmigration i isolerad preview, verifiera
+inloggat ägarskap/sparande/spärrar och följ sedan införandeplanen i
+`handymate-dashboard/tasks/revenue-outreach-pilot.md`.
+
+**PUBLICERING:** Automatisk godkännandegranskning blockerade GitHub-push och begär uttryckligt användargodkännande. Ingen PR/merge/deploy genomförd; lokal commit klar.

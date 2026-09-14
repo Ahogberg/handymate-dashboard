@@ -11,6 +11,7 @@ import {
   STAGES,
 } from '@/lib/revenue/domain'
 import { fetchCandidates } from '@/lib/revenue/source'
+import { firstContact } from '@/lib/revenue/outreach'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -310,7 +311,23 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       )
     let input: Record<string, unknown> = { account_id: accountId }
-    if (type === 'contact') {
+    if (type === 'outreach') {
+      if (!Number.isInteger(body.version))
+        return failure(new Error('Uppdatera företaget och försök igen.'), 400)
+      const signals = await ctx.db.from('revenue_signals')
+        .select('id,title,detail,source_url,observed_at,signal_type')
+        .eq('account_id', accountId)
+        .order('observed_at', { ascending: false }).limit(50)
+      if (signals.error) throw signals.error
+      const draft = firstContact(a.company_name, signals.data || [], text(body.angle, 30), text(body.cta, 30))
+      const result = await ctx.db.rpc('revenue_prepare_outreach', {
+        p_actor: ctx.userId, p_email: ctx.email, p_manager: ctx.manager,
+        p_request: requestId,
+        p_input: { account_id: accountId, version: body.version, draft_body: draft.body, summary: draft.summary },
+      })
+      if (result.error) throw result.error
+      return NextResponse.json(result.data)
+    } else if (type === 'contact') {
       input = {
         ...input,
         name: text(body.name, 200),

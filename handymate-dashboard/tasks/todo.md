@@ -1549,3 +1549,13 @@ Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
 - [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
 - Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
 Publicering och aktuell mergestatus dokumenteras i PR #42.
+
+
+## Revenue förstakontakt — 2026-09-14
+- [x] Läs aktuell main och återanvänd Revenue v2.
+- [x] Förbered källbelagda budskap med valbar CTA och beständiga utkast.
+- [x] Verifiera ägarskap, spärrar, återspelning och verklig UI/handler/SQL-kedja.
+- [x] Dokumentera nästa volymsteg och förbered separat PR.
+- [ ] Publicera efter uttryckligt godkännande: automatisk granskning blockerade push.
+
+Verifiering: Revenue-kontrakt och lokal UI/handler/PostgreSQL-kedja gröna; typkontroll och produktionsbygge exit 0. Se tasks/revenue-outreach-pilot.md.
