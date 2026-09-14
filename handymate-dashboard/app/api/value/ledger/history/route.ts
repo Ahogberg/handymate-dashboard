@@ -1,8 +1,9 @@
+import { ledgerMethod } from '@/lib/value/events/read'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
-import { getManadsLedger, MANADS_LEDGER_METHOD_VERSION } from '@/lib/value/ledger'
+import { getManadsLedger } from '@/lib/value/ledger'
 
 export const dynamic = 'force-dynamic'
 
@@ -47,6 +48,11 @@ export async function GET(request: NextRequest) {
     const manader = Number.isFinite(raw) ? Math.min(MAX_MANADER, Math.max(1, raw)) : DEFAULT_MANADER
 
     const supabase = getServerSupabase()
+    const requestedMethod = request.nextUrl.searchParams.get('method')
+    if (requestedMethod !== null && requestedMethod !== '2' && requestedMethod !== '3') {
+      return NextResponse.json({ error: 'Ogiltig metod' }, { status: 400 })
+    }
+    const method = ledgerMethod(requestedMethod)
     const nu = new Date()
     const historik: Array<{ period: string; betalt_kr: number; betalt_antal: number }> = []
     // Äldst först: i räknar bakåt från den äldsta månaden ned till 0 = nu,
@@ -54,12 +60,12 @@ export async function GET(request: NextRequest) {
     for (let i = manader - 1; i >= 0; i--) {
       const d = new Date(Date.UTC(nu.getUTCFullYear(), nu.getUTCMonth() - i, 1))
       const period = `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
-      const ledger = await getManadsLedger(supabase, business.business_id, period)
+      const ledger = await getManadsLedger(supabase, business.business_id, period, method)
       if (!ledger) continue // ogiltig period kan inte uppstå här, men gissa aldrig
       historik.push({ period, betalt_kr: ledger.betalt.kr, betalt_antal: ledger.betalt.antal })
     }
 
-    return NextResponse.json({ historik, method_version: MANADS_LEDGER_METHOD_VERSION })
+    return NextResponse.json({ historik, method_version: method })
   } catch (err: any) {
     console.error('[value/ledger/history] oväntat fel:', err)
     return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })

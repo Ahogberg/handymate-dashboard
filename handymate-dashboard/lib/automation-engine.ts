@@ -1121,7 +1121,7 @@ export async function executeRule(
     triggerType: typedRule.trigger_type,
     actionType: typedRule.action_type,
     status,
-    context: execContext,
+    context: { ...execContext, ...(autonomyKey ? { autonomy_key: autonomyKey } : {}) },
     result: result.data,
     errorMessage: result.error,
   })
