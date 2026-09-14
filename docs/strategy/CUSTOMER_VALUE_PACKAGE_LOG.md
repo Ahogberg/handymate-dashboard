@@ -31,7 +31,7 @@ product *identified* and *acted on*; the kernel records what was *invoiced* and 
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
 | V0 | P0: `/api/automation/value` separates estimated minutes from confirmed money | Claude | **done 2026-09-14** (this PR; `tests/automation-value-honesty.spec.ts`) | — |
-| V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **ready — brief in §3** | — |
+| V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **implemented (PR #72) — review in §5: 1 MEDIUM (trigger wrappers must be SECURITY DEFINER) to fix before merge, 5 LOW** | M1 on #72; then activation gate: v241 applied, retention/anonymisation decision, backfill + method comparison, `VALUE_EVENTS_ENABLED` |
 | V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | C6 pilot flag on (C5b merged 2026-09-14) |
 | V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | sketched (§4) | V1, V2 |
 | — | Revenue-recovery loop closed to draft → sent → paid (audit action 2) | Codex | folded into V1 (acted) + V2 (paid); no separate package | — |
@@ -153,10 +153,28 @@ log; its receipt copy must use *förberett* / *agerat* and may show measured min
 
 ## 5. Review record
 
-*(none yet)*
+### V1 — value event log (PR #72), Claude review 2026-09-14, orchestration §6 A + B
+
+Verified locally on `codex/customer-value-v1` head `ea9b02b4`: 96 tests green (four V1 suites, value-ledger,
+vardekvitto, weekly-value, recovered-revenue, account-deletion, cron-auth), `tsc` clean. Production checked
+read-only: every column the v241 triggers read exists; `invoice.sent_at` / `quotes.sent_at` nullable without
+default. Handoff deviations accepted: producers as source-transaction triggers (atomic, covers every writer),
+method 2 default behind `VALUE_EVENTS_ENABLED`, `profitability_warning` in producers, measured time framed as
+*elapsed workflow time, not labour saved*, no time backfill (v126 synthetic dates). Handoff:
+[CUSTOMER_VALUE_V1_HANDOFF.md](CUSTOMER_VALUE_V1_HANDOFF.md) (on the PR branch until merge).
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | Trigger wrappers run as the writing role; production has `authenticated` write policies on `invoice`, `quotes`, `v3_automation_logs`, `pending_approvals`. A member's RLS-permitted write fails: `permission denied for function record_value_approval` / `for table project` (reproduced in PGlite). No browser write path exists today. Fix: the three trigger functions `SECURITY DEFINER SET search_path`, plus a member-write test. | open on #72 — fix before merge |
+| LOW | `MANADS_LEDGER_METHOD_VERSION = 3` while default is 2; weekly response carries two differently based estimates when the flag is on; PostgREST `::text` cast unproven against a real database; no `minutes * kr` source scan outside V0; one `time_estimated` row per automation success (retention). | carry |
+
+**Activation gate (owner):** v241 not applied; retention/anonymisation decision for `value_events` (snapshots
+carry card titles); backfill per business in pages; method 2/3 comparison on representative months; only then
+`VALUE_EVENTS_ENABLED=true`.
 
 ## 6. Amendment log
 
 | Date | Change | Source |
 |---|---|---|
 | 2026-09-14 | Created after the ROI/WOW audit: V0 done (P0 fix), V1 brief, V2/V3 sketches, owner boundary against the Financial Kernel. | Claude |
+| 2026-09-14 | V1 implemented by Codex (PR #72) and reviewed: 1 MEDIUM (trigger wrappers vs member RLS writes), 5 LOW; activation gate recorded. V2 blocker updated after C5b merged. | V1 review |
