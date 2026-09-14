@@ -194,7 +194,7 @@ test('partial payments remain invoice evidence and are not added to fully settle
     ),
   )
   expect(html).toContain('Delbetalt:')
-  expect(html).toContain('Kundfordran är fortfarande öppen')
+  expect(html).toContain('Räknas inte in i steget Betalt')
 })
 test('cron projection transport failure does not prevent payment bridge or effect sweep', async () => {
   const calls: string[] = []
