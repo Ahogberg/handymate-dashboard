@@ -92,7 +92,12 @@ jobs:
           tests/financial-kernel-bridge.spec.ts
           tests/financial-kernel-sweeper.spec.ts
           tests/financial-kernel-admin-intents.spec.ts
-          tests/financial-kernel-effects-runners.spec.ts tests/financial-kernel-shadow-sql.spec.ts tests/financial-kernel-shadow-compare.spec.ts tests/financial-kernel-shadow-run.spec.ts tests/financial-kernel-admin-shadow.spec.ts tests/financial-kernel-shadow-integration.spec.ts
+          tests/financial-kernel-effects-runners.spec.ts
+          tests/financial-kernel-shadow-sql.spec.ts
+          tests/financial-kernel-shadow-compare.spec.ts
+          tests/financial-kernel-shadow-run.spec.ts
+          tests/financial-kernel-admin-shadow.spec.ts
+          tests/financial-kernel-shadow-integration.spec.ts
           tests/financial-kernel-facade.spec.ts
           tests/financial-kernel-facade-legacy-frozen.spec.ts
           tests/financial-kernel-money.spec.ts

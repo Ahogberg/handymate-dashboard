@@ -29,7 +29,7 @@ The original draft was executed first. Five of six initial adversarial SQL tests
 
 ## Evidence
 
-New SQL, exact comparison, run, admin and full integration suites are registered identically in local contracts and CI. The full SQL-backed Fortnox stub scenario records a one-öre mismatch, a next-day confirmed sighting and one report, an unreported same-day repeat, then an exact match with `superseded_by_match` pointing to its comparison; four immutable snapshots and twelve unsupported-level rows remain. Separate integration tests prove kill-switch sweep without consume and lost-finish isolation without re-send. The initial new/C5b sweep batch has 56 passing tests. Final TypeScript, build and complete CI results are recorded on the PR's current head.
+New SQL, exact comparison, run, admin and full integration suites are registered identically in local contracts and CI. The full SQL-backed Fortnox stub scenario records a one-öre mismatch, a next-day confirmed sighting and one report, an unreported same-day repeat, then an exact match with `superseded_by_match` pointing to its comparison; four immutable snapshots and twelve unsupported-level rows remain. Separate integration tests prove kill-switch sweep without consume and lost-finish isolation without re-send. The final local regression has 322 passing tests, including 53 new C6 tests; six PostgreSQL-only cases are visibly skipped locally and pass in both PostgreSQL CI jobs. TypeScript and next build exit 0. The initial full CI run passed 2,306 tests and failed only the workflow-format guard (six valid spec arguments needed one YAML line each); that formatting is corrected without changing the test order. Final complete CI results are recorded on the PR's current head.
 
 ## Limits and owner gates
 
