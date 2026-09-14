@@ -37,7 +37,7 @@ Rules that keep this file honest:
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
 | C5 | `applyInvoicePayment()` compatibility facade | Codex | **done 2026-09-14** (PR #66 merged; Claude review A/B/C/E: no BLOCKER, 3 MEDIUM resolved and re-verified; 4 LOW carried into C5b) | — |
 | C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
-| C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **implemented — review pending** ([C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md); no production activation) | flip itself: PMF gate (orchestration §2) + owner pilot decision |
+| C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **done 2026-09-14** (PR #73 merged after base merge `8400f720`; review §5: no BLOCKER, 3 LOW; [C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md)) | flip itself: v239 → v240 → v242 applied, crons live, PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
 | C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
@@ -920,6 +920,26 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 
 ## 5. Review record
 
+### C6 — phase control and Level 1 shadow (PR #73), Claude review 2026-09-14, orchestration §6 A + B + C + E
+
+Verified locally on `codex/financial-kernel-c6` head `9d0aa338`: 320 tests green (five C6 suites, C5b/C5/C4/C3
+suites, legacy facit, cron-auth 50, route-auth inventory ≤166, kontoradering, tenant sweep, parity), `tsc` clean.
+Production read-only: `business_config.fortnox_connected` exists and is the sync cron's own gate; `uq_invoice_business_invoice`
+exists for the snapshot FK; 0 businesses enabled, so v242's "no flag without history" precondition passes. PGlite: the
+`business_config` guard trigger fires for a role without EXECUTE and lets default-false inserts through (onboarding safe).
+Handoff deviations 1–10 accepted: RPC-only writes (service_role SELECT only), monotonic rollout sequence + raw-flag guard,
+one running run per business with stale expiry, replay-idempotent comparisons, confirmation on consecutive Stockholm days,
+tenant-checked snapshots, `list_shadow_candidates`, reference adapter without the legacy ±1 kr tolerance, drift report with
+persistence receipt, 25 s persistence reserve. C5b LOW 1–2 fixed here (per-intent finish isolation; bridge reason).
+No BLOCKER, no MEDIUM. Base merge `8400f720` after #72 verified (only the merge commit since the reviewed head; 170 specs
+in identical order in both lists); merged 2026-09-14.
+
+| Sev | Finding | Status |
+|---|---|---|
+| LOW | A divergence kind no longer observed stays open with `seen_count 0` until a full match or manual resolve; consider kind-level `superseded_by_match`. | carry |
+| LOW | Admin phase select defaults to the flip of the current phase. | carry |
+| LOW | First pilot run: up to 200 sequential Fortnox GETs; confirm rate handling and read `counts.budgetExhausted`. | carry |
+
 ### C5b — intent bridge, shared sweep and human recovery (PR #71), Claude review 2026-09-14, orchestration §6 A + B + C
 
 Verified locally on `codex/financial-kernel-c5b` head `d02f1978`: 185 tests green (bridge, sweeper,
@@ -1126,3 +1146,5 @@ No BLOCKER.
 | 2026-09-14 | C5 implementation reviewed (PR #66): no BLOCKER, 3 MEDIUM (approval target + amount, legacy-routed replay, eager-issuance throw after delivery), 4 LOW. Same day: the three MEDIUM resolved on #66 and re-verified; board row left to #66. | C5 review |
 | 2026-09-14 | C5 merged (PR #66) and the review log (PR #67). C5b brief written: DB-only bridge producing intents via `ensure_effect_intents`, cron consumer + sweeper, human resolution of `unknown`/exhausted intents, admin surface, the four C5 LOWs; v240 draft embedded and verified in PGlite (24 checks). C5 v3 brief retired to git history. C6 sketched in §4. | Package C5b prep |
 | 2026-09-14 | C5b reviewed and merged (PR #71; review in §5, 3 LOW carried to C6). C6 brief written: phase history + `set_financial_kernel_phase` as the only flag writer, kill switch that keeps sweeping owed intents, Level 1 exact comparison with sighting-count confirmation, Levels 2–4 as `unsupported`, admin surface; v242 draft embedded and verified in PGlite (40 checks). C5b brief retired to git history. | Package C6 prep |
+| 2026-09-14 | C6 implemented by Codex (PR #73) and reviewed: no BLOCKER, 3 LOW; C5b LOW 1–2 closed in #73. | C6 review |
+| 2026-09-14 | C6 merged (PR #73, base merge `8400f720` verified: only the merge commit since the reviewed head, 170 specs in identical order). S2 definition after two clean S1 weeks; C12 stays sketched. | C6 merge |

@@ -31,8 +31,8 @@ product *identified* and *acted on*; the kernel records what was *invoiced* and 
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
 | V0 | P0: `/api/automation/value` separates estimated minutes from confirmed money | Claude | **done 2026-09-14** (this PR; `tests/automation-value-honesty.spec.ts`) | — |
-| V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **implemented (PR #72) — M1 corrected by Codex, awaiting Claude re-verification; 5 LOW carry** | Claude re-verification on #72; then activation gate: v241 applied, retention/anonymisation decision, backfill + method comparison, `VALUE_EVENTS_ENABLED` |
-| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | C6 pilot flag on (C5b merged 2026-09-14) |
+| V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **done 2026-09-14** (PR #72 merged; M1 fixed and re-verified; 5 LOW in §5; handoff [CUSTOMER_VALUE_V1_HANDOFF.md](CUSTOMER_VALUE_V1_HANDOFF.md)) | activation gate: v241 applied, retention/anonymisation decision, paged backfill + method 2/3 comparison, `VALUE_EVENTS_ENABLED` |
+| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | C6 merged 2026-09-14; blocked on the pilot flag being on (S1) |
 | V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | sketched (§4) | V1, V2 |
 | — | Revenue-recovery loop closed to draft → sent → paid (audit action 2) | Codex | folded into V1 (acted) + V2 (paid); no separate package | — |
 | — | Onboarding scan → work → receipt in 15 minutes (audit action 3) | Codex | product package outside this log; receipt wording must follow rule 1 (say *prepared* / *acted*, never *earned*) | — |
@@ -179,7 +179,7 @@ method 2 default behind `VALUE_EVENTS_ENABLED`, `profitability_warning` in produ
 
 | Sev | Finding | Status |
 |---|---|---|
-| MEDIUM | Trigger wrappers run as the writing role; production has `authenticated` write policies on `invoice`, `quotes`, `v3_automation_logs`, `pending_approvals`. A member's RLS-permitted write fails: `permission denied for function record_value_approval` / `for table project` (reproduced in PGlite). No browser write path exists today. Fix: the three trigger functions `SECURITY DEFINER SET search_path`, plus a member-write test. | corrected on #72 by Codex: all three wrappers SECURITY DEFINER with fixed search_path; member-write regression test added. Awaiting Claude re-verification |
+| MEDIUM (resolved on #72 `dcdebf32`) | Trigger wrappers ran as the writing role; production has `authenticated` write policies on `invoice`, `quotes`, `v3_automation_logs`, `pending_approvals`. A member's RLS-permitted write fails: `permission denied for function record_value_approval` / `for table project` (reproduced in PGlite). No browser write path exists today. Fix: the three trigger functions `SECURITY DEFINER SET search_path`, plus a member-write test. | corrected on #72 by Codex: all three wrappers SECURITY DEFINER with fixed search_path; member-write regression test added. Awaiting Claude re-verification |
 | LOW | `MANADS_LEDGER_METHOD_VERSION = 3` while default is 2; weekly response carries two differently based estimates when the flag is on; PostgREST `::text` cast unproven against a real database; no `minutes * kr` source scan outside V0; one `time_estimated` row per automation success (retention). | carry |
 
 **Activation gate (owner):** v241 not applied; retention/anonymisation decision for `value_events` (snapshots
@@ -192,3 +192,4 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 |---|---|---|
 | 2026-09-14 | Created after the ROI/WOW audit: V0 done (P0 fix), V1 brief, V2/V3 sketches, owner boundary against the Financial Kernel. | Claude |
 | 2026-09-14 | V1 implemented by Codex (PR #72) and reviewed: 1 MEDIUM (trigger wrappers vs member RLS writes), 5 LOW; activation gate recorded. V2 blocker updated after C5b merged. | V1 review |
+| 2026-09-14 | V1 M1 fixed by Codex, re-verified and merged (PR #72). C6 merged the same day; V2 is next once the pilot flag is on. | V1 merge |
