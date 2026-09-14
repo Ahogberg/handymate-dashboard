@@ -91,13 +91,13 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // del 1) och använder helpern korrekt.
   // 2026-09-10: cron/phone-number-verify tillkom — kontrollerar att de nummer
   // vi säger är kopplade faktiskt är våra hos 46elks. Sex av åtta nummer var
-  // spöken när saldot tog slut, och ingenting kontrollerade det → 48.
-  // C5b: financial-kernel uses the same verified cron secret → 49.
-  expect(files).toHaveLength(49)
+  // spöken när saldot tog slut, och ingenting kontrollerade det → 49.
+  // C5b: financial-kernel uses the same verified cron secret → 50.
+  expect(files).toHaveLength(50)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(48)
+  expect(ownedRoutes).toHaveLength(49)
 
   const missing = ownedRoutes
     .filter(file => {

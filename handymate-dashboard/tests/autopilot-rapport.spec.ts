@@ -284,8 +284,8 @@ test.describe('Del 1 — cron-auth-taket och route-auth-inventeringen', () => {
 
   test('facit-route-auth-inventory har höjt eller behållit taket för utan-standardgrind', () => {
     const inv = read('tests/facit-route-auth-inventory.spec.ts')
-    // C5b adds four verified superadmin routes and one cron; documented cap is 161.
-    expect(inv).toMatch(/toBeLessThanOrEqual\(161\)/)
+    // C5b adds four verified superadmin routes and one cron; documented cap is 166.
+    expect(inv).toMatch(/toBeLessThanOrEqual\(166\)/)
   })
 })
 

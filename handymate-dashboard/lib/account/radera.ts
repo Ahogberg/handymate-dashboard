@@ -108,6 +108,12 @@ export const BEHALLS: string[] = [
   // Raderas aldrig här; retention/anonymisering måste utredas i spår G.
   'financial_payment_commands',
   'financial_effect_intents',
+  'financial_kernel_rollout',
+  'financial_shadow_snapshots',
+  'financial_shadow_runs',
+  'financial_shadow_comparisons',
+  'financial_shadow_divergences',
+  'financial_shadow_resolutions',
   'financial_events',
   // V1: immutable product-work history, NOT statutory accounting evidence.
   // Unactivated: agree retention/anonymisation before applying v241/enabling V1.

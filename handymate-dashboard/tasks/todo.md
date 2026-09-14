@@ -1567,3 +1567,9 @@ Publicering och aktuell mergestatus dokumenteras i PR #42.
 - [ ] Live: återanslut testföretaget, importera faktura, ändra i Fortnox och synka igen.
 
 Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsprov gröna. TypeScript grön med 12 GB heap. PostgreSQL-lås/privilegier/unikhet verifierade lokalt med PGlite. Produktionsmigration avvisad av automatisk granskning: kräver Andreas godkännande. Build och slutligt publicerat träd redovisas i PR.
+
+## C6 basmerge efter V1 — 2026-09-14
+- [x] Merga main b06ab81f i C6 med båda paketens tester kvar i samma ordning lokalt och i CI.
+- [x] 88 riktade tester för C6, V1, honesty och CI-paritet gröna.
+- [ ] TypeScript, bygge och publicering; slutresultaten anges på #73.
+- [ ] Kontrollera CI på publicerat huvud inför Claudes merge.

@@ -145,3 +145,14 @@ The actor is server-derived. No endpoint is public by design.
 The route inventory recognises this verified helper and its cap increases by the
 five named routes (156 to 161). Behavioral tests exercise all four admin denials,
 foreign-tenant resolution, spoofed actor rejection and the resume reason gate.
+
+
+### C6 shadow routes (2026-09-14)
+
+Four new admin routes (`financial-kernel/phase`, `financial-kernel/shadow`,
+`financial-kernel/shadow/[id]/resolve`, `financial-kernel/shadow/run`) use
+`financialKernelAdmin`, which verifies the Supabase user and superadmin authority.
+Business IDs are explicit operator selections; all RPCs tenant-scope object IDs.
+Actor identity comes from verified Auth, never request bodies.
+The new `financial-kernel-shadow` cron uses `verifyCronSecret` before any DB access.
+All read routes are force-dynamic. Inventory ceiling: 166; cron routes: 50.
