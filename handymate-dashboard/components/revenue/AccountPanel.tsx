@@ -3,6 +3,8 @@ import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { sendRevenue } from '@/lib/revenue/client'
+import { QualificationForm, SequencePanel } from './SalesWorkflow'
+import type { SalesSequence } from '@/lib/revenue/qualification'
 import {
   STAGES,
   type Account,
@@ -20,6 +22,7 @@ type Detail = {
   signals: Signal[]
   sessions: Session[]
   drafts: Draft[]
+  sequences: SalesSequence[]
   manager: boolean
 }
 const field =
@@ -134,6 +137,10 @@ export function AccountPanel({
     const input: Record<string, unknown> = Object.fromEntries(form)
     if (type === 'next') input.version = data?.account.version
     if (type === 'activity') input.make_draft = form.get('make_draft') === 'on'
+    for (const key of ['next_action_at', 'occurred_at']) {
+      const value = input[key]
+      if (typeof value === 'string' && value) input[key] = new Date(value).toISOString()
+    }
     const r = await act(type, input)
     if (r && type === 'contact') e.currentTarget?.reset()
   }
@@ -332,6 +339,8 @@ export function AccountPanel({
                 </button>
               </form>
             </section>
+            <SequencePanel account={data.account} contacts={data.contacts} sequences={data.sequences || []} busy={busy} act={act} />
+            <QualificationForm account={data.account} busy={busy} act={act} />
             <section className="rounded-2xl border bg-white p-5">
               <h3 className="font-semibold">Vad hände?</h3>
               <form

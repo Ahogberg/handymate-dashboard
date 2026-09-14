@@ -137,19 +137,36 @@ async function main() {
       .fill('556487-1234')
     await page.getByRole('button', { name: 'Spara företag' }).click()
     await page.getByRole('heading', { name: 'Browser El AB' }).waitFor()
+    console.log('STEP qualification')
+    await page.getByLabel('Antal anställda', { exact: true }).fill('8')
+    await page.getByLabel('Svenskt hantverks- eller serviceföretag', { exact: true }).check()
+    await page.getByLabel('Källa och bekräftade uppgifter', { exact: true }).fill('Ägaren bekräftade åtta anställda i elservice.')
+    await page.getByRole('button', { name: 'Spara kvalificering och räkna poäng' }).click()
+    await page.getByText('Så räknas prioriteten: 25/100', { exact: true }).waitFor()
     console.log('STEP contact')
     await page.getByText('Lägg till kontaktperson', { exact: true }).click()
     await page.getByLabel('Namn', { exact: true }).fill('Kundkontakt')
     await page
       .getByLabel('E-post', { exact: true })
       .fill('kontakt@example.test')
+    await page.getByLabel('Telefon', { exact: true }).fill('0701234567')
     await page.getByRole('button', { name: 'Spara kontakt' }).click()
-    await page.getByText('kontakt@example.test', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Starta kontaktsekvens' }).waitFor()
+    console.log('STEP sequence')
+    await page.getByRole('button', { name: 'Starta kontaktsekvens' }).click()
+    await page.getByText('Steg 1: Ring och undersök behovet', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Granska och kopiera underlag' }).click()
+    await page.getByLabel('Vad gjorde du och vad hände?', { exact: true }).fill('Ringde, ingen svarade.')
+    await page.getByRole('button', { name: 'Logga genomförd kontakt och planera nästa steg' }).click()
+    await page.getByText('Steg 2: Följ upp med ett kort mejl', { exact: true }).waitFor()
+    await page.reload()
+    await page.getByRole('button', { name: /Browser El AB/ }).first().click()
+    await page.getByText('Steg 2: Följ upp med ett kort mejl', { exact: true }).waitFor()
     console.log('STEP activity')
     await page
       .getByLabel('Sammanfattning', { exact: true })
       .fill('Vi behöver följa upp offerterna bättre.')
-    await page.getByRole('checkbox').check()
+    await page.getByRole('checkbox', { name: 'Förbered ett uppföljningsutkast från sammanfattningen' }).check()
     await page.getByRole('button', { name: 'Logga och planera' }).click()
     await page
       .getByText('Vi behöver följa upp offerterna bättre.', { exact: true })
@@ -248,8 +265,14 @@ async function main() {
       .first()
       .waitFor()
     assert.deepEqual(errors, [])
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportera till CRM' }).click()
+    const download = await downloadPromise
+    assert.equal(download.suggestedFilename(), 'handymate-revenue-crm.csv')
+    await download.saveAs('test-results/revenue/crm-export.csv')
+    assert(fs.readFileSync('test-results/revenue/crm-export.csv', 'utf8').includes('Browser El AB'))
     console.log(
-      'PASS real UI + handlers + PostgreSQL: create, contact, activity, session, case, reload, onboarding link, approval, reply invalidation, source import, 375/1280px',
+      'PASS real UI + handlers + PostgreSQL: create, qualification, contact, sequence, activity, session, case, reload, onboarding link, approval, reply invalidation, source import, CRM download, 375/1280px',
     )
     success = true
   } finally {

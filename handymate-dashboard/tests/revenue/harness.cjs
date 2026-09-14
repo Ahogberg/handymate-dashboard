@@ -149,6 +149,7 @@ async function harness() {
   )
   await db.exec(fs.readFileSync('sql/v231_sales_case.sql', 'utf8'))
   await db.exec(fs.readFileSync('sql/v2_revenue_os.sql', 'utf8'))
+  await db.exec(fs.readFileSync('supabase/migrations/20260914213502_revenue_sales_workflow.sql', 'utf8'))
   const ctx = {
     userId: '10000000-0000-4000-8000-000000000001',
     email: 'a@handymate.se',
