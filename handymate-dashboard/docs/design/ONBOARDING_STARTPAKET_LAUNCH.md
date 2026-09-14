@@ -187,3 +187,14 @@ Se [implementations- och lanseringsplan](../runbooks/MAIL_INTEGRATIONS_PREPARATI
 ## Implementationsuppdatering
 
 Se [branschpaket och onboarding](BRANSCHPAKET_ONBOARDING_LAUNCH.md) för genomfört kodpaket för samtliga sju namngivna branscher, kundkanal och borttagna malltak. Befintliga kundval bevaras. Underhållsmålning har ersatts av Trapphus och gemensamma utrymmen i måleriets starturval.
+
+
+## Kontaktvägar — implementation 2026-09-14 (draft)
+
+Flera kontaktvägar kan väljas med bibehållen primär kanal och bakåtkompatibilitet för äldre sessioner. SMS är separat från samtal. Valen sparas i befintlig onboarding_data och kan ändras på integrationssidan. Samma ContactReadiness visar serverlästa, daterade kanalbevis på båda ytorna och guidar till kundärende, ansvarig och nästa steg. Läsfel blir okänd status. Alla valda kanaler måste ha bevis innan startuppgiften kan avslutas; vidarekopplad telefon avslutas inte automatiskt eftersom befintligt prov inte bevisar vägen genom det gamla numret.
+
+Telefonsteget skiljer på missade respektive alla samtal och hänvisar till operatörens inställningar. Tidigare ovillkorliga **21-koder har tagits bort från instruktionen för missade samtal. Gmail/Outlook får leverantörsval och vägledning för manuellt prov/vidarebefordran; valknapparna aktiverar inte OAuth eller synk.
+
+Verifierat lokalt: fyra beteendeprov för kanalval/readiness, sju React/DOM-prov (inklusive misslyckad lagring och återförsök), tio befintliga telefon-/startuppgiftskontrakt samt TypeScript. DOM-proven använder jsdom utan dess valfria native canvas-modul; ingen canvasfunktion ingår. Ingen autentiserad browserresa, riktig lagring eller providerleverans har verifierats på denna kodversion.
+
+Återstår i det bredare uppdraget: separata direktanslutningar för Gmail/Microsoft med säker OAuth-återgång, Microsoft-adapter, vald avsändare och externa leverantörsgodkännanden; färska prov bundna till exakt anslutning/vidarekoppling; SMS-bevis; utfallsmätning till första riktiga kundnytta; mobil- och autentiserat acceptansprov. Historiska kanalbevis ska inte tolkas som dessa acceptansbevis. Ingen produktionsändring ingår.
