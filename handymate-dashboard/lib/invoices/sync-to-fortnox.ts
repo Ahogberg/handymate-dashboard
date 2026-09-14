@@ -401,6 +401,12 @@ export async function syncInvoiceToFortnox(
     invoice_number: fortnoxDocumentNumber,
     ocr_number: newOcrNumber,
   }
+  const {readKernelDispatchFlag}=await import('@/lib/financial-kernel/dispatch-flag')
+  if(await readKernelDispatchFlag(businessId,supabase)) {
+    const {data:receivables,error:readError}=await supabase.from('financial_receivables').select('id').eq('business_id',businessId).eq('invoice_id',invoiceId).limit(1)
+    if(readError) throw new Error(readError.message)
+    if(receivables?.length) delete updateData.invoice_number
+  }
   // 'submitted' = Fortnox HAR en begäran (ROT och RUT), annars null.
   if (taxReductionCreated) {
     updateData.rot_application_status = 'submitted'

@@ -159,7 +159,7 @@ BEGIN
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.financial_receivable_json(r public.financial_receivables) RETURNS JSONB
-LANGUAGE sql IMMUTABLE AS $fn$
+LANGUAGE sql IMMUTABLE SET search_path = public, pg_temp AS $fn$
   SELECT jsonb_build_object(
     'id', r.id, 'invoice_id', r.invoice_id, 'component', r.component, 'owner', r.owner, 'origin', r.origin,
     'currency', r.currency, 'amount_minor', r.amount_minor::text, 'adjusted_minor', r.adjusted_minor::text,

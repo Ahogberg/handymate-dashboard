@@ -58,6 +58,9 @@ const EVENT_LIKE = /'((?:[a-z]+_)+(?:created|issued|credited|adjusted|settled|in
  * ska ha en motivering; en rad utan motivering är en genväg.
  */
 const NOT_EVENTS = new Set<string>([
+  'already_paid', // C5 command state, not a published event
+  'to_paid', // legacy PaymentTransition returned by the C5 facade
+  'to_customer_paid', // legacy PaymentTransition returned by the C5 facade
   'already_settled', // fält i PaymentDecision (lib/invoices/payment-decision.ts), legacy-projektion
   'customer_paid', // legacy fakturastatus, projektion — inte ett event
 ])

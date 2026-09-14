@@ -1,135 +1,64 @@
-/**
- * Review probes for the C5 proposal in PR #59, NOT facade acceptance tests.
- * These deliberately demonstrate counterexamples to the proposed algorithm.
- * The RPCs and Fortnox caller are real; proposal-only steps are named explicitly.
- * Convert these into prevention tests when the contract is corrected.
- */
-import { test, expect } from '@playwright/test'
-import { readFileSync } from 'fs'
-import ts from 'typescript'
-import { receivablesDatabase, seedInvoice, issue, settle, allocate, domain } from './helpers/financial-receivables-database'
-import { isFinancialKernelEnabled } from '../lib/financial-kernel/flags'
-import * as customerShare from '../lib/invoices/customer-share'
-
-let fixture: Awaited<ReturnType<typeof receivablesDatabase>>
-test.describe.configure({ mode: 'serial' })
-test.beforeAll(async () => { fixture = await receivablesDatabase() })
-test.afterAll(async () => { await fixture?.db.close() })
-test.beforeEach(async () => { await fixture.db.exec('BEGIN'); await seedInvoice(fixture.db, 'rot', '12500', 'a', 'rot', '9500') })
-test.afterEach(async () => { await fixture.db.exec('ROLLBACK; RESET ROLE') })
-
-test('proposal: deriving identity from the next open component turns a ROT double-click into a tax payment', async () => {
-  const { db } = fixture
-  async function proposedDerivedCall() {
-    const rec = (await issue(db, 'rot')).receivables.find(r => r.status === 'open')!
-    const key = `manual:rot:2026-09-20T00:00:${rec.outstanding_minor}:${rec.component}`
-    const payment = await settle(db, rec.outstanding_minor, key)
-    await allocate(db, payment.payment_id, rec.id, rec.outstanding_minor, key + ':' + rec.component)
-    return { component: rec.component, key }
-  }
-  const first = await proposedDerivedCall()
-  const retry = await proposedDerivedCall()
-  expect(first.component).toBe('customer')
-  expect(retry.component).toBe('tax_authority')
-  expect(retry.key).not.toBe(first.key)
-  expect((await issue(db, 'rot')).receivables.map(r => r.status)).toEqual(['settled', 'settled'])
-  expect((await db.query('SELECT id FROM financial_payments')).rows).toHaveLength(2)
+import {test,expect} from '@playwright/test'
+import {receivablesDatabase,seedInvoice,domain} from './helpers/financial-receivables-database'
+let f:Awaited<ReturnType<typeof receivablesDatabase>>
+test.describe.configure({mode:'serial'})
+test.beforeAll(async()=>{f=await receivablesDatabase()})
+test.afterAll(async()=>{await f?.db.close()})
+test.beforeEach(async()=>{await f.db.exec('BEGIN');await seedInvoice(f.db,'i','12500','a','rot','9500')})
+test.afterEach(async()=>{await f.db.exec('ROLLBACK;RESET ROLE')})
+const command=(key:string,amount:string|null=null,observation:unknown=null)=>domain<any>(f.db,'execute_payment_command',['a',key,'i','manual',null,amount,null,'manual','manual','manual',observation,100,['portal_message'],'manual',null,'system',null])
+test('stable identity cannot turn a customer retry into a tax payment, including fresh timestamp/amount',async()=>{
+ const first=await command('manual:a');const replay=await command('manual:a','1');expect(replay.command.payment_id).toBe(first.command.payment_id);expect(replay.command.replayed).toBe(true);expect(replay.projection.derived_status).toBe('customer_paid');expect(replay.projection.recorded_minor).toBe('950000')
 })
-
-test('real C4: same minute identity with a fresh timestamp conflicts on a partial-payment retry', async () => {
-  const { db } = fixture
-  const args = ['a', 'manual', null, 'inbound', null, 'SEK', '10000', null, 'manual',
-    '2026-09-20T00:00:01Z', 'fin_invoice_rot', 'manual:rot:2026-09-20T00:00:10000', 'system', null]
-  await domain(db, 'record_payment_settlement', args)
-  await db.exec('SAVEPOINT retry')
-  args[9] = '2026-09-20T00:00:02Z'
-  await expect(domain(db, 'record_payment_settlement', args)).rejects.toThrow('financial_payment_idempotency_conflict')
-  await db.exec('ROLLBACK TO SAVEPOINT retry')
+test('legacy evidence persists routing and creates no receivables even after evidence changes',async()=>{
+ await f.db.exec("RESET ROLE;UPDATE invoice SET status='customer_paid',paid_amount=9500;SET LOCAL ROLE service_role")
+ expect((await command('manual:old')).command.route).toBe('legacy')
+ await f.db.exec("RESET ROLE;UPDATE invoice SET status='sent',paid_amount=0;SET LOCAL ROLE service_role")
+ expect((await command('manual:other')).command.route).toBe('legacy');expect((await f.db.query('SELECT id FROM financial_receivables')).rows).toEqual([])
 })
-
-test('proposal: retry after allocation commits cannot discover a just-settled component from the proposed loop', async () => {
-  const { db } = fixture
-  const customer = (await issue(db, 'rot')).receivables[0]
-  const payment = await settle(db, '950000', 'customer-command')
-  await allocate(db, payment.payment_id, customer.id, '950000', 'customer-command:customer')
-  // Crash here: no legacy projection or marker/effects have been written.
-  const receivables = (await issue(db, 'rot')).receivables
-  const replay = await domain<{ unallocated_minor: string }>(db, 'record_payment_settlement',
-    ['a', 'manual', null, 'inbound', null, 'SEK', '950000', null, 'manual',
-      '2026-09-20T00:00:00Z', null, 'customer-command', 'system', null])
-  expect(replay.unallocated_minor).toBe('0')
-  expect(receivables[0].status).toBe('settled')
-  expect(receivables.filter(r => r.status === 'open' && BigInt(replay.unallocated_minor) > BigInt(0))).toEqual([])
-  // The specified loop performs no allocation RPC, so its transition table has
-  // neither "customer settled now" nor "tax settled now" to resume the command.
+test('provider confirms manual money, only its new delta is recorded',async()=>{
+ await command('manual:a');expect((await command('manual:observed',null,{paid_minor:'950000'})).command.state).toBe('no_new_money')
+ expect((await command('manual:below',null,{paid_minor:'900000'})).command.state).toBe('provider_below_kernel')
+ expect((await command('manual:tax',null,{paid_minor:'1250000'})).command.amount_minor).toBe('300000')
+ expect((await f.db.query('SELECT id FROM financial_payments')).rows).toHaveLength(2)
 })
-
-function compile(file: string, deps: Record<string, unknown>): Record<string, unknown> {
-  const js = ts.transpileModule(readFileSync(file, 'utf8'), {
-    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true },
-  }).outputText
-  const module = { exports: {} }
-  new Function('require', 'module', 'exports', js)((name: string) => {
-    if (!(name in deps)) throw Error('Unstubbed dependency: ' + name)
-    return deps[name]
-  }, module, module.exports)
-  return module.exports
-}
-
-async function captureFortnoxCall(status: string, balance: number) {
-  const calls: Record<string, unknown>[] = []
-  const invoice = { invoice_id: 'rot', business_id: 'a', status, fortnox_document_number: 'doc-42',
-    fortnox_invoice_number: '42', total: 12500, customer_pays: 9500, rot_rut_type: 'rot', paid_amount: status === 'customer_paid' ? 9500 : 0 }
-  const supabase = { from(table: string) {
-    const query = {
-      select: (_fields: string) => query, eq: (_key: string, _value: unknown) => query,
-      not: (_key: string, _op: string, _value: unknown) => query,
-      update: (_values: unknown) => query,
-      then: (resolve: (result: unknown) => unknown) => Promise.resolve({ data: table === 'invoice' ? [invoice] : null, error: null }).then(resolve),
-    }
-    return query
-  } }
-  const classifier = compile('lib/fortnox/classify-payment.ts', { '@/lib/invoices/customer-share': customerShare })
-  const module = compile('lib/fortnox/sync-payments.ts', {
-    '@/lib/supabase': { getServerSupabase: () => supabase },
-    '@/lib/fortnox': { isFortnoxConnected: async () => true, fortnoxRequest: async () => ({ Invoice: { Total: 12500, Balance: balance, TaxReduction: 3000, TotalToPay: 9500 } }) },
-    '@/lib/fortnox/classify-payment': classifier,
-    '@/lib/invoices/customer-share': customerShare,
-    '@/lib/invoices/apply-payment': { applyInvoicePayment: async (opts: Record<string, unknown>) => { calls.push(opts); return { ok: true, transition: 'none' } } },
-  })
-  await (module.syncFortnoxPaymentsForBusiness as (id: string) => Promise<unknown>)('a')
-  expect(calls).toHaveLength(1)
-  return calls[0]
-}
-
-test('real Fortnox caller: two distinct balances are indistinguishable at the facade after customer_paid', async () => {
-  const zero = await captureFortnoxCall('customer_paid', 0)
-  const credit = await captureFortnoxCall('customer_paid', -100)
-  expect(zero).toEqual(credit)
-  expect(zero).toEqual({ businessId: 'a', invoiceId: 'rot', amount: undefined, paidVia: 'fortnox', source: 'fortnox' })
-  expect(zero).not.toHaveProperty('Balance')
-  expect(zero).not.toHaveProperty('fortnox_document_number')
+test('injected projection failure rolls back issuance, payment, allocations, command and intents',async()=>{
+ await f.db.exec("RESET ROLE;CREATE FUNCTION deny_projection() RETURNS trigger LANGUAGE plpgsql AS $$ BEGIN RAISE EXCEPTION 'injected'; END $$;CREATE TRIGGER deny_projection BEFORE UPDATE ON invoice FOR EACH ROW EXECUTE FUNCTION deny_projection();SET LOCAL ROLE service_role;SAVEPOINT fault")
+ await expect(command('manual:fail')).rejects.toThrow('injected');await f.db.exec('ROLLBACK TO SAVEPOINT fault')
+ for(const table of ['financial_receivables','financial_payments','financial_payment_commands','financial_effect_intents','financial_events'])expect((await f.db.query('SELECT * FROM '+table)).rows).toEqual([])
 })
-
-test('real caller + lazy-issue proposal: old customer_paid invoice records customer share instead of tax remainder', async () => {
-  const { db } = fixture
-  const opts = await captureFortnoxCall('customer_paid', 0)
-  expect(opts.amount).toBeUndefined()
-  // Old invoice has 9,500 kr paid in legacy, but no kernel history (C4b deferred).
-  const next = (await issue(db, 'rot')).receivables.find(r => r.status === 'open')!
-  expect(next.component).toBe('customer')
-  expect(next.outstanding_minor).toBe('950000') // actual remaining tax payment is 300000
-  const pay = await settle(db, next.outstanding_minor, 'fortnox-import')
-  await allocate(db, pay.payment_id, next.id, next.outstanding_minor, 'fortnox-import:customer')
-  expect((await issue(db, 'rot')).receivables.map(r => r.status)).toEqual(['settled', 'open'])
+test('stale attempts become unknown, are never reclaimed and accept only their late matching finish',async()=>{
+ const out=await command('manual:a');const claim=await domain<any>(f.db,'claim_effect_intents',['a','i',3,10]);const attempt=claim.claimed[0]
+ await f.db.exec("RESET ROLE;UPDATE financial_effect_intents SET claimed_at=clock_timestamp()-interval '11 minutes';SET LOCAL ROLE service_role")
+ const sweep=await domain<any>(f.db,'claim_effect_intents',['a','i',3,10]);expect(sweep.claimed).toEqual([]);expect(sweep.unknown_ids).toEqual([attempt.id])
+ expect((await domain<any>(f.db,'finish_effect_intent',['a',attempt.id,attempt.attempt_token,'sent',{},null])).was_unknown).toBe(true)
 })
-
-test('real C4 flag helper makes one kernel RPC even for a disabled business', async () => {
-  const calls: string[] = []
-  const enabled = await isFinancialKernelEnabled({ async rpc(name, args) {
-    calls.push(name)
-    return fixture.rpc.rpc(name, args)
-  } }, 'a')
-  expect(enabled).toBe(false)
-  expect(calls).toEqual(['financial_kernel_flags'])
+test('eager issuance obeys the same legacy route and is idempotent',async()=>{
+ const issue=()=>domain<any>(f.db,'issue_invoice_receivables_if_eligible',['a','i']);expect((await issue()).inserted).toBe(true);expect((await issue()).inserted).toBe(false)
+ await seedInvoice(f.db,'old');await f.db.exec("RESET ROLE;UPDATE invoice SET status='customer_paid',paid_amount=1 WHERE invoice_id='old';SET LOCAL ROLE service_role")
+ expect((await domain<any>(f.db,'issue_invoice_receivables_if_eligible',['a','old'])).route).toBe('legacy')
+})
+test('clients cannot mutate command/intent tables or execute any C5 RPC',async()=>{
+ const rows=(await f.db.query<{name:string;client:boolean;service:boolean}>(`SELECT proname name,
+ has_function_privilege('authenticated',oid,'EXECUTE') OR has_function_privilege('anon',oid,'EXECUTE') client,
+ has_function_privilege('service_role',oid,'EXECUTE') service FROM pg_proc WHERE proname IN
+ ('execute_payment_command','claim_effect_intents','finish_effect_intent','financial_invoice_projection','financial_project_invoice','issue_invoice_receivables_if_eligible')`)).rows
+ expect(rows).toHaveLength(6);for(const row of rows){expect(row.client).toBe(false);expect(row.service).toBe(!['financial_invoice_projection','financial_project_invoice'].includes(row.name))}
+ for(const role of ['anon','authenticated','service_role'])for(const table of ['financial_payment_commands','financial_effect_intents'])
+ expect((await f.db.query<{allowed:boolean}>('SELECT has_table_privilege($1,$2,\'INSERT\') allowed',[role,table])).rows[0].allowed).toBe(false)
+})
+test('failed effects stop after three attempts; reversal and resettlement never create new intents',async()=>{
+ const first=await command('manual:a');const claim=()=>domain<any>(f.db,'claim_effect_intents',['a','i',3,10])
+ for(let n=1;n<=3;n++){const i=(await claim()).claimed[0];expect(i.attempts).toBe(n);await domain(f.db,'finish_effect_intent',['a',i.id,i.attempt_token,'failed',{},'failure'])}
+ expect((await claim()).claimed).toEqual([])
+ const allocation=(await f.db.query<{id:string}>('SELECT id FROM financial_payment_allocations')).rows[0].id
+ await domain(f.db,'reverse_payment_allocation',['a',allocation,'correction','system',null]);const second=await command('manual:replacement')
+ expect(second.command.effects_suppressed).toEqual(['portal_message']);expect((await command('manual:replacement')).command.effects_suppressed).toEqual(['portal_message'])
+ expect((await f.db.query('SELECT id FROM financial_effect_intents')).rows).toHaveLength(1)
+})
+test('issued invoice number cannot change under flag; legacy flag-off behavior remains',async()=>{
+ await command('manual:a');await f.db.exec("RESET ROLE;UPDATE business_config SET financial_kernel_enabled=true WHERE business_id='a';UPDATE invoice SET invoice_number='new' WHERE invoice_id='i'")
+ expect((await f.db.query<{invoice_number:string}>("SELECT invoice_number FROM invoice WHERE invoice_id='i'")).rows[0].invoice_number).toBe('i')
+ await f.db.exec("UPDATE business_config SET financial_kernel_enabled=false WHERE business_id='a';UPDATE invoice SET invoice_number='new' WHERE invoice_id='i'")
+ expect((await f.db.query<{invoice_number:string}>("SELECT invoice_number FROM invoice WHERE invoice_id='i'")).rows[0].invoice_number).toBe('new')
 })

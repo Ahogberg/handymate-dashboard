@@ -1,3 +1,4 @@
+import { fromLegacyNumber } from '@/lib/financial-kernel/money'
 import { getServerSupabase } from '@/lib/supabase'
 import { fortnoxRequest, isFortnoxConnected, type FortnoxInvoice } from '@/lib/fortnox'
 import { classifyFortnoxPayment, paidSoFarFromFortnox } from '@/lib/fortnox/classify-payment'
@@ -122,6 +123,11 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string, options
         continue
       }
 
+      const observedPaid=paidSoFarFromFortnox(fnInv)
+      const paidMinor=fromLegacyNumber(observedPaid ?? (cls==='paid'?Number(inv.total || 0):getCustomerShare(inv)),'SEK','HALF_UP').amountMinor.toString()
+      const providerObservation={provider:'fortnox' as const,documentNumber:String(docNum),total:fnInv.Total,balance:fnInv.Balance,fullyPaid:fnInv.FullyPaid,
+        paidMinor,paidFrom:observedPaid!==null?'total_minus_balance':cls==='paid'?'local_invoice_total':'local_customer_share',observedAt:new Date().toISOString()}
+      const commandKey=`fortnox_import:${inv.invoice_id}:${docNum}:${paidMinor}`
       if (cls === 'paid') {
         // Från customer_paid: belopp utelämnat = återstoden → 'settled'.
         // Från sent/overdue: hela beloppet → 'to_paid'.
@@ -133,6 +139,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string, options
             : (typeof fnInv.Total === 'number' && fnInv.Total > 0 ? fnInv.Total : undefined),
           paidVia: 'fortnox',
           source: 'fortnox',
+          commandKey, providerObservation,
         })
         if (!r.ok) throw new Error(r.error || 'apply-payment failed')
         if (r.transition === 'to_paid') result.marked_paid++
@@ -147,6 +154,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string, options
           amount: paidSoFarFromFortnox(fnInv) ?? getCustomerShare(inv),
           paidVia: 'fortnox',
           source: 'fortnox',
+          commandKey, providerObservation,
         })
         if (!r.ok) throw new Error(r.error || 'apply-payment failed')
         if (r.transition === 'to_customer_paid') result.marked_customer_paid++

@@ -126,7 +126,7 @@ export default function InvoicesPage() {
     try {
       const response = await fetch(`/api/invoices/${invoiceId}/mark-paid`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({}),
       })
       const result = await response.json().catch(() => null)
