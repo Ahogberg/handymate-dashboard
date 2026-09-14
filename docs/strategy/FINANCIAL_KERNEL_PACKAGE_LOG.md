@@ -35,7 +35,7 @@ Rules that keep this file honest:
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
-| C5 | `applyInvoicePayment()` compatibility facade | Codex | **implemented — PR #66, awaiting CI and Claude A/B/C/E review** | review; v239 not applied externally |
+| C5 | `applyInvoicePayment()` compatibility facade | Codex | **Claude reviewed; 3 MEDIUM corrected in PR #66 — verification pending** | current-head CI; v239 not applied externally |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
@@ -333,7 +333,7 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 
 Package / scope
 : C5 v3: frozen legacy dispatch, atomic command/projection, persistent effect intents,
-  caller identities and Fortnox observations. Implementation awaits CI and Claude A/B/C/E review.
+  caller identities and Fortnox observations. Claude A/B/C/E review completed; correction verification below.
 
 Files / boundaries
 : v239; commands/service + facade; dispatch flag, service client adapter, effect runners,
@@ -394,6 +394,46 @@ Swedish regimes / open decisions
   C5b owns periodic sweeping/admin handling; inline recovery occurs on kernel calls. Unknown
   external outcomes require a human and are not automatically resent. R0/P0/C1b remain with
   their named owners; no accountant approval is claimed by this implementation.
+
+### C5 — Claude review corrections (Codex, 2026-09-14)
+
+Scope / files
+: Three MEDIUM findings from [Claude's review of #66](https://github.com/Ahogberg/handymate-dashboard/pull/66#pullrequestreview-5196166127),
+  also recorded by Claude in PR #67. Changes are limited to the approval caller,
+  command facade, delivery outcome, existing facade regression suite and task/package logs.
+
+Corrections
+: Approval specifies `target: customer` only without an explicit reviewed amount.
+  Full-amount ROT confirmation allocates customer then tax, with no unallocated remainder.
+  `financial_command_target_not_open` returns a tenant-scoped current invoice projection
+  with `transition: none`; unrelated command errors still propagate.
+: A persisted legacy-routed replay returns the current invoice status and replay metadata,
+  without executing the frozen legacy function a second time. **Replay protection is not
+  crash recovery:** a crash after command persistence but before the legacy write is not
+  automatically recovered by retry. C4b must resolve that cut-over/recovery limitation.
+: Eager issuance errors (returned RPC errors, thrown transport errors and dispatch-flag
+  read failures) are reported through `financial-kernel:eager-issuance-failed` and added
+  to the send result's errors while preserving `delivered: true`. Payment-time lazy issuance
+  remains the recovery path; the customer must not receive a duplicate send.
+
+Evidence
+: All three findings reproduced before the fix. 78 targeted tests pass after correction,
+  including seven added cases: real approval executor + actual v239 allocation with/without
+  amount, second customer confirmation with tax still open, actual legacy function invoked
+  once on replay, and three post-delivery failure modes. External delivery providers are
+  stubbed; no actual SMS/email or production database write is claimed.
+: The test DB uses per-RPC savepoints to reproduce PostgREST transaction boundaries inside
+  its outer rollback; invoice NUMERIC transport is adapted to PostgREST's JSON numbers.
+  The frozen legacy body is independently byte-identical to current main `db8b772` via AST.
+  TypeScript, build and current-head CI results are pending and will be recorded on #66.
+
+Contract / remaining work
+: No event, SQL/RPC definition, feature flag or accounting policy change. Relies on FK.3,
+  blueprint §18 and orchestration §9. ROT and legacy cut-over paths are covered; no VAT
+  computation or posting rule is introduced. No new accounting approval is required.
+  Claude's four LOW groups remain tracked in the review / PR #67. C5b is not implemented.
+  R0/P0/C1b and owner decisions remain unchanged. **No v239 in production and no feature
+  flag activation before C5 merge and the owner's C6 pilot selection.**
 
 ## 3. Next package — Codex brief: C5 v3 the compatibility facade around `applyInvoicePayment()`
 

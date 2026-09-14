@@ -530,11 +530,19 @@ export async function applyInvoiceDeliveryOutcome(
       results.errors.push('Fakturan skickades men kundhistoriken kunde inte sparas.')
     }
 
-    const {readKernelDispatchFlag}=await import('@/lib/financial-kernel/dispatch-flag')
-    if(await readKernelDispatchFlag(businessId,supabase)) {
-      const {kernelDb}=await import('@/lib/financial-kernel/kernel-db')
-      const {error}=await kernelDb().rpc('issue_invoice_receivables_if_eligible',{p_business_id:businessId,p_invoice_id:invoiceId})
-      if(error) throw new Error(error.message)
+    try {
+      const {readKernelDispatchFlag}=await import('@/lib/financial-kernel/dispatch-flag')
+      if(await readKernelDispatchFlag(businessId,supabase)) {
+        const {kernelDb}=await import('@/lib/financial-kernel/kernel-db')
+        const {error}=await kernelDb().rpc('issue_invoice_receivables_if_eligible',{p_business_id:businessId,p_invoice_id:invoiceId})
+        if(error) throw new Error(error.message)
+      }
+    } catch(error) {
+      // Delivery has already happened. Lazy issuance at payment can recover;
+      // reporting a failed send here would invite a duplicate customer delivery.
+      const message=error instanceof Error ? error.message : String(error)
+      results.errors.push('Fakturan skickades men betalningsunderlaget kunde inte förberedas. Skicka inte igen.')
+      await rapporteraTystFel(supabase,businessId,'financial-kernel:eager-issuance-failed',message,{invoiceId})
     }
     return { delivered: true, sentMethod }
   }

@@ -1291,7 +1291,7 @@ async function executeApprovalPayload(
           markedByUserId: null,
           source: 'customer_confirmed',
           commandKey: `customer_confirmed:${approvalId}`,
-          target: 'customer',
+          target: reviewed.amount == null ? 'customer' : undefined,
           approvalFollowUps: {
             approvalId,
             updateWorkflows: reviewed.choices.update_workflows === true,
