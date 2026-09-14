@@ -35,7 +35,7 @@ Rules that keep this file honest:
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
-| C5 | `applyInvoicePayment()` compatibility facade | Codex | **Claude reviewed; 3 MEDIUM corrected in PR #66 — verification pending** | current-head CI; v239 not applied externally |
+| C5 | `applyInvoicePayment()` compatibility facade | Codex | **done 2026-09-14** (PR #66 merged; Claude review A/B/C/E: no BLOCKER, 3 MEDIUM resolved and re-verified; 4 LOW carried into C5b) | — |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
@@ -1131,6 +1131,24 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 
 ## 5. Review record
 
+### C5 — compatibility facade (PR #66), Claude review 2026-09-14, orchestration §6 A + B + C + E
+
+Verified locally on `codex/financial-kernel-c5-implementation` head `e88b7d31`: 163 tests green
+(C5 facade/frozen/probes, kernel SQL suites, golden paths, replay, schema contract,
+payment-decision, classifier, side doors, Bolagsverket), `tsc` clean. Legacy body byte-identical
+to `main` by an independent AST comparison. Production checked read-only: v238's
+`uq_invoice_business_invoice` exists, so v239's composite FK applies. Six probes against the
+implemented v239 (approval target + amount, invoice-level allocation, legacy-routed replay,
+number trigger flagged/unflagged). Handoff deviations accepted as improvements. No BLOCKER.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | Approval caller forces `target:'customer'` with `reviewed.amount`: full-amount confirmation on a ROT invoice leaves tax open and 3 000 unallocated where legacy gives `paid`; a second confirmation on `customer_paid` raises `financial_command_target_not_open` out of the facade. | open — target only without amount; map target_not_open to `transition 'none'` |
+| MEDIUM | Legacy-routed replay re-runs the legacy body (`route==='legacy'` ignores `replayed`), so B1 survives on invoices C4b has not migrated. | open — replay of a legacy-routed command returns `none` without re-running |
+| MEDIUM | Eager issuance throws after the invoice was delivered (`applyInvoiceDeliveryOutcome`), inviting a resend. | open — report via `results.errors` + `rapporteraTystFel`, keep `delivered:true` |
+| LOW | Malformed `Idempotency-Key` → 500 instead of 400; `sync-to-fortnox` receipt path throws on read error; number trigger reverts silently; `p_stale_minutes` must equal 10; real thanks/review runner paths only under stubbed runners. | open |
+
+
 ### C5 v2 retry integration — Codex, 2026-09-14
 
 PR #61 merged after green CI, incorporating #60. Four diagnostic tests execute the exact v2
@@ -1301,3 +1319,4 @@ No BLOCKER.
 | 2026-09-14 | `v235`–`v238` applied to production; read-only verification recorded under §1 "Deployment state". Duplicate C2 review block in §5 removed. `v239` gains the advisor's `search_path` pin for two helpers. | Owner deploy, Supabase advisors |
 | 2026-09-14 | C5 brief v2 after Codex review PR #60 (B1–B4, M1 accepted): command identity + atomic `execute_payment_command`, provider observation, persisted legacy routing, effect intents, dispatch flag reader; v239 draft embedded and verified in PGlite (34 checks). v1 retired to git history. Response recorded in §5. | Package C5 prep v2 |
 | 2026-09-14 | C5 brief v3 after Codex review PR #62 (R1–R4 accepted): projection written by the RPC from current state under the invoice lock, `{command, projection}` on every state, attempt tokens on claim/finish, status-route effects as intents; v239 draft re-verified in PGlite (48 checks + 6 privilege denials). v2 retired to git history. Response in §5. | Package C5 prep v3 |
+| 2026-09-14 | C5 implementation reviewed (PR #66): no BLOCKER, 3 MEDIUM (approval target + amount, legacy-routed replay, eager-issuance throw after delivery), 4 LOW; board updated. | C5 review |
