@@ -167,6 +167,22 @@ log; its receipt copy must use *förberett* / *agerat* and may show measured min
 
 ## 5. Review record
 
+### Web receipt and evidence links (PR #75), Claude review 2026-09-14, orchestration §6 A + B
+
+Verified locally on `codex/customer-value-next` head `a085e9cb`: 165 tests green (customer-value-experience,
+automation-value-honesty, lisa-fangar, value-ledger*, value-events-producers, vardekvitto, recovered-revenue,
+parity, route-auth inventory, onboarding-wow, first-value-*, kundtext), `tsc` clean; `approval-<id>` anchors
+exist on the approvals page. Accepted: one shared receipt with paid and accepted-quote amounts split from
+deduplicated attributions; `invoicePaymentEvidence` shared by ledger and recovered-revenue; weekly API
+owner/admin-gated, strict reads → 503 with retry; company switch aborts in-flight reads; vardekvitto method 3.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | "0 kr Registrerat betalt · 0 kr Accepterade offerter" headline when the week holds only estimated minutes, new requests or autonomous actions; the removed widget carried the rule against exactly that. Fix: money tiles only when money > 0, otherwise cold-start line plus the non-money rows; two tests. | open on #75 — fix before merge |
+| LOW | `/api/automation/value` + `lib/value/automation-value.ts` have no web consumer after the widget removal; retire in V3 once native is confirmed not to read them. | carry |
+| LOW | `lisa-fangar` allowlist pinned to a line number; content anchor would stop the churn. | carry |
+| — | The acceptance note's V2 contract list is adopted into the V2 brief as written. | noted |
+
 ### V1 — value event log (PR #72), Claude review 2026-09-14, orchestration §6 A + B
 
 Verified locally on `codex/customer-value-v1` head `ea9b02b4`: 96 tests green (four V1 suites, value-ledger,
@@ -194,3 +210,4 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 | 2026-09-14 | V1 implemented by Codex (PR #72) and reviewed: 1 MEDIUM (trigger wrappers vs member RLS writes), 5 LOW; activation gate recorded. V2 blocker updated after C5b merged. | V1 review |
 | 2026-09-14 | V1 M1 fixed by Codex, re-verified and merged (PR #72). C6 merged the same day; V2 is next once the pilot flag is on. | V1 merge |
 | 2026-09-14 | v241 applied to production (after v239/v240/v242) with v243 revoking API EXECUTE on the trigger wrappers. Producers are live (0 rows at apply time, dry-run backfill examined 192 cards for the largest tenant). Reading stays on method 2: `VALUE_EVENTS_ENABLED` unset; backfill and the retention decision remain owner gates. | Deploy |
+| 2026-09-14 | PR #75 (shared web receipt) reviewed: 1 MEDIUM (0 kr headline on non-money weeks), 2 LOW. Companion brief `TRYGG_OVERLAMNING_BRIEF.md` (H1–H4) written for the handover work. | #75 review |
