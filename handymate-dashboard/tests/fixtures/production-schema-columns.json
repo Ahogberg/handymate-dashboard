@@ -180,7 +180,9 @@
       "widget_position",
       "widget_quick_questions",
       "widget_welcome_message",
-      "working_hours"
+      "working_hours",
+      "financial_kernel_enabled",
+      "accounting_method"
     ],
     "pipeline_automation": [
       "ai_analyze_calls",

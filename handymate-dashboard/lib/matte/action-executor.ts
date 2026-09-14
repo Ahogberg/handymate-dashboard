@@ -1,3 +1,4 @@
+import { createHash } from 'crypto'
 /**
  * Matte Action Executor — exekverar beslut direkt eller via approvals.
  */
@@ -118,6 +119,7 @@ async function executeDirectAction(
           businessId,
           invoiceId: action.params.invoice_id as string,
           source: 'manual',
+          commandKey: `manual:${action.params.invoice_id}:matte:${createHash('sha256').update([signal.channel,signal.from,signal.receivedAt].join('|')).digest('hex').slice(0,32)}`,
           paidVia: 'matte',
           markedByUserId: null,
         })

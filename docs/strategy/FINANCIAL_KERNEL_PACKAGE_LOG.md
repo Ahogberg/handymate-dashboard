@@ -329,6 +329,72 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 - **Validation:** 125 local kernel/golden-path/schema/retention/CI tests passed, then all 24 C4 tests passed after an additional validation case (126 distinct checks). TypeScript passed. Remote CI tracked on the implementation PR; Claude A/B/C/E review required before merge.
 - **Open decisions / limits:** R0/P0 remain with the owner and named consultant. C1b rounding magnitude/account, C4s suppliers and C5 callers/notification semantics are not implemented. C3 resume's immutable audit TODO remains outstanding because this C4 brief includes no audit table. Human accounting review is required for later posting/policy packages; these tests preserve supplied regime data and do not approve account proposals.
 
+### C5 — compatibility facade implementation (Codex, 2026-09-14)
+
+Package / scope
+: C5 v3: frozen legacy dispatch, atomic command/projection, persistent effect intents,
+  caller identities and Fortnox observations. Implementation awaits CI and Claude A/B/C/E review.
+
+Files / boundaries
+: v239; commands/service + facade; dispatch flag, service client adapter, effect runners,
+  rounding policy; shared payment-thanks; existing five payment callers and two UI headers;
+  eager delivery issuance and Fortnox number preservation; regression tests and CI registration.
+  Account deletion classifies both new business tables as retained, as required by its gate.
+
+Contract / events
+: §3 v3, FK.1–FK.3 and orchestration C5. Uses existing C2/C4 events; no event names added.
+  Legacy portal vocabulary remains in the invoice adapter. `already_paid`, `to_paid` and
+  `to_customer_paid` are documented non-event state/transition names in the catalog scanner.
+
+DB / feature flags
+: v239 NOT applied outside isolated local tests / CI. Existing v235–v238 deployment is the
+  previously reported owner deployment. No feature flag changed. Old helper definitions also
+  receive the pinned search_path; v239 applies those pins to already deployed installations.
+
+Implementation deviations from draft, with reasons
+: Persist `effect_context` on each command and return it with claims: later callers sweeping
+  older intents must use the original approval id, review choices, source and amount. Without
+  this, an approval's owed portal artifact could become a direct send on a later manual call.
+  `execute_payment_command` has one additional optional final JSONB argument for that context.
+: Claim returns the newly unknown intent ids, not just their count, for the specified per-id
+  human alert. Claim bounds are validated. Exhausted failures are reported after attempt three.
+: Finish takes the business lock before the intent row lock, preserving the kernel lock order
+  and allowing the Postgres delayed-finish proof to establish the actual blocking point.
+: Eager issuance uses `issue_invoice_receivables_if_eligible` under the same locks as payment,
+  rather than a check-then-issue race. Persisted legacy routing is consulted on subsequent keys.
+: Add a tenant invoice FK to command rows; compare replay invoice/source null-safely; persist
+  suppressed-effect history on the command. Current projection includes status and timestamps.
+: A database trigger additionally preserves an issued invoice number for flagged businesses,
+  closing the race between a receipt's preliminary read and concurrent issuance. The receipt
+  path still omits invoice_number when receivables are present, as briefed.
+: Callers with a real markedBy user retain user attribution. Legacy callers without an actor
+  id use system attribution, satisfying FK.2 instead of inventing a user identity.
+: Shared route effect functions preserve legacy message/approval content; kernel invocations
+  report send/insert failures as PaymentEffect results so the intent is not falsely completed.
+
+Verification / limits
+: The pre-C5 legacy function body is byte-identical in an executable facit test. Flag-off,
+  missing-row and missing-column dispatch make no kernel RPCs. Real PGlite tests cover command
+  identity, stale replay, atomic rollback, snapshots, historical routing, rounding, overpayment,
+  repeated settlement, intent retries/unknowns/tokens and privileges. Actual status route plus
+  actual facade is exercised with external effect dispatch stubbed; no real SMS was sent.
+  Original approval context survives a sweep by a different caller. Postgres CI has two
+  connection tests for command identity and delayed finish. It must pass before handoff is green.
+: Local full contracts initially passed 2204/2210, with three changed-contract checks corrected
+  and passing subsequently. Two pre-existing Unix grep invocations cannot run in the Windows
+  shell; Linux CI is the verification environment for those. One existing test is skipped.
+  Updated targeted tests and TypeScript pass; final remote result is recorded on the PR.
+: Updated the production-schema test fixture's two business_config columns from the documented
+  production verification in §1, not from a new live inspection. Existing source facit tests
+  now follow the extracted SMS module and current booking-only Fortnox route semantics.
+
+Swedish regimes / open decisions
+: Explicit interim <=100-öre rounding, ROT split and non-ROT partial-payment divergence remain
+  as approved. No VAT or account selection, opening-balance import, refund or flag activation.
+  C5b owns periodic sweeping/admin handling; inline recovery occurs on kernel calls. Unknown
+  external outcomes require a human and are not automatically resent. R0/P0/C1b remain with
+  their named owners; no accountant approval is claimed by this implementation.
+
 ## 3. Next package — Codex brief: C5 v3 the compatibility facade around `applyInvoicePayment()`
 
 > **v3, 2026-09-14.** v2 (PR #61) was reviewed by Codex in PR #62 with four further executable

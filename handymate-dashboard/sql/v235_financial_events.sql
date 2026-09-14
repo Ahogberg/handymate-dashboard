@@ -61,7 +61,7 @@ CREATE INDEX IF NOT EXISTS idx_financial_events_source
 
 -- Immutable. Corrections are new events; there is no second path.
 CREATE OR REPLACE FUNCTION public.financial_events_immutable() RETURNS trigger
-LANGUAGE plpgsql AS $fn$
+LANGUAGE plpgsql SET search_path = public, pg_temp AS $fn$
 BEGIN
   RAISE EXCEPTION 'financial_events_immutable' USING ERRCODE = 'restrict_violation';
 END $fn$;

@@ -1,0 +1,95 @@
+{
+  const { businessId, invoiceId, markedByUserId = null, source } = opts
+  const paidAt = opts.paidAt || new Date().toISOString()
+  const supabase = getServerSupabase()
+
+  const { data: invoice, error: fetchErr } = await supabase
+    .from('invoice')
+    .select('invoice_id, status, customer_id, invoice_number, fortnox_invoice_number, total, rot_rut_type, rot_rut_deduction, customer_pays, paid_amount, paid_at')
+    .eq('invoice_id', invoiceId)
+    .eq('business_id', businessId)
+    .single()
+
+  if (fetchErr || !invoice) {
+    return { ok: false, error: 'Faktura hittades inte' }
+  }
+  if (invoice.status === 'paid') {
+    return { ok: true, already_paid: true, status: 'paid', transition: 'none', paid_at: invoice.paid_at || paidAt }
+  }
+
+  const decision = decidePaymentOutcome(invoice, opts.amount)
+  const now = new Date().toISOString()
+  const paidVia = opts.paidVia
+    ?? (source === 'fortnox' ? 'fortnox' : source === 'customer_confirmed' ? 'customer_confirmed' : 'manual')
+
+  const updates: Record<string, unknown> = { paid_amount: decision.paid_amount }
+  if (decision.transition === 'to_paid') {
+    Object.assign(updates, { status: 'paid', paid_at: paidAt, settled_at: paidAt, paid_via: paidVia })
+  } else if (decision.transition === 'to_customer_paid') {
+    Object.assign(updates, { status: 'customer_paid', paid_at: paidAt, paid_via: paidVia })
+  } else if (decision.transition === 'settled') {
+    Object.assign(updates, { status: 'paid', settled_at: paidAt })
+  }
+  if (source !== 'fortnox' && decision.transition !== 'none') {
+    updates.manual_paid_marked_at = now
+    updates.manual_paid_by_user_id = markedByUserId
+  }
+
+  const { error: updateErr } = await supabase
+    .from('invoice')
+    .update(updates)
+    .eq('invoice_id', invoiceId)
+    .eq('business_id', businessId)
+
+  if (updateErr) {
+    return { ok: false, error: updateErr.message }
+  }
+
+  const customerJustSettled = decision.transition === 'to_paid' || decision.transition === 'to_customer_paid'
+
+  const effects: PaymentEffect[] = []
+  if (customerJustSettled) {
+    const reviewed = opts.approvalFollowUps
+    effects.push(...await runPostPaymentAutomations(invoiceId, businessId, invoice.customer_id, {
+      triggeredBy: source === 'fortnox' ? 'system' : 'user',
+      reason: source === 'fortnox' ? 'Faktura betald (Fortnox-synk)' : 'Betal-markering',
+      logPrefix: `[apply-payment/${source}]`,
+      updateWorkflows: reviewed?.updateWorkflows !== false,
+      runCustomerCommunication: !reviewed,
+      runAutomationRules: reviewed?.runAutomationRules !== false,
+      requireExplicitApproval: !!reviewed,
+    }))
+
+    if (reviewed) {
+      if (reviewed.prepareCustomerMessages && invoice.customer_id) {
+        effects.push(...await preparePaymentCustomerMessages(supabase, businessId, reviewed.approvalId, invoice, decision.paid_amount))
+      } else {
+        effects.push({ effect: 'customer_messages', status: 'skipped', message: reviewed.prepareCustomerMessages ? 'Fakturan saknar kund' : 'Valdes bort i granskningen' })
+      }
+    } else if (invoice.customer_id) {
+      try {
+        const { sendPortalNotification } = await import('@/lib/portal/notification-emails')
+        const notification = await sendPortalNotification(businessId, invoice.customer_id, 'invoice_paid', {
+          context: {
+            amount: decision.paid_amount,
+            invoice_number: invoice.invoice_number || invoice.fortnox_invoice_number || invoiceId,
+          },
+        })
+        effects.push({ effect: 'portal_message', status: notification.success ? (notification.skipped ? 'skipped' : 'succeeded') : 'failed', message: notification.skipped || notification.error })
+      } catch (notifErr) {
+        console.error(`[apply-payment/${source}] portal notification invoice_paid failed:`, notifErr)
+        effects.push({ effect: 'portal_message', status: 'failed', message: notifErr instanceof Error ? notifErr.message : String(notifErr) })
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    status: decision.status,
+    transition: decision.transition,
+    paid_at: customerJustSettled ? paidAt : (invoice.paid_at || paidAt),
+    paid_amount: decision.paid_amount,
+    remaining_rot_kr: decision.remaining_rot_kr,
+    effects,
+  }
+}

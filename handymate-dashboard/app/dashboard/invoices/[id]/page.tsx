@@ -200,7 +200,7 @@ export default function InvoiceDetailPage() {
     try {
       const response = await fetch(`/api/invoices/${invoiceId}/status`, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
         body: JSON.stringify({
           status: 'paid',
           paid_at: paymentData.paid_at,

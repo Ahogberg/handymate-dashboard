@@ -87,6 +87,10 @@ jobs:
           tests/permission-contract.spec.ts
           tests/schema-contract.spec.ts
           tests/financial-kernel-event-contract.spec.ts
+          tests/financial-kernel-c5-brief-probes.spec.ts
+          tests/financial-kernel-c5-v2-brief-probes.spec.ts
+          tests/financial-kernel-facade.spec.ts
+          tests/financial-kernel-facade-legacy-frozen.spec.ts
           tests/financial-kernel-money.spec.ts
           tests/financial-kernel-events-sql.spec.ts
           tests/financial-kernel-outbox-sql.spec.ts

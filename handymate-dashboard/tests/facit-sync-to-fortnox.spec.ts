@@ -59,8 +59,9 @@ test.describe('send-via-fortnox/route.ts ar en tunn wrapper', () => {
     expect(ROUTE).not.toMatch(/fortnoxRequest\(/)
   })
 
-  test('satter fortfarande status=sent for bakatkompatibilitet med den fristaende knappen', () => {
-    expect(ROUTE).toContain("status: 'sent'")
+  test('fristående bokföring skickar inte och ändrar inte leveransstatus', () => {
+    expect(ROUTE).toContain('allowEInvoice: false')
+    expect(ROUTE).not.toContain("status: 'sent'")
   })
 })
 
@@ -170,7 +171,7 @@ test.describe('Sista DB-skrivningen (markera synced) — felet kollas, inte tyst
   test('ett fel dar rapporteras via rapporteraTystFel, inte bara console.error', () => {
     expect(FILE).toContain("from '@/lib/observability/driftlarm'")
     const idx = FILE.indexOf("fortnox_sync_status: 'synced',")
-    const block = FILE.slice(idx, idx + 1200)
+    const block = FILE.slice(idx, FILE.indexOf('return {', idx))
     expect(block).toMatch(/rapporteraTystFel/)
   })
 })

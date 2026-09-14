@@ -13,7 +13,7 @@ export async function receivablesDatabase() {
     INSERT INTO business_config VALUES ('a',NULL),('b',NULL);
     INSERT INTO business_users VALUES ('a','00000000-0000-0000-0000-000000000001',true);
     CREATE TABLE invoice(invoice_id text PRIMARY KEY,business_id text NOT NULL REFERENCES business_config,
-      invoice_number text,customer_id text,project_id text,total numeric,customer_pays numeric,
+      status text DEFAULT 'sent',paid_amount numeric,paid_at timestamptz,settled_at timestamptz,paid_via text,manual_paid_marked_at timestamptz,manual_paid_by_user_id text,invoice_number text,customer_id text,project_id text,total numeric,customer_pays numeric,
       rot_rut_deduction numeric,rot_rut_type text,invoice_date date,due_date date);
     GRANT USAGE ON SCHEMA public,auth TO anon,authenticated,service_role,deployer;
     GRANT CREATE ON SCHEMA public TO deployer;
@@ -23,7 +23,7 @@ export async function receivablesDatabase() {
   const helper=readFileSync('sql/testbed_tenant_isolation.sql','utf8').match(/CREATE OR REPLACE FUNCTION public\.is_business_member[\s\S]*?\$function\$;/)
   if (!helper) throw Error('Missing membership function')
   await db.exec(helper[0]); await db.exec('SET ROLE deployer')
-  for(const file of ['v235_financial_events.sql','v236_financial_event_consumers.sql','v238_financial_receivables.sql']) await db.exec(readFileSync('sql/'+file,'utf8'))
+  for(const file of ['v235_financial_events.sql','v236_financial_event_consumers.sql','v238_financial_receivables.sql','v239_financial_payment_commands.sql']) await db.exec(readFileSync('sql/'+file,'utf8'))
   await db.exec('RESET ROLE')
   const rpc:KernelDb={async rpc(name,args){
     if(!/^[a-z_]+$/.test(name)||Object.keys(args).some(k=>!/^p_[a-z_]+$/.test(k))) throw Error('Unsafe test RPC')
