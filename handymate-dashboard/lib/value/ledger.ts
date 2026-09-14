@@ -60,12 +60,14 @@
  * felaktig — beskrivning är den ärliga vägen.
  */
 
+import { readValueEvents, ledgerMethod } from './events/read'
+import { eventCohort } from './events/cohort'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { manadsfonster } from '@/lib/value/vardekvitto'
 import { mapApprovalRowToCard, isWithinAttributionWindow } from '@/lib/value/recovered-revenue'
 import { isCustomerSettled, PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
-export const MANADS_LEDGER_METHOD_VERSION = 2
+export const MANADS_LEDGER_METHOD_VERSION = 3
 
 /** De fem korttyperna som bär ett belopp värt att spåra genom ledgern.
     Medvetet skild från RECOVERY_APPROVAL_TYPES — profitability_warning är
@@ -335,23 +337,53 @@ export async function getManadsLedger(
   supabase: SupabaseClient,
   businessId: string,
   period: string,
+  method: 2 | 3 = ledgerMethod(),
 ): Promise<ManadsLedger | null> {
   const fonster = manadsfonster(period)
   if (!fonster) return null
 
-  const { data: rows, error } = await supabase
-    .from('pending_approvals')
-    .select('id, approval_type, status, created_at, resolved_at, payload, title')
-    .eq('business_id', businessId)
-    .in('approval_type', VALUE_LEDGER_APPROVAL_TYPES as unknown as string[])
-    .gte('created_at', new Date(fonster.fromMs).toISOString())
-    .lt('created_at', new Date(fonster.toMs).toISOString())
-    .limit(2000)
-  if (error) throw new Error(`pending_approvals-uppslag misslyckades: ${error.message}`)
-
-  const kortRader = rows || []
+  let kortRader: Array<{ id: string; approval_type: string; status: string; created_at: string;
+    resolved_at: string | null; payload: any; title?: string | null; value_amount_kr?: number }>
+  if (method === 2) {
+    const { data: rows, error } = await supabase
+      .from('pending_approvals')
+      .select('id, approval_type, status, created_at, resolved_at, payload, title')
+      .eq('business_id', businessId)
+      .in('approval_type', VALUE_LEDGER_APPROVAL_TYPES as unknown as string[])
+      .gte('created_at', new Date(fonster.fromMs).toISOString())
+      .lt('created_at', new Date(fonster.toMs).toISOString())
+      .limit(2000)
+    if (error) throw new Error(`pending_approvals-uppslag misslyckades: ${error.message}`)
+    kortRader = rows || []
+  } else {
+    const identified = (await readValueEvents(supabase, businessId, {
+      types: ['opportunity_identified'], from: new Date(fonster.fromMs).toISOString(), to: new Date(fonster.toMs).toISOString(),
+    })).filter(e => (VALUE_LEDGER_APPROVAL_TYPES as readonly string[]).includes(e.payload.approval_type))
+    const lifecycle = []
+    // Chunk IN clauses; events after the cohort month still belong to this cohort.
+    for (let i = 0; i < identified.length; i += 100) {
+      lifecycle.push(...await readValueEvents(supabase, businessId, {
+        types: ['opportunity_acted', 'opportunity_dismissed'], cardIds: identified.slice(i, i + 100).map(e => e.card_id!),
+      }))
+    }
+    kortRader = eventCohort(identified, lifecycle)
+    // V1 keeps the existing live invoice-facit path. Execution artifacts may be
+    // persisted AFTER approval; they are evidence links, never the cohort/status/estimate.
+    for (let i = 0; i < kortRader.length; i += 100) {
+      const slice = kortRader.slice(i, i + 100)
+      const { data, error } = await supabase.from('pending_approvals').select('id, payload')
+        .eq('business_id', businessId).in('id', slice.map(r => r.id))
+      if (error) throw new Error(`value evidence read failed: ${error.message}`)
+      for (const row of slice) {
+        const live = (data || []).find((r: { id: string; payload: any }) => r.id === row.id)
+        if (live) row.payload = live.payload
+      }
+    }
+  }
+  // Stable attribution winner in both methods; database heap order is not evidence.
+  kortRader.sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
   if (kortRader.length === 0) {
-    return byggManadsLedger({ period, cards: [], invoices: new Map() })
+    return { ...byggManadsLedger({ period, cards: [], invoices: new Map() }), method_version: method }
   }
 
   // Direktreferenserna — samma extraktion som attributionskärnan (per-typ-
@@ -408,7 +440,7 @@ export async function getManadsLedger(
         status: row.status,
         created_at_ms: createdAtMs,
         resolved_at_ms: kort?.resolved_at_ms ?? null,
-        amount_kr: ledgerCardAmountKr(row.approval_type, (row.payload || {}) as Record<string, unknown>),
+        amount_kr: row.value_amount_kr ?? ledgerCardAmountKr(row.approval_type, (row.payload || {}) as Record<string, unknown>),
         invoice_id: invoiceId,
         invoice_verified: invoiceVerified,
         title: typeof (row as { title?: unknown }).title === 'string' ? (row as { title?: string }).title! : null,
@@ -450,5 +482,5 @@ export async function getManadsLedger(
     }
   }
 
-  return byggManadsLedger({ period, cards, invoices })
+  return { ...byggManadsLedger({ period, cards, invoices }), method_version: method }
 }

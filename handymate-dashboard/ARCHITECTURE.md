@@ -937,3 +937,19 @@ Ingen tabell, ingen RPC, ingen flagga, ingen Money-klass, inget beteende. Nästa
 OAuth förnyas inom fem minuter före utgång, med ett databaslås per företag. Företagsnamnet uppdateras separat från tokenparet; CompanyInformation läses från Fortnox-svaret. `20260914072732_fortnox_sync_locks.sql` krävs före driftsättning; tillför service-only lås och unikt företag/dokumentnummer. Migrationen är ännu INTE körd i produktion (automatisk godkännandegranskning stoppade den).
 
 Avgränsning: SEK-standardfakturor. Kredit-/kontantfakturor, annan valuta och återöppnad/makulerad redan betald faktura ger ett synligt avstämningsfel; ingen tyst omskrivning av betalningshistorik. Hämtningen omfattar senaste året, alla öppna och alla redan lokalt kopplade dokument. Sidtak/tidsgräns ger fel, aldrig falskt komplett synk. Kundimport finns fortsatt som Hämta historik; nya fakturor utan lokalt kundnummer importeras okopplade. Full liveacceptans återstår efter migration, deploy och återanslutning.
+
+### Customer Value V1 — arbetsbevis, separata från Financial Kernel
+
+`value_events` är append-only med tenant-isolerad medlemsläsning och service-role-RPC-skrivning.
+V1 tillåter `opportunity_identified`, `opportunity_acted`, `opportunity_dismissed`,
+`time_measured` och `time_estimated`. Kernelns pengastadier får inte skrivas av V1.
+Kortens skapande/beslut och automationsloggens lyckade resultat fångas av SQL-triggers
+som anropar samma producenter/RPC i källskrivningens transaktion. Inga utskick sker där.
+Identifierad kortuppskattning fryses; belopp serialiseras som öressträngar, aldrig tidsvärde i kronor.
+Godkänt (`opportunity_acted`) betyder ett fattat beslut, inte en bevisad leverans.
+`time_measured` mäter ledtid för en direktlänkad kedja, **inte sparad arbetstid**.
+Saknade tidsstämplar ger separat schablon med underlag; historiska syntetiska sent_at mäts inte.
+Metod 3 läser kortkohort och beslut ur händelser. V1 behåller tenant-grindade uppslag för
+levande fakturareferenser och fakturornas belopp; V2 övertar pengastadierna senare.
+`VALUE_EVENTS_ENABLED` är server-only och av som standard; ägare/admin kan jämföra
+`/api/value/ledger?method=2` och `?method=3` efter v241 + explicit historikinläsning.
