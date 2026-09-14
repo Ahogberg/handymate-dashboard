@@ -56,3 +56,9 @@ test('failed effects stop after three attempts; reversal and resettlement never 
  expect(second.command.effects_suppressed).toEqual(['portal_message']);expect((await command('manual:replacement')).command.effects_suppressed).toEqual(['portal_message'])
  expect((await f.db.query('SELECT id FROM financial_effect_intents')).rows).toHaveLength(1)
 })
+test('issued invoice number cannot change under flag; legacy flag-off behavior remains',async()=>{
+ await command('manual:a');await f.db.exec("RESET ROLE;UPDATE business_config SET financial_kernel_enabled=true WHERE business_id='a';UPDATE invoice SET invoice_number='new' WHERE invoice_id='i'")
+ expect((await f.db.query<{invoice_number:string}>("SELECT invoice_number FROM invoice WHERE invoice_id='i'")).rows[0].invoice_number).toBe('i')
+ await f.db.exec("UPDATE business_config SET financial_kernel_enabled=false WHERE business_id='a';UPDATE invoice SET invoice_number='new' WHERE invoice_id='i'")
+ expect((await f.db.query<{invoice_number:string}>("SELECT invoice_number FROM invoice WHERE invoice_id='i'")).rows[0].invoice_number).toBe('new')
+})

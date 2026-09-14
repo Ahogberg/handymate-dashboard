@@ -55,3 +55,15 @@ test('GP5: two non-ROT partial payments leave open then settle once',async()=>{
  expect((await call('first',40)).status).toBe('sent');expect(h.effects).toEqual([])
  const second=await call('second',60);expect(second.status).toBe('paid');expect(second.paid_amount).toBe(100);expect(h.effects).toHaveLength(6)
 })
+test('real Fortnox sync passes distinct snapshots and stable keys while preserving legacy amount',async()=>{
+ const calls:Record<string,any>[]=[];let balance=0
+ const invoice={invoice_id:'i',business_id:'a',status:'customer_paid',fortnox_document_number:'doc',fortnox_invoice_number:'42',total:12500,customer_pays:9500,rot_rut_type:'rot'}
+ const sb={from(table:string){const q={select:()=>q,eq:()=>q,not:()=>q,update:()=>q,then:(done:(r:unknown)=>unknown)=>Promise.resolve({data:table==='invoice'?[invoice]:null,error:null}).then(done)};return q}}
+ const load=c5Modules({'@/lib/supabase':{getServerSupabase:()=>sb},'@/lib/fortnox':{isFortnoxConnected:async()=>true,fortnoxRequest:async()=>({Invoice:{Total:12500,Balance:balance}})},
+ '@/lib/invoices/apply-payment':{applyInvoicePayment:async(opts:Record<string,any>)=>{calls.push(opts);return {ok:true,transition:'settled'}}}})
+ const sync=load('lib/fortnox/sync-payments.ts').syncFortnoxPaymentsForBusiness
+ expect((await sync('a')).marked_settled).toBe(1);await sync('a');balance=-100;await sync('a')
+ expect(calls[0].amount).toBeUndefined();expect(calls[0].commandKey).toBe(calls[1].commandKey);expect(calls[2].commandKey).not.toBe(calls[0].commandKey)
+ expect(calls[0].providerObservation).toMatchObject({documentNumber:'doc',paidMinor:'1250000',balance:0})
+ expect(calls[2].providerObservation.paidMinor).toBe('1260000')
+})

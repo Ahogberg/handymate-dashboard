@@ -35,7 +35,7 @@ Rules that keep this file honest:
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
-| C5 | `applyInvoicePayment()` compatibility facade | Codex | **ready — brief v3 in §3** (v2 corrected after Codex review PR #62: R1–R4; v239 draft re-verified in PGlite) | — |
+| C5 | `applyInvoicePayment()` compatibility facade | Codex | **implemented — PR #66, awaiting CI and Claude A/B/C/E review** | review; v239 not applied externally |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
