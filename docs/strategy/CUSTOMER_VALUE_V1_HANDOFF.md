@@ -1,8 +1,8 @@
 # Customer Value V1 — Codex handoff
 
 Status: implemented in PR #72; final CI results tracked on the PR. Not deployed; v241 has not been applied.
-Base: C5b main `9d363a25`. The V1 brief and V0 code remain in PR #70; this branch does not copy
-V0 or merge that branch. Attach this handoff to §2 of CUSTOMER_VALUE_PACKAGE_LOG when #70 lands.
+M1 rebase: main `8577acc085a3435904171c8527771e9e11e80e0c`, including merged #70.
+V0 and the package log are now on the base; the M1 correction is handed off in that log §2.
 
 ## Scope and ownership
 
@@ -103,3 +103,11 @@ against production by this package. No pilot selection is assumed.
 Open kernel §38 decisions remain untouched. Reverse charge/cash basis/ROT/cut-over computation is
 unchanged: existing invoice facit is reused, no VAT or posting code is introduced. No new accounting
 rule requires human accounting approval; Claude A/B review remains before merge.
+
+## M1 follow-up
+
+All three source-trigger wrappers use SECURITY DEFINER with fixed `public, pg_temp` search_path.
+Member writes permitted by source-table RLS now reach the private producer functions; direct
+member calls remain forbidden. The new member test reproduced the previous failure before the
+fix and covers all four source tables, tenant rejection and idempotency after it.
+The five reviewed LOW items remain tracked; this correction does not activate V1.

@@ -118,7 +118,7 @@ END $$;
 REVOKE ALL ON FUNCTION public.record_value_approval(text,text,boolean) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.record_value_approval(text,text,boolean) TO service_role;
 
-CREATE FUNCTION public.value_approval_written() RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_temp AS $$
+CREATE FUNCTION public.value_approval_written() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN
  PERFORM public.record_value_approval(NEW.business_id,NEW.id,false);
  RETURN NEW;
@@ -174,12 +174,12 @@ BEGIN
 END $$;
 REVOKE ALL ON FUNCTION public.record_value_automation(text,text) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public.record_value_automation(text,text) TO service_role;
-CREATE FUNCTION public.value_automation_written() RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_temp AS $$
+CREATE FUNCTION public.value_automation_written() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 BEGIN PERFORM public.record_value_automation(NEW.business_id,NEW.id); RETURN NEW; END $$;
 CREATE TRIGGER value_automation_producer AFTER INSERT OR UPDATE OF status ON public.v3_automation_logs
  FOR EACH ROW EXECUTE FUNCTION public.value_automation_written();
 
-CREATE FUNCTION public.value_document_sent() RETURNS trigger LANGUAGE plpgsql SET search_path=public,pg_temp AS $$
+CREATE FUNCTION public.value_document_sent() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $$
 DECLARE started timestamptz; row_data jsonb:=to_jsonb(NEW);
 BEGIN
  IF row_data->>'sent_at' IS NULL THEN RETURN NEW; END IF;
