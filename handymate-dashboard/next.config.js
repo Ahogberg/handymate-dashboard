@@ -2,6 +2,13 @@ const { withSentryConfig } = require('@sentry/nextjs')
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  // Byggkostnad (2026-09-14): Vercel-fakturan var 99 % byggminuter. CI kör redan
+  // `tsc --noEmit` med 6 GB heap (contracts.yml, playwright.yml), så bygget upprepar
+  // inte typkontrollen — på 624 rutter + 144 sidor kostade den minuter per bygge.
+  // Typfel fångas fortfarande i CI innan merge. Repot har ingen ESLint-konfig, så
+  // lint är avstängd i bygget uttryckligen i stället för att Next ska fråga.
+  eslint: { ignoreDuringBuilds: true },
+  typescript: { ignoreBuildErrors: true },
   experimental: {
     // Chromium-PDF (app/api/quotes/pdf): puppeteer-core + @sparticuz/chromium
     // måste lämnas utanför webpack-bundlingen — binär-uppackningen och
