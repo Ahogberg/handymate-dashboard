@@ -31,11 +31,11 @@ Rules that keep this file honest:
 | C0 | Architecture contract, event names, flags, CI gate | Claude | **done 2026-09-13** | — |
 | C1 | Money primitives | Codex | **done 2026-09-13** (PR #49 merged; MEDIUM corrected) | — |
 | C1b | Rounding policy + rounding account | Codex + accountant | not started | named accounting consultant (orchestration §3) |
-| C2 | `financial_events` schema + append RPC | Codex | **done 2026-09-13** (PR #50 merged; HIGH + 2 MEDIUM corrected; migration not yet applied to any environment) | — |
+| C2 | `financial_events` schema + append RPC | Codex | **done 2026-09-13** (PR #50 merged; HIGH + 2 MEDIUM corrected) | — |
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
-| C5 | `applyInvoicePayment()` compatibility facade | Codex | **ready — brief in §3** | — |
+| C5 | `applyInvoicePayment()` compatibility facade | Codex | **ready — brief v2 in §3** (v1 corrected after Codex review PR #60: B1–B4, M1; v239 draft verified in PGlite) | — |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
@@ -46,6 +46,21 @@ Rules that keep this file honest:
 | C13 | VAT return primitives | Codex | not started | C9, D3 (file vs produce) |
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
+
+**Deployment state (2026-09-14):** `v235`–`v238` are applied to the production Supabase
+project (Handymate, eu-west-1). Verified read-only the same day: the seven `financial_*` tables
+exist with RLS enabled and no FORCE; every kernel RPC is SECURITY DEFINER with
+`search_path = public, pg_temp` and EXECUTE only for `postgres` and `service_role` (the three
+internal helpers `financial_lock`, `financial_append`, `assert_financial_consumer_lease` are
+`postgres` only); `business_config.financial_kernel_enabled` defaults false and is true for
+**0** businesses; `accounting_method` and `invoice.vat_regime` carry their defaults; the
+`v237` backfill left **0** paid/customer_paid invoices with `paid_amount IS NULL`;
+`financial_events` and `financial_receivables` are empty. Supabase security advisors report
+two INFO items that are by design (`financial_event_consumers` and `financial_event_deliveries`
+have RLS enabled and no policy: status is read through `get_financial_consumer_status`) and
+one WARN that C5's `v239` fixes (`financial_events_immutable()` and
+`financial_receivable_json()` have no pinned `search_path`; neither is SECURITY DEFINER, so
+this is hardening, not exposure). `v239` is not yet written.
 
 Parallel Claude analysis tracks (orchestration §4): **A done** (C2 brief), **B done**
 (`FINANCIAL_KERNEL_CALL_SITE_MAP.md`), **C done** (18 of 40 golden paths executable as data in
@@ -314,149 +329,535 @@ expected messages and was removed; `npx tsc --noEmit` clean.
 - **Validation:** 125 local kernel/golden-path/schema/retention/CI tests passed, then all 24 C4 tests passed after an additional validation case (126 distinct checks). TypeScript passed. Remote CI tracked on the implementation PR; Claude A/B/C/E review required before merge.
 - **Open decisions / limits:** R0/P0 remain with the owner and named consultant. C1b rounding magnitude/account, C4s suppliers and C5 callers/notification semantics are not implemented. C3 resume's immutable audit TODO remains outstanding because this C4 brief includes no audit table. Human accounting review is required for later posting/policy packages; these tests preserve supplied regime data and do not approve account proposals.
 
-## 3. Next package — Codex brief: C5 the compatibility facade around `applyInvoicePayment()`
+## 3. Next package — Codex brief: C5 v2 the compatibility facade around `applyInvoicePayment()`
 
-> The C4 brief is retired to git history (outcome: C4 handoff in §2, C4 review in §5).
-> **Prerequisite met:** `main` carries C0–C4 with payload amounts as strings.
-> **This is the first package that touches legacy code.** Dimension B (integration) is the
-> review's centre of gravity. Every legacy behaviour named below was read from the code at
-> `main` on 2026-09-14; if the code has moved, the code wins and the handoff says so.
+> **v2, 2026-09-14.** v1 (PR #59) was reviewed by Codex in PR #60 with six executable
+> counterexamples ([C5 brief review](FINANCIAL_KERNEL_C5_BRIEF_REVIEW.md)). All five findings are
+> accepted; the response is in §5. v2 replaces the algorithm: the kernel step becomes **one atomic
+> RPC keyed by a command identity**, side effects become **durable intents**, invoices with legacy
+> payment evidence are **routed to the legacy path** until C4b, and the Fortnox caller passes an
+> **explicit observation**. The v1 decisions Codex did not challenge stand unchanged: legacy body
+> frozen byte-for-byte, flag default off and set for nobody, non-ROT partial payment stays open
+> under the flag (golden paths 4/37), overpayment stays unallocated (GP7), interim rounding is an
+> explicit posting, `invoice_number` immutable once receivables exist, thank-you SMS untouched.
+> **Prerequisite met:** `main` carries C0–C4; v235–v238 are applied in production (§1).
 
-Read first: `FINANCIAL_KERNEL_CALL_SITE_MAP.md` §1, §2 (tier 1–3), §4; blueprint §18.1–18.5,
-§20.1, §21; orchestration §5 C5, §6 A+B+C+E, §9; `ARCHITECTURE.md` §FK.3 (the bridge rule);
-`tests/financial-kernel/golden-paths.ts` (1, 4, 5, 7, 12, 30, 34, 36, 37 and their
-`legacyStatus`/`legacyPaymentReceived` fields). Then the legacy code you change:
-`lib/invoices/apply-payment.ts`, `lib/invoices/send-invoice.ts` (`recordInvoiceDeliveryOutcome`),
-`lib/invoices/sync-to-fortnox.ts` (the receipt update at ~:413); and the code you read but do not
-change: `lib/invoices/payment-decision.ts`, `lib/invoices/customer-share.ts`,
-`lib/fortnox/sync-payments.ts`, `app/api/invoices/[id]/status/route.ts`,
-`app/api/approvals/[id]/route.ts` (`confirm_payment`). Test pattern for legacy modules with
-injected dependencies: `tests/project-invoice-journey.spec.ts` (transpile + `new Function`
-loader with a `deps` map) and `tests/helpers/financial-receivables-database.ts` (PGlite with
-the real v235–v238).
+Read first: `FINANCIAL_KERNEL_C5_BRIEF_REVIEW.md` and
+`tests/financial-kernel-c5-brief-probes.spec.ts` (the faults, to be converted into prevention
+tests); `FINANCIAL_KERNEL_CALL_SITE_MAP.md` §1, §2 (tier 1–3), §4; blueprint §18.1–18.5, §20.1,
+§21; orchestration §5 C5, §6 A+B+C+E, §9; `ARCHITECTURE.md` §FK.3; golden paths 1, 4, 5, 7, 12,
+30, 34, 36, 37. Legacy code you change: `lib/invoices/apply-payment.ts`,
+`lib/invoices/send-invoice.ts` (`recordInvoiceDeliveryOutcome`), `lib/invoices/sync-to-fortnox.ts`
+(receipt update ~:413), `lib/fortnox/sync-payments.ts` (observation only), the four callers under
+"Callers" below. Code you read but do not change: `lib/invoices/payment-decision.ts`,
+`lib/invoices/customer-share.ts`, `lib/fortnox/classify-payment.ts`. Test patterns:
+`tests/project-invoice-journey.spec.ts` (transpile + injected `deps`),
+`tests/helpers/financial-receivables-database.ts` (PGlite with the real v235–v238; add `status`
+and `paid_amount` to its `invoice` fixture, and v239).
+
+### What changed from v1, and why
+
+| Finding (PR #60) | v1 | v2 |
+|---|---|---|
+| **B1** command identity derived from state | key carried the derived amount and component; a retry after the customer settled became a Skatteverket payment; a fresh default timestamp conflicted in C4 | **Identity is a caller-supplied command key.** Target, amount and `settled_at` are resolved once inside `execute_payment_command`, persisted on the command row in the same transaction as the kernel writes, and every replay of the key returns the stored outcome without touching the kernel, whatever the caller sends now. A *different* key on a `customer_paid` invoice is the Skatteverket payment, which is what legacy means by a second call (mark-paid route doc comment) — now explicit and auditable instead of implicit. |
+| **B2** Fortnox evidence not passed | key needed `DocumentNumber` and `Balance` that the caller never sends; cumulative `Total − Balance` treated as a new payment | `syncFortnoxPaymentsForBusiness` passes a **provider observation** (document identity, cumulative paid, observed at) next to the untouched legacy arguments. Under the flag the RPC records **new money = snapshot − everything the kernel already holds for the invoice**; zero or negative deltas record nothing and are stored on the command row for C11. Legacy branch ignores the observation. |
+| **B3** lazy issuance on part-paid invoices | issued both components fully open, so the next payment was mis-targeted | **Routing rule, persisted:** an invoice with legacy payment evidence (`paid_amount > 0` or status `customer_paid`/`paid`) and no kernel receivables is `legacy_routed` — the facade runs the frozen legacy body for it, forever, until C4b imports its opening balance. No receivable is invented from legacy status. |
+| **B4** no recovery protocol | app-side steps between RPCs; pre-send marker could suppress a never-sent effect; early `paid` return on retry | Issuance, settlement, allocations, rounding, outcome **and effect intents commit in one transaction**; there is no state between them to recover. Effects are **intent rows** (`pending → attempting → sent/failed/skipped`, stale attempts → `unknown` and reported to a human); a retried request finishes what a crashed one owed; the intent row is the marker C5b's bridge checks, so a marker exists only together with the obligation it records. No exactly-once claim for external sends: at-most-once per attempt, never silently lost. |
+| **M1** flag helper calls a kernel RPC | dispatch used the C4 helper | New `readKernelDispatchFlag` reads the column directly; absent column/row → `false`; other errors throw. The C4 helper stays for kernel callers. |
 
 ### Claude decisions embedded in this brief
 
 | Decision | Why |
 |---|---|
-| **The legacy path is preserved byte-for-byte.** Move today's body of `applyInvoicePayment` into `applyInvoicePaymentLegacy` unchanged; the exported `applyInvoicePayment` dispatches on `isFinancialKernelEnabled(businessId)`. Flag off → legacy, with zero kernel RPC calls. | Orchestration C5: legacy behaviour unchanged for non-kernel customers. A facit test asserts the legacy function's source is identical to `main`'s. |
-| **Under the flag, the kernel is the truth and `invoice.status/paid_amount` are a projection** written by the facade from the RPC results, with the same columns legacy writes. | Blueprint §18.1. The projection write is app-side and not atomic with the kernel; C6/C12's integrity check compares them. Accepted for C5; C6 owns the alarm. |
-| **Post-payment effects run inline, exactly as today, gated on "customer component settled in this call"**, and the facade writes the bridge marker per `receivable_id` *before* running them. The C3 consumer runner and the event-driven bridge become **C5b**. | Keeps C5 equivalent and small. The marker guarantees that when C5b's bridge later consumes `receivable_settled{customer}` it finds the marker and stays silent (C4 review requirement). |
-| **Interim SE rounding policy: shortfall ≤ 100 öre after allocating everything available settles via `adjust_receivable{rounding}`.** Named `INTERIM_SE_ROUNDING_MAX_MINOR = 100n` in `lib/financial-kernel/policies/se-rounding.ts`, exported as a *policy function*, with a header stating it mirrors legacy `paid >= total - 1` and is replaced by C1b's accountant-confirmed value. No account number is chosen. | Orchestration C5: "every invoice that settles today must still settle — now with a rounding posting that explains why". This is the explicit posting mechanism (blueprint §5), not a comparison tolerance: the kernel never compares with slack; it records an adjustment. The contract test's tolerance scan targets `TOLERANCE`/`EPSILON`/`Math.abs(` in kernel dirs; this constant is a policy in `policies/`, documented as interim. The reviewer will check that no *comparison* uses it. |
-| **Overpayment stays unallocated on the payment** (customer credit), visible in `financial_payments.allocated_minor < amount_minor`; the invoice projects `paid` when all components are settled. | Golden path 7. Legacy silently marks paid; kernel keeps the 100 kr visible. Same customer-visible status. Refund/apply-to-next is C7/C14. |
-| **The non-ROT partial-payment quirk is fixed under the flag**: a partial payment leaves the invoice `sent` (or `overdue`) with `paid_amount` updated and no `payment_received`. Legacy path keeps the quirk. | Call-site map + golden paths 4 and 37. This is an intended, documented divergence for kernel businesses; it is why shadow (C6) compares status, so it will show up there as expected, not as a bug. Owner may veto in review. |
-| **Allocation strategy for a legacy call** (`amount` optional): allocate to the customer component first, then the tax-authority component, then leave the rest unallocated; then apply the rounding policy per component still open. `amount` undefined = "everything still open on the next open component" (legacy: customer share, then the Skatteverket remainder). | Mirrors `decidePaymentOutcome` exactly, including the ROT case where the customer pays `total − 0.5`: legacy jumps to `paid`; kernel allocates 9 500 to customer, 2 999,50 to tax, rounds 0,50 → both settled → `paid`. |
-| **Idempotency keys per source:** `customer_confirmed` → `customer_confirmed:<approval_id>`; `fortnox` → `fortnox_import:<invoice_id>:<fortnox_document_number>:<Balance>` (blueprint §21); `manual`/`status_patch` → `manual:<invoice_id>:<paid_at to the minute>:<amount_minor>`; every key also carries the target component when `amount` was derived. | Legacy callers have no idempotency key. These make a double-click, a retried cron and a redelivered approval each exactly-once; two genuine equal manual payments within the same minute are the accepted edge. |
-| **Lazy issuance:** if the flagged invoice has no receivables at payment time, the facade calls `issue_invoice_receivables` first (`origin='invoice'`, `issued_date = invoice_date`). `recordInvoiceDeliveryOutcome` issues eagerly on successful delivery. | Fortnox sync runs *before* delivery in `send-invoice.ts`, so the number is final at issue. C4b replaces lazy issuance with opening balances for pre-cut-over documents; until then this is the only way a flagged business can pay an older invoice. |
-| **`invoice_number` becomes immutable once receivables exist.** In `sync-to-fortnox.ts`, under the flag and when `financial_receivables` has rows for the invoice, the receipt update omits `invoice_number` (keeps `fortnox_invoice_number`, `fortnox_document_number`, `ocr_number`). Legacy path unchanged. | §36.1 and every idempotency key derived from the number. Only reachable when a first sync failed and a later retry succeeds after issuance. |
-| **The thank-you SMS in `[id]/status/route.ts` stays where it is.** | It keys on `result.transition`, which the facade reproduces. Moving it is C5b together with the bridge. |
+| **The legacy path is preserved byte-for-byte** in `applyInvoicePaymentLegacy`; the export dispatches on `readKernelDispatchFlag(businessId)` and on the RPC's routing outcome. Flag off → zero kernel RPCs and one extra `business_config` read. | Orchestration C5. Facit test compares the legacy function source with `main`. |
+| **One command = one atomic RPC.** `execute_payment_command` (v239) does routing, lazy issuance, settlement, allocation, rounding, outcome and intents under the business lock, in one transaction, keyed by `(business_id, command_key)`. | B1 + B4. Verified in PGlite (below). The same RPC is what C5b's runner and C7's provider adapter will call, so the command table becomes the audit trail of "who asked for what". |
+| **Callers own identity.** Every caller passes `commandKey` (table under "Callers"). HTTP routes accept a client `Idempotency-Key` header or body `command_id`; when absent the route mints one and echoes it in the response. | B1. A retry (same key) is idempotent by construction; a new key is a new command, as legacy semantics require. |
+| **Resolution order for a command without an observation:** explicit `target` (+ optional amount) → explicit `amount` (allocate customer → tax_authority → unallocated) → neither: the next open component, customer first, for its full outstanding. Persisted once. | Mirrors `decidePaymentOutcome` including the ROT `total − 0.5` case, but never re-derived on replay. |
+| **Provider snapshot rule:** with an observation the target is the invoice and the amount is `snapshot_paid − kernel_recorded`; `≤ 0` records nothing (`no_new_money` / `provider_below_kernel`, the latter reported once via `rapporteraTystFel`, reconciliation is C11). | B2. Manual-then-provider confirms without double counting; overpayment observed by the provider stays unallocated. |
+| **Routing:** no receivables + legacy evidence → `legacy_routed`, run the frozen body. Eager issuance in `recordInvoiceDeliveryOutcome` obeys the same rule (a resend of a part-paid invoice issues nothing). | B3. C4b replaces this with opening balances; until then flagged businesses keep legacy behaviour on their old paper. |
+| **Effects run inline, from intents.** Intents are created in the kernel transaction only when the **customer component settled in this command**, one per `(receivable_id, effect)` ever (a reversal + re-settlement gets `effects_suppressed`, C4 review). Dispatch: `claim_effect_intents` (max 3 attempts, 10 min stale) → run → `finish_effect_intent`. Every kernel-branch call also sweeps that invoice's owed intents. | B4. `runPostPaymentAutomations` gets an additive `only?: string[]` so one effect can run alone; legacy callers unchanged. |
+| **`unknown` is a human's**: an attempt that did not finish within 10 minutes is never auto-retried (the SMS may have gone out); it is reported via `rapporteraTystFel('financial-kernel:effect-unknown', …)` with the intent id. C5b adds the periodic sweeper and the admin surface. | Honest at-most-once for external sends. |
+| **Interim SE rounding policy** `INTERIM_SE_ROUNDING_MAX_MINOR = 100n` in `lib/financial-kernel/policies/se-rounding.ts`, passed to the RPC as `p_rounding_max_minor`; the RPC applies it **only to components this command paid into, only when nothing is left unallocated**, as an `adjust_receivable{rounding}` posting. | Same as v1, now a policy argument; the reviewer checks no TypeScript comparison uses the constant. |
+| **Projection:** `invoice.status` from the transition table, `paid_amount = recorded_minor` (every settled inbound payment the kernel holds for the invoice, allocated or not), `paid_at/settled_at/paid_via/manual_paid_*` as legacy. Written app-side after the RPC; on replay rewritten idempotently. Not atomic with the kernel; C6/C12 compare. | Blueprint §18.1. Same columns as legacy so every reader in the call-site map keeps working. |
+| **Kernel branch never reads `invoice.status` to decide.** `already_paid` comes from the RPC (`state = 'already_paid'`: nothing open); a replayed command re-projects and re-sweeps instead of early-returning. | B4 (early `paid` return on retry). |
+| **`invoice_number` immutable once receivables exist** (Fortnox receipt update under the flag, `sync-to-fortnox.ts`), **thank-you SMS in `[id]/status/route.ts` untouched**, **non-ROT partial stays open under the flag**, **overpayment unallocated**. | Unchanged from v1; not challenged. |
+
+### Command keys per caller
+
+| Source | Caller | `commandKey` | Target / amount |
+|---|---|---|---|
+| `manual` | `POST /api/invoices/[id]/mark-paid` | `manual:<invoice_id>:<client key>` — client key = `Idempotency-Key` header or body `command_id`, sanitised to `[A-Za-z0-9._-]{1,120}`; absent → `crypto.randomUUID()` minted by the route and echoed as `command_id` in the JSON response | body `amount` → explicit amount; else next open component |
+| `status_patch` | `PATCH /api/invoices/[id]/status` (`status: 'paid'`) | `status_patch:<invoice_id>:<client key or minted uuid>` | body `paid_amount` → explicit; else next open component |
+| `manual` | `lib/matte/action-executor.ts` `mark_invoice_paid` | `manual:<invoice_id>:matte:<sha256(channel|from|receivedAt) first 32 hex>` from the `IncomingSignal` (it has no id) | next open component |
+| `customer_confirmed` | `app/api/approvals/[id]/route.ts` `confirm_payment` | `customer_confirmed:<approval_id>` | `target: 'customer'`, `reviewed.amount` if present |
+| `fortnox` | `lib/fortnox/sync-payments.ts` | `fortnox_import:<invoice_id>:<document_number>:<paid_minor>` | `providerObservation` (below); `amount` argument kept as today for the legacy branch |
+
+UI: `app/dashboard/invoices/page.tsx` `handleMarkPaid` and the status modal in
+`app/dashboard/invoices/[id]/page.tsx` send `Idempotency-Key: crypto.randomUUID()` generated per
+click. Server-side minting keeps old clients and curl working (no retry protection, exactly as today).
+
+**Provider observation** (`providerObservation` on `ApplyPaymentOptions`, optional, ignored by the
+legacy branch):
+
+```ts
+{ provider: 'fortnox', documentNumber: string, total?: number, balance?: number, fullyPaid?: boolean,
+  paidMinor: string /* decimal string of öre: Money.fromLegacyNumber(paidSoFarFromFortnox(fn) ?? fallback) */,
+  paidFrom: 'total_minus_balance' | 'local_invoice_total' | 'local_customer_share', observedAt: string }
+```
+
+`paidMinor` fallbacks mirror the caller today: classifier `paid` without `Total`/`Balance` → the
+local invoice total; classifier `customer_paid` without them → `getCustomerShare(inv)`.
+
+### v239 — implement as written (deviations in the handoff with reasons)
+
+```sql
+-- v239_financial_payment_commands.sql — DRAFT for the C5 brief v2 (Claude, 2026-09-14).
+-- Verified in PGlite on top of v235–v238 (probe7.cjs). Codex implements as written; deviations in the handoff.
+BEGIN;
+
+-- Supabase advisor WARN (production check 2026-09-14): pin search_path on the two v235/v238 helpers.
+ALTER FUNCTION public.financial_events_immutable() SET search_path = public, pg_temp;
+ALTER FUNCTION public.financial_receivable_json(public.financial_receivables) SET search_path = public, pg_temp;
+
+-- ── Payment commands: one row per command identity, written in the same transaction as the kernel writes ──
+CREATE TABLE IF NOT EXISTS public.financial_payment_commands (
+  id            TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id   TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
+  command_key   TEXT        NOT NULL CHECK (command_key ~ '^[a-z_]+:\S+$' AND length(command_key) <= 400),
+  invoice_id    TEXT        NOT NULL,
+  source        TEXT        NOT NULL CHECK (source IN ('manual', 'status_patch', 'customer_confirmed', 'fortnox')),
+  route         TEXT        NOT NULL CHECK (route IN ('kernel', 'legacy')),
+  state         TEXT        NOT NULL CHECK (state IN ('executed', 'already_paid', 'legacy_routed', 'no_new_money', 'provider_below_kernel')),
+  target        TEXT        NULL CHECK (target IS NULL OR target IN ('customer', 'tax_authority', 'invoice')),
+  amount_minor  BIGINT      NULL CHECK (amount_minor IS NULL OR amount_minor > 0),
+  currency      TEXT        NOT NULL DEFAULT 'SEK' CHECK (currency ~ '^[A-Z]{3}$'),
+  settled_at    TIMESTAMPTZ NOT NULL,
+  provider      TEXT        NOT NULL CHECK (provider IN ('manual', 'fortnox')),
+  method        TEXT        NULL,
+  evidence      TEXT        NOT NULL CHECK (evidence IN ('manual', 'fortnox')),
+  observation   JSONB       NULL,
+  payment_id    TEXT        NULL,
+  outcome       JSONB       NOT NULL,
+  actor_type    TEXT        NOT NULL,
+  actor_id      TEXT        NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (business_id, id),
+  UNIQUE (business_id, command_key),
+  FOREIGN KEY (business_id, payment_id) REFERENCES public.financial_payments(business_id, id),
+  CHECK ((state = 'executed') = (payment_id IS NOT NULL)),
+  CHECK ((state = 'executed') = (amount_minor IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_financial_payment_commands_invoice ON public.financial_payment_commands (business_id, invoice_id, created_at);
+
+-- ── Effect intents: durable "we owe this side effect" rows; the marker the C5b bridge checks ──
+CREATE TABLE IF NOT EXISTS public.financial_effect_intents (
+  id            TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id   TEXT        NOT NULL REFERENCES public.business_config(business_id) ON DELETE RESTRICT,
+  command_id    TEXT        NOT NULL,
+  invoice_id    TEXT        NOT NULL,
+  receivable_id TEXT        NOT NULL,
+  effect        TEXT        NOT NULL CHECK (effect ~ '^[a-z_]{2,40}$'),
+  status        TEXT        NOT NULL CHECK (status IN ('pending', 'attempting', 'sent', 'failed', 'skipped', 'unknown')),
+  attempts      INT         NOT NULL DEFAULT 0 CHECK (attempts >= 0),
+  claimed_at    TIMESTAMPTZ NULL,
+  finished_at   TIMESTAMPTZ NULL,
+  last_error    TEXT        NULL,
+  result        JSONB       NULL,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (id),
+  UNIQUE (business_id, id),
+  UNIQUE (business_id, command_id, effect),
+  UNIQUE (business_id, receivable_id, effect),
+  FOREIGN KEY (business_id, command_id) REFERENCES public.financial_payment_commands(business_id, id),
+  FOREIGN KEY (business_id, receivable_id) REFERENCES public.financial_receivables(business_id, id),
+  CHECK ((status = 'attempting') = (claimed_at IS NOT NULL AND finished_at IS NULL) OR status IN ('sent', 'failed', 'skipped', 'unknown')),
+  CHECK ((status IN ('sent', 'failed', 'skipped', 'unknown')) = (finished_at IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_financial_effect_intents_open ON public.financial_effect_intents (business_id, invoice_id)
+  WHERE status IN ('pending', 'attempting', 'failed');
+
+DO $rls$ DECLARE t TEXT; BEGIN
+  FOREACH t IN ARRAY ARRAY['financial_payment_commands', 'financial_effect_intents'] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_tenant_read', t);
+    EXECUTE format('CREATE POLICY %I ON public.%I FOR SELECT TO authenticated USING (public.is_business_member(business_id))', t || '_tenant_read', t);
+    EXECUTE format('REVOKE ALL ON TABLE public.%I FROM PUBLIC, anon, authenticated, service_role', t);
+    EXECUTE format('GRANT SELECT ON TABLE public.%I TO authenticated, service_role', t);
+  END LOOP;
+END $rls$;
+
+-- ── RPC 1: execute (or replay) one payment command atomically ──
+-- Identity = (business_id, command_key). Parameters are resolved ONCE and persisted with the outcome
+-- in the same transaction as issuance, settlement, allocations, rounding and effect intents.
+-- A replay returns the stored outcome and never touches the kernel again.
+CREATE OR REPLACE FUNCTION public.execute_payment_command(
+  p_business_id TEXT, p_command_key TEXT, p_invoice_id TEXT, p_source TEXT,
+  p_target TEXT, p_amount_minor BIGINT, p_settled_at TIMESTAMPTZ,
+  p_provider TEXT, p_method TEXT, p_evidence TEXT, p_observation JSONB,
+  p_rounding_max_minor BIGINT, p_effects TEXT[], p_actor_type TEXT, p_actor_id TEXT
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE
+  cmd public.financial_payment_commands%ROWTYPE;
+  inv RECORD; r RECORD;
+  v_target TEXT; v_amount BIGINT; v_state TEXT := 'executed';
+  v_recorded BIGINT; v_snapshot BIGINT; v_delta BIGINT;
+  pay JSONB; al JSONB; adj JSONB; recs JSONB;
+  v_unallocated BIGINT; v_alloc BIGINT; v_open_count INT;
+  v_settled_now TEXT[] := '{}'; v_touched TEXT[] := '{}'; v_suppressed TEXT[] := '{}';
+  v_allocations JSONB := '[]'; v_adjustments JSONB := '[]'; v_intents JSONB := '[]';
+  v_customer_rec TEXT; v_effect TEXT; v_intent_id TEXT; v_cmd_id TEXT; v_outcome JSONB;
+  v_settled_at TIMESTAMPTZ := COALESCE(p_settled_at, now());
+BEGIN
+  PERFORM public.financial_lock(p_business_id);
+  IF p_command_key IS NULL OR p_command_key = '' THEN RAISE EXCEPTION 'financial_command_key_required' USING ERRCODE = 'check_violation'; END IF;
+  IF p_source NOT IN ('manual', 'status_patch', 'customer_confirmed', 'fortnox') THEN RAISE EXCEPTION 'financial_command_source_invalid' USING ERRCODE = 'check_violation'; END IF;
+
+  -- Replay: identity wins over everything the caller sends now.
+  SELECT * INTO cmd FROM public.financial_payment_commands c WHERE c.business_id = p_business_id AND c.command_key = p_command_key;
+  IF FOUND THEN
+    IF cmd.invoice_id <> p_invoice_id OR cmd.source <> p_source THEN
+      RAISE EXCEPTION 'financial_command_conflict' USING ERRCODE = 'unique_violation', DETAIL = cmd.id;
+    END IF;
+    RETURN cmd.outcome || jsonb_build_object('replayed', true, 'command_id', cmd.id,
+      'intents', (SELECT COALESCE(jsonb_agg(jsonb_build_object('id', i.id, 'effect', i.effect, 'status', i.status, 'attempts', i.attempts) ORDER BY i.effect), '[]'::jsonb)
+                    FROM public.financial_effect_intents i WHERE i.business_id = p_business_id AND i.command_id = cmd.id));
+  END IF;
+
+  SELECT i.invoice_id, i.status, i.paid_amount, i.total INTO inv
+    FROM public.invoice i WHERE i.invoice_id = p_invoice_id AND i.business_id = p_business_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_invoice_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
+
+  -- Routing (B3): an invoice with legacy payment evidence and no kernel receivables stays on the legacy path
+  -- until C4b imports its opening balance. The decision is persisted so every later command on it agrees.
+  IF NOT EXISTS (SELECT 1 FROM public.financial_receivables x WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id) THEN
+    IF COALESCE(inv.paid_amount, 0) > 0 OR inv.status IN ('customer_paid', 'paid') THEN
+      v_outcome := jsonb_build_object('route', 'legacy', 'state', 'legacy_routed', 'reason', 'legacy_payment_evidence',
+        'legacy_status', inv.status, 'legacy_paid_amount', inv.paid_amount);
+      INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, settled_at, provider, method, evidence, observation, outcome, actor_type, actor_id)
+        VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'legacy', 'legacy_routed', v_settled_at, p_provider, p_method, p_evidence, p_observation, v_outcome, p_actor_type, p_actor_id)
+        RETURNING id INTO v_cmd_id;
+      RETURN v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', '[]'::jsonb, 'effects_suppressed', '[]'::jsonb);
+    END IF;
+    PERFORM public.issue_invoice_receivables(p_business_id, p_invoice_id, p_actor_type, p_actor_id);
+  END IF;
+
+  SELECT count(*) INTO v_open_count FROM public.financial_receivables x
+    WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open';
+  IF v_open_count = 0 THEN
+    v_outcome := jsonb_build_object('route', 'kernel', 'state', 'already_paid', 'settled_now', '[]'::jsonb, 'unallocated_minor', '0');
+    INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, settled_at, provider, method, evidence, observation, outcome, actor_type, actor_id)
+      VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'kernel', 'already_paid', v_settled_at, p_provider, p_method, p_evidence, p_observation, v_outcome, p_actor_type, p_actor_id)
+      RETURNING id INTO v_cmd_id;
+    RETURN v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', '[]'::jsonb, 'effects_suppressed', '[]'::jsonb);
+  END IF;
+
+  -- Resolve target and amount ONCE (B1). Persisted below; a replay never re-derives.
+  IF p_observation IS NOT NULL THEN
+    -- Provider snapshot (B2): new money = cumulative paid per provider − everything the kernel already holds for the invoice.
+    v_target := 'invoice';
+    v_snapshot := (p_observation->>'paid_minor')::bigint;
+    IF v_snapshot IS NULL OR v_snapshot < 0 THEN RAISE EXCEPTION 'financial_observation_paid_minor_required' USING ERRCODE = 'check_violation'; END IF;
+    SELECT COALESCE(sum(p.amount_minor), 0) INTO v_recorded FROM public.financial_payments p
+      WHERE p.business_id = p_business_id AND p.correlation_id = 'fin_invoice_' || p_invoice_id AND p.status = 'settled' AND p.direction = 'inbound';
+    v_delta := v_snapshot - v_recorded;
+    IF v_delta <= 0 THEN
+      v_state := CASE WHEN v_delta = 0 THEN 'no_new_money' ELSE 'provider_below_kernel' END;
+      v_outcome := jsonb_build_object('route', 'kernel', 'state', v_state, 'snapshot_paid_minor', v_snapshot::text,
+        'kernel_recorded_minor', v_recorded::text, 'delta_minor', v_delta::text, 'settled_now', '[]'::jsonb, 'unallocated_minor', '0');
+      INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, target, settled_at, provider, method, evidence, observation, outcome, actor_type, actor_id)
+        VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'kernel', v_state, 'invoice', v_settled_at, p_provider, p_method, p_evidence, p_observation, v_outcome, p_actor_type, p_actor_id)
+        RETURNING id INTO v_cmd_id;
+      RETURN v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', '[]'::jsonb, 'effects_suppressed', '[]'::jsonb);
+    END IF;
+    v_amount := v_delta;
+  ELSIF p_target IS NOT NULL THEN
+    IF p_target NOT IN ('customer', 'tax_authority') THEN RAISE EXCEPTION 'financial_command_target_invalid' USING ERRCODE = 'check_violation'; END IF;
+    v_target := p_target;
+    SELECT (x.amount_minor + x.adjusted_minor - x.allocated_minor) INTO v_amount FROM public.financial_receivables x
+      WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.component = p_target AND x.status = 'open';
+    IF NOT FOUND THEN RAISE EXCEPTION 'financial_command_target_not_open' USING ERRCODE = 'check_violation'; END IF;
+    IF p_amount_minor IS NOT NULL THEN v_amount := p_amount_minor; END IF;
+  ELSIF p_amount_minor IS NOT NULL THEN
+    v_target := 'invoice'; v_amount := p_amount_minor;
+  ELSE
+    -- Legacy "no amount" = the next open component, customer first. Resolved under the lock, persisted once.
+    SELECT x.component, (x.amount_minor + x.adjusted_minor - x.allocated_minor) INTO v_target, v_amount FROM public.financial_receivables x
+      WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open'
+      ORDER BY CASE x.component WHEN 'customer' THEN 0 ELSE 1 END LIMIT 1;
+  END IF;
+  IF v_amount IS NULL OR v_amount <= 0 THEN RAISE EXCEPTION 'financial_command_amount_invalid' USING ERRCODE = 'check_violation'; END IF;
+
+  pay := public.record_payment_settlement(p_business_id, p_provider, NULL, 'inbound', p_method, 'SEK', v_amount, NULL, p_evidence, v_settled_at,
+    'fin_invoice_' || p_invoice_id, p_command_key, p_actor_type, p_actor_id);
+  v_unallocated := (pay->>'unallocated_minor')::bigint;
+
+  FOR r IN SELECT x.id, x.component, (x.amount_minor + x.adjusted_minor - x.allocated_minor) AS outstanding FROM public.financial_receivables x
+             WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open' AND (v_target = 'invoice' OR x.component = v_target)
+             ORDER BY CASE x.component WHEN 'customer' THEN 0 ELSE 1 END
+  LOOP
+    EXIT WHEN v_unallocated <= 0;
+    v_alloc := LEAST(v_unallocated, r.outstanding);
+    al := public.allocate_payment(p_business_id, pay->>'payment_id', r.id, v_alloc, p_command_key || ':alloc:' || r.component, p_actor_type, p_actor_id);
+    v_unallocated := v_unallocated - v_alloc;
+    v_touched := v_touched || r.component;
+    v_allocations := v_allocations || jsonb_build_object('component', r.component, 'receivable_id', r.id, 'amount_minor', v_alloc::text);
+    IF (al->>'receivable_settled')::boolean THEN v_settled_now := v_settled_now || r.component; END IF;
+  END LOOP;
+
+  -- Interim SE rounding policy (C1b replaces the value): only components this command paid into, only when the
+  -- payment is fully allocated, only a shortfall within the policy. An explicit adjustment posting, never a comparison.
+  IF v_unallocated = 0 AND COALESCE(p_rounding_max_minor, 0) > 0 THEN
+    FOR r IN SELECT x.id, x.component, (x.amount_minor + x.adjusted_minor - x.allocated_minor) AS outstanding FROM public.financial_receivables x
+               WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.status = 'open' AND x.component = ANY(v_touched)
+    LOOP
+      IF r.outstanding > 0 AND r.outstanding <= p_rounding_max_minor THEN
+        adj := public.adjust_receivable(p_business_id, r.id, 'rounding', -r.outstanding, NULL, 'payment_command', p_command_key,
+          p_command_key || ':rounding:' || r.component, p_actor_type, p_actor_id);
+        v_adjustments := v_adjustments || jsonb_build_object('component', r.component, 'receivable_id', r.id, 'delta_minor', (-r.outstanding)::text);
+        IF (adj->>'receivable_settled')::boolean THEN v_settled_now := v_settled_now || r.component; END IF;
+      END IF;
+    END LOOP;
+  END IF;
+
+  SELECT jsonb_agg(public.financial_receivable_json(x) ORDER BY x.component) INTO recs FROM public.financial_receivables x
+    WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id;
+  -- recorded_minor = every settled inbound payment the kernel holds for the invoice (allocated or not): the legacy paid_amount projection.
+  SELECT COALESCE(sum(p.amount_minor), 0) INTO v_recorded FROM public.financial_payments p
+    WHERE p.business_id = p_business_id AND p.correlation_id = 'fin_invoice_' || p_invoice_id AND p.status = 'settled' AND p.direction = 'inbound';
+  v_outcome := jsonb_build_object('route', 'kernel', 'state', 'executed', 'payment_id', pay->>'payment_id', 'amount_minor', v_amount::text,
+    'target', v_target, 'settled_now', to_jsonb(v_settled_now), 'allocations', v_allocations, 'adjustments', v_adjustments,
+    'unallocated_minor', v_unallocated::text, 'recorded_minor', v_recorded::text, 'receivables', recs);
+  INSERT INTO public.financial_payment_commands (business_id, command_key, invoice_id, source, route, state, target, amount_minor, settled_at, provider, method, evidence, observation, payment_id, outcome, actor_type, actor_id)
+    VALUES (p_business_id, p_command_key, p_invoice_id, p_source, 'kernel', 'executed', v_target, v_amount, v_settled_at, p_provider, p_method, p_evidence, p_observation, pay->>'payment_id', v_outcome, p_actor_type, p_actor_id)
+    RETURNING id INTO v_cmd_id;
+
+  -- Effect intents (B4): owed only when the CUSTOMER component settled in this command; one per receivable and effect, ever.
+  IF 'customer' = ANY(v_settled_now) AND p_effects IS NOT NULL THEN
+    SELECT x.id INTO v_customer_rec FROM public.financial_receivables x
+      WHERE x.business_id = p_business_id AND x.invoice_id = p_invoice_id AND x.component = 'customer';
+    FOREACH v_effect IN ARRAY p_effects LOOP
+      v_intent_id := NULL;
+      INSERT INTO public.financial_effect_intents (business_id, command_id, invoice_id, receivable_id, effect, status)
+        VALUES (p_business_id, v_cmd_id, p_invoice_id, v_customer_rec, v_effect, 'pending')
+        ON CONFLICT (business_id, receivable_id, effect) DO NOTHING RETURNING id INTO v_intent_id;
+      IF v_intent_id IS NULL THEN v_suppressed := v_suppressed || v_effect;
+      ELSE v_intents := v_intents || jsonb_build_object('id', v_intent_id, 'effect', v_effect, 'status', 'pending', 'attempts', 0); END IF;
+    END LOOP;
+  END IF;
+
+  RETURN v_outcome || jsonb_build_object('replayed', false, 'command_id', v_cmd_id, 'intents', v_intents, 'effects_suppressed', to_jsonb(v_suppressed));
+END $fn$;
+
+-- ── RPC 2: claim the intents owed on an invoice (pending, or failed below the retry cap). Stale attempts become 'unknown'. ──
+CREATE OR REPLACE FUNCTION public.claim_effect_intents(p_business_id TEXT, p_invoice_id TEXT, p_max_attempts INT, p_stale_minutes INT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE v_unknown INT; v_claimed JSONB;
+BEGIN
+  PERFORM public.financial_lock(p_business_id);
+  UPDATE public.financial_effect_intents SET status = 'unknown', finished_at = clock_timestamp(),
+      last_error = 'attempt did not finish within ' || p_stale_minutes || ' min; delivery unknown, needs a human'
+    WHERE business_id = p_business_id AND invoice_id = p_invoice_id AND status = 'attempting'
+      AND claimed_at < clock_timestamp() - make_interval(mins => p_stale_minutes);
+  GET DIAGNOSTICS v_unknown = ROW_COUNT;
+  WITH c AS (
+    UPDATE public.financial_effect_intents SET status = 'attempting', attempts = attempts + 1, claimed_at = clock_timestamp(), finished_at = NULL
+      WHERE business_id = p_business_id AND invoice_id = p_invoice_id
+        AND (status = 'pending' OR (status = 'failed' AND attempts < p_max_attempts))
+      RETURNING id, command_id, receivable_id, effect, attempts)
+  SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.effect), '[]'::jsonb) INTO v_claimed FROM c;
+  RETURN jsonb_build_object('claimed', v_claimed, 'marked_unknown', v_unknown);
+END $fn$;
+
+-- ── RPC 3: finish one claimed intent ──
+CREATE OR REPLACE FUNCTION public.finish_effect_intent(p_business_id TEXT, p_intent_id TEXT, p_status TEXT, p_result JSONB, p_error TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+BEGIN
+  IF p_status NOT IN ('sent', 'failed', 'skipped') THEN RAISE EXCEPTION 'financial_effect_status_invalid' USING ERRCODE = 'check_violation'; END IF;
+  UPDATE public.financial_effect_intents SET status = p_status, finished_at = clock_timestamp(), result = p_result, last_error = p_error
+    WHERE business_id = p_business_id AND id = p_intent_id AND status = 'attempting';
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_effect_intent_not_attempting' USING ERRCODE = 'check_violation'; END IF;
+  RETURN jsonb_build_object('id', p_intent_id, 'status', p_status);
+END $fn$;
+
+REVOKE ALL ON FUNCTION public.execute_payment_command(TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB, BIGINT, TEXT[], TEXT, TEXT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.claim_effect_intents(TEXT, TEXT, INT, INT) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.finish_effect_intent(TEXT, TEXT, TEXT, JSONB, TEXT) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.execute_payment_command(TEXT, TEXT, TEXT, TEXT, TEXT, BIGINT, TIMESTAMPTZ, TEXT, TEXT, TEXT, JSONB, BIGINT, TEXT[], TEXT, TEXT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.claim_effect_intents(TEXT, TEXT, INT, INT) TO service_role;
+GRANT EXECUTE ON FUNCTION public.finish_effect_intent(TEXT, TEXT, TEXT, JSONB, TEXT) TO service_role;
+
+COMMIT;
+```
+
+**Verified 2026-09-14 in PGlite on v235–v238 + this draft (`probe7.cjs`, 34 checks):**
+Codex probe 1 → the same key replays with the same `payment_id` even when the caller now sends a
+different timestamp or a different target/amount; one payment, customer settled, tax open. Codex
+probe 2 → no `financial_payment_idempotency_conflict` on a fresh timestamp (the stored
+`settled_at` wins). Codex probe 3 → a command rolled back mid-way leaves no payment and no
+receivable; the retry executes fresh with `settled_now = ['customer']`. Codex probe 5 → an old
+`customer_paid` invoice with `paid_amount 9500` and no receivables is `legacy_routed` on both a
+Fortnox observation and a manual command; zero receivables, zero payments; `paid_amount > 0` alone
+is evidence. Codex probe 4 → two observations `950000` then `1250000` on the same document give
+two payments (customer, then tax) with intents only on the first; the same observation twice
+replays. Manual 9 500 then Fortnox `950000` → `no_new_money`; Fortnox `900000` →
+`provider_below_kernel` (delta −50000, nothing recorded); Fortnox `1250000` → tax settled.
+Overpayment `1010000` on a 10 000 invoice → customer settled, `unallocated 10000`,
+`recorded_minor 1010000`. GP36 `total − 0,50` → customer and tax settled, one rounding
+adjustment of −50 on tax; 1,00 short → settled with adjustment; 1,01 short → open, no
+adjustment; a component the command did not pay into is never rounded (9 500 to customer with
+2 999,50 unallocated leaves tax open at 300000 and rounds nothing). `already_paid` records
+nothing. Intents: six claimed at attempt 1; `finish` twice → `financial_effect_intent_not_attempting`;
+an attempt older than 10 min → `unknown`, not re-claimed; `failed` re-claimed until attempt 3, then
+never. Reversal + re-settlement → `settled_now = ['customer']` with all six effects in
+`effects_suppressed`. Cross-tenant key → `financial_invoice_not_found`; `authenticated` cannot
+execute the RPC nor insert into the tables; both helpers now carry `search_path = public, pg_temp`.
+Not proven in PGlite: two connections racing on the same key (Postgres CI job must; the advisory
+lock serialises them and the second sees the row).
 
 ### Facade algorithm (kernel branch)
 
 ```text
+applyInvoicePayment(opts):
+  if not readKernelDispatchFlag(opts.businessId): return applyInvoicePaymentLegacy(opts)     -- frozen, zero kernel RPCs
+  return applyInvoicePaymentKernel(opts)
+
 applyInvoicePaymentKernel(opts):
-  read invoice (same select as legacy) → if status = 'paid' → return already_paid (legacy shape)
-  receivables := issueInvoiceReceivables(invoiceId)            -- idempotent, lazy
-  key := idempotency key per source (table above)
-  payment := recordPaymentSettlement({ provider: source→provider, method, amount: opts.amount ?? nextOpenComponentOutstanding,
-             evidence: 'manual' | 'fortnox', settledAt: opts.paidAt, correlationId: fin_invoice_<id>, idempotencyKey: key, actor })
-  for component in [customer, tax_authority] while payment.unallocated > 0 and component.open:
-      allocatePayment(min(unallocated, component.outstanding), key ':' component)
-  for component still open with 0 < outstanding ≤ policy.maxMinor and payment.unallocated = 0:
-      adjustReceivable({ reason: 'rounding', delta: −outstanding, idempotencyKey: key ':rounding:' component })
-  derive transition (table below); write invoice projection (same columns as legacy:
-      status, paid_amount = Σ allocated across components as kr, paid_at/settled_at/paid_via/manual_paid_*)
-  if customer component settled in this call: write bridge marker (receivable_id), then runPostPaymentAutomations(...) exactly as legacy
-  return legacy ApplyPaymentResult shape (+ kernel: { paymentId, allocations, unallocated })
+  invoice := same select as legacy + status, paid_amount        -- not found → legacy error shape
+  cmd := { key: opts.commandKey (required under the flag; throw 'financial_command_key_required' if missing),
+           source, target?, amountMinor? (Money.fromLegacyNumber(opts.amount)), settledAt: opts.paidAt ?? now,
+           provider/method/evidence per source, observation?: opts.providerObservation,
+           roundingMaxMinor: INTERIM_SE_ROUNDING_MAX_MINOR, effects: effectSetFor(opts) }
+  out := kernelDb.rpc('execute_payment_command', cmd)
+  if out.route == 'legacy':            return applyInvoicePaymentLegacy(opts)   -- log once per invoice: legacy_routed until C4b
+  if out.state == 'already_paid':      return { ok, already_paid: true, status: 'paid', transition: 'none', paid_at }
+  if out.state == 'provider_below_kernel': rapporteraTystFel(...) once; fallthrough as no_new_money
+  if out.state == 'no_new_money':      transition 'none'; projection from out.receivables; no intents
+  projection := derive(out.receivables, out.settled_now, out.recorded_minor)      -- table below
+  write invoice projection (same columns as legacy; idempotent; replay rewrites)
+  effects := sweepIntents(businessId, invoiceId, opts)     -- claim_effect_intents(3, 10) → run each via runPostPaymentAutomations({only:[effect]}) / portal / approval artifacts → finish_effect_intent
+  effects += legacy 'skipped' rows for effects not in the set (approval choices), as legacy reports them
+  return legacy ApplyPaymentResult + kernel: { commandId, paymentId, replayed, unallocatedMinor, effectsSuppressed }
 ```
 
-Source → provider: `manual`/`status_patch` → `'manual'` (evidence `'manual'`), `customer_confirmed`
-→ `'manual'` with `method: 'customer_confirmed'`, `fortnox` → `'fortnox'` (evidence `'fortnox'`).
+Source → provider/evidence: `manual`/`status_patch` → `'manual'`/`'manual'`; `customer_confirmed`
+→ `'manual'` with `method: 'customer_confirmed'`; `fortnox` → `'fortnox'`/`'fortnox'`.
 
-### Legacy transition derived from kernel results
+Effect set (`p_effects`): `['pipeline','project_check','project_stage','smart_communication','payment_received_rules','portal_message']`
+for an unreviewed call; for `approvalFollowUps` the same gating as legacy (`updateWorkflows`
+false → drop the first three; `runAutomationRules` false → drop `payment_received_rules`;
+customer messages become `portal_message` and `review_request` approval artifacts when
+`prepareCustomerMessages`). Effects dropped by review are reported `skipped` in `effects[]`
+exactly as legacy, without an intent row.
 
-| Customer component | Tax component | This call settled | Transition | Status |
-|---|---|---|---|---|
-| settled now | none | customer | `to_paid` | `paid` |
-| settled now | open | customer | `to_customer_paid` | `customer_paid` |
-| settled now | settled now | customer (+tax) | `to_paid` | `paid` |
-| settled earlier | settled now | tax | `settled` | `paid` |
-| open | any | nothing | `none` | unchanged (`sent`/`overdue`/`customer_paid`) |
+### Legacy transition derived from the outcome
 
-`customerJustSettled` (the gate for all effects) = "customer component settled in this call".
-This reproduces §18.5 and golden path 34 without reading `status`.
+| `settled_now` contains | Tax component after | Transition | Status |
+|---|---|---|---|
+| customer | none | `to_paid` | `paid` |
+| customer | open | `to_customer_paid` | `customer_paid` |
+| customer, tax_authority | settled | `to_paid` | `paid` |
+| tax_authority only | settled | `settled` | `paid` |
+| nothing | any | `none` | unchanged (`sent`/`overdue`/`customer_paid`); only `paid_amount` moves |
+
+`customerJustSettled` = `'customer' ∈ settled_now`. Reproduces §18.5 and golden path 34 without
+reading `status`; on a replayed command `settled_now` is the stored value, so a retried request
+projects the same transition and only sweeps what is still owed.
 
 ### Scope
 
 ```text
-lib/invoices/apply-payment.ts                       (dispatch + kernel branch; legacy body moved verbatim to applyInvoicePaymentLegacy)
-lib/invoices/send-invoice.ts                        (eager issuance on delivered, under flag)
+lib/invoices/apply-payment.ts                       (dispatch + kernel branch; legacy body moved verbatim to applyInvoicePaymentLegacy;
+                                                     ApplyPaymentOptions += commandKey?, providerObservation?; runPostPaymentAutomations += only?)
+lib/invoices/send-invoice.ts                        (eager issuance on delivered, under flag, routing rule)
 lib/invoices/sync-to-fortnox.ts                     (invoice_number immutable after issuance, under flag)
-lib/financial-kernel/policies/se-rounding.ts        (new; interim policy function)
-lib/financial-kernel/bridge/marker.ts               (new; write/read marker per receivable_id) + sql/v239_financial_bridge_markers.sql
-lib/financial-kernel/kernel-db.ts                   (new; KernelDb adapter over the service-role Supabase client — the only place the two meet)
+lib/fortnox/sync-payments.ts                        (providerObservation + commandKey on both applyInvoicePayment calls; nothing else)
+app/api/invoices/[id]/mark-paid/route.ts            (commandKey from header/body or minted; echoed)
+app/api/invoices/[id]/status/route.ts               (same, source status_patch)
+app/api/approvals/[id]/route.ts                     (commandKey customer_confirmed:<approval_id>, target 'customer')
+lib/matte/action-executor.ts                        (commandKey from the signal)
+app/dashboard/invoices/page.tsx, app/dashboard/invoices/[id]/page.tsx   (Idempotency-Key header)
+lib/financial-kernel/dispatch-flag.ts               (new; readKernelDispatchFlag)
+lib/financial-kernel/policies/se-rounding.ts        (new; interim policy constant + function)
+lib/financial-kernel/commands/service.ts            (new; executePaymentCommand, claimEffectIntents, finishEffectIntent — typed wrappers, strings for money)
+lib/financial-kernel/kernel-db.ts                   (new; KernelDb adapter over the service-role client — the only place the two meet)
+sql/v239_financial_payment_commands.sql             (as above)
+tests/helpers/financial-receivables-database.ts     (+ invoice.status/paid_amount, + v239)
+tests/financial-kernel-c5-brief-probes.spec.ts      (rewritten: each probe asserts prevention; registered in test:contracts)
 tests/financial-kernel-facade.spec.ts               (new; PGlite + injected legacy deps; golden paths under both flag states)
-tests/financial-kernel-facade-legacy-frozen.spec.ts (new; legacy function source identical to main; flag-off makes no kernel RPC)
+tests/financial-kernel-facade-legacy-frozen.spec.ts (new; legacy source identical to main; flag-off makes no kernel RPC, also pre-v239 schema)
 package.json, .github/workflows/contracts.yml, docs (handoff)
 ```
 
-Migration `v239`: `financial_bridge_markers (business_id, receivable_id, marker, delivered_at, source, PRIMARY KEY (business_id, receivable_id, marker))`
-with `marker = 'payment_received'` for now; RPC `record_bridge_marker(...)` returning whether it
-was new. Grants as in v236.
-
 ### Invariants (tests first)
 
-1. **Legacy frozen:** with the flag off, `applyInvoicePayment` produces identical results and
-   identical `invoice` writes to `main` for every existing test in `apply-payment-decision.spec.ts`,
-   `facit-invoice-customer-paid.spec.ts`, `fortnox-classify-payment.spec.ts`; no kernel RPC is
-   invoked (assert the `KernelDb` fake was never called); the legacy function's source text equals
-   the pre-C5 body (facit).
-2. **Equivalence table:** for golden paths 1, 5, 12, 30, 34, 36 the kernel branch yields the same
-   `status`, `transition` sequence and `payment_received` count as `legacyStatus`/`legacyPaymentReceived`;
-   for 4, 7, 37 it yields the documented divergence (open vs. paid; unallocated 100 kr) and the
-   test names it as intended.
-3. **Rounding boundary:** shortfalls of 0,01, 1,00 → settled with a `receivable_adjusted{rounding}`
-   of exactly that amount; 1,01 → open, no adjustment. Both branches agree at 1,00 (legacy `>=`).
-4. **ROT `total − 0.5` case:** customer 9 500 allocated, tax 2 999,50 allocated, 0,50 rounding on
-   tax, status `paid`, `payment_received` once.
-5. **Double-click / retry:** the same manual call twice within a minute → one payment, one
-   allocation set, one marker, one `payment_received`; the second returns `already_paid` or the
-   same result, never a second effect.
-6. **Fortnox sync equivalence:** `syncFortnoxPaymentsForBusiness` through the flagged facade on
-   the classifier's `paid`/`customer_paid` fixtures produces the same counters as today, and a
-   second run with the same `Balance` is a no-op (idempotency key).
-7. **Approval path:** `customer_confirmed` with `approvalFollowUps` keeps preparing the separate
-   approval cards; key is the approval id; a redelivered approval is exactly-once.
-8. **Lazy issuance:** an invoice sent before the flag flipped gets receivables at first payment
-   with `issued_date = invoice_date`, then behaves as any other.
-9. **Eager issuance:** `recordInvoiceDeliveryOutcome` success under the flag issues once; delivery
-   failure issues nothing; flag off issues nothing.
-10. **Number immutability:** under the flag with receivables present, the Fortnox receipt update
-    does not change `invoice_number`; without receivables (or flag off) it behaves as today.
-11. **Marker before effects:** the marker row exists before `runPostPaymentAutomations` is called
-    (order asserted with a spy); a marker already present suppresses effects and is reported in
-    `effects[]` as skipped.
-12. **Contract test still green:** `fireEvent` appears only in `apply-payment.ts` (not a kernel
-    dir) and the bridge file; no undocumented event name; no `Number(` on minor amounts in the new
-    kernel files; the interim policy constant is used only as an argument to `adjustReceivable`,
-    never in a comparison that skips an adjustment (source-scan).
+1. **Legacy frozen:** flag off → identical results and identical `invoice` writes to `main` for
+   every existing test in `apply-payment-decision.spec.ts`, `facit-invoice-customer-paid.spec.ts`,
+   `fortnox-classify-payment.spec.ts`; the `KernelDb` fake is never called; the legacy function's
+   source equals the pre-C5 body (facit); the dispatch read tolerates a `business_config` without
+   the column (pre-v238 deploy) and answers `false`.
+2. **Command identity (from Codex probes 1 and 2):** the same `commandKey` twice, with a fresh
+   default `paidAt` and even with a different `amount`, yields one payment, one allocation set,
+   one intent set, one `payment_received`; the second call reports `kernel.replayed = true` and
+   the same transition. A different key on the resulting `customer_paid` ROT invoice records the
+   tax payment with `transition 'settled'` and no intents.
+3. **Atomic kernel step (from probe 3):** a fault injected after `execute_payment_command`
+   returns (before projection, between intents, after an intent send) leaves the kernel
+   consistent; the retried request re-projects the same transition and finishes only the intents
+   still `pending`/`failed`; no intent is dispatched twice; a stale `attempting` intent becomes
+   `unknown` and is reported once, never re-sent.
+4. **Fortnox observation (from probe 4):** two distinct balances produce two distinct
+   observations and keys; `syncFortnoxPaymentsForBusiness` through the flagged facade on the
+   classifier's fixtures produces today's counters; a second run with the same observation is a
+   replay with no new payment; manual-then-provider is `no_new_money`; flag off → the legacy
+   branch receives exactly today's arguments plus the ignored observation.
+5. **Routing (from probe 5):** an invoice `customer_paid` with `paid_amount 9500` and no
+   receivables goes to the legacy body under the flag, settles as today, and never gets receivables
+   from the facade; the routing outcome is persisted on the command row.
+6. **Dispatch flag (from probe 6):** flag off → zero `rpc()` calls; the C4 helper is untouched.
+7. **Equivalence table:** golden paths 1, 5, 12, 30, 34, 36 → same `status`, transition sequence
+   and `payment_received` count as `legacyStatus`/`legacyPaymentReceived`; 4, 7, 37 → the
+   documented divergence, named as intended in the test.
+8. **Rounding boundary:** 0,01 and 1,00 short → settled with a `receivable_adjusted{rounding}` of
+   exactly that amount; 1,01 → open, no adjustment; ROT `total − 0,50` → customer 9 500, tax
+   2 999,50 + rounding 0,50, `paid`, one `payment_received`; a component the command did not pay
+   into is never rounded.
+9. **Approval path:** `customer_confirmed` keeps preparing the separate approval cards; key is
+   the approval id; a redelivered approval is a replay.
+10. **Issuance:** first payment on a never-paid invoice issues with `issued_date = invoice_date`;
+    `recordInvoiceDeliveryOutcome` success under the flag issues once and only when the routing
+    rule allows; failure and flag off issue nothing.
+11. **Number immutability:** under the flag with receivables present the Fortnox receipt update
+    leaves `invoice_number`; otherwise as today.
+12. **Marker semantics for C5b:** an intent row exists for `(customer receivable, effect)` before
+    any effect runs (order asserted with a spy); reversal + re-settlement yields
+    `effects_suppressed` for all effects and no second thank-you.
+13. **Contract test still green:** `fireEvent` only in `apply-payment.ts` and the bridge; no
+    undocumented event name; no `Number(` on minor amounts in new kernel files; the rounding
+    constant appears only as an RPC argument (source-scan).
+14. **Postgres CI:** two connections executing the same `commandKey` concurrently → one payment,
+    one outcome, both callers see the same `command_id`.
 
 ### Acceptance (orchestration §5 C5 + §9)
 
-All existing invoice/payment suites green unchanged; all kernel suites green; `tsc` clean; the
-flag defaults false and no business has it set; the diff outside the three legacy files is
-additive; handoff states which golden paths diverge and why.
+All existing invoice/payment suites green unchanged; all kernel suites green including the
+rewritten probes; `tsc` clean; the flag defaults false and no business has it set; the diff
+outside the listed legacy files is additive; handoff states which golden paths diverge and why,
+and lists every caller with its key.
 
 ### Not in this package
 
-The consumer runner and event-driven bridge (C5b). Moving the thank-you SMS (C5b). Real
-rounding policy and account (C1b). Opening balances (C4b). Refund of unallocated overpayment
-(C7/C14). Supplier side (C4s). Any flag flip for any business (C6).
+The consumer runner, the event-driven bridge, the periodic intent sweeper and the admin surface
+for `unknown` intents (C5b). Moving the thank-you SMS (C5b). Real rounding policy and account
+(C1b). Opening balances and the end of `legacy_routed` (C4b). Refund of unallocated overpayment
+(C7/C14). Reconciliation of `provider_below_kernel` (C11). Supplier side (C4s). Any flag flip
+for any business (C6).
 
 ### Handoff back
 
 Orchestration §7 block under §2, same PR, including the list of behaviours that differ under
-the flag. Claude reviews against §6 A, B, C, E with B as the centre.
+the flag and the conversion table probe → prevention test. Claude reviews against §6 A, B, C, E
+with B as the centre.
 
 ---
 
@@ -480,10 +881,13 @@ become callers in C5s. Golden path 20 is the acceptance replay.
 
 **C5b — consumer runner and event-driven bridge.** A cron route (with the repo's cron-auth
 contract) that runs `consumeOnce` for `automation-bridge` per flagged business; the bridge maps
-`receivable_settled{customer}` → the same effects the facade runs inline, guarded by the
-`financial_bridge_markers` row, so producers that are not the facade (ROT decision import,
-PSP webhooks in C7) get the effects exactly once. Moves the thank-you SMS out of
-`[id]/status/route.ts` into the bridge. Handler gets an `AbortSignal` (C3 review).
+`receivable_settled{customer}` → the same effects the facade runs inline, guarded by
+`financial_effect_intents` (brief v2: an intent row for the receivable and effect means the
+inline path owns delivery and the bridge stays silent; no row means a producer that is not the
+facade — ROT decision import, PSP webhooks in C7 — and the bridge creates the intents and
+dispatches them). Adds the periodic sweeper for `pending`/`failed` intents and the admin surface
+for `unknown` ones. Moves the thank-you SMS out of `[id]/status/route.ts` into the bridge.
+Handler gets an `AbortSignal` (C3 review).
 
 **Open-source inputs.** Before C4b, C9, C10, C11, C13 or C14 is briefed, read
 `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §5: it names the reference data (Odoo core `l10n_se`,
@@ -513,6 +917,42 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 Findings that a review left open, or accepted with a note, so that a merge does not erase
 them. BLOCKER/HIGH must be resolved before merge; MEDIUM before the feature flag; LOW is
 tracked.
+
+### C5 brief (PR #59), Codex review 2026-09-14 — correction required
+
+PR #59 merged at `b949c7635` after all checks passed. Before changing legacy callers, six
+diagnostic probes against real C4 RPCs and the real Fortnox caller reproduced contract gaps.
+The probes pass by demonstrating the counterexamples, **not** C5 acceptance. Full evidence,
+proposed correction boundaries and handoff: [C5 brief review](FINANCIAL_KERNEL_C5_BRIEF_REVIEW.md).
+
+| Sev | Finding | Status |
+|---|---|---|
+| BLOCKER B1 | Deriving key/amount/target from current open components turns a duplicate customer payment into a distinct tax payment; fresh default timestamps also conflict on explicit-amount retries. | Stable command identity and persisted original parameters required. |
+| BLOCKER B2 | Real Fortnox caller omits Balance/DocumentNumber and passes cumulative amounts; distinct provider snapshots can produce identical facade arguments. | Explicit observation and reconciliation contract needed; caller is currently outside allowed edits. |
+| BLOCKER B3 | Lazy issuance loses existing legacy paid amounts; an old customer_paid invoice's tax settlement is applied to a newly opened customer component. | Opening-balance prerequisite or explicit cut-over exclusion/routing required. |
+| HIGH B4 | Retry after committed allocation has no "settled now" outcome; pre-effect marker or early paid return can permanently suppress undelivered effects after a crash. | Recoverable command outcome and durable effect intent/completion contract required; do not label the proposed marker exactly-once delivery. |
+| MEDIUM M1 | Existing flag helper calls a kernel RPC even when disabled; it cannot meet the proposed zero-RPC and pre-migration dispatch requirement. | Separate application dispatch flag reader, with explicit pre-migration handling. |
+
+Only this review, package-log status and diagnostic tests are changed. No application code,
+remote migration or flag activation. The §3 proposal is preserved so the contract owner can
+revise the exact assumptions; it is not an approved implementation algorithm while these
+findings remain open.
+
+**Claude response 2026-09-14 (brief v2 in §3).** All five accepted. Two readings corrected:
+(a) B1's "duplicate of the customer's payment command" — a second *distinct* command on a
+`customer_paid` ROT invoice is, in legacy semantics, the Skatteverket payment (the mark-paid
+route documents it); the fault was that a *retry* could not be told from a new command. v2
+makes identity a caller-supplied key and persists the resolved parameters, so a retry replays
+and a new command is a new key. (b) B4's marker — v2 has no marker separate from the
+obligation: the intent row is created in the kernel transaction and is what C5b's bridge checks.
+
+| Finding | Resolution in v2 | Proof |
+|---|---|---|
+| B1 | `execute_payment_command` keyed by `(business_id, command_key)`; target/amount/`settled_at` resolved once, stored, replayed | PGlite: same key with a fresh timestamp or a different body → same `payment_id`, one payment |
+| B2 | `providerObservation` from the Fortnox caller; RPC records `snapshot − kernel_recorded`, stores `no_new_money`/`provider_below_kernel` | PGlite: 950000 then 1250000 → two payments; repeat → replay; manual-then-provider → nothing new |
+| B3 | Persisted routing: legacy evidence + no receivables → `legacy_routed`, frozen body runs; C4b ends it | PGlite: old `customer_paid` invoice → no receivables, no payment, both commands routed legacy |
+| B4 | One transaction for the kernel step; intents `pending→attempting→sent/failed/skipped/unknown`; sweep on every call; `unknown` to a human | PGlite: rollback leaves nothing; claim/finish lifecycle; stale → `unknown`; retry cap 3; reversal + re-settlement → all effects suppressed |
+| M1 | `readKernelDispatchFlag` reads the column; absent → false | Invariant 1 and 6 |
 
 ### C1 — Money primitives (PR #49), Claude review 2026-09-13, orchestration §6 A
 
@@ -599,22 +1039,6 @@ No BLOCKER.
 
 ---
 
-### C2 — `financial_events` (PR #50), Claude review 2026-09-13, orchestration §6 A + C
-
-Verified locally on `codex/financial-kernel-c2` head `1ec1c34`: the 13 C2 tests plus contract,
-Money, schema and account-deletion suites green (64). Two probes beyond the suite: the migration
-deployed by a role without BYPASSRLS that owns the objects, then the RPC called as
-`service_role`; and `to_jsonb` of the RPC result followed by `JSON.parse`. Codex's two DDL
-deviations (service_role REVOKE ALL + GRANT SELECT; `financial_events` in `BEHALLS`) are correct.
-No BLOCKER.
-
-| Sev | Finding | Status |
-|---|---|---|
-| HIGH | `FORCE ROW LEVEL SECURITY` makes the only write path depend on the deploying role having BYPASSRLS. Proven: with a NOBYPASSRLS owner the append fails with an RLS violation; without FORCE it succeeds. The superuser PGlite harness cannot see this. Origin: the Claude DDL proposal, not Codex. Fix: drop FORCE, document why, add the non-bypass owner probe as a test. | resolved in PR #50: non-bypass deployer owns the tested objects; FORCE removed |
-| MEDIUM | RPC returns BIGINT inside a composite; PostgREST serialises it as a JSON number and `JSON.parse` loses digits above 2^53 (proven: …993 → …992). Return a flat row with `seq` and `amount_minor` as TEXT now, while the migration is unapplied. Any future PostgREST read of the table must cast the same two columns. | resolved in PR #50 with regression tests |
-| MEDIUM | Idempotency replay compares type/payload/amount/currency only; a replay with a different `correlation_id`, source, `causation_id` or `effective_date` silently returns the original. Add those four to the comparison; deliberately exclude `occurred_at` and actor. | resolved in PR #50 with regression tests |
-| accepted | Sequence gaps on failed inserts; single-session PGlite cannot prove concurrent commit order (C3 must, with the Postgres CI service); `hashtext` collisions only over-serialise; account deletion soft-deletes `business_config` so the RESTRICT FK does not fire on that path, track G remains open. | — |
-
 
 ## 6. Amendment log
 
@@ -626,3 +1050,8 @@ No BLOCKER.
 | 2026-09-13 | Tracks C and D delivered: executable golden paths + SE ledger review. | Tracks C, D |
 | 2026-09-13 | Track B delivered as `FINANCIAL_KERNEL_CALL_SITE_MAP.md`; board updated. | Track B |
 | 2026-09-13 | C3 brief written (outbox = events table, cursor per business/consumer, delivery ledger, halt-never-skip, two-connection proof). C2 brief retired to git history. C4 sketched. | Package C3 prep |
+| 2026-09-13 | C3 brief corrected after Codex's review (lease tokens, ordered ack enforced in SQL, attempt timestamps, status RPC); the review is recorded in §5. | Codex review of the C3 brief |
+| 2026-09-14 | C3 marked done (PR #54, review in §5). C4 brief written (receivables, payments, allocations, adjustments; DDL verified in PGlite with 32 probes). C3 brief retired to git history. C5 sketched. | Package C4 prep |
+| 2026-09-14 | C4 marked done (PR #56, review in §5; §FK.1 amended to decimal-string payload amounts in PR #57). C5 brief written (frozen legacy path, kernel branch as projection writer, inline effects behind a bridge marker, interim SE rounding policy, idempotency keys per source, lazy/eager issuance, immutable `invoice_number`). C4 brief retired to git history. C5b sketched. | Package C5 prep |
+| 2026-09-14 | `v235`–`v238` applied to production; read-only verification recorded under §1 "Deployment state". Duplicate C2 review block in §5 removed. `v239` gains the advisor's `search_path` pin for two helpers. | Owner deploy, Supabase advisors |
+| 2026-09-14 | C5 brief v2 after Codex review PR #60 (B1–B4, M1 accepted): command identity + atomic `execute_payment_command`, provider observation, persisted legacy routing, effect intents, dispatch flag reader; v239 draft embedded and verified in PGlite (34 checks). v1 retired to git history. Response recorded in §5. | Package C5 prep v2 |
