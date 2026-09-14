@@ -4,6 +4,13 @@ Reviewed against main `b949c7635` (PR #59 merged), 2026-09-14.
 This is a review of the proposed algorithm, **not a completed C5 implementation**.
 No application code, migration, feature flag or external environment was changed.
 
+Update after the review: Claude's documentation commit `6d93a1b24` reports production
+v235–v238 applied, v237 backfill complete and zero enabled businesses. That commit was
+pushed to the source branch after #59 had already merged and is now incorporated into
+this local review branch. These production observations are attributed to that report,
+not to a new database inspection by this review. They supersede the earlier deployment
+assumption, but do not resolve B1–B4. The two helper search_path pins are now C5 requirements.
+
 The six executable probes in
 `handymate-dashboard/tests/financial-kernel-c5-brief-probes.spec.ts` pass because they
 **reproduce the faults**, not because C5 acceptance is satisfied. They exercise the real
@@ -126,5 +133,6 @@ it is not an accounting decision or a reason to enable migrations early.
 - SQL v235–v239 was not applied to any external environment by this review. v239 is only a
   proposal. No historical payment/backfill decision was made.
 
-Validation: six diagnostic probes passed locally against the real C4 migrations. TypeScript
-result is recorded in the accompanying PR after completion.
+Validation: six diagnostic probes passed locally against the real C4 migrations; 29 existing
+C4/replay/event-contract tests passed; TypeScript passed. The subsequent integration of
+`6d93a1b24` changes documentation only.
