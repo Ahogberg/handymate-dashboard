@@ -1,7 +1,8 @@
+import { syncInvoicesFromFortnox } from '@/lib/fortnox/sync-invoices'
 import { NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
-import { syncFortnoxPaymentsForBusiness, syncSupplierInvoicePayments } from '@/lib/fortnox/sync-payments'
+import { syncSupplierInvoicePayments } from '@/lib/fortnox/sync-payments'
 import { batchSync } from '@/lib/fortnox/sync'
 import { importSupplierInvoicesForBusiness, rescanUnlinkedSupplierInvoices } from '@/lib/fortnox/import-supplier-invoices'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
@@ -47,6 +48,8 @@ export async function GET(request: Request) {
 
   const results = []
   const supplierResults = []
+  let totalInvoicesImported = 0
+  let totalInvoicesUpdated = 0
   let totalChecked = 0
   let totalMarkedPaid = 0
   let totalMarkedOverdue = 0
@@ -96,7 +99,9 @@ export async function GET(request: Request) {
     }
 
     try {
-      const result = await syncFortnoxPaymentsForBusiness(biz.business_id)
+      const result = await syncInvoicesFromFortnox(biz.business_id)
+      totalInvoicesImported += result.imported
+      totalInvoicesUpdated += result.updated
       results.push(result)
       totalChecked += result.checked
       totalMarkedPaid += result.marked_paid
@@ -178,10 +183,12 @@ export async function GET(request: Request) {
   }
 
   return NextResponse.json({
-    ok: true,
+    ok: errors.length === 0,
     businesses_synced: businesses?.length || 0,
     total_customers_synced: totalCustomersSynced,
     total_projects_synced: totalProjectsSynced,
+    total_invoices_imported: totalInvoicesImported,
+    total_invoices_updated: totalInvoicesUpdated,
     total_checked: totalChecked,
     total_marked_paid: totalMarkedPaid,
     total_marked_overdue: totalMarkedOverdue,

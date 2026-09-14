@@ -247,7 +247,7 @@ export const IRRELEVANT: string[] = [
   'product_components', 'products', 'quote_items', 'job_types', 'work_type',
   'vehicles', 'inventory', 'inventory_items', 'inventory_locations',
   'grossist_product', 'manual_supplier_products', 'supplier_product',
-  'supplier_connection', 'fortnox_sync', 'fuel_ledger',
+  'supplier_connection', 'fortnox_sync', 'fortnox_operation_lock', 'fuel_ledger',
   'custom_quote_categories', 'customer_segments', 'customer_tag',
   'contract_types', 'allowance_types', 'service_agreement_type',
   'lead_source', 'lead_sources', 'lead_scoring_rules', 'leads_monthly_usage',

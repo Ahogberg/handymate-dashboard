@@ -31,7 +31,7 @@ vm.runInNewContext(source + `\ngetSupabase = () => __db; isFortnoxConnected = as
   module: mod, exports: mod.exports, process: { env: {} }, console, Date,
   __db: db, __connected: () => connected,
   __send: async (business, body) => { assert.equal(business, 'b1'); sent.push(body); return response },
-  require: name => { if (name === '@supabase/supabase-js') return { createClient: () => { throw Error('Unexpected client') } }; if (name === '@/lib/observability/driftlarm') return { rapporteraTystFel: async () => {} }; throw Error('Forbidden dependency ' + name) },
+  require: name => { if (name === './fortnox/operation-lock') return { withFortnoxLock: () => { throw Error('Unexpected OAuth lock in isolated transport/project test') } }; if (name === '@supabase/supabase-js') return { createClient: () => { throw Error('Unexpected client') } }; if (name === '@/lib/observability/driftlarm') return { rapporteraTystFel: async () => {} }; throw Error('Forbidden dependency ' + name) },
 })
 function reset() { row = { project_id:'p1', name:'Test', project_number:'P-1042', status:'active', fortnox_project_number:null }; mode='ok'; sent=[]; dbReads=0; readError=false; connected=true; response={ProjectNumber:'1042'} }
 const run = () => mod.exports.syncProjectToFortnox('b1','p1')

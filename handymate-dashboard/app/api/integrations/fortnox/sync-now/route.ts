@@ -1,28 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-import { syncFortnoxPaymentsForBusiness } from '@/lib/fortnox/sync-payments'
+import { syncInvoicesFromFortnox } from '@/lib/fortnox/sync-invoices'
 
-/**
- * POST /api/integrations/fortnox/sync-now
- *
- * Trigga manuell synk av Fortnox-betalstatus för det inloggade företaget.
- * Använder samma logik som cron-jobbet (/api/cron/fortnox-sync) men för en
- * enskild business — rätt att klicka när som helst.
- */
+export const maxDuration = 300
 export async function POST(request: NextRequest) {
-  try {
-    const business = await getAuthenticatedBusiness(request)
-    if (!business) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const result = await syncFortnoxPaymentsForBusiness(business.business_id)
-
-    return NextResponse.json({
-      success: result.errors.length === 0,
-      ...result,
-    })
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })
-  }
+  const business = await getAuthenticatedBusiness(request)
+  if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try { return NextResponse.json(await syncInvoicesFromFortnox(business.business_id)) }
+  catch (error) { return NextResponse.json({ success: false, error: error instanceof Error ? error.message : 'Synken misslyckades' }, { status: 500 }) }
 }

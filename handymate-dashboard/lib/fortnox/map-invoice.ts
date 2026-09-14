@@ -19,7 +19,7 @@ import type { FortnoxInvoiceListItem } from '../fortnox'
 export interface MappedInvoiceRow {
   invoice_number: string
   invoice_type: 'standard'
-  status: 'sent' | 'overdue' | 'paid'
+  status: 'draft' | 'sent' | 'overdue' | 'paid' | 'cancelled'
   total: number
   invoice_date: string
   due_date: string | null
@@ -58,13 +58,13 @@ export function mapFortnoxInvoice(fi: FortnoxInvoiceListItem, today: string): Ma
   // vad Balance råkar säga (2026-08-15, historik-widening — Fortnox kan
   // utelämna/felaktigt sätta Balance på betalda rader; en fallback till Total
   // hade riskerat att räkna en betald faktura som skuld).
-  const outstanding = isPaid ? 0 : (fi.Balance != null ? Number(fi.Balance) || 0 : total)
+  const outstanding = fi.Cancelled || fi.Booked === false || isPaid ? 0 : (fi.Balance != null ? Number(fi.Balance) || 0 : total)
 
   const invoice_date = fi.InvoiceDate ?? today
   const due_date = fi.DueDate ?? null
   // Betald slår allt (en betald faktura är aldrig "förfallen"), annars
   // förfallen om förfallodatum passerat, annars bara skickad.
-  const status: 'sent' | 'overdue' | 'paid' = isPaid
+  const status: 'draft' | 'sent' | 'overdue' | 'paid' | 'cancelled' = fi.Cancelled ? 'cancelled' : fi.Booked === false ? 'draft' : isPaid
     ? 'paid'
     : (due_date && due_date < today ? 'overdue' : 'sent')
 
@@ -79,7 +79,7 @@ export function mapFortnoxInvoice(fi: FortnoxInvoiceListItem, today: string): Ma
       invoice_date,
       due_date,
       fortnox_document_number: docNumber,
-      fortnox_invoice_number: fi.InvoiceNumber ?? null,
+      fortnox_invoice_number: fi.InvoiceNumber ?? docNumber,
       // SÄKERHET: historisk faktura — inga påminnelser triggas. reminder_count = 0
       // och next_reminder_at utelämnas (lämnas orört/null i DB).
       reminder_count: 0,

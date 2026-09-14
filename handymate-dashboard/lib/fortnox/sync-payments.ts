@@ -61,7 +61,7 @@ interface LocalInvoiceRow {
  * post-payment-kedjan här längre. Varje skrivning läser error; räknarna
  * räknas bara upp vid lyckad skrivning.
  */
-export async function syncFortnoxPaymentsForBusiness(businessId: string): Promise<SyncResult> {
+export async function syncFortnoxPaymentsForBusiness(businessId: string, options: { stamp?: boolean; excludeDocumentNumbers?: string[] } = {}): Promise<SyncResult> {
   const result: SyncResult = {
     business_id: businessId,
     checked: 0,
@@ -88,7 +88,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
     .select('invoice_id, business_id, status, fortnox_invoice_number, fortnox_document_number, due_date, customer_id, total, rot_rut_type, rot_rut_deduction, customer_pays, paid_amount')
     .eq('business_id', businessId)
     .not('fortnox_invoice_number', 'is', null)
-    .not('status', 'in', '(paid,cancelled)')
+    .not('status', 'in', '(paid,cancelled,credited)')
 
   if (error) {
     result.errors.push(`fetch: ${error.message}`)
@@ -98,6 +98,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
   const todayStr = new Date().toISOString().split('T')[0]
 
   for (const inv of (invoices || []) as LocalInvoiceRow[]) {
+    if (options.excludeDocumentNumbers?.includes(inv.fortnox_document_number || inv.fortnox_invoice_number || '')) continue
     result.checked++
     try {
       // Föredra DocumentNumber (Fortnox internt id) över InvoiceNumber
@@ -108,6 +109,7 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
         `/invoices/${docNum}`
       )
       const fnInv = fnRes?.Invoice
+      if (fnInv?.Booked === false && !fnInv.Cancelled) continue
       if (!fnInv) continue
 
       const cls = classifyFortnoxPayment(fnInv, inv, todayStr)
@@ -161,12 +163,14 @@ export async function syncFortnoxPaymentsForBusiness(businessId: string): Promis
     }
   }
 
-  // Uppdatera last_synced_at
-  const { error: stampError } = await supabase
-    .from('business_config')
-    .update({ fortnox_last_synced_at: new Date().toISOString() })
-    .eq('business_id', businessId)
-  if (stampError) result.errors.push(`last_synced_at: ${stampError.message}`)
+  if (options.stamp !== false && result.errors.length === 0) {
+    // Uppdatera last_synced_at
+    const { error: stampError } = await supabase
+      .from('business_config')
+      .update({ fortnox_last_synced_at: new Date().toISOString() })
+      .eq('business_id', businessId)
+    if (stampError) result.errors.push(`last_synced_at: ${stampError.message}`)
+  }
 
   return result
 }

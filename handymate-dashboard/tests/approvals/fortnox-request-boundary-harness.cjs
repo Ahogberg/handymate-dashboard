@@ -4,7 +4,7 @@ let token=null,mode='ok',requests=[]
 const mod={exports:{}}
 const source=ts.transpileModule(fs.readFileSync(path.resolve(__dirname,'../../lib/fortnox.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText
 vm.runInNewContext(source+'\nrefreshTokenIfNeeded = async () => __token();',{module:mod,exports:mod.exports,process:{env:{}},console,Date,Buffer,Response,__token:()=>token,
- require:name=>{if(name==='@supabase/supabase-js')return {createClient:()=>{throw Error('Unexpected DB')}};if(name==='@/lib/fortnox/api-log')return {logFortnoxApi:async()=>{}};throw Error('Forbidden dependency '+name)},
+ require:name=>{if(name==='./fortnox/operation-lock')return {withFortnoxLock:()=>{throw Error('Unexpected OAuth lock in isolated transport/project test')}};if(name==='@supabase/supabase-js')return {createClient:()=>{throw Error('Unexpected DB')}};if(name==='@/lib/fortnox/api-log')return {logFortnoxApi:async()=>{}};throw Error('Forbidden dependency '+name)},
  fetch:async(url,options)=>{requests.push({url,method:options.method});if(mode==='network')throw Error('response lost');if(mode==='bad')return Response.json({ErrorInformation:{message:'Invalid request'}},{status:400});if(mode==='server')return Response.json({ErrorInformation:{message:'Server failure'}},{status:500});return Response.json({Project:{ProjectNumber:'1042'}})}
 })
 const run=()=>mod.exports.fortnoxRequest('b1','POST','/projects',{Project:{ProjectNumber:'1042'}})

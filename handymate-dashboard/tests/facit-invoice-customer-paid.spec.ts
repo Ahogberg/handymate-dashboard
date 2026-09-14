@@ -88,8 +88,8 @@ test.describe('Fortnox-synken — lib/fortnox/sync-payments.ts', () => {
     expect(s).not.toContain('payment_method')
   })
 
-  test('customer_paid ingår i kandidaterna (settle-kollen) — filtret är fortfarande (paid,cancelled)', () => {
-    expect(s).toContain(".not('status', 'in', '(paid,cancelled)')")
+  test('customer_paid ingår i kandidaterna (settle-kollen) — slutbehandlade och krediterade undantas', () => {
+    expect(s).toContain(".not('status', 'in', '(paid,cancelled,credited)')")
   })
 
   test('räknarna är additiva: marked_customer_paid + marked_settled', () => {

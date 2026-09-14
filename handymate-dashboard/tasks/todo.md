@@ -1549,3 +1549,12 @@ Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
 - [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
 - Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
 Publicering och aktuell mergestatus dokumenteras i PR #42.
+
+## Fortnox inkommande synk — 2026-09-14
+- [x] Reproducerat: Synka nu hämtar inget nytt; Hämta historik gav refresh HTTP 400.
+- [x] Rätta OAuth-förnyelse, företagssvar och samtidighet.
+- [x] Gemensam import/uppdatering i manuell synk och cron, bevara lokala kopplingar.
+- [ ] Regressioner, TypeScript, build och PR.
+- [ ] Live: återanslut testföretaget, importera faktura, ändra i Fortnox och synka igen.
+
+Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsprov gröna. TypeScript grön med 12 GB heap. PostgreSQL-lås/privilegier/unikhet verifierade lokalt med PGlite. Produktionsmigration avvisad av automatisk granskning: kräver Andreas godkännande. Build och slutligt publicerat träd redovisas i PR.
