@@ -1,3 +1,4 @@
+import { consumeOnce } from '../lib/financial-kernel/events/consume'
 import { test, expect } from '@playwright/test'
 import { NextRequest } from 'next/server'
 import { receivablesDatabase, seedInvoice, domain } from './helpers/financial-receivables-database'
@@ -54,4 +55,19 @@ test('resolution validates null operation and attempt bounds at the database bou
 test('new producer/list/resolve functions are inaccessible to tenant clients',async()=>{
   const rows=(await f.db.query<any>(`SELECT proname,has_function_privilege('anon',oid,'execute') a,has_function_privilege('authenticated',oid,'execute') u,has_function_privilege('service_role',oid,'execute') s FROM pg_proc WHERE proname IN ('ensure_effect_intents','list_owed_effect_intents','list_unresolved_effect_intents','resolve_effect_intent')`)).rows
   expect(rows).toHaveLength(4);for(const row of rows){expect(row.a).toBe(false);expect(row.u).toBe(false);expect(row.s).toBe(true)}
+})
+
+test('halted consumer resumes only through a reasoned, verified admin action',async()=>{
+  await unknown()
+  const rpc = c5bRpc(f)
+  for(let attempt=0;attempt<5;attempt++) await consumeOnce(rpc,'a',{consumer:'automation-bridge',async handle(){throw Error('broken handler')}})
+  const h=harness(),get=h.load('app/api/admin/financial-kernel/consumers/route.ts')
+  const before=await (await get.GET(new NextRequest('https://test/?business_id=a'))).json()
+  expect(before.consumers[0].halted_at).not.toBeNull()
+  const route=h.load('app/api/admin/financial-kernel/consumers/resume/route.ts')
+  expect((await route.POST(request({business_id:'a',consumer:'automation-bridge',reason:''}))).status).toBe(400)
+  expect((await route.POST(request({business_id:'b',consumer:'automation-bridge',reason:'Fixed'}))).status).toBe(409)
+  expect((await route.POST(request({business_id:'a',consumer:'automation-bridge',reason:'Handler fixed',actor_id:'spoof'}))).status).toBe(200)
+  const row=(await f.db.query<any>("SELECT halted_at,halted_reason FROM financial_event_consumers WHERE business_id='a' AND consumer='automation-bridge'")).rows[0]
+  expect(row.halted_at).toBeNull();expect(row.halted_reason).toBe('resumed by verified-admin: Handler fixed')
 })

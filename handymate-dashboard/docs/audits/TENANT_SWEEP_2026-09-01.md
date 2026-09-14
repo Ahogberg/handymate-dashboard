@@ -130,3 +130,18 @@ Efter-SMS:et (SMS 2) skickas från `finalizeAcceptedQuote` men bara när
 `arDemoOffertForetag(businessId)` — en riktig hantverkares kund får det
 aldrig. Demo-besökarna städas efter 7 dagar av `demo_quote_cleanup` (v223),
 som själv kastar på företag utan `is_demo_tenant`.
+
+
+## C5b addition, 2026-09-14
+
+Five new routes outside customer tenant authentication: `cron/financial-kernel`
+uses the existing fail-closed cron secret; `admin/financial-kernel/intents`,
+`admin/financial-kernel/intents/[id]/resolve`, `admin/financial-kernel/consumers`,
+and `admin/financial-kernel/consumers/resume` use `financialKernelAdmin(request)`.
+That helper verifies the actual user with Auth.getUser and applies isSuperAdmin.
+Each endpoint requires a named business and every mutation requires a reason.
+The actor is server-derived. No endpoint is public by design.
+
+The route inventory recognises this verified helper and its cap increases by the
+five named routes (156 to 161). Behavioral tests exercise all four admin denials,
+foreign-tenant resolution, spoofed actor rejection and the resume reason gate.
