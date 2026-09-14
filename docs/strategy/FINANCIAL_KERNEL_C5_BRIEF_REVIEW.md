@@ -1,5 +1,9 @@
 # C5 brief review — counterexamples before integration
 
+> **Resolved 2026-09-14:** brief v2 in `FINANCIAL_KERNEL_PACKAGE_LOG.md` §3 (command identity,
+> atomic `execute_payment_command`, provider observation, persisted legacy routing, effect intents,
+> dispatch flag reader), Claude's response under §5. The probes below become prevention tests in C5.
+
 Reviewed against main `b949c7635` (PR #59 merged), 2026-09-14.
 This is a review of the proposed algorithm, **not a completed C5 implementation**.
 No application code, migration, feature flag or external environment was changed.
