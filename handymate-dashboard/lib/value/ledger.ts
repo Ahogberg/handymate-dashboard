@@ -1,3 +1,4 @@
+import { invoicePaymentEvidence } from './invoice-payment-evidence'
 /**
  * Value Ledger — fyrstegsvyn (2026-08-12): "Handymate den här månaden:
  * X kr identifierade möjligheter · Y kr agerat · Z kr fakturerat ·
@@ -65,7 +66,7 @@ import { eventCohort } from './events/cohort'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { manadsfonster } from '@/lib/value/vardekvitto'
 import { mapApprovalRowToCard, isWithinAttributionWindow } from '@/lib/value/recovered-revenue'
-import { isCustomerSettled, PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
+import { PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
 export const MANADS_LEDGER_METHOD_VERSION = 3
 
@@ -465,20 +466,7 @@ export async function getManadsLedger(
       if (!(PORTAL_VISIBLE_STATUSES as readonly string[]).includes(inv.status)) continue
       const total = Number(inv.total)
       if (!Number.isFinite(total) || total < 0) continue
-      // customer_paid says the customer is settled, not that the remaining
-      // tax reduction has arrived. Missing payment evidence is never total.
-      const rawPaid = inv.paid_amount == null
-        ? (inv.status === 'paid' ? total : null)
-        : Number(inv.paid_amount)
-      const paidKr = rawPaid !== null && Number.isFinite(rawPaid) && rawPaid > 0
-        ? Math.min(total, rawPaid) : 0
-      const paidAtMs = inv.paid_at ? new Date(inv.paid_at).getTime() : NaN
-      invoices.set(String(inv.invoice_id), {
-        total_kr: total,
-        paid_kr: paidKr,
-        paid: isCustomerSettled(inv.status) && paidKr > 0,
-        paid_at_ms: Number.isFinite(paidAtMs) ? paidAtMs : null,
-      })
+      invoices.set(String(inv.invoice_id), { total_kr: total, ...invoicePaymentEvidence(inv) })
     }
   }
 

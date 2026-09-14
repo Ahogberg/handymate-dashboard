@@ -12,6 +12,8 @@ import { LedgerFlode } from '@/components/value/LedgerFlode'
 import { LedgerRader } from '@/components/value/LedgerRader'
 import { LedgerHistorik, type LedgerHistorikRad } from '@/components/value/LedgerHistorik'
 import RevenueWorkQueue from '@/components/pengar/RevenueWorkQueue'
+import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
+import { useBusiness } from '@/lib/BusinessContext'
 
 /**
  * /dashboard/pengar — Value Ledger + "Pengar på bordet".
@@ -34,10 +36,17 @@ import RevenueWorkQueue from '@/components/pengar/RevenueWorkQueue'
  * ur billing_plan — ägarrapportens regel); annars utelämnas raden helt.
  */
 export default function PengarPaBordetPage() {
+  const business = useBusiness()
+  return <PengarSession key={business.business_id} />
+}
+
+function PengarSession() {
   const [data, setData] = useState<PengarSummary | null>(null)
   const [fel, setFel] = useState(false)
   const [laddar, setLaddar] = useState(true)
   const [ledger, setLedger] = useState<ManadsLedger | null>(null)
+  const [ledgerState, setLedgerState] = useState<'loading' | 'ready' | 'error' | 'denied'>('loading')
+  const [ledgerAttempt, setLedgerAttempt] = useState(0)
   const [historik, setHistorik] = useState<LedgerHistorikRad[] | null>(null)
   const [historikLaddar, setHistorikLaddar] = useState(true)
   const [manadsavgiftKr, setManadsavgiftKr] = useState<number | null>(null)
@@ -54,12 +63,18 @@ export default function PengarPaBordetPage() {
 
   useEffect(() => {
     let aktiv = true
-    fetch('/api/value/ledger')
-      .then(r => (r.ok ? r.json() : null))
+    setLedger(null); setLedgerState('loading')
+    fetch('/api/value/ledger', { cache: 'no-store' })
+      .then(r => {
+        if (r.status === 401 || r.status === 403) { if (aktiv) setLedgerState('denied'); return null }
+        if (!r.ok) throw new Error('ledger_read_failed')
+        return r.json()
+      })
       .then(d => { if (aktiv && d?.ledger) setLedger(d.ledger) })
-      .catch(() => { /* blocket är extra, aldrig blockerande */ })
+      .then(() => { if (aktiv) setLedgerState(s => s === 'denied' ? s : 'ready') })
+      .catch(() => { if (aktiv) setLedgerState('error') })
     return () => { aktiv = false }
-  }, [])
+  }, [ledgerAttempt])
 
   useEffect(() => {
     let aktiv = true
@@ -96,6 +111,10 @@ export default function PengarPaBordetPage() {
   return (
     <div className="p-4 sm:p-8 bg-[#F8FAFC] min-h-screen">
       <div className="max-w-4xl mx-auto flex flex-col gap-5">
+        <WeeklyValueDigest />
+        {ledgerState === 'loading' && <p role="status" className="text-sm text-slate-500">Hämtar värdekedjans underlag…</p>}
+        {ledgerState === 'error' && <section className="rounded-xl border border-amber-200 bg-white p-4"><p role="alert">Värdekedjan kunde inte hämtas. Beloppen visas när underlaget kan läsas igen.</p><button onClick={() => setLedgerAttempt(n => n + 1)} className="mt-2 min-h-[44px] text-teal-800 underline">Försök igen</button></section>}
+        {ledgerState === 'denied' && <p className="text-sm text-slate-600">Värdekedjans ekonomiska underlag är tillgängligt för ägare och administratör.</p>}
         {/* ═══ Ledger-halvan — verifierad kedjedata ═══ */}
         {ledger && (
           <>

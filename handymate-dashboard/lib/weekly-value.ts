@@ -35,6 +35,8 @@ export interface WeeklyValue {
   measured_minutes_basis?: 'elapsed_workflow_time_not_labour_saved'
   range_days: number
   confirmed_kr: number
+  paid_kr?: number
+  accepted_quote_kr?: number
   /** Värdebevisen: agent + dagar-till-utfall gör varje rad till en berättelse. */
   confirmed_items: Array<{ label: string; amount: number; agent: string; dagar: number }>
   captured_count: number
@@ -141,6 +143,8 @@ export async function getWeeklyValue(
     ...observedTime,
     range_days: rangeDays,
     confirmed_kr: recovered.total_recovered_kr,
+    paid_kr: recovered.attributions.filter(a => a.event_kind === 'invoice_paid').reduce((sum, a) => sum + a.amount_kr, 0),
+    accepted_quote_kr: recovered.attributions.filter(a => a.event_kind === 'quote_accepted').reduce((sum, a) => sum + a.amount_kr, 0),
     confirmed_items: confirmedItems,
     captured_count: capturedCount,
     captured_kr: Math.round(capturedKr),

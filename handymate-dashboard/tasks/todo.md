@@ -1573,3 +1573,10 @@ Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsp
 - [x] 88 riktade tester för C6, V1, honesty och CI-paritet gröna.
 - [ ] TypeScript, bygge och publicering; slutresultaten anges på #73.
 - [ ] Kontrollera CI på publicerat huvud inför Claudes merge.
+
+## Kundvärde och upplevelse, nästa leverans — 2026-09-14
+- [x] Kartlagt main, V2/V3-skisser och pågående onboarding-PR #69.
+- [ ] Rätta läsfel, ekonomibehörighet och missvisande veckokvitto.
+- [ ] Sammanhängande, återförsökbar värdevisning med faktiska stadier och separat tidsunderlag.
+- [ ] Dokumentera och förbered återstående V2-, native mobil- och pilotacceptans utan nya ekonomiska antaganden.
+- [ ] Testa riktiga komponenter och routes, typkontroll, bygge, grön PR.
