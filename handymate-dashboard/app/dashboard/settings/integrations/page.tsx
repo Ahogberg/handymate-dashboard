@@ -127,12 +127,12 @@ export default function IntegrationsPage() {
     try {
       const res = await fetch('/api/integrations/fortnox/sync-now', { method: 'POST' })
       const data = await res.json()
-      if (res.ok) {
+      if (res.ok && data.success !== false) {
         setFortnoxToast(
-          `Synkat: ${data.checked} fakturor kontrollerade, ${data.marked_paid} markerade som betalda${data.marked_overdue ? `, ${data.marked_overdue} förfallna` : ''}`
+          `Synkat: ${data.imported || 0} nya, ${data.updated || 0} uppdaterade, ${data.checked} kontrollerade, ${data.marked_paid} markerade som betalda${data.marked_overdue ? `, ${data.marked_overdue} förfallna` : ''}`
         )
       } else {
-        setFortnoxToast(`Synk misslyckades: ${data.error || 'okänt fel'}`)
+        setFortnoxToast(`Synk misslyckades: ${data.error || data.errors?.[0]?.error || data.errors?.[0] || 'Alla fakturor kunde inte synkas. Kontrollera anslutningen och försök igen.'}`)
       }
       await refreshFortnox()
     } catch (err: any) {
@@ -154,7 +154,9 @@ export default function IntegrationsPage() {
   async function handleFortnoxImportHistory() {
     setFortnoxAction('importing')
     try {
-      await fetch('/api/integrations/fortnox/import/customers', { method: 'POST' })
+      const customerRes = await fetch('/api/integrations/fortnox/import/customers', { method: 'POST' })
+      const customerData = await customerRes.json()
+      if (!customerRes.ok || customerData.success === false || customerData.errors?.length) throw new Error('Kunderna kunde inte hämtas. Kontrollera Fortnox-anslutningen.')
       const res = await fetch('/api/integrations/fortnox/import/invoices', { method: 'POST' })
       const data = await res.json()
 
@@ -170,16 +172,17 @@ export default function IntegrationsPage() {
         // de två som redan lyckades.
       }
 
-      if (res.ok) {
+      if (res.ok && data.success !== false) {
         setFortnoxToast(
-          `Historik hämtad: ${data.imported} fakturor importerade${data.skipped ? `, ${data.skipped} redan kända` : ''}${supplierMessage}`
+          `Historik hämtad: ${data.imported} fakturor importerade, ${data.updated || 0} uppdaterade${data.skipped ? `, ${data.skipped} redan kända` : ''}${supplierMessage}`
         )
       } else {
-        setFortnoxToast(`Historik-hämtning misslyckades: ${data.error || 'okänt fel'}`)
+        setFortnoxToast(`Historik-hämtning misslyckades: ${data.error || data.errors?.[0]?.error || data.errors?.[0] || 'Alla fakturor kunde inte synkas. Kontrollera anslutningen och försök igen.'}`)
       }
       await refreshFortnox()
     } catch (err: any) {
       setFortnoxToast(`Historik-hämtning misslyckades: ${err.message || 'okänt fel'}`)
+      await refreshFortnox()
     } finally {
       setFortnoxAction(null)
       setTimeout(() => setFortnoxToast(null), 6000)

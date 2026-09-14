@@ -2506,3 +2506,15 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **VERIFIED:** Read-only uppslag bekräftar Nordström El AB, `biz_al7pjuu5smi`, med det tidigare testkontot. Lokala 17 policytester och 12 CI-kontrakt, testupptäckt samt typkontroll. **NOT VERIFIED:** Ingen autentiserad livekörning genomförd. Aktuellt lösenord i GitHub och åtkomst till preview inte verifierade. Browser fortfarande blockerad; ingen ny omgång browserförsök gjord här.
 
 **CUSTOMER IMPACT:** Återanvändbar testkörning för session, navigering och verkligt sparat/återöppnat utkast. **RISKS:** API-inloggning/skapande ersätter inte hela formulärresan; testutkast lämnas kvar; preview kan använda proddata. **STATUS CHANGES:** Release kvar på HOLD. **NEXT ACTION:** Följ `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`: använd befintlig secret om giltig, starta manuellt från arbetsgrenen, läs verkligt resultat och åtgärda observerade fel. GitHub-anslutningen saknar ny workflow_dispatch och secret-administration; första starten behöver göras i GitHub/CLI.
+
+### Fortnox — akut inkommande synk, 2026-09-14
+
+**DONE/NEW:** Browserprovet på Nordström El AB visade att Synka nu bara läste redan kopplade betalstatusar. Hämta historik gav refresh HTTP 400 och frånkoppling. Rättat i separat PR-arbete: fem minuters refreshmarginal, serialiserad OAuth-förnyelse, separat företagsnamnssparning, korrekt CompanyInformation. Gemensam inkommande fakturakörning för knappar/cron; skapa eller uppdatera, stabil identitet, bevarade jobb/anteckningar/påminnelser och sanningsenliga fel/räknare.
+
+**REUSED:** Fortnox API-klient, befintlig historikhämtning, betalningsklassning och applyInvoicePayment.
+
+**VERIFIED:** 49 befintliga riktade Fortnox-kontrakt gröna, nya körbara regressioner för import/omsynk/OAuth och lokal PostgreSQL-verifiering av lås, RLS/privilegier och unikt index. Exakt slutlig test/build-status dokumenteras i PR:n.
+
+**NOT VERIFIED/RISKS:** Ingen ny live-synk eller återanslutning efter kodändringen. Automatisk säkerhetsgranskning avvisade körning av migrationen i produktion; godkännande krävs. SEK-standardfakturor stöds av uppdateringen; kredit/kontant, annan valuta och återöppnade betalda fakturor rapporteras för avstämning. Ingen faktura skickades i browserprovet.
+
+**CUSTOMER IMPACT/STATUS:** Fortnox kvarstår PROVE, inte färdig lanseringsacceptans. Nästa steg: godkänn och kör den granskade migrationen, deploya, återanslut testföretaget, hämta testfakturan och bevisa beständig ändring från Fortnox utan dubblett.

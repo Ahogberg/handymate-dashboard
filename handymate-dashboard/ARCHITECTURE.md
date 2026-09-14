@@ -922,3 +922,11 @@ Legacy-filer som blir fasad, inte ersätts: `lib/invoices/apply-payment.ts` (C5)
 
 Ingen tabell, ingen RPC, ingen flagga, ingen Money-klass, inget beteende. Nästa paket är C1
 (Money) — se `docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md` för Codex-briefen.
+
+## Fortnox inkommande fakturasynk (2026-09-14)
+
+`syncInvoicesFromFortnox` används av Synka nu, Hämta historik och cron. Importtjänsten läser fakturadetaljer, uppdaterar endast Fortnox-ägda ekonomifält och bevarar lokala jobbkopplingar, interna anteckningar och påminnelsehistorik. Befintliga betalningsövergångar fortsätter via applyInvoicePayment. Oavslutade utgående överföringar blockeras för avstämning i stället för att importeras som dubbletter. Utkast blir inte förfallna/betalda bara på saldo 0.
+
+OAuth förnyas inom fem minuter före utgång, med ett databaslås per företag. Företagsnamnet uppdateras separat från tokenparet; CompanyInformation läses från Fortnox-svaret. `20260914072732_fortnox_sync_locks.sql` krävs före driftsättning; tillför service-only lås och unikt företag/dokumentnummer. Migrationen är ännu INTE körd i produktion (automatisk godkännandegranskning stoppade den).
+
+Avgränsning: SEK-standardfakturor. Kredit-/kontantfakturor, annan valuta och återöppnad/makulerad redan betald faktura ger ett synligt avstämningsfel; ingen tyst omskrivning av betalningshistorik. Hämtningen omfattar senaste året, alla öppna och alla redan lokalt kopplade dokument. Sidtak/tidsgräns ger fel, aldrig falskt komplett synk. Kundimport finns fortsatt som Hämta historik; nya fakturor utan lokalt kundnummer importeras okopplade. Full liveacceptans återstår efter migration, deploy och återanslutning.

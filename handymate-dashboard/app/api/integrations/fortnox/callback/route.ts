@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
-import { saveFortnoxTokens, getFortnoxCompanyInfo } from '@/lib/fortnox'
+import { saveFortnoxTokens, saveFortnoxCompanyName, getFortnoxCompanyInfo } from '@/lib/fortnox'
 import { logFortnoxApi } from '@/lib/fortnox/api-log'
 
 // Läser state-cookien per request — får aldrig cachas statiskt (CLAUDE.md).
@@ -187,7 +187,7 @@ export async function GET(request: NextRequest) {
     await saveFortnoxTokens(businessId, tokens)
     const companyInfo = await getFortnoxCompanyInfo(businessId).catch(() => null)
     if (companyInfo?.CompanyName) {
-      await saveFortnoxTokens(businessId, tokens, companyInfo.CompanyName)
+      await saveFortnoxCompanyName(businessId, companyInfo.CompanyName)
     }
 
     cookieStore.delete('fortnox_oauth_state')
