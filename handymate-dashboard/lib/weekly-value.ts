@@ -30,6 +30,7 @@ const ROLLING_DAYS = 7
 const DEFAULT_LEAD_VALUE = 5000 // konservativ schablon när lead saknar estimated_value
 
 export interface WeeklyValue {
+  impact_available?: boolean
   measured_minutes?: number
   estimated_minutes?: number
   measured_minutes_basis?: 'elapsed_workflow_time_not_labour_saved'

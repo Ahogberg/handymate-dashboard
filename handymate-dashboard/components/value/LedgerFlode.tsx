@@ -33,13 +33,13 @@ function stegDefs(l: ManadsLedger): StegDef[] {
     {
       nr: '1', etikett: 'Identifierat', steg: l.identifierat,
       antalText: `${l.identifierat.antal} poster`,
-      forklaring: 'Möjligheter teamet hittat: ofakturerat, förfallet, ÄTA och lönsamhetsvarningar.',
+      forklaring: 'Möjligheter teamet hittat. Belopp från förslagets underlag, inte bekräftad intäkt.',
       betoning: false, barFarg: 'bg-slate-400',
     },
     {
       nr: '2', etikett: 'Agerat', steg: l.agerat,
       antalText: `${l.agerat.antal} poster · du godkände`,
-      forklaring: 'Kort du godkänt — åtgärden är utförd.',
+      forklaring: 'Godkända åtgärder, med belopp från förslagets underlag. Ett godkännande är inte ett sändkvitto.',
       betoning: false, barFarg: 'bg-primary-400',
     },
     {
@@ -51,7 +51,7 @@ function stegDefs(l: ManadsLedger): StegDef[] {
     {
       nr: '4', etikett: 'Verifierat betalt', steg: l.betalt,
       antalText: `${l.betalt.antal} poster`,
-      forklaring: 'Fakturan är markerad betald i bokföringen. Enda siffran vi räknar som värde.',
+      forklaring: 'Verifierad kundbetalning. Obetald skattereduktion och öppna delbetalningar räknas inte här.',
       betoning: true, barFarg: 'bg-primary-700',
     },
   ]

@@ -135,12 +135,14 @@ export async function getVardekvitto(
   supabase: SupabaseClient,
   businessId: string,
   period: string,
+  opts: { failOnReadError?: boolean } = {},
 ): Promise<Vardekvitto | null> {
   const fonster = manadsfonster(period)
   if (!fonster) return null
 
   const dagar = Math.ceil((fonster.toMs - fonster.fromMs) / DAY_MS)
   const recovered = await getRecoveredRevenue(supabase, businessId, {
+    failOnReadError: opts.failOnReadError,
     sinceDays: dagar,
     now: new Date(fonster.toMs),
   })

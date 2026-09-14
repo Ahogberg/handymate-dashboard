@@ -1,5 +1,7 @@
 # Kundvärde: återstående acceptans efter V1 och C6
 
+**Uppdatering 2026-09-14:** den senare beställda implementationen av första jobbet, V2 och V3 beskrivs i [CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md](CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md). Texten nedan dokumenterar PR #75:s ursprungliga avgränsning, inte status för den nya leveransen.
+
 2026-09-14. Denna leverans rättar befintlig webbyta; den aktiverar inte V1 eller kernel i produktion och är inte hela V2/V3.
 
 ## Levererad webbförbättring

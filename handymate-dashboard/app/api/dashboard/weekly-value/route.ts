@@ -1,3 +1,5 @@
+import { usesKernelValue } from '@/lib/value/kernel-evidence'
+import { impactEnabled } from '@/lib/value/impact-flags'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
@@ -28,7 +30,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const value = await getWeeklyValue(supabase, business.business_id, days, { failOnReadError: true })
-    return NextResponse.json(value)
+    return NextResponse.json({ ...value, ...(impactEnabled() && await usesKernelValue(supabase, business.business_id) ? { impact_available: true } : {}) })
   } catch {
     return NextResponse.json({ error: 'Veckans underlag kunde inte hämtas. Försök igen.' }, { status: 503 })
   }
