@@ -95,7 +95,7 @@ CREATE INDEX IF NOT EXISTS idx_cost_event_business_resource_created
 -- ── 2. RLS: internt, bara service_role ─────────────────────────────────────
 --
 -- Till skillnad från sms_usage har cost_event INGEN tenant-läspolicy. COGS är
--- vårt tal för vår publik. En hantverkare som betalar 5 990 kr/mån ska inte
+-- vårt tal för vår publik. En hantverkare som betalar 5 995 kr/mån ska inte
 -- kunna läsa vår inköpsmarginal, och kvoten hen SKA se bor i sms_usage.
 -- Mönstret är detsamma som v96_tenant_rls_and_credentials.sql rad 60-64.
 

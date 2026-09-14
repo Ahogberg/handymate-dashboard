@@ -63,7 +63,7 @@ function genomgang() {
       { v: '50–100 jobb', l: 'per månad' },
     ],
     focusTitle: 'Tänk om administrationen gjorde sig själv.',
-    pkg: { name: 'Firman', monthly: '5 990' },
+    pkg: { name: 'Firman', monthly: '5 995' },
     goal: { name: 'Få tillbaka tid', quote: 'Ungefär 15 timmar i veckan går till administration.' },
     meeting: { date: '4 september', iso: '2026-09-04' },
     prospect: { name: 'Peter Svensson', email: 'peter@svenssonsel.se' },
