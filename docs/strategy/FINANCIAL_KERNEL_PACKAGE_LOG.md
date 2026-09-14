@@ -35,7 +35,7 @@ Rules that keep this file honest:
 | C3 | Outbox/inbox/idempotency primitives | Codex | **done 2026-09-14** (PR #54 merged; lease model, ordered ack, Postgres concurrency proof) | — |
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
-| C5 | `applyInvoicePayment()` compatibility facade | Codex | **ready — brief v2 in §3** (v1 corrected after Codex review PR #60: B1–B4, M1; v239 draft verified in PGlite) | — |
+| C5 | `applyInvoicePayment()` compatibility facade | Codex | **v2 retry integration correction required — not implemented** | §5 v2: obsolete projection replay, route-owned SMS, stale effect acknowledgement, incomplete no-op outcome |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
@@ -913,6 +913,24 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 ---
 
 ## 5. Review record
+
+### C5 v2 retry integration — Codex, 2026-09-14
+
+PR #61 merged after green CI, incorporating #60. Four diagnostic tests execute the exact v2
+DDL in isolated PGlite and, for SMS, the real status route with the prescribed facade response
+and stubbed provider. All four reproduce defects; TypeScript passes. These are not C5
+acceptance results. Full evidence and corrections: [v2 review](FINANCIAL_KERNEL_C5_V2_REVIEW.md).
+
+| Sev | Finding | Required correction |
+|---|---|---|
+| BLOCKER R1 | A customer-command replay after the tax command returns old receivables/9500 kr; the mandated re-projection downgrades a fully paid invoice. | Separate command history from current projection; serialize or revision-guard projection writes. |
+| BLOCKER R2 | Stored replay transition re-enters the unchanged route's thank-you SMS block; two sends are attempted outside the intent protocol. | Include flagged route-owned effects in durable dispatch; skipping all replays alone loses crash recovery. |
+| HIGH R3 | Duplicate finish from attempt 1 can mark active attempt 2 failed, permitting attempt 3 while worker 2 sends. | Attempt token/version required by finish, stale acknowledgements rejected. |
+| MEDIUM R4 | no_new_money/provider_below_kernel omit the projection fields the facade requires; already_paid skips the promised sweep. | Complete typed outcomes and recovery path for every kernel state. |
+
+The v1 findings' accepted fixes stand. C5 application integration has not been written and
+v239 has not been applied externally. Diagnostic assertions must become prevention tests
+when these corrections are implemented. The §3 v2 SQL is preserved verbatim for reproduction.
 
 Findings that a review left open, or accepted with a note, so that a merge does not erase
 them. BLOCKER/HIGH must be resolved before merge; MEDIUM before the feature flag; LOW is
