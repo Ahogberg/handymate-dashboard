@@ -1143,10 +1143,10 @@ number trigger flagged/unflagged). Handoff deviations accepted as improvements. 
 
 | Sev | Finding | Status |
 |---|---|---|
-| MEDIUM | Approval caller forces `target:'customer'` with `reviewed.amount`: full-amount confirmation on a ROT invoice leaves tax open and 3 000 unallocated where legacy gives `paid`; a second confirmation on `customer_paid` raises `financial_command_target_not_open` out of the facade. | open — target only without amount; map target_not_open to `transition 'none'` |
-| MEDIUM | Legacy-routed replay re-runs the legacy body (`route==='legacy'` ignores `replayed`), so B1 survives on invoices C4b has not migrated. | open — replay of a legacy-routed command returns `none` without re-running |
-| MEDIUM | Eager issuance throws after the invoice was delivered (`applyInvoiceDeliveryOutcome`), inviting a resend. | open — report via `results.errors` + `rapporteraTystFel`, keep `delivered:true` |
-| LOW | Malformed `Idempotency-Key` → 500 instead of 400; `sync-to-fortnox` receipt path throws on read error; number trigger reverts silently; `p_stale_minutes` must equal 10; real thanks/review runner paths only under stubbed runners. | open |
+| MEDIUM | Approval caller forces `target:'customer'` with `reviewed.amount`: full-amount confirmation on a ROT invoice leaves tax open and 3 000 unallocated where legacy gives `paid`; a second confirmation on `customer_paid` raises `financial_command_target_not_open` out of the facade. | resolved in #66 (`83856c7c`): target only without amount; `target_not_open` → current-projection no-op. Verified by Claude with the real approval executor against v239 |
+| MEDIUM | Legacy-routed replay re-runs the legacy body (`route==='legacy'` ignores `replayed`), so B1 survives on invoices C4b has not migrated. | resolved in #66: replayed legacy-routed command returns current status + `kernel.replayed`; legacy body invoked once (spy). Residual: no crash recovery on legacy-routed invoices until C4b |
+| MEDIUM | Eager issuance throws after the invoice was delivered (`applyInvoiceDeliveryOutcome`), inviting a resend. | resolved in #66: try/catch → `results.errors` + `rapporteraTystFel('financial-kernel:eager-issuance-failed')`, `delivered:true` kept; three failure modes tested |
+| LOW | Malformed `Idempotency-Key` → 500 instead of 400; `sync-to-fortnox` receipt path throws on read error; number trigger reverts silently; `p_stale_minutes` must equal 10; real thanks/review runner paths only under stubbed runners. | open — not merge-blocking; carry into C5b |
 
 
 ### C5 v2 retry integration — Codex, 2026-09-14
@@ -1319,4 +1319,4 @@ No BLOCKER.
 | 2026-09-14 | `v235`–`v238` applied to production; read-only verification recorded under §1 "Deployment state". Duplicate C2 review block in §5 removed. `v239` gains the advisor's `search_path` pin for two helpers. | Owner deploy, Supabase advisors |
 | 2026-09-14 | C5 brief v2 after Codex review PR #60 (B1–B4, M1 accepted): command identity + atomic `execute_payment_command`, provider observation, persisted legacy routing, effect intents, dispatch flag reader; v239 draft embedded and verified in PGlite (34 checks). v1 retired to git history. Response recorded in §5. | Package C5 prep v2 |
 | 2026-09-14 | C5 brief v3 after Codex review PR #62 (R1–R4 accepted): projection written by the RPC from current state under the invoice lock, `{command, projection}` on every state, attempt tokens on claim/finish, status-route effects as intents; v239 draft re-verified in PGlite (48 checks + 6 privilege denials). v2 retired to git history. Response in §5. | Package C5 prep v3 |
-| 2026-09-14 | C5 implementation reviewed (PR #66): no BLOCKER, 3 MEDIUM (approval target + amount, legacy-routed replay, eager-issuance throw after delivery), 4 LOW; board updated. | C5 review |
+| 2026-09-14 | C5 implementation reviewed (PR #66): no BLOCKER, 3 MEDIUM (approval target + amount, legacy-routed replay, eager-issuance throw after delivery), 4 LOW. Same day: the three MEDIUM resolved on #66 and re-verified; board row left to #66. | C5 review |
