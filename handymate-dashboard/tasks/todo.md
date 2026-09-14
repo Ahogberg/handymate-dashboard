@@ -1,3 +1,12 @@
+## Financial Kernel C5 — review corrections, 2026-09-14
+
+- [x] Read PR #66 review, C5 contract and current main.
+- [x] Reproduce and fix approval allocation/no-op, legacy replay and post-delivery issuance errors (78 targeted tests green).
+- [ ] Run relevant regression/contract suites, TypeScript and build.
+- [ ] Update C5 package handoff and existing PR #66; leave v239 and flags undeployed.
+
+---
+
 # Revenue OS v2 — 2026-09-13
 
 - [x] Läs aktuell main, strategi, befintlig kod och verkligt databasschema.
@@ -1549,10 +1558,3 @@ Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
 - [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
 - Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
 Publicering och aktuell mergestatus dokumenteras i PR #42.
-
-## Financial Kernel C5 — review corrections, 2026-09-14
-
-- [x] Read PR #66 review, C5 contract and current main.
-- [x] Reproduce and fix approval allocation/no-op, legacy replay and post-delivery issuance errors (78 targeted tests green).
-- [ ] Run relevant regression/contract suites, TypeScript and build.
-- [ ] Update C5 package handoff and existing PR #66; leave v239 and flags undeployed.
