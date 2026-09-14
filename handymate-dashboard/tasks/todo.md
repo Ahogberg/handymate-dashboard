@@ -1576,7 +1576,9 @@ Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsp
 
 ## Kundvärde och upplevelse, nästa leverans — 2026-09-14
 - [x] Kartlagt main, V2/V3-skisser och pågående onboarding-PR #69.
-- [ ] Rätta läsfel, ekonomibehörighet och missvisande veckokvitto.
-- [ ] Sammanhängande, återförsökbar värdevisning med faktiska stadier och separat tidsunderlag.
-- [ ] Dokumentera och förbered återstående V2-, native mobil- och pilotacceptans utan nya ekonomiska antaganden.
+- [x] Rätta läsfel, ekonomibehörighet och missvisande veckokvitto.
+- [x] Sammanhängande, återförsökbar värdevisning med faktiska stadier och separat tidsunderlag.
+- [x] Dokumentera och förbered återstående V2-, native mobil- och pilotacceptans utan nya ekonomiska antaganden.
 - [ ] Testa riktiga komponenter och routes, typkontroll, bygge, grön PR.
+
+Publicerad i PR #75. Slutliga test-/byggresultat redovisas på PR-huvudet. V2, full V3/native och produktionspilot är fortfarande öppna enligt docs/strategy/CUSTOMER_VALUE_NEXT_ACCEPTANCE.md.

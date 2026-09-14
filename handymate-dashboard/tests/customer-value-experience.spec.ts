@@ -91,7 +91,7 @@ test.describe('real receipt component interactions',()=>{
   let settle!:(r:Response)=>void
   global.fetch=(()=>new Promise<Response>(r=>{settle=r})) as typeof fetch
   await render('a');const late=settle
-  global.fetch=(async()=>Response.json({...receipt,confirmed_kr:0,captured_count:0,autonomous_count:0,time_minutes:0})) as typeof fetch
+  global.fetch=(async()=>Response.json({...receipt,confirmed_kr:0,paid_kr:0,accepted_quote_kr:0,confirmed_items:[],captured_count:0,autonomous_count:0,time_minutes:0,measured_minutes:0})) as typeof fetch
   await render('b');expect(host.textContent).toContain('Ännu finns inget registrerat utfall')
   await act(async()=>late(Response.json(receipt)));expect(host.textContent).not.toContain('Köksarbete');expect(host.textContent).toContain('Ännu finns inget registrerat utfall')
  })
