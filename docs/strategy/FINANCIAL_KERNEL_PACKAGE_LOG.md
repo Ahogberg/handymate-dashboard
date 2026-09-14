@@ -37,7 +37,7 @@ Rules that keep this file honest:
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
 | C5 | `applyInvoicePayment()` compatibility facade | Codex | **done 2026-09-14** (PR #66 merged; Claude review A/B/C/E: no BLOCKER, 3 MEDIUM resolved and re-verified; 4 LOW carried into C5b) | — |
 | C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
-| C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
+| C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **ready — brief in §3** (v242 draft verified in PGlite, 40 checks) | flip itself: PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
 | C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
@@ -439,320 +439,438 @@ Contract / remaining work
   R0/P0/C1b and owner decisions remain unchanged. **No v239 in production and no feature
   flag activation before C5 merge and the owner's C6 pilot selection.**
 
-## 3. Next package — Codex brief: C5b the consumer runner, the event bridge, the sweeper and the human loop
+## 3. Next package — Codex brief: C6 shadow payment mode (S1 for one pilot business)
 
-> **Written 2026-09-14 after C5 merged (PR #66).** The C5 v3 brief is retired to git history
-> (outcome: C5 handoff in §2, review in §5). C5b closes the fundament: the C3 consumer gets a
-> runner, the bridge becomes a real producer of effect intents for payments that do not pass
-> through the facade, the sweeper finishes what a crashed request owed, and a human gets a
-> surface for `unknown` intents and halted consumers. It also carries the four LOW findings from
-> the C5 review. **No flag flip for any business** (C6). v240 is proposed and verified in PGlite;
-> not applied anywhere.
+> Goal: the first flag flip becomes a *phase* that is explicit, dated, auditable and reversible with a
+> reason, and every day the kernel's view of each pilot invoice is compared with Fortnox at Level 1 and
+> with the legacy columns the facade projects. Divergences are recorded, confirmed on a second sighting,
+> reported, and closed only with provenance. Nothing is auto-corrected. Nothing here is a readiness
+> score: S1 evidence proves the sync works, not that the kernel is right (shadow architecture §2).
+> The flip itself is the owner's action, after PMF (orchestration §2); C6 builds the machinery.
 
-Read first: orchestration §5 C5b, §6 A+B+C, §9; blueprint §18.6, §20; `ARCHITECTURE.md` §FK.3;
-C3 handoff and review (§2, §5: lease model, ordered ack, halt-never-skip, `AbortSignal` ask);
-C4 review (§5: marker per `receivable_id`); C5 handoff (§2) and review (§5: the four LOW);
-`lib/financial-kernel/events/consume.ts`, `bridge-automation.ts` (placeholder + TODO),
-`lib/financial-kernel/commands/facade.ts` (the sweep block), `lib/financial-kernel/effects/runners.ts`,
-`sql/v236`, `sql/v239`; cron pattern `app/api/cron/fortnox-sync/route.ts` + `lib/cron/verify-secret.ts`;
-admin gate `lib/auth/superadmin.ts` (`isSuperAdmin`) as used by `app/api/admin/*`.
+Read first: `FINANCIAL_KERNEL_SHADOW_ARCHITECTURE.md` §2, §5–§9, §11, §17, §21.6 (the 2026-09-12 decision:
+Level 1 only, Levels 2–4 persisted as *unsupported*), orchestration §5 C6 (S1/S2 stored per business and
+shown wherever divergence metrics appear), `sql/v238`–`v240`, `lib/financial-kernel/{flags,dispatch-flag}.ts`,
+`lib/fortnox/classify-payment.ts` (the payment classes Fortnox can express: `cancelled | paid | customer_paid |
+overdue | unchanged`), `lib/fortnox/sync-payments.ts` (Fortnox → facade, `source:'fortnox'`, every two hours),
+`lib/fortnox.ts` `getFortnoxInvoice` (`Total`, `TotalToPay`, `Balance`, `FullyPaid`, `Cancelled`, `TaxReduction`),
+`financial_invoice_projection` in v239 (`receivables`, `recorded_minor`, `derived_status`), the C5b cron
+`app/api/cron/financial-kernel/route.ts`, `lib/financial-kernel/admin.ts` and `FinancialKernelSection.tsx`.
 
 ### Claude decisions embedded in this brief
 
 | Decision | Why |
 |---|---|
-| **The bridge handler is database-only.** On `receivable_settled` with `payload.component = 'customer'` it calls `ensure_effect_intents(receivable_id, event_id, effects, context)`; every other event type returns. It never dispatches an effect. | C3: a handler may not outlive its lease and a timeout cannot cancel a send. Creating intents is idempotent per `(receivable_id, effect)`, so at-least-once delivery of the event is harmless. C4 review: one marker per receivable, ever. |
-| **Dispatch happens in exactly two places:** the facade's inline sweep (C5) and the cron sweeper (C5b). Both use one shared `sweepInvoiceIntents()` extracted from the facade. | One code path for claim → run → finish, one place for the `unknown`/`exhausted` reports. |
-| **Facade-owned intents win.** The bridge's `ensure_effect_intents` is `ON CONFLICT DO NOTHING`; for a facade payment every effect comes back `suppressed`. For a non-facade producer (C7 PSP webhook, ROT decision import, a C4 RPC called by anything else) the bridge creates them with `context.source = 'bridge'`. | Brief v2/v3 marker semantics, now executable. |
-| **Bridge effect set = the unreviewed six** (`pipeline`, `project_check`, `project_stage`, `smart_communication`, `payment_received_rules`, `portal_message`). Not `invoice_paid_thanks`/`review_request_schedule`: those belong to the status-route flow in legacy and stay `status_patch`-only. | Legacy parity. C7 decides whether a PSP payment earns the thank-you SMS. |
-| **The consumer runs from a cron route**, `GET /api/cron/financial-kernel`, `verifyCronSecret`, `dynamic = 'force-dynamic'`, `maxDuration = 300`, every 10 minutes in `vercel.json` (the file already carries `*/5` and `*/15` schedules on the Pro plan; the Hobby-plan warning in `CLAUDE.md` is stale). Per business with `financial_kernel_enabled = true`: `consumeOnce(automation-bridge, { limit: 100 })`, then the sweep over `list_owed_effect_intents(3, 10, 50)`. A wall-clock budget of 240 s stops the loop; the next run continues. | Repo cron contract. Flag-off businesses cost one `business_config` read per run and nothing else. |
-| **Halted consumer = a human's.** A run that finds `halted_at` set reports once via `rapporteraTystFel('financial-kernel:consumer-halted', …)`; `resume_financial_consumer` (C3, actor + reason) is exposed on the admin API, never called automatically. | C3 halt-never-skip. |
-| **`unknown` and exhausted intents get a human surface**: `list_unresolved_effect_intents` and `resolve_effect_intent(delivered | abandon | retry, actor, reason)`. `retry` resets attempts and returns the intent to `pending` for the next sweep; `delivered` → `sent`; `abandon` → `skipped`. Every resolution is appended to the row's `resolution` log. | C5 brief: never auto-resend an unknown. The decision is recorded with who and why. |
-| **Sweeper concurrency:** two sweepers on the same business are serialised by `financial_lock` inside `claim_effect_intents`; the second sees nothing claimable. Proven in Postgres CI. | Same lock discipline as every kernel RPC. |
-| **The four C5 LOWs are in scope:** 400 on a malformed `Idempotency-Key`; the Fortnox receipt path never throws (omit `invoice_number`, report); the number trigger `RAISE NOTICE`s when it reverts (v240); claim bounds validated (v240); a runner test that executes the real `invoice_paid_thanks` / `review_request_schedule` paths with `sendSmsViaElks` stubbed. | Carried from the C5 review. |
-| **Legacy path untouched.** The status route's thank-you block for flag-off businesses stays as it is; under the flag it is already intents (C5). The v1 idea "move the SMS into the bridge" is superseded. | Frozen legacy. |
+| **Phase is a history table, not a column.** `financial_kernel_rollout` (append-only: `phase`, `previous_phase`, `actor`, `reason`, `changed_at`); current phase = latest row, default `off`. `set_financial_kernel_phase(business, phase, actor, reason)` is from now on the **only writer** of `business_config.financial_kernel_enabled` (`S1` → true, `off` → false, same phase → no-op). `S2` is refused (`financial_kernel_phase_reserved`) until the S2 definition exists (after two clean S1 weeks, separate amendment). | Shadow §2: per business, explicit, dated, auditable, reversible only with reason. A raw column update leaves no trace; the RPC does. |
+| **Kill switch = `set_financial_kernel_phase(..., 'off', actor, reason)`.** Every caller returns to the frozen legacy body on the next call (C5 dispatch flag); projected columns stay valid (C5 invariant). Intents already owed are **not abandoned**: `list_financial_kernel_work()` returns `consume` (flag on) and `sweep` (flag on **or** owed intents) per business, and the C5b cron switches from its `business_config` query to this RPC. The RPC's response carries `owed_intents` so the operator sees what is still in flight. | Today the cron ignores flag-off businesses, so a kill switch would silently strand pending thanks-SMS. An intent is a committed obligation created while the flag was on. |
+| **Level 1 only, exact, no tolerances.** Pure engine `compareInvoiceLevel1(handymate, snapshot)` → `{result, differences[]}` with `result ∈ match | divergent | reference_missing`; amounts compared in öre as strings; a 1–100 öre difference is recorded as `ROUNDING_DIVERGENCE` (severity `low`), never suppressed. Levels 2–4 are written once per run as `unsupported` with the reason `bookkeeping scope not granted` (§21.6). | Shadow §7 and §17: no monetary tolerances; unsupported is recorded, not implied. |
+| **Dimensions and kinds (comparison_version 1):** (a) settlement state — `classifyFortnoxPayment` class vs `derived_status` (`paid`/`customer_paid`/`null`=open; `cancelled` vs a voided receivable) → `PAYMENT_DIVERGENCE`, `critical`; (b) amounts — Fortnox `Total` vs the sum of receivable amounts, `TotalToPay` vs the customer receivable, and for class `paid` Fortnox `Balance` = 0 vs open kernel amount 0 → `RECEIVABLE_BALANCE_DIVERGENCE`, `high` (or `ROUNDING_DIVERGENCE` when ≤ 100 öre); (c) invoice has `fortnox_document_number` but Fortnox returns 404 → `MISSING_REFERENCE_ENTRY`, `high`; no document number or fetch error → `reference_missing` (`REFERENCE_DATA_UNAVAILABLE`, `medium`); (d) invoice sent after the phase started with no kernel receivables → `MISSING_HANDYMATE_ENTRY`, `high`; (e) **Level 0, internal**: `invoice.status`/`paid_amount` vs `derived_status`/`recorded_minor` → `PROJECTION_DIVERGENCE`, `critical` (the facade broke its own invariant). Severity policy lives in one versioned TS table. | Shadow §6 Level 1 dimensions and §8 taxonomy, reduced to what the Fortnox grant can express. (e) is the C5 invariant checked against production data every day. |
+| **Eventual consistency by sighting count, not by tolerance.** A divergence is `open` on first sighting, `confirmed` on the second consecutive daily sighting (`seen_count ≥ 2`), reported once through `rapporteraTystFel('financial-kernel:shadow-divergence')` when confirmed, and shown in admin as *ny* / *bekräftad*. A later `match` on the same object closes every open divergence on it with `resolution_type = superseded_by_match` and the comparison id as provenance. The run is scheduled 30 minutes after the Fortnox payment sync so lag is the exception. | Shadow §9 (retry before alarm) and §11 (no closing without provenance). A payment Fortnox saw after the last sync would otherwise page every night. |
+| **Reference snapshots are append-only** (`financial_shadow_snapshots`, one row per fetch incl. `not_found`/`error`); each comparison points at the snapshot it used. | Shadow §5: a later observation never rewrites the snapshot an earlier comparison used. |
+| **Nothing in `lib/financial-kernel/shadow/**` may call the facade, any kernel command RPC or write `invoice`.** The daily run reads; the only writes are the shadow tables through their RPCs. | Shadow §17: no auto-correction in either direction. |
+| **Admin, not customer.** Phase control (off/S1 with a required reason), shadow status per business (phase, since when, last run, open divergences by severity, confirmed count, the *unsupported* levels listed), the divergence list with resolve (type + reason). All behind `financialKernelAdmin`. No customer-facing surface. | S1 numbers are not customer value and must not be read as kernel correctness. |
 
-### v240 — implement as written (deviations in the handoff with reasons)
+### v242 — implement as written (deviations in the handoff with reasons)
+
+Verified in PGlite on top of `v235`–`v240` (`probe12.cjs`, 40 checks: phase default/reserved/reason/no-op/flip
+and history; work list before and after a kill switch with one owed intent; run refused while off; comparisons
+need a running run and non-empty differences; first sighting open, second confirmed + reportable, reported once;
+`reference_missing` → one `medium` divergence; `unsupported` writes no divergence; match closes with provenance;
+manual resolve requires reason and type and refuses a closed row; close/record after close refused; rollout,
+snapshots, comparisons immutable; snapshot check constraint; no RPC touches `public.invoice`; every RPC
+service_role-only; RLS on all six tables; member insert and member RPC denied).
 
 ```sql
--- v240_financial_bridge_intents.sql — DRAFT for the C5b brief (Claude, 2026-09-14).
--- Verified in PGlite on top of v235–v239 (probe11.cjs). Codex implements as written; deviations in the handoff.
+-- v242_financial_kernel_shadow.sql — DRAFT for the C6 brief (Claude, 2026-09-14).
+-- Verified in PGlite on top of v235–v240 (probe12.cjs). Codex implements as written; deviations in the handoff.
+-- Shadow architecture §2 (S1/S2), §5 (persistence), §7 (no tolerances), §9 (eventual consistency), §11 (lifecycle), §17 (safety).
+-- v241 is reserved for the Customer Value package (value_events).
 BEGIN;
 
--- ── Intents can now be owed by a producer that is not the facade (bridge on receivable_settled{customer}) ──
-ALTER TABLE public.financial_effect_intents ALTER COLUMN command_id DROP NOT NULL;
-ALTER TABLE public.financial_effect_intents ADD COLUMN IF NOT EXISTS source_event_id TEXT NULL;
-ALTER TABLE public.financial_effect_intents ADD COLUMN IF NOT EXISTS context JSONB NULL;
-ALTER TABLE public.financial_effect_intents ADD COLUMN IF NOT EXISTS resolution JSONB NULL;
-ALTER TABLE public.financial_effect_intents DROP CONSTRAINT IF EXISTS financial_effect_intents_origin_check;
-ALTER TABLE public.financial_effect_intents ADD CONSTRAINT financial_effect_intents_origin_check
-  CHECK ((command_id IS NOT NULL) <> (source_event_id IS NOT NULL));
-ALTER TABLE public.financial_effect_intents DROP CONSTRAINT IF EXISTS financial_effect_intents_source_event_fk;
-ALTER TABLE public.financial_effect_intents ADD CONSTRAINT financial_effect_intents_source_event_fk
-  FOREIGN KEY (business_id, source_event_id) REFERENCES public.financial_events(business_id, id);
-CREATE INDEX IF NOT EXISTS idx_financial_effect_intents_unknown ON public.financial_effect_intents (business_id, finished_at) WHERE status = 'unknown';
+-- ── 1. Phase per business: explicit, dated, auditable, reversible with reason (§2, §14) ──
+-- business_config.financial_kernel_enabled stays the dispatch switch and is written ONLY by set_financial_kernel_phase.
+CREATE TABLE IF NOT EXISTS public.financial_kernel_rollout (
+  id             TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id    TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  phase          TEXT        NOT NULL CHECK (phase IN ('off','S1','S2')),
+  previous_phase TEXT        NOT NULL CHECK (previous_phase IN ('off','S1','S2')),
+  actor          TEXT        NOT NULL CHECK (actor <> ''),
+  reason         TEXT        NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  changed_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_financial_kernel_rollout_latest ON public.financial_kernel_rollout (business_id, changed_at DESC);
 
--- ── RPC: the bridge's producer. Idempotent per (receivable, effect); silent when the facade already owns delivery. ──
-CREATE OR REPLACE FUNCTION public.ensure_effect_intents(
-  p_business_id TEXT, p_receivable_id TEXT, p_source_event_id TEXT, p_effects TEXT[], p_context JSONB
-) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE rec public.financial_receivables%ROWTYPE; v_effect TEXT; v_id TEXT; v_created JSONB := '[]'; v_suppressed TEXT[] := '{}'; v_recorded BIGINT;
-BEGIN
-  PERFORM public.financial_lock(p_business_id);
-  SELECT * INTO rec FROM public.financial_receivables x WHERE x.business_id = p_business_id AND x.id = p_receivable_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'financial_receivable_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
-  IF rec.component <> 'customer' OR rec.status <> 'settled' THEN RAISE EXCEPTION 'financial_intent_receivable_not_settled_customer' USING ERRCODE = 'check_violation'; END IF;
-  PERFORM 1 FROM public.financial_events e WHERE e.business_id = p_business_id AND e.id = p_source_event_id AND e.event_type = 'receivable_settled'
-    AND e.source_type = 'receivable' AND e.source_id = p_receivable_id;
-  IF NOT FOUND THEN RAISE EXCEPTION 'financial_intent_source_event_invalid' USING ERRCODE = 'foreign_key_violation'; END IF;
-  IF p_effects IS NULL OR array_length(p_effects, 1) IS NULL THEN RAISE EXCEPTION 'financial_intent_effects_required' USING ERRCODE = 'check_violation'; END IF;
-  SELECT COALESCE(sum(p.amount_minor), 0) INTO v_recorded FROM public.financial_payments p
-    WHERE p.business_id = p_business_id AND p.correlation_id = 'fin_invoice_' || rec.invoice_id AND p.status = 'settled' AND p.direction = 'inbound';
-  FOREACH v_effect IN ARRAY p_effects LOOP
-    v_id := NULL;
-    INSERT INTO public.financial_effect_intents (business_id, source_event_id, invoice_id, receivable_id, effect, status, context)
-      VALUES (p_business_id, p_source_event_id, rec.invoice_id, rec.id, v_effect, 'pending',
-        COALESCE(p_context, '{}'::jsonb) || jsonb_build_object('source', 'bridge', 'paidAmountMinor', v_recorded::text, 'sourceEventId', p_source_event_id))
-      ON CONFLICT (business_id, receivable_id, effect) DO NOTHING RETURNING id INTO v_id;
-    IF v_id IS NULL THEN v_suppressed := v_suppressed || v_effect;
-    ELSE v_created := v_created || jsonb_build_object('id', v_id, 'effect', v_effect); END IF;
+-- ── 2. Reference snapshots: append-only, versioned; a later observation never rewrites an earlier one (§5) ──
+CREATE TABLE IF NOT EXISTS public.financial_shadow_snapshots (
+  id             TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id    TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  provider       TEXT        NOT NULL CHECK (provider IN ('fortnox')),
+  object_type    TEXT        NOT NULL CHECK (object_type IN ('invoice')),
+  external_id    TEXT        NOT NULL,
+  invoice_id     TEXT        NULL,
+  fetch_status   TEXT        NOT NULL CHECK (fetch_status IN ('ok','not_found','error')),
+  snapshot       JSONB       NULL,
+  error          TEXT        NULL,
+  schema_version INT         NOT NULL DEFAULT 1,
+  observed_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id),
+  CHECK ((fetch_status = 'ok') = (snapshot IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_snapshots_object ON public.financial_shadow_snapshots (business_id, object_type, external_id, observed_at DESC);
+
+-- ── 3. Comparison runs and comparisons (§5, §6) ──
+CREATE TABLE IF NOT EXISTS public.financial_shadow_runs (
+  id                 TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id        TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  phase              TEXT        NOT NULL CHECK (phase IN ('S1','S2')),
+  trigger_type       TEXT        NOT NULL CHECK (trigger_type IN ('cron','manual')),
+  comparison_version INT         NOT NULL,
+  status             TEXT        NOT NULL DEFAULT 'running' CHECK (status IN ('running','completed','failed')),
+  counts             JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  started_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  completed_at       TIMESTAMPTZ NULL,
+  PRIMARY KEY (business_id, id)
+);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_runs_latest ON public.financial_shadow_runs (business_id, started_at DESC);
+
+CREATE TABLE IF NOT EXISTS public.financial_shadow_comparisons (
+  id                 TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id        TEXT        NOT NULL,
+  run_id             TEXT        NOT NULL,
+  phase              TEXT        NOT NULL CHECK (phase IN ('S1','S2')),
+  level              INT         NOT NULL CHECK (level BETWEEN 1 AND 4),
+  object_type        TEXT        NOT NULL CHECK (object_type IN ('invoice','ledger','aggregate','report')),
+  invoice_id         TEXT        NULL,
+  snapshot_id        TEXT        NULL,
+  result             TEXT        NOT NULL CHECK (result IN ('match','divergent','reference_missing','unsupported')),
+  comparison_version INT         NOT NULL,
+  handymate          JSONB       NOT NULL DEFAULT '{}'::jsonb,
+  differences        JSONB       NOT NULL DEFAULT '[]'::jsonb,
+  checked_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id),
+  FOREIGN KEY (business_id, run_id) REFERENCES public.financial_shadow_runs(business_id, id),
+  FOREIGN KEY (business_id, snapshot_id) REFERENCES public.financial_shadow_snapshots(business_id, id),
+  CHECK ((result = 'divergent') = (jsonb_array_length(differences) > 0)),
+  CHECK ((object_type = 'invoice') = (invoice_id IS NOT NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_comparisons_run ON public.financial_shadow_comparisons (business_id, run_id);
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_comparisons_invoice ON public.financial_shadow_comparisons (business_id, invoice_id, checked_at DESC) WHERE invoice_id IS NOT NULL;
+
+-- ── 4. Divergences: one OPEN row per (object, kind); sightings accumulate; closed only with provenance (§8, §11) ──
+CREATE TABLE IF NOT EXISTS public.financial_shadow_divergences (
+  id              TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id     TEXT        NOT NULL REFERENCES public.business_config(business_id),
+  phase           TEXT        NOT NULL CHECK (phase IN ('S1','S2')),
+  kind            TEXT        NOT NULL CHECK (kind IN ('PAYMENT_DIVERGENCE','RECEIVABLE_BALANCE_DIVERGENCE','ROUNDING_DIVERGENCE',
+                                                     'MISSING_HANDYMATE_ENTRY','MISSING_REFERENCE_ENTRY','REFERENCE_DATA_UNAVAILABLE','PROJECTION_DIVERGENCE')),
+  severity        TEXT        NOT NULL CHECK (severity IN ('info','low','medium','high','critical')),
+  object_type     TEXT        NOT NULL,
+  invoice_id      TEXT        NULL,
+  comparison_id   TEXT        NOT NULL,
+  expected        JSONB       NULL,
+  actual          JSONB       NULL,
+  seen_count      INT         NOT NULL DEFAULT 1,
+  first_seen_at   TIMESTAMPTZ NOT NULL DEFAULT now(),
+  last_seen_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  confirmed_at    TIMESTAMPTZ NULL,
+  reported_at     TIMESTAMPTZ NULL,
+  status          TEXT        NOT NULL DEFAULT 'open' CHECK (status IN ('open','resolved')),
+  root_cause_code TEXT        NULL,
+  PRIMARY KEY (business_id, id),
+  FOREIGN KEY (business_id, comparison_id) REFERENCES public.financial_shadow_comparisons(business_id, id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_financial_shadow_divergence_open ON public.financial_shadow_divergences (business_id, object_type, COALESCE(invoice_id,''), kind) WHERE status = 'open';
+CREATE INDEX IF NOT EXISTS idx_financial_shadow_divergences_open ON public.financial_shadow_divergences (business_id, severity, last_seen_at DESC) WHERE status = 'open';
+
+CREATE TABLE IF NOT EXISTS public.financial_shadow_resolutions (
+  id              TEXT        NOT NULL DEFAULT gen_random_uuid()::TEXT,
+  business_id     TEXT        NOT NULL,
+  divergence_id   TEXT        NOT NULL,
+  resolution_type TEXT        NOT NULL CHECK (resolution_type IN ('superseded_by_match','accepted','fixed','reference_error','duplicate')),
+  reason          TEXT        NOT NULL CHECK (length(reason) BETWEEN 3 AND 500),
+  resolved_by     TEXT        NOT NULL CHECK (resolved_by <> ''),
+  fix_reference   TEXT        NULL,
+  resolved_at     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, id),
+  FOREIGN KEY (business_id, divergence_id) REFERENCES public.financial_shadow_divergences(business_id, id)
+);
+
+-- ── 5. Immutability: rollout, snapshots, comparisons and resolutions are history; runs/divergences change only via the RPCs ──
+DO $do$ DECLARE t TEXT; BEGIN
+  FOREACH t IN ARRAY ARRAY['financial_kernel_rollout','financial_shadow_snapshots','financial_shadow_comparisons','financial_shadow_resolutions'] LOOP
+    EXECUTE format('DROP TRIGGER IF EXISTS %I ON public.%I', t || '_immutable', t);
+    EXECUTE format('CREATE TRIGGER %I BEFORE UPDATE OR DELETE ON public.%I FOR EACH ROW EXECUTE FUNCTION public.financial_events_immutable()', t || '_immutable', t);
   END LOOP;
-  RETURN jsonb_build_object('receivable_id', rec.id, 'invoice_id', rec.invoice_id, 'created', v_created, 'suppressed', to_jsonb(v_suppressed));
-END $fn$;
+END $do$;
 
--- ── RPC: claim, now with C5-review LOW fix (validated bounds) and per-intent context for bridge-owed intents ──
-CREATE OR REPLACE FUNCTION public.claim_effect_intents(p_business_id TEXT, p_invoice_id TEXT, p_max_attempts INT, p_stale_minutes INT)
+-- ── 6. RLS: members read, nobody writes through the API; service_role via RPC ──
+DO $do$ DECLARE t TEXT; BEGIN
+  FOREACH t IN ARRAY ARRAY['financial_kernel_rollout','financial_shadow_snapshots','financial_shadow_runs','financial_shadow_comparisons','financial_shadow_divergences','financial_shadow_resolutions'] LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t);
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', t || '_tenant_read', t);
+    EXECUTE format('CREATE POLICY %I ON public.%I FOR SELECT TO authenticated USING (public.is_business_member(business_id))', t || '_tenant_read', t);
+    EXECUTE format('REVOKE ALL ON public.%I FROM anon, authenticated', t);
+    EXECUTE format('GRANT SELECT ON public.%I TO authenticated', t);
+    EXECUTE format('GRANT ALL ON public.%I TO service_role', t);
+  END LOOP;
+END $do$;
+
+-- ── 7. Phase read + write ──
+CREATE OR REPLACE FUNCTION public.financial_kernel_phase(p_business_id TEXT)
+RETURNS TEXT LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT COALESCE((SELECT phase FROM public.financial_kernel_rollout r WHERE r.business_id = p_business_id ORDER BY changed_at DESC, id DESC LIMIT 1), 'off')
+$fn$;
+
+-- The only writer of business_config.financial_kernel_enabled from now on. 'S2' is reserved until the S2 definition exists (brief: after two clean S1 weeks).
+CREATE OR REPLACE FUNCTION public.set_financial_kernel_phase(p_business_id TEXT, p_phase TEXT, p_actor TEXT, p_reason TEXT)
 RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE v_unknown INT; v_claimed JSONB; v_unknown_ids JSONB;
+DECLARE v_prev TEXT; v_owed INT; v_id TEXT;
 BEGIN
+  IF p_phase = 'S2' THEN RAISE EXCEPTION 'financial_kernel_phase_reserved' USING ERRCODE = 'check_violation'; END IF;
+  IF p_phase NOT IN ('off','S1') THEN RAISE EXCEPTION 'financial_kernel_phase_invalid' USING ERRCODE = 'check_violation'; END IF;
+  IF p_actor IS NULL OR p_actor = '' OR p_reason IS NULL OR length(p_reason) < 3 THEN RAISE EXCEPTION 'financial_kernel_phase_reason_required' USING ERRCODE = 'check_violation'; END IF;
   PERFORM public.financial_lock(p_business_id);
-  IF p_max_attempts IS NULL OR p_max_attempts NOT BETWEEN 1 AND 10 OR p_stale_minutes IS NULL OR p_stale_minutes NOT BETWEEN 1 AND 60 THEN
-    RAISE EXCEPTION 'financial_effect_claim_limits_invalid' USING ERRCODE = 'check_violation';
+  PERFORM 1 FROM public.business_config WHERE business_id = p_business_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'business_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
+  v_prev := public.financial_kernel_phase(p_business_id);
+  SELECT count(*) INTO v_owed FROM public.financial_effect_intents i WHERE i.business_id = p_business_id AND i.status IN ('pending','failed','attempting','unknown');
+  IF v_prev = p_phase THEN
+    RETURN jsonb_build_object('phase', v_prev, 'changed', false, 'owed_intents', v_owed);
   END IF;
-  WITH expired AS (UPDATE public.financial_effect_intents SET status = 'unknown', finished_at = clock_timestamp(),
-      last_error = 'attempt did not finish within ' || p_stale_minutes || ' min; delivery unknown, needs a human'
-    WHERE business_id = p_business_id AND invoice_id = p_invoice_id AND status = 'attempting'
-      AND claimed_at < clock_timestamp() - make_interval(mins => p_stale_minutes) RETURNING id)
-  SELECT count(*), COALESCE(jsonb_agg(id), '[]'::jsonb) INTO v_unknown, v_unknown_ids FROM expired;
-  WITH c AS (
-    UPDATE public.financial_effect_intents SET status = 'attempting', attempts = attempts + 1, attempt_token = gen_random_uuid()::text,
-        claimed_at = clock_timestamp(), finished_at = NULL
-      WHERE business_id = p_business_id AND invoice_id = p_invoice_id
-        AND (status = 'pending' OR (status = 'failed' AND attempts < p_max_attempts))
-      RETURNING id, command_id, receivable_id, effect, attempts, attempt_token, context)
-  SELECT COALESCE(jsonb_agg((to_jsonb(c) - 'context') || jsonb_build_object('context', COALESCE(c.context, cmd.effect_context)) ORDER BY c.effect), '[]'::jsonb)
-    INTO v_claimed FROM c LEFT JOIN public.financial_payment_commands cmd ON cmd.business_id = p_business_id AND cmd.id = c.command_id;
-  RETURN jsonb_build_object('claimed', v_claimed, 'marked_unknown', v_unknown, 'unknown_ids', v_unknown_ids);
+  INSERT INTO public.financial_kernel_rollout (business_id, phase, previous_phase, actor, reason)
+    VALUES (p_business_id, p_phase, v_prev, p_actor, p_reason) RETURNING id INTO v_id;
+  UPDATE public.business_config SET financial_kernel_enabled = (p_phase <> 'off') WHERE business_id = p_business_id;
+  RETURN jsonb_build_object('phase', p_phase, 'previous_phase', v_prev, 'changed', true, 'rollout_id', v_id, 'owed_intents', v_owed);
 END $fn$;
 
--- ── RPC: the sweeper's work list. One row per invoice with something owed; stale attempts are counted so the sweeper claims them into 'unknown'. ──
-CREATE OR REPLACE FUNCTION public.list_owed_effect_intents(p_business_id TEXT, p_max_attempts INT, p_stale_minutes INT, p_limit INT)
-RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('invoice_id', x.invoice_id, 'owed', x.owed, 'stale', x.stale) ORDER BY x.oldest), '[]'::jsonb)
-  FROM (
-    SELECT i.invoice_id,
-           count(*) FILTER (WHERE i.status = 'pending' OR (i.status = 'failed' AND i.attempts < p_max_attempts)) AS owed,
-           count(*) FILTER (WHERE i.status = 'attempting' AND i.claimed_at < clock_timestamp() - make_interval(mins => p_stale_minutes)) AS stale,
-           min(i.created_at) AS oldest
-      FROM public.financial_effect_intents i
-     WHERE i.business_id = p_business_id AND i.status IN ('pending', 'failed', 'attempting')
-     GROUP BY i.invoice_id
-    HAVING count(*) FILTER (WHERE i.status = 'pending' OR (i.status = 'failed' AND i.attempts < p_max_attempts)
-                              OR (i.status = 'attempting' AND i.claimed_at < clock_timestamp() - make_interval(mins => p_stale_minutes))) > 0
-     LIMIT LEAST(GREATEST(COALESCE(p_limit, 50), 1), 500)
-  ) x
+-- Businesses the kernel cron must visit: dispatch on (consume + sweep) OR owed intents left behind by a kill switch (sweep only).
+CREATE OR REPLACE FUNCTION public.list_financial_kernel_work()
+RETURNS TABLE (business_id TEXT, phase TEXT, consume BOOLEAN, sweep BOOLEAN) LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT b.business_id, public.financial_kernel_phase(b.business_id), b.financial_kernel_enabled,
+         b.financial_kernel_enabled OR EXISTS (SELECT 1 FROM public.financial_effect_intents i WHERE i.business_id = b.business_id AND i.status IN ('pending','failed','attempting'))
+    FROM public.business_config b
+   WHERE b.financial_kernel_enabled OR EXISTS (SELECT 1 FROM public.financial_effect_intents i WHERE i.business_id = b.business_id AND i.status IN ('pending','failed','attempting'))
+   ORDER BY b.business_id
 $fn$;
 
--- ── RPC: a human resolves an 'unknown' (or exhausted 'failed') intent. Actor and reason are mandatory and persisted. ──
-CREATE OR REPLACE FUNCTION public.resolve_effect_intent(
-  p_business_id TEXT, p_intent_id TEXT, p_resolution TEXT, p_actor_id TEXT, p_reason TEXT, p_max_attempts INT
+-- ── 8. Shadow run lifecycle ──
+CREATE OR REPLACE FUNCTION public.open_shadow_run(p_business_id TEXT, p_trigger_type TEXT, p_comparison_version INT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE v_phase TEXT; v_id TEXT;
+BEGIN
+  v_phase := public.financial_kernel_phase(p_business_id);
+  IF v_phase = 'off' THEN RAISE EXCEPTION 'financial_shadow_phase_off' USING ERRCODE = 'check_violation'; END IF;
+  INSERT INTO public.financial_shadow_runs (business_id, phase, trigger_type, comparison_version) VALUES (p_business_id, v_phase, p_trigger_type, p_comparison_version) RETURNING id INTO v_id;
+  RETURN jsonb_build_object('run_id', v_id, 'phase', v_phase);
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.close_shadow_run(p_business_id TEXT, p_run_id TEXT, p_status TEXT, p_counts JSONB)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE r public.financial_shadow_runs%ROWTYPE;
+BEGIN
+  IF p_status NOT IN ('completed','failed') THEN RAISE EXCEPTION 'financial_shadow_run_status_invalid' USING ERRCODE = 'check_violation'; END IF;
+  UPDATE public.financial_shadow_runs SET status = p_status, counts = COALESCE(p_counts, '{}'::jsonb), completed_at = now()
+    WHERE business_id = p_business_id AND id = p_run_id AND status = 'running' RETURNING * INTO r;
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_shadow_run_not_running' USING ERRCODE = 'check_violation'; END IF;
+  RETURN to_jsonb(r);
+END $fn$;
+
+CREATE OR REPLACE FUNCTION public.record_shadow_snapshot(p_business_id TEXT, p_provider TEXT, p_object_type TEXT, p_external_id TEXT, p_invoice_id TEXT, p_fetch_status TEXT, p_snapshot JSONB, p_error TEXT)
+RETURNS TEXT LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  INSERT INTO public.financial_shadow_snapshots (business_id, provider, object_type, external_id, invoice_id, fetch_status, snapshot, error)
+    VALUES (p_business_id, p_provider, p_object_type, p_external_id, p_invoice_id, p_fetch_status, p_snapshot, p_error) RETURNING id
+$fn$;
+
+-- One comparison → its divergence sightings. A match closes every open divergence on the object with provenance (§11).
+-- Severity is the engine's (versioned in TS); the RPC stores, counts, confirms on the second consecutive sighting (§9) and never edits invoice.
+CREATE OR REPLACE FUNCTION public.record_shadow_comparison(
+  p_business_id TEXT, p_run_id TEXT, p_level INT, p_object_type TEXT, p_invoice_id TEXT, p_snapshot_id TEXT,
+  p_result TEXT, p_handymate JSONB, p_differences JSONB
 ) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-DECLARE i public.financial_effect_intents%ROWTYPE; v_status TEXT;
+DECLARE run public.financial_shadow_runs%ROWTYPE; v_cmp TEXT; d JSONB; v_div public.financial_shadow_divergences%ROWTYPE; v_out JSONB := '[]'; v_closed INT := 0;
 BEGIN
-  PERFORM public.financial_lock(p_business_id);
-  IF p_resolution NOT IN ('delivered', 'abandon', 'retry') THEN RAISE EXCEPTION 'financial_effect_resolution_invalid' USING ERRCODE = 'check_violation'; END IF;
-  IF nullif(btrim(p_actor_id), '') IS NULL OR nullif(btrim(p_reason), '') IS NULL THEN RAISE EXCEPTION 'financial_effect_resolution_requires_actor_and_reason' USING ERRCODE = 'check_violation'; END IF;
-  SELECT * INTO i FROM public.financial_effect_intents x WHERE x.business_id = p_business_id AND x.id = p_intent_id FOR UPDATE;
-  IF NOT FOUND THEN RAISE EXCEPTION 'financial_effect_intent_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
-  IF NOT (i.status = 'unknown' OR (i.status = 'failed' AND i.attempts >= p_max_attempts)) THEN
-    RAISE EXCEPTION 'financial_effect_intent_not_resolvable' USING ERRCODE = 'check_violation', DETAIL = i.status;
+  SELECT * INTO run FROM public.financial_shadow_runs WHERE business_id = p_business_id AND id = p_run_id;
+  IF NOT FOUND OR run.status <> 'running' THEN RAISE EXCEPTION 'financial_shadow_run_not_running' USING ERRCODE = 'check_violation'; END IF;
+  IF p_result = 'divergent' AND (p_differences IS NULL OR jsonb_typeof(p_differences) <> 'array' OR jsonb_array_length(p_differences) = 0) THEN
+    RAISE EXCEPTION 'financial_shadow_differences_required' USING ERRCODE = 'check_violation'; END IF;
+  INSERT INTO public.financial_shadow_comparisons (business_id, run_id, phase, level, object_type, invoice_id, snapshot_id, result, comparison_version, handymate, differences)
+    VALUES (p_business_id, p_run_id, run.phase, p_level, p_object_type, p_invoice_id, p_snapshot_id, p_result, run.comparison_version, COALESCE(p_handymate,'{}'::jsonb), COALESCE(p_differences,'[]'::jsonb))
+    RETURNING id INTO v_cmp;
+  IF p_result = 'match' THEN
+    FOR v_div IN SELECT * FROM public.financial_shadow_divergences x WHERE x.business_id = p_business_id AND x.object_type = p_object_type AND COALESCE(x.invoice_id,'') = COALESCE(p_invoice_id,'') AND x.status = 'open' FOR UPDATE LOOP
+      UPDATE public.financial_shadow_divergences SET status = 'resolved' WHERE business_id = p_business_id AND id = v_div.id;
+      INSERT INTO public.financial_shadow_resolutions (business_id, divergence_id, resolution_type, reason, resolved_by, fix_reference)
+        VALUES (p_business_id, v_div.id, 'superseded_by_match', 'Objektet stämde vid en senare jämförelse', 'shadow-run', v_cmp);
+      v_closed := v_closed + 1;
+    END LOOP;
+    RETURN jsonb_build_object('comparison_id', v_cmp, 'divergences', v_out, 'closed', v_closed);
   END IF;
-  v_status := CASE p_resolution WHEN 'delivered' THEN 'sent' WHEN 'abandon' THEN 'skipped' ELSE 'pending' END;
-  UPDATE public.financial_effect_intents SET status = v_status,
-      finished_at = CASE WHEN v_status = 'pending' THEN NULL ELSE clock_timestamp() END,
-      attempt_token = CASE WHEN v_status = 'pending' THEN NULL ELSE attempt_token END,
-      claimed_at = CASE WHEN v_status = 'pending' THEN NULL ELSE claimed_at END,
-      attempts = CASE WHEN v_status = 'pending' THEN 0 ELSE attempts END,
-      resolution = COALESCE(resolution, '[]'::jsonb) || jsonb_build_object('at', clock_timestamp(), 'by', p_actor_id, 'from', i.status, 'to', v_status, 'reason', p_reason)
-    WHERE business_id = p_business_id AND id = p_intent_id;
-  RETURN jsonb_build_object('id', i.id, 'from', i.status, 'to', v_status);
+  IF p_result = 'reference_missing' THEN
+    p_differences := jsonb_build_array(jsonb_build_object('kind','REFERENCE_DATA_UNAVAILABLE','severity','medium','expected',NULL,'actual',NULL));
+  END IF;
+  IF p_result = 'unsupported' THEN RETURN jsonb_build_object('comparison_id', v_cmp, 'divergences', v_out, 'closed', 0); END IF;
+  FOR d IN SELECT * FROM jsonb_array_elements(p_differences) LOOP
+    INSERT INTO public.financial_shadow_divergences (business_id, phase, kind, severity, object_type, invoice_id, comparison_id, expected, actual)
+      VALUES (p_business_id, run.phase, d->>'kind', d->>'severity', p_object_type, p_invoice_id, v_cmp, d->'expected', d->'actual')
+    ON CONFLICT (business_id, object_type, (COALESCE(invoice_id,'')), kind) WHERE status = 'open' DO UPDATE SET
+      seen_count = public.financial_shadow_divergences.seen_count + 1, last_seen_at = now(), comparison_id = EXCLUDED.comparison_id,
+      severity = EXCLUDED.severity, expected = EXCLUDED.expected, actual = EXCLUDED.actual, phase = EXCLUDED.phase,
+      confirmed_at = COALESCE(public.financial_shadow_divergences.confirmed_at, now())
+    RETURNING * INTO v_div;
+    v_out := v_out || jsonb_build_object('id', v_div.id, 'kind', v_div.kind, 'severity', v_div.severity, 'seen_count', v_div.seen_count,
+      'confirmed', v_div.confirmed_at IS NOT NULL, 'report', v_div.confirmed_at IS NOT NULL AND v_div.reported_at IS NULL);
+  END LOOP;
+  RETURN jsonb_build_object('comparison_id', v_cmp, 'divergences', v_out, 'closed', 0);
 END $fn$;
 
--- ── RPC: what a human sees. Unknown and exhausted intents per business, with the command/event that owed them. ──
-CREATE OR REPLACE FUNCTION public.list_unresolved_effect_intents(p_business_id TEXT, p_max_attempts INT, p_limit INT)
-RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
-  SELECT COALESCE(jsonb_agg(jsonb_build_object('id', i.id, 'invoice_id', i.invoice_id, 'receivable_id', i.receivable_id, 'effect', i.effect,
-           'status', i.status, 'attempts', i.attempts, 'claimed_at', i.claimed_at, 'finished_at', i.finished_at, 'last_error', i.last_error,
-           'command_id', i.command_id, 'source_event_id', i.source_event_id, 'resolution', i.resolution) ORDER BY i.finished_at NULLS LAST, i.created_at), '[]'::jsonb)
-  FROM (SELECT * FROM public.financial_effect_intents i WHERE i.business_id = p_business_id
-          AND (i.status = 'unknown' OR (i.status = 'failed' AND i.attempts >= p_max_attempts))
-        ORDER BY i.finished_at NULLS LAST, i.created_at LIMIT LEAST(GREATEST(COALESCE(p_limit, 100), 1), 500)) i
+CREATE OR REPLACE FUNCTION public.mark_shadow_divergences_reported(p_business_id TEXT, p_ids TEXT[])
+RETURNS INT LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  WITH u AS (UPDATE public.financial_shadow_divergences SET reported_at = now() WHERE business_id = p_business_id AND id = ANY(p_ids) AND reported_at IS NULL AND confirmed_at IS NOT NULL RETURNING 1)
+  SELECT count(*)::int FROM u
 $fn$;
 
--- ── C5-review LOW: the issued-number guard says so when it reverts ──
-CREATE OR REPLACE FUNCTION public.financial_preserve_issued_number()
-RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+CREATE OR REPLACE FUNCTION public.resolve_shadow_divergence(p_business_id TEXT, p_divergence_id TEXT, p_resolution_type TEXT, p_reason TEXT, p_actor TEXT, p_fix_reference TEXT, p_root_cause_code TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE v_div public.financial_shadow_divergences%ROWTYPE; v_res TEXT;
 BEGIN
- IF NEW.invoice_number IS DISTINCT FROM OLD.invoice_number
- AND EXISTS(SELECT 1 FROM public.business_config WHERE business_id=NEW.business_id AND financial_kernel_enabled)
- AND EXISTS(SELECT 1 FROM public.financial_receivables WHERE business_id=NEW.business_id AND invoice_id=NEW.invoice_id) THEN
-   RAISE NOTICE 'financial_preserve_issued_number: invoice % keeps number % (attempted %)', NEW.invoice_id, OLD.invoice_number, NEW.invoice_number;
-   NEW.invoice_number := OLD.invoice_number;
- END IF;
- RETURN NEW;
+  IF p_resolution_type NOT IN ('accepted','fixed','reference_error','duplicate') THEN RAISE EXCEPTION 'financial_shadow_resolution_invalid' USING ERRCODE = 'check_violation'; END IF;
+  IF p_actor IS NULL OR p_actor = '' OR p_reason IS NULL OR length(p_reason) < 3 THEN RAISE EXCEPTION 'financial_shadow_reason_required' USING ERRCODE = 'check_violation'; END IF;
+  SELECT * INTO v_div FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND id = p_divergence_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'financial_shadow_divergence_not_found' USING ERRCODE = 'foreign_key_violation'; END IF;
+  IF v_div.status <> 'open' THEN RAISE EXCEPTION 'financial_shadow_divergence_not_open' USING ERRCODE = 'check_violation'; END IF;
+  UPDATE public.financial_shadow_divergences SET status = 'resolved', root_cause_code = p_root_cause_code WHERE business_id = p_business_id AND id = p_divergence_id;
+  INSERT INTO public.financial_shadow_resolutions (business_id, divergence_id, resolution_type, reason, resolved_by, fix_reference)
+    VALUES (p_business_id, p_divergence_id, p_resolution_type, p_reason, p_actor, p_fix_reference) RETURNING id INTO v_res;
+  RETURN jsonb_build_object('divergence_id', p_divergence_id, 'resolution_id', v_res, 'status', 'resolved');
 END $fn$;
 
-REVOKE ALL ON FUNCTION public.ensure_effect_intents(TEXT, TEXT, TEXT, TEXT[], JSONB) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.list_owed_effect_intents(TEXT, INT, INT, INT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.resolve_effect_intent(TEXT, TEXT, TEXT, TEXT, TEXT, INT) FROM PUBLIC, anon, authenticated;
-REVOKE ALL ON FUNCTION public.list_unresolved_effect_intents(TEXT, INT, INT) FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.ensure_effect_intents(TEXT, TEXT, TEXT, TEXT[], JSONB) TO service_role;
-GRANT EXECUTE ON FUNCTION public.list_owed_effect_intents(TEXT, INT, INT, INT) TO service_role;
-GRANT EXECUTE ON FUNCTION public.resolve_effect_intent(TEXT, TEXT, TEXT, TEXT, TEXT, INT) TO service_role;
-GRANT EXECUTE ON FUNCTION public.list_unresolved_effect_intents(TEXT, INT, INT) TO service_role;
+CREATE OR REPLACE FUNCTION public.list_shadow_divergences(p_business_id TEXT, p_status TEXT, p_limit INT)
+RETURNS SETOF public.financial_shadow_divergences LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT * FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND status = COALESCE(p_status,'open')
+   ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 WHEN 'low' THEN 3 ELSE 4 END, last_seen_at DESC
+   LIMIT LEAST(GREATEST(COALESCE(p_limit,100),1),500)
+$fn$;
+
+CREATE OR REPLACE FUNCTION public.financial_shadow_status(p_business_id TEXT)
+RETURNS JSONB LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+  SELECT jsonb_build_object(
+    'phase', public.financial_kernel_phase(p_business_id),
+    'phase_since', (SELECT changed_at FROM public.financial_kernel_rollout r WHERE r.business_id = p_business_id ORDER BY changed_at DESC, id DESC LIMIT 1),
+    'last_run', (SELECT to_jsonb(r) FROM public.financial_shadow_runs r WHERE r.business_id = p_business_id ORDER BY started_at DESC LIMIT 1),
+    'open', (SELECT COALESCE(jsonb_object_agg(severity, n), '{}'::jsonb) FROM (SELECT severity, count(*) n FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND status = 'open' GROUP BY severity) s),
+    'open_confirmed', (SELECT count(*) FROM public.financial_shadow_divergences WHERE business_id = p_business_id AND status = 'open' AND confirmed_at IS NOT NULL),
+    'unsupported_levels', '[2,3,4]'::jsonb)
+$fn$;
+
+-- ── 9. Privileges: service_role only, like every kernel RPC ──
+DO $do$ DECLARE f TEXT; BEGIN
+  FOREACH f IN ARRAY ARRAY[
+    'financial_kernel_phase(TEXT)', 'set_financial_kernel_phase(TEXT,TEXT,TEXT,TEXT)', 'list_financial_kernel_work()',
+    'open_shadow_run(TEXT,TEXT,INT)', 'close_shadow_run(TEXT,TEXT,TEXT,JSONB)', 'record_shadow_snapshot(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,JSONB,TEXT)',
+    'record_shadow_comparison(TEXT,TEXT,INT,TEXT,TEXT,TEXT,TEXT,JSONB,JSONB)', 'mark_shadow_divergences_reported(TEXT,TEXT[])',
+    'resolve_shadow_divergence(TEXT,TEXT,TEXT,TEXT,TEXT,TEXT,TEXT)', 'list_shadow_divergences(TEXT,TEXT,INT)', 'financial_shadow_status(TEXT)'] LOOP
+    EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon, authenticated', f);
+    EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO service_role', f);
+  END LOOP;
+END $do$;
 
 COMMIT;
 ```
 
-**Verified 2026-09-14 in PGlite on v235–v239 (`main` after #66) + this draft (`probe11.cjs`, 24 checks):**
-after a facade payment the bridge's `ensure_effect_intents` creates nothing and suppresses all six;
-for a C7-style producer (C4 RPCs called directly, `receivable_settled` appended) it creates six
-intents with `source_event_id`, `context.source = 'bridge'`, `paidAmountMinor` from the invoice's
-settled payments, and a second call suppresses all six; an event of another type, an event of
-another receivable, and an open or tax receivable are all rejected; `claim` returns the intent's
-own context for bridge intents and the command's for facade intents; `list_owed_effect_intents`
-lists nothing while attempts are fresh and lists the invoice with `stale 6` after backdating;
-claim bounds accept stale 5 and reject 0 and max 11; `resolve` requires actor and reason,
-`delivered` → `sent`, `retry` → `pending` with attempts 0 and no token, `abandon` → `skipped`,
-a resolved intent cannot be resolved again, an exhausted `failed` intent is listed and can be
-retried and then shows as owed again; the resolution log carries from/to/by/reason; all four new
-RPCs are executable by `service_role` only. Twelve intents in total, six by command and six by
-event. Not proven in PGlite: two sweepers racing (Postgres CI, invariant 12) and the consumer
-loop itself (covered by C3's suites; C5b adds the bridge through `consumeOnce`).
-
 ### Runtime shape
 
 ```text
-GET /api/cron/financial-kernel                       (verifyCronSecret; 401 otherwise)
-  for business in business_config where financial_kernel_enabled:
-    consumeOnce(kernelDb, business, automationBridge, { limit: 100 })   -- handler: receivable_settled{customer} → ensure_effect_intents
-      if result.halted: rapporteraTystFel('financial-kernel:consumer-halted') once per run
-    for row in list_owed_effect_intents(business, 3, 10, 50):
-      sweepInvoiceIntents(business, row.invoice_id)                     -- claim → runPaymentEffect → finish; unknown/exhausted reported
-    stop when 240 s elapsed; return { businesses, consumed, swept, halted, unknown }
+cron  /api/cron/financial-kernel-shadow        30 4 * * *   (Fortnox payment sync runs 0 */2; 04:30 compares against a state ≤ 30 min old)
+      CRON_SECRET, force-dynamic, 240 s budget, business rotation as in the C5b cron
+      for each business in list_financial_kernel_work() with phase ≠ off and Fortnox connected:
+        run = open_shadow_run(business, 'cron', COMPARISON_VERSION)
+        invoices = rows with kernel receivables ∪ rows sent after phase_since with fortnox_document_number ∪ open receivables   (cap 200 per run, least recently compared first)
+        for each invoice:
+          snapshot = getFortnoxInvoice(document_number) → record_shadow_snapshot(ok | not_found | error)     (no document number → no fetch, snapshot NULL)
+          handymate = financial_invoice_projection + invoice columns (status, paid_amount, total, customer_pays, rot_rut_type, sent_at)
+          {result, differences} = compareInvoiceLevel1(handymate, snapshot)                                 (pure; versioned severity table)
+          out = record_shadow_comparison(business, run, 1, 'invoice', invoice_id, snapshot_id, result, handymate, differences)
+          collect out.divergences where report = true
+        record_shadow_comparison(..., level 2/3/4, object_type ledger/aggregate/report, 'unsupported', {reason})   once each per run
+        rapporteraTystFel('financial-kernel:shadow-divergence', <n confirmed, worst severity>) then mark_shadow_divergences_reported(ids)
+        close_shadow_run(business, run, 'completed' | 'failed', counts)
 
-automationBridge.handle(event, db):
-  if event.eventType !== 'receivable_settled' or event.payload.component !== 'customer': return
-  ensure_effect_intents(business, event.payload.receivable_id, event.eventId, BRIDGE_EFFECTS, { source: 'bridge' })
+cron  /api/cron/financial-kernel               business list from list_financial_kernel_work(): consume when consume, sweep when sweep
 
-sweepInvoiceIntents(business, invoiceId):                                -- extracted from facade.ts, used by facade + cron
-  claims := claim_effect_intents(business, invoiceId, 3, 10)
-  report each claims.unknown_ids once ('financial-kernel:effect-unknown')
-  for intent in claims.claimed: result := runPaymentEffect(...); finish_effect_intent(id, attempt_token, status)
-    if failed and attempts >= 3: report 'financial-kernel:effect-exhausted'
-  return effects[]
-
-GET  /api/admin/financial-kernel/intents?business_id=…        (isSuperAdmin) → list_unresolved_effect_intents
-POST /api/admin/financial-kernel/intents/{id}/resolve         { resolution, reason } → resolve_effect_intent(actor = admin user id)
-GET  /api/admin/financial-kernel/consumers?business_id=…      → get_financial_consumer_status
-POST /api/admin/financial-kernel/consumers/resume             { business_id, consumer, reason } → resume_financial_consumer
+admin GET  /api/admin/financial-kernel/shadow?business=…                 → financial_shadow_status + list_shadow_divergences('open')
+      POST /api/admin/financial-kernel/phase        {business, phase, reason}          → set_financial_kernel_phase (actor = admin user id)
+      POST /api/admin/financial-kernel/shadow/[id]/resolve {business, type, reason, fix_reference?, root_cause_code?}
+      POST /api/admin/financial-kernel/shadow/run   {business}                        → one manual run (trigger_type 'manual'), same code path as the cron
 ```
-
-Admin UI: one section on the existing admin page, "Ekonomikärnan — utskick som kräver beslut",
-listing unresolved intents (invoice, effect, status, attempts, last error) with three buttons
-(Levererat, Avbryt, Försök igen) that require a reason, and halted consumers with Återuppta.
-No design work beyond the page's existing components.
 
 ### Scope
 
 ```text
-sql/v240_financial_bridge_intents.sql               (as above)
-lib/financial-kernel/events/bridge-automation.ts    (real handler; DB-only; BRIDGE_EFFECTS constant)
-lib/financial-kernel/effects/sweep.ts               (new; sweepInvoiceIntents extracted from facade.ts, facade calls it)
-lib/financial-kernel/commands/service.ts            (+ ensureEffectIntents, listOwedEffectIntents, listUnresolvedEffectIntents, resolveEffectIntent wrappers)
-app/api/cron/financial-kernel/route.ts              (new; consumer + sweeper per flagged business; time budget)
-vercel.json                                         (+ cron every 10 min)
-app/api/admin/financial-kernel/intents/route.ts, …/intents/[id]/resolve/route.ts, …/consumers/route.ts, …/consumers/resume/route.ts (new; isSuperAdmin)
-app/admin/page.tsx                                  (section "Ekonomikärnan — utskick som kräver beslut")
-lib/invoices/payment-command-key.ts + both routes   (LOW: malformed key → 400)
-lib/invoices/sync-to-fortnox.ts                     (LOW: read error → omit invoice_number + rapporteraTystFel, never throw)
-tests/financial-kernel-bridge.spec.ts               (new; PGlite: consumeOnce + real handler + real RPCs; non-facade producer, facade producer, foreign event types, replay, lease expiry mid-handler with a second worker)
-tests/financial-kernel-sweeper.spec.ts              (new; PGlite: cron route auth, per-business loop, dispatch once, unknown/exhausted reports, time budget)
-tests/financial-kernel-admin-intents.spec.ts        (new; admin auth, resolve semantics, resume requires reason)
-tests/financial-kernel-effects-runners.spec.ts      (new; real runPaymentEffect for invoice_paid_thanks and review_request_schedule with sendSmsViaElks stubbed — C5 LOW)
-tests/financial-kernel-command-concurrency.spec.ts  (+ two sweepers racing on one business)
-tests/helpers/financial-receivables-database.ts     (+ v240)
-package.json, .github/workflows/contracts.yml, tests/fixtures/production-schema-columns.json if needed, docs (handoff)
+sql/v242_financial_kernel_shadow.sql                       (as above)
+lib/financial-kernel/phase.ts                              (readPhase, setPhase over the RPCs; typed phases 'off' | 'S1' | 'S2')
+lib/financial-kernel/shadow/compare.ts                     (pure Level 1 engine + SEVERITY table + COMPARISON_VERSION = 1)
+lib/financial-kernel/shadow/run.ts                         (runShadowForBusiness: fetch, snapshot, compare, record, report; injectable Fortnox reader and clock)
+lib/financial-kernel/shadow/service.ts                     (typed RPC wrappers)
+app/api/cron/financial-kernel-shadow/route.ts
+app/api/cron/financial-kernel/route.ts                     (business list via list_financial_kernel_work; consume/sweep per flags)
+app/api/admin/financial-kernel/{phase, shadow, shadow/[id]/resolve, shadow/run}/route.ts
+app/admin/components/FinancialKernelSection.tsx            (phase control, shadow status, divergence list; Swedish labels: Fas, Avvikelser, Bekräftad, Ny, Ej stödd nivå)
+vercel.json                                                (30 4 * * *)
+tests/financial-kernel-shadow-sql.spec.ts                  (PGlite: the 40 probe checks as assertions)
+tests/financial-kernel-shadow-compare.spec.ts              (fixtures: paid, customer_paid ROT, cancelled, open, 404, no document number, rounding 1–100 öre, projection mismatch, missing handymate entry)
+tests/financial-kernel-shadow-run.spec.ts                  (stubbed Fortnox: budget, cap, phase filter, report-once rule, no facade/command call (spy), no invoice write)
+tests/financial-kernel-admin-shadow.spec.ts                (auth, reason required, actor = user id, phase S2 refused → 400)
+tests/cron-auth (+1 = 50), tests/route-auth inventory (+4), docs (handoff here, §2)
 ```
 
 ### Invariants (tests first)
 
-1. **Bridge is a producer only.** Through the real `consumeOnce`: a `receivable_settled{customer}`
-   from a non-facade payment yields six `pending` intents with `source_event_id` and no external
-   call; the same event delivered twice (replay) yields no new rows; `receivable_settled{tax_authority}`,
-   `payment_settled`, `invoice_issued` create nothing; the handler never imports a runner.
-2. **Facade-owned intents stay facade-owned.** A facade payment followed by the consumer run
-   produces `suppressed` for all six and no second row per `(receivable, effect)`.
-3. **Lease expiry mid-handler (C3 requirement):** worker A claims the batch, its lease expires
-   inside the handler, worker B claims and completes; the receivable ends with exactly one
-   intent per effect and the sweeper later dispatches each exactly once.
-4. **Sweep is the only dispatcher.** `sweepInvoiceIntents` is the single import of
-   `runPaymentEffect` besides its own test; the facade uses the extracted function and its C5
-   tests stay green unchanged.
-5. **Cron contract:** no/incorrect secret → 401 with nothing executed; flag-off businesses are
-   never touched (zero kernel RPCs); the 240 s budget stops the loop and the response says how
-   many businesses were skipped.
-6. **Unknown and exhausted are reported once and never auto-resent:** a stale attempt becomes
-   `unknown` on the first sweep and is not claimed on later sweeps; three failures exhaust the
-   intent; each is reported exactly once via `rapporteraTystFel`.
-7. **Human resolution:** `delivered`, `abandon`, `retry` behave as verified; actor and reason are
-   required and logged; a retried intent is dispatched on the next sweep; resolving anything not
-   `unknown`/exhausted is refused.
-8. **Halted consumer:** a handler failure five times halts the consumer (C3), the cron reports it
-   once per run and continues with the next business; `resume` from the admin route requires a
-   reason and records the actor.
-9. **Admin routes** refuse non-superadmins (same gate as the other admin routes) and act only on
-   the named business.
-10. **LOWs:** malformed `Idempotency-Key` → 400; Fortnox receipt path with a failing receivables
-    read omits `invoice_number`, reports, and completes the receipt; the number trigger emits a
-    notice when it reverts; claim bounds reject 0 and 11.
-11. **Runner paths are real:** `runPaymentEffect` for `invoice_paid_thanks` calls the stubbed
-    `sendSmsViaElks` once and maps success/failure; `review_request_schedule` inserts one
-    `scheduled_review_request` row or skips within the 180-day guard.
-12. **Postgres CI:** two sweepers on the same business at once → one claims all owed intents, the
-    other claims none, no intent is dispatched twice.
-13. **Contract test still green:** no new event names; `fireEvent` still only in the two allowed
-    files; no `Number(` on minor amounts in new kernel files.
+1. `financial_kernel_phase` defaults to `off`; `set_financial_kernel_phase` refuses `S2`, an empty actor or a
+   reason shorter than 3 characters; `S1` sets the flag true and appends one history row; the same phase again
+   changes nothing; `off` sets the flag false, keeps the history and returns `owed_intents`.
+2. No other code path writes `business_config.financial_kernel_enabled` (source scan over `lib/`, `app/`, `sql/v242`).
+3. After a kill switch with owed intents, the C5b cron still sweeps that business (`sweep = true`) and no
+   longer consumes (`consume = false`); the two-sweeper race and the C5b suites stay green.
+4. `open_shadow_run` refuses phase `off`; `record_shadow_comparison` and `close_shadow_run` refuse a run that
+   is not `running`; `divergent` requires at least one difference.
+5. First sighting → `open`, `seen_count 1`, not reported; second → `confirmed_at` set, `report = true` once;
+   third → `report = false`; `mark_shadow_divergences_reported` only marks confirmed rows.
+6. A `match` closes every open divergence on the object with `superseded_by_match` and the comparison id;
+   a manual resolve requires type and reason, records the actor, and refuses an already-resolved row.
+7. `reference_missing` records exactly one `REFERENCE_DATA_UNAVAILABLE` (`medium`); `unsupported` records the
+   comparison and no divergence; every run writes Levels 2–4 as `unsupported`.
+8. The engine is exact: 1 öre is a `ROUNDING_DIVERGENCE`, 101 öre a `RECEIVABLE_BALANCE_DIVERGENCE`; no
+   constant named tolerance/epsilon/margin exists under `lib/financial-kernel/shadow/`.
+9. The engine maps every `FortnoxPaymentClass` and every `derived_status`; a class the engine does not know
+   is `reference_missing` with `error`, never `match`.
+10. The run never calls `applyInvoicePayment`, `execute_payment_command` or any C4 RPC, and never writes
+    `invoice` (spy + source scan + the probe's `prosrc` scan).
+11. Rollout, snapshots, comparisons and resolutions are immutable; every RPC is service_role-only; RLS read
+    for members on all six tables; a member's insert and RPC call are denied.
+12. Every status payload and every admin view carries the phase; the admin section shows *Ej stödd nivå 2–4*
+    next to any divergence count, and never a percentage.
+13. `tests/cron-auth` counts 50 and the route-auth inventory includes the four admin routes.
 
-### Acceptance (orchestration §5 C5b + §9)
+### Acceptance (orchestration §5 C6 + §9)
 
-All C5 suites green unchanged; all new suites green; Postgres CI green; `tsc` clean; the flag is
-still false for every business; the cron is registered but does nothing for flag-off businesses;
-handoff lists every report key (`financial-kernel:*`) the package emits and where a human sees it.
+All C3/C4/C5/C5b suites unchanged and green; new suites green; `tsc` clean; the handoff shows one full local
+run against a stubbed Fortnox with at least one confirmed divergence and one `superseded_by_match`; v242 not
+applied anywhere by the PR; no business flipped.
 
 ### Not in this package
 
-Flag flip and shadow comparison (C6). PSP webhooks (C7). Opening balances and the end of
-`legacy_routed` (C4b). Real rounding policy (C1b). Any accounting posting (C8/C9). Admin UI
-beyond the one section. Supplier side (C4s).
+S2 definition and the S1 → S2 flip. Readiness metrics and the migration gate (C12, on Level 1 only until the
+scope question is reopened). Supplier invoices/payables (C4s). Reusing the sync's own Fortnox observation as a
+snapshot (queued optimisation). Any customer-facing number.
 
 ### Handoff back
 
-Orchestration §7 block under §2, same PR. Claude reviews against §6 A, B, C with B as the centre.
+Same §7 block as before, under §2. Claude reviews against orchestration §6 A + B + C + E. Owner-side before
+the flip: v239 + v240 + v242 applied, the two crons live, Fortnox connected for the pilot, pilot named in the
+reason.
 
----
-
-## 4. Queued after C5 — sketch only, briefed when C5 merges
+## 4. Queued — sketch only
 
 **C5 brief requirement from PR #54 review (MEDIUM):** before firing any automation,
 the bridge must persist its own payment_received idempotency marker per `receivable_id` (C4 review supersedes the C3 per-event proposal). Database effects,
@@ -770,13 +888,7 @@ emitting `supplier_payment_settled` and `payable_settled`. Both today's writers 
 `supplier_invoices.status='paid'` (the Fortnox supplier sync and `PATCH /api/supplier-invoices`)
 become callers in C5s. Golden path 20 is the acceptance replay.
 
-**C6 — shadow payment mode (S1/S2 per business).** The first flag flip, for one pilot business
-the owner names. S1: kernel enabled, projection written, effects via intents, Fortnox still the
-truth for bookkeeping; a daily comparison job compares the kernel projection with Fortnox's
-invoice balances (Level 1 per shadow architecture §21.6) and reports drift through `rapporteraTystFel`
-with a per-business kill switch (flag off returns every caller to the frozen legacy body; the
-projected columns stay valid). S2 is defined after two clean weeks of S1. Needs: v239 + v240
-applied in production, the C5b cron live, and the owner's pilot decision.
+**C6 — shadow payment mode.** Briefed in §3 (2026-09-14). S2 definition follows two clean S1 weeks.
 
 **Open-source inputs.** Before C4b, C9, C10, C11, C13 or C14 is briefed, read
 `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §5: it names the reference data (Odoo core `l10n_se`,
@@ -802,6 +914,21 @@ branch before writing C4; do not merge #12 into the kernel path as-is.
 ---
 
 ## 5. Review record
+
+### C5b — intent bridge, shared sweep and human recovery (PR #71), Claude review 2026-09-14, orchestration §6 A + B + C
+
+Verified locally on `codex/financial-kernel-c5b` head `d02f1978`: 185 tests green (bridge, sweeper,
+admin-intents, effects-runners, command-concurrency incl. the two-sweeper race, C5/C4/C3 suites, legacy
+apply-payment facit, cron-auth 49, route-auth inventory 161), `tsc` clean. v240 read in full: bridge is a
+DB-only producer keyed by (receivable, effect) with facade-owned suppression, amount from active allocations,
+reopened receivable acknowledged; admin RPCs service_role-only with actor + reason; claim bounds at the RPC
+boundary. Handoff deviations 1–6 accepted as improvements. No BLOCKER, no MEDIUM. Merged the same day.
+
+| Sev | Finding | Status |
+|---|---|---|
+| LOW | `sweepInvoiceIntents` calls `finishEffectIntent` outside the try/catch: one thrown finish aborts the loop and the other claimed intents on the invoice age into `unknown` (never a duplicate send; they land in the admin queue instead of the next tick). | open — carry to C6; per-intent try/catch + `rapporteraTystFel` |
+| LOW | Runners use reason `Betal-markering` for `source === 'bridge'`. | open — cosmetic, next touch of `runners.ts` |
+| LOW | `consumeOnce` limit 100 per business per run; a backlog after halt/resume drains over several ticks. | noted for the pilot |
 
 ### C5 — compatibility facade (PR #66), Claude review 2026-09-14, orchestration §6 A + B + C + E
 
@@ -993,3 +1120,4 @@ No BLOCKER.
 | 2026-09-14 | C5 brief v3 after Codex review PR #62 (R1–R4 accepted): projection written by the RPC from current state under the invoice lock, `{command, projection}` on every state, attempt tokens on claim/finish, status-route effects as intents; v239 draft re-verified in PGlite (48 checks + 6 privilege denials). v2 retired to git history. Response in §5. | Package C5 prep v3 |
 | 2026-09-14 | C5 implementation reviewed (PR #66): no BLOCKER, 3 MEDIUM (approval target + amount, legacy-routed replay, eager-issuance throw after delivery), 4 LOW. Same day: the three MEDIUM resolved on #66 and re-verified; board row left to #66. | C5 review |
 | 2026-09-14 | C5 merged (PR #66) and the review log (PR #67). C5b brief written: DB-only bridge producing intents via `ensure_effect_intents`, cron consumer + sweeper, human resolution of `unknown`/exhausted intents, admin surface, the four C5 LOWs; v240 draft embedded and verified in PGlite (24 checks). C5 v3 brief retired to git history. C6 sketched in §4. | Package C5b prep |
+| 2026-09-14 | C5b reviewed and merged (PR #71; review in §5, 3 LOW carried to C6). C6 brief written: phase history + `set_financial_kernel_phase` as the only flag writer, kill switch that keeps sweeping owed intents, Level 1 exact comparison with sighting-count confirmation, Levels 2–4 as `unsupported`, admin surface; v242 draft embedded and verified in PGlite (40 checks). C5b brief retired to git history. | Package C6 prep |

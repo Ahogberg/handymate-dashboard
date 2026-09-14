@@ -32,7 +32,7 @@ product *identified* and *acted on*; the kernel records what was *invoiced* and 
 |---|---|---|---|---|
 | V0 | P0: `/api/automation/value` separates estimated minutes from confirmed money | Claude | **done 2026-09-14** (this PR; `tests/automation-value-honesty.spec.ts`) | — |
 | V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **ready — brief in §3** | — |
-| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | Financial Kernel C5b merged, C6 pilot flag on |
+| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | C6 pilot flag on (C5b merged 2026-09-14) |
 | V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | sketched (§4) | V1, V2 |
 | — | Revenue-recovery loop closed to draft → sent → paid (audit action 2) | Codex | folded into V1 (acted) + V2 (paid); no separate package | — |
 | — | Onboarding scan → work → receipt in 15 minutes (audit action 3) | Codex | product package outside this log; receipt wording must follow rule 1 (say *prepared* / *acted*, never *earned*) | — |
