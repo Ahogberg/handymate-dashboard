@@ -23,7 +23,7 @@ export async function receivablesDatabase() {
   const helper=readFileSync('sql/testbed_tenant_isolation.sql','utf8').match(/CREATE OR REPLACE FUNCTION public\.is_business_member[\s\S]*?\$function\$;/)
   if (!helper) throw Error('Missing membership function')
   await db.exec(helper[0]); await db.exec('SET ROLE deployer')
-  for(const file of ['v235_financial_events.sql','v236_financial_event_consumers.sql','v238_financial_receivables.sql','v239_financial_payment_commands.sql']) await db.exec(readFileSync('sql/'+file,'utf8'))
+  for(const file of ['v235_financial_events.sql','v236_financial_event_consumers.sql','v238_financial_receivables.sql','v239_financial_payment_commands.sql','v240_financial_bridge_intents.sql']) await db.exec(readFileSync('sql/'+file,'utf8'))
   await db.exec('RESET ROLE')
   const rpc:KernelDb={async rpc(name,args){
     if(!/^[a-z_]+$/.test(name)||Object.keys(args).some(k=>!/^p_[a-z_]+$/.test(k))) throw Error('Unsafe test RPC')
@@ -46,3 +46,4 @@ export const issue=(db:PGlite,id='invoice',biz='a')=>domain<{inserted:boolean;re
 export const settle=(db:PGlite,amount='1250000',key='pay',biz='a',currency='SEK')=>domain<{payment_id:string;inserted:boolean}>(db,'record_payment_settlement',[biz,'manual',null,'inbound',null,currency,amount,null,'manual','2026-09-20T00:00:00Z',null,key,'system',null])
 export const allocate=(db:PGlite,payment:string,receivable:string,amount='1250000',key='allocation')=>domain(db,'allocate_payment',['a',payment,receivable,amount,key,'system',null])
 export const adjust=(db:PGlite,rec:string,delta:string,reason='rounding',key='adjust',owner:string|null=null)=>domain(db,'adjust_receivable',['a',rec,reason,delta,owner,null,null,key,'system',null])
+

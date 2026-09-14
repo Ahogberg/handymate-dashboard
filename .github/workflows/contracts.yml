@@ -89,6 +89,10 @@ jobs:
           tests/financial-kernel-event-contract.spec.ts
           tests/financial-kernel-c5-brief-probes.spec.ts
           tests/financial-kernel-c5-v2-brief-probes.spec.ts
+          tests/financial-kernel-bridge.spec.ts
+          tests/financial-kernel-sweeper.spec.ts
+          tests/financial-kernel-admin-intents.spec.ts
+          tests/financial-kernel-effects-runners.spec.ts
           tests/financial-kernel-facade.spec.ts
           tests/financial-kernel-facade-legacy-frozen.spec.ts
           tests/financial-kernel-money.spec.ts

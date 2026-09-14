@@ -36,6 +36,7 @@ Rules that keep this file honest:
 | C4 | Receivables + allocations behind flag | Codex | **done 2026-09-14** (PR #56 merged; payload amounts as strings per amended §FK.1) | — |
 | C4b | Opening balances and cut-over | Codex | not started | C4, D4 (cut-over year) |
 | C5 | `applyInvoicePayment()` compatibility facade | Codex | **done 2026-09-14** (PR #66 merged; Claude review A/B/C/E: no BLOCKER, 3 MEDIUM resolved and re-verified; 4 LOW carried into C5b) | — |
+| C5b | Consumer bridge, shared sweep and human recovery | Codex | **implemented — review pending**; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md) | Claude §6 A/B/C + CI |
 | C6 | Shadow payment mode (S1/S2 phase per business) | Codex | not started | C5, PMF gate (orchestration §2) |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
 | C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |

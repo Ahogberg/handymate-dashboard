@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import PartnerCommissionModal from './components/PartnerCommissionModal'
 import SupportQueueTab from './components/SupportQueueTab'
+import FinancialKernelSection from './components/FinancialKernelSection'
 import RaddningskoTab from './components/RaddningskoTab'
 
 interface Customer {
@@ -912,7 +913,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* SUPPORT TAB */}
-        {activeTab === 'support' && <SupportQueueTab />}
+        {activeTab === 'support' && <><SupportQueueTab /><FinancialKernelSection businesses={customers} /></>}
 
         {/* RÄDDNINGS TAB */}
         {activeTab === 'rescue' && <RaddningskoTab />}
@@ -935,3 +936,4 @@ export default function AdminDashboardPage() {
     </div>
   )
 }
+

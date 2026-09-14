@@ -874,6 +874,13 @@ Detta är blueprint §18.5 och golden path 34, inte en försiktighetsnot. Legacy
 `to_paid` och `to_customer_paid` i `payment-decision.ts` motsvarar exakt "kundkomponenten
 settlad"; `settled` motsvarar "skattekomponenten settlad" och avfyrar inget.
 
+C5b: bryggan producerar bara durabla intents, aldrig utskick. Fasad och cron delar
+`effects/sweep.ts` för claim → run → finish. Ett betalningskommando som avslutade
+kundfordran äger hela uppföljningsbeslutet, även bortval utan intent-rad. Historiska
+settlement-event för återöppnade fordringar kvitteras utan nya intents. Bryggans
+belopp bygger på aktiva allokeringar till fakturan, även utan fakturans correlation-id.
+Okända och uttömda utskick kräver superadminbeslut med skäl; ingen automatisk retry.
+
 ### FK.4 Feature-flaggor — per företag, kolumner på `business_config`
 
 Alla flaggor är `BOOLEAN NOT NULL DEFAULT false`. Default = dagens beteende, alltid. Ingen

@@ -23,7 +23,7 @@ export async function runPaymentEffect(businessId:string, invoiceId:string, clai
     return sendLegacyPaymentPortal(businessId,invoice.customer_id,amount,invoice.invoice_number || invoice.fortnox_invoice_number || invoiceId)
   }
   const effects=await runPostPaymentAutomations(invoiceId,businessId,invoice.customer_id,{
-    only:[claim.effect],triggeredBy:source==='fortnox'?'system':'user',reason:source==='fortnox'?'Faktura betald (Fortnox-synk)':'Betal-markering',
+    only:[claim.effect],triggeredBy:source==='fortnox'||source==='bridge'?'system':'user',reason:source==='fortnox'?'Faktura betald (Fortnox-synk)':'Betal-markering',
     logPrefix:`[apply-payment/${source}]`,updateWorkflows:reviewed?.updateWorkflows!==false,
     runCustomerCommunication:!reviewed,runAutomationRules:reviewed?.runAutomationRules!==false,requireExplicitApproval:!!reviewed,
   })
