@@ -109,6 +109,10 @@ export const BEHALLS: string[] = [
   'financial_payment_commands',
   'financial_effect_intents',
   'financial_events',
+  // V1: immutable product-work history, NOT statutory accounting evidence.
+  // Unactivated: agree retention/anonymisation before applying v241/enabling V1.
+  // Must not be put in the ordinary DELETE loop: its immutability guard rejects it.
+  'value_events',
   'financial_receivables',
   'financial_payments',
   'financial_payment_allocations',

@@ -985,7 +985,7 @@ export async function executeRule(
   }
   // Muta ALDRIG caller-ägda context (fireEvent delar payload-objektet över
   // regler i loopen) — härled en lokal kopia för den autonoma vägen.
-  const execContext = autonomousBypass ? { ...context, earned_autonomy: true, autonomy_key: autonomyKey } : context
+  const execContext = autonomousBypass ? { ...context, earned_autonomy: true } : context
 
   // Vilken händelse som utlöste regeln. Följer med ner till åtgärden eftersom
   // send_sms behöver den för att välja syfte — ett svar på inkommande
@@ -1121,7 +1121,7 @@ export async function executeRule(
     triggerType: typedRule.trigger_type,
     actionType: typedRule.action_type,
     status,
-    context: execContext,
+    context: { ...execContext, ...(autonomyKey ? { autonomy_key: autonomyKey } : {}) },
     result: result.data,
     errorMessage: result.error,
   })

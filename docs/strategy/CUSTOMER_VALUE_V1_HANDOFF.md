@@ -70,6 +70,17 @@ returns last_id and has_more, and marks historical records `payload.backfilled=t
 same page changes nothing. It never enables reading and never measures synthetic historical times.
 The migration creates no nightly schedule: run the explicit, bounded seed once during rollout.
 
+## Account deletion / retention — activation gate
+
+The repository's completeness check requires every tenant table to be classified. `value_events`
+is explicitly in BEHALLS because ordinary deletion is incompatible with the immutable contract.
+It is **not** classified as statutory accounting evidence, and no seven-year retention entitlement
+is claimed. Its snapshots include titles and attribution IDs, so production activation must wait
+for a defined retention/anonymisation design approved in review; do not enable this table on live
+customers merely because its CI is green. This follows the existing kernel history's explicit
+retention gate, but product-work data needs its own justified retention policy. No immutable trigger
+bypass or new deletion authority was introduced to silently resolve that policy decision.
+
 ## Verification and rollout
 
 - Local relevant value/attribution suites: 96 passed before the additional weekly response test.
