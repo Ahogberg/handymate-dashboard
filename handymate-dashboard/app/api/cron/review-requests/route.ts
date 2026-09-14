@@ -322,6 +322,7 @@ export async function GET(request: NextRequest) {
           status: smsResult.success ? 'success' : 'failed',
           context: {
             earned_autonomy: reviewAutonomous,
+            autonomy_key: 'review_request',
             mandate_id: mandateResolution.covered ? mandateResolution.mandate.id : null,
             customer_id: customer.customer_id,
             project_id: project.project_id,

@@ -89,6 +89,13 @@ jobs:
           tests/financial-kernel-event-contract.spec.ts
           tests/financial-kernel-c5-brief-probes.spec.ts
           tests/financial-kernel-c5-v2-brief-probes.spec.ts
+          tests/value-events-sql.spec.ts
+          tests/value-events-producers.spec.ts
+          tests/value-ledger-method3.spec.ts
+          tests/value-time-measured.spec.ts
+          tests/value-ledger.spec.ts
+          tests/value-ledger-history.spec.ts
+          tests/vardekvitto.spec.ts
           tests/financial-kernel-bridge.spec.ts
           tests/financial-kernel-sweeper.spec.ts
           tests/financial-kernel-admin-intents.spec.ts

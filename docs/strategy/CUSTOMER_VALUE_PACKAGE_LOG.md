@@ -31,7 +31,7 @@ product *identified* and *acted on*; the kernel records what was *invoiced* and 
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
 | V0 | P0: `/api/automation/value` separates estimated minutes from confirmed money | Claude | **done 2026-09-14** (this PR; `tests/automation-value-honesty.spec.ts`) | — |
-| V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **implemented (PR #72) — review in §5: 1 MEDIUM (trigger wrappers must be SECURITY DEFINER) to fix before merge, 5 LOW** | M1 on #72; then activation gate: v241 applied, retention/anonymisation decision, backfill + method comparison, `VALUE_EVENTS_ENABLED` |
+| V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **implemented (PR #72) — M1 corrected by Codex, awaiting Claude re-verification; 5 LOW carry** | Claude re-verification on #72; then activation gate: v241 applied, retention/anonymisation decision, backfill + method comparison, `VALUE_EVENTS_ENABLED` |
 | V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | C6 pilot flag on (C5b merged 2026-09-14) |
 | V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | sketched (§4) | V1, V2 |
 | — | Revenue-recovery loop closed to draft → sent → paid (audit action 2) | Codex | folded into V1 (acted) + V2 (paid); no separate package | — |
@@ -61,6 +61,20 @@ Verification
 Limits
 : Still a 7-day window from `v3_automation_logs`; still a constant for minutes (V1 measures). The widget
   keeps its place on the agent page; V3 replaces it.
+
+### V1 M1 correction — Codex, 2026-09-14
+
+Rebased #72 onto main `8577acc085a3435904171c8527771e9e11e80e0c` after #70.
+`value_approval_written`, `value_automation_written` and `value_document_sent` now use
+`SECURITY DEFINER SET search_path = public, pg_temp`. The member's original source-table RLS
+still authorizes the write; privileged producers remain inaccessible as direct member RPCs.
+The new PGlite test first reproduced `permission denied for function record_value_approval`.
+It exercises authenticated insert/update paths for approvals, logs, quotes and invoices,
+including source lookups the member cannot read, replay dedupe, foreign-tenant denials and
+continued denial of direct producer/event writes. The honesty spec is retained in exactly the
+same position in local and CI test lists. Final verification is recorded on PR #72.
+No migration or activation. Claude owns re-verification and merge; the five LOW and activation
+gates remain as reviewed.
 
 ## 3. Next package — Codex brief: V1 the value event log
 
@@ -165,7 +179,7 @@ method 2 default behind `VALUE_EVENTS_ENABLED`, `profitability_warning` in produ
 
 | Sev | Finding | Status |
 |---|---|---|
-| MEDIUM | Trigger wrappers run as the writing role; production has `authenticated` write policies on `invoice`, `quotes`, `v3_automation_logs`, `pending_approvals`. A member's RLS-permitted write fails: `permission denied for function record_value_approval` / `for table project` (reproduced in PGlite). No browser write path exists today. Fix: the three trigger functions `SECURITY DEFINER SET search_path`, plus a member-write test. | open on #72 — fix before merge |
+| MEDIUM | Trigger wrappers run as the writing role; production has `authenticated` write policies on `invoice`, `quotes`, `v3_automation_logs`, `pending_approvals`. A member's RLS-permitted write fails: `permission denied for function record_value_approval` / `for table project` (reproduced in PGlite). No browser write path exists today. Fix: the three trigger functions `SECURITY DEFINER SET search_path`, plus a member-write test. | corrected on #72 by Codex: all three wrappers SECURITY DEFINER with fixed search_path; member-write regression test added. Awaiting Claude re-verification |
 | LOW | `MANADS_LEDGER_METHOD_VERSION = 3` while default is 2; weekly response carries two differently based estimates when the flag is on; PostgREST `::text` cast unproven against a real database; no `minutes * kr` source scan outside V0; one `time_estimated` row per automation success (retention). | carry |
 
 **Activation gate (owner):** v241 not applied; retention/anonymisation decision for `value_events` (snapshots

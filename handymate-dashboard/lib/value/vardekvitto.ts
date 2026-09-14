@@ -1,3 +1,5 @@
+import { valueEventsEnabled, readValueTime } from './events/read'
+import { sumValueTime, type ValueTimeTotals } from './time-measured'
 /**
  * Värdekvittot natt 1 (Tur 4 etapp 7, VP4/VP5 första steget) — månadens
  * ärliga kronor som REN BERÄKNING. Inga migrationer, inga utskick, ingen
@@ -52,7 +54,7 @@ export interface VardekvittoRad {
   approval_id: string
 }
 
-export interface Vardekvitto {
+export interface Vardekvitto extends ValueTimeTotals {
   /** 'ÅÅÅÅ-MM' — kalendermånaden, inte ett rullande fönster. */
   period: string
   confirmed_kr: number
@@ -92,6 +94,7 @@ export function byggVardekvitto(input: {
   attributions: Attribution[]
   /** Vilande ur pengar-på-bordet-summeringen. null = inte läst här. */
   potentialKr: number | null
+  time?: ValueTimeTotals
 }): Vardekvitto {
   const inne = manadensAttributioner(input.attributions, input.period)
 
@@ -108,6 +111,7 @@ export function byggVardekvitto(input: {
     }))
 
   return Object.freeze({
+    ...(input.time ?? sumValueTime([])),
     period: input.period,
     confirmed_kr: sumRecoveredKr(inne),
     confirmed_items: Object.freeze(items) as unknown as VardekvittoRad[],
@@ -140,5 +144,7 @@ export async function getVardekvitto(
     now: new Date(fonster.toMs),
   })
 
-  return byggVardekvitto({ period, attributions: recovered.attributions, potentialKr: null })
+  const time = valueEventsEnabled() ? await readValueTime(supabase, businessId,
+    new Date(fonster.fromMs).toISOString(), new Date(fonster.toMs).toISOString()) : sumValueTime([])
+  return byggVardekvitto({ period, attributions: recovered.attributions, potentialKr: null, time })
 }
