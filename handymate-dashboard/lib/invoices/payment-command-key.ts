@@ -6,4 +6,3 @@ export function paymentCommandId(header: string | null, body: unknown): string {
   if (typeof value !== 'string' || !/^[A-Za-z0-9._-]{1,120}$/.test(value)) throw new InvalidPaymentCommandKey('Ogiltig Idempotency-Key')
   return value
 }
-

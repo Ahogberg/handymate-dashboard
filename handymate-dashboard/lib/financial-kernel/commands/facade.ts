@@ -74,4 +74,3 @@ async function currentInvoiceNoop(sb:ReturnType<typeof getServerSupabase>,busine
   return {ok:true,transition:'none',status:invoice.status,already_paid:invoice.status==='paid',
     paid_at:invoice.paid_at ?? undefined,paid_amount:invoice.paid_amount ?? undefined}
 }
-

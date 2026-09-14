@@ -465,4 +465,3 @@ export async function syncInvoiceToFortnox(
 }
 
 // mapUnit flyttad till lib/invoices/fortnox-rows.ts (mapFortnoxUnit) — A3.
-

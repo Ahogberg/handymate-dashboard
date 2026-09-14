@@ -46,4 +46,3 @@ export const issue=(db:PGlite,id='invoice',biz='a')=>domain<{inserted:boolean;re
 export const settle=(db:PGlite,amount='1250000',key='pay',biz='a',currency='SEK')=>domain<{payment_id:string;inserted:boolean}>(db,'record_payment_settlement',[biz,'manual',null,'inbound',null,currency,amount,null,'manual','2026-09-20T00:00:00Z',null,key,'system',null])
 export const allocate=(db:PGlite,payment:string,receivable:string,amount='1250000',key='allocation')=>domain(db,'allocate_payment',['a',payment,receivable,amount,key,'system',null])
 export const adjust=(db:PGlite,rec:string,delta:string,reason='rounding',key='adjust',owner:string|null=null)=>domain(db,'adjust_receivable',['a',rec,reason,delta,owner,null,null,key,'system',null])
-

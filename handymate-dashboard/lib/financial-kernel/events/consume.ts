@@ -79,4 +79,3 @@ export async function consumeOnce(db: KernelDb, businessId: string, handler: Fin
   }
   return result
 }
-
