@@ -193,3 +193,4 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 | 2026-09-14 | Created after the ROI/WOW audit: V0 done (P0 fix), V1 brief, V2/V3 sketches, owner boundary against the Financial Kernel. | Claude |
 | 2026-09-14 | V1 implemented by Codex (PR #72) and reviewed: 1 MEDIUM (trigger wrappers vs member RLS writes), 5 LOW; activation gate recorded. V2 blocker updated after C5b merged. | V1 review |
 | 2026-09-14 | V1 M1 fixed by Codex, re-verified and merged (PR #72). C6 merged the same day; V2 is next once the pilot flag is on. | V1 merge |
+| 2026-09-14 | v241 applied to production (after v239/v240/v242) with v243 revoking API EXECUTE on the trigger wrappers. Producers are live (0 rows at apply time, dry-run backfill examined 192 cards for the largest tenant). Reading stays on method 2: `VALUE_EVENTS_ENABLED` unset; backfill and the retention decision remain owner gates. | Deploy |
