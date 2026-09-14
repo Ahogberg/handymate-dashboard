@@ -7,8 +7,10 @@ import { processPendingMeetingJobs, cleanupStaleMeetingJobs } from '@/lib/meetin
  * Cron: GET /api/cron/meeting-worker
  *
  * Mötesassistenten V2 (sql/v119_meeting_v2.sql) — transkriberar väntande
- * mötessegment och sätter ihop klara transkript. Körs var 5:e minut som
- * säkerhetsnät; /api/voice/meeting/complete puttar dessutom denna endpoint
+ * mötessegment och sätter ihop klara transkript. Körs var 15:e minut som
+ * säkerhetsnät (var 5:e t.o.m. 2026-09-14; sänkt för att hålla nere Vercel-
+ * kostnaden — den vanliga vägen är knuffen nedan, inte cronen);
+ * /api/voice/meeting/complete puttar dessutom denna endpoint
  * fire-and-forget direkt när ett möte avslutas, så korta möten inte
  * behöver vänta på nästa cron-tick.
  *
