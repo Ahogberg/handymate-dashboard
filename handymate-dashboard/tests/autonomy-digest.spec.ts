@@ -1,0 +1,75 @@
+import { test, expect } from '@playwright/test'
+import { autonomyDigest } from '../lib/notifications/autonomy-digest'
+import {
+  pickMorningDecisions,
+  expirySummary,
+} from '../lib/notifications/morning-decisions'
+import {
+  autonomyOffToken,
+  verifyAutonomyOffToken,
+} from '../lib/autonomy/off-token'
+test('morning prioritizes deadlines, then money, while internal gates fill by age', () => {
+  expect(
+    pickMorningDecisions([
+      { id: 'gate-old', title: 'a', created_at: '2026-01-01', amount_kr: 999 },
+      { id: 'gate-new', title: 'b', created_at: '2026-02-01' },
+      {
+        id: 'send-low',
+        title: 'c',
+        created_at: '2026-03-01',
+        amount_kr: 1,
+        expires_at: '2026-04-01',
+      },
+      {
+        id: 'send-high',
+        title: 'd',
+        created_at: '2026-03-01',
+        amount_kr: 20,
+        expires_at: '2026-04-01',
+      },
+    ]).map((x) => x.id),
+  ).toEqual(['send-high', 'send-low', 'gate-old'])
+  expect(
+    expirySummary(
+      [1, 2, 3, 4].map((n) => ({ kind: 'expired', title: `Förslag ${n}` })),
+    ),
+  ).toBe('4 förslag fick inget svar: Förslag 1 · Förslag 2 · Förslag 3')
+})
+test('supervised lists each result; earned counts successes without hiding unknown outcomes', () => {
+  const line = (mode: string, outcome: string, title: string) => ({
+    kind: 'autonomy',
+    autonomy_key: 'invoice_reminder',
+    mode,
+    outcome,
+    title,
+  })
+  const result = autonomyDigest([
+    line('supervised', 'success', 'A'),
+    line('supervised', 'failed', 'B'),
+    line('earned', 'success', 'C'),
+    line('earned', 'success', 'D'),
+    line('earned', 'unknown', 'E'),
+  ])
+  expect(result).toEqual([
+    'Karin: A — skickat.',
+    'Karin: B — misslyckades.',
+    'Karin: E — utfallet är inte bekräftat.',
+    'Karin: 2 fakturapåminnelser skickade.',
+  ])
+})
+test('off token binds tenant/key/purpose/expiry and rejects tampering', () => {
+  const original = process.env.AUTONOMY_OFF_SECRET
+  process.env.AUTONOMY_OFF_SECRET = 'test-only-secret'
+  try {
+    const token = autonomyOffToken('a', 'booking_reminder', 1000)!
+    expect(verifyAutonomyOffToken(token, 1001)).toEqual({
+      businessId: 'a',
+      key: 'booking_reminder',
+    })
+    expect(verifyAutonomyOffToken(token, 1000 + 8 * 86400000)).toBeNull()
+    expect(verifyAutonomyOffToken(token + 'x', 1001)).toBeNull()
+  } finally {
+    if (original === undefined) delete process.env.AUTONOMY_OFF_SECRET
+    else process.env.AUTONOMY_OFF_SECRET = original
+  }
+})

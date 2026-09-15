@@ -98,6 +98,10 @@ export async function GET(request: NextRequest) {
       .gte('invoice_date', nittioDagar),
   ])
 
+  const readError = [invoicesRes, paidInvoicesRes, customerRes, dealRows, stagesRes,
+    quotesCountRes, projectsCountRes, invoicesCountRes].some(result => result.error)
+  if (readError) return NextResponse.json({ error: 'Genomgången kunde inte hämta hela underlaget. Försök igen.' }, { status: 503 })
+
   const result = computeInstantValue({
     invoices: invoicesRes.data ?? [],
     customerCount: customerRes.count ?? 0,

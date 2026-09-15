@@ -17,6 +17,7 @@ import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
  * 2026-08-31) — ren funktion, inga fetch-anrop, inget state.
  */
 export interface QuotePayloadContext {
+  firstWorkId?: string
   selectedCustomer: string
   title: string
   description: string
@@ -134,6 +135,7 @@ export function buildQuotePayload(input: BuildQuotePayloadInput) {
   if (input.mode === 'create') {
     return {
       ...base,
+      ...(input.firstWorkId ? { first_work_id: input.firstWorkId } : {}),
       ai_generated: input.aiGenerated || false,
       ai_confidence: input.aiConfidence || null,
       source_transcript: input.sourceTranscript || null,

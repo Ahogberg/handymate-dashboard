@@ -309,6 +309,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   // ─── Form state ────────────────────────────────────────────────────
   const [selectedCustomer, setSelectedCustomer] = useState<string>('')
+  const [firstWorkId, setFirstWorkId] = useState<string | undefined>()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [items, setItems] = useState<QuoteItem[]>([])
@@ -2034,6 +2035,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       ...(isEditMode
         ? {}
         : {
+            firstWorkId,
             aiGenerated,
             aiConfidence,
             sourceTranscript,
@@ -2055,7 +2057,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       if (!c || !Array.isArray(saved.items) || !Array.isArray(saved.photos) || !Array.isArray(c.reservationsSnapshot) || !Array.isArray(c.paymentPlan) || !Array.isArray(c.attachments)
         || [c.title,c.description,c.selectedCustomer,c.notIncluded,c.ataTerms,c.paymentTermsText,c.termsText,c.referencePerson,c.customerReference,c.projectAddress,c.personnummer,c.fastighetsbeteckning,saved.quickInput,saved.aiTextInput].some(value => typeof value !== 'string')
         || [c.vatRate,c.discountPercent,c.validDays].some(value => !Number.isFinite(value))) throw new Error('Invalid recovery')
-      setItems(saved.items); setSelectedCustomer(c.selectedCustomer); setTitle(c.title); setDescription(c.description)
+      setFirstWorkId(c.firstWorkId); setItems(saved.items); setSelectedCustomer(c.selectedCustomer); setTitle(c.title); setDescription(c.description)
       setPricingSettings(previous => previous ? { ...previous, vat_rate: c.vatRate } : previous); setDiscountPercent(c.discountPercent); setNotIncluded(c.notIncluded)
       setAtaTerms(c.ataTerms); setPaymentTermsText(c.paymentTermsText); setTermsText(c.termsText)
       reservations.setSnapshot(c.reservationsSnapshot); setPaymentPlan(c.paymentPlan)
@@ -2415,7 +2417,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       <QuickIntake
         jobTypeStart={<>{reliefError && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{reliefError} <a href="/dashboard/avlastning" className="underline">Till mitt underlag</a></p>}{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
           <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
-            onApply={sample => { applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
+            onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
             onSource={text => setQuickInput(text)} />{jobTypeStart}{preparationInput}</>}
         customers={customers}
         selectedCustomer={selectedCustomer}
@@ -2542,7 +2544,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         {jobTypeStart}
         {preparationInput}
         {!isEditMode && <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
-          onApply={sample => { applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
+          onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
           onSource={text => { setQuickInput(text); setAiTextInput(text) }} />}
         {firstQuoteIntent && jobStartApplied && <FirstQuoteGuide key={business.business_id}
           companyName={business.business_name} hasCustomer={!!selectedCustomer}

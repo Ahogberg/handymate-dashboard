@@ -24,6 +24,8 @@ export interface SendEmailResult {
   success: boolean
   messageId?: string
   error?: string
+  channelSkipped?: boolean
+  channelReason?: string
   deliveryState?: 'accepted' | 'rejected' | 'unknown'
 }
 
@@ -31,6 +33,13 @@ export interface SendEmailResult {
  * Send an email via Resend API
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
+  if (params.businessId && process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const { gateChannel } = await import('@/lib/channels/preflight')
+    const check = await gateChannel(getServerSupabase(), params.businessId, 'email', { fromAddress: params.fromAddress })
+    if (!check.ok) return { success: false, deliveryState: 'rejected', channelSkipped: true, channelReason: check.reason, error: check.message }
+  }
+
   if (!RESEND_API_KEY) {
     return { success: false, deliveryState: 'rejected', error: 'RESEND_API_KEY not configured' }
   }

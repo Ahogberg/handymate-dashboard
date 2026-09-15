@@ -331,6 +331,7 @@ export async function resolveTargetUserId(businessUserId?: string | null): Promi
  * oförändrat: en extra, snabb (fail-open) läsning, sedan samma väg som idag.
  */
 export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
+  if (process.env.HANDOFF_INBOX_ENABLED === 'true' && (await import('@/lib/approvals/card-kind')).cardKind(approval.approval_type) === 'notice') return
   const payload = (approval.payload || {}) as Record<string, any>
   const template = buildPushTemplate(approval.approval_type, payload)
 

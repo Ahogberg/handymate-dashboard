@@ -587,7 +587,9 @@ export async function insertAvtalForslagApproval(
   if (params.sourceRefs.project_id) payload.project_id = params.sourceRefs.project_id
   if (params.sourceRefs.quote_id) payload.quote_id = params.sourceRefs.quote_id
 
-  const { error } = await params.supabase.from('pending_approvals').insert({
+  const { error } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(params.supabase, row))
+      : (row: Record<string, any>) => params.supabase.from('pending_approvals').insert(row))({
     business_id: params.businessId,
     approval_type: 'send_sms',
     title: `🔧 Serviceavtal — ${customerLabel}`,

@@ -85,7 +85,7 @@ function route(file: string, extra: Record<string, unknown>) {
   const exports: Record<string, any> = {}
   const modules: Record<string, unknown> = { 'next/server': { NextResponse }, crypto: { createHash },
     '@/lib/quotes/visit-rule': visits, '@/lib/onboarding/work-sample': sample, '@/lib/quotes/handoff': handoff,
-    '@/lib/quotes/followup-round': followupRound,
+    '@/lib/quotes/followup-round': followupRound, '@/lib/onboarding/first-work': { firstWorkEnabled: () => false },
     '@/lib/billing/aktiva-konton': { harAktivtTeam: () => true }, '@/lib/dates': { svDateStr: () => '2026-09-08' }, ...extra }
   const code = ts.transpileModule(readFileSync(file, 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
   new Function('require', 'exports', code)((name: string) => { if (!(name in modules)) throw new Error(`Unexpected dependency ${name}`); return modules[name] }, exports)

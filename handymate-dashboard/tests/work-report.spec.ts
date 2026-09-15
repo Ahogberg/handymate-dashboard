@@ -307,7 +307,8 @@ function agentTurn(modelResponse: any) {
   const source = extract('app/api/matte/chat/route.ts', ['runAgentTurn', 'isToolAllowedForAgent', 'UNIVERSAL_COORDINATION_TOOLS', 'APPROVAL_COORDINATION_TOOLS']) + '\n' + extract('lib/agent/agents/shared.ts', ['filterTools'])
   const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
   const calls: any[] = []
-  const deps = { ...report, getAgentTools, toolDefinitions, isToolAllowedForActor,
+  // This is a dynamic Function argument map; do not expand every tool schema into Object.values.
+  const deps: Record<string, unknown> = { ...report, getAgentTools, toolDefinitions, isToolAllowedForActor,
     callClaude: async (args: any) => { calls.push(args); return modelResponse },
     executeSharedTool: () => { throw new Error('A report must never execute before confirmation') },
   }

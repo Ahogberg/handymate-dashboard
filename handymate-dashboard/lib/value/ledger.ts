@@ -1,3 +1,5 @@
+import { usesKernelValue, readKernelInvoiceEvidence } from './kernel-evidence'
+import { invoicePaymentEvidence } from './invoice-payment-evidence'
 /**
  * Value Ledger — fyrstegsvyn (2026-08-12): "Handymate den här månaden:
  * X kr identifierade möjligheter · Y kr agerat · Z kr fakturerat ·
@@ -65,7 +67,7 @@ import { eventCohort } from './events/cohort'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { manadsfonster } from '@/lib/value/vardekvitto'
 import { mapApprovalRowToCard, isWithinAttributionWindow } from '@/lib/value/recovered-revenue'
-import { isCustomerSettled, PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
+import { PORTAL_VISIBLE_STATUSES } from '@/lib/invoices/status'
 
 export const MANADS_LEDGER_METHOD_VERSION = 3
 
@@ -115,9 +117,13 @@ export interface LedgerItem {
   kr: number
   invoice_id: string | null
   paid_at: string | null
+  /** Customer allocations on an invoice which is still open; never added to the paid stage. */
+  partial_paid_kr?: number
 }
 
 export interface ManadsLedger {
+  money_method_version?: 4
+  money_source?: 'kernel'
   /** 'ÅÅÅÅ-MM' — kalendermånaden kortet SKAPADES i, inte händelsens månad. */
   period: string
   identifierat: ManadsLedgerSteg
@@ -173,6 +179,7 @@ export interface LedgerInvoiceFacit {
   /** Registered payment, capped to the invoice amount. Older pure callers
       without this field model a fully paid invoice. I/O always supplies it. */
   paid_kr?: number
+  partial_paid_kr?: number
   paid: boolean
   paid_at_ms: number | null
 }
@@ -306,6 +313,7 @@ export function byggManadsLedger(input: {
         steg,
         kr: Math.round(faktura ? (steg === 'betalt' ? faktura.paid_kr ?? faktura.total_kr : faktura.total_kr) : c.amount_kr),
         invoice_id: fakturaBevisad ? c.invoice_id : null,
+        ...(faktura?.partial_paid_kr ? { partial_paid_kr: faktura.partial_paid_kr } : {}),
         paid_at:
           steg === 'betalt' && faktura && faktura.paid_at_ms !== null
             ? new Date(faktura.paid_at_ms).toISOString()
@@ -342,6 +350,7 @@ export async function getManadsLedger(
   const fonster = manadsfonster(period)
   if (!fonster) return null
 
+  const kernelSource = await usesKernelValue(supabase, businessId)
   let kortRader: Array<{ id: string; approval_type: string; status: string; created_at: string;
     resolved_at: string | null; payload: any; title?: string | null; value_amount_kr?: number }>
   if (method === 2) {
@@ -383,7 +392,7 @@ export async function getManadsLedger(
   // Stable attribution winner in both methods; database heap order is not evidence.
   kortRader.sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
   if (kortRader.length === 0) {
-    return { ...byggManadsLedger({ period, cards: [], invoices: new Map() }), method_version: method }
+    return { ...byggManadsLedger({ period, cards: [], invoices: new Map() }), method_version: method, ...(kernelSource ? { money_source: 'kernel' as const, money_method_version: 4 as const } : {}) }
   }
 
   // Direktreferenserna — samma extraktion som attributionskärnan (per-typ-
@@ -451,8 +460,8 @@ export async function getManadsLedger(
   const invoiceIds = Array.from(
     new Set(cards.map(c => c.invoice_id).filter((v): v is string => v !== null)),
   )
-  const invoices = new Map<string, LedgerInvoiceFacit>()
-  if (invoiceIds.length > 0) {
+  const invoices = kernelSource ? await readKernelInvoiceEvidence(supabase, businessId, invoiceIds) : new Map<string, LedgerInvoiceFacit>()
+  if (!kernelSource && invoiceIds.length > 0) {
     const { data: invRows, error: invErr } = await supabase
       .from('invoice')
       .select('invoice_id, total, status, paid_amount, paid_at')
@@ -465,22 +474,9 @@ export async function getManadsLedger(
       if (!(PORTAL_VISIBLE_STATUSES as readonly string[]).includes(inv.status)) continue
       const total = Number(inv.total)
       if (!Number.isFinite(total) || total < 0) continue
-      // customer_paid says the customer is settled, not that the remaining
-      // tax reduction has arrived. Missing payment evidence is never total.
-      const rawPaid = inv.paid_amount == null
-        ? (inv.status === 'paid' ? total : null)
-        : Number(inv.paid_amount)
-      const paidKr = rawPaid !== null && Number.isFinite(rawPaid) && rawPaid > 0
-        ? Math.min(total, rawPaid) : 0
-      const paidAtMs = inv.paid_at ? new Date(inv.paid_at).getTime() : NaN
-      invoices.set(String(inv.invoice_id), {
-        total_kr: total,
-        paid_kr: paidKr,
-        paid: isCustomerSettled(inv.status) && paidKr > 0,
-        paid_at_ms: Number.isFinite(paidAtMs) ? paidAtMs : null,
-      })
+      invoices.set(String(inv.invoice_id), { total_kr: total, ...invoicePaymentEvidence(inv) })
     }
   }
 
-  return { ...byggManadsLedger({ period, cards, invoices }), method_version: method }
+  return { ...byggManadsLedger({ period, cards, invoices }), method_version: method, ...(kernelSource ? { money_source: 'kernel' as const, money_method_version: 4 as const } : {}) }
 }

@@ -391,7 +391,9 @@ export async function createInvoiceReminderCard(
 
   const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   const amountLabel = step.amountToPay.toLocaleString('sv-SE')
-  const { error: apprErr } = await supabase.from('pending_approvals').insert({
+  const { error: apprErr } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
     id: approvalId,
     business_id: businessId,
     approval_type: 'invoice_reminder',

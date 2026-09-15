@@ -93,11 +93,12 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // vi säger är kopplade faktiskt är våra hos 46elks. Sex av åtta nummer var
   // spöken när saldot tog slut, och ingenting kontrollerade det → 49.
   // C5b: financial-kernel uses the same verified cron secret → 50.
-  expect(files).toHaveLength(50)
+  // H4: bounded morning-report retry uses verifyCronSecret → 51.
+  expect(files).toHaveLength(51)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(49)
+  expect(ownedRoutes).toHaveLength(50)
 
   const missing = ownedRoutes
     .filter(file => {

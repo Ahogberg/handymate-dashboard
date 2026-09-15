@@ -298,6 +298,7 @@ async function handleSendSms(
     message,
     customerId: (context.customer_id as string) || null,
     messageType: 'automation_rule',
+    ...(context.handoff_autonomy_key ? {autonomyKey: context.handoff_autonomy_key as import('@/lib/autonomy/earned-autonomy').AutonomyKey} : {}),
     recipient: 'customer',
     // Ett svar på något kunden just gjort får inte hållas tillbaka av
     // sjudagarsspärren; kampanjer och omvårdnad ska det. Se
@@ -306,6 +307,7 @@ async function handleSendSms(
   })
 
   if (!r.success) {
+    if (r.channelSkipped) return { success: true, data: { skipped: true, reason: r.channelReason, message: r.error } }
     console.error('[automation-engine] SMS misslyckades:', r.error)
     return { success: false, error: r.error || 'SMS send failed' }
   }
@@ -351,6 +353,7 @@ async function handleSendEmail(
       .join('<br>')
     const html = emailLayout(branding, emailParagraph(text))
     const result = await sendEmail({ businessId, to, subject, html, fromName: branding.businessName })
+    if (result.channelSkipped) return { success: true, data: { skipped: true, reason: result.channelReason, message: result.error } }
     await logEmail({
       businessId,
       customerId: (context.customer_id as string) || undefined,
@@ -393,7 +396,8 @@ async function handleRunAgent(
     })
 
     if (!result.success) {
-      return { success: false, error: result.error || 'Orchestrator failed' }
+      const { classifyAgentFailure } = await import('@/lib/automation/morning-report')
+      return { success: false, error: `[${classifyAgentFailure(result.error)}] ${result.error || 'Orchestrator failed'}` }
     }
 
     return {
@@ -407,7 +411,8 @@ async function handleRunAgent(
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : 'Orchestrator failed'
-    return { success: false, error: msg }
+    const { classifyAgentFailure } = await import('@/lib/automation/morning-report')
+    return { success: false, error: `[${classifyAgentFailure(msg)}] ${msg}` }
   }
 }
 
@@ -421,6 +426,12 @@ async function handleCreateApproval(
   // {{key}}-interpolation, samma mönster som handleSendSms — se A i
   // dashboard-städpaketet: gamla statiska titlar/beskrivningar utan
   // platshållare rör sig inte, saknade nycklar lämnas orörda.
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { gateApprovalChannels } = await import('@/lib/channels/preflight')
+    const check = await gateApprovalChannels(supabase, businessId, String(config.approval_type || 'automation'), context)
+    if (check) return { success: true, data: { skipped: true, reason: check.reason, message: check.message } }
+  }
+
   const title = interpolateTemplate((config.title as string) || 'Godkännande krävs', context)
   const description = interpolateTemplate((config.description as string) || '', context)
 
@@ -598,6 +609,7 @@ async function handleNotifyOwner(
         reason: error instanceof Error ? error.message : 'Okänt pushutfall' })
     }
   }
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true' && outcomes.every(o => !o.accepted && ['no_recipients','konfiguration','kontrollfel'].includes(String(o.reason)))) return { success: true, data: { skipped: true, reason: 'konfiguration', outcomes } }
   const success = outcomes.every(outcome => outcome.ok)
   const partial = !success && outcomes.some(outcome => Number(outcome.accepted) > 0 || outcome.uncertain)
   return { success, data: { title, outcomes, partial, sent: outcomes.reduce((sum, outcome) => sum + Number(outcome.accepted), 0) },
@@ -985,7 +997,10 @@ export async function executeRule(
   }
   // Muta ALDRIG caller-ägda context (fireEvent delar payload-objektet över
   // regler i loopen) — härled en lokal kopia för den autonoma vägen.
-  const execContext = autonomousBypass ? { ...context, earned_autonomy: true } : context
+  const execContext = { ...context, ...(autonomousBypass ? { earned_autonomy: true } : {}),
+    // Server-derived only: mandate and human approval sends keep their existing path.
+    handoff_autonomy_key: autonomousBypass && !mandateStamp ? autonomyKey : null,
+  }
 
   // Vilken händelse som utlöste regeln. Följer med ner till åtgärden eftersom
   // send_sms behöver den för att välja syfte — ett svar på inkommande
@@ -1011,7 +1026,7 @@ export async function executeRule(
       ...(autonomyKey ? { autonomy_key: autonomyKey } : {}),
     }, typedRule.name)
 
-    const approvalStatus = approvalResult.success ? 'pending_approval' : 'failed'
+    const approvalStatus = approvalResult.data?.skipped ? 'skipped' : approvalResult.success ? 'pending_approval' : 'failed'
     await logExecution(supabase, {
       businessId: typedRule.business_id,
       ruleId: typedRule.id,
@@ -1034,7 +1049,10 @@ export async function executeRule(
   // execContext själv — muta aldrig caller-ägd context) så direkta
   // create_approval-regler (t.ex. "Faktura eskalering dag 7", som aldrig
   // passerar approval-grenen ovan) ändå har nyckeln dedupe-logiken kräver.
-  const result = await executeAction(
+  const morning = process.env.MORNING_REPORT_RELIABILITY_ENABLED === 'true' ? await import('@/lib/automation/morning-report') : null
+  const result = morning?.isMorningReportRule(typedRule)
+    ? await morning.runMorningReport(supabase, typedRule.business_id, typedRule.id)
+    : await executeAction(
     supabase,
     typedRule.business_id,
     typedRule.action_type,
@@ -1043,7 +1061,7 @@ export async function executeRule(
     typedRule.name
   )
 
-  const status: LogStatus = result.success ? 'success' : 'failed'
+  const status: LogStatus = result.data?.skipped ? 'skipped' : result.success ? 'success' : 'failed'
 
   // Etapp W (Mission Mandates V1): mandat-täckta körningar stämplas med ett
   // eget auto_approved-kort — mandatets mätinstrument (mandate-facit.ts,

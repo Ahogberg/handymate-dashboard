@@ -154,6 +154,8 @@ export function underAutonomyCap(capKr: number | null, amountKr: number | null |
 
 export type AutonomyState = Record<string, {
   status: 'autonomous'
+  mode?: 'supervised' | 'earned'
+  source?: 'consent' | 'offer' | 'streak'
   granted_at: string
   /** Override av DEFAULT_AUTONOMY_CAPS för denna nyckel (kr). Saknas → default gäller. */
   cap_kr?: number
@@ -180,8 +182,17 @@ async function readState(
 export async function isAutonomous(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<boolean> {
+  if (process.env.SUPERVISED_AUTONOMY_ENABLED === 'true') {
+    try {
+      const {readAutonomyControl,supervisedAutonomyEnabled}=await import('./consent-grant')
+      if (!supervisedAutonomyEnabled()) return false
+      const control=await readAutonomyControl(supabase,businessId,key)
+      if(control)return control.granted && supervisedAutonomyEnabled()
+    } catch { return false }
+  }
   const { state } = await readState(supabase, businessId)
-  return state[key]?.status === 'autonomous'
+  // A consent grant may never turn into legacy autonomy when its release flag is switched off.
+  return state[key]?.source !== 'consent' && state[key]?.status === 'autonomous'
 }
 
 /** DB-hjälpare: läs state och slå upp beloppsgränsen för nyckeln i ett svep. */
@@ -205,6 +216,11 @@ async function writeState(
 export async function grantAutonomy(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<void> {
+  if(process.env.SUPERVISED_AUTONOMY_ENABLED==='true'){
+    const r=await supabase.rpc('accept_earned_autonomy_offer',{p_business_id:businessId,p_key:key})
+    if(r.error)throw Error('autonomy_offer_failed')
+    return
+  }
   const { state, error: readError } = await readState(supabase, businessId)
   if (readError) throw new Error(`earned_autonomy read failed (skriver inte på trasigt läs): ${readError}`)
   state[key] = { status: 'autonomous', granted_at: new Date().toISOString() }
@@ -214,9 +230,17 @@ export async function grantAutonomy(
 export async function revokeAutonomy(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<void> {
+  if (process.env.SUPERVISED_AUTONOMY_ENABLED === 'true') {
+    await (await import('./consent-grant')).stopSupervisedAutonomy(supabase,businessId,key)
+    return
+  }
   const { state, error: readError } = await readState(supabase, businessId)
   if (readError) throw new Error(`earned_autonomy read failed (skriver inte på trasigt läs): ${readError}`)
   if (!state[key]) return
+  if (state[key].source === 'consent' || state[key].source === 'offer') {
+    await (await import('./consent-grant')).stopSupervisedAutonomy(supabase,businessId,key)
+    return
+  }
   delete state[key]
   await writeState(supabase, businessId, state)
 }
@@ -246,6 +270,14 @@ export async function computeStreak(
 export async function maybeCreateOffer(
   supabase: SupabaseClient, businessId: string, key: AutonomyKey
 ): Promise<boolean> {
+  if (process.env.SUPERVISED_AUTONOMY_ENABLED === 'true') {
+    const control=await (await import('./consent-grant')).readAutonomyControl(supabase,businessId,key)
+    if(control?.granted && control.mode==='supervised'){
+      await supabase.rpc('promote_supervised_autonomy',{p_business_id:businessId,p_key:key})
+      return false
+    }
+    if(control?.cooldown_until && new Date(control.cooldown_until).getTime()>Date.now())return false
+  }
   if (await isAutonomous(supabase, businessId, key)) return false
 
   const { count } = await supabase
@@ -345,8 +377,8 @@ export async function recordAutonomyFailure(
     }
 
     // Tröskeln nådd → nedgradera + informationskort.
-    delete state[key]
-    await writeState(supabase, businessId, state)
+    if (process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' || current.source === 'consent' || current.source === 'offer') await (await import('./consent-grant')).stopSupervisedAutonomy(supabase,businessId,key,'failure')
+    else { delete state[key]; await writeState(supabase, businessId, state) }
 
     const meta = AUTONOMY_META[key]
     const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`

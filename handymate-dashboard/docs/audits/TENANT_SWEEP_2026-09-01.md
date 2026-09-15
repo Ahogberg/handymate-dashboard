@@ -156,3 +156,9 @@ Business IDs are explicit operator selections; all RPCs tenant-scope object IDs.
 Actor identity comes from verified Auth, never request bodies.
 The new `financial-kernel-shadow` cron uses `verifyCronSecret` before any DB access.
 All read routes are force-dynamic. Inventory ceiling: 166; cron routes: 50.
+
+
+### H3a/H4 — 2026-09-15
+- GET `/api/dashboard/channels`: authenticated business + active owner/admin membership in that same business; target-user-scoped push readiness; no-store. No caller-controlled tenant.
+- GET `/api/cron/morning-report-retry`: fail-closed `verifyCronSecret`; disabled unless MORNING_REPORT_RELIABILITY_ENABLED; bounded worker. Non-standard-auth inventory ceiling +1 (167), cron inventory 51.
+- v246: service-only commands, member/anon no read/write; new tables classified RADERAS.

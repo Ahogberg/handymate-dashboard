@@ -2010,6 +2010,11 @@ async function queueAgentActionForApproval(
   context: ToolContext,
   descriptionOverride?: string | null
 ): Promise<ToolResult> {
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true' && approvalType !== 'create_booking') {
+    const { gateChannel } = await import('@/lib/channels/preflight')
+    const check = await gateChannel(supabase, businessId, approvalType === 'send_sms' ? 'sms' : 'email')
+    if (!check.ok) return { success: true, data: { skipped: true, reason: check.reason, message: check.message } }
+  }
   const id = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
   if (context.quoteFollowupRound && (approvalType === 'send_sms' || approvalType === 'send_email')) {
     try { return await prepareQuoteFollowupRound(supabase, businessId, context.quoteFollowupRound, approvalType, payload) }

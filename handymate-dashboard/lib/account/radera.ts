@@ -163,7 +163,7 @@ export const RADERAS: string[] = [
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.
   'work_report_session', 'agent_followup_event', 'agent_followup',
   // ── Kundregister, offerter, bokningar, leads, affärer — kärnan ──
-  'customer', 'quotes', 'booking', 'leads', 'deal', 'project',
+  'customer', 'quotes', 'first_work', 'booking', 'leads', 'deal', 'project',
 
   // ── Det gamla telefoni-/ärende-lagret (se header) ──
   'call', 'transcript', 'case_record', 'action_log', 'emergency_escalation',
@@ -231,6 +231,8 @@ export const IRRELEVANT: string[] = [
   // Agent-/AI-inställningar och aggregerad, icke-personlig statistik.
   'agent_context', 'agent_settings', 'ai_learned_preferences',
   'business_insights', 'business_integration_credentials',
+  'handoff_items', 'handoff_digests', 'autonomy_consents', 'autonomy_controls',
+  'channel_notices', 'morning_report_runs',
   'business_patterns', 'business_preferences', 'business_twin_forecast',
   'business_counters', 'mission', 'mission_mandate', 'monthly_reviews',
   'next_best_action', 'operating_experiment', 'pricing_intelligence',

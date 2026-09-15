@@ -85,6 +85,14 @@ jobs:
           tests/cron-auth.spec.ts
           tests/dead-code-paths.spec.ts
           tests/permission-contract.spec.ts
+          tests/channel-preflight.spec.ts
+          tests/handoff-reliability-sql.spec.ts
+          tests/morning-report-reliability.spec.ts
+          tests/card-kind-contract.spec.ts
+          tests/handoff-consent-sql.spec.ts
+          tests/autonomy-digest.spec.ts
+          tests/handoff-runtime.spec.ts
+          tests/handoff-ui.spec.ts
           tests/schema-contract.spec.ts
           tests/financial-kernel-event-contract.spec.ts
           tests/financial-kernel-c5-brief-probes.spec.ts
@@ -115,6 +123,10 @@ jobs:
           tests/financial-kernel-golden-paths.spec.ts
           tests/betalsanning-sidodorrar.spec.ts
           tests/automation-value-honesty.spec.ts
+          tests/customer-value-experience.spec.ts
+          tests/value-money-events.spec.ts
+          tests/first-work-sql.spec.ts
+          tests/customer-journey-value.spec.ts
           tests/facit-ci-grind.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts

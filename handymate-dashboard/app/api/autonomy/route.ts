@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { getCurrentUser,isOwnerOrAdmin } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
 import {
   AUTONOMY_META, STREAK_TARGET, WINDOW_DAYS, computeStreak, autonomyKeyFromApproval,
-  resolveAutonomyCap, type AutonomyKey, type AutonomyState,
+  isAutonomous, resolveAutonomyCap, type AutonomyKey, type AutonomyState,
 } from '@/lib/autonomy/earned-autonomy'
 
 
@@ -29,16 +30,19 @@ export async function GET(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const user=await getCurrentUser(request,business.business_id)
+  if(!user||!isOwnerOrAdmin(user))return NextResponse.json({error:'Behörighet saknas.'},{status:403})
   const supabase = getServerSupabase()
   const keys = Object.keys(AUTONOMY_META) as AutonomyKey[]
 
   // Fail-safe: ett läsfel behandlas som "inget beviljat, ingen override" —
   // samma riktning som earned-autonomy.ts readState.
-  const { data: settingsRow } = await supabase
+  const { data: settingsRow, error: settingsError } = await supabase
     .from('v3_automation_settings')
     .select('earned_autonomy')
     .eq('business_id', business.business_id)
     .maybeSingle()
+  if(settingsError)return NextResponse.json({error:'Kunde inte läsa inställningarna.'},{status:503})
   const state = (settingsRow?.earned_autonomy as AutonomyState) || {}
 
   const sinceIso = new Date(Date.now() - WINDOW_DAYS * 24 * 3600_000).toISOString()
@@ -51,7 +55,7 @@ export async function GET(request: NextRequest) {
     .limit(500)
 
   const items = await Promise.all(keys.map(async (key) => {
-    const autonomous = state[key]?.status === 'autonomous'
+    const autonomous = await isAutonomous(supabase,business.business_id,key)
     const streak = await computeStreak(supabase, business.business_id, key)
 
     // approved/edited/failed är ömsesidigt uteslutande (prioritet: ett
@@ -72,6 +76,7 @@ export async function GET(request: NextRequest) {
       label: AUTONOMY_META[key].label,
       agent: AUTONOMY_META[key].agentName,
       status: autonomous ? 'autonomous' : 'gated',
+      mode: state[key]?.mode || 'earned',
       streak,
       target: STREAK_TARGET,
       handled_60d: { approved, edited, failed },
