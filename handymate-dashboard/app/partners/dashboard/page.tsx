@@ -25,6 +25,7 @@ import {
   Mail, MessageCircle, Smartphone, ChevronRight,
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
+import AssignedLeads from './components/AssignedLeads'
 import AgreementGate from '../components/AgreementGate'
 import PortalPreview from './components/PortalPreview'
 import StatementSection from './components/StatementSection'
@@ -299,6 +300,8 @@ export default function PartnerDashboardPage() {
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
+        <Link href="/partners/leads" className="self-end text-sm font-medium text-teal-700">Öppna leadsvyn →</Link>
+        <AssignedLeads />
         {/* ─── Sidhuvud ─── */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>

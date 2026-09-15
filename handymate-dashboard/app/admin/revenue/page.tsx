@@ -2,10 +2,12 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { AccountPanel } from '@/components/revenue/AccountPanel'
+import { SalesMetrics, type Metrics } from '@/components/revenue/SalesMetrics'
 import { sendRevenue } from '@/lib/revenue/client'
 import { STAGES, type Account } from '@/lib/revenue/domain'
 
 type Overview = {
+  metrics: Metrics
   accounts: Account[]
   queue: Account[]
   total: number
@@ -84,6 +86,20 @@ export default function RevenueOSPage() {
       setBusy(false)
     }
   }
+  async function exportCrm() {
+    setBusy(true)
+    setError('')
+    try {
+      const res = await fetch('/api/admin/revenue?export=crm', { cache: 'no-store' })
+      if (!res.ok) throw new Error((await res.json()).error)
+      const url = URL.createObjectURL(await res.blob())
+      const link = document.createElement('a')
+      link.href = url; link.download = 'handymate-revenue-crm.csv'; link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+      setMessage('CRM-exporten är hämtad. Använd id som unik nyckel vid import. Exporten innehåller din behöriga portfölj och kontaktspärrar; ingen automatisk synk är aktiverad.')
+    } catch (e) { setError((e as Error).message) }
+    finally { setBusy(false) }
+  }
   async function source(e: FormEvent<HTMLFormElement>) {
     e.preventDefault()
     const form = new FormData(e.currentTarget)
@@ -122,6 +138,7 @@ export default function RevenueOSPage() {
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <button className="rounded-xl border px-4 py-2 text-sm disabled:opacity-50" disabled={busy} onClick={exportCrm}>Exportera till CRM</button>
             <button
               className={button}
               onClick={() => setShowSource(!showSource)}
@@ -251,6 +268,7 @@ export default function RevenueOSPage() {
                 : 'Min säljarvy · egna företag'}{' '}
               · {data.email}
             </p>
+            {data.metrics && <SalesMetrics metrics={data.metrics} />}
             <div className="grid gap-6 lg:grid-cols-[1fr_1.5fr]">
               <section className="rounded-2xl border bg-white">
                 <div className="border-b p-5">

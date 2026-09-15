@@ -54,6 +54,9 @@ async function main() {
   )
   assert.equal(domain.normalizeOrg('165564871234'), '5564871234')
   assert.throws(() => domain.normalizeOrg('abc'))
+  const unanswered = domain.followupBody('Firman', 'Inget svar', undefined, 'no_response')
+  assert(!unanswered.includes('Tack för samtalet'))
+  assert(!unanswered.includes('Det här tog vi upp'))
   const now = Date.parse('2026-09-13T12:00:00Z'),
     signal = {
       title: 'Söker elektriker',
