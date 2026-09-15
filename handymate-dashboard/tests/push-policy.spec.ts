@@ -161,10 +161,11 @@ test.describe('källskanning — inkopplingen', () => {
 
   test('/api/push/send skickar TTL + urgency till web-push och ttl/priority till Expo', () => {
     const route = read('app/api/push/send/route.ts')
-    expect(route).toContain('{ TTL: ttlSeconds, urgency:')
-    expect(route).toContain('normaliseraTtl(ttl_seconds')
-    expect(route).toContain('normaliseraPrioritet(priority')
-    expect(route).toMatch(/sendExpoPushNotification\([\s\S]*ttlSeconds,[\s\S]*priority: pushPriority/)
+    expect(route).toContain('normaliseraTtl(body.ttl_seconds')
+    expect(route).toContain('normaliseraPrioritet(body.priority')
+    const delivery = read('lib/notifications/push-delivery.ts')
+    expect(delivery).toContain('{ TTL: input.ttlSeconds, urgency:')
+    expect(delivery).toMatch(/sendExpoPushNotification\([\s\S]*ttlSeconds: input\.ttlSeconds, priority: input\.priority/)
     const expo = read('lib/notifications/expo-push.ts')
     expect(expo).toContain('ttl: options.ttlSeconds')
     expect(expo).toContain('priority: options.priority')

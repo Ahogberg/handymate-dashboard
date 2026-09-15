@@ -200,3 +200,34 @@ test('49 replay retains the exact provider reference and cancellation fact witho
   expect((await claim()).claimed).toEqual([])
   expect((await row(i.id)).attempts).toBe(1)
 })
+async function source(version = 'v1', envelope: any = { message: 'Hej' }, autonomy: string | null = null) {
+  return rpc('record_outbound_message', ['a','sms','cron','source-1','source-key','+46700000001','source-template',autonomy,null,version,envelope,null])
+}
+test('50 durable source and body-free intent are recorded atomically', async () => {
+  const result = await source()
+  expect(result).toMatchObject({ created: true, source_version: 'v1' })
+  expect((await db.query<any>('SELECT envelope FROM outbound_messages')).rows[0].envelope).toEqual({ message: 'Hej' })
+  const intent = await row(result.id)
+  expect(intent.context).toEqual({ version: 'v1' })
+  expect(JSON.stringify(intent)).not.toContain('Hej')
+})
+test('51 durable source replay is idempotent and changed content is refused', async () => {
+  const first = await source(); const replay = await source()
+  expect(replay).toMatchObject({ id: first.id, created: false })
+  await expect(source('v2', { message: 'Ändrat' })).rejects.toThrow('outbound_dedupe_conflict')
+  expect((await db.query('SELECT * FROM outbound_messages')).rows).toHaveLength(1)
+})
+test('52 revoked autonomy leaves neither source nor promise', async () => {
+  await off(); expect(await source('v1', { message: 'Hej' }, 'invoice_reminder')).toMatchObject({ blocked: true })
+  expect((await db.query('SELECT * FROM outbound_messages')).rows).toHaveLength(0)
+  expect((await db.query('SELECT * FROM outbound_intents')).rows).toHaveLength(0)
+})
+test('53 source rows have the same service-only read and erase boundary', async () => {
+  await source(); await db.exec('SET ROLE authenticated')
+  await expect(db.query('SELECT * FROM outbound_messages')).rejects.toThrow('permission denied')
+  await expect(source()).rejects.toThrow('permission denied')
+  await db.exec('RESET ROLE'); await db.exec('SET ROLE service_role')
+  expect((await db.query('SELECT * FROM outbound_messages')).rows).toHaveLength(1)
+  await db.exec("DELETE FROM outbound_messages WHERE business_id='a'")
+  expect((await db.query('SELECT * FROM outbound_messages')).rows).toHaveLength(0)
+})

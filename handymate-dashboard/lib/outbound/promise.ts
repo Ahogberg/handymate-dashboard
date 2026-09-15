@@ -25,6 +25,12 @@ export type Preflight = (db: SupabaseClient, businessId: string, kind: OutboundP
 export async function withOutboundPromise(db: SupabaseClient, p: OutboundPromise,
   send: (intent: ClaimedOutbound) => Promise<ProviderOutcome>, preflight: Preflight = gateChannel): Promise<PromiseOutcome> {
   const recorded = await recordOutboundIntent(db, p)
+  return dispatchRecordedOutbound(db, p, recorded, send, preflight)
+}
+
+export async function dispatchRecordedOutbound(db: SupabaseClient, p: OutboundPromise,
+  recorded: { id?: string; status?: OutboundStatus; provider_ref?: string | null; cancel_requested?: boolean },
+  send: (intent: ClaimedOutbound) => Promise<ProviderOutcome>, preflight: Preflight = gateChannel): Promise<PromiseOutcome> {
   if (!recorded.id) return { status: 'skipped', receiptConfirmed: false }
   if (['sent', 'skipped', 'unknown', 'attempting'].includes(recorded.status!)) {
     return { id: recorded.id, status: recorded.status!, providerRef: recorded.provider_ref ?? undefined,

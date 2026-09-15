@@ -48,6 +48,20 @@ export async function GET(request: NextRequest) {
       { status: 503 },
     )
   const rows = notices.data || []
+  let outbound: any[] = []
+  if (process.env.OUTBOUND_INTENTS_ENABLED === 'true') {
+    const sourceIds = Array.from(new Set([
+      ...rows.map((row: any) => row.id),
+      ...(digests.data || []).flatMap((digest: any) => (digest.snapshot?.decisions || []).map((decision: any) => decision.id)),
+    ].filter(Boolean)))
+    if (sourceIds.length) {
+      const receipts = await db.from('outbound_intents')
+        .select('source_id,kind,status,defer_reason,finished_at,cancel_requested_at')
+        .eq('business_id', business.business_id).eq('source', 'approval').in('source_id', sourceIds)
+      if (receipts.error) return NextResponse.json({ error: 'Leveranskvittensen kunde inte hämtas. Försök igen.' }, { status: 503 })
+      outbound = receipts.data || []
+    }
+  }
   const off_tokens = Object.fromEntries(
     Object.keys(AUTONOMY_META).map((k) => [
       k,
@@ -61,6 +75,7 @@ export async function GET(request: NextRequest) {
       next: rows.length > 100 ? rows[99].id : null,
       digests: digests.data,
       channels: channels.data,
+      outbound,
     },
     { headers: { 'Cache-Control': 'no-store' } },
   )

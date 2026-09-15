@@ -12,6 +12,9 @@ import { automationBridge } from '@/lib/financial-kernel/events/bridge-automatio
 import { listOwedEffectIntents } from '@/lib/financial-kernel/commands/service'
 import { listFinancialKernelWork } from '@/lib/financial-kernel/shadow/service'
 import { sweepInvoiceIntents } from '@/lib/financial-kernel/effects/sweep'
+import { sweepOutboundIntents } from '@/lib/outbound/sweep'
+import { resolveOutboundSource } from '@/lib/outbound/resolve'
+import { outboundIntentsEnabled } from '@/lib/outbound/intents'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 300
@@ -23,18 +26,6 @@ export async function GET(request: Request) {
   const shouldStop = () => Date.now() >= deadline
   const sb = getServerSupabase(),
     db = kernelDb()
-  let all
-  try {
-    all = await listFinancialKernelWork(db)
-  } catch (error) {
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : String(error) },
-      { status: 500 },
-    )
-  }
-  // Rotate the first business between scheduled runs so a busy tenant cannot starve the tail.
-  const offset = all.length ? Math.floor(Date.now() / 600_000) % all.length : 0
-  const businesses = [...all.slice(offset), ...all.slice(0, offset)]
   const summary = {
     businesses: 0,
     consumed: 0,
@@ -44,7 +35,30 @@ export async function GET(request: Request) {
     skipped: 0,
     budgetExhausted: false,
     errors: [] as { businessId: string; message: string }[],
+    outbound: null as Awaited<ReturnType<typeof sweepOutboundIntents>> | null,
   }
+  // Outbound has an all-tenant work list and receives a fixed slice before
+  // kernel rotation, so a busy accounting tenant cannot starve messages.
+  if (outboundIntentsEnabled() && !shouldStop()) {
+    const outboundDeadline = Math.min(deadline, Date.now() + 45_000)
+    try {
+      summary.outbound = await sweepOutboundIntents(sb, resolveOutboundSource, {
+        shouldStop: () => Date.now() >= outboundDeadline,
+      })
+    } catch (error) {
+      summary.errors.push({ businessId: 'outbound', message: error instanceof Error ? error.message : String(error) })
+    }
+  }
+  let all
+  try {
+    all = await listFinancialKernelWork(db)
+  } catch (error) {
+    summary.errors.push({ businessId: 'financial-kernel', message: error instanceof Error ? error.message : String(error) })
+    return NextResponse.json({ ok: false, ...summary }, { status: 500 })
+  }
+  // Rotate the first business between scheduled runs so a busy tenant cannot starve the tail.
+  const offset = all.length ? Math.floor(Date.now() / 600_000) % all.length : 0
+  const businesses = [...all.slice(offset), ...all.slice(0, offset)]
   for (const business of businesses) {
     if (shouldStop()) break
     const businessId = business.business_id

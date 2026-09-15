@@ -2,11 +2,15 @@ import { test, expect } from '@playwright/test'
 import { withOutboundPromise, dispatchClaimedOutbound, type ProviderOutcome } from '../lib/outbound/promise'
 import { outboundStatusText } from '../lib/outbound/status'
 import { readOutboundReceipt, type OutboundPromise } from '../lib/outbound/intents'
+import { outboundVersion, readOutboundSource, type SmsEnvelope } from '../lib/outbound/source'
+import { aggregateAutonomyOutcome, reviewedDocumentReceipt } from '../lib/outbound/resolve'
+import { pushProviderOutcome } from '../lib/notifications/push-delivery'
 import { c5Modules } from './helpers/c5-module'
 import { NextRequest, NextResponse } from 'next/server'
+import { readFileSync } from 'node:fs'
 
 const input: OutboundPromise = { businessId: 'a', source: 'approval', sourceId: 'approved-1', dedupeKey: 'approved-1:sms', kind: 'sms', template: 'approved-sms', recipient: '+46700000001' }
-const active = { id: 'i', attempt_token: 'fence', attempts: 1, kind: 'sms' as const, source: 'approval' as const, source_id: 'approved-1', recipient: input.recipient, template: input.template, autonomy_key: null, context: null }
+const active = { id: 'i', attempt_token: 'fence', attempts: 1, kind: 'sms' as const, source: 'approval' as const, source_id: 'approved-1', dedupe_key: input.dedupeKey, recipient: input.recipient, template: input.template, autonomy_key: null, context: null }
 const ready = async () => ({ channel: 'sms' as const, ok: true, message: '', href: '' })
 function fixture(options: { status?: string; providerRef?: string; finishError?: boolean; revoked?: boolean; cancelAtFinish?: boolean; cancelBeforeSend?: boolean } = {}) {
   let state = options.status ?? 'pending'
@@ -163,4 +167,93 @@ test('sweep recovers all tenants, defers preflight without dispatch and respects
   calls.length = 0
   await sweepOutboundIntents(db, resolve, { shouldStop: () => true })
   expect(calls).toEqual(['list_owed_outbound_intents'])
+})
+
+test('canonical source version is stable across key order and refuses tenant or content drift', async () => {
+  const envelope: SmsEnvelope = { message: 'Hej', recipient: 'customer', purpose: 'transactional', customerId: 'c' }
+  expect(outboundVersion(envelope)).toBe(outboundVersion({ purpose: 'transactional', customerId: 'c', recipient: 'customer', message: 'Hej' }))
+  const intent = { ...active, context: { version: outboundVersion(envelope) } }
+  const sourceDb = (stored: SmsEnvelope, exists = true) => {
+    const query: any = { select: () => query, eq: () => query, maybeSingle: async () => exists ? { data: {
+      recipient: intent.recipient, template: intent.template, version: intent.context.version, envelope: stored,
+    } } : { data: null } }
+    return { from: () => query } as any
+  }
+  expect(await readOutboundSource<any>(sourceDb(envelope), 'a', intent)).toEqual(envelope)
+  await expect(readOutboundSource<any>(sourceDb(envelope, false), 'b', intent)).rejects.toThrow('outbound_source_not_found')
+  await expect(readOutboundSource<any>(sourceDb({ ...envelope, message: 'Ändrat' }), 'a', intent)).rejects.toThrow('outbound_source_changed')
+})
+
+test('mixed push delivery is unknown so an accepted device is never replayed automatically', () => {
+  const result = (expo: any, web: any = { attempted: 0, accepted: 0, rejected: 0 }) => ({ delivered: expo.accepted > 0, sent: expo.accepted + web.accepted, channels: { expo, web } })
+  expect(pushProviderOutcome(result({ attempted: 2, accepted: 1, rejected: 1, tickets: ['ticket-1'] })))
+    .toMatchObject({ status: 'unknown', providerRef: 'ticket-1' })
+  expect(pushProviderOutcome(result({ attempted: 2, accepted: 2, rejected: 0, tickets: ['a', 'b'] }))).toMatchObject({ status: 'sent' })
+  expect(pushProviderOutcome(result({ attempted: 0, accepted: 0, rejected: 0 }))).toMatchObject({ status: 'skipped' })
+})
+
+test('multi-channel autonomy receipt waits for certainty and succeeds when either channel is sent', () => {
+  const rows = [
+    { id: 'sms', status: 'attempting', context: { auditId: 'audit' } },
+    { id: 'email', status: 'pending', context: { auditId: 'audit' } },
+    { id: 'other', status: 'sent', context: { auditId: 'another' } },
+  ]
+  expect(aggregateAutonomyOutcome(rows, 'sms', 'audit', { status: 'failed' })).toBeNull()
+  expect(aggregateAutonomyOutcome(rows, 'sms', 'audit', { status: 'sent' })).toBe('success')
+  expect(aggregateAutonomyOutcome(rows.map(row => row.id === 'email' ? { ...row, status: 'skipped' } : row), 'sms', 'audit', { status: 'failed' })).toBe('failed')
+})
+
+test('the three provider boundaries and all four supervised actions use durable identities', () => {
+  for (const file of ['lib/sms-send.ts', 'lib/email.ts', 'app/api/push/send/route.ts']) {
+    const source = readFileSync(file, 'utf8')
+    expect(source).toContain('withOutboundSource')
+  }
+  const actions: Array<[string, string]> = [
+    ['invoice_reminder', 'lib/invoice-reminder-send.ts'],
+    ['booking_reminder', 'lib/booking-reminders.ts'],
+    ['quote_followup_sms', 'app/api/cron/quote-follow-up/route.ts'],
+    ['review_request', 'app/api/cron/review-requests/route.ts'],
+  ]
+  for (const [key, file] of actions) {
+    const source = readFileSync(file, 'utf8')
+    expect(source).toContain(`autonomyKey`)
+    expect(source).toContain('outbound:')
+    expect(source).toContain(key)
+  }
+})
+
+test('outbound sweep has its own all-tenant budget before financial kernel work', () => {
+  const route = readFileSync('app/api/cron/financial-kernel/route.ts', 'utf8')
+  expect(route.indexOf('sweepOutboundIntents(sb')).toBeGreaterThan(0)
+  expect(route.indexOf('sweepOutboundIntents(sb')).toBeLessThan(route.indexOf('listFinancialKernelWork(db)'))
+  expect(route).toContain('Date.now() + 45_000')
+})
+
+test('recovered reviewed email restores the tenant-scoped document receipt once', async () => {
+  let variables: any = { delivery: { version: 'v1', state: 'sending', attempt: 1 } }
+  let writes = 0
+  const db: any = { from: (table: string) => {
+    expect(table).toBe('generated_document')
+    let update: any = null
+    const filters: Array<[string, unknown]> = []
+    const query: any = {
+      select: () => query, update: (value: any) => { update = value; return query },
+      eq: (key: string, value: unknown) => { filters.push([key, value]); return query },
+      maybeSingle: async () => ({ data: { variables_data: structuredClone(variables) } }),
+      then: (resolve: (value: unknown) => void) => {
+        expect(filters).toContainEqual(['business_id', 'a'])
+        expect(filters).toContainEqual(['variables_data', JSON.stringify(variables)])
+        variables = update.variables_data; writes++
+        resolve({ data: [{ id: 'doc' }], error: null })
+      },
+    }
+    return query
+  } }
+  const envelope: any = { subject: 'Rapport', html: '<p>Granskad</p>',
+    journal: { type: 'reviewed_document', documentId: 'doc', version: 'v1' } }
+  await reviewedDocumentReceipt(db, 'a', envelope, { status: 'sent', providerRef: 'mail-1' })
+  expect(writes).toBe(1)
+  expect(variables.delivery).toMatchObject({ state: 'accepted', messageId: 'mail-1' })
+  await reviewedDocumentReceipt(db, 'a', envelope, { status: 'sent', providerRef: 'mail-1' })
+  expect(writes).toBe(1)
 })

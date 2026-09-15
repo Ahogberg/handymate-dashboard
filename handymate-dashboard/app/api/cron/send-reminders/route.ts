@@ -247,7 +247,7 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
                 inv.business_id,
                 'invoice_reminder',
                 deliveryInput.customerPhone ? 'sms' : 'email',
-                () => deliverInvoiceReminder(supabase, deliveryInput),
+                (auditId) => deliverInvoiceReminder(supabase, { ...deliveryInput, outboundAutonomyKey: 'invoice_reminder', outboundAuditId: auditId }),
                 invoiceReminderOutcome,
                 {
                   smsSent: false,

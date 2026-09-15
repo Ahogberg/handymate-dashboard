@@ -1620,25 +1620,37 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] SQL-/route-/komponentprov och tsc.
 - [x] Bygge och publicering: PR #81, v248 endast utkast.
 - [ ] Slutlig CI på PR #81; first-value-harness kompletterat med explicit flaggmiljö och av/på-prov.
-- [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.
+- [ ] Native Ja/Nej: separat mobil integration enligt briefens §7, inte del av H3b.
 
 ## H3b — 2026-09-15
 - [x] Läs #82, utkast v249 och de verkliga sändvägarna.
 - [x] RPC-service och de 43 SQL-kontrollerna mot v248 + v249 (plus fem skärpningsprov).
 - [x] Gemensamt leveranskontrakt med token, återförsök och okända utfall, 18 runtimeprov gröna.
-- [ ] Källbunden återupptagning, tre strypunkter, autonomi och tiominuterssvep.
-- [ ] Admin, kundkvitto, kontoradering och kontraktsgrind.
+- [x] Källbunden återupptagning, tre strypunkter, autonomi och tiominuterssvep.
+- [x] Admin, kundkvitto, kontoradering och kontraktsgrind.
 - [ ] Native push i mobil-repot, separat granskning.
-- [ ] Typkontroll, tester, bygge och PR-handoff.
+- [x] Typkontroll, tester, bygge och PR-handoff.
 
 H3b checkpoint: 48 SQL-prov och 18 runtimeprov gröna. Typkontroll och
 produktionsbygge gröna. Källåterupptagning och ursprungsåtgärdens kvittens
 måste kopplas innan cron/sändvägar aktiveras; detaljer i briefens Handoff.
-Draft-PR, inte en färdig H3b-leverans. Ingen produktionsskrivning.
+Checkpointen ovan är ersatt av slutleveransen nedan. Ingen produktionsskrivning.
 
 ### H3b återupptagning — kvittenser
 - [x] Återansluten arbetsmiljö och verifierad ren utgångspunkt.
 - [x] Bevara leverantörsreferens och avstängningsfakta vid återläsning.
 - [x] Läs faktiskt utfall efter förlorad claim; saknat underlag blir osäkerhet.
 - [x] 72 outbound-prov gröna, inklusive sex nya återläsnings-/samtidighetsfall.
-- [ ] Kvarstående källintegrationer enligt H3b-briefens tabell; ingen aktivering.
+- [x] Källintegrationerna i H3b-paketet är slutförda; ingen aktivering.
+
+### H3b slutleverans — 2026-09-15
+- [x] Basera #83 på aktuell main och bevara båda kontraktslistorna.
+- [x] Inför en beständig, tenantbunden sändkälla för meddelanden som idag bara finns i minnet; intenten lagrar fortsatt aldrig brödtext eller bilagor.
+- [x] Koppla SMS, e-post och push till record → preflight → claim → provider → finish med stabilt producent-ID för H2:s fyra övervakade handlingar och den granskade dokumentleveransen.
+- [x] Återläs källan i svepet, kontrollera version/mottagare och stäm av ursprungsåtgärdens kvittens exakt en gång.
+- [x] Kör outbound-svepet separat från kernelarbetet inom tiominuterscronens tidsbudget.
+- [x] Visa verklig leveransstatus i överlämningsinkorgen och behåll adminhantering för okänt/uttömt utfall.
+- [x] Prova synkron leverans, kraschåterhämtning, avstängning, delvis push, tenantgränser och kvittensåterställning.
+- [x] Kör kontraktssvit, typkontroll och produktionsbygge; publicera färdig granskningshandoff i #83.
+
+Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är gröna. Hela kontraktssviten är grön efter att push-policyns källprov flyttats till den nya transportmodulen; typkontroll och Next-produktionsbygge går igenom. v249 är fortsatt ett utkast, flaggan är av och ingen extern leverans eller produktionsskrivning gjordes. Native Ja/Nej ligger fortsatt separat enligt briefens §7.

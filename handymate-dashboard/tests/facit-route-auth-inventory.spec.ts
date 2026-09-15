@@ -224,6 +224,8 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // kontext. Den interna säljytan arbetar med husets GTM-data → 156.
   // C5b: four superadmin endpoints and one verifyCronSecret cron; no public endpoints.
   // H4: morning-report-retry is an authenticated internal cron → 167.
-  // H3b: one endpoint with GET/POST, verified superadmin actor → 168.
-  expect(utanStandard.length).toBeLessThanOrEqual(168)
+  // 2026-09-15: admin/revenue/partner-leads (requireRevenue + manager)
+  // och partners/leads (verifierad partner-token + aktuellt avtal) → 169.
+  // H3b: one endpoint with GET/POST, verified superadmin actor → 170.
+  expect(utanStandard.length).toBeLessThanOrEqual(170)
 })

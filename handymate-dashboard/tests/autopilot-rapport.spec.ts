@@ -284,8 +284,8 @@ test.describe('Del 1 — cron-auth-taket och route-auth-inventeringen', () => {
 
   test('facit-route-auth-inventory har höjt eller behållit taket för utan-standardgrind', () => {
     const inv = read('tests/facit-route-auth-inventory.spec.ts')
-    // H3b adds one verified superadmin GET/POST route; documented cap is 168.
-    expect(inv).toMatch(/toBeLessThanOrEqual\(168\)/)
+    // Revenue adds two partner lead routes; H3b adds one verified superadmin GET/POST route; documented cap is 170.
+    expect(inv).toMatch(/toBeLessThanOrEqual\(170\)/)
   })
 })
 

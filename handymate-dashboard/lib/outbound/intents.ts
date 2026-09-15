@@ -17,10 +17,11 @@ export interface OutboundPromise {
   template: string
   autonomyKey?: AutonomyKey
   /** Source locator/version only. Never body, attachments or provider credentials. */
-  context?: { version?: string; targetUserId?: string; fromAddress?: string }
+  context?: { version?: string; targetUserId?: string; fromAddress?: string; auditId?: string }
 }
 export interface ClaimedOutbound {
   id: string; kind: Channel; source: OutboundSource; source_id: string
+  dedupe_key: string
   recipient: string; template: string; autonomy_key: AutonomyKey | null
   attempts: number; attempt_token: string; context: OutboundPromise['context'] | null
 }
@@ -50,7 +51,7 @@ export async function recordOutboundIntent(db: SupabaseClient, p: OutboundPromis
   for (const field of [p.businessId, p.sourceId, p.dedupeKey, p.recipient, p.template]) {
     if (typeof field !== 'string' || !field.trim()) throw new TypeError('outbound_identity_required')
   }
-  if (p.context && Object.keys(p.context).some(key => !['version', 'targetUserId', 'fromAddress'].includes(key))) {
+  if (p.context && Object.keys(p.context).some(key => !['version', 'targetUserId', 'fromAddress', 'auditId'].includes(key))) {
     throw new TypeError('outbound_context_must_only_identify_source')
   }
   return outboundRpc<{ id?: string; status?: OutboundStatus; provider_ref?: string | null; cancel_requested?: boolean; created: boolean; blocked?: boolean; deferred?: boolean }>(db, 'record_outbound_intent', {

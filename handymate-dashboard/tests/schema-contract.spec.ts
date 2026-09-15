@@ -60,10 +60,11 @@ function walk(dir: string, out: string[] = []): string[] {
 
 function buildSchemaFacit(): Set<string> {
   const facit = new Set<string>([...BASE_TABLES, ...MANUAL_TABLES])
-  const sqlDir = path.join(ROOT, 'sql')
-  for (const file of fs.readdirSync(sqlDir)) {
-    if (!file.endsWith('.sql')) continue
-    const content = fs.readFileSync(path.join(sqlDir, file), 'utf8')
+  const migrationFiles = ['sql', 'supabase/migrations'].flatMap(dir =>
+    fs.readdirSync(path.join(ROOT, dir)).filter(file => file.endsWith('.sql')).sort().map(file => path.join(ROOT, dir, file)),
+  )
+  for (const file of migrationFiles) {
+    const content = fs.readFileSync(file, 'utf8')
     for (const m of Array.from(content.matchAll(
       /CREATE TABLE (?:IF NOT EXISTS )?(?:"?[a-z0-9_]+"?\.)?"?([a-z0-9_]+)"?/gi,
     ))) {
@@ -113,7 +114,7 @@ test.describe('schema-kontraktet — alla .from() mot tabeller som finns', () =>
 
     expect(
       unknown,
-      `Okända tabellnamn hittade (finns varken i sql/ eller vitlistorna).\n` +
+      `Okända tabellnamn hittade (finns varken i sql/, supabase/migrations/ eller vitlistorna).\n` +
         `Är tabellen felstavad? Rätta koden. Finns tabellen i prod utan\n` +
         `migrationsfil? Skriv sql-filen eller lägg till i MANUAL_TABLES med\n` +
         `motivering.\n${JSON.stringify(unknown, null, 2)}`,

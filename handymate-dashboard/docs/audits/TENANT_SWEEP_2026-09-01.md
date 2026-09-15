@@ -167,3 +167,7 @@ All read routes are force-dynamic. Inventory ceiling: 166; cron routes: 50.
 - GET `/api/dashboard/channels`: authenticated business + active owner/admin membership in that same business; target-user-scoped push readiness; no-store. No caller-controlled tenant.
 - GET `/api/cron/morning-report-retry`: fail-closed `verifyCronSecret`; disabled unless MORNING_REPORT_RELIABILITY_ENABLED; bounded worker. Non-standard-auth inventory ceiling +1 (167), cron inventory 51.
 - v246: service-only commands, member/anon no read/write; new tables classified RADERAS.
+
+## 2026-09-15 — Revenue partnerleads
+
+Inventeringen omfattar nu 169 rutter utanför getAuthenticatedBusiness. Två nya rutter: admin/revenue/partner-leads kräver requireRevenue och manager; partners/leads härleder partneridentiteten från verifierad partner-token och kräver aktiv partner med aktuellt avtal. Service-role används endast bakom dessa servergrindar. Tilldelning är intern säljdata och partnerns läsning begränsas av serverhärlett partner-id. Korspartneråtkomst, återkallning, avtal, inaktiv partner och kontaktspärrar testas i tests/revenue/partner-leads.cjs.

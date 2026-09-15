@@ -45,6 +45,28 @@ CREATE INDEX outbound_intents_due ON public.outbound_intents (not_before NULLS F
 CREATE INDEX outbound_intents_unknown ON public.outbound_intents (business_id, finished_at) WHERE status = 'unknown';
 CREATE INDEX outbound_intents_source ON public.outbound_intents (business_id, source, source_id);
 
+-- Canonical source for messages that previously existed only in process
+-- memory. The intent remains a body-free delivery ledger; the sweeper reads
+-- this tenant-scoped row and verifies its immutable version before dispatch.
+CREATE TABLE public.outbound_messages (
+  business_id TEXT NOT NULL REFERENCES public.business_config(business_id) ON DELETE CASCADE,
+  source TEXT NOT NULL CHECK (source IN ('approval','automation_log','autonomy','cron','manual')),
+  source_id TEXT NOT NULL,
+  kind TEXT NOT NULL CHECK (kind IN ('sms','email','push')),
+  dedupe_key TEXT NOT NULL,
+  recipient TEXT NOT NULL,
+  template TEXT NOT NULL,
+  autonomy_key TEXT NULL CHECK (autonomy_key IS NULL OR autonomy_key IN ('invoice_reminder','booking_reminder','quote_followup_sms','review_request')),
+  version TEXT NOT NULL,
+  context JSONB NULL,
+  envelope JSONB NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (business_id, source, source_id, kind),
+  UNIQUE (business_id, dedupe_key),
+  CHECK (octet_length(envelope::text) <= 2097152)
+);
+CREATE INDEX outbound_messages_created ON public.outbound_messages (business_id, created_at);
+
 CREATE FUNCTION public.outbound_lock(p_business_id TEXT) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
 BEGIN
@@ -95,6 +117,38 @@ BEGIN
     RETURNING id INTO v_id;
   RETURN jsonb_build_object('id',v_id,'status','pending','created',true,'deferred',p_defer_reason IS NOT NULL);
 END $fn$;
+
+-- Persist an immutable, authorized source and its body-free promise in one
+-- transaction. A duplicate request must match byte-for-byte after JSONB
+-- normalization; otherwise the stable producer identity has been misused.
+CREATE FUNCTION public.record_outbound_message(
+  p_business_id TEXT, p_kind TEXT, p_source TEXT, p_source_id TEXT, p_dedupe_key TEXT,
+  p_recipient TEXT, p_template TEXT, p_autonomy_key TEXT, p_context JSONB,
+  p_version TEXT, p_envelope JSONB, p_defer_reason TEXT DEFAULT NULL
+) RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE m public.outbound_messages%ROWTYPE; result JSONB;
+BEGIN
+  PERFORM public.outbound_lock(p_business_id);
+  IF nullif(btrim(p_source_id),'') IS NULL OR nullif(btrim(p_version),'') IS NULL OR p_envelope IS NULL THEN
+    RAISE EXCEPTION 'outbound_source_fields_required' USING ERRCODE='check_violation';
+  END IF;
+  result := public.record_outbound_intent(p_business_id,p_kind,p_source,p_source_id,p_dedupe_key,
+    p_recipient,p_template,p_autonomy_key,coalesce(p_context,'{}'::jsonb)||jsonb_build_object('version',p_version),p_defer_reason);
+  IF coalesce((result->>'blocked')::boolean,false) THEN RETURN result; END IF;
+  SELECT * INTO m FROM public.outbound_messages
+    WHERE business_id=p_business_id AND source=p_source AND source_id=p_source_id AND kind=p_kind;
+  IF FOUND THEN
+    IF (m.dedupe_key,m.recipient,m.template,m.autonomy_key,m.version,m.context,m.envelope)
+       IS DISTINCT FROM (p_dedupe_key,p_recipient,p_template,p_autonomy_key,p_version,p_context,p_envelope) THEN
+      RAISE EXCEPTION 'outbound_source_conflict' USING ERRCODE='check_violation';
+    END IF;
+  ELSE
+    INSERT INTO public.outbound_messages(business_id,source,source_id,kind,dedupe_key,recipient,template,autonomy_key,version,context,envelope)
+      VALUES(p_business_id,p_source,p_source_id,p_kind,p_dedupe_key,p_recipient,p_template,p_autonomy_key,p_version,p_context,p_envelope);
+  END IF;
+  RETURN result || jsonb_build_object('source_version',p_version);
+END $fn$;
+
 
 -- Preflight may fail on any attempt, including a sweep after recovery. It is
 -- not a provider failure and must not consume the three provider attempts.
@@ -162,7 +216,7 @@ BEGIN
     UPDATE public.outbound_intents SET status='attempting', attempts=attempts+1, attempt_token=gen_random_uuid()::TEXT,
         claimed_at=clock_timestamp(), finished_at=NULL, not_before=NULL, defer_reason=NULL
       WHERE business_id=p_business_id AND id IN (SELECT id FROM due)
-      RETURNING id,kind,source,source_id,recipient,template,autonomy_key,attempts,attempt_token,context)
+      RETURNING id,kind,source,source_id,dedupe_key,recipient,template,autonomy_key,attempts,attempt_token,context)
   SELECT COALESCE(jsonb_agg(to_jsonb(c) ORDER BY c.id),'[]'::jsonb) INTO v_claimed FROM c;
   RETURN jsonb_build_object('claimed',v_claimed,'unknown_ids',v_unknown,'cancelled_ids',v_cancelled);
 END $fn$;
@@ -297,12 +351,15 @@ RETURNS JSONB LANGUAGE sql SECURITY DEFINER SET search_path = public, pg_temp AS
 $fn$;
 
 ALTER TABLE public.outbound_intents ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.outbound_messages ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON public.outbound_intents FROM PUBLIC, anon, authenticated, service_role;
+REVOKE ALL ON public.outbound_messages FROM PUBLIC, anon, authenticated, service_role;
 -- SELECT and DELETE only: every write goes through the RPCs; DELETE serves account erasure.
 GRANT SELECT, DELETE ON public.outbound_intents TO service_role;
+GRANT SELECT, DELETE ON public.outbound_messages TO service_role;
 DO $g$ DECLARE f RECORD; BEGIN
   FOR f IN SELECT oid::regprocedure sig FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname = ANY(ARRAY[
-      'outbound_lock','outbound_autonomy_granted','record_outbound_intent','defer_outbound_intent','claim_outbound_intents','finish_outbound_intent',
+      'outbound_lock','outbound_autonomy_granted','record_outbound_intent','record_outbound_message','defer_outbound_intent','claim_outbound_intents','finish_outbound_intent',
       'cancel_outbound_intents','list_owed_outbound_intents','resolve_outbound_intent','list_unresolved_outbound_intents','read_outbound_status']) LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', f.sig);

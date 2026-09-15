@@ -12,7 +12,7 @@ export async function supervisedSend<T>(
   businessId: string,
   key: AutonomyKey,
   channel: Channel,
-  send: () => Promise<T>,
+  send: (auditId?: string) => Promise<T>,
   outcome: (result: T) => 'success' | 'failed' | 'skipped' | 'unknown',
   blocked: T,
   options: NonNullable<Parameters<typeof gateChannel>[3]> & {
@@ -42,7 +42,7 @@ export async function supervisedSend<T>(
     return blocked
   }
   try {
-    const result = await send()
+    const result = await send(id)
     const finish = await db.rpc('finish_autonomy_attempt', {
       p_business_id: businessId,
       p_id: id,

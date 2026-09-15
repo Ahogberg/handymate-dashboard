@@ -42,6 +42,9 @@ function bundle(entry) {
 }
 async function main() {
   const h = await harness()
+  const partnerIdentity = { id: '20000000-0000-4000-8000-000000000001', name: 'Portalpartner', status: 'active', agreement_version: '1.0' }
+  await h.db.query('insert into partners(id,name,company,status,agreement_version) values($1,$2,$3,$4,$5)', [partnerIdentity.id, partnerIdentity.name, 'Partnerbolaget', 'active', '1.0'])
+  h.setPartner(partnerIdentity)
   const executablePath =
     process.env.HANDYMATE_CHROMIUM_PATH ||
     (await require('@sparticuz/chromium').default.executablePath())
@@ -80,7 +83,7 @@ async function main() {
     await page.route('**/*', async (route) => {
       const req = route.request(),
         url = new URL(req.url())
-      if (url.pathname === '/api/admin/revenue') {
+      if (url.pathname.startsWith('/api/admin/revenue') || url.pathname === '/api/partners/leads') {
         const r = await h.request(
           req.method(),
           req.url(),
@@ -113,10 +116,10 @@ async function main() {
           body: `<html lang="sv"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><style>${css}</style></head><body>${renderToStaticMarkup(result)}</body></html>`,
         })
       }
-      if (url.pathname.startsWith('/admin/revenue')) {
+      if (url.pathname.startsWith('/admin/revenue') || url.pathname === '/partners/leads') {
         const isSession = url.pathname.includes('/session/'),
           b = bundle(
-            isSession
+            url.pathname === '/partners/leads' ? 'app/partners/leads/page.tsx' : isSession
               ? 'app/admin/revenue/session/[id]/page.tsx'
               : 'app/admin/revenue/page.tsx',
           )
@@ -137,19 +140,36 @@ async function main() {
       .fill('556487-1234')
     await page.getByRole('button', { name: 'Spara företag' }).click()
     await page.getByRole('heading', { name: 'Browser El AB' }).waitFor()
+    console.log('STEP qualification')
+    await page.getByLabel('Antal anställda', { exact: true }).fill('8')
+    await page.getByLabel('Svenskt hantverks- eller serviceföretag', { exact: true }).check()
+    await page.getByLabel('Källa och bekräftade uppgifter', { exact: true }).fill('Ägaren bekräftade åtta anställda i elservice.')
+    await page.getByRole('button', { name: 'Spara kvalificering och räkna poäng' }).click()
+    await page.getByText('Så räknas prioriteten: 25/100', { exact: true }).waitFor()
     console.log('STEP contact')
     await page.getByText('Lägg till kontaktperson', { exact: true }).click()
     await page.getByLabel('Namn', { exact: true }).fill('Kundkontakt')
     await page
       .getByLabel('E-post', { exact: true })
       .fill('kontakt@example.test')
+    await page.getByLabel('Telefon', { exact: true }).fill('0701234567')
     await page.getByRole('button', { name: 'Spara kontakt' }).click()
-    await page.getByText('kontakt@example.test', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Starta kontaktsekvens' }).waitFor()
+    console.log('STEP sequence')
+    await page.getByRole('button', { name: 'Starta kontaktsekvens' }).click()
+    await page.getByText('Steg 1: Ring och undersök behovet', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Granska och kopiera underlag' }).click()
+    await page.getByLabel('Vad gjorde du och vad hände?', { exact: true }).fill('Ringde, ingen svarade.')
+    await page.getByRole('button', { name: 'Logga genomförd kontakt och planera nästa steg' }).click()
+    await page.getByText('Steg 2: Följ upp med ett kort mejl', { exact: true }).waitFor()
+    await page.reload()
+    await page.getByRole('button', { name: /Browser El AB/ }).first().click()
+    await page.getByText('Steg 2: Följ upp med ett kort mejl', { exact: true }).waitFor()
     console.log('STEP activity')
     await page
       .getByLabel('Sammanfattning', { exact: true })
       .fill('Vi behöver följa upp offerterna bättre.')
-    await page.getByRole('checkbox').check()
+    await page.getByRole('checkbox', { name: 'Förbered ett uppföljningsutkast från sammanfattningen' }).check()
     await page.getByRole('button', { name: 'Logga och planera' }).click()
     await page
       .getByText('Vi behöver följa upp offerterna bättre.', { exact: true })
@@ -215,6 +235,32 @@ async function main() {
       .fill('Kunden svarade, vi tar nästa steg tillsammans.')
     await page.getByRole('button', { name: 'Logga och planera' }).click()
     await page.getByText('Inga aktuella utkast.', { exact: true }).waitFor()
+    console.log('STEP assign partner lead')
+    await page.getByLabel('Underlag till partnern', { exact: true }).fill('Kontakta ägaren om offertuppföljning.')
+    await page.getByRole('button', { name: 'Tilldela lead till partner' }).click()
+    await page.getByText('Leaden finns nu i partnerns portal.', { exact: true }).waitFor()
+    await page.goto('https://revenue.test/partners/leads')
+    await page.getByRole('heading', { name: 'Browser El AB' }).waitFor()
+    await page.getByRole('button', { name: 'Spara mitt val' }).click()
+    await page.getByText('Accepterad', { exact: true }).waitFor()
+    await page.getByLabel('Vad vill du göra?', { exact: true }).selectOption('contacted')
+    await page.getByLabel('Återkoppling till Handymate', { exact: true }).fill('Partnern ringde ägaren.')
+    await page.getByRole('button', { name: 'Spara mitt val' }).click()
+    await page.getByText('Kontaktad', { exact: true }).waitFor()
+    await page.reload()
+    await page.getByText('Kontaktad', { exact: true }).waitFor()
+    await page.setViewportSize({ width: 375, height: 900 })
+    assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    await page.screenshot({ path: 'test-results/revenue/partner-leads-mobile.png', fullPage: true })
+    await page.goto('https://revenue.test/admin/revenue')
+    await page.getByRole('button', { name: /Browser El AB/ }).first().click()
+    await page.getByText('Partnerns återkoppling: Partnern ringde ägaren.', { exact: true }).waitFor()
+    await page.getByRole('button', { name: 'Återkalla tilldelning', exact: true }).click()
+    await page.getByText('Tilldelningen är återkallad och visas inte längre för partnern.', { exact: true }).waitFor()
+    await page.goto('https://revenue.test/partners/leads')
+    await page.getByText('Du har inga tilldelade leads just nu. Nya leads från Handymate visas här.', { exact: true }).waitFor()
+    await page.goto('https://revenue.test/admin/revenue')
+    await page.getByRole('button', { name: /Browser El AB/ }).first().click()
     await page.setViewportSize({ width: 375, height: 900 })
     assert(
       await page.evaluate(
@@ -248,8 +294,14 @@ async function main() {
       .first()
       .waitFor()
     assert.deepEqual(errors, [])
+    const downloadPromise = page.waitForEvent('download')
+    await page.getByRole('button', { name: 'Exportera till CRM' }).click()
+    const download = await downloadPromise
+    assert.equal(download.suggestedFilename(), 'handymate-revenue-crm.csv')
+    await download.saveAs('test-results/revenue/crm-export.csv')
+    assert(fs.readFileSync('test-results/revenue/crm-export.csv', 'utf8').includes('Browser El AB'))
     console.log(
-      'PASS real UI + handlers + PostgreSQL: create, contact, activity, session, case, reload, onboarding link, approval, reply invalidation, source import, 375/1280px',
+      'PASS real UI + handlers + PostgreSQL: create, qualification, contact, sequence, activity, session, case, reload, onboarding link, approval, reply invalidation, source import, CRM download, 375/1280px',
     )
     success = true
   } finally {
