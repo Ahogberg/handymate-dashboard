@@ -1573,3 +1573,19 @@ Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsp
 - [x] 88 riktade tester för C6, V1, honesty och CI-paritet gröna.
 - [ ] TypeScript, bygge och publicering; slutresultaten anges på #73.
 - [ ] Kontrollera CI på publicerat huvud inför Claudes merge.
+
+## Kundvärde och upplevelse, nästa leverans — 2026-09-14
+- [x] Kartlagt main, V2/V3-skisser och pågående onboarding-PR #69.
+- [x] Rätta läsfel, ekonomibehörighet och missvisande veckokvitto.
+- [x] Sammanhängande, återförsökbar värdevisning med faktiska stadier och separat tidsunderlag.
+- [x] Dokumentera och förbered återstående V2-, native mobil- och pilotacceptans utan nya ekonomiska antaganden.
+- [ ] Testa riktiga komponenter och routes, typkontroll, bygge, grön PR.
+
+Publicerad i PR #75. Slutliga test-/byggresultat redovisas på PR-huvudet. V2, full V3/native och produktionspilot är fortfarande öppna enligt docs/strategy/CUSTOMER_VALUE_NEXT_ACCEPTANCE.md.
+
+## 2026-09-15 — Review #75 M1
+- [x] Dölj nollrubrik vid enbart tid/förfrågningar; behåll underlaget.
+- [x] Prova faktisk komponent med tid, förfrågningar och äldre osplittrat kvitto.
+- [x] Publicera rättningen för Claudes omverifiering.
+
+Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågningsfall (split + äldre kontrakt). Slutlig CI redovisas i PR #75.

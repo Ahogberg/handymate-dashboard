@@ -95,11 +95,11 @@ test.describe('källfacit — ingen kr-schablon för tid finns kvar', () => {
   })
 
   test('widgeten visar minuter som uppskattning och summerar aldrig tid i kronor', () => {
-    expect(widget).toContain('min sparade (uppskattning, inte mätt)')
-    expect(widget).toContain('estimate_basis')
+    expect(widget).toContain('<WeeklyValueDigest />')
+    const receipt = readFileSync('components/dashboard/WeeklyValueDigest.tsx', 'utf8')
+    expect(receipt).toContain('Schablon per aktivitet, inte uppmätt arbetstid.')
+    expect(receipt).toContain('TIME_ESTIMATE_EXPLANATION')
     expect(widget).not.toContain('genererat automatiskt')
-    const start = widget.indexOf('function AutomationValueWidget()')
-    const block = widget.slice(start)
-    expect(block).not.toMatch(/estimated_minutes\s*\*/)
+    expect(receipt).not.toMatch(/estimated_minutes\s*\*/)
   })
 })

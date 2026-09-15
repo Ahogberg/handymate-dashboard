@@ -1,3 +1,4 @@
+import { invoicePaymentEvidence } from './invoice-payment-evidence'
 /**
  * Återvunnet-kärnan (gap 2, tasks/vilande-pengar-masterplan.md VP2) —
  * attribuerar VERIFIERADE intäktshändelser till godkända approval-kort:
@@ -446,9 +447,9 @@ export async function getRecoveredRevenue(
   try {
     const { data, error } = await supabase
       .from('invoice')
-      .select('invoice_id, customer_id, quote_id, total, paid_at, invoice_number')
+      .select('invoice_id, customer_id, quote_id, total, paid_amount, status, paid_at, invoice_number')
       .eq('business_id', businessId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'customer_paid'])
       .gte('paid_at', eventsSinceIso)
       .limit(1000)
     if (error) {
@@ -456,15 +457,16 @@ export async function getRecoveredRevenue(
       if (opts.failOnReadError) throw error
     } else {
       for (const inv of data || []) {
-        if (!inv.paid_at) continue
+        const evidence = invoicePaymentEvidence(inv)
+        if (!evidence.paid || evidence.paid_at_ms === null) continue
         events.push({
           kind: 'invoice_paid',
           event_id: String(inv.invoice_id),
           customer_id: inv.customer_id ? String(inv.customer_id) : null,
           quote_id: inv.quote_id ? String(inv.quote_id) : null,
-          amount_kr: Number(inv.total) || 0,
-          occurred_at_ms: new Date(inv.paid_at).getTime(),
-          label: `Faktura ${inv.invoice_number || ''} betald`.replace('  ', ' ').trim(),
+          amount_kr: evidence.paid_kr,
+          occurred_at_ms: evidence.paid_at_ms,
+          label: `Faktura ${inv.invoice_number || ''} – registrerad betalning`.replace('  ', ' ').trim(),
         })
       }
     }
