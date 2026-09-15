@@ -58,6 +58,7 @@ const EVENT_LIKE = /'((?:[a-z]+_)+(?:created|issued|credited|adjusted|settled|in
  * ska ha en motivering; en rad utan motivering är en genväg.
  */
 const NOT_EVENTS = new Set<string>([
+  'customer_settled', // V2 observation JSON boolean; not a published financial event
   'already_paid', // C5 command state, not a published event
   'to_paid', // legacy PaymentTransition returned by the C5 facade
   'to_customer_paid', // legacy PaymentTransition returned by the C5 facade
@@ -189,6 +190,12 @@ test('kernel-kod och financial_events-migrationer använder bara katalogens namn
     for (const m of Array.from(src.matchAll(EVENT_LIKE))) {
       const name = m[1]
       if (catalog.has(name) || NOT_EVENTS.has(name)) continue
+      // V2 writes the separately documented value_events namespace, never financial_events or fireEvent.
+      if (rel === 'sql/v245_value_money_events.sql' && name === 'payment_received') {
+        expect(src).not.toMatch(/INSERT\s+INTO\s+(?:public\.)?financial_events|append_financial_event\s*\(|fireEvent\s*\(/i)
+        expect(src).toContain('INSERT INTO public.value_events')
+        continue
+      }
       // Bryggan får — och bara den — nämna legacy-namn, för det är dess jobb.
       if (isBridge && legacy.has(name)) continue
       const why = reserved.has(name)

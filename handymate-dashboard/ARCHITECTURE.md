@@ -952,3 +952,13 @@ Metod 3 läser kortkohort och beslut ur händelser. V1 behåller tenant-grindade
 levande fakturareferenser och fakturornas belopp; V2 övertar pengastadierna senare.
 `VALUE_EVENTS_ENABLED` är server-only och av som standard; ägare/admin kan jämföra
 `/api/value/ledger?method=2` och `?method=3` efter v241 + explicit historikinläsning.
+
+## Kundvärde V2/V3 och första jobbet (2026-09-14)
+
+Byggs enligt Andreas uttryckliga beställning före pilot, med separata aktiveringsgrindar. Acceptans och avvikelser: `../docs/strategy/CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md`.
+
+- **V2 konsumerar, producerar inga finansiella kommandon.** C3-konsumenten `value-ledger` använder `record_value_money_event(business_id,event_id)` (v243). Den skriver enbart till `value_events`. Där betyder `invoice_issued` utfärdat belopp och `payment_received` en historisk kundavräkningskontrollpunkt. Dessa är värdeloggens namn, inte nya namn i FK.1 eller anrop till automationsmotorns likalydande event.
+- `money_state_observed` är en append-only observation av fakturans aktuella nettobelopp och kundallokeringar, med kanoniskt event-id och finansiell sekvens. `customer_settled` är ett booleskt fält i observationens JSON, inget eventnamn. Läsaren tar senaste observation per faktura; den summerar aldrig kumulativa kontrollpunkter. Krediter och återföringar observeras genom befintliga fordrans-/allokeringshändelser. Nya ännu omappade refund/dispute/invoice-credit-händelser haltar läsningen tills en granskat mappning finns.
+- `VALUE_KERNEL_EVENTS_ENABLED` styr konsumtion och byte av pengakälla för kernel-aktiverade företag. Andra företag behåller fakturaprojektionen. En aktiverad läsare vägrar inaktuellt, haltat eller saknat underlag. V3 kräver dessutom `VALUE_IMPACT_ENABLED`, `VALUE_EVENTS_ENABLED` och företagets kernel-flagga. Webb och native använder samma `/api/dashboard/impact`, utan lokal beloppshärledning.
+- `first_work` (v244) lagrar en företagsbunden länk till första offerten och serverstämplad start/förberedelse/första registrerade utskick. Ingen ny kundtext kopieras. `FIRST_WORK_ENABLED` aktiverar flödet. Databasens unika länk hindrar dubbla offerter efter återförsök. Raderad offert rensar länken och utskickstiden. Förfluten tid inkluderar pauser och påstås inte vara sparad arbetstid eller bevis på mottagen kommunikation.
+- Nästa steg och bevakningsstatus återanvänder offertens befintliga handoff-kontrakt. Inga behörigheter att skicka eller följa upp utökas av denna leverans.

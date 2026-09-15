@@ -1,3 +1,4 @@
+import { VALUE_LEDGER_CONSUMER } from '@/lib/value/events/kernel-consumer'
 import { NextRequest, NextResponse } from 'next/server'
 import { financialKernelAdmin, requiredText, adminFailure } from '@/lib/financial-kernel/admin'
 import { kernelDb } from '@/lib/financial-kernel/kernel-db'
@@ -9,9 +10,9 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => { throw new TypeError('Ogiltig begäran') })
     const businessId = requiredText(body?.business_id, 'företag', 100)
     const reason = requiredText(body?.reason, 'skäl')
-    if (body?.consumer !== AUTOMATION_BRIDGE_CONSUMER) throw new TypeError('Okänd uppföljning')
+    if (![AUTOMATION_BRIDGE_CONSUMER, VALUE_LEDGER_CONSUMER].includes(body?.consumer)) throw new TypeError('Okänd uppföljning')
     const { data, error } = await kernelDb().rpc('resume_financial_consumer', {
-      p_business_id: businessId, p_consumer: AUTOMATION_BRIDGE_CONSUMER, p_actor_id: actor, p_reason: reason,
+      p_business_id: businessId, p_consumer: body.consumer, p_actor_id: actor, p_reason: reason,
     })
     if (error) throw new Error(error.message)
     if (data !== true) return NextResponse.json({ error: 'Uppföljningen är inte pausad. Uppdatera listan.' }, { status: 409 })

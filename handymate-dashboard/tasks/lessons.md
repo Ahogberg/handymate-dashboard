@@ -687,3 +687,6 @@ medlemmen fortfarande nekas direkta producentanrop och andra företags rader.
 
 ## 2026-09-14 — Parallella paket kräver basmerge efter första merge
 När parallella paket registrerar tester på samma package.json-rad: merga aktuell main, behåll båda paketens specar och härled den lokala ordningen från CI-listan. Kontrollera fullständig ordningsparitet och en spec per YAML-rad på den sammanslagna versionen före överlämning.
+
+## 2026-09-15 — Icke-monetärt arbete ska inte bli en nollrubrik
+Prova tid och förfrågningar separat från helt tomt kvitto. Att det finns arbete är inte samma sak som att det finns ett ekonomiskt utfall; bevara arbetsunderlaget utan en stor 0 kr-rubrik.
