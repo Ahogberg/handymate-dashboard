@@ -33,7 +33,7 @@
 ### Execution roadmaps
 
 - [`../roadmap/FORTNOX_REPLACEMENT_2027.md`](../roadmap/FORTNOX_REPLACEMENT_2027.md) — Andreas mål om Fortnox-ersättning från 1 januari 2027; föreslagen september–decemberplan, beslutspunkt 30 november, konsultgranskat historiskt facit och avgränsad livepilot. Gemensam tidsplan för Codex och Claude; ändrar inga aktiveringsgrindar.
-
+- [`../roadmap/FORTNOX_CAPABILITY_MATRIX.md`](../roadmap/FORTNOX_CAPABILITY_MATRIX.md) — förmågematrisen för Fortnox-ersättningen: femton förmågor lästa ur koden, tio saknade paket, fyra ägargrindar, och var designen hör hemma.
 - [`../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md`](../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md)
 - [`../roadmap/BRAIN_VISIBILITY_WEEKEND.md`](../roadmap/BRAIN_VISIBILITY_WEEKEND.md)
 
