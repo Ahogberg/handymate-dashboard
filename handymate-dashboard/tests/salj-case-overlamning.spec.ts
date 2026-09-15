@@ -475,3 +475,75 @@ test.describe('genomgången bor i appen, inte i kanvasen', () => {
     expect(sida).not.toContain("'use client'")
   })
 })
+
+test.describe('partnern kör genomgången själv', () => {
+  // 2026-09-15, Andreas: "lägg in bland materialet som ingår som partner".
+  // Tredje monteringsplatsen för samma komponent. Partnern ÄR säljaren där,
+  // så säljarläget är på — kan partnern inte spara ett case kan hen inte
+  // lämna ifrån sig en länk som bär den egna koden, och då gör partnern
+  // jobbet medan affären blir oattribuerad.
+  const sida = read('app/partners/material/genomgang/page.tsx')
+  const rutt = utanKommentarer(read('app/api/sales-case/route.ts'))
+  const kalla = read('design-sales-experience/SalesExperience.dc.html')
+  const genererad = read('components/sales/sales-experience.generated.jsx')
+
+  test('partnersidan monterar samma komponent, inte en kopia', () => {
+    expect(sida).toContain("import('@/components/sales/sales-experience.generated')")
+    expect(sida).toContain('showSalesSession={true}')
+    expect(sida).toContain('ssr: false')
+  })
+
+  test('sidan är portalinnehåll — inloggad partner, samma grind som resten av materialet', () => {
+    expect(sida).toContain('usePartnerMe')
+    // usePartnerMe skickar 401 till inloggningen. Utan grinden vore
+    // genomgången en öppen sida med vår prissättning och våra argument.
+    expect(utanKommentarer(read('app/partners/material/usePartnerMe.ts'))).toContain("router.push('/partners/login')")
+  })
+
+  test('den syns i portalen — annars finns den inte', () => {
+    const portal = read('app/partners/dashboard/page.tsx')
+    expect(portal).toContain("href: '/partners/material/genomgang'")
+  })
+
+  test('rutten nekar en partner utan gällande avtal, inte bara en inaktiv', () => {
+    // claimPartnerAttribution avvisar med agreement_not_current. En aktiv
+    // partner blir icke-aktuell i samma sekund som AGREEMENT_VERSION höjs,
+    // och skulle då dela ut länkar som ser ut att bära provision men inte
+    // gör det. Grinden hör i rutten, inte i efterhand hos registreringen.
+    expect(rutt).toContain('hasAcceptedCurrentAgreement(partner)')
+    expect(rutt).toMatch(/!hasAcceptedCurrentAgreement\(partner\)\)\s*\{\s*return NextResponse\.json\([^)]*status: 403/s)
+    expect(rutt).toMatch(/partner\.status !== 'active'/)
+  })
+
+  test('en nekad sparning ger ALDRIG ut en länk', () => {
+    // Kanvasens reservväg skriver till localStorage och pekar på en
+    // .dc.html-fil. I appen blev det en "Skickat."-ruta med en död länk
+    // som säljaren skickar vidare — tystare och värre än ett fel.
+    for (const fil of [kalla, genererad]) {
+      // Reservvägen frågar VAR vi kör, inte hur anropet misslyckades: ett
+      // nätfel i appen är inte en prototyp.
+      expect(fil).toMatch(/iKanvasen = \/\\\.dc\\\.html\$\/i\.test\(location\.pathname\)/)
+      expect(fil).toContain('if (!iKanvasen)')
+      // Det nekade läget nollar länken och flaggar sig självt.
+      expect(fil).toMatch(/caseUrl: '', caseOnboardingUrl: '', caseError: meddelande, caseNekad: true/)
+      // localStorage-raden får bara nås efter kanvas-kontrollen.
+      const kanvasIdx = fil.indexOf('if (!iKanvasen)')
+      expect(kanvasIdx).toBeGreaterThan(-1)
+      expect(fil.indexOf("localStorage.setItem('hm_sales_case'", kanvasIdx)).toBeGreaterThan(kanvasIdx)
+    }
+  })
+
+  test('den nekade kvittorutan ser inte ut som en bekräftelse', () => {
+    for (const fil of [kalla, genererad]) {
+      expect(fil).toContain("sentTitle: nekad ? 'Genomgången sparades inte.' : 'Skickat.'")
+      // Ingen grön bock, ingen länkrad, ingen "Öppna kundens länk".
+      expect(fil).toContain("sentMark: nekad ? '!' : '✓'")
+      expect(fil).toContain('hasCaseUrl: Boolean(s.caseUrl)')
+    }
+    // Både url-raden och knappen är villkorade i markupen — inte bara
+    // tomma, utan borta.
+    expect((genererad.match(/\(v\.hasCaseUrl\) \? \(/g) || []).length).toBeGreaterThanOrEqual(2)
+    // Och "Skickat." får inte längre stå hårdkodat i rubriken.
+    expect(genererad).not.toMatch(/letter-spacing: '-\.025em'[^}]*\}\}>\s*Skickat\./)
+  })
+})

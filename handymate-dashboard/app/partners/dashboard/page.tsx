@@ -527,6 +527,7 @@ export default function PartnerDashboardPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             {[
+              { href: '/partners/material/genomgang', titel: 'Säljgenomgången', detalj: 'Kör mötet och skicka kundens länk med din kod' },
               { href: '/partners/material/partnerdeck', titel: 'Partnerdeck för mobilen', detalj: '11 slides att visa i kundmötet' },
               { href: '/partners/material/leave-behind', titel: 'Leave-behind (A4)', detalj: 'Skriv ut med din kontakt förifylld' },
               { href: '/partners/material/demo-manus', titel: 'Demo-manus, 20 minuter', detalj: 'Talarstöd och vanliga invändningar' },

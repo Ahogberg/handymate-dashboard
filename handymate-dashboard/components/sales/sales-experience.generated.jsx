@@ -1,7 +1,7 @@
 /* GENERERAD FIL — ändra inte här.
  *
  * Källa:  design-sales-experience/SalesExperience.dc.html
- * Kör om: python3 scripts/dc_till_react.py design-sales-experience/SalesExperience.dc.html components/sales/sales-experience.generated.jsx SalesExperienceGenererad
+ * Kör om: python3 scripts/dc_till_react.py design-sales-experience/SalesExperience.dc.html components/sales/sales-experience.generated.jsx SalesExperience
  *
  * Designen ägs av .dc.html-filen. Ändrar Andreas i kanvasen byts källan
  * och skriptet körs om — den här filen är utdata, inte en kopia att
@@ -479,7 +479,7 @@ class Component extends DCLogic {
     q2: null,
     asm: {},
     matteOpen: false, matteLine: '',
-    caseSaving: false, caseUrl: '', caseOnboardingUrl: '', caseError: '',
+    caseSaving: false, caseUrl: '', caseOnboardingUrl: '', caseError: '', caseNekad: false,
     meetingDate: new Date().toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' }),
     meetingISO: new Date().toISOString().slice(0, 10),
     roiAnim: 1,
@@ -884,6 +884,8 @@ class Component extends DCLogic {
 
     const openSend = (variant) => () => this.setState({ modal: 'send', sendVariant: variant });
 
+    // Sant bara när servern svarade nej på en sparning. Styr kvittorutan.
+    const nekad = s.caseNekad === true;
     const casePayload = () => ({
       company: { name: c.name, short: c.short, org: c.orgNumber, sni: c.sni, seat: c.seat },
       told: [
@@ -961,6 +963,7 @@ class Component extends DCLogic {
 
       modalOpen: !!s.modal,
       isSend: s.modal === 'send', isSent: s.modal === 'sent',
+      hasCaseUrl: Boolean(s.caseUrl),
       sendTitle: s.sendVariant === 'think' ? 'Ta med er genomgången hem' : 'Skicka ' + c.short + ' × Handymate',
       sendSub: s.sendVariant === 'think'
         ? 'Ingen stress. Vi skickar hela genomgången så att ni kan gå igenom den i lugn och ro.'
@@ -976,27 +979,55 @@ class Component extends DCLogic {
       sendCase: () => {
         const payload = casePayload();
         this.setState({ caseSaving: true, caseError: '' });
+        // Kanvasen serverar komponenten som en fil; appen serverar den som
+        // en rutt. Det avgör om den lokala reservvägen får användas alls —
+        // och den frågan ska ställas på VAR vi kör, inte på hur anropet
+        // misslyckades. Ett nätfel i appen är inte en prototyp.
+        const iKanvasen = /\.dc\.html$/i.test(location.pathname);
         fetch('/api/sales-case', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload }) })
-          .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+          .then((r) => r.json().catch(() => null).then((d) => ({ ok: r.ok, d })))
           .then(({ ok, d }) => {
             if (ok && d && d.url) {
-              this.setState({ caseSaving: false, caseUrl: d.url, caseOnboardingUrl: d.onboardingUrl || '', modal: 'sent' });
+              this.setState({ caseSaving: false, caseUrl: d.url, caseOnboardingUrl: d.onboardingUrl || '', caseNekad: false, modal: 'sent' });
             } else {
               throw new Error((d && d.error) || 'Kunde inte spara genomgången.');
             }
           })
           .catch((err) => {
-            // Utanför appen (design-kanvasen) finns inget API — spara lokalt så prototypen går att visa.
+            const meddelande = err && err.message ? err.message : 'Kunde inte spara genomgången.';
+            if (!iKanvasen) {
+              // I APPEN. Ge då aldrig ut en länk: kundens prefill och
+              // partnerns attribution sitter i raden vi inte fick spara,
+              // inte i länken. En "Skickat."-ruta med en död länk är
+              // värre än ett tydligt fel — säljaren skickar den vidare.
+              this.setState({ caseSaving: false, caseUrl: '', caseOnboardingUrl: '', caseError: meddelande, caseNekad: true, modal: 'sent' });
+              return;
+            }
+            // Utanför appen (design-kanvasen) finns ingen rutt att nå — spara lokalt så prototypen går att visa.
             try { localStorage.setItem('hm_sales_case', JSON.stringify(payload)); } catch (e) {}
             const local = location.pathname.replace(/[^/]*$/, '') + 'Personligt Case.dc.html';
-            this.setState({ caseSaving: false, caseUrl: local, caseOnboardingUrl: '', caseError: err && err.message ? err.message : '', modal: 'sent' });
+            this.setState({ caseSaving: false, caseUrl: local, caseOnboardingUrl: '', caseError: meddelande, caseNekad: false, modal: 'sent' });
           });
       },
       caseSaving: s.caseSaving, caseUrl: s.caseUrl, caseError: s.caseError, sendLabel: s.caseSaving ? 'Sparar…' : 'Skicka mitt case',
       onboardingHref: s.caseOnboardingUrl || (location.pathname + '#onboarding'),
       sendCtaBg: s.caseEmail.includes('@') ? 'var(--teal-700)' : 'var(--slate-400)',
       closeModal: () => this.setState({ modal: null }),
-      sentThen: () => { this.setState({ modal: null }); this.go('handoff'); },
+      // Kvittorutan har två utfall. Den nekade får aldrig se ut som en
+      // bekräftelse: ingen länk, ingen grön bock, ingen "Skickat."
+      sentMark: nekad ? '!' : '✓',
+      sentMarkBg: nekad ? 'var(--amber-50)' : 'var(--teal-50)',
+      sentMarkBorder: nekad ? 'var(--amber-200)' : 'var(--teal-100)',
+      sentMarkColor: nekad ? 'var(--amber-700)' : 'var(--teal-700)',
+      sentTitle: nekad ? 'Genomgången sparades inte.' : 'Skickat.',
+      sentBody: nekad
+        ? 'Ingen länk har skapats, så ingenting har gått till ' + c.short + '. Åtgärda felet nedan och försök igen.'
+        : c.short + ' får sin personliga genomgång med det ni berättat, business caset och vår rekommendation.',
+      sentCta: nekad ? 'Tillbaka' : 'Fortsätt till Handymate',
+      caseErrorText: nekad
+        ? s.caseError
+        : 'Servern kunde inte nås (' + s.caseError + '). Genomgången är sparad lokalt i den här webbläsaren; utanför appen fungerar länken bara här.',
+      sentThen: () => { if (nekad) { this.setState({ modal: 'send' }); return; } this.setState({ modal: null }); this.go('handoff'); },
       openSendReady: openSend('ready'),
       openSendThink: openSend('think'),
 
@@ -1100,7 +1131,7 @@ class Component extends DCLogic {
   }
 }
 
-export default class SalesExperienceGenererad extends Component {
+export default class SalesExperience extends Component {
   // React fyller på defaults innan render — logikklassen läser this.props
   // precis som i kanvasen, och ingen behöver skriva om props på plats.
   static defaultProps = DEFAULTS
@@ -2896,34 +2927,42 @@ export default class SalesExperienceGenererad extends Component {
                   {(v.isSent) ? (
                     <>
                       <div style={{textAlign: "center", padding: "8px 0"}}>
-                        <div style={{width: "64px", height: "64px", margin: "0 auto", borderRadius: "50%", background: "var(--teal-50)", border: "1px solid var(--teal-100)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: "var(--teal-700)", animation: "hmNode 500ms cubic-bezier(.34,1.56,.64,1) backwards"}}>
-                          ✓
+                        <div style={{width: "64px", height: "64px", margin: "0 auto", borderRadius: "50%", background: `${v.sentMarkBg}`, border: `1px solid ${v.sentMarkBorder}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", color: `${v.sentMarkColor}`, animation: "hmNode 500ms cubic-bezier(.34,1.56,.64,1) backwards"}}>
+                          {v.sentMark}
                         </div>
                         <h2 style={{marginTop: "28px", fontFamily: "var(--font-heading)", fontSize: "clamp(28px,3.2vw,36px)", fontWeight: "700", letterSpacing: "-.025em"}}>
-                          Skickat.
+                          {v.sentTitle}
                         </h2>
                         <p style={{margin: "16px auto 0", fontSize: "17px", lineHeight: "1.6", color: "var(--slate-500)", maxWidth: "400px"}}>
-                          {v.companyShort} får sin personliga genomgång med det ni berättat, business caset och vår rekommendation.
+                          {v.sentBody}
                         </p>
-                        <div style={{display: "flex", alignItems: "center", gap: "10px", margin: "22px 0 0", padding: "12px 14px", borderRadius: "12px", background: "var(--bg-page)", border: "1px solid var(--border)", textAlign: "left"}}>
-                          <span style={{flex: "1", minWidth: "0", fontFamily: "var(--font-mono)", fontSize: "13px", color: "var(--slate-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
-                            {v.caseUrl}
-                          </span>
-                        </div>
+                        {(v.hasCaseUrl) ? (
+                          <>
+                            <div style={{display: "flex", alignItems: "center", gap: "10px", margin: "22px 0 0", padding: "12px 14px", borderRadius: "12px", background: "var(--bg-page)", border: "1px solid var(--border)", textAlign: "left"}}>
+                              <span style={{flex: "1", minWidth: "0", fontFamily: "var(--font-mono)", fontSize: "13px", color: "var(--slate-700)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap"}}>
+                                {v.caseUrl}
+                              </span>
+                            </div>
+                          </>
+                        ) : null}
                         {(v.caseError) ? (
                           <>
                             <p style={{margin: "12px 0 0", fontSize: "13px", lineHeight: "1.5", textAlign: "left", color: "var(--amber-800)", background: "var(--amber-50)", border: "1px solid var(--amber-200)", borderRadius: "10px", padding: "10px 12px"}}>
-                              Servern kunde inte nås ({v.caseError}). Genomgången är sparad lokalt i den här webbläsaren; utanför appen fungerar länken bara här.
+                              {v.caseErrorText}
                             </p>
                           </>
                         ) : null}
                         <div style={{display: "flex", flexDirection: "column", gap: "12px", marginTop: "26px"}}>
                           <button onClick={v.sentThen} style={{height: "54px", borderRadius: "14px", background: "var(--teal-700)", color: "#fff", fontSize: "17px", fontWeight: "600", transition: "background 180ms"}} className="hx33">
-                            Fortsätt till Handymate
+                            {v.sentCta}
                           </button>
-                          <a href={v.caseUrl} target="_blank" style={{height: "54px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1.5px solid var(--border)", color: "var(--slate-900)", fontSize: "16px", fontWeight: "600", transition: "border-color 180ms"}} className="hx34">
-                            Öppna kundens länk
-                          </a>
+                          {(v.hasCaseUrl) ? (
+                            <>
+                              <a href={v.caseUrl} target="_blank" style={{height: "54px", display: "flex", alignItems: "center", justifyContent: "center", borderRadius: "14px", border: "1.5px solid var(--border)", color: "var(--slate-900)", fontSize: "16px", fontWeight: "600", transition: "border-color 180ms"}} className="hx34">
+                                Öppna kundens länk
+                              </a>
+                            </>
+                          ) : null}
                         </div>
                       </div>
                     </>

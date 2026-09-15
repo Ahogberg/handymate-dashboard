@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
+import { hasAcceptedCurrentAgreement } from '@/lib/partners/agreement'
 import { getPartnerFromToken, getPartnerTokenFromRequest } from '@/lib/partners/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import {
@@ -61,6 +62,18 @@ export async function POST(request: NextRequest) {
       if (partner.status !== 'active') {
         return NextResponse.json(
           { error: 'Ditt partnerkonto är inte aktivt ännu. Genomgången kan visas, men inte sparas som ett case.' },
+          { status: 403 },
+        )
+      }
+      // Samma argument, andra dörren: claimPartnerAttribution avvisar med
+      // agreement_not_current om partnern inte accepterat den version som
+      // gäller nu. En aktiv partner blir icke-aktuell i samma sekund som
+      // AGREEMENT_VERSION höjs, och skulle då dela ut case-länkar som ser
+      // ut att bära provision men inte gör det. Grinden hör hit, inte i
+      // efterhand hos registreringen.
+      if (!hasAcceptedCurrentAgreement(partner)) {
+        return NextResponse.json(
+          { error: 'Godkänn det gällande partneravtalet innan du sparar case — annars räknas inte hänvisningen.' },
           { status: 403 },
         )
       }

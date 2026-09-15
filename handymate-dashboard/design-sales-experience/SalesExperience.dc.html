@@ -1141,18 +1141,22 @@ h1,h2,h3{text-wrap:balance;margin:0}
 
     <sc-if value="{{ isSent }}" hint-placeholder-val="{{ false }}">
       <div style="text-align:center;padding:8px 0">
-        <div style="width:64px;height:64px;margin:0 auto;border-radius:50%;background:var(--teal-50);border:1px solid var(--teal-100);display:flex;align-items:center;justify-content:center;font-size:28px;color:var(--teal-700);animation:hmNode 500ms cubic-bezier(.34,1.56,.64,1) backwards">✓</div>
-        <h2 style="margin-top:28px;font-family:var(--font-heading);font-size:clamp(28px,3.2vw,36px);font-weight:700;letter-spacing:-.025em">Skickat.</h2>
-        <p style="margin:16px auto 0;font-size:17px;line-height:1.6;color:var(--slate-500);max-width:400px">{{ companyShort }} får sin personliga genomgång med det ni berättat, business caset och vår rekommendation.</p>
-        <div style="display:flex;align-items:center;gap:10px;margin:22px 0 0;padding:12px 14px;border-radius:12px;background:var(--bg-page);border:1px solid var(--border);text-align:left">
-          <span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:13px;color:var(--slate-700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ caseUrl }}</span>
-        </div>
+        <div style="width:64px;height:64px;margin:0 auto;border-radius:50%;background:{{ sentMarkBg }};border:1px solid {{ sentMarkBorder }};display:flex;align-items:center;justify-content:center;font-size:28px;color:{{ sentMarkColor }};animation:hmNode 500ms cubic-bezier(.34,1.56,.64,1) backwards">{{ sentMark }}</div>
+        <h2 style="margin-top:28px;font-family:var(--font-heading);font-size:clamp(28px,3.2vw,36px);font-weight:700;letter-spacing:-.025em">{{ sentTitle }}</h2>
+        <p style="margin:16px auto 0;font-size:17px;line-height:1.6;color:var(--slate-500);max-width:400px">{{ sentBody }}</p>
+        <sc-if value="{{ hasCaseUrl }}" hint-placeholder-val="{{ true }}">
+          <div style="display:flex;align-items:center;gap:10px;margin:22px 0 0;padding:12px 14px;border-radius:12px;background:var(--bg-page);border:1px solid var(--border);text-align:left">
+            <span style="flex:1;min-width:0;font-family:var(--font-mono);font-size:13px;color:var(--slate-700);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ caseUrl }}</span>
+          </div>
+        </sc-if>
         <sc-if value="{{ caseError }}" hint-placeholder-val="{{ false }}">
-          <p style="margin:12px 0 0;font-size:13px;line-height:1.5;text-align:left;color:var(--amber-800);background:var(--amber-50);border:1px solid var(--amber-200);border-radius:10px;padding:10px 12px">Servern kunde inte nås ({{ caseError }}). Genomgången är sparad lokalt i den här webbläsaren; utanför appen fungerar länken bara här.</p>
+          <p style="margin:12px 0 0;font-size:13px;line-height:1.5;text-align:left;color:var(--amber-800);background:var(--amber-50);border:1px solid var(--amber-200);border-radius:10px;padding:10px 12px">{{ caseErrorText }}</p>
         </sc-if>
         <div style="display:flex;flex-direction:column;gap:12px;margin-top:26px">
-          <button onClick="{{ sentThen }}" style="height:54px;border-radius:14px;background:var(--teal-700);color:#fff;font-size:17px;font-weight:600;transition:background 180ms" style-hover="background:var(--teal-600)">Fortsätt till Handymate</button>
-          <a href="{{ caseUrl }}" target="_blank" style="height:54px;display:flex;align-items:center;justify-content:center;border-radius:14px;border:1.5px solid var(--border);color:var(--slate-900);font-size:16px;font-weight:600;transition:border-color 180ms" style-hover="border-color:var(--teal-700);color:var(--teal-700)">Öppna kundens länk</a>
+          <button onClick="{{ sentThen }}" style="height:54px;border-radius:14px;background:var(--teal-700);color:#fff;font-size:17px;font-weight:600;transition:background 180ms" style-hover="background:var(--teal-600)">{{ sentCta }}</button>
+          <sc-if value="{{ hasCaseUrl }}" hint-placeholder-val="{{ true }}">
+            <a href="{{ caseUrl }}" target="_blank" style="height:54px;display:flex;align-items:center;justify-content:center;border-radius:14px;border:1.5px solid var(--border);color:var(--slate-900);font-size:16px;font-weight:600;transition:border-color 180ms" style-hover="border-color:var(--teal-700);color:var(--teal-700)">Öppna kundens länk</a>
+          </sc-if>
         </div>
       </div>
     </sc-if>
@@ -1626,7 +1630,7 @@ class Component extends DCLogic {
     q2: null,
     asm: {},
     matteOpen: false, matteLine: '',
-    caseSaving: false, caseUrl: '', caseOnboardingUrl: '', caseError: '',
+    caseSaving: false, caseUrl: '', caseOnboardingUrl: '', caseError: '', caseNekad: false,
     meetingDate: new Date().toLocaleDateString('sv-SE', { day: 'numeric', month: 'long' }),
     meetingISO: new Date().toISOString().slice(0, 10),
     roiAnim: 1,
@@ -2031,6 +2035,8 @@ class Component extends DCLogic {
 
     const openSend = (variant) => () => this.setState({ modal: 'send', sendVariant: variant });
 
+    // Sant bara när servern svarade nej på en sparning. Styr kvittorutan.
+    const nekad = s.caseNekad === true;
     const casePayload = () => ({
       company: { name: c.name, short: c.short, org: c.orgNumber, sni: c.sni, seat: c.seat },
       told: [
@@ -2108,6 +2114,7 @@ class Component extends DCLogic {
 
       modalOpen: !!s.modal,
       isSend: s.modal === 'send', isSent: s.modal === 'sent',
+      hasCaseUrl: Boolean(s.caseUrl),
       sendTitle: s.sendVariant === 'think' ? 'Ta med er genomgången hem' : 'Skicka ' + c.short + ' × Handymate',
       sendSub: s.sendVariant === 'think'
         ? 'Ingen stress. Vi skickar hela genomgången så att ni kan gå igenom den i lugn och ro.'
@@ -2123,27 +2130,55 @@ class Component extends DCLogic {
       sendCase: () => {
         const payload = casePayload();
         this.setState({ caseSaving: true, caseError: '' });
+        // Kanvasen serverar komponenten som en fil; appen serverar den som
+        // en rutt. Det avgör om den lokala reservvägen får användas alls —
+        // och den frågan ska ställas på VAR vi kör, inte på hur anropet
+        // misslyckades. Ett nätfel i appen är inte en prototyp.
+        const iKanvasen = /\.dc\.html$/i.test(location.pathname);
         fetch('/api/sales-case', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payload }) })
-          .then((r) => r.json().then((d) => ({ ok: r.ok, d })))
+          .then((r) => r.json().catch(() => null).then((d) => ({ ok: r.ok, d })))
           .then(({ ok, d }) => {
             if (ok && d && d.url) {
-              this.setState({ caseSaving: false, caseUrl: d.url, caseOnboardingUrl: d.onboardingUrl || '', modal: 'sent' });
+              this.setState({ caseSaving: false, caseUrl: d.url, caseOnboardingUrl: d.onboardingUrl || '', caseNekad: false, modal: 'sent' });
             } else {
               throw new Error((d && d.error) || 'Kunde inte spara genomgången.');
             }
           })
           .catch((err) => {
-            // Utanför appen (design-kanvasen) finns inget API — spara lokalt så prototypen går att visa.
+            const meddelande = err && err.message ? err.message : 'Kunde inte spara genomgången.';
+            if (!iKanvasen) {
+              // I APPEN. Ge då aldrig ut en länk: kundens prefill och
+              // partnerns attribution sitter i raden vi inte fick spara,
+              // inte i länken. En "Skickat."-ruta med en död länk är
+              // värre än ett tydligt fel — säljaren skickar den vidare.
+              this.setState({ caseSaving: false, caseUrl: '', caseOnboardingUrl: '', caseError: meddelande, caseNekad: true, modal: 'sent' });
+              return;
+            }
+            // Utanför appen (design-kanvasen) finns ingen rutt att nå — spara lokalt så prototypen går att visa.
             try { localStorage.setItem('hm_sales_case', JSON.stringify(payload)); } catch (e) {}
             const local = location.pathname.replace(/[^/]*$/, '') + 'Personligt Case.dc.html';
-            this.setState({ caseSaving: false, caseUrl: local, caseOnboardingUrl: '', caseError: err && err.message ? err.message : '', modal: 'sent' });
+            this.setState({ caseSaving: false, caseUrl: local, caseOnboardingUrl: '', caseError: meddelande, caseNekad: false, modal: 'sent' });
           });
       },
       caseSaving: s.caseSaving, caseUrl: s.caseUrl, caseError: s.caseError, sendLabel: s.caseSaving ? 'Sparar…' : 'Skicka mitt case',
       onboardingHref: s.caseOnboardingUrl || (location.pathname + '#onboarding'),
       sendCtaBg: s.caseEmail.includes('@') ? 'var(--teal-700)' : 'var(--slate-400)',
       closeModal: () => this.setState({ modal: null }),
-      sentThen: () => { this.setState({ modal: null }); this.go('handoff'); },
+      // Kvittorutan har två utfall. Den nekade får aldrig se ut som en
+      // bekräftelse: ingen länk, ingen grön bock, ingen "Skickat."
+      sentMark: nekad ? '!' : '✓',
+      sentMarkBg: nekad ? 'var(--amber-50)' : 'var(--teal-50)',
+      sentMarkBorder: nekad ? 'var(--amber-200)' : 'var(--teal-100)',
+      sentMarkColor: nekad ? 'var(--amber-700)' : 'var(--teal-700)',
+      sentTitle: nekad ? 'Genomgången sparades inte.' : 'Skickat.',
+      sentBody: nekad
+        ? 'Ingen länk har skapats, så ingenting har gått till ' + c.short + '. Åtgärda felet nedan och försök igen.'
+        : c.short + ' får sin personliga genomgång med det ni berättat, business caset och vår rekommendation.',
+      sentCta: nekad ? 'Tillbaka' : 'Fortsätt till Handymate',
+      caseErrorText: nekad
+        ? s.caseError
+        : 'Servern kunde inte nås (' + s.caseError + '). Genomgången är sparad lokalt i den här webbläsaren; utanför appen fungerar länken bara här.',
+      sentThen: () => { if (nekad) { this.setState({ modal: 'send' }); return; } this.setState({ modal: null }); this.go('handoff'); },
       openSendReady: openSend('ready'),
       openSendThink: openSend('think'),
 
