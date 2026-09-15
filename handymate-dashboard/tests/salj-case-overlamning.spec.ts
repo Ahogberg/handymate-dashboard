@@ -371,3 +371,107 @@ test.describe('partnerns attribution följer med caset', () => {
     expect(skapa).toMatch(/referral_code: referralCode/)
   })
 })
+
+test.describe('genomgången bor i appen, inte i kanvasen', () => {
+  // 2026-09-15. Kanvasens iframe har ingen nätutgång bortom sin egen
+  // origin, så CTA:n kunde aldrig nå /api/sales-case därifrån — den föll
+  // tillbaka på localStorage, som inte följer med till kundens webbläsare.
+  // Porteringen är själva kopplingen, inte kosmetik.
+  const kalla = read('design-sales-experience/SalesExperience.dc.html')
+  const genererad = read('components/sales/sales-experience.generated.jsx')
+
+  test('den genererade filen är utdata, inte en kopia att redigera', () => {
+    expect(genererad.slice(0, 400)).toContain('GENERERAD FIL')
+    expect(genererad).toContain('scripts/dc_till_react.py')
+    // Logikklassen ska följa med orörd — en handredigerad kopia driver
+    // isär från designkällan vid första ändringen i kanvasen.
+    expect(genererad).toContain('class Component extends DCLogic')
+  })
+
+  test('skriptet kan köras om — källan och verktyget finns kvar i repot', () => {
+    expect(fs.existsSync(path.join(ROOT, 'scripts/dc_till_react.py'))).toBe(true)
+    expect(kalla).toContain('<x-dc>')
+  })
+
+  test('token läses ur sökvägen, inte bara ur ?case=', () => {
+    // Den personliga länken är /case/<token>. Läser sidan bara
+    // frågeparametern hittar den aldrig sitt eget case, och kunden möts av
+    // en tom genomgång.
+    for (const fil of [kalla, genererad]) {
+      expect(fil).toMatch(/location\.pathname\.match\(\/\\\/case\\\/\(\[\^\/\?#\]\+\)\//)
+      expect(fil).toContain("URLSearchParams(location.search).get('case')")
+    }
+  })
+
+  test('CTA:n på kundens sida använder serverns onboardingUrl', () => {
+    // Faller den tillbaka på location.pathname + '#onboarding' tappas
+    // ?ref= — alltså partnerns provision, tyst.
+    for (const fil of [kalla, genererad]) {
+      expect(fil).toContain('caseOnboardingUrl: d.onboardingUrl')
+    }
+  })
+
+  test('kanvasens globala CSS är skopad, inte utsläppt i dashboarden', () => {
+    // `*`, `body`, `a`, `button` och `p` från designkällan hade annars
+    // slagit mot hela appen.
+    expect(genererad).toContain('.hm-sx *{box-sizing:border-box}')
+    expect(genererad).not.toMatch(/const CSS = "\*\{/)
+    // Även inuti @media — där låg ett oskopat `*`.
+    expect(genererad).not.toContain('reduce){*{')
+    // Och hovringstillstånden finns kvar som riktiga regler.
+    expect(genererad).toMatch(/\.hm-sx \.hx\d+:hover\{/)
+  })
+
+  test('variablerna designen ärver definieras i appen', () => {
+    // 32 variabler kommer från kanvasens brand-bundle och finns inte i
+    // dashboardens CSS. Utan dem renderas sidan färglös, och det syns inte
+    // i en typkontroll.
+    const tokens = read('components/sales/sales-tokens.css')
+    for (const v of ['--teal-700', '--slate-900', '--border', '--fg-muted', '--bg-page', '--brand', '--amber-700']) {
+      expect(tokens, `variabeln ${v} saknas`).toContain(v + ':')
+    }
+    expect(tokens).toContain('.hm-sx {')
+    // Fonterna sätts app-brett av layouten och ska inte sättas om här.
+    expect(tokens).not.toContain('--font-heading:')
+    expect(genererad).toContain("import './sales-tokens.css'")
+  })
+
+  test('båda monteringsplatserna finns och är rätt läge', () => {
+    const admin = read('app/admin/sales/page.tsx')
+    const kund = read('app/case/[token]/KundGenomgang.tsx')
+    // Säljarvyn är på hos oss, av hos kunden.
+    expect(admin).toContain('showSalesSession={true}')
+    expect(kund).toContain('showSalesSession={false}')
+    // ssr: false — logiken läser window/location i componentDidMount.
+    for (const sida of [admin, kund]) {
+      expect(sida).toContain('ssr: false')
+      expect(sida).toContain("'use client'")
+    }
+  })
+
+  test('kundens sida behåller grinden som fanns före porteringen', () => {
+    // Sidan fanns redan som serverkomponent och bar tre saker som en
+    // klientsida inte kan bära. Porteringen bytte vyn, inte grinden.
+    const sida = utanKommentarer(read('app/case/[token]/page.tsx'))
+    // 1. En utgången eller okänd token ska ge 404 på servern. Utan detta
+    //    möts kunden av säljarens första steg ("skriv in
+    //    organisationsnummer"), för vyn faller tillbaka dit när
+    //    hämtningen misslyckas.
+    //    Importen räcker inte — utgångsdatumet ska faktiskt läsas och
+    //    leda till notFound(). (Ett tidigare utkast av det här testet
+    //    letade bara efter namnet 'arUtgangen' och överlevde att anropet
+    //    togs bort.)
+    expect(sida).toMatch(/arUtgangen\(\s*data\.expires_at/)
+    expect(sida).toMatch(/arUtgangen\([^)]*\)[^\n]*\)\s*notFound\(\)/)
+    expect(sida).toContain("select('expires_at')")
+    expect(sida.match(/notFound\(\)/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
+    // 2. Den personliga länken ska aldrig indexeras eller läcka sin URL
+    //    vidare som referrer.
+    expect(sida).toMatch(/index: false/)
+    expect(sida).toMatch(/referrer: 'no-referrer'/)
+    // 3. Uppslaget av en token får aldrig cachas statiskt.
+    expect(sida).toContain("export const dynamic = 'force-dynamic'")
+    // Grinden ligger på servern, alltså får sidan inte vara klientkod.
+    expect(sida).not.toContain("'use client'")
+  })
+})
