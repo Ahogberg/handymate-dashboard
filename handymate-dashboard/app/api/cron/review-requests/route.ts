@@ -312,6 +312,8 @@ export async function GET(request: NextRequest) {
           ...(!mandateResolution.covered ? {autonomyKey:'review_request' as const} : {}),
           recipient: 'customer',
           purpose: 'proactive',
+          outbound: { source: 'cron', sourceId: `review-request:${project.project_id}`,
+            dedupeKey: `review-request:${project.project_id}`, template: 'review-request' },
         })
 
         const { error: logError } = await supabase.from('v3_automation_logs').insert({

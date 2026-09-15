@@ -1,5 +1,10 @@
 # Tenant-svepet — rutterna utanför standardgrinden
 
+H3b, 2026-09-15: `/api/admin/outbound/intents` GET/POST använder
+`financialKernelAdmin` och verifierar superadmin mot Auth före läsning eller
+mutation. Åtgärden loggar verifierad aktör och obligatoriskt skäl. Inventeringens
+tak utanför standardgrinden ökar från 167 till 168.
+
 _2026-09-01, nattpass. Granskning + fix i samma pass. Facit:
 `tests/facit-route-auth-inventory.spec.ts` (inventeringen som beslut) och
 `tests/facit-tenant-sweep.spec.ts` (fixarna)._

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { approvalArtifactId, insertApprovalArtifact } from './artifact-write'
-import { sendEmail, type SendEmailParams } from '@/lib/email'
+import { sendEmail, emailProviderOutcome, type SendEmailParams } from '@/lib/email'
 
 export interface ReviewedDocument {
   businessId: string
@@ -62,11 +62,30 @@ export async function deliverReviewedDocument(db: SupabaseClient, doc: ReviewedD
       return failure('PDF-filen kunde inte sparas. Inget mejl skickades.', true)
     }
     providerCalled = true
+    if (typeof process !== 'undefined' && process.env.OUTBOUND_INTENTS_ENABLED === 'true') {
+      const { withOutboundSource } = await import('@/lib/outbound/source')
+      const { reviewedDocumentReceipt } = await import('@/lib/outbound/resolve')
+      const envelope = { ...doc.email, storedAttachments: [{ filename: 'jobbrapport.pdf', bucket: 'customer-documents', path: storagePath }],
+        journal: { type: 'reviewed_document' as const, documentId: id, version: doc.version } }
+      const promised = await withOutboundSource(db, {
+        promise: { businessId: doc.businessId, kind: 'email', source: 'approval', sourceId: doc.approvalId,
+          dedupeKey: `reviewed-document:${id}:${doc.version}`, recipient: doc.email.to, template: 'reviewed-job-report',
+          context: { version: doc.version, ...(doc.email.fromAddress ? { fromAddress: doc.email.fromAddress } : {}) } },
+        envelope,
+      }, async (_intent, persistedEnvelope) => {
+        const result = emailProviderOutcome(await sendEmail({ ...doc.email, businessId: doc.businessId,
+          attachments: [{ filename: 'jobbrapport.pdf', content: doc.pdf.toString('base64') }],
+          idempotencyKey: `reviewed-document/${id}/${doc.version}` }))
+        await reviewedDocumentReceipt(db, doc.businessId, persistedEnvelope, result)
+        return result
+      })
+      if (promised.status === 'sent') return { ok: true, email_sent: true, document_id: id, message_id: promised.providerRef }
+      if (promised.status === 'pending') return failure('Dokumentet är sparat och väntar på att mejlkanalen blir tillgänglig.', true)
+      return failure(promised.status === 'failed' ? 'Mejltjänsten avvisade dokumentet.' : 'Dokumentet är sparat, men mejlets leverans är okänd. Inget automatiskt omutskick görs.', true)
+    }
     const result = await sendEmail({ ...doc.email, businessId: doc.businessId,
-      // No customerId: sending must not silently move pipeline stages.
       attachments: [{ filename: 'jobbrapport.pdf', content: doc.pdf.toString('base64') }],
-      idempotencyKey: `reviewed-document/${id}/${doc.version}`,
-    })
+      idempotencyKey: `reviewed-document/${id}/${doc.version}` })
     const state = result.success && result.messageId ? 'accepted' : result.deliveryState === 'rejected' ? 'rejected' : 'unknown'
     const persisted = await record(state, { messageId: result.messageId || null, error: result.error || null })
     if (state === 'accepted') return { ok: !persisted.error && !!persisted.data?.length, email_sent: true, document_id: id, message_id: result.messageId,

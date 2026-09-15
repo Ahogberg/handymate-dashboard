@@ -18,6 +18,16 @@ export interface SendEmailParams {
   /** Immutable reviewed document bytes; never re-render at the provider boundary. */
   attachments?: Array<{ filename: string; content: string }>
   idempotencyKey?: string
+  /** Stable source identity for H3b recovery. */
+  outbound?: {
+    source: import('@/lib/outbound/intents').OutboundSource
+    sourceId: string
+    dedupeKey: string
+    template: string
+    autonomyKey?: import('@/lib/autonomy/earned-autonomy').AutonomyKey
+    auditId?: string
+  }
+  outboundReconcile?: { type: 'invoice_reminder'; input: Record<string, unknown> }
 }
 
 export interface SendEmailResult {
@@ -33,6 +43,57 @@ export interface SendEmailResult {
  * Send an email via Resend API
  */
 export async function sendEmail(params: SendEmailParams): Promise<SendEmailResult> {
+  if (process.env.OUTBOUND_INTENTS_ENABLED === 'true' && params.outbound && params.businessId) {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const { withOutboundSource } = await import('@/lib/outbound/source')
+    const db = getServerSupabase()
+    const outcome = await withOutboundSource<import('@/lib/outbound/source').EmailEnvelope>(db, {
+      promise: {
+        businessId: params.businessId, kind: 'email', source: params.outbound.source,
+        sourceId: params.outbound.sourceId, dedupeKey: params.outbound.dedupeKey,
+        recipient: params.to.trim().toLowerCase(), template: params.outbound.template,
+        autonomyKey: params.outbound.autonomyKey,
+        context: params.fromAddress || params.outbound.auditId ? {
+          ...(params.fromAddress ? { fromAddress: params.fromAddress } : {}),
+          ...(params.outbound.auditId ? { auditId: params.outbound.auditId } : {}),
+        } : undefined,
+      },
+      envelope: {
+        subject: params.subject, html: params.html, fromName: params.fromName,
+        fromAddress: params.fromAddress, replyTo: params.replyTo, customerId: params.customerId,
+        attachments: params.attachments, reconcile: params.outboundReconcile,
+      },
+    }, async (_intent, envelope) => {
+      const result = emailProviderOutcome(await sendEmailWithoutOutbound({
+        ...envelope, to: params.to, businessId: params.businessId,
+        idempotencyKey: params.idempotencyKey || params.outbound!.dedupeKey,
+      }))
+      if (result.status === 'sent' && envelope.reconcile?.type === 'invoice_reminder') {
+        const receipt = await (await import('@/lib/invoice-reminder-send')).reconcileInvoiceReminder(db, envelope.reconcile.input as any, { emailSent: true })
+        if (!receipt.reconciled) throw new Error(receipt.error || 'Påminnelsekvittensen kunde inte sparas')
+      }
+      return result
+    })
+    if (outcome.status === 'sent') return { success: true, deliveryState: 'accepted', messageId: outcome.providerRef }
+    if (outcome.status === 'pending' || outcome.status === 'skipped') return { success: false, deliveryState: 'rejected', channelSkipped: true, channelReason: 'konfiguration', error: 'Utskicket väntar tills kanalen kan användas.' }
+    return { success: false, deliveryState: outcome.status === 'failed' ? 'rejected' : 'unknown',
+      error: outcome.status === 'failed' ? 'E-posttjänsten avvisade utskicket.' : 'Leveransbesked saknas. Skicka inte igen innan utfallet har kontrollerats.' }
+  }
+  return sendEmailWithoutOutbound(params)
+}
+
+export function emailProviderOutcome(result: SendEmailResult): import('@/lib/outbound/promise').ProviderOutcome {
+  if (result.success && result.messageId) return { status: 'sent', providerRef: result.messageId }
+  if (result.deliveryState === 'rejected') return { status: result.channelSkipped ? 'skipped' : 'failed', error: result.error }
+  return { status: 'unknown', error: result.error }
+}
+
+/** Used by the H3b sweeper after reading and validating the immutable source. */
+export function sendPersistedEmail(params: SendEmailParams) {
+  return sendEmailWithoutOutbound({ ...params, outbound: undefined, outboundReconcile: undefined })
+}
+
+async function sendEmailWithoutOutbound(params: SendEmailParams): Promise<SendEmailResult> {
   if (params.businessId && process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
     const { getServerSupabase } = await import('@/lib/supabase')
     const { gateChannel } = await import('@/lib/channels/preflight')

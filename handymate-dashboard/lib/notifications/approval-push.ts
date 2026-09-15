@@ -437,6 +437,12 @@ export async function sendApprovalPush(approval: ApprovalLike): Promise<void> {
         tag: `approval:${approval.approval_type}`,
         ttl_seconds: policy.ttlSeconds,
         priority: policy.priority,
+        outbound: {
+          source: approval.id ? 'approval' : 'manual',
+          source_id: approval.id || dedupeKey,
+          dedupe_key: `push:${dedupeKey}`,
+          template: `approval:${approval.approval_type}`,
+        },
         ...(agentPushEnvelope ? { data: agentPushEnvelope } : {}),
         ...(targetUserId ? { target_user_id: targetUserId } : {}),
       }),
