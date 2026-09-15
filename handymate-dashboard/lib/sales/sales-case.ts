@@ -70,6 +70,18 @@ export interface SalesCasePayload {
 /** Det som inte har någon plats i OnboardingFormData men ska följa med in i kontot. */
 export interface SalesCaseExtras {
   token: string
+  /**
+   * Partnerns hänvisningskod, när caset skapades av en partner.
+   *
+   * Den bär partnerns provision (lib/partners/commission.ts) och sätts
+   * ALLTID serverside ur partnerns egen rad — aldrig ur anropets body.
+   * Onboardingen får den via `?ref=` i länken, inte via formuläret: fältet
+   * i Step2Business läser redan den parametern (rad 38) och validerar den,
+   * så koden behöver ingen ny väg in. Bedömningen (self_referral,
+   * already_attributed, agreement_not_current …) görs fortfarande av
+   * claimPartnerAttribution vid registreringen.
+   */
+  referralCode?: string
   /** Kundens mål med Handymate, ordagrant ur genomgången. Följs upp på 30/60/90 dagar. */
   mal?: string
   malCitat?: string
@@ -167,7 +179,11 @@ function text(v: unknown): string | undefined {
  * dit LÄNKEN skickades — inte nödvändigtvis den som ska äga kontot, och ett
  * förifyllt kontomejl som är fel är värre än ett tomt fält.
  */
-export function prefillFranCase(token: string, payload: SalesCasePayload | null | undefined): SalesCasePrefill {
+export function prefillFranCase(
+  token: string,
+  payload: SalesCasePayload | null | undefined,
+  referralCode?: string | null,
+): SalesCasePrefill {
   const p = payload ?? {}
   const c = p.company ?? {}
   const raw = (p.raw ?? {}) as Record<string, unknown>
@@ -207,6 +223,7 @@ export function prefillFranCase(token: string, payload: SalesCasePayload | null 
 
   const extras: SalesCaseExtras = {
     token,
+    referralCode: text(referralCode),
     mal: text(p.goal?.name),
     malCitat: text(p.goal?.quote),
     fokus: text(p.focusTitle),
@@ -227,7 +244,18 @@ export function byggCaseLank(token: string): string {
   return `${APP_URL}/case/${token}`
 }
 
-/** Länken som tar kunden in i onboardingen med genomgången ifylld. */
-export function byggOnboardingLank(token: string): string {
-  return `${APP_URL}/onboarding?case=${encodeURIComponent(token)}`
+/**
+ * Länken som tar kunden in i onboardingen med genomgången ifylld.
+ *
+ * Bär partnerns kod som `?ref=` när caset har en. Det är MEDVETET samma
+ * parameter som partnerns vanliga hänvisningslänk använder: Step2Business
+ * läser och validerar den redan, och attributionen fryses av
+ * claimPartnerAttribution vid registreringen precis som annars. En egen
+ * väg in för case-länkar hade blivit en andra sanning om vem som ska ha
+ * provisionen.
+ */
+export function byggOnboardingLank(token: string, referralCode?: string | null): string {
+  const bas = `${APP_URL}/onboarding?case=${encodeURIComponent(token)}`
+  const kod = text(referralCode)
+  return kod ? `${bas}&ref=${encodeURIComponent(kod)}` : bas
 }

@@ -300,3 +300,74 @@ test.describe('consumed_at — stämpeln som svarar om genomgången ledde någon
     expect(block, 'ett stämpelfel returnerar felstatus').not.toMatch(/return NextResponse\.json\([^)]*status:/)
   })
 })
+
+test.describe('partnerns attribution följer med caset', () => {
+  // Beslut Andreas 2026-09-15: partners ska kunna SKAPA case, inte bara visa
+  // materialet — och då måste deras attribution följa med in i onboardingen.
+  //
+  // Hålet: attributionen fryses EN gång, vid kontoskapandet (POST /api/auth →
+  // claimPartnerAttribution), ur `?ref=` som förifyller fältet i
+  // Step2Business. Case-länken bar ingen kod, så en partner som gjorde hela
+  // genomgången fick kunden in med allt ifyllt UTOM det som gör kunden till
+  // partnerns. Ingen kod, ingen rad i provisionsledgern.
+  // Mät på koden, inte på kommentarerna — de beskriver just det hål som
+  // lagades och nämner alltså strängarna vi förbjuder.
+  const modul = utanKommentarer(read('lib/sales/sales-case.ts'))
+  const skapa = utanKommentarer(read('app/api/sales-case/route.ts'))
+  const las = utanKommentarer(read('app/api/sales-case/[token]/route.ts'))
+
+  test('onboardinglänken bär koden som ?ref= — samma parameter som annars', () => {
+    // En egen väg in för case-länkar hade blivit en andra sanning om vem som
+    // ska ha provisionen. Step2Business läser och validerar redan ?ref=.
+    expect(modul).toMatch(/export function byggOnboardingLank\(token: string, referralCode\?: string \| null\)/)
+    expect(modul).toMatch(/&ref=\$\{encodeURIComponent\(kod\)\}/)
+    // Och utan kod ska länken vara oförändrad — inget tomt ref=.
+    expect(modul).toMatch(/kod \? `\$\{bas\}&ref=/)
+    const step2 = utanKommentarer(read('app/onboarding/components/Step2Business.tsx'))
+    expect(step2, 'Step2Business läser inte längre ?ref= — då bär länken en död parameter')
+      .toMatch(/searchParams\?\.get\('ref'\)/)
+  })
+
+  test('koden läses ur partnerns EGEN rad, aldrig ur anropets body', () => {
+    // En kod klienten får skicka är en kod någon annan kan göra anspråk på.
+    expect(skapa).toMatch(/referralCode = partner\.referral_code/)
+    expect(skapa).not.toMatch(/body\.referral|payload\?\.referral|body\.ref\b/)
+    expect(skapa).toContain('getPartnerFromToken')
+  })
+
+  test('en partner som inte är aktiv kan inte skapa case', () => {
+    // Annars producerar den länkar som utlovar en attribution
+    // registreringen sedan avvisar.
+    const pos = skapa.indexOf("partner.status !== 'active'")
+    expect(pos, 'statusgrinden saknas').toBeGreaterThan(-1)
+    expect(skapa.slice(pos, pos + 400)).toContain('403')
+  })
+
+  test('rutten dömer inte själv om provisionen — det gör registreringen', () => {
+    // Två domare glider isär. claimPartnerAttribution äger bedömningen
+    // (self_referral, already_attributed, agreement_not_current ...).
+    expect(skapa).not.toContain('claimPartnerAttribution')
+    expect(skapa).not.toContain('self_referral')
+  })
+
+  test('läsrutten lämnar ut koden men aldrig vem som byggde caset', () => {
+    expect(las).toMatch(/\.select\('[^']*referral_code[^']*'\)/)
+    expect(las).not.toMatch(/\.select\('[^']*created_by_partner_id/)
+    expect(las).not.toMatch(/\.select\('[^']*created_by_business_id/)
+  })
+
+  test('kundsidans knapp får sin URL från servern, inte av sig själv', () => {
+    // Bygger sidan sin egen länk tappas ?ref= första gången någon skriver om
+    // knappen — och då är provisionen borta utan att något syns gå sönder.
+    expect(las).toMatch(/onboardingUrl: byggOnboardingLank\(token, referralCode\)/)
+  })
+
+  test('attributionen ligger i en KOLUMN, inte i payloaden', () => {
+    // payload ägs av säljsidans design och kan bytas ut; ett löfte om pengar
+    // får inte bo där.
+    const sql = read('sql/v235_sales_case_attribution.sql')
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS referral_code TEXT/)
+    expect(sql).toMatch(/ADD COLUMN IF NOT EXISTS created_by_partner_id UUID/)
+    expect(skapa).toMatch(/referral_code: referralCode/)
+  })
+})

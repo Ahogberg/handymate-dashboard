@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { arUtgangen, prefillFranCase, type SalesCasePayload } from '@/lib/sales/sales-case'
+import { arUtgangen, byggOnboardingLank, prefillFranCase, type SalesCasePayload } from '@/lib/sales/sales-case'
 
 // force-dynamic: svaret beror på vilken token som frågas och på om raden
 // gått ut. En statisk cache här hade kunnat servera ETT företags genomgång
@@ -37,7 +37,7 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     const supabase = getServerSupabase()
     const { data, error } = await supabase
       .from('sales_case')
-      .select('token, business_name, org_number, prospect_name, prospect_email, payload, expires_at, opened_at, consumed_at')
+      .select('token, business_name, org_number, prospect_name, prospect_email, payload, expires_at, opened_at, consumed_at, referral_code')
       .eq('token', token)
       .maybeSingle()
 
@@ -68,7 +68,11 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
     }
 
     const payload = (data.payload ?? {}) as SalesCasePayload
-    const { form, extras } = prefillFranCase(token, payload)
+    // Hänvisningskoden är INTE en läcka: en partnerkod delas ut öppet och
+    // syns redan i partnerns vanliga länk. Det som stannar på servern är vem
+    // hos oss eller vilken partner-RAD som byggde caset (created_by_*).
+    const referralCode = (data.referral_code as string | null) ?? null
+    const { form, extras } = prefillFranCase(token, payload, referralCode)
 
     return NextResponse.json({
       ok: true,
@@ -81,6 +85,10 @@ export async function GET(request: NextRequest, { params }: { params: { token: s
       // säljsidans payload-form. Se lib/sales/sales-case.ts.
       prefill: form,
       extras,
+      // Serverns länk, inte klientens. Bygger sidan sin egen URL tappas
+      // partnerns `?ref=` första gången någon skriver om knappen — och då
+      // är provisionen borta utan att något går sönder synligt.
+      onboardingUrl: byggOnboardingLank(token, referralCode),
       redanAnvand: Boolean(data.consumed_at),
     })
   } catch (err: any) {
