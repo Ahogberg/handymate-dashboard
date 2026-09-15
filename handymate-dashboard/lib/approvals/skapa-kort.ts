@@ -71,7 +71,8 @@ export async function skapaKort(
     if (await gateApprovalChannels(supabase, kort.business_id, kort.approval_type, kort.payload)) return null
   }
 
-  if (kanalFor(kort.approval_type) === 'digest') {
+  const inbox = process.env.HANDOFF_INBOX_ENABLED === 'true' ? await import('@/lib/approvals/card-kind') : null
+  if (kanalFor(kort.approval_type) === 'digest' && !inbox) {
     return skrivDigestrad(supabase, kort)
   }
 
@@ -91,7 +92,7 @@ export async function skapaKort(
 
   const id = data.id as string
 
-  if (opts?.push !== false) {
+  if (opts?.push !== false && inbox?.cardKind(kort.approval_type) !== 'notice') {
     try {
       await sendApprovalPush({
         id,

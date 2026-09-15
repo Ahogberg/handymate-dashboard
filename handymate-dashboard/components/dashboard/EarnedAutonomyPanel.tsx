@@ -1,5 +1,6 @@
 'use client'
 
+import { useBusiness } from '@/lib/BusinessContext'
 import { useEffect, useState } from 'react'
 
 /**
@@ -13,6 +14,7 @@ interface AutonomyItem {
   agent: string
   status: 'autonomous' | 'gated'
   streak: number
+  mode?: 'supervised' | 'earned'
   target: number
   handled_60d?: { approved: number; edited: number; failed: number }
   cap_kr?: number | null
@@ -36,6 +38,11 @@ function capText(agent: string, capKr?: number | null): string | null {
 }
 
 export default function EarnedAutonomyPanel() {
+  const business=useBusiness()
+  return <AutonomyPanelSession key={business.business_id} businessId={business.business_id}/>
+}
+function AutonomyPanelSession({businessId}:{businessId:string}) {
+  const [error,setError]=useState<string|null>(null)
   const [items, setItems] = useState<AutonomyItem[]>([])
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -55,16 +62,16 @@ export default function EarnedAutonomyPanel() {
   }, [])
 
   async function revoke(key: string) {
-    if (!confirm('Ta tillbaka ratten? Åtgärderna kräver ditt godkännande igen.')) return
-    setBusy(key)
+    setBusy(key);setError(null)
     try {
-      await fetch('/api/autonomy/revoke', {
+      const response=await fetch('/api/autonomy/revoke', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ key }),
+        body: JSON.stringify({ key, expected_business_id:businessId }),
       })
+      if(!response.ok)throw Error('Avstängningen kunde inte sparas.')
       await load()
-    } catch { /* nätverksfel — state förblir sanningen från servern vid nästa load */ }
+    } catch { setError('Avstängningen kunde inte sparas. Försök igen.') }
     finally { setBusy(null) }
   }
 
@@ -72,6 +79,7 @@ export default function EarnedAutonomyPanel() {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-5 shadow-sm">
+      {error && <p role="alert" className="text-red-700">{error}</p>}
       <h3 className="text-sm font-bold text-gray-900 mb-1">Förtroendetrappan</h3>
       <p className="text-xs text-gray-400 mb-4">
         Teamet förtjänar rätten att agera själv — i takt med att du godkänner. Du kan alltid ta tillbaka ratten.
@@ -89,13 +97,13 @@ export default function EarnedAutonomyPanel() {
                 </div>
                 {it.status === 'autonomous' ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">Sköts självständigt</span>
+                    <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">{it.mode==='supervised'?'Varje åtgärd i morgonkvittot':'Sköts självständigt'}</span>
                     <button
                       onClick={() => revoke(it.key)}
                       disabled={busy === it.key}
                       className="text-xs text-gray-400 hover:text-red-600 underline disabled:opacity-50"
                     >
-                      Ta tillbaka
+                      Stäng av
                     </button>
                   </div>
                 ) : (

@@ -218,3 +218,7 @@ Cache för 46elks/Resend behåller definitiva utfall men släpper kontrollfel oc
 Main:s H2-ägarbeslut i §4 är aktuellt och har bevarats; den tidigare rekommendationen i handoffen ovan är historik. H2 implementeras inte i denna rättning.
 
 LOW-avgränsningar: kontrollfel stoppar fortfarande själva utskicksförsöket (fail-closed); cachen förlänger däremot inte pausen. `channel_notices` skrivs för kommande H1-läsning, medan dagens banner visar live-status. Morgonrapporten är en deterministisk databasbrief och saknar den tidigare LLM-genererade insiktstexten; det är en avsiktlig produktförändring för tillförlitlighet. Saknad SMS-mottagares text och grupperingar av klassprefix i driftloggar kvarstår som LOW. Slutlig verifiering anges på PR-huvudet.
+
+### Handoff — Codex H1/H2, 2026-09-15 (granskningsunderlag)
+
+Byggt från `main c09364e7` efter #78. Ägarbeslutet i §4 är implementerat som uttryckligt engångssamtycke; inget default-on. Inkorg, SQL-insamlad expiry, beständigt morgonkvitto, fyra övervakade nycklar och omedelbar avstängning finns för granskning. [Implementation, aktivering och avvikelser](H1_H2_IMPLEMENTATION.md) beskriver v248 och proven. Board ska inte markeras helt done: native Ja/Nej och H3b:s cancellation-integration återstår. Pilot och produktionsflaggor är fortfarande ägarens aktiveringssteg.

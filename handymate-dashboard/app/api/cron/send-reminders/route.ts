@@ -177,7 +177,13 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       }
 
       if (autonomous) {
-        const delivery = await deliverInvoiceReminder(supabase, deliveryInput)
+        const delivery = process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' && !mandateResolution.covered
+          ? await (await import('@/lib/autonomy/supervised-send')).supervisedSend(
+            supabase,inv.business_id,'invoice_reminder',deliveryInput.customerPhone?'sms':'email',
+            ()=>deliverInvoiceReminder(supabase,deliveryInput),r=>r.skipped?'unknown':'success',
+            {smsSent:false,emailSent:false,feeAdded:0,interestAdded:0,skipped:true,orsak:'Självständiga påminnelser är pausade.'},
+            {fromAddress:`faktura@${process.env.RESEND_DOMAIN||'handymate.se'}`,recordLog:true})
+          : await deliverInvoiceReminder(supabase, deliveryInput)
         if (!delivery.skipped) {
           if (delivery.feeAdded > 0 || delivery.interestAdded > 0) {
             feesApplied++
