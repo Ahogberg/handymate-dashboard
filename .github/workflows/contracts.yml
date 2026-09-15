@@ -267,3 +267,6 @@ jobs:
 
       - name: Livetestets företags- och skrivgrindar (utan nätverk)
         run: node --test tests/live-journey/policy.test.cjs
+
+      - name: Planering — flerpass, återförsök och timbudget
+        run: npm run test:planning

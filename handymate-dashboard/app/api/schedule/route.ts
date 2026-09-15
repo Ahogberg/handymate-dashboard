@@ -5,6 +5,8 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser } from '@/lib/permissions'
 import { notifyScheduleAssignment } from '@/lib/notifications/schedule-push'
 
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/schedule - Lista schema-poster
  * Query params: start_date, end_date, user_ids (kommaseparerade), type
@@ -103,15 +105,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Convert time_off_requests to virtual schedule entries
-    const timeOffEntries = (timeOffRequests || []).map((tor: any) => ({
+    const timeOffEntries = (projectId || (type && type !== 'time_off') ? [] : timeOffRequests || []).map((tor: any) => ({
       id: `time_off_${tor.id}`,
       business_id: tor.business_id,
       business_user_id: tor.business_user_id,
       project_id: null,
       title: getTimeOffTitle(tor.type),
       description: tor.note || null,
-      start_datetime: `${tor.start_date}T00:00:00`,
-      end_datetime: `${tor.end_date}T23:59:59`,
+      start_datetime: svDayRange(tor.start_date,tor.end_date).from,
+      end_datetime: svDayRange(tor.start_date,tor.end_date).toExclusive,
       all_day: true,
       type: 'time_off' as const,
       status: 'scheduled' as const,

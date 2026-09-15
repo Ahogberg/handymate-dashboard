@@ -1612,3 +1612,10 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] Sex återhämtnings- och credential-raceprov; 14 kanalprov gröna före basmerge.
 - [x] Sammanfoga aktuell main, bevara H2-beslut och båda testlistornas ordning.
 - [ ] Slutverifiera på publicerat huvud; resultat i PR #78.
+
+## Planeringsfeedback 2026-09-15
+
+- [x] Återställ de fem önskemålen efter att opublicerad arbetskopia städats bort.
+- [x] Verifiera servergränser, idempotens, timmar och mobil-/datorvy på nytt.
+- [x] Koppla planeringskontroller till CI.
+- [ ] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande.
