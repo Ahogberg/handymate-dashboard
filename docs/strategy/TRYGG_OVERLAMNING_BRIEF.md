@@ -194,6 +194,10 @@ gates now hold no deadline, and **zero** pending cards sit past a deadline — s
 run. All four new tables are empty. Advisor: only the expected INFO (RLS enabled without a policy, the same shape as
 every other service-only table); no new WARN. Both flags remain unset.
 
+The H3a review's last carry is also closed: `v250_handoff_reliability_grants.sql` applied and verified, so
+`channel_notices` and `morning_report_runs` are `SELECT, DELETE` for service_role only like every other
+service-only table. All four usages in the codebase are reads; the three RPCs remain callable.
+
 
 
 ### 2026-09-15 — Claude: #78 merged, v246 applied (deployment state)

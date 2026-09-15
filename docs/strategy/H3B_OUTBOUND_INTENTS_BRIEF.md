@@ -96,10 +96,7 @@ Grants: RLS on, `REVOKE ALL` from PUBLIC/anon/authenticated/service_role, `GRANT
 service_role only (reads and account erasure; every write goes through an RPC). All RPCs `SECURITY DEFINER`
 with `search_path` pinned and EXECUTE for service_role only; `outbound_lock` is revoked even from service_role.
 
-**Carry from the H3a review while you are in here:** `v246` revoked `channel_notices` and
-`morning_report_runs` from PUBLIC/anon/authenticated but not from service_role, so those two tables kept
-Supabase's default `ALL`. Add the two `REVOKE ALL … FROM service_role` plus `GRANT SELECT, DELETE` to this
-migration. Nothing is exposed today (the app only writes through the RPCs); it is a default we should not leave.
+**Already done, not your job:** the H3a review's carry — `v246` left `channel_notices` and `morning_report_runs` with service_role's default `ALL` — is closed by `v250_handoff_reliability_grants.sql`, applied to production 2026-09-15 and verified: both tables are now `SELECT, DELETE` for service_role only, matching v244 and v248, with the three RPCs still callable.
 
 ## 4. Scope
 
