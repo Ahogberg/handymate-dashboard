@@ -25,10 +25,10 @@ The volumes are small and mostly ours. The shapes are not.
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
 | H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **ready — brief §3** | — |
-| H2 | Autonomy on from day one for the four allowlisted keys, supervised by the daily digest, one-tap off | Codex | **ready — brief §4** | owner policy decision (§4, one line) |
-| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **ready — brief §5** | — |
+| H2 | Autonomy on from day one for the four allowlisted keys, supervised by the daily digest, one-tap off | Codex | **ready — brief §4**; Codex recommends (2026-09-15) explicit one-time onboarding consent, then supervised mode with digest and one-tap off — the brief's fallback | owner policy decision (§4, one line) |
+| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **implemented, in review** (PR #78 `ec1364ea`, reviewed 2026-09-15: 1 MEDIUM — failed provider check cached 10 min; 6 LOW; 337 tests + tsc green locally) | M1 fix → merge; then `v245_handoff_reliability.sql`, `CHANNEL_PREFLIGHT_ENABLED` on pilot |
 | H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | sketched (§5b); Claude drafts DDL after H3a | H3a |
-| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **ready — brief §6** | — |
+| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **implemented, in review** (PR #78; root cause = 198/198 credit errors; seeded rule now delivers the deterministic brief without the LLM — owner should note the product change) | merge with H3a; `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
 
 Order: H3a and H4 first (they decide whether the customer can trust anything), then H1 and H2 together.
 Codex's own priority 1 (first real job) runs in parallel; its single metric is in §7.
