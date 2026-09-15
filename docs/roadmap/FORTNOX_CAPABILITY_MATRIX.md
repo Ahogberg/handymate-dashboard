@@ -39,12 +39,12 @@ Detta är kärnan i frågan. Händelsekatalogen reserverar redan `journal_entry_
 
 | # | Förmåga | Kundbehov och avgränsning | Aktuell implementation | Saknat arbete | Ansvarig | Godkännandeprov | Målperiod |
 |---|---|---|---|---|---|---|---|
-| B1 | Kontoplan och konteringsmotor | Varje affärshändelse blir ett verifikat med debet och kredit | **Inget byggt.** Paket **C8** i loggen | C8: verifikatschema, konteringsmotor, verifikatserier | Codex | Nytt SQL-kontrakt + PGlite-facit, mönster som C2/C3 | **Oktober — kan börja nu, se §Beroenden** |
+| B1 | Kontoplan och konteringsmotor | Varje affärshändelse blir ett verifikat med debet och kredit | **Brief skriven 2026-09-15**, [C8-briefen](../strategy/FINANCIAL_KERNEL_C8_BRIEF.md): v251 utkastad och bevisad i PGlite (48/48). Inget byggt i kod ännu | C8: verifikatschema, konteringsmotor, verifikatserier | Codex | 48 SQL-kontroller + golden path-återspelning + motorprov, se briefens §6 | **Oktober — Codex kan börja nu** |
 | B2 | Svenska konteringsregler | Försäljning, omvänd byggmoms, ROT, dröjsmålsränta, PSP-avgift, kundförlust | **Domänen utredd, inget byggt.** [SE-granskningen](../strategy/FINANCIAL_KERNEL_SE_LEDGER_REVIEW.md) §1–2 har reglerna och kontoförslaget; paket **C9** | C9: reglerna som kod, efter konsultgranskning | Codex + konsult | Konsultgranskat facit per regel | Oktober |
 | B3 | Bokföringsmetod | Fakturerings- kontra kontantmetod | **Delvis byggd.** `accounting_method: 'accrual' \| 'cash'` bärs redan på `invoice_issued` i kärnans händelsetyper; SE-granskningen §3 har reglerna | Metoden måste styra konteringen i C9 | Codex | Facit för båda metoderna på samma faktura | Oktober |
 | B4 | Avrundning | Öresavrundning med eget konto | **Interimslösning.** `lib/financial-kernel/policies/se-rounding.ts` säger uttryckligen att C1b ersätter den och att inget konto är valt | C1b | Codex + konsult | Konsultbeslut om konto | Oktober |
 | B5 | Krediter och rättelser | Kreditfaktura, återföring, rättelse i stängd period | **Delvis byggd.** Kreditfaktura finns i fakturalagret; kärnan har återföring av allokering. SE-granskningen §4 har reglerna | Konteringssidan (C9) och periodlås (B6) | Codex | Facit per rättelsetyp | Oktober |
-| B6 | Räkenskapsår och perioder | Periodlås, verifikatserier, spärr mot bokning i stängd period | **Inget byggt.** Händelsenamnen reserverade; SE-granskningen §5 | Del av C8 | Codex | Bokning i låst period nekas | Oktober |
+| B6 | Räkenskapsår och perioder | Periodlås, verifikatserier, spärr mot bokning i stängd period | **I C8-briefen**, utkast v251: räkenskapsår 1–18 månader, månadsperioder, lås i datumordning, auditerad upplåsning med skäl | Del av C8 | Codex | Bokning i låst period nekas (kontroll 38 och 43 i briefen) | Oktober |
 | B7 | Ingående balanser och brytdatum | Ta över mitt i ett år eller vid årsskifte | **Inget byggt.** Paket **C4b** | C4b | Codex | Balansprov mot konsultgranskat underlag | November |
 | B8 | Momsrapport | Momsdeklarationens underlag | **Inget byggt.** Paket **C13** | C13 | Codex | Facit mot konsultgranskad period | November |
 | B9 | Bankavstämning | Läs in kontohändelser, matcha mot fordringar | **Inget byggt.** Paket **C11** | C11 + bankåtkomst | Codex + ägare | Matchningsfacit på pilotens riktiga konto | November |
@@ -94,7 +94,7 @@ utanför och sker hos konsulten. Ingen av dessa markeras färdig av matrisen.
 
 ## Beroenden — det viktigaste i hela dokumentet
 
-**C8, konteringsmotorn, är ofri just nu.** Paketloggen anger dess blockerare till C2 och C3, och båda är
+**C8, konteringsmotorn, är ofri just nu och har en brief sedan 2026-09-15.** Paketloggen anger dess blockerare till C2 och C3, och båda är
 mergade sedan 2026-09-13 respektive 09-14. Ingenting hindrar att den börjar i dag, och nästan allt i avsnitt
 B och C hänger på den: C9, C10, C12 och C13 väntar alla på C8. Det är den enskilt viktigaste raden i matrisen.
 
@@ -126,6 +126,7 @@ som ska flyttas — planen säger själv att ett företag vars nödvändiga flö
 
 ## Ändringslogg
 
+- **2026-09-15 (natt, senare):** C8-briefen skriven ([FINANCIAL_KERNEL_C8_BRIEF.md](../strategy/FINANCIAL_KERNEL_C8_BRIEF.md)): konton, räkenskapsår, månadsperioder, verifikatserier med lucklös numrering i samma transaktion, återföring som nytt verifikat, periodlås med auditerad upplåsning, och en tom regelmotor som kernelkonsument. Inget konto, ingen serie, ingen regel och ingen flagga beslutas i C8. Rad B1 och B6 uppdaterade.
 - **2026-09-15 (natt):** Designen klar. Tredje canvasen kontrollerad mot v2: av-knapp per händelsetyp med efterläge, regelhänvisning på varje Karin-verifikat, byrån som samma produkt. Sparad som designreferens i `docs/design/`. Regelnumren i canvasen (regel 2, 3, 4, 5, 11, 12) är designens platshållare, inte C9:s regelbok — den skrivs med konsulten.
 - **2026-09-15 (sent):** Första canvasen granskad. Fyra ytor saknades och är nu rader C6–C9: kvitton och utlägg, leverantörsbetalningar, manuella verifikat, arkiv. Karin som bokförare bekräftad mot roadmapens §2.1 och §8; version 2 av designprompten skriven.
 - **2026-09-15 (kväll):** Två beslut inskrivna. Byråer ska kunna logga in för sina klientföretag (rad C4). Inriktningen för D3 är förbereda och skicka där kunden signerar, vilket är det starkaste någon leverantör kan erbjuda. Designprompten för de åtta ytorna skriven (rad C5).
