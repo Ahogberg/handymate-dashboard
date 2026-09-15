@@ -7,6 +7,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { svDateStr } from '@/lib/dates'
 import ChannelBanner from '@/components/dashboard/ChannelBanner'
+import { FirstWorkCard } from '@/components/onboarding/FirstWorkCard'
 import JarvisHome from '@/components/jarvis/JarvisHome'
 
 /**
@@ -53,6 +54,7 @@ export default function DashboardPage() {
 
 function DashboardContent() {
   const business = useBusiness()
+  const { user } = useCurrentUser()
 
   const [bookings, setBookings] = useState<BookingRow[]>([])
   const [bookingsLoaded, setBookingsLoaded] = useState(false)
@@ -103,6 +105,7 @@ function DashboardContent() {
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
       <ChannelBanner />
+      {business?.business_id && ['owner','admin'].includes(user?.role || '') && <FirstWorkCard businessId={business.business_id}/>}
       <JarvisHome
         greetingName={greetingName}
         bookings={bookings}

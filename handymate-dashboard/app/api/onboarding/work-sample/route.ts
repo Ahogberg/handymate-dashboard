@@ -1,3 +1,5 @@
+import { firstWorkEnabled, beginFirstWork } from '@/lib/onboarding/first-work'
+import { getServerSupabase } from '@/lib/supabase'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
@@ -25,10 +27,14 @@ export async function POST(request: NextRequest) {
   const globalLimit = await checkPublicRateLimitDb('work-sample:global', { maxRequests: 200, windowMs: 86400000 })
   if (!globalLimit.allowed) return NextResponse.json({ error: 'Arbetsprovet är tillfälligt upptaget. Försök senare eller fortsätt med din förfrågan.' }, { status: 429 })
   try {
+    const workDb = firstWorkEnabled() ? getServerSupabase() : null
+    const workId = workDb ? await beginFirstWork(workDb, business.business_id) : undefined
     const quote = await generateQuoteFromInput({ businessId: business.business_id,
       branch: describeBranches(resolveBusinessBranch(business)), hourlyRate: null,
       textDescription: source, priceList: [], templates: [] })
-    return NextResponse.json({ sample: buildWorkSample(source, quote) }, { headers: { 'Cache-Control': 'no-store' } })
+    const sample = { ...buildWorkSample(source, quote), ...(workId ? { workId } : {}) }
+    if (workDb && workId) { const { error } = await workDb.rpc('prepare_first_work', { p_business_id: business.business_id, p_id: workId }); if (error) throw error }
+    return NextResponse.json({ sample }, { headers: { 'Cache-Control': 'no-store' } })
   } catch (error) {
     console.error('[work-sample] Generation failed', error instanceof Error ? error.name : 'unknown')
     return NextResponse.json({ error: 'Underlaget kunde inte färdigställas. Din text finns kvar; försök igen eller fortsätt.' }, { status: 503 })

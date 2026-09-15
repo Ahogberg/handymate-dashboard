@@ -1,6 +1,7 @@
 import type { GeneratedQuote } from '../ai-quote-generator'
 
 export interface WorkSample {
+  workId?: string
   version: 1
   source: string
   title: string
@@ -21,7 +22,7 @@ export function readWorkSample(value: unknown): WorkSample | null {
     && typeof r.unit === 'string' && r.unit.length > 0 && r.unit.length <= 20
     && ['labor', 'material', 'service'].includes(r.type))) return null
   // Allowlist: prices, customer IDs, links and product references never cross this boundary.
-  return { version: 1, source: s.source, title: s.title, description: s.description, createdAt: s.createdAt,
+  return { ...(typeof s.workId === 'string' && /^[0-9a-f-]{36}$/i.test(s.workId) ? { workId: s.workId } : {}), version: 1, source: s.source, title: s.title, description: s.description, createdAt: s.createdAt,
     items: s.items.map(r => ({ description: r.description, quantity: r.quantity, unit: r.unit, type: r.type })) }
 }
 

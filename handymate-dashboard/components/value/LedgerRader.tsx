@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { formatKr } from '@/lib/moments/derive'
 import type { LedgerItem, LedgerItemSteg } from '@/lib/value/ledger'
 import { KORTTYP_ETIKETT, kortDatum } from './ledger-format'
@@ -100,7 +101,7 @@ export function LedgerRader({ items }: { items: LedgerItem[] }) {
           </button>
         ) : <span />}
         <span className="text-[12px] text-slate-400">
-          Betald = fakturan är markerad betald i bokföringen
+          Betald = kundbetalning med verifierat underlag
         </span>
       </div>
     </section>
@@ -120,6 +121,11 @@ function Rad({ item }: { item: LedgerItem }) {
           {titel}
         </div>
         <div className="text-[13px] text-slate-500 truncate">{meta}</div>
+        {item.partial_paid_kr != null && <p className="text-sm text-slate-600">Delbetalt: {formatKr(item.partial_paid_kr)}. Räknas inte in i steget Betalt.</p>}
+        <Link href={item.invoice_id ? `/dashboard/invoices/${encodeURIComponent(item.invoice_id)}` : `/dashboard/approvals#approval-${encodeURIComponent(item.approval_id)}`}
+          className="inline-flex min-h-[44px] items-center text-sm text-teal-800 underline">
+          {item.invoice_id ? 'Öppna fakturaunderlaget' : 'Öppna förslaget och beslutet'}
+        </Link>
       </div>
 
       <KedjeRals steg={item.steg} className="col-start-1 row-start-2 md:col-start-2 md:row-start-1" />

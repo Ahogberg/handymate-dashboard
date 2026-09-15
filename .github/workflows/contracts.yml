@@ -118,6 +118,10 @@ jobs:
           tests/financial-kernel-golden-paths.spec.ts
           tests/betalsanning-sidodorrar.spec.ts
           tests/automation-value-honesty.spec.ts
+          tests/customer-value-experience.spec.ts
+          tests/value-money-events.spec.ts
+          tests/first-work-sql.spec.ts
+          tests/customer-journey-value.spec.ts
           tests/facit-ci-grind.spec.ts
           tests/facit-driftsynlighet.spec.ts
           tests/credit-watch.spec.ts

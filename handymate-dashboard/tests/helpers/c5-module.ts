@@ -9,12 +9,12 @@ export function c5Modules(deps:Record<string,unknown>) {
     file=path.resolve(file)
     if(cache.has(file)) return cache.get(file)!
     const module={exports:{} as Record<string,any>};cache.set(file,module.exports)
-    const js=ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}}).outputText
+    const js=ts.transpileModule(readFileSync(file,'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,jsx:ts.JsxEmit.ReactJSX,esModuleInterop:true}}).outputText
     new Function('require','module','exports',js)((name:string)=>{
       if(name in deps) return deps[name]
       if(name.startsWith('@/')||name.startsWith('.')) {
         const base=name.startsWith('@/')?path.resolve(name.slice(2)):path.resolve(path.dirname(file),name)
-        return load(existsSync(base+'.ts')?base+'.ts':base+'/index.ts')
+        return load(existsSync(base+'.ts')?base+'.ts':existsSync(base+'.tsx')?base+'.tsx':base+'/index.ts')
       }
       return require(name)
     },module,module.exports)

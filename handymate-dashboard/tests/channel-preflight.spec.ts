@@ -89,3 +89,40 @@ test('real home banner renders plain-language channel state and disappears after
   expect(dom.window.document.querySelector('aside')).toBeNull()
  }finally{await act(async()=>root.unmount());dom.window.close();g.window=previous.window;g.document=previous.document;Object.defineProperty(g,'navigator',{value:previous.navigator,configurable:true});g.IS_REACT_ACT_ENVIRONMENT=previous.IS_REACT_ACT_ENVIRONMENT}
 })
+
+for (const channel of ['sms', 'email'] as const) for (const failure of ['503', 'rejection'] as const)
+ test(`${channel}: ${failure} is not cached; another business recovers within the TTL`, async () => {
+  process.env.ELKS_API_USER='u';process.env.ELKS_API_PASSWORD='p'
+  process.env.RESEND_API_KEY='send';process.env.RESEND_PREFLIGHT_API_KEY='read'
+  let requests=0
+  global.fetch=async()=>{
+   requests++
+   if(requests===1){if(failure==='rejection')throw new Error('timeout');return new Response('',{status:503})}
+   return Response.json(channel==='sms'?{balance:100000,currency:'SEK'}:{data:[{name:'handymate.se',status:'verified'}],has_more:false})
+  }
+  const s=db()
+  expect(await gateChannel(s,'a',channel)).toMatchObject({ok:false,reason:'kontrollfel'})
+  expect(await gateChannel(s,'b',channel)).toMatchObject({ok:true})
+  expect(await gateChannel(s,'c',channel)).toMatchObject({ok:true})
+  expect(requests).toBe(2)
+  expect(s.calls).toHaveLength(1)
+  expect(s.calls[0].args.p_business_id).toBe('a')
+ })
+for (const channel of ['sms','email'] as const)
+ test(`${channel}: an older failed request cannot evict rotated credentials' healthy cache`,async()=>{
+  process.env.ELKS_API_USER='u';process.env.ELKS_API_PASSWORD='old'
+  process.env.RESEND_API_KEY='send';process.env.RESEND_PREFLIGHT_API_KEY='old'
+  let release!:(r:Response)=>void,requests=0
+  global.fetch=async()=>{
+   requests++
+   if(requests===1)return new Promise<Response>(r=>{release=r})
+   return Response.json(channel==='sms'?{balance:100000,currency:'SEK'}:{data:[{name:'handymate.se',status:'verified'}],has_more:false})
+  }
+  const old=preflightChannel(db(),'a',channel)
+  process.env.ELKS_API_PASSWORD='new';process.env.RESEND_PREFLIGHT_API_KEY='new'
+  expect((await preflightChannel(db(),'b',channel)).ok).toBe(true)
+  release(new Response('',{status:503}))
+  expect((await old).reason).toBe('kontrollfel')
+  expect((await preflightChannel(db(),'c',channel)).ok).toBe(true)
+  expect(requests).toBe(2)
+ })

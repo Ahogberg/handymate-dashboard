@@ -29,8 +29,8 @@ export function adminFailure(error: unknown) {
   return NextResponse.json({ error: 'Åtgärden kunde inte bekräftas. Uppdatera listan innan du försöker igen.' }, { status: 500 })
 }
 export interface ConsumerStatus { last_seq: string; backlog: string; lease_active: boolean; halted_at: string | null }
-export async function consumerStatus(db: KernelDb, businessId: string): Promise<ConsumerStatus[]> {
-  const { data, error } = await db.rpc('get_financial_consumer_status', { p_business_id: businessId, p_consumer: AUTOMATION_BRIDGE_CONSUMER })
+export async function consumerStatus(db: KernelDb, businessId: string, consumer: string = AUTOMATION_BRIDGE_CONSUMER): Promise<ConsumerStatus[]> {
+  const { data, error } = await db.rpc('get_financial_consumer_status', { p_business_id: businessId, p_consumer: consumer })
   if (error) throw new Error(error.message)
   if (!Array.isArray(data)) throw new TypeError('Invalid consumer status')
   return data as ConsumerStatus[]

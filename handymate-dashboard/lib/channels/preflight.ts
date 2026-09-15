@@ -7,6 +7,7 @@ export type ChannelReason = 'saldo' | 'konfiguration' | 'mottagare' | 'kontrollf
 export type ChannelState = { channel: Channel; ok: boolean; reason?: ChannelReason; message: string; href: string }
 export const channelPreflightEnabled = () => process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
 const TTL = 10 * 60_000
+// Coalesce in-flight reads, retain only definitive outcomes. A failed old read must not evict a newer entry.
 // Provider configuration is global. Recipients are deliberately NEVER cached.
 let balanceCache: { key: string; expires: number; value: Promise<ElksSaldo> } | undefined
 let domainCache: { key: string; expires: number; value: Promise<Set<string>> } | undefined
@@ -60,7 +61,15 @@ export async function preflightChannel(supabase: SupabaseClient, businessId: str
         const boundedFetch: typeof fetch = (input, init) => fetch(input, { ...init, signal: AbortSignal.timeout(5000), cache: 'no-store' })
         balanceCache = { key, expires: Date.now() + TTL, value: hamta46elksSaldo(boundedFetch) }
       }
-      return assessSmsBalance(await balanceCache.value, options.smsParts)
+      const entry = balanceCache
+      try {
+        const state = assessSmsBalance(await entry.value, options.smsParts)
+        if (state.reason === 'kontrollfel' && balanceCache === entry) balanceCache = undefined
+        return state
+      } catch (error) {
+        if (balanceCache === entry) balanceCache = undefined
+        throw error
+      }
     }
     if (channel === 'email') {
       if (!process.env.RESEND_API_KEY) return channelState(channel, 'konfiguration')
@@ -69,8 +78,15 @@ export async function preflightChannel(supabase: SupabaseClient, businessId: str
       if (!domainCache || domainCache.key !== key || domainCache.expires <= Date.now()) {
         domainCache = { key, expires: Date.now() + TTL, value: verifiedDomains(key) }
       }
-      const domain = (options.fromAddress || 'noreply@handymate.se').split('@')[1]?.toLowerCase()
-      return channelState(channel, domain && (await domainCache.value).has(domain) ? undefined : 'konfiguration')
+      const entry = domainCache
+      try {
+        const domains = await entry.value
+        const domain = (options.fromAddress || 'noreply@handymate.se').split('@')[1]?.toLowerCase()
+        return channelState(channel, domain && domains.has(domain) ? undefined : 'konfiguration')
+      } catch (error) {
+        if (domainCache === entry) domainCache = undefined
+        throw error
+      }
     }
     let expo = supabase.from('push_tokens').select('token').eq('business_id', businessId)
     let web = supabase.from('push_subscriptions').select('endpoint, p256dh, auth').eq('business_id', businessId)

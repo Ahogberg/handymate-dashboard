@@ -41,7 +41,8 @@ import {
 // månad kan alltså ge fler bekräftade kronor än innan denna version, inte
 // för att pengarna ändrades utan för att fler av dem nu kan bevisas. Ett
 // kvitto skrivet med v1 jämförs aldrig direkt mot ett skrivet med v2.
-export const VARDEKVITTO_METHOD_VERSION = 2
+// v3: registered paid_amount takes precedence over invoice total, including customer-paid ROT.
+export const VARDEKVITTO_METHOD_VERSION = 3
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
@@ -134,12 +135,14 @@ export async function getVardekvitto(
   supabase: SupabaseClient,
   businessId: string,
   period: string,
+  opts: { failOnReadError?: boolean } = {},
 ): Promise<Vardekvitto | null> {
   const fonster = manadsfonster(period)
   if (!fonster) return null
 
   const dagar = Math.ceil((fonster.toMs - fonster.fromMs) / DAY_MS)
   const recovered = await getRecoveredRevenue(supabase, businessId, {
+    failOnReadError: opts.failOnReadError,
     sinceDays: dagar,
     now: new Date(fonster.toMs),
   })

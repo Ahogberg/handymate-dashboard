@@ -25,10 +25,10 @@ The volumes are small and mostly ours. The shapes are not.
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
 | H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **ready — brief §3** | — |
-| H2 | Autonomy on from day one for the four allowlisted keys, supervised by the daily digest, one-tap off | Codex | **ready — brief §4** | owner policy decision (§4, one line) |
-| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **ready — brief §5** | — |
+| H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **ready — brief §4**; owner decision taken 2026-09-15 (explicit consent, no implicit default-on) | H3a merged (pre-flight is a precondition) |
+| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **implemented, in review** (PR #78 `ec1364ea`, reviewed 2026-09-15: 1 MEDIUM — failed provider check cached 10 min; 6 LOW; 337 tests + tsc green locally) | M1 fix → merge; then `v245_handoff_reliability.sql`, `CHANNEL_PREFLIGHT_ENABLED` on pilot |
 | H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | sketched (§5b); Claude drafts DDL after H3a | H3a |
-| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **ready — brief §6** | — |
+| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **implemented, in review** (PR #78; root cause = 198/198 credit errors; seeded rule now delivers the deterministic brief without the LLM — owner should note the product change) | merge with H3a; `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
 
 Order: H3a and H4 first (they decide whether the customer can trust anything), then H1 and H2 together.
 Codex's own priority 1 (first real job) runs in parallel; its single metric is in §7.
@@ -80,11 +80,11 @@ tests/morning-decisions.spec.ts            (≤3, ordering, quiet hours untouche
 
 ## 4. H2 — Autonomy on from day one, supervised
 
-### The one owner decision this needs (one line in the handoff)
+### The owner decision (taken 2026-09-15)
 
-> New businesses start with the four allowlisted actions on. Existing businesses get the existing offer card once. Turning off is one tap and immediate.
+> **Owner decision (Andreas, 2026-09-15): no implicit default-on.** Onboarding asks one explicit, concrete consent for the four allowlisted actions ("Får Handymate skicka fakturapåminnelser, bokningspåminnelser, offertuppföljningar och recensionsförfrågningar åt dig? Du ser varje utskick i morgonrapporten och kan stänga av med ett tryck."). A yes grants the four keys in `supervised` mode with `source: 'consent'`; a no leaves today's offer-card path untouched. Existing businesses get the same consent card once. Turning off is one tap and immediate.
 
-If the owner says no, H2 reduces to lowering `STREAK_TARGET` to 5 and counting across the four keys; the rest of this section still applies to the digest and the off switch.
+Consequences for the scope below: `source` gains the value `'consent'` and `'default'` is not used; `grantDefaults` becomes `grantOnConsent(business)` called from the onboarding consent step (and from the one-time consent card for existing businesses), never from business creation alone. `STREAK_TARGET` stays as the supervised → earned path. Everything else in this section stands.
 
 ### Claude decisions
 
@@ -100,18 +100,18 @@ If the owner says no, H2 reduces to lowering `STREAK_TARGET` to 5 and counting a
 
 ```text
 lib/autonomy/earned-autonomy.ts            (mode, source, default grant on business creation behind a dated flag; unchanged revoke/downgrade)
-lib/autonomy/default-grant.ts              (grantDefaults(business) called from onboarding finalize; idempotent)
+lib/autonomy/consent-grant.ts              (grantOnConsent(business) called from the onboarding consent step and the one-time consent card; idempotent)
 lib/notifications/autonomy-digest.ts       (pure: yesterday's autonomous actions per key → lines; supervised lists, earned counts)
 app/api/cron/push-morgon/route.ts          (digest block)
 app/api/autonomy/off/route.ts              (one-tap off from push/mail: signed token, POST, immediate revoke)
 components/dashboard/EarnedAutonomyPanel.tsx (shows mode; off switch)
-tests/autonomy-default-on.spec.ts          (new business → four grants supervised; existing business → offer once; off → revoke + cancel + cooldown)
+tests/autonomy-consent.spec.ts             (consent yes → four grants supervised with source consent; consent no → nothing granted; existing business → consent card once; off → revoke + cancel + cooldown)
 tests/autonomy-digest.spec.ts              (lines, counts, quiet hours)
 ```
 
 ### Invariants
 
-1. A new business finalized after the flag date has exactly the four keys granted in `supervised` mode; nothing else.
+1. A business that has answered yes to the consent step has exactly the four keys granted in `supervised` mode with `source: 'consent'`; a business that has not answered, or answered no, has no grant from this package.
 2. An autonomous action never executes without a pre-flight pass (H3a) and is always logged with `earned_autonomy` and `autonomy_key` (exists) so v241 records `opportunity_acted`.
 3. Every supervised action is listed in the next digest exactly once; earned actions are counted.
 4. *Stäng av* revokes within the same request, cancels the key's pending intents, and blocks re-offer for 30 days; a rejected supervised action does the same (existing path).
@@ -211,3 +211,10 @@ Same §7 block as the other logs, under a new §Handoffs here. Claude reviews H1
 **Architecture / accounting.** Relies on the existing provider send boundaries, automation status/consent contract and orchestration §6 A+B and §7; records this package in ARCHITECTURE.md. Canonical financial events touched: none. Swedish reverse-charge/cash-basis/ROT/cut-over calculation changes: none. No accounting-policy or merchant-of-record decision made; no new human accounting approval needed for these operational changes. H2 owner decision stays open.
 
 **Verification.** Detailed final command/CI results are recorded in the PR body. Production activation, actual iPhone receipt and real-customer pilot are not claimed by these tests.
+
+### 2026-09-15 — Review M1 och basmerge mot main
+Cache för 46elks/Resend behåller definitiva utfall men släpper kontrollfel och avvisade promises direkt. Nästa anrop gör en ny kontroll; en gammal misslyckad kontroll får inte radera en ny cachepost efter credential-byte. Sex nya prov: 503→200, avvisat anrop→200 och gammalt fel efter credential-byte, för båda leverantörerna. Tidigare samtidighets- och definitiva negativcacheprov kvarstår.
+
+Main:s H2-ägarbeslut i §4 är aktuellt och har bevarats; den tidigare rekommendationen i handoffen ovan är historik. H2 implementeras inte i denna rättning.
+
+LOW-avgränsningar: kontrollfel stoppar fortfarande själva utskicksförsöket (fail-closed); cachen förlänger däremot inte pausen. `channel_notices` skrivs för kommande H1-läsning, medan dagens banner visar live-status. Morgonrapporten är en deterministisk databasbrief och saknar den tidigare LLM-genererade insiktstexten; det är en avsiktlig produktförändring för tillförlitlighet. Saknad SMS-mottagares text och grupperingar av klassprefix i driftloggar kvarstår som LOW. Slutlig verifiering anges på PR-huvudet.
