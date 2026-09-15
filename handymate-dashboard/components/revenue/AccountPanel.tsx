@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { sendRevenue } from '@/lib/revenue/client'
 import { QualificationForm, SequencePanel } from './SalesWorkflow'
+import { PartnerLeadAssignment } from './PartnerLeadAssignment'
 import type { SalesSequence } from '@/lib/revenue/qualification'
 import {
   STAGES,
@@ -340,6 +341,7 @@ export function AccountPanel({
               </form>
             </section>
             <SequencePanel account={data.account} contacts={data.contacts} sequences={data.sequences || []} busy={busy} act={act} />
+            {data.manager && <PartnerLeadAssignment account={data.account} contacts={data.contacts} onChanged={async () => { await load(); onChanged() }} />}
             <QualificationForm account={data.account} busy={busy} act={act} />
             <section className="rounded-2xl border bg-white p-5">
               <h3 className="font-semibold">Vad hände?</h3>

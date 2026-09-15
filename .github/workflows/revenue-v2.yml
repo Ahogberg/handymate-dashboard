@@ -10,6 +10,10 @@ on:
       - 'handymate-dashboard/sql/v2_revenue_os.sql'
       - 'handymate-dashboard/tests/revenue/**'
       - 'handymate-dashboard/supabase/migrations/*revenue_sales_workflow.sql'
+      - 'handymate-dashboard/supabase/migrations/*revenue_partner_leads.sql'
+      - 'handymate-dashboard/app/partners/leads/**'
+      - 'handymate-dashboard/app/api/partners/leads/**'
+      - 'handymate-dashboard/app/partners/dashboard/**'
       - '.github/workflows/revenue-v2.yml'
   workflow_dispatch:
 permissions:

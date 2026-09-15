@@ -150,6 +150,9 @@ async function harness() {
   await db.exec(fs.readFileSync('sql/v231_sales_case.sql', 'utf8'))
   await db.exec(fs.readFileSync('sql/v2_revenue_os.sql', 'utf8'))
   await db.exec(fs.readFileSync('supabase/migrations/20260914213502_revenue_sales_workflow.sql', 'utf8'))
+  // Minimal existing partner schema; partner JWT verification has separate coverage.
+  await db.exec('create table partners(id uuid primary key, name text, company text, email text, status text, agreement_version text);')
+  await db.exec(fs.readFileSync('supabase/migrations/20260914220545_revenue_partner_leads.sql', 'utf8'))
   const ctx = {
     userId: '10000000-0000-4000-8000-000000000001',
     email: 'a@handymate.se',
@@ -158,6 +161,17 @@ async function harness() {
     db: adapter(db),
   }
   let allowed = true
+  let partner = null
+  const agreement = { AGREEMENT_VERSION: '1.0', hasAcceptedCurrentAgreement: p => p.agreement_version === '1.0' }
+  const adminPartnerApi = load('app/api/admin/revenue/partner-leads/route.ts', {
+    '@/lib/revenue/auth': { requireRevenue: async () => allowed ? ctx : null },
+    '@/lib/partners/agreement': agreement,
+  })
+  const partnerApi = load('app/api/partners/leads/route.ts', {
+    '@/lib/partners/auth': { getPartnerTokenFromRequest: () => partner ? 'verified-test-token' : null, getPartnerFromToken: async () => partner?.status === 'active' ? partner : null },
+    '@/lib/partners/agreement': agreement,
+    '@/lib/supabase': { getServerSupabase: () => ctx.db },
+  })
   const api = load('app/api/admin/revenue/route.ts', {
     '@/lib/revenue/auth': {
       requireRevenue: async () => (allowed ? ctx : null),
@@ -177,22 +191,25 @@ async function harness() {
       ],
     },
   })
-  async function request(method, url, body) {
+  async function request(method, url, body, headers = {}) {
     const req = new NextRequest(url, {
       method,
       ...(body
         ? {
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', ...headers },
             body: JSON.stringify(body),
           }
         : {}),
     })
-    return api[method](req)
+    const pathname = new URL(url).pathname
+    const handler = pathname === '/api/admin/revenue/partner-leads' ? adminPartnerApi : pathname === '/api/partners/leads' ? partnerApi : api
+    return handler[method](req)
   }
   return {
     db,
     ctx,
     setAllowed: (v) => (allowed = v),
+    setPartner: (v) => (partner = v),
     request,
     load,
     adapter: ctx.db,
