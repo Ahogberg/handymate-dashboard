@@ -36,6 +36,7 @@
 - [`../roadmap/FORTNOX_CAPABILITY_MATRIX.md`](../roadmap/FORTNOX_CAPABILITY_MATRIX.md) — förmågematrisen för Fortnox-ersättningen: femton förmågor lästa ur koden, tio saknade paket, fyra ägargrindar, och var designen hör hemma.
 - [`../design/BOKFORING_UI_DESIGNPROMPT.md`](../design/BOKFORING_UI_DESIGNPROMPT.md) — designprompt till Claude Design för bokföringens åtta ytor, med Handymates varumärkestokens.
 - [`../design/BOKFORING_UI_DESIGNPROMPT_V2.md`](../design/BOKFORING_UI_DESIGNPROMPT_V2.md) — version 2: Karin bokför inom konsultens regelbok, förtroendetrappan, byråns egen ingång, elva ytor.
+- [`../design/BOKFORING_UI_CANVAS_2026-09-15.dc.html`](../design/BOKFORING_UI_CANVAS_2026-09-15.dc.html) — den godkända canvasen, elva artboards. Öppnas i Claude Design.
 - [`../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md`](../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md)
 - [`../roadmap/BRAIN_VISIBILITY_WEEKEND.md`](../roadmap/BRAIN_VISIBILITY_WEEKEND.md)
 
