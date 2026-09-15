@@ -25,7 +25,7 @@ const SalesExperience = dynamic(
 
 export default function PartnerGenomgang() {
   // Samma grind som resten av säljmaterialet: 401 skickar till inloggningen.
-  const { partner, loading } = usePartnerMe()
+  const { partner, loading, grind } = usePartnerMe()
 
   if (loading) {
     return (
@@ -35,6 +35,8 @@ export default function PartnerGenomgang() {
     )
   }
   if (!partner) return null
+  // Avtalsgrind: inget säljmaterial förrän gällande partneravtal är godkänt.
+  if (grind) return grind
 
   return (
     <div className="min-h-screen bg-white">

@@ -497,7 +497,8 @@ test.describe('partnern kör genomgången själv', () => {
     expect(sida).toContain('usePartnerMe')
     // usePartnerMe skickar 401 till inloggningen. Utan grinden vore
     // genomgången en öppen sida med vår prissättning och våra argument.
-    expect(utanKommentarer(read('app/partners/material/usePartnerMe.ts'))).toContain("router.push('/partners/login')")
+    // (.tsx sedan 2026-09-15: kroken renderar även avtalsgrinden.)
+    expect(utanKommentarer(read('app/partners/material/usePartnerMe.tsx'))).toContain("router.push('/partners/login')")
   })
 
   test('den syns i portalen — annars finns den inte', () => {

@@ -110,6 +110,42 @@ test.describe('P0-9 — ingen partner utan accepterat avtal', () => {
     expect(read('lib/partners/auth.ts')).toContain('agreement_version: string | null')
   })
 
+  test('säljmaterialet visar också AgreementGate — inte bara portalens startsida', () => {
+    // 2026-09-15, Andreas. Startsidan har haft grinden sedan 2026-09-01, men
+    // materialsidorna nåddes på sin adress med bara en inloggning. Det biter
+    // dagen AGREEMENT_VERSION höjs: alla befintliga partners blir
+    // icke-aktuella på en gång, och claimPartnerAttribution avvisar deras
+    // koder med agreement_not_current. Då ska materialet inte gå att använda
+    // som om ingenting hänt.
+    const me = read('app/api/partners/me/route.ts')
+    // Samma härledning och samma fältnamn som dashboardrutten, så de två
+    // vägarna aldrig kan säga olika sak om samma partner.
+    expect(me).toContain('agreement_required: !hasAcceptedCurrentAgreement(partner)')
+    expect(me).toContain('current_agreement_version: AGREEMENT_VERSION')
+
+    // Grinden bor i den delade hämtningen, inte klistrad in per sida.
+    const hook = read('app/partners/material/usePartnerMe.tsx')
+    expect(hook).toContain('<AgreementGate')
+    expect(hook).toContain('partner.agreement_required')
+    // Versionen kommer från servern — hårdkodas den i klienten driver den
+    // isär från AGREEMENT_VERSION vid nästa höjning.
+    expect(hook).toContain('partner.current_agreement_version')
+    expect(hook).not.toMatch(/agreementVersion=\{'[0-9.]+'\}/)
+    // Acceptansen ska öppna sidan direkt, utan omladdning.
+    expect(hook).toContain('onAccepted={hamta}')
+
+    // Alla fyra materialsidor släpper igenom grinden före sitt eget innehåll.
+    for (const sida of ['partnerdeck', 'leave-behind', 'demo-manus', 'genomgang']) {
+      const kod = read(`app/partners/material/${sida}/page.tsx`)
+      expect(kod, `${sida} hämtar inte grinden`).toMatch(/const \{[^}]*\bgrind\b[^}]*\} = usePartnerMe\(\)/)
+      const grindIdx = kod.indexOf('if (grind) return grind')
+      expect(grindIdx, `${sida} renderar aldrig grinden`).toBeGreaterThan(0)
+      // Före sidans egen JSX — en grind efter innehållet är ingen grind.
+      const innehallIdx = kod.indexOf('return (', grindIdx)
+      expect(innehallIdx, `${sida}: grinden kommer efter innehållet`).toBeGreaterThan(grindIdx)
+    }
+  })
+
   test('båda admin-godkännandevägarna vägrar (409) utan acceptans', () => {
     const patch = read('app/api/admin/partners/route.ts')
     const approveCase = patch.slice(patch.indexOf("case 'approve':"), patch.indexOf("case 'suspend':"))
