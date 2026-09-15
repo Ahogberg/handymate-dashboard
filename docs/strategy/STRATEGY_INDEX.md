@@ -33,6 +33,7 @@
 ### Execution roadmaps
 
 - [`../roadmap/FORTNOX_CAPABILITY_MATRIX.md`](../roadmap/FORTNOX_CAPABILITY_MATRIX.md) — förmågematrisen för Fortnox-ersättningen: femton förmågor lästa ur koden, tio saknade paket, fyra ägargrindar, och var designen hör hemma.
+- [`../design/BOKFORING_UI_DESIGNPROMPT.md`](../design/BOKFORING_UI_DESIGNPROMPT.md) — designprompt till Claude Design för bokföringens åtta ytor, med Handymates varumärkestokens.
 - [`../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md`](../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md)
 - [`../roadmap/BRAIN_VISIBILITY_WEEKEND.md`](../roadmap/BRAIN_VISIBILITY_WEEKEND.md)
 
