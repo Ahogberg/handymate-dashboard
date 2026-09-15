@@ -88,10 +88,10 @@ export async function runMorningReport(supabase: SupabaseClient, businessId: str
 
 export function morningDriftLine(rows: Array<Pick<MorningRun, 'business_id' | 'status' | 'failure_class'>>) {
   const businesses = new Map(rows.map(r => [r.business_id, r]))
-  const failed = [...businesses.values()].filter(r => !['delivered','cancelled','waiting'].includes(r.status))
+  const failed = Array.from(businesses.values()).filter(r => !['delivered','cancelled','waiting'].includes(r.status))
   const counts = new Map<string, number>()
   for (const r of failed) { const key = r.failure_class || (r.status === 'running' ? 'ko' : 'okant'); counts.set(key, (counts.get(key) || 0) + 1) }
-  return { count: failed.length, total: businesses.size, line: `Morgonrapportens avisering saknas för ${failed.length} av ${businesses.size} företag${failed.length ? ': ' + [...counts].map(([k,n]) => `${k} ${n}`).join(', ') : ''}.` }
+  return { count: failed.length, total: businesses.size, line: `Morgonrapportens avisering saknas för ${failed.length} av ${businesses.size} företag${failed.length ? ': ' + Array.from(counts).map(([k,n]) => `${k} ${n}`).join(', ') : ''}.` }
 }
 
 export async function retryMorningReports(supabase: SupabaseClient, deadline = Date.now() + 45_000) {
