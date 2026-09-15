@@ -60,7 +60,23 @@ Här ligger den lucka du pekade på: planen provar konsultresan i november men s
 | C2 | Rapportytor | Huvudbok, balans, resultat, verifikatlista, momsunderlag | **Inget byggt.** Ingen route under `app/dashboard` rör bokföring | Design + implementation ovanpå C8/C10 | **Claude design, Codex bygge** | Konsult utför en månadsavstämning i ytan | **Design september, bygge november** |
 | C3 | Deklarationsinlämning | Skicka momsdeklaration | Karin påminner om datum. Inlämning sker utanför Handymate | **Inriktning satt 2026-09-15: förbereda och skicka, kunden signerar.** Signeringen görs alltid av den skattskyldige hos Skatteverket och kan inte göras via API av någon leverantör, inte heller Fortnox. Kvarstår: ansökan om partneråtkomst och organisationscertifikat, sedan C13 mot testmiljön | **Ägare (ansökan) + Codex (C13)** | Underlag som Skatteverket accepterar i testmiljön | Ansökan i september, kod i november |
 | C4 | Konsultåtkomst och byrå | **Beslut 2026-09-15: ja.** Har företaget en redovisningsbyrå ska byrån kunna logga in för sina klientföretag med egen behörighet | **Inget byggt.** Rollerna är `owner`, `admin`, `employee`; ingen konsultroll och ingen byråentitet finns | Ny roll, byråkoppling över flera företag, inbjudan, spår över vad konsulten gjort, och ägarens vy över vem som har åtkomst | Codex | Konsult arbetar en hel period med egen inloggning i två klientföretag | Oktober |
-| C5 | Huvudstruktur och utseende | Hur bokföringsdelen hänger ihop med resten av Handymate | **Designprompt skriven** 2026-09-15: [BOKFORING_UI_DESIGNPROMPT.md](../design/BOKFORING_UI_DESIGNPROMPT.md), åtta artboards med varumärkestokens ur koden | Köra prompten i Claude Design, sedan genomgång | **Claude + ägare** | Genomgång med Andreas, därefter med konsulten | **September — pågår** |
+| C6 | Kvitton och utlägg | Hantverkarens kortköp med fotograferat kvitto; den vanligaste bokföringshändelse hen själv rör | **Inget byggt.** Ingen kvittoyta, ingen tolkning | Fotoflöde i mobilen, Karins tolkning och kontoförslag, tre lägen (säker, frågar, oläsligt); ingår i C9-regelboken | Codex + Claude (Karins regler) | 60 riktiga kvitton från piloten tolkade, konsulten godkänner utfallet | Oktober |
+| C7 | Leverantörsbetalningar | Reskontra med förfallodatum, attest, och en väg att betala: betalfil till banken eller manuell markering | **Delvis.** Leverantörsfakturor och Fortnox-matchning finns; ingen reskontravy, ingen betalning | Reskontra, attestflöde, betalfil (bankgiro/ISO 20022) eller manuell kvittens. **Utan detta kan kunden inte lämna Fortnox** | Codex + ägare (bankformat) | En riktig betalfil accepterad av pilotens bank | November |
+| C8 | Manuella verifikat | Konsulten periodiserar och rättar själv | **Inget byggt.** Del av C8-motorn men behöver egen yta | Skapa verifikat för hand, återföring som pekar på originalet, inget Karin-märke | Codex | Konsult bokför en periodisering och en rättelse | Oktober |
+| C9 | Arkiv | Bokföringslagen: räkenskapsinformation bevaras i sju år, per period, uttagbar | **Delvis.** `evidence-manifest.ts` samlar underlag per faktura; ingen arkivyta, ingen retention per period | Arkivvy per period, kvittofoton och bankfiler inkluderade, export | Codex | Konsult tar ut ett helt kvartals underlag | November |
+| C5 | Huvudstruktur och utseende | Hur bokföringsdelen hänger ihop med resten av Handymate | **Första canvasen levererad och granskad** 2026-09-15; [version 2 av prompten](../design/BOKFORING_UI_DESIGNPROMPT_V2.md) med Karin som bokförare, förtroendetrappan, byråns egen ingång och fyra nya ytor | Köra v2 i Claude Design, sedan genomgång med konsulten | **Claude + ägare** | Konsultens reaktion på förtroendemodellen | **September — pågår** |
+
+### Karin bokför — svaret på "är de trygga med AI i bokföringen"
+
+Frågan ställdes 2026-09-15 vid genomgången av den första canvasen. Svaret kommer från roadmapen, som redan
+avgjort det: §2.1 säger att Handymate Accounting inte är ett bokföringsverktyg utan en tjänst som bokför själv
+och eskalerar undantag; §8 ger förtroendemodellen (hög säkerhet och deterministisk validering → bokför enligt
+företagets policy; medel → godkännandekö; låg → människa; allt spårbart). Fortnox och Visma har redan
+automatiska bokföringsförslag, så konsulterna är vana vid att programvara föreslår. Det nya är inte AI i
+bokföringen utan tre saker som gör den trygg: Karin bokför bara inom konsultens regelbok, allt hon gör syns i
+morgonkvittot och kan stängas av per typ med ett tryck (H2:s trappa), och hon rör aldrig periodlås, moms­inlämning
+eller rättelse i stängd period. Ansvaret ligger enligt bokföringslagen alltid hos företaget, oavsett verktyg,
+så Karin ändrar inte ansvarsbilden — hon ändrar vad konsulten lägger sin tid på.
 
 ## D. Övergången från Fortnox
 
@@ -110,6 +126,7 @@ som ska flyttas — planen säger själv att ett företag vars nödvändiga flö
 
 ## Ändringslogg
 
+- **2026-09-15 (sent):** Första canvasen granskad. Fyra ytor saknades och är nu rader C6–C9: kvitton och utlägg, leverantörsbetalningar, manuella verifikat, arkiv. Karin som bokförare bekräftad mot roadmapens §2.1 och §8; version 2 av designprompten skriven.
 - **2026-09-15 (kväll):** Två beslut inskrivna. Byråer ska kunna logga in för sina klientföretag (rad C4). Inriktningen för D3 är förbereda och skicka där kunden signerar, vilket är det starkaste någon leverantör kan erbjuda. Designprompten för de åtta ytorna skriven (rad C5).
 - **2026-09-15:** Matrisen ifylld från kod av Claude. Femton förmågor lästa ur implementationen, tio paket
   identifierade som saknade, fyra ägargrindar listade. C8 konstaterad ofri. Design av huvudstruktur och

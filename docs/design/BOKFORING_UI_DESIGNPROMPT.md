@@ -1,4 +1,6 @@
-# Designprompt till Claude Design — bokföringsplattformens ytor
+# Designprompt till Claude Design — bokföringsplattformens ytor (version 1, ersatt)
+
+> **Ersatt 2026-09-15 av [version 2](BOKFORING_UI_DESIGNPROMPT_V2.md)** efter Andreas genomgång av den första canvasen: Karin bokför, fyra saknade ytor, byrån får egen ingång. Behålls för diffen mot den första canvasen.
 
 > Skriven av Claude 2026-09-15 som svar på förmågematrisens rad C5 och C2
 > ([FORTNOX_CAPABILITY_MATRIX.md](../roadmap/FORTNOX_CAPABILITY_MATRIX.md)).
