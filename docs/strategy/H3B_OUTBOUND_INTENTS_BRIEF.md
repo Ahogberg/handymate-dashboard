@@ -158,5 +158,52 @@ before widening. The flag gates the wrapper and the sweep; the DDL alone sends n
 
 ## Handoff
 
-_Codex fills this in: what was built, deviations from §1 with reasons, the check list from §6 with results,
-flags and what remains. Claude reviews against orchestration §6 A + B._
+### Codex implementation checkpoint, 2026-09-15 — NOT activation-ready
+
+Built the typed RPC service, synchronous promise wrapper, injected-source sweep,
+Swedish status formatter, superadmin GET/POST resolution and erasure inventory.
+Converted all 43 listed SQL checks into separately named PGlite tests against
+the actual v248 and v249 migrations. Added five SQL checks for the changes below
+and 18 wrapper/admin/sweep tests. Both contract lists include the specs.
+
+Verified: 48 SQL checks and 18 runtime checks green; five route inventory checks
+green. The neighboring H1/H2, erasure, permission and schema suites passed (150
+passed before adjusting the route-count inventory, then that inventory passed).
+TypeScript is clean and the production build exits 0 (`Compiled successfully`).
+See the implementation PR for the final full contract gate.
+
+Two draft corrections, requiring Claude's review:
+
+1. `record_outbound_intent` rejects a reused dedupe key with changed kind, source,
+   source id, recipient, template, autonomy key or context. Returning the first
+   id while invoking a callback built from the second envelope is unsafe.
+2. Added service-only, token-fenced `defer_outbound_intent`. The original DDL
+   could only defer when first creating a row, while a ten-minute sweep also
+   needs to defer when preflight is still unavailable. No provider attempt is
+   charged for this. Off wins, stale tokens fail, and unclaimed failed/terminal
+   rows cannot be revived through this RPC.
+
+The sweep claims one row at a time to avoid claiming a batch that the time
+budget cannot dispatch. A transport exception or lost finish is left for the
+SQL stale-attempt transition to `unknown`, never converted to a retryable failure.
+The wrapper does not invent producer IDs or persist message bodies.
+
+### Remaining integration contract exposed by reading the actual producers
+
+The three chokepoints have NOT yet been wired and the sweep is NOT called by
+the cron. No new flag is enabled. This checkpoint must stay draft until these
+source/reconciliation paths are implemented and tested:
+
+| Actual source path | Missing durable contract | Required integration |
+|---|---|---|
+| `sendSmsViaElks` | `approvalId`, `relatedId`, and `messageType` are optional. `relatedId` alone cannot distinguish successive reminders. | Each producer supplies a stable operation ID, persisted source locator and immutable envelope version. A new manual send needs a new operation ID; a retry reuses it. |
+| `sendEmail` | `businessId` and `idempotencyKey` are optional; HTML/attachments can exist only in memory. | Persist or reference the authorized source before calling the wrapper. Never put HTML or attachment bytes in intent context. |
+| `deliverInvoiceReminder` | Email calls `resend.emails.send` directly, outside `lib/email.ts`; input is assembled in memory on cron path. Fee, interest and reminder counters are updated after delivery. | Route email through the durable adapter, persist reminder-round identity, and reconcile success once after recovered delivery. Replaying only the SMS would leave the domain receipt incorrect. |
+| `deliverReviewedDocument` | Already has its own CAS delivery journal and immutable PDF/envelope. | Reuse that source and reconcile its existing journal. Do not dispatch the whole approval executor from the outbound sweep. |
+| `/api/push/send` | Request body can be transient; one invocation fans out to multiple Expo/Web recipients. | Per-recipient durable source/dispatch identity, with partial and unknown provider outcomes tracked without resending to accepted recipients. |
+| `supervisedSend` | H2 audit wraps the aggregate operation; some operations send both SMS and email. | Propagate autonomy identity to each child intent, retain the single domain-level digest receipt, and reconcile it from actual child outcomes. |
+
+Native push Yes/No is still separate and unmodified here. It must preserve the
+mandatory review step for customer communications and money; a notification
+button must not authorize an unreviewed envelope. This work is not evidence of
+an activated pilot or of a customer experiencing the handover.

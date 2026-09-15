@@ -76,7 +76,13 @@ BEGIN
     RAISE EXCEPTION 'outbound_intent_fields_required' USING ERRCODE='check_violation';
   END IF;
   SELECT * INTO i FROM public.outbound_intents x WHERE x.business_id=p_business_id AND x.dedupe_key=p_dedupe_key;
-  IF FOUND THEN RETURN jsonb_build_object('id',i.id,'status',i.status,'created',false); END IF;
+  IF FOUND THEN
+    IF (i.kind,i.source,i.source_id,i.recipient,i.template,i.autonomy_key,i.context)
+      IS DISTINCT FROM (p_kind,p_source,p_source_id,p_recipient,p_template,p_autonomy_key,p_context) THEN
+      RAISE EXCEPTION 'outbound_dedupe_conflict' USING ERRCODE='check_violation';
+    END IF;
+    RETURN jsonb_build_object('id',i.id,'status',i.status,'created',false);
+  END IF;
   IF NOT public.outbound_autonomy_granted(p_business_id, p_autonomy_key) THEN
     RETURN jsonb_build_object('created',false,'blocked',true,'reason','autonomy_revoked');
   END IF;
@@ -87,6 +93,35 @@ BEGIN
       CASE WHEN p_defer_reason IS NOT NULL THEN 'kanalen var pausad: '||p_defer_reason END)
     RETURNING id INTO v_id;
   RETURN jsonb_build_object('id',v_id,'status','pending','created',true,'deferred',p_defer_reason IS NOT NULL);
+END $fn$;
+
+-- Preflight may fail on any attempt, including a sweep after recovery. It is
+-- not a provider failure and must not consume the three provider attempts.
+CREATE FUNCTION public.defer_outbound_intent(p_business_id TEXT, p_id TEXT, p_attempt_token TEXT, p_reason TEXT)
+RETURNS JSONB LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
+DECLARE i public.outbound_intents%ROWTYPE;
+BEGIN
+  PERFORM public.outbound_lock(p_business_id);
+  IF p_reason IS NULL OR p_reason NOT IN ('saldo','konfiguration','mottagare','kontrollfel') THEN
+    RAISE EXCEPTION 'outbound_defer_reason_invalid' USING ERRCODE='check_violation';
+  END IF;
+  SELECT * INTO i FROM public.outbound_intents WHERE business_id=p_business_id AND id=p_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'outbound_intent_not_found' USING ERRCODE='foreign_key_violation'; END IF;
+  IF p_attempt_token IS NULL THEN
+    IF i.status <> 'pending' THEN RETURN jsonb_build_object('deferred',false,'status',i.status); END IF;
+  ELSIF i.status<>'attempting' OR i.attempt_token IS DISTINCT FROM p_attempt_token THEN
+    RAISE EXCEPTION 'outbound_attempt_stale' USING ERRCODE='check_violation';
+  END IF;
+  IF i.cancel_requested_at IS NOT NULL OR NOT public.outbound_autonomy_granted(p_business_id,i.autonomy_key) THEN
+    UPDATE public.outbound_intents SET status='skipped',finished_at=clock_timestamp()
+      WHERE business_id=p_business_id AND id=p_id;
+    RETURN jsonb_build_object('deferred',false,'status','skipped');
+  END IF;
+  UPDATE public.outbound_intents SET status='pending',attempt_token=NULL,claimed_at=NULL,finished_at=NULL,
+    attempts=attempts-CASE WHEN i.status='attempting' THEN 1 ELSE 0 END,
+    defer_reason=p_reason,not_before=clock_timestamp()+interval '10 minutes'
+    WHERE business_id=p_business_id AND id=p_id;
+  RETURN jsonb_build_object('deferred',true,'status','pending');
 END $fn$;
 
 -- ── Claim. p_ids = the synchronous path (send now); NULL = the sweeper's turn for this business. ──
@@ -266,7 +301,7 @@ REVOKE ALL ON public.outbound_intents FROM PUBLIC, anon, authenticated, service_
 GRANT SELECT, DELETE ON public.outbound_intents TO service_role;
 DO $g$ DECLARE f RECORD; BEGIN
   FOR f IN SELECT oid::regprocedure sig FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname = ANY(ARRAY[
-      'outbound_lock','outbound_autonomy_granted','record_outbound_intent','claim_outbound_intents','finish_outbound_intent',
+      'outbound_lock','outbound_autonomy_granted','record_outbound_intent','defer_outbound_intent','claim_outbound_intents','finish_outbound_intent',
       'cancel_outbound_intents','list_owed_outbound_intents','resolve_outbound_intent','list_unresolved_outbound_intents','read_outbound_status']) LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC, anon, authenticated', f.sig);
     EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role', f.sig);

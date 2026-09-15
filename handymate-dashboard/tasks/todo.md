@@ -1621,3 +1621,17 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] Bygge och publicering: PR #81, v248 endast utkast.
 - [ ] Slutlig CI på PR #81; first-value-harness kompletterat med explicit flaggmiljö och av/på-prov.
 - [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.
+
+## H3b — 2026-09-15
+- [x] Läs #82, utkast v249 och de verkliga sändvägarna.
+- [x] RPC-service och de 43 SQL-kontrollerna mot v248 + v249 (plus fem skärpningsprov).
+- [x] Gemensamt leveranskontrakt med token, återförsök och okända utfall, 18 runtimeprov gröna.
+- [ ] Källbunden återupptagning, tre strypunkter, autonomi och tiominuterssvep.
+- [ ] Admin, kundkvitto, kontoradering och kontraktsgrind.
+- [ ] Native push i mobil-repot, separat granskning.
+- [ ] Typkontroll, tester, bygge och PR-handoff.
+
+H3b checkpoint: 48 SQL-prov och 18 runtimeprov gröna. Typkontroll och
+produktionsbygge gröna. Källåterupptagning och ursprungsåtgärdens kvittens
+måste kopplas innan cron/sändvägar aktiveras; detaljer i briefens Handoff.
+Draft-PR, inte en färdig H3b-leverans. Ingen produktionsskrivning.
