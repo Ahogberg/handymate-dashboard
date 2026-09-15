@@ -1593,3 +1593,9 @@ Andreas har uttryckligen beställt både första jobbet/trygg överlämning och 
 - [ ] Verklig pilotacceptans och aktivering redovisas separat, aldrig ersatta av fixtures.
 
 V2/V3: helsviten lokalt 2418 godkända + 1 avsiktligt hoppat, 17 Node/API-prov och aktivitetstest gröna. Därefter 34 riktade prov gröna på slutlig SQL/cron, inklusive tre tillagda penningfall. Native: tsc, 245 Jest (bildmoduler mockade lokalt) och alla CJS-kontrakt gröna. Mobil-PR #10 kör även full iOS-readiness i CI med repots verkliga assets. Ingen pilot eller produktionsaktivering påstås klar.
+## 2026-09-15 — Review #75 M1
+- [x] Dölj nollrubrik vid enbart tid/förfrågningar; behåll underlaget.
+- [x] Prova faktisk komponent med tid, förfrågningar och äldre osplittrat kvitto.
+- [x] Publicera rättningen för Claudes omverifiering.
+
+Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågningsfall (split + äldre kontrakt). Slutlig CI redovisas i PR #75.
