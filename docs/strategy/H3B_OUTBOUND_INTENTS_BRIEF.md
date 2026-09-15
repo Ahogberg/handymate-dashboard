@@ -207,3 +207,15 @@ Native push Yes/No is still separate and unmodified here. It must preserve the
 mandatory review step for customer communications and money; a notification
 button must not authorize an unreviewed envelope. This work is not evidence of
 an activated pilot or of a customer experiencing the handover.
+
+### Resumed checkpoint — receipt replay
+
+Before wiring source reconciliation, corrected two receipt losses: an idempotent
+record now returns its persisted provider reference and cancellation fact; a
+worker that loses the claim reads the tenant-scoped current receipt instead of
+inventing a pending result. Missing or failed receipt reads return uncertainty
+and never dispatch. No state-machine or retry policy changed.
+
+The real v249 replay probe and five runtime cases bring the outbound suites to
+72 passing checks (49 SQL + 23 runtime). The source-integration table above is
+still open; these checks do not prove a completed H3b or a production pilot.

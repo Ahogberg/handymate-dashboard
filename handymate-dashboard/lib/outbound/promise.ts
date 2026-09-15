@@ -1,7 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { gateChannel, type ChannelState } from '@/lib/channels/preflight'
 import {
-  recordOutboundIntent, claimOutboundIntents, finishOutboundIntent, deferOutboundIntent,
+  recordOutboundIntent, claimOutboundIntents, finishOutboundIntent, deferOutboundIntent, readOutboundReceipt,
   type OutboundPromise, type OutboundStatus, type ClaimedOutbound,
 } from './intents'
 
@@ -27,7 +27,8 @@ export async function withOutboundPromise(db: SupabaseClient, p: OutboundPromise
   const recorded = await recordOutboundIntent(db, p)
   if (!recorded.id) return { status: 'skipped', receiptConfirmed: false }
   if (['sent', 'skipped', 'unknown', 'attempting'].includes(recorded.status!)) {
-    return { id: recorded.id, status: recorded.status!, receiptConfirmed: true }
+    return { id: recorded.id, status: recorded.status!, providerRef: recorded.provider_ref ?? undefined,
+      cancelRequested: recorded.cancel_requested, receiptConfirmed: true }
   }
   const state = await checkedPreflight(db, p.businessId, p.kind, p.context, preflight)
   if (!state.ok) {
@@ -39,7 +40,13 @@ export async function withOutboundPromise(db: SupabaseClient, p: OutboundPromise
   if (!claimed) {
     // No claim is not a delivery acknowledgement. Another worker may own it,
     // it may be in backoff, or off may have cancelled it.
-    return { id: recorded.id, status: claims.cancelled_ids.includes(recorded.id) ? 'skipped' : 'pending', receiptConfirmed: false }
+    try {
+      const receipt = await readOutboundReceipt(db, p.businessId, recorded.id)
+      return { id: recorded.id, status: receipt.status, providerRef: receipt.provider_ref ?? undefined,
+        cancelRequested: !!receipt.cancel_requested_at, receiptConfirmed: true }
+    } catch {
+      return { id: recorded.id, status: 'unknown', receiptConfirmed: false }
+    }
   }
   return dispatchClaimedOutbound(db, p.businessId, claimed, send)
 }

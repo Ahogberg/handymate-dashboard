@@ -190,3 +190,13 @@ test('48 new defer RPC respects tenants and service-only execution', async () =>
     await db.exec('RESET ROLE')
   }
 })
+test('49 replay retains the exact provider reference and cancellation fact without another claim', async () => {
+  const i = await attempt('invoice_reminder')
+  await off()
+  await finish(i)
+  expect(await record('one', 'a', 'invoice_reminder')).toMatchObject({
+    id: i.id, status: 'sent', created: false, provider_ref: 'provider-1', cancel_requested: true,
+  })
+  expect((await claim()).claimed).toEqual([])
+  expect((await row(i.id)).attempts).toBe(1)
+})

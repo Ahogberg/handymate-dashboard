@@ -1635,3 +1635,10 @@ H3b checkpoint: 48 SQL-prov och 18 runtimeprov gröna. Typkontroll och
 produktionsbygge gröna. Källåterupptagning och ursprungsåtgärdens kvittens
 måste kopplas innan cron/sändvägar aktiveras; detaljer i briefens Handoff.
 Draft-PR, inte en färdig H3b-leverans. Ingen produktionsskrivning.
+
+### H3b återupptagning — kvittenser
+- [x] Återansluten arbetsmiljö och verifierad ren utgångspunkt.
+- [x] Bevara leverantörsreferens och avstängningsfakta vid återläsning.
+- [x] Läs faktiskt utfall efter förlorad claim; saknat underlag blir osäkerhet.
+- [x] 72 outbound-prov gröna, inklusive sex nya återläsnings-/samtidighetsfall.
+- [ ] Kvarstående källintegrationer enligt H3b-briefens tabell; ingen aktivering.

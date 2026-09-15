@@ -81,7 +81,8 @@ BEGIN
       IS DISTINCT FROM (p_kind,p_source,p_source_id,p_recipient,p_template,p_autonomy_key,p_context) THEN
       RAISE EXCEPTION 'outbound_dedupe_conflict' USING ERRCODE='check_violation';
     END IF;
-    RETURN jsonb_build_object('id',i.id,'status',i.status,'created',false);
+    RETURN jsonb_build_object('id',i.id,'status',i.status,'created',false,
+      'provider_ref',i.provider_ref,'cancel_requested',i.cancel_requested_at IS NOT NULL);
   END IF;
   IF NOT public.outbound_autonomy_granted(p_business_id, p_autonomy_key) THEN
     RETURN jsonb_build_object('created',false,'blocked',true,'reason','autonomy_revoked');

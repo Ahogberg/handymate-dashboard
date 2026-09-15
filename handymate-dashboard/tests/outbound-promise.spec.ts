@@ -1,20 +1,20 @@
 import { test, expect } from '@playwright/test'
 import { withOutboundPromise, dispatchClaimedOutbound, type ProviderOutcome } from '../lib/outbound/promise'
 import { outboundStatusText } from '../lib/outbound/status'
-import type { OutboundPromise } from '../lib/outbound/intents'
+import { readOutboundReceipt, type OutboundPromise } from '../lib/outbound/intents'
 import { c5Modules } from './helpers/c5-module'
 import { NextRequest, NextResponse } from 'next/server'
 
 const input: OutboundPromise = { businessId: 'a', source: 'approval', sourceId: 'approved-1', dedupeKey: 'approved-1:sms', kind: 'sms', template: 'approved-sms', recipient: '+46700000001' }
 const active = { id: 'i', attempt_token: 'fence', attempts: 1, kind: 'sms' as const, source: 'approval' as const, source_id: 'approved-1', recipient: input.recipient, template: input.template, autonomy_key: null, context: null }
 const ready = async () => ({ channel: 'sms' as const, ok: true, message: '', href: '' })
-function fixture(options: { status?: string; finishError?: boolean; revoked?: boolean; cancelAtFinish?: boolean; cancelBeforeSend?: boolean } = {}) {
+function fixture(options: { status?: string; providerRef?: string; finishError?: boolean; revoked?: boolean; cancelAtFinish?: boolean; cancelBeforeSend?: boolean } = {}) {
   let state = options.status ?? 'pending'
   const calls: Array<{ name: string; args: any }> = []
   const query: any = { select: () => query, eq: () => query, maybeSingle: async () => ({ data: { status: 'attempting', attempt_token: 'fence', cancel_requested_at: options.cancelBeforeSend ? new Date().toISOString() : null } }) }
   const db: any = { from: () => query, rpc: async (name: string, args: any) => {
     calls.push({ name, args })
-    if (name === 'record_outbound_intent') return { data: options.revoked ? { blocked: true, created: false } : { id: 'i', status: state, created: true } }
+    if (name === 'record_outbound_intent') return { data: options.revoked ? { blocked: true, created: false } : { id: 'i', status: state, created: true, provider_ref: options.providerRef, cancel_requested: options.cancelAtFinish } }
     if (name === 'claim_outbound_intents') {
       const claimed = state === 'pending' ? [active] : []; state = 'attempting'
       return { data: { claimed, unknown_ids: [], cancelled_ids: [] } }
@@ -59,6 +59,32 @@ for (const state of ['sent', 'unknown', 'attempting', 'skipped']) test(`${state}
   const { db, calls } = fixture({ status: state }); let count = 0
   await withOutboundPromise(db, input, async () => { count++; return { status: 'sent' } }, ready)
   expect(count).toBe(0); expect(calls).toHaveLength(1)
+})
+test('replaying a sent promise retains its provider receipt and in-flight cancellation', async () => {
+  const { db } = fixture({ status: 'sent', providerRef: 'original-mail', cancelAtFinish: true })
+  expect(await withOutboundPromise(db, input, async () => { throw Error('must not send') }, ready))
+    .toMatchObject({ status: 'sent', providerRef: 'original-mail', cancelRequested: true, receiptConfirmed: true })
+})
+test('a worker that loses the claim reads the winners actual receipt within the tenant', async () => {
+  const filters: unknown[] = []
+  const query: any = { select: () => query, eq: (key: string, value: unknown) => { filters.push([key, value]); return query },
+    maybeSingle: async () => ({ data: { status: 'sent', provider_ref: 'winner-mail', cancel_requested_at: null } }) }
+  const db: any = { from: (table: string) => { expect(table).toBe('outbound_intents'); return query }, rpc: async (name: string) => ({ data: name === 'record_outbound_intent'
+    ? { id: 'i', status: 'pending', created: false } : { claimed: [], unknown_ids: [], cancelled_ids: [] } }) }
+  expect(await withOutboundPromise(db, input, async () => { throw Error('must not send') }, ready))
+    .toMatchObject({ status: 'sent', providerRef: 'winner-mail', receiptConfirmed: true })
+  expect(filters).toEqual([['business_id', 'a'], ['id', 'i']])
+})
+for (const failure of ['missing', 'query-error', 'rejection']) test(`a lost claim with ${failure} does not invent a pending or sent receipt`, async () => {
+  const query: any = { select: () => query, eq: () => query, maybeSingle: async () => {
+    if (failure === 'rejection') throw Error('network')
+    return { data: null, error: failure === 'query-error' ? { message: 'read failed' } : null }
+  } }
+  const db: any = { from: () => query, rpc: async (name: string) => ({ data: name === 'record_outbound_intent'
+    ? { id: 'i', status: 'pending', created: false } : { claimed: [], unknown_ids: [], cancelled_ids: [] } }) }
+  await expect(readOutboundReceipt(db, 'a', 'i')).rejects.toThrow()
+  expect(await withOutboundPromise(db, input, async () => { throw Error('must not send') }, ready))
+    .toMatchObject({ status: 'unknown', receiptConfirmed: false })
 })
 test('definite rejection finishes as failed with the claim token', async () => {
   const { db, calls } = fixture()

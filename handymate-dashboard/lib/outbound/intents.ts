@@ -27,6 +27,19 @@ export interface ClaimedOutbound {
 export interface OutboundClaim {
   claimed: ClaimedOutbound[]; unknown_ids: string[]; cancelled_ids: string[]
 }
+export interface OutboundReceipt {
+  status: OutboundStatus
+  provider_ref: string | null
+  cancel_requested_at: string | null
+}
+/** A lost claim race is not proof of pending work: another worker may already
+ * have finished. Read the durable receipt without invoking any producer. */
+export async function readOutboundReceipt(db: SupabaseClient, businessId: string, id: string): Promise<OutboundReceipt> {
+  const { data, error } = await db.from('outbound_intents')
+    .select('status,provider_ref,cancel_requested_at').eq('business_id', businessId).eq('id', id).maybeSingle()
+  if (error || !data) throw new Error('outbound_receipt_unavailable')
+  return data as OutboundReceipt
+}
 export async function outboundRpc<T>(db: SupabaseClient, name: string, args: Record<string, unknown>): Promise<T> {
   const { data, error } = await db.rpc(name, args)
   if (error) throw new Error(`${name}: ${error.message}`)
@@ -40,7 +53,7 @@ export async function recordOutboundIntent(db: SupabaseClient, p: OutboundPromis
   if (p.context && Object.keys(p.context).some(key => !['version', 'targetUserId', 'fromAddress'].includes(key))) {
     throw new TypeError('outbound_context_must_only_identify_source')
   }
-  return outboundRpc<{ id?: string; status?: OutboundStatus; created: boolean; blocked?: boolean; deferred?: boolean }>(db, 'record_outbound_intent', {
+  return outboundRpc<{ id?: string; status?: OutboundStatus; provider_ref?: string | null; cancel_requested?: boolean; created: boolean; blocked?: boolean; deferred?: boolean }>(db, 'record_outbound_intent', {
     p_business_id: p.businessId, p_kind: p.kind, p_source: p.source, p_source_id: p.sourceId,
     p_dedupe_key: p.dedupeKey, p_recipient: p.recipient, p_template: p.template,
     p_autonomy_key: p.autonomyKey ?? null, p_context: p.context ?? null, p_defer_reason: deferReason,
