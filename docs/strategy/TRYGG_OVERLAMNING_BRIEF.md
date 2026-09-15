@@ -26,9 +26,9 @@ The volumes are small and mostly ours. The shapes are not.
 |---|---|---|---|---|
 | H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **ready — brief §3** | — |
 | H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **ready — brief §4**; owner decision taken 2026-09-15 (explicit consent, no implicit default-on) | H3a merged (pre-flight is a precondition) |
-| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **implemented, in review** (PR #78 `ec1364ea`, reviewed 2026-09-15: 1 MEDIUM — failed provider check cached 10 min; 6 LOW; 337 tests + tsc green locally) | M1 fix → merge; then `v245_handoff_reliability.sql`, `CHANNEL_PREFLIGHT_ENABLED` on pilot |
-| H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | sketched (§5b); Claude drafts DDL after H3a | H3a |
-| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **implemented, in review** (PR #78; root cause = 198/198 credit errors; seeded rule now delivers the deterministic brief without the LLM — owner should note the product change) | merge with H3a; `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
+| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **done 2026-09-15** (PR #78 merged `c09364e7` after M1 fix: failed provider check no longer cached, six new tests; 305 tests + tsc green locally, CI 13/13; v246 applied to production and verified) | activation: `CHANNEL_PREFLIGHT_ENABLED` on pilot; optional `RESEND_PREFLIGHT_API_KEY` if the production Resend key is sending-only |
+| H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | sketched (§5b); **Claude drafts DDL next** | — (H3a merged) |
+| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **done 2026-09-15** (PR #78; root cause 198/198 credit errors; seeded rule delivers the deterministic brief without the LLM, one retry via cron `*/10`, own driftlarm line; v246 `morning_report_runs` applied) | activation: `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
 
 Order: H3a and H4 first (they decide whether the customer can trust anything), then H1 and H2 together.
 Codex's own priority 1 (first real job) runs in parallel; its single metric is in §7.
@@ -179,6 +179,21 @@ Same §7 block as the other logs, under a new §Handoffs here. Claude reviews H1
 §6 A + B; H3b gets a DDL draft and PGlite probe from Claude before Codex implements it.
 
 ## Handoffs
+
+### 2026-09-15 — Claude: #78 merged, v246 applied (deployment state)
+
+`v246_handoff_reliability.sql` applied to production via Supabase MCP after the merge and verified read-only:
+`channel_notices` and `morning_report_runs` with RLS, `record_channel_notice` / `claim_morning_report` /
+`finish_morning_report` SECURITY DEFINER with EXECUTE for service_role only, `morning_report_due` index, 0 rows,
+10 seeded morning-report rules match the claim predicate. Advisor: no new WARN. Both flags unset.
+
+One LOW for H3b's DDL: v246 revokes table privileges from PUBLIC/anon/authenticated but not from service_role,
+so service_role keeps Supabase's default ALL on both tables (v244 revoked service_role too). The app only
+writes through the RPCs, so nothing is exposed; tighten to SELECT,DELETE when H3b's migration touches these
+tables. Review record: 1 MEDIUM (fixed on `c0859d92`), 6 LOW carried (execution-time `kontrollfel` is
+fail-closed; missing-recipient copy on invoice reminders; `channel_notices` has no reader until H1; the
+morning report no longer uses the LLM — owner informed; `[class]` prefix on all `run_agent` errors; numbering).
+
 
 ### 2026-09-15 — Codex H3a/H4 implementation for Claude review
 
