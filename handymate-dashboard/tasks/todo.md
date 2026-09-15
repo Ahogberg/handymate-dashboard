@@ -1618,4 +1618,4 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] Återställ de fem önskemålen efter att opublicerad arbetskopia städats bort.
 - [x] Verifiera servergränser, idempotens, timmar och mobil-/datorvy på nytt.
 - [x] Koppla planeringskontroller till CI.
-- [ ] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande.
+- [x] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande: https://github.com/Ahogberg/handymate-dashboard/pull/80.

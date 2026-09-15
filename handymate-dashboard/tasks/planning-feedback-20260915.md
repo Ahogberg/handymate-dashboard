@@ -30,7 +30,7 @@ Den tidigare lokala committen `f1896b91` försvann med arbetsytans städning fö
 - `tests/schedule/ui.cjs`: riktiga sidkomponenter med mockad transport, Chromium 390 och 1280 px. Jobbcontext, två personer × tre dagar, avbrutet nätanrop, stäng/öppna och samma request-ID vid retry, fast heldagsrad efter scroll. Inga sidfel.
 - UI-harness kräver esbuild via NODE_PATH (tillfälligt installerad utanför repot), samt Chromium via HANDYMATE_TEST_CHROMIUM.
 - `npm run test:planning` ingår i kontrakts-CI.
-- Produktionsbygge: pågår vid denna anteckning; resultat kompletteras före PR-leverans.
+- Produktionsbygge: godkänt (exit 0). Tillfälligt en byggworker för lokal minnesgräns; next.config.js återställd. TypeScript kördes separat och är godkänd.
 
 ## Gränser
 
