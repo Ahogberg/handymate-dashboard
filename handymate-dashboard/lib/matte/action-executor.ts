@@ -208,6 +208,10 @@ async function createApproval(
   supabase: SupabaseClient,
   availableSlots?: TimeSlot[]
 ): Promise<void> {
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { gateApprovalChannels } = await import('@/lib/channels/preflight')
+    if (await gateApprovalChannels(supabase, businessId, action.type, action.params)) return
+  }
   const id = `appr_matte_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
 
   await supabase.from('pending_approvals').insert({
@@ -280,7 +284,9 @@ async function queueCustomerReplyForApproval(
 ): Promise<void> {
   if (!entity.phone) return
   const id = `appr_matte_reply_${Date.now()}_${Math.random().toString(36).substr(2, 8)}`
-  const { error } = await supabase.from('pending_approvals').insert({
+  const { error } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
     id,
     business_id: businessId,
     approval_type: 'send_sms',

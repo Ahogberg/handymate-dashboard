@@ -83,6 +83,8 @@ export interface SendSmsResult {
   /** Maskinläsbar orsak från den centrala säkerhetsgrinden. */
   blockedReason?: SmsGateCode | FuelGateReason
   /** true = samma approval hade redan ett levererat SMS; inget nytt skickades. */
+  channelSkipped?: boolean
+  channelReason?: string
   idempotent?: boolean
 }
 
@@ -162,6 +164,7 @@ async function resolveSmsQuotaPlan(
  * lika fel som ingen räkning alls.
  */
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
+
   const {
     supabase,
     businessId,
@@ -246,6 +249,12 @@ export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> 
     blockedReason = gate.code
   } else {
     resolvedCustomerId = gate.customerId
+  }
+
+  if (!errorMsg && process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { gateChannel } = await import('@/lib/channels/preflight')
+    const check = await gateChannel(args.supabase, args.businessId, 'sms', { smsParts: smsPartCount(message) })
+    if (!check.ok) return { success: false, channelSkipped: true, channelReason: check.reason, error: check.message }
   }
 
   if (!errorMsg && (!ELKS_API_USER || !ELKS_API_PASSWORD)) {

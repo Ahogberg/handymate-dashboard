@@ -177,3 +177,44 @@ kernel's own intents (unchanged). Native mobile (parity after web, as in the acc
 
 Same §7 block as the other logs, under a new §Handoffs here. Claude reviews H1–H4 against orchestration
 §6 A + B; H3b gets a DDL draft and PGlite probe from Claude before Codex implements it.
+
+## Handoffs
+
+### 2026-09-15 — Codex H3a/H4 implementation for Claude review
+
+**H2 recommendation: NO to implicit default-on customer sends at account creation.** Recommend one explicit, concrete onboarding consent for these four actions, then supervised mode, per-action digest and immediate off. A message already sent cannot be reversed. This is Codex's recommendation, not a claim that Andreas has accepted an owner policy. H2 and its alternative streak threshold have not been implemented in this package.
+
+**Package / scope.** H3a automated-channel readiness and H4 the seeded V3 morning report. Built directly on main `4a334519`, independently of #75/#77. The brief's text above is carried from #76; only this handoff is added. H1 and H3b remain separate.
+
+**Root cause, read-only production evidence (2026-09-15 UTC).** Grouping the last 60 days of `v3_automation_logs` for `rule_name='Morgonrapport'` found 198 failed, ALL containing Anthropic's insufficient-credit error, and 180 marked success. These 180 are historical agent success, not established report delivery. The generic `Agent-köning misslyckades` is not the root cause for this cohort. No production writes or real sends were made.
+
+**Files / integration.** New `lib/channels/preflight.ts` and `approval-insert.ts`; common card creator, automation approval/execution handlers, central SMS/Resend/push senders, agent-tool queue and existing direct SMS/review/reminder card producers. Shared owner/admin API and `ChannelBanner` on home. `lib/automation/morning-report.ts`, strict mode on the existing morning-brief reader, a bounded retry cron and a separate driftlarm line. `lib/agent/orchestrator.ts` additionally scopes the existing idempotency lookup to business and no longer reports failed/running history as success. New tables are included in account erasure.
+
+**DB/RPC.** v246 creates `channel_notices` (atomic unique business/channel/Swedish-day) and narrowly scoped `morning_report_runs` (business/day, attempt token, two-attempt ceiling, next-attempt time, persisted report/notice/outcome). Service-only commands `record_channel_notice`, `claim_morning_report`, `finish_morning_report`; anon/member access denied. No modification of financial intents, financial canonical events or value_events producers.
+
+**Flags / rollout.** Both `CHANNEL_PREFLIGHT_ENABLED` and `MORNING_REPORT_RELIABILITY_ENABLED` default off. Apply v246 after review, check Resend domain-read access (optional `RESEND_PREFLIGHT_API_KEY` for a sending-only production key), enable in test/pilot and prove visible channel recovery/report delivery before broader activation. The new cron is configured every ten minutes and returns without work while its flag is off. Flags and server guards must remain enabled together for the combined acceptance. This PR does not switch any production flag or request provider credentials.
+
+**Golden paths.** PGlite: notice races, tenant/RPC privileges, foreign rule, first claim, ten-minute eligibility, exactly one retry, stale token, interrupted-worker unknown, no blind redispatch, pause and deletion. Real module tests: SMS raw balance/multipart estimate and cache, exact verified Resend sending domain, recipient/tenant-targeted push, actual card insert blocked before DB write, email-only reminder channel selection, engine skipped result/log/stats, strict report + owner push, missing recipients with persistent notice, prepared-report reuse, unknown push, drift classes, route roles and a rendered home-banner recovery.
+
+**Deliberate tightenings / limits to review:**
+1. The 46elks balance is Handymate's global provider balance. The customer sees a pause and a support link, never an instruction to replenish our account. SMS readiness uses the existing versioned cost estimate (52 öre/part), not the older 35-öre warning estimate; actual execution uses normalized multipart count. A cached balance is a readiness check, never a reservation or delivery guarantee.
+2. Push readiness means a usable stored token/subscription for the correct tenant/person, not proof that the phone will receive it. Expo can work without VAPID. Invalid-provider acknowledgements remain delivery failures; a readiness check alone cannot predict them.
+3. A daily channel notice is an informational row in its own table, surfaced through the shared live home state. It is not an unanswerable approval. H1's inbox and monthly archival UI are not invented here. Failed notice persistence is logged, and the original send remains blocked.
+4. The exact seeded system morning instruction is routed to the existing deterministic brief, with core query/cache errors made strict. This eliminates the proven credit dependency and avoids retrying an unconstrained tool-using agent. Custom instructions, other `run_agent` rules and the separate legacy agent-context SMS report are not rewritten. This scope distinction must be preserved in activation testing.
+5. The report is available on the existing overview's team strip; the owner-targeted push contains only a link, no financial/customer details. `delivered` means provider-accepted notification, not device read. A prepared report is reused on retry. Paused/inactive/edited rules cancel a queued retry at claim.
+6. “Every failure retried exactly once” is tightened to **at most one retry for a known failure, no earlier than ten minutes**. The cron cadence can add up to ten minutes. Ambiguous push responses and interrupted workers are `unknown`, carry visible status, and are NOT automatically resent. H3b's broader unknown-resolution workflow remains Claude's next DDL package.
+7. Quiet hours use the existing `arTystTid`: work is deferred durably and does not consume the failure retry. If push itself cannot work, no implementation can guarantee a push notice. The persisted home notice and driftlarm cover that case. Copy promises a retry only while one remains; it never guarantees “later today” after the final failure. Database unavailability returns an explicit status-read error, not healthy/zero.
+8. This is a provider-read gate for the specified automation paths, not a consolidation of every transport in the repository. Manual Gmail/Outlook transports keep their existing authorization/token checks; Resend-dependent automation checks must be pilot-tested alongside connected mailboxes. Existing consent, STOPP, quotas, approval and quiet-hours policies are not relaxed.
+
+**§7 first-work metric (read-only, NOT an achieved target).** Cohort: businesses created in the last 60 days, including internal/test businesses. Four have `opportunity_identified`; zero have a valid first identified→acted timestamp pair, four have no acted event. Median is NULL/unavailable. Count over 15 minutes among completed pairs is zero because there are no completed pairs; do not interpret this as meeting the target. No fixture or client timer contributes to this result.
+
+**Architecture / accounting.** Relies on the existing provider send boundaries, automation status/consent contract and orchestration §6 A+B and §7; records this package in ARCHITECTURE.md. Canonical financial events touched: none. Swedish reverse-charge/cash-basis/ROT/cut-over calculation changes: none. No accounting-policy or merchant-of-record decision made; no new human accounting approval needed for these operational changes. H2 owner decision stays open.
+
+**Verification.** Detailed final command/CI results are recorded in the PR body. Production activation, actual iPhone receipt and real-customer pilot are not claimed by these tests.
+
+### 2026-09-15 — Review M1 och basmerge mot main
+Cache för 46elks/Resend behåller definitiva utfall men släpper kontrollfel och avvisade promises direkt. Nästa anrop gör en ny kontroll; en gammal misslyckad kontroll får inte radera en ny cachepost efter credential-byte. Sex nya prov: 503→200, avvisat anrop→200 och gammalt fel efter credential-byte, för båda leverantörerna. Tidigare samtidighets- och definitiva negativcacheprov kvarstår.
+
+Main:s H2-ägarbeslut i §4 är aktuellt och har bevarats; den tidigare rekommendationen i handoffen ovan är historik. H2 implementeras inte i denna rättning.
+
+LOW-avgränsningar: kontrollfel stoppar fortfarande själva utskicksförsöket (fail-closed); cachen förlänger däremot inte pausen. `channel_notices` skrivs för kommande H1-läsning, medan dagens banner visar live-status. Morgonrapporten är en deterministisk databasbrief och saknar den tidigare LLM-genererade insiktstexten; det är en avsiktlig produktförändring för tillförlitlighet. Saknad SMS-mottagares text och grupperingar av klassprefix i driftloggar kvarstår som LOW. Slutlig verifiering anges på PR-huvudet.

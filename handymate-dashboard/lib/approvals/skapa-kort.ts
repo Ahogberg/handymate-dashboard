@@ -66,6 +66,11 @@ export async function skapaKort(
   kort: NyttKort,
   opts?: { push?: boolean },
 ): Promise<{ id: string; kanal?: 'kort' | 'digest' } | null> {
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { gateApprovalChannels } = await import('@/lib/channels/preflight')
+    if (await gateApprovalChannels(supabase, kort.business_id, kort.approval_type, kort.payload)) return null
+  }
+
   if (kanalFor(kort.approval_type) === 'digest') {
     return skrivDigestrad(supabase, kort)
   }

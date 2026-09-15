@@ -213,7 +213,9 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
           const mandate = mandateResolution.mandate
           const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
           const amountLabelMandate = amountToPay?.toLocaleString('sv-SE') ?? '0'
-          const { error: cardErr } = await supabase.from('pending_approvals').insert({
+          const { error: cardErr } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
             id: cardId,
             business_id: inv.business_id,
             approval_type: 'invoice_reminder',

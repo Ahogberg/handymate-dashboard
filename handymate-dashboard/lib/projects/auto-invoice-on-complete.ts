@@ -205,7 +205,7 @@ export async function autoInvoiceOnComplete(
         // Etapp 0 (2026-08-27): tidigare fetch mot den sessions-grindade
         // /api/sms/send → 401 (ägaren fick aldrig utfallet). Nu strypunkten.
         if (options.deferInternalNotification) {
-          const notification = await supabase.from('pending_approvals').insert({
+          const notification = await (async () => { const row = {
             business_id: businessId,
             approval_type: 'send_sms',
             title: `Fakturabesked — ${project.name}`,
@@ -221,7 +221,13 @@ export async function autoInvoiceOnComplete(
               purpose: 'internal',
               source_project_id: projectId,
             },
-          }).select('id').maybeSingle()
+          }
+            if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+              const { checkedApprovalInsert } = await import('@/lib/channels/approval-insert')
+              return await checkedApprovalInsert(supabase, row).select('id').maybeSingle()
+            }
+            return await supabase.from('pending_approvals').insert(row).select('id').maybeSingle()
+          })()
           if (notification.error || !notification.data?.id) {
             const message = notification.error?.message || 'Internt SMS-förslag kunde inte verifieras'
             warnings.push(message)

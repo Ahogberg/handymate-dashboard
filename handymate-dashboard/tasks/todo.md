@@ -1574,6 +1574,13 @@ Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsp
 - [ ] TypeScript, bygge och publicering; slutresultaten anges på #73.
 - [ ] Kontrollera CI på publicerat huvud inför Claudes merge.
 
+
+## H3a/H4 — 2026-09-15 (Codex)
+- [x] Read brief and inspect real provider/automation paths. H2 recommendation: explicit onboarding consent, no default customer sends.
+- [x] Channel preflight at creation/execution, durable daily notices and home status.
+- [x] Morning report: explicit outcome, one bounded retry and drift summary.
+- [ ] SQL, tenant, race, skipped-vs-failed and UI contracts; TypeScript/build/CI.
+- [ ] Reviewable PR + handoff for Claude; no production activation.
 ## Kundvärde och upplevelse, nästa leverans — 2026-09-14
 - [x] Kartlagt main, V2/V3-skisser och pågående onboarding-PR #69.
 - [x] Rätta läsfel, ekonomibehörighet och missvisande veckokvitto.
@@ -1599,3 +1606,9 @@ V2/V3: helsviten lokalt 2418 godkända + 1 avsiktligt hoppat, 17 Node/API-prov o
 - [x] Publicera rättningen för Claudes omverifiering.
 
 Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågningsfall (split + äldre kontrakt). Slutlig CI redovisas i PR #75.
+
+## 2026-09-15 — #78 M1
+- [x] Släpp 46elks/Resend-kontrollfel från cachen; bevara samtidighet och definitiva utfall.
+- [x] Sex återhämtnings- och credential-raceprov; 14 kanalprov gröna före basmerge.
+- [x] Sammanfoga aktuell main, bevara H2-beslut och båda testlistornas ordning.
+- [ ] Slutverifiera på publicerat huvud; resultat i PR #78.

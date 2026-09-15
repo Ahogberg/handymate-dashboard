@@ -213,6 +213,10 @@
     {
       "path": "/api/cron/financial-kernel-shadow",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/morning-report-retry",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

@@ -121,6 +121,12 @@ export async function deliverInvoiceReminder(
     currentCount, nextReminderAt, reminderFee, interestAmount, penaltyInterest, daysOverdue,
   } = input
 
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { gateApprovalChannels } = await import('@/lib/channels/preflight')
+    const blocked = await gateApprovalChannels(supabase, input.businessId, 'invoice_reminder', { delivery: input })
+    if (blocked) return { smsSent: false, emailSent: false, feeAdded: 0, interestAdded: 0, skipped: true, orsak: blocked.message }
+  }
+
   const errors: string[] = []
   const { data: verified, error: verificationError } = await supabase.from('invoice')
     .select('invoice_id, status, customer_id, reminder_count').eq('invoice_id', invoiceId).eq('business_id', businessId).maybeSingle()

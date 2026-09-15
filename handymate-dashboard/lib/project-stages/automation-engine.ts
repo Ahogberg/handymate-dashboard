@@ -392,7 +392,9 @@ async function runDefaultAutomations(
             businessName: companyName,
             reviewUrl,
           })
-          await supabase.from('pending_approvals').insert({
+          await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
             id: 'appr_' + Math.random().toString(36).substring(2, 14),
             business_id: businessId,
             approval_type: 'review_request',
@@ -517,7 +519,9 @@ async function sendStageSms(opts: {
   const autonomyGranted = false // ingen allowlistad nyckel för stage-notiser (se kommentar ovan)
   if (shouldQueueForApproval('system', autonomyGranted)) {
     const supabase = getServerSupabase()
-    const { error } = await supabase.from('pending_approvals').insert({
+    const { error } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
       id: 'appr_' + Math.random().toString(36).substring(2, 14),
       business_id: opts.businessId,
       approval_type: 'send_sms',

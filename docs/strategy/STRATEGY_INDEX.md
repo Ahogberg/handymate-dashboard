@@ -268,3 +268,5 @@ The early financing case should be built around paying/retained customers, activ
 > **Handymate — The operating system for the trades.**
 
 The moat is not any individual module. It is the closed loop from demand and quote assumptions through operational execution, money movement, accounting truth and realized profitability back into better future decisions — plus the rulebook of real edge cases that lets Handymate increasingly deliver those outcomes without proportional human headcount.
+
+- [Trygg överlämning H1–H4](TRYGG_OVERLAMNING_BRIEF.md) — H3a/H4 implementation and H2 recommendation under Handoffs.

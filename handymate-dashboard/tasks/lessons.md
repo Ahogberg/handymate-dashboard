@@ -690,3 +690,6 @@ När parallella paket registrerar tester på samma package.json-rad: merga aktue
 
 ## 2026-09-15 — Icke-monetärt arbete ska inte bli en nollrubrik
 Prova tid och förfrågningar separat från helt tomt kvitto. Att det finns arbete är inte samma sak som att det finns ett ekonomiskt utfall; bevara arbetsunderlaget utan en stor 0 kr-rubrik.
+
+## 2026-09-15 — Leverantörskontrollfel är inte ett definitivt cacheutfall
+Spara gärna pågående kontroll för samtidiga anrop, men kasta cacheposten vid kontrollfel. Testa 503 och avvisat anrop följt av återhämtning inom TTL; jämför postidentitet så att ett gammalt fel inte raderar en ny post.
