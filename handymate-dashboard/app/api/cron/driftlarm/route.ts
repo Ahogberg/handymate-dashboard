@@ -360,6 +360,19 @@ async function runDriftlarm() {
     brokenSweeps.push('46elks-saldo')
   }
 
+  let morning: SweepOutcome = EMPTY
+  if (process.env.MORNING_REPORT_RELIABILITY_ENABLED === 'true') {
+    try {
+      const { morningDriftLine } = await import('@/lib/automation/morning-report')
+      let q = supabase.from('morning_report_runs').select('business_id, day, status, failure_class').gte('updated_at', since).order('day', { ascending: true })
+      if (demoBusinessId) q = q.neq('business_id', demoBusinessId)
+      const r = await q
+      if (r.error) throw r.error
+      const summary = morningDriftLine(r.data || [])
+      morning = { ok: true, count: summary.count, rows: [escapeHtml(summary.line)] }
+    } catch { brokenSweeps.push('Morgonrapporten') }
+  }
+
   const totals = {
     sms: sms.count,
     email: email.count,
@@ -368,7 +381,7 @@ async function runDriftlarm() {
   }
   // usageSignal räknas medvetet INTE in i totalErrors — det är en
   // uppsäljningssignal, inte ett fel (se filhuvudet + Del 3-beslutet).
-  const totalErrors = totals.sms + totals.email + totals.billing + totals.automation
+  const totalErrors = totals.sms + totals.email + totals.billing + totals.automation + morning.count
 
   let mailed = false
   // Mailar om något faktiskt hittades, ett svep gick sönder, ELLER
@@ -378,7 +391,7 @@ async function runDriftlarm() {
   const saldoKritiskt = saldoLarm !== null || saldoFel > 0 || !saldo.ok
   if (totalErrors > 0 || brokenSweeps.length > 0 || usageSignal.count > 0 || saldoKritiskt) {
     try {
-      const html = buildDriftlarmHtml({ sms, email, billing, automation, usageSignal, brokenSweeps, saldo, saldoLarm, saldoFel })
+      const html = buildDriftlarmHtml({ morning, sms, email, billing, automation, usageSignal, brokenSweeps, saldo, saldoLarm, saldoFel })
       // Om enbart signalen utlöser mailet (inga fel, inga trasiga svep) får
       // det en egen ämnesrad — signalen ska aldrig se ut som ett driftlarm.
       const onlySignal = totalErrors === 0 && brokenSweeps.length === 0 && usageSignal.count > 0 && !saldoKritiskt
@@ -483,6 +496,7 @@ function usageSignalSection(sweep: SweepOutcome, broken: boolean): string {
 }
 
 function buildDriftlarmHtml(params: {
+  morning?: SweepOutcome
   sms: SweepOutcome
   email: SweepOutcome
   billing: SweepOutcome
@@ -497,6 +511,7 @@ function buildDriftlarmHtml(params: {
 
   const sections = [
     saldoSection(saldo, saldoLarm, saldoFel),
+    categorySection('Morgonrapporten', params.morning || EMPTY, brokenSweeps.includes('Morgonrapporten')),
     categorySection('SMS', sms, brokenSweeps.includes('SMS-loggen')),
     categorySection('E-post', email, brokenSweeps.includes('E-post/kommunikationsloggen')),
     categorySection('Betalningar', billing, brokenSweeps.includes('Betalningar')),

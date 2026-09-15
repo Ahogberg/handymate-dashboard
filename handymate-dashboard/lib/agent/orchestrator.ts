@@ -146,11 +146,13 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
         .from('agent_runs')
         .select('run_id, status, final_response, tool_calls, duration_ms, agent_type')
         .eq('idempotency_key', idempotencyKey)
+        .eq('business_id', businessId)
         .single()
 
       if (existing) {
         return {
-          success: true,
+          success: existing.status === 'completed',
+          ...(existing.status !== 'completed' ? { error: `Agent run ${existing.status || 'unknown'} — execution not repeated` } : {}),
           runId: existing.run_id,
           agentType: (existing.agent_type as AgentType) || 'lead',
           finalResponse: existing.final_response || '',

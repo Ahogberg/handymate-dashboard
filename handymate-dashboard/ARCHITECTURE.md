@@ -952,3 +952,12 @@ Metod 3 läser kortkohort och beslut ur händelser. V1 behåller tenant-grindade
 levande fakturareferenser och fakturornas belopp; V2 övertar pengastadierna senare.
 `VALUE_EVENTS_ENABLED` är server-only och av som standard; ägare/admin kan jämföra
 `/api/value/ledger?method=2` och `?method=3` efter v241 + explicit historikinläsning.
+
+## Trygg överlämning — H3a/H4 (2026-09-15, review)
+
+- `CHANNEL_PREFLIGHT_ENABLED` (default off): shared provider-read preflight at approval creation and central SMS/Resend/push sends. Checks never authorize sends or replace opt-out, billing, approval or quiet-hour guards. Global provider reads have ten-minute process-local, credential-scoped caches; recipient checks always use tenant AND user. `RESEND_PREFLIGHT_API_KEY` optionally supplies domain-read access alongside a sending-only key.
+- `channel_notices` (v245): one service-created informational row per business/channel/Swedish day, no approval and no expiry; same Swedish reason as the home banner. Internal platform credit shortages are Handymate's responsibility.
+- `MORNING_REPORT_RELIABILITY_ENABLED` (default off, v245 first): the exact seeded system morning rule uses existing `generateMorningBrief(...,{strict:true})`, without LLM/tool execution. It retains core query failures instead of presenting empty data as healthy. Existing custom `run_agent` rules remain on their own path and gain classified errors.
+- `morning_report_runs` is a narrowly scoped daily report job, NOT the future H3b outbound-intent primitive. One initial claim and at most one retry no earlier than ten minutes; fence tokens prevent stale finish. Confirmed push acceptance is distinct from report availability. Unknown dispatch/crashed-worker outcomes stop automatic retries. The owner/admin home surface carries persisted status even without a push subscription. Owner-targeted push does not carry financial details.
+- GET `/api/cron/morning-report-retry` uses existing cron authentication, ten-minute schedule and bounded batches/time budget. Flags off means no work. GET `/api/dashboard/channels` requires the active tenant's owner/admin and is no-store. Daily driftlarm has a separate morning-notification line by failure class; balance remains first.
+- Both new tables are service-only with tenant FK and classified RADERAS. No financial canonical events, money primitives, VAT rules, earned autonomy grants or H3b intents change. H1/H2 remain separate packages.

@@ -85,6 +85,9 @@ jobs:
           tests/cron-auth.spec.ts
           tests/dead-code-paths.spec.ts
           tests/permission-contract.spec.ts
+          tests/channel-preflight.spec.ts
+          tests/handoff-reliability-sql.spec.ts
+          tests/morning-report-reliability.spec.ts
           tests/schema-contract.spec.ts
           tests/financial-kernel-event-contract.spec.ts
           tests/financial-kernel-c5-brief-probes.spec.ts

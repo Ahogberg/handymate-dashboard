@@ -208,7 +208,9 @@ export async function GET(request: NextRequest) {
           if ((existing ?? 0) > 0) continue
 
           const approvalId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-          const { error: apprErr } = await supabase.from('pending_approvals').insert({
+          const { error: apprErr } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
             id: approvalId,
             business_id: q.business_id,
             approval_type: 'send_sms',
@@ -304,7 +306,9 @@ export async function GET(request: NextRequest) {
             if (mandateResolution.covered) {
               const mandate = mandateResolution.mandate
               const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-              const { error: cardErr } = await supabase.from('pending_approvals').insert({
+              const { error: cardErr } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
                 id: cardId,
                 business_id: q.business_id,
                 approval_type: 'send_sms',

@@ -6,6 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { svDateStr } from '@/lib/dates'
+import ChannelBanner from '@/components/dashboard/ChannelBanner'
 import JarvisHome from '@/components/jarvis/JarvisHome'
 
 /**
@@ -101,6 +102,7 @@ function DashboardContent() {
 
   return (
     <div className="bg-[#F8FAFC] min-h-screen">
+      <ChannelBanner />
       <JarvisHome
         greetingName={greetingName}
         bookings={bookings}

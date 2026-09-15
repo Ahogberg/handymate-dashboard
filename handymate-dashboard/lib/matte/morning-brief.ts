@@ -40,18 +40,20 @@ export interface MorningBrief {
   version?: number
 }
 
-export async function generateMorningBrief(businessId: string): Promise<MorningBrief> {
+export async function generateMorningBrief(businessId: string, options: { strict?: boolean } = {}): Promise<MorningBrief> {
   const supabase = getServerSupabase()
   // TD-3: morgonbriefen skickas ofta tidigt — UTC-splitting av dagens
   // datum kan peka på GÅRDAGEN om cronen kör före midnatt UTC men efter
   // midnatt svensk tid. Måste räknas i svensk lokaltid.
   const today = svDateStr()
 
-  const { data: config } = await supabase
+  const { data: config, error: configError } = await supabase
     .from('business_config')
     .select('contact_name, business_name')
     .eq('business_id', businessId)
     .single()
+
+  if (options.strict && (configError || !config)) throw new Error('underlag: business config unavailable')
 
   const firstName = config?.contact_name?.split(' ')[0] || 'du'
 
@@ -124,6 +126,8 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
       .gte('created_at', new Date(Date.now() - 86400000).toISOString())
       .order('created_at', { ascending: false }).limit(5),
   ])
+
+  if (options.strict && [overdueInvoices, pendingInvoices, openLeads, staleQuotes, todayBookings, profWarnings, inactiveCustomers, pendingApprovals, recentCalls].some(r => r.error)) throw new Error('underlag: morning report query failed')
 
   const karinBrief = buildKarinBrief(overdueInvoices.data || [], pendingInvoices.data || [])
 
@@ -226,7 +230,7 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
   }
 
   // Cache
-  await supabase.from('business_preferences').upsert({
+  const cached = await supabase.from('business_preferences').upsert({
     business_id: businessId,
     key: 'morning_brief_latest',
     value: JSON.stringify(brief),
@@ -235,6 +239,7 @@ export async function generateMorningBrief(businessId: string): Promise<MorningB
   }, { onConflict: 'business_id,key' })
   // eslint-disable-next-line -- fire-and-forget cache
 
+  if (options.strict && cached.error) throw new Error('cache: morning report not persisted')
   return brief
 }
 
