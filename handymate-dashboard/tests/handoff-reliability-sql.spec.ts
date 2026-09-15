@@ -6,7 +6,7 @@ async function database(){const db=new PGlite();await db.exec(`CREATE ROLE anon;
  CREATE TABLE v3_automation_rules(id text PRIMARY KEY,business_id text,is_active boolean,is_system boolean,action_type text,trigger_type text,action_config jsonb);
  INSERT INTO business_config(business_id) VALUES('a'),('b');
  INSERT INTO v3_automation_rules VALUES('rule-a','a',true,true,'run_agent','cron','{}'),('rule-b','b',true,true,'run_agent','cron','{}');
- UPDATE v3_automation_rules SET action_config=jsonb_build_object('instruction','Generera morgonrapport med dagens bokningar, utestående offerter, försenade fakturor och insikter.');`);await db.exec(readFileSync('sql/v245_handoff_reliability.sql','utf8'));return db}
+ UPDATE v3_automation_rules SET action_config=jsonb_build_object('instruction','Generera morgonrapport med dagens bokningar, utestående offerter, försenade fakturor och insikter.');`);await db.exec(readFileSync('sql/v246_handoff_reliability.sql','utf8'));return db}
 const claim=async(db:PGlite,b='a',r='rule-a')=>(await db.query<any>('SELECT * FROM claim_morning_report($1,$2)',[b,r])).rows[0]
 const finish=async(db:PGlite,r:any,outcome='failed',token=r.attempt_token)=>(await db.query<any>('SELECT finish_morning_report($1,$2,$3,$4,$5,$6,$7,false) AS ok',[r.business_id,r.day,token,outcome,'underlag',null,'Försenad'])).rows[0].ok
 
