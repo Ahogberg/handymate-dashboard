@@ -126,8 +126,10 @@ test.describe('F02 — varje RPC koden anropar är definierad i sql/', () => {
       for (const m of Array.from(utanKommentarer(fs.readFileSync(f, 'utf8')).matchAll(/\.rpc\('([a-z_0-9]+)'/g))) names.add(m[1])
     }
     expect(names.size).toBeGreaterThan(5)
-    const sqlAll = fs.readdirSync(path.join(ROOT, 'sql')).filter(f => f.endsWith('.sql')).map(f => read(`sql/${f}`)).join('\n')
+    const sqlAll = ['sql', 'supabase/migrations'].flatMap(dir =>
+      fs.readdirSync(path.join(ROOT, dir)).filter(f => f.endsWith('.sql')).map(f => read(`${dir}/${f}`)),
+    ).join('\n')
     const saknas = Array.from(names).filter(n => !new RegExp(`FUNCTION\\s+(public\\.)?${n}\\s*\\(`, 'i').test(sqlAll))
-    expect(saknas, 'RPC utan CREATE FUNCTION i sql/ — den kan inte finnas i produktion').toEqual([])
+    expect(saknas, 'RPC utan CREATE FUNCTION i sql/ eller supabase/migrations/').toEqual([])
   })
 })
