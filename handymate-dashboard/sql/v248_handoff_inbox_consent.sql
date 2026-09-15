@@ -1,4 +1,4 @@
--- H1/H2. v247 reserved for Claude's H3b draft. Apply only after review.
+-- H1/H2. Applied to production 2026-09-15. H3b is v249 (it replaces stop_supervised_autonomy below).
 -- No grants to customers or external dispatch occur on migration.
 BEGIN;
 CREATE TABLE public.handoff_items (

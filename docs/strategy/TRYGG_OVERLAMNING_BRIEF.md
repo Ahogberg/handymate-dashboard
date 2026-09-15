@@ -24,8 +24,8 @@ The volumes are small and mostly ours. The shapes are not.
 
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
-| H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **implemented, in review** (PR #81 `835c9949`, reviewed 2026-09-15: 3 MEDIUM — backfill shortens live expiries, digest-channel types become pushed cards, reminder outcome mapping; 6 LOW; 357 tests + tsc green locally) | M1–M3 fix → merge → v248; native Ja/Nej in push stays open |
-| H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **implemented, in review** (PR #81; explicit one-shot consent, four keys supervised, off with 30-day cooldown, revocation trigger, audit before provider call) | same PR as H1; cancel-on-off of queued sends waits for H3b |
+| H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **done 2026-09-15** (PR #81 merged `263ce4a5` after the three MEDIUM fixes; v248 applied and verified) | `HANDOFF_INBOX_ENABLED` on the pilot; native Ja/Nej in push still open |
+| H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **done 2026-09-15** (PR #81; explicit one-shot consent, four keys supervised, off with 30-day cooldown and revocation trigger) | `SUPERVISED_AUTONOMY_ENABLED` + `AUTONOMY_OFF_SECRET`; cancel-on-off of queued sends lands with H3b (v249) |
 | H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **done 2026-09-15** (PR #78 merged `c09364e7` after M1 fix: failed provider check no longer cached, six new tests; 305 tests + tsc green locally, CI 13/13; v246 applied to production and verified) | activation: `CHANNEL_PREFLIGHT_ENABLED` on pilot; optional `RESEND_PREFLIGHT_API_KEY` if the production Resend key is sending-only |
 | H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | **ready — [H3B_OUTBOUND_INTENTS_BRIEF.md](H3B_OUTBOUND_INTENTS_BRIEF.md)**; Claude drafted `sql/v249_outbound_intents.sql` and proved it in PGlite (43/43) 2026-09-15 | #81 merged (v249 replaces v248's `stop_supervised_autonomy`) |
 | H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **done 2026-09-15** (PR #78; root cause 198/198 credit errors; seeded rule delivers the deterministic brief without the LLM, one retry via cron `*/10`, own driftlarm line; v246 `morning_report_runs` applied) | activation: `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
@@ -179,6 +179,22 @@ Same §7 block as the other logs, under a new §Handoffs here. Claude reviews H1
 §6 A + B; H3b gets a DDL draft and PGlite probe from Claude before Codex implements it.
 
 ## Handoffs
+
+### 2026-09-15 — Claude: #81 merged, v248 applied (deployment state)
+
+Re-reviewed on `e61d3d05`: the three MEDIUM are closed (backfill no longer shortens a live window, digest types stay
+notices and keep their activity history, reminder outcomes classify correctly) and the owner decision is implemented as
+an explicit per-type expiry axis that fails to compile when a new card type is added without a policy. Locally 435 tests,
+the recovery harness and `tsc` green; CI 13/13.
+
+`v248_handoff_inbox_consent.sql` applied to production via Supabase MCP and verified read-only: four tables with RLS and
+no client grants, eleven SECURITY DEFINER RPCs with EXECUTE for service_role only (the two classification functions are
+pure `IMMUTABLE` SQL, by design), all three triggers installed, 165 cards reclassified as notices, 15 pending internal
+gates now hold no deadline, and **zero** pending cards sit past a deadline — so no batch expiry on the first maintenance
+run. All four new tables are empty. Advisor: only the expected INFO (RLS enabled without a policy, the same shape as
+every other service-only table); no new WARN. Both flags remain unset.
+
+
 
 ### 2026-09-15 — Claude: #78 merged, v246 applied (deployment state)
 
