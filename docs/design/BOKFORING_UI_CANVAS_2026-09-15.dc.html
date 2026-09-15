@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<meta name="design_doc_mode" content="canvas">
+<link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/colors_and_type.css">
+<link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/styles.css">
+<script src="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/_ds_bundle.js"></script>
+<style>body{margin:0;background:#e9edf1;font-family:'DM Sans',sans-serif;color:#1e293b;font-variant-numeric:tabular-nums}a{color:#0369a1;text-decoration:none}a:hover{color:#0ea5e9}</style>
+</helmet>
+
+<div style="display:flex;flex-direction:column;gap:64px;padding:56px 64px;width:1600px">
+
+<!-- Canvas header -->
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:40px;max-width:1440px">
+  <div>
+    <div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Handymate · Bokföring · september 2026</div>
+    <h1 style="font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:8px 0 0">Huvudstruktur och elva artboards</h1>
+    <p style="max-width:720px;margin-top:12px;color:#475569;font-size:15px;line-height:1.6">Underlag för förmågematrisens rad C2 och C5 samt konsultresans genomgång i november. Artboard 1 är informationsarkitekturen, 2–4 och 6–11 skärmar. Designat mot Lindqvist El &amp; Montage AB (mindre AB, Kungsbacka, 3,5 Mkr/år, kvartalsmoms, ROT på ca en tredjedel av jobben) och byrån Sjöberg Redovisning AB med sex klienter.</p>
+  </div>
+  <div style="display:grid;gap:8px;font-size:13px;color:#475569;min-width:380px">
+    <div style="display:flex;gap:10px;align-items:flex-start"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:#0f766e;margin-top:6px"></span>Skärm 2 fungerar på telefon för hantverkaren (visas bredvid). Skärm 2–7 är designade för 1440 px och behöver bara vara läsbara på mobil, inte arbetsbara.</div>
+    <div style="display:flex;gap:10px;align-items:flex-start"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:#0f766e;margin-top:6px"></span>Varje belopp har en väg hem: belopp → verifikat → affärshändelse → källa. Blå text är alltid en sådan länk.</div>
+    <div style="display:flex;gap:10px;align-items:flex-start"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:#0f766e;margin-top:6px"></span>Tre tillstånd, tre ord: förberett, skickat, bekräftat. Ett obekräftat utfall heter «utfallet är inte bekräftat».</div>
+    <div style="display:flex;gap:10px;align-items:flex-start"><span style="flex:none;width:8px;height:8px;border-radius:50%;background:#0f766e;margin-top:6px"></span>Karin (ekonomen) bokför enligt förtroendetrappan: nivå 3 kundfakturor (bokför, ingen granskning), nivå 2 leverantörsfakturor (bokför, konsulten granskar i efterhand), nivå 1 kvitton (föreslår, någon säger ja). Allt Karin gjort bär märket <span style="display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:999px;background:#ccfbf1;color:#115e59;font-size:11px;font-weight:600">Karin</span>. Knappen till Skatteverket har det aldrig.</div>
+  </div>
+</div>
+
+<!-- ============ ARTBOARD 1 · IA ============ -->
+<section id="ab1" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">01</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Informationsarkitektur</h2><span style="font-size:13px;color:#64748b">Bokföringen blir ett eget läge, inte en menysektion</span></div>
+  <div style="width:1440px;box-sizing:border-box;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:40px;display:grid;grid-template-columns:300px 1fr 300px;gap:32px;align-items:start">
+
+    <div style="display:grid;gap:12px">
+      <div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">I dag · ägaren loggar in</div>
+      <div style="background:#1a3a4a;border-radius:16px;padding:16px 12px;display:grid;gap:2px;color:#fff">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:26px;height:26px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px">Handymate</span></div>
+        <sc-for list="{{ mainNav }}" as="n" hint-placeholder-count="10">
+          <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;font-size:13px;color:rgba(255,255,255,.85)">{{ n.label }}<span style="font-size:11px;color:#5eead4">{{ n.note }}</span></div>
+        </sc-for>
+        <div style="padding:7px 10px;font-size:12px;color:rgba(255,255,255,.45)">… ca 30 ytor totalt</div>
+      </div>
+      <p style="font-size:13px;color:#475569;line-height:1.55">Ingen ny post i sidomenyn. Hantverkaren som aldrig öppnar bokföringen märker den bara på tre ställen, markerade i teal.</p>
+    </div>
+
+    <div style="display:grid;gap:14px;padding-top:32px">
+      <div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Var bokföringen hakar i</div>
+      <div style="display:grid;gap:10px">
+        <div style="border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:110px 1fr;gap:12px;font-size:13px"><div style="font-weight:600;color:#0f172a">Hem</div><div style="color:#475569">Ett lugnt besked-kort: «Bokföringen är hanterad. Nästa moms den 12 november.» Blir en fråga när ett beslut behövs. Kortet är enda vägen in för ägaren.</div></div>
+        <div style="border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:110px 1fr;gap:12px;font-size:13px"><div style="font-weight:600;color:#0f172a">Godkännanden</div><div style="color:#475569">Frågor från bokföringen hamnar i samma kö som allt annat ägaren ska ta ställning till. «Fick du 4 200 kr kontant av Berglund den 14 sep?» Ja / Nej / Vet inte.</div></div>
+        <div style="border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;display:grid;grid-template-columns:110px 1fr;gap:12px;font-size:13px"><div style="font-weight:600;color:#0f172a">Fakturor, betalningar, ROT</div><div style="color:#475569">Varje källa får en rad «Bokförd som V-241». Det är kedjans startpunkt sett från hantverkarens sida, och samma kedja konsulten följer bakåt.</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px;margin-top:8px"><div style="flex:1;height:1px;background:#cbd5e1"></div><span style="font-size:12px;color:#64748b">Konsult loggar in</span><div style="flex:1;height:1px;background:#cbd5e1"></div></div>
+      <div style="display:flex;gap:10px;align-items:stretch">
+        <div style="flex:1;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;font-size:13px"><div style="font-weight:600;color:#0f172a">Byråvyn</div><div style="color:#475569;margin-top:4px">Landningssida. Sex klienter, periodstatus, vad som väntar.</div></div>
+        <div style="display:flex;align-items:center;color:#94a3b8">→</div>
+        <div style="flex:1;border:1px solid #e2e8f0;border-radius:12px;padding:14px 16px;font-size:13px"><div style="font-weight:600;color:#0f172a">Klient</div><div style="color:#475569;margin-top:4px">Öppnas direkt i bokföringsläget. Konsulten ser aldrig offerter, kalender eller automationer.</div></div>
+        <div style="display:flex;align-items:center;color:#94a3b8">→</div>
+        <div style="flex:1;border:1px solid #5eead4;background:#f0fdfa;border-radius:12px;padding:14px 16px;font-size:13px"><div style="font-weight:600;color:#0f172a">Bokföringsläge</div><div style="color:#475569;margin-top:4px">Samma sex ytor för ägare och konsult. Klientväxlaren sitter i sidomenyn.</div></div>
+      </div>
+      <div style="background:#f8fafc;border-radius:12px;padding:14px 16px;font-size:13px;color:#1e293b;line-height:1.55"><strong>Varför ett läge:</strong> ett läge håller huvudmenyn oförändrad för hantverkaren och ger konsulten ett arbetsrum utan trettio ytor hon inte behöver; en menysektion hade gjort båda sämre. <strong>Varför byråns ingång är samma produkt:</strong> konsulten läser samma verifikat, samma regler och samma spår som ägaren ser, så det hon låser är exakt det han fick besked om; en separat byråprodukt hade gett två sanningar om samma bokföring.</div>
+    </div>
+
+    <div style="display:grid;gap:12px">
+      <div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Bokföringsläge · sidomeny</div>
+      <div style="background:#1a3a4a;border-radius:16px;padding:16px 12px;display:grid;gap:2px;color:#fff">
+        <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 10px"><img src="assets/logo.png" alt="" style="width:26px;height:26px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:16px">Handymate</span></div>
+        <div style="margin:0 4px 10px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+        <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+        <sc-for list="{{ navOversikt }}" as="n" hint-placeholder-count="6">
+          <div style="padding:8px 10px;border-radius:8px;font-size:13px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div>
+        </sc-for>
+        <div style="margin-top:14px;border-top:1px solid rgba(255,255,255,.12);padding:12px 10px 4px;font-size:13px;color:rgba(255,255,255,.7)">← Tillbaka till Handymate</div>
+      </div>
+      <p style="font-size:13px;color:#475569;line-height:1.55">Ägaren når samma läge från besked-kortet. För honom saknas klientväxlaren, och «Tillbaka» tar honom hem.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 2 · Översikt ============ -->
+<section id="ab2" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">02</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Bokföringsöversikt</h2><span style="font-size:13px;color:#64748b">Konsult 1440 px · hantverkare på telefon. Svarar på «är vi i fas?» på tre sekunder.</span></div>
+  <div style="display:flex;gap:32px;align-items:flex-start">
+  <div style="width:1440px;flex:none;height:1270px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navOversikt }}" as="n" hint-placeholder-count="6"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;display:grid;gap:12px"><div style="padding:0 10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div><div style="display:flex;gap:10px;align-items:center;padding:0 10px"><div style="width:32px;height:32px;border-radius:50%;background:#0f766e;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">MS</div><div><div style="font-size:13px;font-weight:600">Maria Sjöberg</div><div style="font-size:11px;color:rgba(255,255,255,.55)">Sjöberg Redovisning AB</div></div></div></div>
+    </aside>
+    <main style="flex:1;padding:32px 40px;display:grid;gap:24px;align-content:start">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · Lindqvist El &amp; Montage AB</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Översikt</h1></div>
+        <div style="display:flex;gap:10px"><div style="display:flex;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;font-size:13px;background:#fff"><div style="padding:9px 14px;color:#64748b">Augusti</div><div style="padding:9px 14px;background:#f1f5f9;font-weight:600;color:#0f172a">September 2026</div><div style="padding:9px 14px;color:#94a3b8">Oktober</div></div></div>
+      </div>
+      <div style="border-radius:20px;background:linear-gradient(135deg,#0f2e2a,#134e4a);color:#fff;padding:28px 32px;display:grid;grid-template-columns:1.3fr 1fr 1fr 1fr;gap:32px;align-items:end">
+        <div><div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:#5eead4">Periodens läge</div><div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;margin-top:8px;letter-spacing:-.02em">September är öppen</div><div style="font-size:14px;color:rgba(255,255,255,.7);margin-top:6px;display:flex;align-items:center;gap:8px">{{ ic.lock }} Augusti låstes 4 sep av Maria Sjöberg</div></div>
+        <div><div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)">Väntar på någon</div><div style="font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:500;margin-top:6px">3</div><div style="font-size:13px;color:rgba(255,255,255,.7)">2 på dig · 1 på Johan</div></div>
+        <div><div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)">Oavstämda bankrader</div><div style="font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:500;margin-top:6px">3</div><div style="font-size:13px;color:rgba(255,255,255,.7)">av 41 i september</div></div>
+        <div><div style="font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.6)">Nästa moms</div><div style="font-family:'JetBrains Mono',monospace;font-size:36px;font-weight:500;margin-top:6px">12 nov</div><div style="font-size:13px;color:rgba(255,255,255,.7)">Kvartal 3 · underlag skickat, inte bekräftat</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1.5fr 1fr;gap:24px">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0;color:#0f172a">Väntar på någon</h3><a href="#ab5" style="font-size:13px">Öppna avstämningen →</a></div>
+          <div style="font-size:13px;color:#64748b;margin-top:6px">Karin har bokfört 41 av 43 verifikat i september själv. Två väntar på ett ja.</div>
+          <div style="display:grid;margin-top:16px">
+            <sc-for list="{{ waiting }}" as="w" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:24px 1fr auto;gap:14px;align-items:start;padding:14px 0;border-top:1px solid #f1f5f9"><span style="color:{{ w.col }};margin-top:2px">{{ w.icon }}</span><div><div style="font-size:14px;font-weight:500;color:#0f172a">{{ w.title }}</div><div style="font-size:13px;color:#64748b;margin-top:2px">{{ w.sub }}</div></div><div style="text-align:right"><div style="font-size:12px;color:#64748b">Väntar på</div><div style="font-size:13px;font-weight:600;color:#1e293b">{{ w.who }}</div></div></div>
+            </sc-for>
+          </div>
+        </div>
+        <div style="display:grid;gap:24px;align-content:start">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px">
+            <h3 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0;color:#0f172a">September hittills</h3>
+            <div style="display:grid;gap:10px;margin-top:14px;font-size:14px">
+              <div style="display:flex;justify-content:space-between"><span style="color:#475569">Kundfakturor bokförda</span><a href="#ab3">38 st · 289 450,00 kr</a></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:#475569">Leverantörsfakturor bokförda</span><a href="#ab3">23 st · 98 340,00 kr</a></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:#475569">ROT-ansökningar</span><a href="#ab3">12 st · 15 000,00 kr utbetalt</a></div>
+              <div style="display:flex;justify-content:space-between"><span style="color:#475569">Verifikat skapade</span><a href="#ab3">V-201 – V-243</a></div>
+              <div style="display:flex;justify-content:space-between;border-top:1px solid #f1f5f9;padding-top:10px"><span style="color:#475569">Bankens saldo 14 sep</span><a href="#ab4" style="font-weight:600">492 527,95 kr</a></div>
+            </div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px">
+            <h3 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0;color:#0f172a">Periodavslut</h3>
+            <div style="font-size:14px;color:#475569;margin-top:8px">4 av 7 punkter klara. Låsning blir möjlig när bankraderna är avstämda, differensen förklarad och Karins frågor besvarade.</div>
+            <div style="height:6px;background:#f1f5f9;border-radius:3px;margin-top:14px;overflow:hidden"><div style="width:57%;height:100%;background:#14b8a6"></div></div>
+            <a href="#ab7" style="display:inline-block;margin-top:14px;font-size:13px">Till checklistan →</a>
+          </div>
+        </div>
+      </div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h3 style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;margin:0;color:#0f172a">Förtroendetrappan</h3><span style="font-size:13px;color:#64748b">Vad Karin får göra själv hos Lindqvist</span></div>
+        <div style="font-size:13px;color:#64748b;margin-top:6px">Avstängd betyder att Karin förbereder men frågar dig innan verifikatet skapas. Inget som redan är bokfört ändras.</div>
+        <div style="display:grid;margin-top:16px;font-size:13px">
+          <div style="display:grid;grid-template-columns:minmax(0,1.2fr) 150px minmax(0,1.6fr) 96px;gap:16px;padding:0 0 8px;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>Händelsetyp</span><span>Nivå</span><span>Regel</span><span></span></div>
+          <sc-for list="{{ trust }}" as="t" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:minmax(0,1.2fr) 150px minmax(0,1.6fr) 96px;gap:16px;padding:13px 0;border-bottom:1px solid #f1f5f9;align-items:center">
+              <span style="font-weight:500;color:#0f172a">{{ t.type }}</span>
+              <span style="display:flex;gap:6px;align-items:center;color:{{ t.lcol }};font-weight:500">{{ t.licon }}{{ t.level }}</span>
+              <span style="color:#475569;min-width:0"><a href="#ab3">{{ t.rule }}</a><sc-if value="{{ t.off }}" hint-placeholder-val="{{ false }}"><div style="margin-top:3px;color:#92400e;display:flex;gap:6px;align-items:center">{{ ic.pause }} {{ t.offText }}</div></sc-if></span>
+              <sc-if value="{{ t.on }}" hint-placeholder-val="{{ true }}"><div style="height:34px;border-radius:10px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:13px">Stäng av</div></sc-if>
+              <sc-if value="{{ t.off }}" hint-placeholder-val="{{ false }}"><div style="height:34px;border-radius:10px;background:#fff;border:1px solid #e2e8f0;color:#0f766e;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:13px">Sätt på</div></sc-if>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Mobile -->
+  <div style="display:grid;gap:14px;flex:none">
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="padding:64px 20px 24px;display:grid;gap:16px;font-family:'DM Sans',sans-serif;color:#1e293b;background:#f8fafc;min-height:100%">
+        <div style="display:flex;align-items:center;gap:8px;font-size:13px;color:#64748b"><span>‹ Hem</span></div>
+        <div style="border-radius:20px;background:linear-gradient(135deg,#0f2e2a,#134e4a);color:#fff;padding:24px 22px">
+          <div style="font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:#5eead4">Bokföringen</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;margin-top:8px;line-height:1.2;letter-spacing:-.02em">Allt är hanterat. Nästa moms den 12 november.</div>
+          <div style="font-size:14px;color:rgba(255,255,255,.7);margin-top:12px;line-height:1.5">Maria på Sjöberg Redovisning sköter september. Augusti är låst och klar.</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;display:grid;gap:14px">
+          <div style="display:flex;gap:10px;align-items:center;color:#b45309;font-size:12px;font-weight:600;letter-spacing:.1em;text-transform:uppercase">{{ ic.help }} En fråga till dig</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:#0f172a;line-height:1.3">Fick du 4 200 kr via Swish från B. Berglund den 14 september?</div>
+          <div style="font-size:14px;color:#475569;line-height:1.5">Pengarna kom in på kontot men vi hittar ingen faktura som passar. Svaret hjälper Maria att bokföra rätt.</div>
+          <div style="display:grid;gap:8px">
+            <div style="height:48px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px">Ja, det var för ett jobb</div>
+            <div style="height:48px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px">Nej, det är något annat</div>
+            <div style="height:48px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px">Vet inte, låt Maria titta</div>
+          </div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:18px 20px;display:grid;gap:12px;font-size:14px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#475569">Faktura 2026-118, Sandra Ek</span><span style="color:#b45309;font-weight:500;display:flex;gap:6px;align-items:center">{{ ic.alert }} På påminnelse</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#475569">Moms kvartal 3</span><span style="color:#1e293b;font-weight:500">Förberett, du signerar 12 nov</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="color:#475569">Vem har tillgång</span><a href="#ab8">Maria, Erik →</a></div>
+        </div>
+      </div>
+    </x-import>
+    <p style="font-size:13px;color:#475569;max-width:400px;line-height:1.55">Hantverkarens version: ett besked, en fråga, tre rader. Inga redovisningstermer. Frågan har samma tre svar som i Godkännanden.</p>
+  </div>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 3 · Verifikationer ============ -->
+<section id="ab3" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">03</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Verifikationer</h2><span style="font-size:13px;color:#64748b">Lista + detalj. Brödsmulespåret hem till affärshändelsen. Rättelse som återföring, aldrig raderad rad.</span></div>
+  <div style="width:1440px;height:1080px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navVerifikat }}" as="n" hint-placeholder-count="6"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 380px;min-width:0">
+      <div style="padding:32px 32px 32px 40px;display:grid;gap:20px;align-content:start;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · september 2026</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Verifikationer</h1></div><div style="font-size:13px;color:#64748b">43 verifikat · V-201 till V-243</div></div>
+        <div style="display:flex;gap:8px;flex-wrap:wrap;font-size:13px">
+          <div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;display:flex;gap:8px;align-items:center;color:#94a3b8;min-width:220px">{{ ic.search }} Sök text, belopp eller V-nummer</div>
+          <div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;color:#1e293b">Period: <strong>September 2026</strong> ⌄</div>
+          <div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;color:#1e293b">Konto: <strong>Alla</strong> ⌄</div>
+          <div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;color:#1e293b">Belopp: <strong>Alla</strong> ⌄</div>
+          <div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;color:#1e293b">Typ: <strong>Alla</strong> ⌄</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:13px">
+          <div style="display:grid;grid-template-columns:52px 52px minmax(0,1fr) 88px 90px 100px;gap:10px;padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>V-nr</span><span>Datum</span><span>Text</span><span>Typ</span><span style="text-align:right">Belopp</span><span>Läge</span></div>
+          <sc-for list="{{ vouchers }}" as="v" hint-placeholder-count="10">
+            <div style="display:grid;grid-template-columns:52px 52px minmax(0,1fr) 88px 90px 100px;gap:10px;padding:11px 20px;border-bottom:1px solid #f1f5f9;align-items:center;background:{{ v.bg }}"><a href="#ab3" style="font-weight:600">{{ v.id }}</a><span style="color:#64748b">{{ v.date }}</span><span style="min-width:0"><span style="display:block;color:#1e293b;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ v.text }}</span><sc-if value="{{ v.rule }}" hint-placeholder-val="{{ false }}"><a href="#ab2" style="display:block;font-size:12px;color:#0f766e;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Bokfört enligt {{ v.ruleShort }}</a></sc-if></span><span style="color:#64748b">{{ v.type }}</span><span style="text-align:right;color:#0f172a">{{ v.amount }}</span><span style="display:flex;gap:6px;align-items:center;color:{{ v.scol }};font-weight:500">{{ v.sicon }}{{ v.status }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="border-left:1px solid #e2e8f0;background:#fff;padding:32px 32px;display:grid;gap:22px;align-content:start;overflow:auto">
+        <div>
+          <div style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Vägen hem</div>
+          <div style="display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:8px;font-size:13px"><a href="#ab3" style="padding:4px 8px;border-radius:6px;background:#f0f9ff;font-weight:500">Faktura 2026-112</a><span style="color:#94a3b8">→</span><a href="#ab5" style="padding:4px 8px;border-radius:6px;background:#f0f9ff;font-weight:500">Betalning 14 sep</a><span style="color:#94a3b8">→</span><span style="padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff;font-weight:500">Verifikat V-241</span></div>
+        </div>
+        <div><div style="display:flex;justify-content:space-between;align-items:baseline"><h2 style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:0">V-241</h2><span style="font-size:13px;color:#64748b">2026-09-14</span></div><div style="font-size:14px;color:#1e293b;margin-top:4px">Betalning av faktura 2026-112, Familjen Holm</div></div>
+        <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;font-size:13px">
+          <div style="display:grid;grid-template-columns:1fr 100px 100px;gap:8px;padding:8px 14px;background:#f8fafc;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>Konto</span><span style="text-align:right">Debet</span><span style="text-align:right">Kredit</span></div>
+          <div style="display:grid;grid-template-columns:1fr 100px 100px;gap:8px;padding:10px 14px;border-top:1px solid #f1f5f9"><span><a href="#ab4" style="font-weight:600">1930</a> <span style="color:#475569">Företagskonto</span></span><span style="text-align:right">18 750,00</span><span style="text-align:right;color:#94a3b8">–</span></div>
+          <div style="display:grid;grid-template-columns:1fr 100px 100px;gap:8px;padding:10px 14px;border-top:1px solid #f1f5f9"><span><a href="#ab4" style="font-weight:600">1510</a> <span style="color:#475569">Kundfordringar</span></span><span style="text-align:right;color:#94a3b8">–</span><span style="text-align:right">18 750,00</span></div>
+          <div style="display:grid;grid-template-columns:1fr 100px 100px;gap:8px;padding:10px 14px;border-top:1px solid #e2e8f0;font-weight:600;color:#0f172a"><span>Summa</span><span style="text-align:right">18 750,00</span><span style="text-align:right">18 750,00</span></div>
+        </div>
+        <div style="display:grid;gap:10px;font-size:13px">
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:12px"><span style="color:#64748b">Affärshändelse</span><span>Betalning registrerad 14 sep 06:12 vid bankinläsning · <a href="#ab5">visa händelsen</a></span></div>
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:12px"><span style="color:#64748b">Källa</span><span>Bankrad Handelsbanken 14 sep, 18 750,00 kr · <a href="#ab5">öppna bankraden</a></span></div>
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:12px"><span style="color:#64748b">Matchning</span><span style="display:flex;gap:6px;align-items:center;color:#166534">{{ ic.check }} Säker match (OCR och belopp)</span></div>
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:12px"><span style="color:#64748b">Skapad</span><span>Automatiskt 14 sep 06:12 · ändras aldrig</span></div>
+          <div style="display:grid;grid-template-columns:120px 1fr;gap:12px"><span style="color:#64748b">Regel</span><a href="#ab2" style="display:flex;gap:6px;align-items:center;color:#0f766e;font-weight:500">Bokfört enligt regel 2 · kundbetalning med säker match {{ ic.arrow }}</a></div>
+        </div>
+        <div style="font-size:12px;color:#64748b;line-height:1.5;margin-top:-10px">Raden finns bara på verifikat Karin skapat. Manuella verifikat och periodlås har ingen regel att peka på.</div>
+        <div style="border-top:1px solid #e2e8f0;padding-top:20px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Så ser en rättelse ut</div>
+          <div style="margin-top:10px;border:1px solid #fde68a;background:#fffbeb;border-radius:12px;padding:14px 16px;font-size:13px;display:grid;gap:10px">
+            <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-weight:600;color:#0f172a">V-236 · Återföring av <a href="#ab3">V-229</a></span><span style="color:#92400e;display:flex;gap:6px;align-items:center">{{ ic.undo }} Rättelse</span></div>
+            <div style="color:#475569">V-229 bokförde Elektroskandia 51102 på 4010 Material. Rätt konto är 5410 Förbrukningsinventarier. Originalet står kvar och får texten «Rättad av V-236».</div>
+            <div style="display:grid;grid-template-columns:1fr 90px 90px;gap:8px;border-top:1px solid #fde68a;padding-top:8px"><span><strong>4010</strong> Material</span><span style="text-align:right;color:#94a3b8">–</span><span style="text-align:right">3 180,00</span></div>
+            <div style="display:grid;grid-template-columns:1fr 90px 90px;gap:8px"><span><strong>5410</strong> Förbrukningsinventarier</span><span style="text-align:right">3 180,00</span><span style="text-align:right;color:#94a3b8">–</span></div>
+            <div style="color:#64748b;font-size:12px">Skapad 8 sep 09:20 av Maria Sjöberg · orsak: «Fel konto, verktyg inte material»</div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 4 · Huvudbok ============ -->
+<section id="ab4" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">04</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Huvudbok och rapporter</h2><span style="font-size:13px;color:#64748b">Konsultens mest använda yta. Täthet före luft. Jämförelse mot föregående period i varje rad.</span></div>
+  <div style="width:1440px;height:960px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navHuvudbok }}" as="n" hint-placeholder-count="6"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;padding:28px 40px;display:grid;gap:16px;align-content:start;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · september 2026</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Huvudbok och rapporter</h1></div>
+        <div style="display:flex;gap:10px;align-items:center;font-size:13px"><div style="display:flex;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff"><div style="padding:8px 14px;background:#f1f5f9;font-weight:600;color:#0f172a">Huvudbok</div><div style="padding:8px 14px;color:#64748b">Balansräkning</div><div style="padding:8px 14px;color:#64748b">Resultaträkning</div></div><div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px">Jämför med: <strong>Augusti 2026</strong> ⌄</div><div style="border:1px solid #e2e8f0;background:#fff;border-radius:10px;padding:8px 12px;color:#475569">Exportera SIE</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 360px;gap:16px;min-height:0">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:12.5px;align-self:start">
+          <div style="display:flex;gap:8px;padding:12px 16px;border-bottom:1px solid #e2e8f0"><div style="flex:1;border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;display:flex;gap:8px;align-items:center;color:#94a3b8">{{ ic.search }} Sök konto eller namn (t.ex. 1930, moms)</div><div style="border:1px solid #e2e8f0;border-radius:8px;padding:6px 10px;color:#1e293b">Dölj nollkonton ✓</div></div>
+          <div style="display:grid;grid-template-columns:44px 1fr 90px 90px 100px 96px 64px;gap:8px;padding:8px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>Konto</span><span>Namn</span><span style="text-align:right">Debet</span><span style="text-align:right">Kredit</span><span style="text-align:right">Utg. saldo</span><span style="text-align:right">Aug 2026</span><span style="text-align:right">Δ</span></div>
+          <sc-for list="{{ accounts }}" as="a" hint-placeholder-count="14">
+            <div style="display:grid;grid-template-columns:44px 1fr 90px 90px 100px 96px 64px;gap:8px;padding:7px 16px;border-bottom:1px solid #f1f5f9;background:{{ a.bg }};color:#1e293b;font-weight:{{ a.fw }}"><a href="#ab4" style="font-weight:600">{{ a.no }}</a><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ a.name }}</span><span style="text-align:right">{{ a.d }}</span><span style="text-align:right">{{ a.k }}</span><span style="text-align:right;font-weight:600">{{ a.ub }}</span><span style="text-align:right;color:#64748b">{{ a.prev }}</span><span style="text-align:right;color:{{ a.dcol }}">{{ a.delta }}</span></div>
+          </sc-for>
+        </div>
+        <div style="display:grid;gap:16px;align-content:start">
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:12.5px">
+            <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:baseline"><div><div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b">Konto</div><div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#0f172a">1930 Företagskonto</div></div><div style="text-align:right"><div style="font-size:11px;color:#64748b">Utg. saldo 14 sep</div><div style="font-weight:600;color:#0f172a">492 527,95</div></div></div>
+            <sc-for list="{{ acctRows }}" as="r" hint-placeholder-count="6">
+              <div style="display:grid;grid-template-columns:52px 46px 1fr 90px;gap:8px;padding:8px 16px;border-bottom:1px solid #f1f5f9;align-items:center"><a href="#ab3" style="font-weight:600">{{ r.id }}</a><span style="color:#64748b">{{ r.date }}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#1e293b">{{ r.text }}</span><span style="text-align:right;color:{{ r.col }}">{{ r.amount }}</span></div>
+            </sc-for>
+            <div style="padding:10px 16px;font-size:12px;color:#64748b;display:flex;justify-content:space-between"><span>41 transaktioner i september · 3 oavstämda</span><a href="#ab5">Avstämning →</a></div>
+          </div>
+          <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:12.5px">
+            <div style="padding:14px 16px;border-bottom:1px solid #e2e8f0;display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#0f172a">Resultaträkning</div><div style="font-size:11px;color:#64748b;display:flex;gap:16px"><span>Sep 2026</span><span>Aug 2026</span></div></div>
+            <sc-for list="{{ pnl }}" as="p" hint-placeholder-count="7">
+              <div style="display:grid;grid-template-columns:1fr 92px 92px;gap:8px;padding:7px 16px;border-bottom:1px solid #f1f5f9;font-weight:{{ p.fw }};color:#1e293b;background:{{ p.bg }}"><a href="#ab4" style="color:#1e293b">{{ p.name }}</a><span style="text-align:right">{{ p.cur }}</span><span style="text-align:right;color:#64748b">{{ p.prev }}</span></div>
+            </sc-for>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 5 · Avstämning ============ -->
+<section id="ab5" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">06</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Avstämning</h2><span style="font-size:13px;color:#64748b">Bank till vänster, systemets poster till höger, Karins matchning i mitten. Rader utan motsvarighet överst, aldrig gömda.</span></div>
+  <div style="width:1440px;height:920px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navAvstamning }}" as="n" hint-placeholder-count="6"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;padding:28px 40px;display:grid;gap:18px;align-content:start;min-width:0">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end">
+        <div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · september 2026</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Avstämning · Handelsbanken 6152 393 811</h1></div>
+        <div style="display:flex;gap:16px;font-size:13px;align-items:center"><span style="color:#475569">Bankens saldo 14 sep <strong style="color:#0f172a">492 527,95 kr</strong></span><span style="color:#475569">Bokfört 1930 <strong style="color:#0f172a">488 326,45 kr</strong></span><span style="display:flex;gap:6px;align-items:center;color:#92400e;font-weight:600;background:#fef3c7;padding:6px 10px;border-radius:8px">{{ ic.alert }} Differens 4 201,50 kr</span></div>
+      </div>
+      <div style="display:flex;gap:8px;font-size:13px"><div style="padding:7px 12px;border-radius:999px;background:#1e293b;color:#fff;font-weight:500">Alla 41</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#991b1b">{{ ic.alert }} Utan motsvarighet 1</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#92400e">{{ ic.help }} Karin föreslår, behöver ett ja 2</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#166534">{{ ic.check }} Karins säkra match 38</div></div>
+      <div style="display:grid;grid-template-columns:1fr 300px 1fr;gap:0 16px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b;padding:0 4px"><span>Bankens rader</span><span style="text-align:center">Karins matchning</span><span>Systemets poster</span></div>
+      <div style="display:grid;gap:10px">
+        <sc-for list="{{ recon }}" as="r" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:1fr 300px 1fr;gap:16px;align-items:stretch">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;font-size:13px"><span style="color:#64748b">{{ r.bdate }}</span><div><div style="font-weight:500;color:#0f172a">{{ r.btext }}</div><div style="font-size:12px;color:#64748b">{{ r.bsub }}</div></div><span style="font-weight:600;color:{{ r.bcol }}">{{ r.bamt }}</span></div>
+            <div style="border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;text-align:center;background:{{ r.mbg }};border:1px solid {{ r.mborder }};font-size:12.5px"><span style="display:flex;gap:6px;align-items:center;font-weight:600;color:{{ r.mcol }}">{{ r.micon }}{{ r.mlabel }}</span><span style="color:#475569">{{ r.msub }}</span><sc-if value="{{ r.action }}" hint-placeholder-val="{{ false }}"><div style="display:flex;gap:6px;margin-top:2px"><span style="padding:5px 10px;border-radius:8px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-weight:500;font-size:12px">{{ r.action }}</span><span style="padding:5px 10px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;color:#334155;font-size:12px">{{ r.action2 }}</span></div></sc-if></div>
+            <sc-if value="{{ r.stext }}" hint-placeholder-val="{{ true }}"><div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;font-size:13px"><div><a href="#ab3" style="font-weight:500">{{ r.stext }}</a><div style="font-size:12px;color:#64748b">{{ r.ssub }}</div></div><span style="font-weight:600;color:#0f172a">{{ r.samt }}</span></div></sc-if>
+            <sc-if value="{{ r.noSystem }}" hint-placeholder-val="{{ false }}"><div style="border:1px dashed #cbd5e1;border-radius:12px;padding:12px 16px;display:flex;align-items:center;justify-content:space-between;font-size:13px;color:#64748b"><span>Ingen faktura eller betalning matchar 4 200,00 kr</span><span style="padding:5px 10px;border-radius:8px;background:#fff;border:1px solid #e2e8f0;color:#334155;font-size:12px">Bokför manuellt</span></div></sc-if>
+          </div>
+        </sc-for>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 300px 1fr;gap:16px;align-items:stretch;margin-top:4px">
+        <div style="border:1px dashed #cbd5e1;border-radius:12px;padding:12px 16px;font-size:13px;color:#64748b;display:flex;align-items:center">Ingen bankrad ännu</div>
+        <div style="border-radius:12px;padding:10px 14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;text-align:center;background:#fff;border:1px solid #e2e8f0;font-size:12.5px"><span style="display:flex;gap:6px;align-items:center;font-weight:600;color:#64748b">{{ ic.clock }} Väntar på betalning</span><span style="color:#475569">Förfallen 3 sep · påminnelse skickad 10 sep</span></div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:12px 16px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center;font-size:13px"><div><a href="#ab3" style="font-weight:500">Faktura 2026-118 · Sandra Ek</a><div style="font-size:12px;color:#92400e;display:flex;gap:6px;align-items:center">{{ ic.alert }} På påminnelse, 11 dagar sen</div></div><span style="font-weight:600;color:#0f172a">8 640,00</span></div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 7 · Kvitton ============ -->
+<section id="ab9" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">07</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Kvitton och utlägg</h2><span style="font-size:13px;color:#64748b">Ny. Fotot bredvid Karins tolkning. Nivå 1: Karin föreslår, någon säger ja. Tre lägen: säker och bokförd, frågar, kunde inte läsas.</span></div>
+  <div style="display:flex;gap:32px;align-items:flex-start">
+  <div style="width:1440px;flex:none;height:1140px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navKvitton }}" as="n" hint-placeholder-count="8"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;display:grid;grid-template-columns:minmax(0,1fr) 440px;min-width:0">
+      <div style="padding:28px 32px 28px 40px;display:grid;gap:18px;align-content:start;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · september 2026</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Kvitton och utlägg</h1></div><div style="font-size:13px;color:#64748b">58 kvitton i september · 3 väntar</div></div>
+        <div style="display:flex;gap:8px;font-size:13px"><div style="padding:7px 12px;border-radius:999px;background:#1e293b;color:#fff;font-weight:500">Alla 58</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#991b1b">{{ ic.alert }} Kunde inte läsas 1</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#92400e">{{ ic.help }} Karin frågar 2</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#166534">{{ ic.check }} Bokförda 55</div></div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:13px">
+          <div style="display:grid;grid-template-columns:36px 48px minmax(0,1fr) 72px 80px 110px;gap:10px;padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>Foto</span><span>Datum</span><span>Leverantör · Karins tolkning</span><span>Konto</span><span style="text-align:right">Belopp</span><span>Läge</span></div>
+          <sc-for list="{{ receipts }}" as="r" hint-placeholder-count="7">
+            <div style="display:grid;grid-template-columns:36px 48px minmax(0,1fr) 72px 80px 110px;gap:10px;padding:10px 20px;border-bottom:1px solid #f1f5f9;align-items:center;background:{{ r.bg }}"><div style="width:30px;height:40px;border-radius:6px;background:{{ r.photo }};border:1px solid #e2e8f0"></div><span style="color:#64748b">{{ r.date }}</span><div><div style="font-weight:500;color:#0f172a">{{ r.vendor }}</div><div style="font-size:12px;color:#64748b">{{ r.sub }}</div></div><span style="color:#1e293b">{{ r.acct }}</span><span style="text-align:right;color:#0f172a">{{ r.amount }}</span><span style="display:flex;gap:6px;align-items:center;color:{{ r.scol }};font-weight:500">{{ r.sicon }}{{ r.status }}</span></div>
+          </sc-for>
+        </div>
+      </div>
+      <div style="border-left:1px solid #e2e8f0;background:#fff;padding:28px 24px;display:grid;grid-template-columns:140px minmax(0,1fr);gap:16px;align-content:start">
+        <div style="grid-column:1 / -1;display:flex;justify-content:space-between;align-items:baseline"><div><div style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Kvitto · 12 sep</div><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:4px 0 0">Bauhaus Kungsbacka</h2></div><span style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:#92400e;background:#fef3c7;padding:5px 10px;border-radius:999px">{{ ic.help }} Karin frågar</span></div>
+        <div style="border-radius:10px;background:linear-gradient(180deg,#f1f5f9,#e2e8f0);border:1px solid #e2e8f0;height:280px;display:flex;align-items:center;justify-content:center;font-size:12px;color:#64748b;text-align:center;padding:12px">Fotograferat kvitto<br>(Johan, 12 sep 16:40)</div>
+        <div style="display:grid;gap:10px;font-size:13px;align-content:start">
+          <div style="display:flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b">Karins tolkning <span style="display:inline-flex;align-items:center;padding:1px 7px;border-radius:999px;background:#ccfbf1;color:#115e59;font-size:11px;font-weight:600;letter-spacing:0;text-transform:none">Karin</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><span style="color:#64748b">Leverantör</span><span>Bauhaus &amp; Co KB, org.nr 969627-8836</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><span style="color:#64748b">Belopp</span><span style="font-weight:600">2 340,00 kr</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><span style="color:#64748b">Moms</span><span>468,00 kr (25 %)</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><span style="color:#64748b">Föreslaget konto</span><span><a href="#ab4" style="font-weight:600">5410</a> Förbrukningsinventarier</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><span style="color:#64748b">Anledning</span><span>Raden «Makita slagskruvdragare 18V» är ett verktyg, inte material. Johan skrev «till jobbet Ekliden» i appen.</span></div>
+          <div style="display:grid;grid-template-columns:90px 1fr;gap:8px"><span style="color:#64748b">Betalt med</span><span>Företagskort …4471 · bankrad 12 sep matchad</span></div>
+        </div>
+        <div style="grid-column:1 / -1;background:#fffbeb;border:1px solid #fde68a;border-radius:12px;padding:14px 16px;font-size:13px;display:grid;gap:10px"><div style="font-weight:600;color:#0f172a">Karin frågar: är det ett verktyg till företaget eller material som ska faktureras Brf Ekliden?</div><div style="display:flex;gap:8px;flex-wrap:wrap"><span style="padding:8px 12px;border-radius:10px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;font-weight:500">Verktyg, bokför på 5410</span><span style="padding:8px 12px;border-radius:10px;background:#fff;border:1px solid #e2e8f0;color:#334155">Material, fakturera vidare</span><span style="padding:8px 12px;border-radius:10px;background:#fff;border:1px solid #e2e8f0;color:#334155">Fråga Johan</span></div><div style="font-size:12px;color:#64748b">Ett ja skapar verifikatet med texten «Godkänt av Maria Sjöberg» och länk hit. Efter tio godkända förslag i rad föreslår Karin att gå upp till nivå 2 för kvitton.</div></div>
+        <div style="grid-column:1 / -1;border-top:1px solid #e2e8f0;padding-top:16px;display:grid;gap:8px;font-size:13px"><div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b">De två andra lägena</div><div style="display:flex;gap:8px;align-items:flex-start;color:#166534">{{ ic.check }}<span style="color:#1e293b"><strong>Säker och bokförd:</strong> Ahlsell 9 sep, 1 876,00 kr, konto 4010. Karin läste kvittot, matchade bankraden och skapade <a href="#ab3">V-232</a>. Står i listan med märket Karin och kan granskas i efterhand.</span></div><div style="display:flex;gap:8px;align-items:flex-start;color:#991b1b">{{ ic.alert }}<span style="color:#1e293b"><strong>Kunde inte läsas:</strong> foto 4 sep, blekt termopapper. Karin har bara bankraden: Preem, 812,00 kr. Frågan går till Johan: «Vad köpte du på Preem den 4 sep?». Inget bokförs förrän någon svarat.</span></div></div>
+      </div>
+    </main>
+  </div>
+  <div style="display:grid;gap:14px;flex:none">
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" hint-size="402px,874px">
+      <div style="padding:64px 20px 24px;display:grid;gap:16px;font-family:'DM Sans',sans-serif;color:#1e293b;background:#f8fafc;min-height:100%">
+        <div style="font-size:13px;color:#64748b">‹ Idag</div>
+        <div style="border-radius:16px;background:linear-gradient(180deg,#334155,#1e293b);height:380px;display:flex;align-items:flex-end;justify-content:center;padding:16px;color:rgba(255,255,255,.7);font-size:13px">Kvittot ligger i rutan, Karin läser det medan du fotar</div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:20px;display:grid;gap:12px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:#0f172a">Bauhaus · 2 340 kr</span><span style="display:inline-flex;padding:2px 8px;border-radius:999px;background:#ccfbf1;color:#115e59;font-size:12px;font-weight:600">Karin</span></div>
+          <div style="font-size:14px;color:#475569;line-height:1.5">Kvittot är sparat. Karin har läst belopp och moms. Skriv gärna vad det var till, då slipper hon fråga.</div>
+          <div style="border:1px solid #cbd5e1;border-radius:10px;padding:12px;color:#1e293b;font-size:15px">till jobbet Ekliden</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div style="height:48px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px">Privat köp</div><div style="height:48px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:15px">Klart</div></div>
+        </div>
+      </div>
+    </x-import>
+    <p style="font-size:13px;color:#475569;max-width:400px;line-height:1.55">Hantverkaren i telefonen: fota, en rad text, klart. «Sparat», inte «bokfört», eftersom Karin på nivå 1 bara föreslår.</p>
+  </div>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 8 · Leverantörsbetalningar ============ -->
+<section id="ab10" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">08</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Leverantörsbetalningar</h2><span style="font-size:13px;color:#64748b">Ny. Reskontra, attest och vägen att betala: betalfil till banken eller markering som betald manuellt. Utan den lämnar ingen Fortnox.</span></div>
+  <div style="width:1440px;height:980px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navLev }}" as="n" hint-placeholder-count="8"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;padding:28px 40px;display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:24px;align-content:start;min-width:0">
+      <div style="grid-column:1 / -1;display:flex;justify-content:space-between;align-items:flex-end"><div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · leverantörsreskontra</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Leverantörsbetalningar</h1></div><div style="display:flex;gap:16px;font-size:13px;color:#475569"><span>Skyldiga totalt <strong style="color:#0f172a">110 480,00 kr</strong></span><span>Förfaller inom 7 dagar <strong style="color:#0f172a">31 592,50 kr</strong></span><span>Stämmer mot konto <a href="#ab4">2440</a></span></div></div>
+      <div style="display:grid;gap:14px;align-content:start">
+        <div style="display:flex;gap:8px;font-size:13px"><div style="padding:7px 12px;border-radius:999px;background:#1e293b;color:#fff;font-weight:500">Obetalda 9</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;display:flex;gap:6px;align-items:center;color:#92400e">{{ ic.clock }} Väntar på attest 2</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;color:#475569">Attesterade 4</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;color:#475569">Skickade till banken 3</div><div style="padding:7px 12px;border-radius:999px;background:#fff;border:1px solid #e2e8f0;color:#475569">Betalda i september 16</div></div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:13px">
+          <div style="display:grid;grid-template-columns:20px minmax(0,1fr) 64px 84px 96px 110px 130px;gap:8px;padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span></span><span>Leverantör · faktura</span><span>Förfaller</span><span style="text-align:right">Belopp</span><span>Bokförd</span><span>Attest</span><span>Betalning</span></div>
+          <sc-for list="{{ supplierInv }}" as="s" hint-placeholder-count="9">
+            <div style="display:grid;grid-template-columns:20px minmax(0,1fr) 64px 84px 96px 110px 130px;gap:8px;padding:11px 20px;border-bottom:1px solid #f1f5f9;align-items:center;background:{{ s.bg }}"><span style="width:16px;height:16px;border-radius:4px;border:1.5px solid {{ s.cbBorder }};background:{{ s.cbBg }};display:flex;align-items:center;justify-content:center;color:#fff">{{ s.cbIcon }}</span><div><div style="font-weight:500;color:#0f172a">{{ s.vendor }}</div><div style="font-size:12px;color:#64748b">{{ s.ref }}</div></div><span style="display:flex;gap:6px;align-items:center;color:{{ s.dueCol }};font-weight:{{ s.dueFw }}">{{ s.dueIcon }}{{ s.due }}</span><span style="text-align:right;color:#0f172a">{{ s.amount }}</span><span><a href="#ab3">{{ s.voucher }}</a> <span style="display:inline-flex;padding:0 6px;border-radius:999px;background:#ccfbf1;color:#115e59;font-size:10px;font-weight:600">Karin</span></span><span style="display:flex;gap:6px;align-items:center;color:{{ s.attCol }}">{{ s.attIcon }}{{ s.attest }}</span><span style="display:flex;gap:6px;align-items:center;color:{{ s.payCol }}">{{ s.payIcon }}{{ s.pay }}</span></div>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;color:#475569;line-height:1.55">Karin bokför leverantörsfakturor på nivå 2: verifikatet skapas direkt, konsulten granskar i efterhand. Attest av betalning är alltid en människa: Johan eller den han utsett. Karin attesterar aldrig.</div>
+      </div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:14px;font-size:14px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#0f172a">4 attesterade markerade</div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#475569">Att betala</span><strong style="color:#0f172a">31 592,50 kr</strong></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#475569">Från</span><span>Handelsbanken 6152 393 811</span></div>
+          <div style="display:flex;justify-content:space-between"><span style="color:#475569">Betaldag</span><span>Respektive förfallodag</span></div>
+          <div style="height:48px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:15px">Skapa betalfil till banken</div>
+          <div style="height:44px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;justify-content:center;font-weight:500;font-size:14px">Markera som betalda manuellt</div>
+          <div style="font-size:12px;color:#64748b;line-height:1.5">Betalfilen (ISO 20022) hämtas här och godkänns i internetbanken av Johan. Bekräftat blir det först när bankraden kommer in och Karin matchar den i <a href="#ab5">avstämningen</a>.</div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:12px;font-size:13px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b">Betalfil 11 sep · 3 fakturor · 14 322,00 kr</div>
+          <div style="display:flex;gap:8px;align-items:center;color:#166534">{{ ic.check }}<span style="color:#1e293b">Förberedd 11 sep 08:50 av Maria Sjöberg</span></div>
+          <div style="display:flex;gap:8px;align-items:center;color:#166534">{{ ic.check }}<span style="color:#1e293b">Skickad: hämtad och godkänd i banken 11 sep 12:10 av Johan Lindqvist</span></div>
+          <div style="display:flex;gap:8px;align-items:center;color:#64748b">{{ ic.minus }}<span style="color:#1e293b">Bekräftad för 2 av 3. Telia 890,00 kr: utfallet är inte bekräftat, ingen bankrad ännu.</span></div>
+        </div>
+        <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:16px;padding:18px 20px;display:grid;gap:8px;font-size:13px"><div style="display:flex;gap:8px;align-items:center;font-weight:600;color:#991b1b">{{ ic.alert }} Förfaller i morgon utan attest</div><div style="color:#1e293b">Elektroskandia 51340, 12 870,00 kr, förfaller 16 sep. Johan har fått frågan i Godkännanden och på telefonen: «Ska vi betala Elektroskandia 12 870 kr i morgon?»</div></div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 9 · Moms ============ -->
+<section id="ab6" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">09</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Momsunderlag</h2><span style="font-size:13px;color:#64748b">Deklarationens rutor med väg ner till verifikaten. Signering sker alltid hos Skatteverket, av den skattskyldige. Knappen dit bär inget Karin-märke.</span></div>
+  <div style="width:1440px;height:900px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navMoms }}" as="n" hint-placeholder-count="6"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;padding:28px 40px;display:grid;grid-template-columns:1fr 400px;gap:24px;align-content:start;min-width:0">
+      <div style="grid-column:1 / -1;display:flex;justify-content:space-between;align-items:flex-end">
+        <div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · moms</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Momsunderlag · kvartal 3 2026</h1><div style="font-size:14px;color:#475569;margin-top:6px">Juli–september · deklaration och betalning senast 2026-11-12</div></div>
+        <div style="display:flex;border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;font-size:13px;background:#fff"><div style="padding:8px 14px;color:#64748b">Kv 2</div><div style="padding:8px 14px;background:#f1f5f9;font-weight:600;color:#0f172a">Kv 3 2026</div><div style="padding:8px 14px;color:#94a3b8">Kv 4</div></div>
+      </div>
+      <div style="display:grid;gap:14px;align-content:start">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+          <sc-for list="{{ vat }}" as="b" hint-placeholder-count="6">
+            <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:18px 20px;display:grid;gap:8px;grid-column:{{ b.span }}"><div style="display:flex;justify-content:space-between;font-size:12px;color:#64748b"><span>Ruta {{ b.no }}</span><span>{{ b.count }} verifikat</span></div><div style="font-size:14px;font-weight:500;color:#0f172a">{{ b.name }}</div><div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-size:22px;font-weight:600;color:#0f172a;font-family:'Space Grotesk',sans-serif">{{ b.amount }}</span><a href="#ab3" style="font-size:13px">Visa verifikaten →</a></div></div>
+          </sc-for>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:18px 20px;font-size:13px;display:grid;gap:10px">
+          <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b">Kontroller innan underlaget förbereddes</div>
+          <div style="display:flex;gap:8px;align-items:center;color:#166534">{{ ic.check }} <span style="color:#1e293b">Ruta 10 stämmer mot konto 2610 (210 650,00 kr)</span></div>
+          <div style="display:flex;gap:8px;align-items:center;color:#166534">{{ ic.check }} <span style="color:#1e293b">Ruta 48 stämmer mot konto 2641 (96 412,00 kr)</span></div>
+          <div style="display:flex;gap:8px;align-items:center;color:#166534">{{ ic.check }} <span style="color:#1e293b">ROT-utbetalningar från Skatteverket (12 st) är inte försäljning och ligger utanför ruta 05</span></div>
+          <div style="display:flex;gap:8px;align-items:center;color:#92400e">{{ ic.alert }} <span style="color:#1e293b">September är inte låst. Ändras ett verifikat i kv 3 efter skickat underlag krävs en rättad deklaration hos Skatteverket.</span></div>
+        </div>
+      </div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:18px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#0f172a">Vägen till Skatteverket</div>
+          <div style="display:grid;gap:0">
+            <div style="display:grid;grid-template-columns:24px 1fr;gap:12px"><div style="display:grid;justify-items:center"><span style="width:24px;height:24px;border-radius:50%;background:#dcfce7;color:#166534;display:flex;align-items:center;justify-content:center">{{ ic.check }}</span><span style="width:2px;flex:1;background:#dcfce7;min-height:22px"></span></div><div style="padding-bottom:14px"><div style="font-weight:600;color:#0f172a;font-size:14px;display:flex;gap:8px;align-items:center">Förberett <span style="display:inline-flex;padding:1px 7px;border-radius:999px;background:#ccfbf1;color:#115e59;font-size:11px;font-weight:600">Karin</span></div><div style="font-size:13px;color:#64748b">Sammanställt av Karin, kontrollerat 10 sep 15:40 av Maria Sjöberg · 171 verifikat</div></div></div>
+            <div style="display:grid;grid-template-columns:24px 1fr;gap:12px"><div style="display:grid;justify-items:center"><span style="width:24px;height:24px;border-radius:50%;background:#dcfce7;color:#166534;display:flex;align-items:center;justify-content:center">{{ ic.check }}</span><span style="width:2px;flex:1;background:#e2e8f0;min-height:22px"></span></div><div style="padding-bottom:14px"><div style="font-weight:600;color:#0f172a;font-size:14px">Skickat till Skatteverket</div><div style="font-size:13px;color:#64748b">11 sep 09:14 · överföringen bekräftad av Skatteverkets mottagning</div></div></div>
+            <div style="display:grid;grid-template-columns:24px 1fr;gap:12px"><div style="display:grid;justify-items:center"><span style="width:24px;height:24px;border-radius:50%;border:2px solid #cbd5e1;color:#64748b;display:flex;align-items:center;justify-content:center;box-sizing:border-box">{{ ic.minus }}</span></div><div><div style="font-weight:600;color:#0f172a;font-size:14px">Bekräftat</div><div style="font-size:13px;color:#64748b">Utfallet är inte bekräftat. Deklarationen signeras av den skattskyldige hos Skatteverket, inte av Handymate eller byrån.</div></div></div>
+          </div>
+          <div style="background:#f0fdfa;border:1px solid #ccfbf1;border-radius:12px;padding:14px 16px;font-size:13px;color:#134e4a;line-height:1.5">Underlaget är förberett och skickat till Skatteverket. <strong>Johan Lindqvist signerar där</strong> med BankID senast 12 nov. Vi visar «bekräftat» först när Skatteverket svarat.</div>
+          <div style="height:48px;border-radius:12px;background:linear-gradient(135deg,#0f766e,#14b8a6);color:#fff;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:15px">Öppna Skatteverket och signera {{ ic.external }}</div>
+          <div style="font-size:13px;color:#475569;text-align:center">Att betala: <strong style="color:#0f172a">114 238 kr</strong> till skattekontot, bankgiro 5050-1055, OCR <span style="font-family:'JetBrains Mono',monospace">5561234567 0 3</span></div>
+        </div>
+        <div style="font-size:13px;color:#475569;line-height:1.55;padding:0 4px">Samma vy för Johan på telefon säger: «Momsen för juli–september är förberedd. Du signerar hos Skatteverket före den 12 november.» Knappen är densamma.</div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 7 · Periodavslut ============ -->
+<section id="ab7" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">10</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Periodavslut och arkiv</h2><span style="font-size:13px;color:#64748b">Checklistan som blir grön, sedan låsning. Upplåsning loggas. Arkivet: underlagen per period, bevarade i sju år.</span></div>
+  <div style="width:1440px;height:1320px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="margin:0 4px 14px;background:#2a4a5a;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;font-size:13px"><div><div style="font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#5eead4">Klient</div><div style="font-weight:600">Lindqvist El &amp; Montage AB</div></div><span style="color:rgba(255,255,255,.6)">⌄</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Bokföring</div>
+      <sc-for list="{{ navPeriod }}" as="n" hint-placeholder-count="6"><div style="padding:9px 10px;border-radius:8px;font-size:14px;background:{{ n.bg }};color:{{ n.col }};font-weight:{{ n.fw }}">{{ n.label }}</div></sc-for>
+      <div style="margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding-top:14px;padding-left:10px;font-size:13px;color:rgba(255,255,255,.7)">← Till byråvyn</div>
+    </aside>
+    <main style="flex:1;padding:28px 40px;display:grid;grid-template-columns:1fr 1fr;gap:24px;align-content:start;min-width:0">
+      <div style="grid-column:1 / -1"><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Bokföring · periodavslut</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Periodavslut och arkiv</h1></div>
+      <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:18px;align-content:start">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:#0f172a">September 2026</div><span style="font-size:13px;color:#64748b">4 av 7 klara</span></div>
+        <div style="height:6px;background:#f1f5f9;border-radius:3px;overflow:hidden"><div style="width:57%;height:100%;background:#14b8a6"></div></div>
+        <div style="display:grid">
+          <sc-for list="{{ checklist }}" as="c" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:28px 1fr auto;gap:12px;align-items:start;padding:12px 0;border-top:1px solid #f1f5f9"><span style="width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:{{ c.bg }};color:{{ c.col }}">{{ c.icon }}</span><div><div style="font-size:14px;font-weight:500;color:#0f172a">{{ c.title }}</div><div style="font-size:13px;color:#64748b;margin-top:2px">{{ c.sub }}</div></div><a href="{{ c.href }}" style="font-size:13px;white-space:nowrap">{{ c.link }}</a></div>
+          </sc-for>
+        </div>
+        <div style="display:grid;gap:8px">
+          <div style="height:48px;border-radius:12px;background:#e2e8f0;color:#64748b;display:flex;align-items:center;justify-content:center;gap:8px;font-weight:500;font-size:15px">{{ ic.lock }} Lås september · 3 punkter kvar</div>
+          <div style="font-size:12px;color:#64748b;text-align:center">Låsningen loggas med namn och tidpunkt och syns för ägaren. Låsta verifikat kan bara rättas med återföring i en öppen period.</div>
+        </div>
+      </div>
+      <div style="display:grid;gap:16px;align-content:start">
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:16px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:#0f172a">Augusti 2026</div><span style="display:flex;gap:6px;align-items:center;font-size:13px;font-weight:600;color:#166534;background:#dcfce7;padding:5px 10px;border-radius:999px">{{ ic.lock }} Låst</span></div>
+          <div style="font-size:14px;color:#1e293b">Låst 8 sep 09:41 av Maria Sjöberg. Alla 6 punkter klara, 44 verifikat, moms ingår i kv 3.</div>
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px;display:grid;gap:0">
+            <div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin-bottom:10px">Logg</div>
+            <sc-for list="{{ lockLog }}" as="l" hint-placeholder-count="5">
+              <div style="display:grid;grid-template-columns:100px 20px 1fr;gap:10px;padding:7px 0;font-size:13px;align-items:start"><span style="color:#64748b">{{ l.when }}</span><span style="color:{{ l.col }};margin-top:2px">{{ l.icon }}</span><span style="color:#1e293b">{{ l.text }}</span></div>
+            </sc-for>
+          </div>
+          <div style="display:flex;gap:8px"><div style="height:40px;padding:0 16px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;gap:8px;font-weight:500;font-size:14px">{{ ic.unlock }} Lås upp augusti</div><div style="height:40px;padding:0 16px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;font-weight:500;font-size:14px">Rapporter för augusti</div></div>
+        </div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 20px 40px rgba(15,23,42,.08);padding:24px;display:grid;gap:14px;font-size:14px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#0f172a;display:flex;gap:8px;align-items:center">{{ ic.unlock }} Lås upp augusti 2026?</div>
+          <div style="color:#475569;line-height:1.5">Perioden öppnas för ändringar. Upplåsningen loggas med ditt namn, tidpunkt och orsak, och Johan Lindqvist får ett besked.</div>
+          <div><div style="font-size:12px;color:#64748b;margin-bottom:6px">Orsak (krävs)</div><div style="border:1px solid #cbd5e1;border-radius:10px;padding:10px 12px;color:#1e293b;min-height:60px">Leverantörsfaktura Ahlsell 87990 daterad 28 aug kom in efter låsning.</div></div>
+          <div style="display:flex;gap:8px;justify-content:flex-end"><div style="height:40px;padding:0 16px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;font-weight:500">Avbryt</div><div style="height:40px;padding:0 16px;border-radius:12px;background:#1e293b;color:#fff;display:flex;align-items:center;font-weight:500">Lås upp och logga</div></div>
+        </div>
+      </div>
+      <div style="grid-column:1 / -1;background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:16px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:#0f172a">Arkiv</div><span style="font-size:13px;color:#64748b">Underlag bevaras i sju år efter räkenskapsårets slut (bokföringslagen 7 kap). Inget här kan raderas, bara hämtas.</span></div>
+        <div style="border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;font-size:13px">
+          <div style="display:grid;grid-template-columns:130px 90px 110px 110px 110px 100px 1fr 150px;gap:12px;padding:9px 16px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>Period</span><span>Läge</span><span>Verifikat</span><span>Kvittofoton</span><span>Fakturor</span><span>Bankfiler</span><span>Bevaras till</span><span>Ta ut</span></div>
+          <sc-for list="{{ archive }}" as="a" hint-placeholder-count="4">
+            <div style="display:grid;grid-template-columns:130px 90px 110px 110px 110px 100px 1fr 150px;gap:12px;padding:10px 16px;border-bottom:1px solid #f1f5f9;align-items:center"><span style="font-weight:500;color:#0f172a">{{ a.period }}</span><span style="display:flex;gap:6px;align-items:center;color:{{ a.col }}">{{ a.icon }}{{ a.state }}</span><a href="#ab3">{{ a.vouchers }}</a><a href="#ab9">{{ a.receipts }}</a><a href="#ab10">{{ a.invoices }}</a><a href="#ab5">{{ a.bank }}</a><span style="color:#64748b">{{ a.keep }}</span><span style="color:#0369a1">{{ a.export }}</span></div>
+          </sc-for>
+        </div>
+        <div style="font-size:13px;color:#475569;line-height:1.55">Uttaget är en mapp per period: SIE 4 med alla verifikat, varje kvittofoto och faktura som PDF namngiven med sitt V-nummer, bankfilerna oförändrade, och loggen över låsningar. Konsulten kan ta ut hela räkenskapsåret på en gång inför bokslutet.</div>
+      </div>
+    </main>
+  </div>
+</section>
+
+<!-- ============ ARTBOARD 8 · Byråvyn ============ -->
+<section id="ab8" style="display:grid;gap:16px">
+  <div style="display:flex;align-items:baseline;gap:14px"><span style="font-family:'JetBrains Mono',monospace;font-size:12px;font-weight:500;padding:4px 8px;border-radius:6px;background:#1e293b;color:#fff">11</span><h2 style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;color:#0f172a;margin:0">Byråvyn</h2><span style="font-size:13px;color:#64748b">Konsultens ytterdörr: periodens läge, Karins arbete, undantag, nästa moms. Till höger ägarens spegelbild: vem har åtkomst, sedan när, och spåret.</span></div>
+  <div style="width:1440px;height:900px;display:flex;background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden">
+    <aside style="width:232px;flex:none;background:#1a3a4a;padding:20px 12px;display:flex;flex-direction:column;color:#fff">
+      <div style="display:flex;align-items:center;gap:10px;padding:6px 10px 14px"><img src="assets/logo.png" alt="" style="width:28px;height:28px"><span style="font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:17px">Handymate</span></div>
+      <div style="padding:4px 10px 6px;font-size:10px;letter-spacing:.14em;text-transform:uppercase;color:rgba(255,255,255,.5)">Byrå</div>
+      <div style="padding:9px 10px;border-radius:8px;font-size:14px;background:rgba(255,255,255,.12);color:#fff;font-weight:600">Klienter</div>
+      <div style="padding:9px 10px;border-radius:8px;font-size:14px;color:rgba(255,255,255,.8)">Deadlines</div>
+      <div style="padding:9px 10px;border-radius:8px;font-size:14px;color:rgba(255,255,255,.8)">Medarbetare</div>
+      <div style="margin-top:auto;display:flex;gap:10px;align-items:center;padding:14px 10px 0;border-top:1px solid rgba(255,255,255,.12)"><div style="width:32px;height:32px;border-radius:50%;background:#0f766e;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">MS</div><div><div style="font-size:13px;font-weight:600">Maria Sjöberg</div><div style="font-size:11px;color:rgba(255,255,255,.55)">Sjöberg Redovisning AB</div></div></div>
+    </aside>
+    <main style="flex:1;padding:28px 40px;display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:24px;align-content:start;min-width:0">
+      <div style="display:grid;gap:18px;align-content:start;min-width:0">
+        <div style="display:flex;justify-content:space-between;align-items:flex-end"><div><div style="font-size:12px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#0f766e">Sjöberg Redovisning AB</div><h1 style="font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;letter-spacing:-.02em;color:#0f172a;margin:6px 0 0">Klienter</h1></div><div style="font-size:13px;color:#64748b">Måndag 14 sep 2026 · 6 klienter · 15 punkter väntar</div></div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);overflow:hidden;font-size:13px">
+          <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 90px 120px minmax(0,1.3fr) 96px;gap:12px;padding:10px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;font-size:11px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:#64748b"><span>Företag</span><span>Period</span><span>Läge</span><span>Karins arbete · undantag</span><span>Nästa moms</span></div>
+          <sc-for list="{{ clients }}" as="c" hint-placeholder-count="6">
+            <div style="display:grid;grid-template-columns:minmax(0,1.4fr) 90px 120px minmax(0,1.3fr) 96px;gap:12px;padding:14px 20px;border-bottom:1px solid #f1f5f9;align-items:center;background:{{ c.bg }}"><div><a href="#ab2" style="font-weight:600;color:#0f172a">{{ c.name }}</a><div style="font-size:12px;color:#64748b">{{ c.sub }} · {{ c.last }}</div></div><span style="color:#1e293b">{{ c.period }}</span><span style="display:flex;gap:6px;align-items:center;color:{{ c.scol }};font-weight:500">{{ c.sicon }}{{ c.status }}</span><span style="color:#1e293b">{{ c.waiting }}</span><span style="color:#1e293b">{{ c.vat }}</span></div>
+          </sc-for>
+        </div>
+        <p style="font-size:13px;color:#475569;line-height:1.55;max-width:720px">Klienter som ännu ligger i Fortnox visas med det som står i byråns egen planering, utan periodstatus från oss. Vi påstår inget om system vi inte läser.</p>
+      </div>
+      <div style="display:grid;gap:12px;align-content:start">
+        <div style="font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:#64748b">Ägarens sida · kort på Bokföringsöversikten</div>
+        <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;box-shadow:0 2px 8px rgba(15,23,42,.05);padding:24px;display:grid;gap:16px;font-size:14px">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:#0f172a">Vem har tillgång till din bokföring</div>
+          <div style="display:grid;gap:12px">
+            <div style="display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center"><div style="width:36px;height:36px;border-radius:50%;background:#ccfbf1;color:#0f766e;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">MS</div><div><div style="font-weight:600;color:#0f172a">Maria Sjöberg</div><div style="font-size:13px;color:#64748b">Sjöberg Redovisning AB · kan bokföra, rätta och låsa</div></div><div style="font-size:12px;color:#64748b;text-align:right">sedan<br>2 jan 2026</div></div>
+            <div style="display:grid;grid-template-columns:36px 1fr auto;gap:12px;align-items:center"><div style="width:36px;height:36px;border-radius:50%;background:#f1f5f9;color:#475569;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600">ED</div><div><div style="font-weight:600;color:#0f172a">Erik Dahl</div><div style="font-size:13px;color:#64748b">Sjöberg Redovisning AB · kan bara läsa</div></div><div style="font-size:12px;color:#64748b;text-align:right">sedan<br>15 aug 2026</div></div>
+          </div>
+          <div style="border-top:1px solid #e2e8f0;padding-top:14px"><div style="font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:#64748b;margin-bottom:10px">Vad de gjort senast</div>
+            <sc-for list="{{ trail }}" as="t" hint-placeholder-count="4"><div style="display:grid;grid-template-columns:96px 1fr;gap:10px;padding:6px 0;font-size:13px"><span style="color:#64748b">{{ t.when }}</span><span style="color:#1e293b">{{ t.text }}</span></div></sc-for>
+          </div>
+          <div style="display:flex;gap:8px"><a href="#ab7" style="height:40px;padding:0 16px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#334155;display:flex;align-items:center;font-weight:500;font-size:14px">Hela spåret</a><div style="height:40px;padding:0 16px;border-radius:12px;background:#fff;border:1px solid #e2e8f0;color:#991b1b;display:flex;align-items:center;font-weight:500;font-size:14px">Ta bort tillgång</div></div>
+        </div>
+        <p style="font-size:13px;color:#475569;line-height:1.55">Kortet ligger på ägarens Bokföringsöversikt och på telefonen under «Vem har tillgång», inte i inställningar. Varje rad i spåret länkar till det verifikat eller den låsning den handlar om.</p>
+      </div>
+    </main>
+  </div>
+</section>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  renderVals() {
+    const svg = (p, sw = 2) => React.createElement('svg', { width: 14, height: 14, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: sw, strokeLinecap: 'round', strokeLinejoin: 'round', style: { flex: 'none' }, dangerouslySetInnerHTML: { __html: p } });
+    const ic = {
+      check: svg('<polyline points="20 6 9 17 4 12"/>'),
+      alert: svg('<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
+      help: svg('<circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12.01" y2="17"/>'),
+      lock: svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/>'),
+      unlock: svg('<rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/>'),
+      clock: svg('<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>'),
+      minus: svg('<line x1="5" y1="12" x2="19" y2="12"/>'),
+      undo: svg('<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>'),
+      external: svg('<path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/>'),
+      search: svg('<circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>', 1.75),
+      dot: svg('<circle cx="12" cy="12" r="10"/>'),
+      pause: svg('<rect x="6" y="4" width="4" height="16"/><rect x="14" y="4" width="4" height="16"/>'),
+      arrow: svg('<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/>'),
+      bolt: svg('<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'),
+    };
+    const OK = '#166534', WARN = '#92400e', ERR = '#991b1b', MUTE = '#64748b';
+    const navItems = ['Översikt', 'Verifikationer', 'Huvudbok & rapporter', 'Avstämning', 'Kvitton & utlägg', 'Leverantörsbetalningar', 'Moms', 'Periodavslut & arkiv'];
+    const nav = (active) => navItems.map(l => ({ label: l, bg: l === active ? 'rgba(255,255,255,.12)' : 'transparent', col: l === active ? '#fff' : 'rgba(255,255,255,.8)', fw: l === active ? 600 : 400 }));
+    const mainNav = [
+      { label: 'Hem', note: 'besked-kort' }, { label: 'Idag', note: '' }, { label: 'Offerter', note: '' }, { label: 'Projekt', note: '' },
+      { label: 'Fakturor', note: '«Bokförd som V-…»' }, { label: 'Kunder', note: '' }, { label: 'Kalender', note: '' },
+      { label: 'Automationer', note: '' }, { label: 'Godkännanden', note: 'frågor' }, { label: 'Impact', note: '' },
+    ];
+    const waiting = [
+      { icon: ic.alert, col: ERR, title: 'Bankrad 14 sep, 4 200,00 kr Swish från B. Berglund, saknar motsvarighet', sub: 'Ingen faktura eller betalning matchar. Frågan är ställd till Johan.', who: 'Johan Lindqvist' },
+      { icon: ic.help, col: WARN, title: 'Differens 1,50 kr på betalning av faktura 2026-104', sub: 'Brf Solgläntan betalade 12 480,50 kr av 12 482,00 kr. Föreslagen avrundning mot 3740.', who: 'Maria Sjöberg' },
+      { icon: ic.help, col: WARN, title: 'Kortköp Circle K 11 sep, 1 249,00 kr, kvitto saknas', sub: 'Föreslagen match mot utlägg av Johan. Behöver ett ja.', who: 'Maria Sjöberg' },
+    ];
+    const lvl = (n) => n === 3 ? { level: 'Nivå 3 · bokför själv', lcol: OK, licon: ic.bolt } : n === 2 ? { level: 'Nivå 2 · bokför, granskas', lcol: '#0f766e', licon: ic.check } : { level: 'Nivå 1 · föreslår', lcol: MUTE, licon: ic.help };
+    const trust = [
+      { type: 'Kundfaktura med ROT', ...lvl(3), rule: 'regel 4 · kundfaktura med ROT', on: true, off: false, offText: '' },
+      { type: 'Kundbetalning, säker match', ...lvl(3), rule: 'regel 2 · kundbetalning med säker match', on: true, off: false, offText: '' },
+      { type: 'Leverantörsfaktura', ...lvl(2), rule: 'regel 7 · leverantörsfaktura från känd leverantör', on: true, off: false, offText: '' },
+      { type: 'Kortköp utan kvitto', ...lvl(1), rule: 'regel 11 · kortköp matchas mot utlägg', on: false, off: true, offText: 'Avstängd av Maria 15 sep, Karin frågar från nästa gång.' },
+      { type: 'Kontant och Swish utan faktura', ...lvl(1), rule: 'regel 12 · inbetalning utan motsvarighet', on: true, off: false, offText: '' },
+    ];
+    const R2 = 'regel 2 · kundbetalning med säker match', R4 = 'regel 4 · kundfaktura med ROT', R7 = 'regel 7 · leverantörsfaktura från känd leverantör';
+    const vouchers = [
+      { id: 'V-243', rule: R2, date: '14 sep', text: 'Betalning faktura 2026-104, Brf Solgläntan', type: 'Kundbetalning', amount: '12 480,50', status: 'Differens 1,50', scol: WARN, sicon: ic.help, bg: 'transparent' },
+      { id: 'V-242', rule: R7, date: '14 sep', text: 'Leverantörsfaktura Ahlsell 88213', type: 'Lev.faktura', amount: '6 412,50', status: 'Bokfört', scol: MUTE, sicon: ic.check, bg: 'transparent' },
+      { id: 'V-241', rule: R2, date: '14 sep', text: 'Betalning faktura 2026-112, Familjen Holm', type: 'Kundbetalning', amount: '18 750,00', status: 'Bokfört', scol: MUTE, sicon: ic.check, bg: '#f0fdfa' },
+      { id: 'V-240', rule: 'regel 5 · ROT-utbetalning från Skatteverket', date: '12 sep', text: 'ROT-utbetalning Skatteverket, ansökan 2026-109', type: 'ROT', amount: '15 000,00', status: 'Bokfört', scol: MUTE, sicon: ic.check, bg: 'transparent' },
+      { id: 'V-239', rule: R4, date: '11 sep', text: 'Kundfaktura 2026-121, Brf Ekliden', type: 'Kundfaktura', amount: '42 300,00', status: 'Bokfört', scol: MUTE, sicon: ic.check, bg: 'transparent' },
+      { id: 'V-238', rule: 'regel 3 · påminnelseavgift', date: '10 sep', text: 'Påminnelseavgift faktura 2026-118, Sandra Ek', type: 'Kundfaktura', amount: '60,00', status: 'Obetald', scol: WARN, sicon: ic.clock, bg: 'transparent' },
+      { id: 'V-237', rule: R4, date: '9 sep', text: 'Kundfaktura 2026-120, Karl Nyström', type: 'Kundfaktura', amount: '9 875,00', status: 'Bokfört', scol: MUTE, sicon: ic.check, bg: 'transparent' },
+      { id: 'V-236', rule: null, date: '8 sep', text: 'Rättelse: återföring av V-229', type: 'Rättelse', amount: '3 180,00', status: 'Pekar på V-229', scol: WARN, sicon: ic.undo, bg: 'transparent' },
+      { id: 'V-235', rule: R7, date: '8 sep', text: 'Leverantörsfaktura Telia, september', type: 'Lev.faktura', amount: '890,00', status: 'Bokfört', scol: MUTE, sicon: ic.check, bg: 'transparent' },
+      { id: 'V-229', rule: R7, date: '3 sep', text: 'Leverantörsfaktura Elektroskandia 51102', type: 'Lev.faktura', amount: '3 180,00', status: 'Rättad av V-236', scol: WARN, sicon: ic.undo, bg: 'transparent' },
+    ];
+    const acc = (no, name, ib, d, k, ub, prev, delta, up, fw = 400, bg = 'transparent') => ({ no, name, ib, d, k, ub, prev, delta, dcol: up === null ? MUTE : (up ? '#166534' : '#991b1b'), fw, bg });
+    const accounts = [
+      acc('1510', 'Kundfordringar', '312 400,00', '264 900,00', '241 150,00', '336 150,00', '312 400,00', '+7,6 %', true),
+      acc('1630', 'Skattekonto', '4 120,00', '0,00', '0,00', '4 120,00', '4 120,00', '0,0 %', null),
+      acc('1930', 'Företagskonto', '418 210,45', '288 640,00', '218 524,50', '488 326,45', '418 210,45', '+16,8 %', true, 600, '#f0fdfa'),
+      acc('2440', 'Leverantörsskulder', '−96 340,00', '84 200,00', '98 340,00', '−110 480,00', '−96 340,00', '+14,7 %', false),
+      acc('2610', 'Utgående moms 25 %', '−141 200,00', '0,00', '69 450,00', '−210 650,00', '−141 200,00', '', null),
+      acc('2641', 'Ingående moms', '73 210,00', '23 202,00', '0,00', '96 412,00', '73 210,00', '', null),
+      acc('2650', 'Redovisningskonto moms', '−94 380,00', '0,00', '0,00', '−94 380,00', '−94 380,00', '0,0 %', null),
+      acc('2890', 'Övriga kortfristiga skulder', '−12 000,00', '0,00', '0,00', '−12 000,00', '−12 000,00', '0,0 %', null),
+      acc('3001', 'Försäljning tjänster 25 %', '−1 984 300,00', '0,00', '193 200,00', '−2 177 500,00', '−1 984 300,00', '+6,5 %', true),
+      acc('3010', 'Försäljning material 25 %', '−612 800,00', '0,00', '96 250,00', '−709 050,00', '−612 800,00', '−1,8 %', false),
+      acc('3740', 'Öres- och kronutjämning', '−12,30', '0,00', '0,00', '−12,30', '−12,30', '0,0 %', null),
+      acc('4010', 'Inköp material', '721 400,00', '98 340,00', '3 180,00', '816 560,00', '721 400,00', '+2,1 %', false),
+      acc('4600', 'Underentreprenörer', '186 000,00', '31 200,00', '0,00', '217 200,00', '186 000,00', '+18,0 %', false),
+      acc('5410', 'Förbrukningsinventarier', '22 610,00', '3 180,00', '0,00', '25 790,00', '22 610,00', '', null),
+      acc('5611', 'Drivmedel', '38 420,00', '1 249,00', '0,00', '39 669,00', '38 420,00', '−32,0 %', true),
+      acc('6212', 'Telefon och internet', '7 120,00', '890,00', '0,00', '8 010,00', '7 120,00', '0,0 %', null),
+    ];
+    const acctRows = [
+      { id: 'V-243', date: '14 sep', text: 'Betalning 2026-104, Brf Solgläntan', amount: '+12 480,50', col: OK },
+      { id: 'V-241', date: '14 sep', text: 'Betalning 2026-112, Familjen Holm', amount: '+18 750,00', col: OK },
+      { id: 'V-242', date: '13 sep', text: 'Ahlsell 88213', amount: '−6 412,50', col: '#1e293b' },
+      { id: 'V-240', date: '12 sep', text: 'ROT-utbetalning Skatteverket', amount: '+15 000,00', col: OK },
+      { id: 'V-235', date: '10 sep', text: 'Telia september', amount: '−890,00', col: '#1e293b' },
+      { id: 'V-233', date: '9 sep', text: 'Betalning 2026-115, Brf Ekliden', amount: '+31 200,00', col: OK },
+    ];
+    const pnl = [
+      { name: 'Nettoomsättning', cur: '289 450', prev: '271 800', fw: 500, bg: 'transparent' },
+      { name: 'Material', cur: '−95 160', prev: '−88 400', fw: 400, bg: 'transparent' },
+      { name: 'Underentreprenörer', cur: '−31 200', prev: '−26 400', fw: 400, bg: 'transparent' },
+      { name: 'Övriga externa kostnader', cur: '−12 615', prev: '−14 980', fw: 400, bg: 'transparent' },
+      { name: 'Personalkostnader', cur: '−86 400', prev: '−86 400', fw: 400, bg: 'transparent' },
+      { name: 'Rörelseresultat', cur: '64 075', prev: '55 620', fw: 600, bg: '#f8fafc' },
+      { name: 'Ackumulerat jan–sep', cur: '512 340', prev: '448 265', fw: 500, bg: 'transparent' },
+    ];
+    const m = (kind) => kind === 'ok' ? { mbg: '#f0fdf4', mborder: '#bbf7d0', mcol: OK, micon: ic.check }
+      : kind === 'warn' ? { mbg: '#fffbeb', mborder: '#fde68a', mcol: WARN, micon: ic.help }
+      : { mbg: '#fef2f2', mborder: '#fecaca', mcol: ERR, micon: ic.alert };
+    const recon = [
+      { bdate: '14 sep', btext: 'Swish BERGLUND B', bsub: 'Meddelande: «tack för hjälpen»', bamt: '+4 200,00', bcol: OK, ...m('err'), mlabel: 'Utan motsvarighet', msub: 'Karin hittar inget. Fråga ställd till Johan 14 sep', action: 'Bokför som intäkt', action2: 'Vänta på svar', noSystem: true },
+      { bdate: '14 sep', btext: 'Brf Solgläntan', bsub: 'OCR 2026104 · 12 480,50', bamt: '+12 480,50', bcol: OK, ...m('warn'), mlabel: 'Karin föreslår', msub: 'Differens 1,50 kr · förslag: avrundning mot 3740', action: 'Ja, avrunda', action2: 'Nej', stext: 'Faktura 2026-104 · Brf Solgläntan', ssub: 'Förfaller 15 sep', samt: '12 482,00' },
+      { bdate: '11 sep', btext: 'CIRCLE K KUNGSBACKA', bsub: 'Kortköp 5611 …4471', bamt: '−1 249,00', bcol: '#1e293b', ...m('warn'), mlabel: 'Karin föreslår', msub: 'Utlägg Johan L, kvitto saknas', action: 'Ja, drivmedel', action2: 'Nej', stext: 'Kortköp · Johan Lindqvist', ssub: 'Registrerat i appen 11 sep 16:02', samt: '1 249,00' },
+      { bdate: '14 sep', btext: 'Familjen Holm', bsub: 'OCR 2026112', bamt: '+18 750,00', bcol: OK, ...m('ok'), mlabel: 'Karins säkra match', msub: 'OCR och belopp · V-241', stext: 'Faktura 2026-112 · Familjen Holm', ssub: 'Bokförd som V-241', samt: '18 750,00' },
+      { bdate: '13 sep', btext: 'AHLSELL SVERIGE AB', bsub: 'Bankgiro 5522-3011', bamt: '−6 412,50', bcol: '#1e293b', ...m('ok'), mlabel: 'Karins säkra match', msub: 'Belopp och mottagare · V-242', stext: 'Leverantörsfaktura Ahlsell 88213', ssub: 'Bokförd som V-242', samt: '6 412,50' },
+      { bdate: '12 sep', btext: 'SKATTEVERKET', bsub: 'ROT-utbetalning', bamt: '+15 000,00', bcol: OK, ...m('ok'), mlabel: 'Karins säkra match', msub: 'Ansökan 2026-109 · V-240', stext: 'ROT-ansökan 2026-109 · Familjen Holm', ssub: 'Skickad 2 sep, utbetald 12 sep', samt: '15 000,00' },
+    ];
+    const vat = [
+      { no: '05', name: 'Momspliktig försäljning 25 %', amount: '842 600 kr', count: 118, span: 'auto' },
+      { no: '10', name: 'Utgående moms 25 %', amount: '210 650 kr', count: 118, span: 'auto' },
+      { no: '48', name: 'Ingående moms att dra av', amount: '96 412 kr', count: 71, span: 'auto' },
+      { no: '49', name: 'Moms att betala', amount: '114 238 kr', count: 189, span: 'auto' },
+    ];
+    const checklist = [
+      { icon: ic.alert, bg: '#fee2e2', col: ERR, title: 'Alla bankrader är avstämda', sub: '3 av 41 rader kvar, varav 1 utan motsvarighet', link: 'Avstämning →', href: '#ab5' },
+      { icon: ic.help, bg: '#fef3c7', col: WARN, title: 'Inga oförklarade differenser', sub: '1 differens: 1,50 kr på faktura 2026-104, föreslagen avrundning', link: 'Visa →', href: '#ab5' },
+      { icon: ic.help, bg: '#fef3c7', col: WARN, title: 'Karins öppna frågor är besvarade', sub: '2 frågor öppna: kvitto Bauhaus 12 sep och kvitto Preem 4 sep som inte gick att läsa', link: 'Kvitton →', href: '#ab9' },
+      { icon: ic.check, bg: '#dcfce7', col: OK, title: 'Alla kundfakturor är bokförda', sub: '40 av 40 · 1 på påminnelse (2026-118), påverkar inte låsning', link: 'Verifikat →', href: '#ab3' },
+      { icon: ic.check, bg: '#dcfce7', col: OK, title: 'Alla leverantörsfakturor är bokförda', sub: '25 av 25 · 2 obetalda, förfaller i oktober', link: 'Verifikat →', href: '#ab3' },
+      { icon: ic.check, bg: '#dcfce7', col: OK, title: 'Momsunderlag för kvartalet är förberett och skickat', sub: 'Utfallet är inte bekräftat. Johan signerar hos Skatteverket senast 12 nov.', link: 'Moms →', href: '#ab6' },
+      { icon: ic.check, bg: '#dcfce7', col: OK, title: 'Huvudbok stämmer mot bank', sub: 'Efter avstämning ovan: bokfört 1930 lika med bankens saldo', link: 'Huvudbok →', href: '#ab4' },
+    ];
+    const lockLog = [
+      { when: '8 sep 09:41', icon: ic.lock, col: OK, text: 'Låst igen av Maria Sjöberg. Johan Lindqvist meddelades.' },
+      { when: '8 sep 09:20', icon: ic.undo, col: WARN, text: 'V-236 skapad: återföring av V-229 (fel konto).' },
+      { when: '8 sep 09:12', icon: ic.check, col: MUTE, text: 'V-234 skapad: leverantörsfaktura Ahlsell 87990, 28 aug.' },
+      { when: '8 sep 09:02', icon: ic.unlock, col: WARN, text: 'Låst upp av Maria Sjöberg. Orsak: «Leverantörsfaktura Ahlsell 87990 saknades».' },
+      { when: '4 sep 14:32', icon: ic.lock, col: OK, text: 'Låst av Maria Sjöberg. 7 av 7 punkter klara.' },
+    ];
+    const receipts = [
+      { date: '12 sep', vendor: 'Bauhaus', sub: 'Verktyg eller material?', acct: '5410?', amount: '2 340,00', status: 'Karin frågar', scol: WARN, sicon: ic.help, bg: '#f0fdfa', photo: 'linear-gradient(180deg,#f1f5f9,#cbd5e1)' },
+      { date: '11 sep', vendor: 'Circle K', sub: 'Bankrad utan kvitto', acct: '5611?', amount: '1 249,00', status: 'Karin frågar', scol: WARN, sicon: ic.help, bg: 'transparent', photo: 'repeating-linear-gradient(45deg,#f8fafc,#f8fafc 4px,#e2e8f0 4px,#e2e8f0 6px)' },
+      { date: '9 sep', vendor: 'Ahlsell', sub: 'Kabel och dosor · V-232', acct: '4010', amount: '1 876,00', status: 'Bokförd', scol: OK, sicon: ic.check, bg: 'transparent', photo: 'linear-gradient(180deg,#f1f5f9,#cbd5e1)' },
+      { date: '8 sep', vendor: 'Jula', sub: 'Förbrukning · V-231', acct: '5460', amount: '412,00', status: 'Bokförd', scol: OK, sicon: ic.check, bg: 'transparent', photo: 'linear-gradient(180deg,#f1f5f9,#cbd5e1)' },
+      { date: '5 sep', vendor: 'EasyPark', sub: 'Parkering · V-228', acct: '5619', amount: '86,00', status: 'Bokförd', scol: OK, sicon: ic.check, bg: 'transparent', photo: 'linear-gradient(180deg,#f1f5f9,#cbd5e1)' },
+      { date: '4 sep', vendor: 'Preem (bankrad)', sub: 'Blekt foto, fråga till Johan', acct: '–', amount: '812,00', status: 'Kunde inte läsas', scol: ERR, sicon: ic.alert, bg: 'transparent', photo: 'linear-gradient(180deg,#f8fafc,#f1f5f9)' },
+      { date: '3 sep', vendor: 'Elektroskandia', sub: 'Kabelskor · V-227', acct: '4010', amount: '638,00', status: 'Bokförd', scol: OK, sicon: ic.check, bg: 'transparent', photo: 'linear-gradient(180deg,#f1f5f9,#cbd5e1)' },
+    ];
+    const cb = (on) => on ? { cbBorder: '#0f766e', cbBg: '#0f766e', cbIcon: ic.check } : { cbBorder: '#cbd5e1', cbBg: '#fff', cbIcon: null };
+    const supplierInv = [
+      { ...cb(false), vendor: 'Elektroskandia Sverige AB', ref: 'Faktura 51340 · V-244', due: '16 sep', dueCol: ERR, dueFw: 600, dueIcon: ic.alert, amount: '12 870,00', voucher: 'V-244', attest: 'Väntar på Johan', attCol: WARN, attIcon: ic.clock, pay: 'Inte förberedd', payCol: MUTE, payIcon: ic.minus, bg: '#fef2f2' },
+      { ...cb(true), vendor: 'Ahlsell Sverige AB', ref: 'Faktura 88213 · V-242', due: '18 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '6 412,50', voucher: 'V-242', attest: 'Johan 14 sep', attCol: OK, attIcon: ic.check, pay: 'Att förbereda', payCol: '#1e293b', payIcon: null, bg: 'transparent' },
+      { ...cb(true), vendor: 'Rexel Sverige AB', ref: 'Faktura 2026-77812 · V-238', due: '20 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '9 340,00', voucher: 'V-238', attest: 'Johan 12 sep', attCol: OK, attIcon: ic.check, pay: 'Att förbereda', payCol: '#1e293b', payIcon: null, bg: 'transparent' },
+      { ...cb(true), vendor: 'Kungsbacka Kommun', ref: 'Bygglovsavgift 4471 · V-234', due: '21 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '3 200,00', voucher: 'V-234', attest: 'Johan 12 sep', attCol: OK, attIcon: ic.check, pay: 'Att förbereda', payCol: '#1e293b', payIcon: null, bg: 'transparent' },
+      { ...cb(true), vendor: 'Würth Svenska AB', ref: 'Faktura 9912034 · V-230', due: '22 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '12 640,00', voucher: 'V-230', attest: 'Johan 9 sep', attCol: OK, attIcon: ic.check, pay: 'Att förbereda', payCol: '#1e293b', payIcon: null, bg: 'transparent' },
+      { ...cb(false), vendor: 'Sydsvensk Elmontage AB', ref: 'UE-faktura 118 · V-226', due: '30 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '31 200,00', voucher: 'V-226', attest: 'Väntar på Johan', attCol: WARN, attIcon: ic.clock, pay: 'Inte förberedd', payCol: MUTE, payIcon: ic.minus, bg: 'transparent' },
+      { ...cb(false), vendor: 'Telia Sverige AB', ref: 'September · V-235', due: '15 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '890,00', voucher: 'V-235', attest: 'Johan 10 sep', attCol: OK, attIcon: ic.check, pay: 'Skickad 11 sep, inte bekräftad', payCol: WARN, payIcon: ic.clock, bg: 'transparent' },
+      { ...cb(false), vendor: 'Ahlsell Sverige AB', ref: 'Faktura 87990 · V-234 (aug)', due: '12 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '7 020,00', voucher: 'V-234', attest: 'Johan 8 sep', attCol: OK, attIcon: ic.check, pay: 'Bekräftad 12 sep', payCol: OK, payIcon: ic.check, bg: 'transparent' },
+      { ...cb(false), vendor: 'Onninen AB', ref: 'Faktura 4402913 · V-224', due: '11 sep', dueCol: '#1e293b', dueFw: 400, dueIcon: null, amount: '6 412,00', voucher: 'V-224', attest: 'Johan 5 sep', attCol: OK, attIcon: ic.check, pay: 'Betald manuellt 10 sep, bekräftad', payCol: OK, payIcon: ic.check, bg: 'transparent' },
+    ];
+    const archive = [
+      { period: 'September 2026', state: 'Öppen', col: WARN, icon: ic.clock, vouchers: '43 verifikat', receipts: '58 foton', invoices: '40 + 25', bank: '2 filer', keep: '2033-12-31', export: 'Ta ut när perioden är låst' },
+      { period: 'Augusti 2026', state: 'Låst', col: OK, icon: ic.lock, vouchers: '44 verifikat', receipts: '61 foton', invoices: '41 + 24', bank: '2 filer', keep: '2033-12-31', export: 'Hämta mapp (zip, 84 MB)' },
+      { period: 'Juli 2026', state: 'Låst', col: OK, icon: ic.lock, vouchers: '39 verifikat', receipts: '47 foton', invoices: '36 + 22', bank: '2 filer', keep: '2033-12-31', export: 'Hämta mapp (zip, 71 MB)' },
+      { period: 'Kvartal 3 · moms', state: 'Skickat', col: MUTE, icon: ic.minus, vouchers: '171 verifikat', receipts: '–', invoices: '–', bank: '–', keep: '2033-12-31', export: 'Underlag som skickades (PDF)' },
+    ];
+    const clients = [
+      { name: 'Norrvikens Tak & Plåt', sub: 'Handymate · månadsmoms', period: 'Augusti 2026', status: 'Inte låst, 7 väntar', scol: ERR, sicon: ic.alert, waiting: 'Karin 31 av 38 · 7 undantag, bankfil saknas', vat: '12 okt', last: 'i dag', bg: 'transparent' },
+      { name: 'Karlssons VVS AB', sub: 'Handymate · kvartalsmoms', period: 'September 2026', status: 'Öppen, 5 väntar', scol: WARN, sicon: ic.help, waiting: 'Karin 52 av 57 · 5 undantag', vat: '12 nov', last: 'i dag', bg: 'transparent' },
+      { name: 'Lindqvist El & Montage', sub: 'Handymate · kvartalsmoms', period: 'September 2026', status: 'Öppen, 3 väntar', scol: WARN, sicon: ic.help, waiting: 'Karin 41 av 43 · 3 undantag', vat: '12 nov · underlag skickat', last: 'i dag 06:12', bg: '#f0fdfa' },
+      { name: 'Ekdahl Snickeri', sub: 'Handymate · enskild firma', period: 'September 2026', status: 'Öppen, 0 väntar', scol: OK, sicon: ic.check, waiting: 'Karin 18 av 18 · inga undantag', vat: '12 nov', last: 'i går', bg: 'transparent' },
+      { name: 'Bergström Måleri', sub: 'Handymate · enskild firma', period: 'September 2026', status: 'Öppen, 0 väntar', scol: OK, sicon: ic.check, waiting: 'Karin 22 av 22 · inga undantag', vat: '12 nov', last: '12 sep', bg: 'transparent' },
+      { name: 'Solberga Trädgård AB', sub: 'Fortnox · öppnas där', period: '–', status: 'Ingen status från Fortnox', scol: MUTE, sicon: ic.minus, waiting: 'Ingen Karin · årsbokslut enligt byrån', vat: '12 nov', last: '–', bg: 'transparent' },
+    ];
+    const trail = [
+      { when: '14 sep 06:12', text: 'Maria godkände föreslagen match V-243 (Brf Solgläntan).' },
+      { when: '12 sep 13:40', text: 'Erik öppnade huvudboken för september.' },
+      { when: '8 sep 09:41', text: 'Maria låste augusti igen efter rättelse V-236.' },
+      { when: '8 sep 09:02', text: 'Maria låste upp augusti. Orsak: faktura Ahlsell 87990 saknades.' },
+    ];
+    return {
+      ic, mainNav, waiting, trust, vouchers: vouchers.map(v => ({ ...v, ruleShort: v.rule ? v.rule.split(' · ')[0] + ' · ' + v.rule.split(' · ')[1].replace('från känd leverantör', '').replace('från Skatteverket', '').replace(' med säker match', '').trim() : null })), accounts, acctRows, pnl, recon, vat, checklist, lockLog, clients, trail,
+      navOversikt: nav('Översikt'), navVerifikat: nav('Verifikationer'), navHuvudbok: nav('Huvudbok & rapporter'),
+      navAvstamning: nav('Avstämning'), navMoms: nav('Moms'), navPeriod: nav('Periodavslut & arkiv'), navKvitton: nav('Kvitton & utlägg'), navLev: nav('Leverantörsbetalningar'), receipts, supplierInv, archive,
+    };
+  }
+}
+</script>
+</body>
+</html>
