@@ -1618,5 +1618,6 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] H2: atomiskt samtycke, fyra nycklar, bestående avstängning och dagligt kvitto.
 - [x] Delad morgonleverans, flaggor, behörigheter och H3b-integrationsgräns.
 - [x] SQL-/route-/komponentprov och tsc.
-- [ ] Bygge, publicering och CI-handoff.
+- [x] Bygge och publicering: PR #81, v248 endast utkast.
+- [ ] Slutlig CI på PR #81; first-value-harness kompletterat med explicit flaggmiljö och av/på-prov.
 - [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.

@@ -8,7 +8,7 @@ const rows=[
 {id:'denied',business_id:'b',status:'approved',payload:{execution_result:{outcome:'failed'}}}]
 const value=(r,k)=>k==='payload->execution_result->>outcome'?r.payload.execution_result.outcome:r[k]
 const db={from(){let predicates=[],start=0,end=Infinity;const q={select(){return q},order(){return q},limit(){return q},range(a,b){start=a;end=b;return q},eq(k,v){predicates.push(r=>value(r,k)===v);return q},in(k,v){predicates.push(r=>v.includes(value(r,k)));return q},gte(k,v){predicates.push(r=>r[k]>=v);return q},then(resolve){resolve({data:rows.filter(r=>predicates.every(p=>p(r))).slice(start,end+1),error:null})}};return q}}
-const context={exports:{},console,require(name){
+const context={exports:{},console,process:{env:{HANDOFF_INBOX_ENABLED:'false'}},require(name){
 if(name==='next/server')return {NextResponse:{json:(v,init)=>Response.json(v,init)}}
 if(name==='@/lib/supabase')return {getServerSupabase:()=>db}
 if(name==='@/lib/auth')return {getAuthenticatedBusiness:async()=>({business_id:'b'})}
@@ -33,6 +33,13 @@ assert.equal(firstPage.approvals[0].id,'old');assert.equal(firstPage.next_offset
 const nextPage=await (await context.exports.GET({nextUrl:new URL('https://test/api/approvals?status=execution_failed&limit=1&offset=1')})).json()
 assert.equal(nextPage.approvals[0].id,'null-date')
 assert.equal((await context.exports.GET({nextUrl:new URL('https://test/api/approvals?offset=-1')})).status,400)
+rows.forEach(row=>{row.card_kind='decision'})
+rows.push({id:'notice',business_id:'b',card_kind:'notice',status:'approved',payload:{execution_result:{outcome:'failed'}}})
+const legacy=await (await context.exports.GET({nextUrl:new URL('https://test/api/approvals?status=execution_failed')})).json()
+assert.deepEqual(legacy.approvals.map(r=>r.id),['old','null-date','notice'])
+context.process.env.HANDOFF_INBOX_ENABLED='true'
+const decisions=await (await context.exports.GET({nextUrl:new URL('https://test/api/approvals?status=execution_failed')})).json()
+assert.deepEqual(decisions.approvals.map(r=>r.id),['old','null-date'])
 let clicked,stopped=false
 const approval={id:'old',status:'approved',payload:{execution_result:{outcome:'failed',receipt:{state:'partial',text:'1 av 2 klart'}}}}
 const tree=render({approval,onRetry:id=>clicked=id,busy:false})
