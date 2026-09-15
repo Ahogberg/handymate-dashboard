@@ -118,20 +118,24 @@ export default function InvoicesPage() {
     }
   }
 
+  // 2026-09-13 (call-site-kartan, tier 1 #2): gick tidigare via PUT /api/invoices
+  // med status 'paid', som bara satte paid_at — aldrig paid_amount, aldrig
+  // customer_paid för ROT/RUT, inga automationer. Nu samma väg som detaljsidan
+  // och Fortnox-synken: betalkärnan via mark-paid-routen.
   const handleMarkPaid = async (invoiceId: string) => {
     try {
-      const response = await fetch('/api/invoices', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ invoice_id: invoiceId, status: 'paid' })
+      const response = await fetch(`/api/invoices/${invoiceId}/mark-paid`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Idempotency-Key': crypto.randomUUID() },
+        body: JSON.stringify({}),
       })
+      const result = await response.json().catch(() => null)
+      if (!response.ok) throw new Error(result?.error || 'Kunde inte uppdatera faktura')
 
-      if (!response.ok) throw new Error('Kunde inte uppdatera faktura')
-
-      showToast('Faktura markerad som betald!', 'success')
+      showToast(result?.message || 'Faktura markerad som betald!', 'success')
       fetchInvoices()
-    } catch {
-      showToast('Något gick fel', 'error')
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : 'Något gick fel', 'error')
     }
   }
 

@@ -36,9 +36,13 @@ const rel = (f: string) => path.relative(API, f).replace(/\\/g, '/').replace(/\/
 const KANDA_GRINDAR: Record<string, RegExp> = {
   // Aktiv owner/admin via getAuthenticatedBusiness + getCurrentUser; beteendet testas i customer-preparation/contract.test.mjs.
   kundforberedelse_agare: /preparationOwner\(/,
+  // C5b: Auth.getUser + isSuperAdmin; executable denial/actor tests in financial-kernel-admin-intents.spec.ts.
+  ekonomikarneadmin: /financialKernelAdmin\(request\)/,
   standardgrind: /getAuthenticatedBusiness\(/,
   cron_hemlighet: /verifyCronSecret\(/,
   plattformsadmin: /\bisAdmin\(request\)/,
+  // Serververifierad getUser + intern säljroll; beteende i tests/revenue/auth.cjs och routes.cjs.
+  revenue_saljare: /requireRevenue\(request\)/,
   superadmin: /isSuperAdmin\(|superadmin/i,
   aktuell_anvandare: /getCurrentUser\(/,
   agare_admin: /isOwnerOrAdmin\(/,
@@ -218,5 +222,9 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // 2026-09-12 (Revenue OS V1): admin/revenue — plattformsadmin via
   // isAdmin(request), service-role bakom admin-grinden och ingen kundtenant-
   // kontext. Den interna säljytan arbetar med husets GTM-data → 156.
-  expect(utanStandard.length).toBeLessThanOrEqual(156)
+  // C5b: four superadmin endpoints and one verifyCronSecret cron; no public endpoints.
+  // H4: morning-report-retry is an authenticated internal cron → 167.
+  // 2026-09-15: admin/revenue/partner-leads (requireRevenue + manager)
+  // och partners/leads (verifierad partner-token + aktuellt avtal) → 169.
+  expect(utanStandard.length).toBeLessThanOrEqual(169)
 })

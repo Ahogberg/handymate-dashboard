@@ -53,6 +53,17 @@ export async function rapporteraTystFel(
   fel: string,
   context?: Record<string, unknown>,
 ): Promise<void> {
+  await rapporteraTystFelMedKvittens(supabase, businessId, kalla, fel, context)
+}
+
+/** Same report, with an explicit persistence receipt for callers recording delivery state. */
+export async function rapporteraTystFelMedKvittens(
+  supabase: SupabaseClient,
+  businessId: string,
+  kalla: string,
+  fel: string,
+  context?: Record<string, unknown>,
+): Promise<boolean> {
   // Samma tysta fel går även till Sentry (no-op utan DSN) — digest-mejlet
   // kommer en gång om dagen, Sentry direkt, med kodställe som gruppnyckel.
   rapporteraTillSentry({
@@ -77,9 +88,12 @@ export async function rapporteraTystFel(
         `[driftlarm-rapportering] kunde inte skriva automation_activity för "${kalla}":`,
         error.message,
       )
+      return false
     }
+    return true
   } catch (err) {
     console.error(`[driftlarm-rapportering] kastade oväntat för "${kalla}":`, err)
+    return false
   }
 }
 

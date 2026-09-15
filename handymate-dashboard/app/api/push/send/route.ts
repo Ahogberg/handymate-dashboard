@@ -70,6 +70,12 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
+    if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+      const { gateChannel } = await import('@/lib/channels/preflight')
+      const check = await gateChannel(supabase, business_id, 'push', { targetUserId: target_user_id })
+      if (!check.ok) return NextResponse.json({ success: true, delivered: false, sent: 0, status: 'skipped', reason: check.reason === 'mottagare' ? 'no_recipients' : check.reason })
+    }
+
 
     // P1-2 (2026-09-01): Expo/mobile-push körs FÖRE web-push-grenens
     // egna early-returns (saknad VAPID-konfig, inga push_subscriptions,

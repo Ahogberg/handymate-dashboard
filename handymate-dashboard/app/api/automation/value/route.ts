@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
-
+import { summariseAutomationValue, type AutomationLogRow, type InvoiceFacit, type QuoteFacit } from '@/lib/value/automation-value'
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
 // som läser request.headers direkt, inte cookies()/headers() från next/headers —
@@ -9,18 +9,14 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 // så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
 export const dynamic = 'force-dynamic'
 
-const TIME_VALUE_PER_MIN = 15 // 900 kr/tim = 15 kr/min
-
-interface ValueItem {
-  type: 'quote_signed' | 'invoice_paid' | 'lead_converted' | 'time_saved'
-  label: string
-  amount: number
-  status: 'confirmed' | 'pending'
-  date?: string
-}
-
 /**
- * GET /api/automation/value — Beräkna faktiskt genererat värde från automationer (senaste 7 dagarna)
+ * GET /api/automation/value — automationernas resultat senaste 7 dagarna.
+ *
+ * 2026-09-14 (ROI-audit P0): tid räknas inte längre om till kronor. Pengar
+ * (`confirmed_value`) kommer bara från faktura- och offertrader i databasen;
+ * sparad tid rapporteras som `estimated_minutes` med schablonen i
+ * `estimate_basis`. Härledningen är ren och facit-testad i
+ * lib/value/automation-value.ts; den här filen gör bara uppslagen.
  */
 export async function GET(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
@@ -29,7 +25,6 @@ export async function GET(request: NextRequest) {
   const supabase = getServerSupabase()
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
 
-  // 1. Hämta automationsloggar senaste 7 dagarna
   const { data: logs } = await supabase
     .from('v3_automation_logs')
     .select('rule_name, action_type, context, result, status, created_at')
@@ -38,104 +33,43 @@ export async function GET(request: NextRequest) {
     .gte('created_at', sevenDaysAgo)
     .order('created_at', { ascending: false })
 
-  const items: ValueItem[] = []
-  let pendingCount = 0
-
-  for (const log of logs || []) {
-    const ctx = (log.context || {}) as Record<string, any>
-    const res = (log.result || {}) as Record<string, any>
-
-    // Offertuppföljning → kolla om offerten signerats
+  const rows = (logs || []) as AutomationLogRow[]
+  const quoteIds = new Set<string>()
+  const invoiceIds = new Set<string>()
+  for (const log of rows) {
+    const ctx = log.context || {}
+    const res = log.result || {}
     if (log.rule_name === 'quote_followup' || log.action_type === 'send_sms') {
-      const quoteId = ctx.quote_id || res.quote_id
-      if (quoteId) {
-        const { data: quote } = await supabase
-          .from('quotes')
-          .select('status, total, title')
-          .eq('quote_id', quoteId)
-          .maybeSingle()
-
-        if (quote?.status === 'accepted') {
-          items.push({
-            type: 'quote_signed',
-            label: `Offert signerad efter uppföljning${quote.title ? ': ' + quote.title : ''}`,
-            amount: Number(quote.total) || 0,
-            status: 'confirmed',
-            date: log.created_at,
-          })
-        } else if (quote && quote.status !== 'declined') {
-          pendingCount++
-        }
-      }
+      const quoteId = (ctx.quote_id ?? res.quote_id) as string | undefined
+      if (quoteId) quoteIds.add(quoteId)
     }
-
-    // Fakturapåminnelse → kolla om betalad inom 7 dagar
     if (log.rule_name === 'invoice_reminder') {
-      const invoiceId = ctx.invoice_id || res.invoice_id
-      if (invoiceId) {
-        const { data: invoice } = await supabase
-          .from('invoice')
-          .select('status, total, paid_at, invoice_number')
-          .eq('invoice_id', invoiceId)
-          .maybeSingle()
-
-        if (invoice?.status === 'paid' && invoice.paid_at) {
-          const paidDate = new Date(invoice.paid_at)
-          const reminderDate = new Date(log.created_at)
-          const daysDiff = (paidDate.getTime() - reminderDate.getTime()) / (24 * 3600000)
-          if (daysDiff <= 7 && daysDiff >= 0) {
-            items.push({
-              type: 'invoice_paid',
-              label: `Faktura betald efter påminnelse: ${invoice.invoice_number || ''}`,
-              amount: Number(invoice.total) || 0,
-              status: 'confirmed',
-              date: invoice.paid_at,
-            })
-          }
-        }
-      }
-    }
-
-    // Bokningspåminnelse: 5 min sparad
-    if (log.rule_name === 'booking_reminder') {
-      items.push({
-        type: 'time_saved',
-        label: 'Bokningspåminnelse skickad',
-        amount: 5 * TIME_VALUE_PER_MIN, // 75 kr
-        status: 'confirmed',
-        date: log.created_at,
-      })
-    }
-
-    // Pipeline-uppdatering: 2 min sparad
-    if (log.action_type === 'update_pipeline' || log.action_type === 'move_deal') {
-      items.push({
-        type: 'time_saved',
-        label: 'Pipeline uppdaterad automatiskt',
-        amount: 2 * TIME_VALUE_PER_MIN, // 30 kr
-        status: 'confirmed',
-        date: log.created_at,
-      })
+      const invoiceId = (ctx.invoice_id ?? res.invoice_id) as string | undefined
+      if (invoiceId) invoiceIds.add(invoiceId)
     }
   }
 
-  // Deduplicate by quote/invoice ID
-  const seen = new Set<string>()
-  const uniqueItems = items.filter(item => {
-    const key = `${item.type}-${item.label}`
-    if (seen.has(key)) return false
-    seen.add(key)
-    return true
-  })
+  const quotes = new Map<string, QuoteFacit>()
+  if (quoteIds.size > 0) {
+    const { data } = await supabase
+      .from('quotes')
+      .select('quote_id, status, total, title')
+      .eq('business_id', business.business_id)
+      .in('quote_id', Array.from(quoteIds))
+    for (const q of data || []) quotes.set(q.quote_id, { status: q.status, total: q.total, title: q.title })
+  }
 
-  const totalValue = uniqueItems
-    .filter(i => i.status === 'confirmed')
-    .reduce((s, i) => s + i.amount, 0)
+  const invoices = new Map<string, InvoiceFacit>()
+  if (invoiceIds.size > 0) {
+    const { data } = await supabase
+      .from('invoice')
+      .select('invoice_id, status, total, paid_amount, paid_at, invoice_number')
+      .eq('business_id', business.business_id)
+      .in('invoice_id', Array.from(invoiceIds))
+    for (const inv of data || []) {
+      invoices.set(inv.invoice_id, { status: inv.status, total: inv.total, paid_amount: inv.paid_amount, paid_at: inv.paid_at, invoice_number: inv.invoice_number })
+    }
+  }
 
-  return NextResponse.json({
-    total_value: totalValue,
-    items: uniqueItems,
-    pending_count: pendingCount,
-    period_days: 7,
-  })
+  return NextResponse.json(summariseAutomationValue(rows, { quotes, invoices }))
 }

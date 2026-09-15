@@ -66,7 +66,25 @@ export async function skapaKort(
   kort: NyttKort,
   opts?: { push?: boolean },
 ): Promise<{ id: string; kanal?: 'kort' | 'digest' } | null> {
-  if (kanalFor(kort.approval_type) === 'digest') {
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+    const { gateApprovalChannels } = await import('@/lib/channels/preflight')
+    if (
+      await gateApprovalChannels(
+        supabase,
+        kort.business_id,
+        kort.approval_type,
+        kort.payload,
+      )
+    )
+      return null
+  }
+
+  const inbox =
+    process.env.HANDOFF_INBOX_ENABLED === 'true'
+      ? await import('@/lib/approvals/card-kind')
+      : null
+  const digest = kanalFor(kort.approval_type) === 'digest'
+  if (digest && !inbox) {
     return skrivDigestrad(supabase, kort)
   }
 
@@ -86,7 +104,14 @@ export async function skapaKort(
 
   const id = data.id as string
 
-  if (opts?.push !== false) {
+  // H1 adds a durable inbox row without removing the existing activity
+  // receipt from "Skött utan dig".
+  if (digest) await skrivDigestrad(supabase, kort)
+
+  if (
+    opts?.push !== false &&
+    inbox?.cardKind(kort.approval_type) !== 'notice'
+  ) {
     try {
       await sendApprovalPush({
         id,
@@ -107,6 +132,7 @@ export async function skapaKort(
     }
   }
 
+  if (digest) return { id, kanal: 'digest' }
   return { id }
 }
 
@@ -126,7 +152,9 @@ async function skrivDigestrad(
   supabase: SupabaseServerClient,
   kort: NyttKort,
 ): Promise<{ id: string; kanal: 'digest' } | null> {
-  const forstaMeningen = (kort.description || '').split(/(?<=[.!?])\s/)[0]?.trim()
+  const forstaMeningen = (kort.description || '')
+    .split(/(?<=[.!?])\s/)[0]
+    ?.trim()
   const beskrivning =
     forstaMeningen && forstaMeningen !== kort.title
       ? `${kort.title} — ${forstaMeningen}`

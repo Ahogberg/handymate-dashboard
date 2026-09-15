@@ -111,7 +111,12 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 
 > ⚠️ **KRITISK REGEL:** Inga event får uppfinnas lokalt av en terminal.
 > Nya event läggs till i denna lista FÖRST, sedan implementeras de.
-> Namnkonvention: `snake_case`, `verb_substantiv`, alltid på engelska.
+> Namnkonvention: `snake_case`, `substantiv_particip` (`quote_sent`, `payment_received`), alltid på engelska.
+>
+> Listan nedan är **automationsmotorns** event (`fireEvent()` i `lib/automation-engine.ts`).
+> Financial Kernels durabla ekonomiska event är ett eget kontrakt med egen tabell och
+> egen katalog — se avsnittet *Financial Kernel — kontrakt* längst ned. De två listorna
+> får inte dela namn, och kernel-event får aldrig gå genom `fireEvent()`.
 
 | Event | Triggas när | Primär payload | Finns |
 |-------|-------------|----------------|-------|
@@ -712,3 +717,260 @@ app/api/billing/
 | `sql/v33_sprint2.sql` | attachment_count på email_conversations, booking-index |
 | `sql/v34_agent_architecture.sql` | routed_agent på pending_approvals, invoice/quotes/leads-index |
 | `sql/v36_stripe_elements.sql` | is_pilot-kolumn, subscription_status default, pilot-konton |
+
+## Team- och kalenderstart (2026-09-13)
+Efter onboarding återanvänds KomIgangRail. `planning_team_start` och
+`planning_calendar_start` i business_preferences är användarbekräftelser,
+inte bevis på verifierad arbetstid eller aktuell beläggning. Skrivning går
+via ägar-/adminskyddad `/api/onboarding/planning-start`, med serverhärlett
+företag och jämförelse mot det underlag användaren fick se. Teamet måste
+vara bekräftat före kalendern. Kalenderbekräftelsen namnger en specifik
+nästa vecka; startsteget är en engångsuppgift, ingen veckovis checklista.
+Dessa uppgifter läggs bara till i webbrailen, inte i livscykelutskicken.
+Den nya 70-procentsgrinden aktiveras inte av startbekräftelserna.
+
+---
+
+## Financial Kernel — kontrakt (Paket C0, 2026-09-13)
+
+> **Status:** kontrakt, ingen kod med beteende. Detta avsnitt är den kanoniska källan för
+> Financial Kernels eventnamn, kuvert, flaggor och modulägande. Blueprinten
+> `docs/strategy/FINANCIAL_KERNEL_ARCHITECTURE.md` förklarar *varför*; om den och detta
+> avsnitt skiljer sig i ett **namn** vinner detta avsnitt, i **domänregler** vinner blueprinten.
+> Exekveringsordning och paketägande: `docs/strategy/FINANCIAL_KERNEL_DEVELOPMENT_ORCHESTRATION.md`.
+> Paketstatus och handoff: `docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md`.
+>
+> **Grindas av CI:** `tests/financial-kernel-event-contract.spec.ts` läser tabellen i FK.1 och
+> failar när ett eventnamn finns i kernel-kod, i `lib/financial-kernel/events/catalog.ts`
+> eller i en migration utan att stå här. Lägg till raden först, koda sedan.
+
+### FK.0 Fyra regler som gäller allt nedan
+
+1. **Ett ekonomiskt event, många projektioner.** Fakturastatus, `paid_amount`, bokföring och
+   avstämning är projektioner av samma event — aldrig oberoende slutsatser.
+2. **Kernel-event går aldrig genom `fireEvent()`.** De persisteras i `financial_events`
+   (FK.2). Automationsmotorn nås bara via bryggan (FK.3).
+3. **Ingen toleranskonstant i kernel-vägen.** `TOLERANCE_KR = 1` i
+   `lib/invoices/payment-decision.ts` är legacy och stannar där. En differens inom
+   landspaketets avrundningspolicy blir en explicit bokföringsrad, en utanför blir ett
+   avstämningsundantag.
+4. **Fyra beslut är ägarens, inte implementerarens** (blueprint §38: merchant-of-record,
+   Pay-före-Ledger, momsdeklaration fil/producera, cut-over-räkenskapsår). Den som stöter på
+   ett av dem stannar och säger det. Ingen "bekväm default".
+
+### FK.1 Kanonisk eventkatalog
+
+Alla event: `snake_case`, `substantiv_particip`, engelska. `Finns` är ❌ på samtliga rader
+tills paketet som inför eventet mergas — då byts markeringen i **samma PR**. Kolumnen
+*Paket* pekar på orkestreringsdokumentets paket som äger första implementationen.
+
+Belopp i payload är alltid **minor units** (öre) som **decimalsträng av ett heltal** (`"1250000"`),
+aldrig ett JSON-tal och aldrig `number` med decimaler, och alltid med `currency`. Ändrat
+2026-09-14 (C4): ett JSON-tal tappar siffror över 2^53 genom PostgREST och `JSON.parse`, och
+kerneln har regeln att aldrig läsa ett belopp som `number`; strängen gör payloaden konsekvent
+med spegelkolumnen `amount_minor` och varje RPC-retur. Konsumenter parsar med `money(BigInt(s), currency)`. Fält märkta † är obligatoriska från dag ett därför att det svenska
+landspaketet inte kan fyllas på i efterhand utan migration (blueprint §15.1–15.2).
+Källan för †-fälten från C4: `invoice.vat_regime` (default `'standard'`) och
+`business_config.accounting_method` (default `'accrual'`), båda införda i C4 som minsta möjliga
+datamodelländring; evidens för köparstatus och UI för regimval är C9.
+
+**Fordran (kommersiell)**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `invoice_issued` | En faktura får sitt nummer och ställs ut (skickas eller importeras redan utställd). Inte när ett utkast skapas — det är automationsmotorns `invoice_created`. | `{ invoice_id, invoice_number, customer_id, project_id?, currency, total_minor, vat_regime†: 'standard'\|'reverse_charge_construction', accounting_method†: 'accrual'\|'cash', issued_date, due_date, tax_reduction?: 'rot'\|'rut' }` | C4 | ❌ |
+| `invoice_credited` | En kreditfaktura ställs ut mot en faktura. | `{ invoice_id, credit_invoice_id, currency, amount_minor, issued_date }` | C4 | ❌ |
+| `receivable_created` | En fordranskomponent skapas. En ROT/RUT-faktura ger två: kundens del och Skatteverkets. | `{ receivable_id, invoice_id, component: 'customer'\|'tax_authority', owner: 'business'\|'factor', currency, amount_minor, due_date }` | C4 | ❌ |
+| `receivable_adjusted` | Komponentens belopp eller ägare ändras utan betalning. Täcker kredit, avskrivning, påminnelseavgift, ränta, avrundning, ägarbyte (factoring) och omklassning mellan komponenter (Skatteverket betalar mindre än begärt: resten flyttar till kunden). Omklassning ger två event, ett per komponent. | `{ receivable_id, reason: 'credit'\|'write_off'\|'dunning_fee'\|'interest'\|'rounding'\|'ownership_transfer'\|'reclassification', delta_minor?, owner_after?, from_component?, to_component? }` | C4 / C14 | ❌ |
+| `receivable_settled` | En komponent är fullt allokerad, eller nollställd av en **avrundningsjustering** på en komponent som har allokering (golden path 36). Kredit, avskrivning och omklassning nollställer utan detta event: komponenten blir `closed`, inte `settled`, och bryggan tiger (golden path 10). | `{ receivable_id, invoice_id, component, settled_at }` | C4 | ❌ |
+
+**Pay (pengarörelse)** — gäller *alla* betalningar, även manuell "markera betald" (`provider: 'manual'`) och Fortnox-import (`provider: 'fortnox'`). Det finns ingen sidoväg där en betalning uppdaterar en faktura utan att bli ett `payment_settled` (blueprint §18.2).
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `payment_intent_created` | En betalningsavsikt skapas (Pay-länk, Swish-QR, kortsession). | `{ payment_intent_id, invoice_id?, receivable_ids[], currency, amount_minor, provider, method }` | C7 | ❌ |
+| `payment_initiated` | En betalning existerar hos leverantören eller registreras manuellt. Tillstånd `created → pending`. `provider` är `'manual'`, `'fortnox'`, `'skatteverket'` (ROT/RUT-utbetalning) eller en PSP-identifierare (C7). | `{ payment_id, payment_intent_id?, provider, provider_ref?, direction: 'inbound'\|'outbound', currency, amount_minor }` | C4 (manual/fortnox/skatteverket), C7 | ❌ |
+| `payment_authorized` | Leverantören har reserverat beloppet. Tillstånd `→ authorized`. | `{ payment_id, provider_ref }` | C7 | ❌ |
+| `payment_processing_started` | Leverantören bearbetar/kapar betalningen. Tillstånd `→ processing`. | `{ payment_id, provider_ref }` | C7 | ❌ |
+| `payment_settled` | Pengarna är faktiskt mottagna eller (för manuell/Fortnox) registrerade som mottagna. Tillstånd `→ settled`. | `{ payment_id, currency, amount_minor, fee_minor?, settled_at, evidence: 'provider'\|'manual'\|'fortnox'\|'bank' }` | C4, C7 | ❌ |
+| `payment_failed` | Betalningen misslyckades slutgiltigt. | `{ payment_id, reason_code, provider_reason? }` | C7 | ❌ |
+| `payment_cancelled` | Betalningen avbröts före settlement. | `{ payment_id, cancelled_by: 'customer'\|'business'\|'provider'\|'system' }` | C7 | ❌ |
+| `payment_refunded` | Hel eller delvis återbetalning är genomförd. `partial` avgör tillstånd `partially_refunded` / `refunded`. | `{ payment_id, refund_id, currency, amount_minor, partial: boolean, authorized_by }` | C7 | ❌ |
+| `payment_disputed` | Chargeback/tvist öppnad hos leverantören. | `{ payment_id, dispute_id, currency, amount_minor, provider_ref }` | C7 | ❌ |
+| `payout_created` | Leverantören har skapat en utbetalning till företagets bankkonto. | `{ payout_id, provider, currency, amount_minor, fee_minor?, payment_ids[] }` | C7 | ❌ |
+| `payout_settled` | Utbetalningen har nått banken. | `{ payout_id, banked_at, bank_transaction_id? }` | C7 / C11 | ❌ |
+
+**Allokering och avstämning**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `payment_allocated` | En settlad betalning knyts till en fordranskomponent. Summan av allokeringar får aldrig överstiga betalningen. | `{ allocation_id, payment_id, receivable_id, currency, amount_minor }` | C4 | ❌ |
+| `payment_allocation_reversed` | En allokering backas (felallokering, kredit, återbetalning). | `{ allocation_id, reason }` | C4 | ❌ |
+| `bank_transaction_imported` | En banktransaktion (eller leverantörs-utbetalningsrad) är importerad som bevis. | `{ bank_transaction_id, source: 'bank'\|'provider'\|'manual', currency, amount_minor, banked_at, external_ref }` | C11 | ❌ |
+| `reconciliation_matched` | Matcharen har knutit en banktransaktion till en betalning, utbetalning eller leverantörsbetalning. | `{ match_id, bank_transaction_id, matched_type: 'payment'\|'payout'\|'supplier_payment', matched_id, currency, amount_minor, partial: boolean }` | C11 | ❌ |
+| `reconciliation_unmatched` | Matcharen lämnade en banktransaktion utan match och öppnade ett undantag. | `{ bank_transaction_id, exception_id, reason }` | C11 | ❌ |
+| `reconciliation_reversed` | En match backas. | `{ match_id, reason }` | C11 | ❌ |
+
+**Ledger (bokföring) och shadow**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `journal_entry_posted` | En verifikation är atomärt bokförd med balanserade rader. Verifikationsnumret tilldelas i samma transaktion (blueprint §36.1). | `{ journal_entry_id, journal_type, voucher_series, voucher_number, effective_date, period_id, rule_id, rule_version, source_event_id }` | C8 | ❌ |
+| `journal_entry_reversed` | En verifikation vänds med en ny verifikation. Bokförd historik ändras aldrig på plats. | `{ journal_entry_id, reversal_entry_id, reason }` | C8 | ❌ |
+| `period_locked` | En räkenskapsperiod låses för bokföring. | `{ period_id, fiscal_year_id, locked_by }` | C8 | ❌ |
+| `period_unlocked` | En låst period öppnas igen (privilegierad, alltid auditerad). | `{ period_id, fiscal_year_id, unlocked_by, reason }` | C8 | ❌ |
+| `payment_divergence_detected` | Shadow-jämförelsen ser att kernelns betalningstillstånd skiljer sig från referensen. `phase` är obligatorisk: en S1-grön period är inte bevis (blueprint §20.1). | `{ divergence_id, comparison_run_id, phase†: 'S1'\|'S2', invoice_id?, payment_id?, severity }` | C6 | ❌ |
+| `accounting_divergence_detected` | Shadow-jämförelsen ser att bokförings- eller aggregatstillstånd skiljer sig från referensen. | `{ divergence_id, comparison_run_id, phase†: 'S1'\|'S2', level: 1\|2\|3\|4, severity }` | C12 | ❌ |
+
+**Leverantör / AP**
+
+| Event | Triggas när | Primär payload | Paket | Finns |
+|-------|-------------|----------------|-------|-------|
+| `supplier_invoice_approved` | En leverantörsfaktura är attesterad och blir en skuld. | `{ supplier_invoice_id, supplier_id, currency, amount_minor, vat_regime†, due_date }` | C9 | ❌ |
+| `payable_created` | Skuldposten skapas. | `{ payable_id, supplier_invoice_id, currency, amount_minor, due_date }` | C9 | ❌ |
+| `supplier_payment_settled` | En utgående betalning till leverantör är genomförd. Är ett `payment_settled` med `direction: 'outbound'` i Pay; detta event är projektionen mot skulden. | `{ payment_id, supplier_invoice_id, currency, amount_minor, settled_at }` | C9 / C11 | ❌ |
+| `payable_settled` | Skuldposten är fullt betald. | `{ payable_id, supplier_invoice_id, settled_at }` | C9 | ❌ |
+
+**Reserverade namn — inte kanoniska.** Får inte förekomma i kod förrän de flyttats upp i en
+tabell ovan i samma PR som inför dem: `opening_balance_posted`, `cutover_recorded`,
+`vat_return_prepared`, `receivable_written_off`, `shadow_phase_flipped`. De finns här bara så att
+nästa paket inte hittar på ett annat namn för samma sak.
+
+### FK.2 Kuvert, nycklar och tid
+
+Tabellen heter `financial_events` (införs i Paket C2, inte tidigare). Alla event delar kuvertet
+i blueprint §7. Bindande fältregler:
+
+| Fält | Regel |
+|------|-------|
+| `schema_version` | Heltal per `event_type`, startar på `1`. Höjs bara när payloadens form ändras bakåtinkompatibelt; konsumenter måste kunna läsa alla versioner som finns i tabellen. |
+| `business_id` | Från autentiserad session eller betrodd mappning (webhook → `provider_ref` → business). Aldrig från klientpayload. |
+| `idempotency_key` | `UNIQUE (business_id, idempotency_key)`. Format `<domän>:<källa>:<id>[:<diskriminator>]`, t.ex. `provider_event:stripe:evt_123`, `allocation:pay_1:rec_2:12500`, `fortnox_import:<biz>:<doc>:<version>`. Samma nyckel fem gånger = ett event. |
+| `correlation_id` | En per ekonomisk kedja: `fin_invoice_<invoice_id>`, `fin_supplier_invoice_<id>`, `fin_payment_<payment_id>` (betalning utan faktura), `fin_bank_<bank_transaction_id>`, `fin_journal_<journal_entry_id>` (manuell verifikation). Rotobjektet bestämmer prefixet. |
+| `causation_id` | `event_id` för eventet som orsakade detta. `NULL` bara för rotevent i kedjan. |
+| `occurred_at` | När det hände i källsystemet. `effective_date` är bokföringsdatum enligt landspaketet. `created_at` är när Handymate persisterade raden. De tre är aldrig samma fält (blueprint §26). |
+| `actor` | `system \| user \| provider \| import \| agent`. En agent som skapar ett ekonomiskt event är `agent` med `actor_id` = agentens id, aldrig `system`. |
+| `amount` / `currency` | Speglar payloadens huvudbelopp för index/sök. Källan är payloaden. |
+
+Atomära skrivningar går via Postgres-RPC, aldrig via flera klientanrop (blueprint §6):
+`record_payment_settlement`, `allocate_payment`, `post_journal_entry`, `record_provider_event`.
+Varje RPC validerar tenant + tillstånd, skriver objektet, skriver eventet/outboxraden och
+returnerar resultatet i **en** transaktion. Namnen är reserverade här så att paketen C2–C8 inte
+döper dem olika.
+
+### FK.3 Bryggan till automationsmotorn — bindande
+
+`payment_received` (§4) behåller sin nuvarande betydelse: *kunden har gjort sitt*. Bryggan
+`lib/financial-kernel/events/bridge-automation.ts` är det **enda** stället i kernel-kod som får
+anropa `fireEvent()`, och den får bara skicka namn ur tabellen i §4.
+
+```text
+receivable_settled { component: 'customer' }   → fireEvent('payment_received')   ✅
+receivable_settled { component: 'tax_authority' } → ingenting                     ✅ (inget andra tack-SMS när Skatteverket betalar)
+payment_settled                                  → ingenting                     ✅ (pengar ≠ kunden klar; allokering avgör)
+```
+
+Detta är blueprint §18.5 och golden path 34, inte en försiktighetsnot. Legacy-övergångarna
+`to_paid` och `to_customer_paid` i `payment-decision.ts` motsvarar exakt "kundkomponenten
+settlad"; `settled` motsvarar "skattekomponenten settlad" och avfyrar inget.
+
+C5b: bryggan producerar bara durabla intents, aldrig utskick. Fasad och cron delar
+`effects/sweep.ts` för claim → run → finish. Ett betalningskommando som avslutade
+kundfordran äger hela uppföljningsbeslutet, även bortval utan intent-rad. Historiska
+settlement-event för återöppnade fordringar kvitteras utan nya intents. Bryggans
+belopp bygger på aktiva allokeringar till fakturan, även utan fakturans correlation-id.
+Okända och uttömda utskick kräver superadminbeslut med skäl; ingen automatisk retry.
+
+### FK.4 Feature-flaggor och daterad fas — per företag
+
+Alla flaggor är `BOOLEAN NOT NULL DEFAULT false`. Default = dagens beteende, alltid. Ingen
+flagga införs före paketet som läser den.
+
+| Kolumn | Betyder | Läses av | Införs i |
+|--------|---------|----------|----------|
+| `financial_kernel_enabled` | Kernel skriver `financial_events` och fordrans-/allokeringsobjekt för företaget. Infrastruktur, inte en produkt. | C4, C5 | C4 |
+| `financial_kernel_rollout` (historik) | Senaste daterade fasen är `off`, `S1` eller reserverad `S2`. Ersätter de tidigare föreslagna kolumnerna `shadow_payments_enabled`/`shadow_payment_phase`. Endast `set_financial_kernel_phase` skriver dispatchflaggan; aktör och skäl krävs. S1 bevisar synken, inte oberoende ekonomisk korrekthet. S2 nekas tills separat beslut. | C6, C12 | C6 |
+| `handymate_pay_enabled` | Kunden kan ta betalt via Handymate Pay. Produkträttighet. | C7 | C7 |
+| `handymate_ledger_enabled` | Kunden ser bokföring/Ledger-ytor. Produkträttighet — grindar UI, aldrig kernelns korrekthet (blueprint §35.5). | C10 | C10 |
+| `shadow_accounting_enabled` | Ledger körs i skuggan mot Fortnox-referens. | C12 | C12 |
+| `auto_post_accounting_enabled` | Deterministiska bokföringsregler får bokföra utan mänskligt godkännande inom policy. | C8, C9 | C9 |
+| `bank_reconciliation_enabled` | Bank-/avstämningsytor synliga för kunden. Produkträttighet. | C11 | C11 |
+| `auto_reconcile_enabled` | Matcharen får bekräfta matchningar inom policy utan granskning. | C11 | C11 |
+
+**Skuggningens räckvidd (beslut 2026-09-12, shadow-arkitekturen §21.6):** Fortnox-scopen
+(`FORTNOX_SCOPES` i `app/api/integrations/fortnox/connect/route.ts`) saknar `bookkeeping`, så
+jämförelsen når bara **nivå 1** (faktura, leverantörsfaktura, betalning, saldon). Nivå 2–4 i
+`accounting_divergence_detected.level` persisteras som `unsupported` med orsak, aldrig som
+gröna. Scopen läggs inte tillbaka (kräver ny OAuth per kund). Momsen och verifikatnivån får
+därför sitt facit från den manuella regelboksrundan (roadmap §21.2), inte från skuggningen.
+
+Utrullningsordning per företag (aldrig big bang):
+`legacy → kernel shadow (S1) → S2 → kernel kanonisk + legacy-projektion → Pay live → Ledger shadow → Ledger kanonisk med Fortnox-skugga → Handymate-only`.
+
+### FK.5 Modulägande
+
+Mappar och vem som äger dem. En primitiv har en implementationsägare (Codex) och flera
+granskare (Claude). Två agenter bygger aldrig konkurrerande versioner av samma primitiv.
+
+| Mapp | Innehåll | Får aldrig |
+|------|----------|------------|
+| `lib/financial-kernel/` | `money.ts`, `events/` (catalog, types, publish, consume, outbox, bridge-automation), `receivables/`, `allocations/`, `audit/`, `integrity/` | importera från `lib/payments/providers/*` eller `lib/ledger/country-packs/*` |
+| `lib/payments/` | tjänst, tillståndsmaskin, intents, refunds, payouts, `providers/<provider>/adapter.ts` | skriva till journaler; läcka leverantörsspecifik status utanför `providers/` |
+| `lib/ledger/` | posting engine, journals, periods, reports, reversals, `country-packs/se/` | läsa leverantörsobjekt direkt; ha en toleranskonstant |
+| `lib/reconciliation/` | service, matcher, projections | ändra betalnings- eller fordranstillstånd utan att gå via kernelns RPC |
+| `app/api/payments/`, `app/api/accounting/`, `app/api/reconciliation/`, `app/api/webhooks/payments/[provider]/` | HTTP-ytor | innehålla domänlogik |
+
+Legacy-filer som blir fasad, inte ersätts: `lib/invoices/apply-payment.ts` (C5),
+`lib/invoices/payment-decision.ts` (behålls oförändrad för icke-kernel-företag),
+`lib/fortnox/sync-payments.ts` (blir referensadapter i S2).
+
+### FK.6 Vad Paket C0 uttryckligen inte gjorde
+
+Ingen tabell, ingen RPC, ingen flagga, ingen Money-klass, inget beteende. Nästa paket är C1
+(Money) — se `docs/strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md` för Codex-briefen.
+
+## Fortnox inkommande fakturasynk (2026-09-14)
+
+`syncInvoicesFromFortnox` används av Synka nu, Hämta historik och cron. Importtjänsten läser fakturadetaljer, uppdaterar endast Fortnox-ägda ekonomifält och bevarar lokala jobbkopplingar, interna anteckningar och påminnelsehistorik. Befintliga betalningsövergångar fortsätter via applyInvoicePayment. Oavslutade utgående överföringar blockeras för avstämning i stället för att importeras som dubbletter. Utkast blir inte förfallna/betalda bara på saldo 0.
+
+OAuth förnyas inom fem minuter före utgång, med ett databaslås per företag. Företagsnamnet uppdateras separat från tokenparet; CompanyInformation läses från Fortnox-svaret. `20260914072732_fortnox_sync_locks.sql` krävs före driftsättning; tillför service-only lås och unikt företag/dokumentnummer. Migrationen är ännu INTE körd i produktion (automatisk godkännandegranskning stoppade den).
+
+Avgränsning: SEK-standardfakturor. Kredit-/kontantfakturor, annan valuta och återöppnad/makulerad redan betald faktura ger ett synligt avstämningsfel; ingen tyst omskrivning av betalningshistorik. Hämtningen omfattar senaste året, alla öppna och alla redan lokalt kopplade dokument. Sidtak/tidsgräns ger fel, aldrig falskt komplett synk. Kundimport finns fortsatt som Hämta historik; nya fakturor utan lokalt kundnummer importeras okopplade. Full liveacceptans återstår efter migration, deploy och återanslutning.
+
+### Customer Value V1 — arbetsbevis, separata från Financial Kernel
+
+`value_events` är append-only med tenant-isolerad medlemsläsning och service-role-RPC-skrivning.
+V1 tillåter `opportunity_identified`, `opportunity_acted`, `opportunity_dismissed`,
+`time_measured` och `time_estimated`. Kernelns pengastadier får inte skrivas av V1.
+Kortens skapande/beslut och automationsloggens lyckade resultat fångas av SQL-triggers
+som anropar samma producenter/RPC i källskrivningens transaktion. Inga utskick sker där.
+Identifierad kortuppskattning fryses; belopp serialiseras som öressträngar, aldrig tidsvärde i kronor.
+Godkänt (`opportunity_acted`) betyder ett fattat beslut, inte en bevisad leverans.
+`time_measured` mäter ledtid för en direktlänkad kedja, **inte sparad arbetstid**.
+Saknade tidsstämplar ger separat schablon med underlag; historiska syntetiska sent_at mäts inte.
+Metod 3 läser kortkohort och beslut ur händelser. V1 behåller tenant-grindade uppslag för
+levande fakturareferenser och fakturornas belopp; V2 övertar pengastadierna senare.
+`VALUE_EVENTS_ENABLED` är server-only och av som standard; ägare/admin kan jämföra
+`/api/value/ledger?method=2` och `?method=3` efter v241 + explicit historikinläsning.
+
+## Trygg överlämning — H3a/H4 (2026-09-15, review)
+
+- `CHANNEL_PREFLIGHT_ENABLED` (default off): shared provider-read preflight at approval creation and central SMS/Resend/push sends. Checks never authorize sends or replace opt-out, billing, approval or quiet-hour guards. Global provider reads have ten-minute process-local, credential-scoped caches; recipient checks always use tenant AND user. `RESEND_PREFLIGHT_API_KEY` optionally supplies domain-read access alongside a sending-only key.
+- `channel_notices` (v246): one service-created informational row per business/channel/Swedish day, no approval and no expiry; same Swedish reason as the home banner. Internal platform credit shortages are Handymate's responsibility.
+- `MORNING_REPORT_RELIABILITY_ENABLED` (default off, v246 first): the exact seeded system morning rule uses existing `generateMorningBrief(...,{strict:true})`, without LLM/tool execution. It retains core query failures instead of presenting empty data as healthy. Existing custom `run_agent` rules remain on their own path and gain classified errors.
+- `morning_report_runs` is a narrowly scoped daily report job, NOT the future H3b outbound-intent primitive. One initial claim and at most one retry no earlier than ten minutes; fence tokens prevent stale finish. Confirmed push acceptance is distinct from report availability. Unknown dispatch/crashed-worker outcomes stop automatic retries. The owner/admin home surface carries persisted status even without a push subscription. Owner-targeted push does not carry financial details.
+- GET `/api/cron/morning-report-retry` uses existing cron authentication, ten-minute schedule and bounded batches/time budget. Flags off means no work. GET `/api/dashboard/channels` requires the active tenant's owner/admin and is no-store. Daily driftlarm has a separate morning-notification line by failure class; balance remains first.
+- Both new tables are service-only with tenant FK and classified RADERAS. No financial canonical events, money primitives, VAT rules, earned autonomy grants or H3b intents change. H1/H2 remain separate packages.
+## Kundvärde V2/V3 och första jobbet (2026-09-14)
+
+Byggs enligt Andreas uttryckliga beställning före pilot, med separata aktiveringsgrindar. Acceptans och avvikelser: `../docs/strategy/CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md`.
+
+- **V2 konsumerar, producerar inga finansiella kommandon.** C3-konsumenten `value-ledger` använder `record_value_money_event(business_id,event_id)` (v243). Den skriver enbart till `value_events`. Där betyder `invoice_issued` utfärdat belopp och `payment_received` en historisk kundavräkningskontrollpunkt. Dessa är värdeloggens namn, inte nya namn i FK.1 eller anrop till automationsmotorns likalydande event.
+- `money_state_observed` är en append-only observation av fakturans aktuella nettobelopp och kundallokeringar, med kanoniskt event-id och finansiell sekvens. `customer_settled` är ett booleskt fält i observationens JSON, inget eventnamn. Läsaren tar senaste observation per faktura; den summerar aldrig kumulativa kontrollpunkter. Krediter och återföringar observeras genom befintliga fordrans-/allokeringshändelser. Nya ännu omappade refund/dispute/invoice-credit-händelser haltar läsningen tills en granskat mappning finns.
+- `VALUE_KERNEL_EVENTS_ENABLED` styr konsumtion och byte av pengakälla för kernel-aktiverade företag. Andra företag behåller fakturaprojektionen. En aktiverad läsare vägrar inaktuellt, haltat eller saknat underlag. V3 kräver dessutom `VALUE_IMPACT_ENABLED`, `VALUE_EVENTS_ENABLED` och företagets kernel-flagga. Webb och native använder samma `/api/dashboard/impact`, utan lokal beloppshärledning.
+- `first_work` (v244) lagrar en företagsbunden länk till första offerten och serverstämplad start/förberedelse/första registrerade utskick. Ingen ny kundtext kopieras. `FIRST_WORK_ENABLED` aktiverar flödet. Databasens unika länk hindrar dubbla offerter efter återförsök. Raderad offert rensar länken och utskickstiden. Förfluten tid inkluderar pauser och påstås inte vara sparad arbetstid eller bevis på mottagen kommunikation.
+- Nästa steg och bevakningsstatus återanvänder offertens befintliga handoff-kontrakt. Inga behörigheter att skicka eller följa upp utökas av denna leverans.
+
+## Trygg överlämning — H1/H2 (2026-09-15, review)
+
+`HANDOFF_INBOX_ENABLED` visar information utan svarskrav och sparade morgonkvitton. v248 normaliserar kortklassificering/utgång i databasen och samlar varje verklig expiry en gång. Utgång är en explicit typmatris: kund-/pengahandlingar sju dagar, autonomierbjudanden fjorton, notices och fjorton interna grindar ingen. Backfill kortar aldrig en levande svarstid. Morgonkvittot prioriterar närmast deadline; interna grindar fyller restplatser efter ålder. Digestnotices behåller även "Skött utan dig"-historiken. `SUPERVISED_AUTONOMY_ENABLED` kräver H1 och preflight samt uttryckligt engångssamtycke från ägare/admin. Fyra befintliga nycklar, oförändrade beloppsgränser, beständiga avstängningar och audit före leverantörsanrop. Signerad off är POST-only. Audit och kvitto är inte dispatchköer: osäkert utfall får ingen automatisk retry. Nya service-only tabeller har tenant-FK och ingår i RADERAS. v241-producenterna är oförändrade. H3b-cancellation och native Ja/Nej återstår som explicita integrationspunkter; fullständig avvikelselista, flaggordning och rollback i `../docs/strategy/H1_H2_IMPLEMENTATION.md`.

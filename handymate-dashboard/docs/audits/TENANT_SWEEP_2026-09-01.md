@@ -130,3 +130,39 @@ Efter-SMS:et (SMS 2) skickas från `finalizeAcceptedQuote` men bara när
 `arDemoOffertForetag(businessId)` — en riktig hantverkares kund får det
 aldrig. Demo-besökarna städas efter 7 dagar av `demo_quote_cleanup` (v223),
 som själv kastar på företag utan `is_demo_tenant`.
+
+
+## C5b addition, 2026-09-14
+
+Five new routes outside customer tenant authentication: `cron/financial-kernel`
+uses the existing fail-closed cron secret; `admin/financial-kernel/intents`,
+`admin/financial-kernel/intents/[id]/resolve`, `admin/financial-kernel/consumers`,
+and `admin/financial-kernel/consumers/resume` use `financialKernelAdmin(request)`.
+That helper verifies the actual user with Auth.getUser and applies isSuperAdmin.
+Each endpoint requires a named business and every mutation requires a reason.
+The actor is server-derived. No endpoint is public by design.
+
+The route inventory recognises this verified helper and its cap increases by the
+five named routes (156 to 161). Behavioral tests exercise all four admin denials,
+foreign-tenant resolution, spoofed actor rejection and the resume reason gate.
+
+
+### C6 shadow routes (2026-09-14)
+
+Four new admin routes (`financial-kernel/phase`, `financial-kernel/shadow`,
+`financial-kernel/shadow/[id]/resolve`, `financial-kernel/shadow/run`) use
+`financialKernelAdmin`, which verifies the Supabase user and superadmin authority.
+Business IDs are explicit operator selections; all RPCs tenant-scope object IDs.
+Actor identity comes from verified Auth, never request bodies.
+The new `financial-kernel-shadow` cron uses `verifyCronSecret` before any DB access.
+All read routes are force-dynamic. Inventory ceiling: 166; cron routes: 50.
+
+
+### H3a/H4 — 2026-09-15
+- GET `/api/dashboard/channels`: authenticated business + active owner/admin membership in that same business; target-user-scoped push readiness; no-store. No caller-controlled tenant.
+- GET `/api/cron/morning-report-retry`: fail-closed `verifyCronSecret`; disabled unless MORNING_REPORT_RELIABILITY_ENABLED; bounded worker. Non-standard-auth inventory ceiling +1 (167), cron inventory 51.
+- v246: service-only commands, member/anon no read/write; new tables classified RADERAS.
+
+## 2026-09-15 — Revenue partnerleads
+
+Inventeringen omfattar nu 169 rutter utanför getAuthenticatedBusiness. Två nya rutter: admin/revenue/partner-leads kräver requireRevenue och manager; partners/leads härleder partneridentiteten från verifierad partner-token och kräver aktiv partner med aktuellt avtal. Service-role används endast bakom dessa servergrindar. Tilldelning är intern säljdata och partnerns läsning begränsas av serverhärlett partner-id. Korspartneråtkomst, återkallning, avtal, inaktiv partner och kontaktspärrar testas i tests/revenue/partner-leads.cjs.

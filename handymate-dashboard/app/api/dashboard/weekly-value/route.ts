@@ -1,7 +1,12 @@
+import { usesKernelValue } from '@/lib/value/kernel-evidence'
+import { impactEnabled } from '@/lib/value/impact-flags'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { getWeeklyValue } from '@/lib/weekly-value'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
+
+export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/dashboard/weekly-value
@@ -13,6 +18,8 @@ import { getWeeklyValue } from '@/lib/weekly-value'
 export async function GET(request: NextRequest) {
   const business = await getAuthenticatedBusiness(request)
   if (!business) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const user = await getCurrentUser(request, business.business_id)
+  if (!user || !isOwnerOrAdmin(user)) return NextResponse.json({ error: 'Endast ägare och administratör' }, { status: 403 })
 
   const supabase = getServerSupabase()
 
@@ -21,7 +28,10 @@ export async function GET(request: NextRequest) {
   const daysRaw = parseInt(request.nextUrl.searchParams.get('days') || '7', 10)
   const days = [7, 30].includes(daysRaw) ? daysRaw : 7
 
-  const value = await getWeeklyValue(supabase, business.business_id, days)
-
-  return NextResponse.json(value)
+  try {
+    const value = await getWeeklyValue(supabase, business.business_id, days, { failOnReadError: true })
+    return NextResponse.json({ ...value, ...(impactEnabled() && await usesKernelValue(supabase, business.business_id) ? { impact_available: true } : {}) })
+  } catch {
+    return NextResponse.json({ error: 'Veckans underlag kunde inte hämtas. Försök igen.' }, { status: 503 })
+  }
 }

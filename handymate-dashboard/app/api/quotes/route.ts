@@ -1,3 +1,4 @@
+import { firstWorkEnabled } from '@/lib/onboarding/first-work'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -502,6 +503,14 @@ export async function POST(request: NextRequest) {
       rut_customer_pays: rutCustomerPays || null,
     }
 
+    if (body.first_work_id) {
+      if (!firstWorkEnabled() || typeof body.first_work_id !== 'string' || !/^[0-9a-f-]{36}$/i.test(body.first_work_id)) return NextResponse.json({ error: 'Arbetsprovet kunde inte verifieras.' }, { status: 400 })
+      const work = await supabase.from('first_work').select('id,quote_id').eq('business_id', businessId).eq('id', body.first_work_id).maybeSingle()
+      if (work.error) return NextResponse.json({ error: 'Kunde inte kontrollera ditt sparade jobb.' }, { status: 503 })
+      if (!work.data) return NextResponse.json({ error: 'Arbetsprovet hittades inte.' }, { status: 404 })
+      if (work.data.quote_id) return NextResponse.json({ error: 'Jobbet har redan en sparad offert. Öppna den för att fortsätta.', existing_quote_id: work.data.quote_id }, { status: 409 })
+      insertData.first_work_id = body.first_work_id
+    }
     if (body.personnummer) insertData.personnummer = body.personnummer
     if (body.fastighetsbeteckning) insertData.fastighetsbeteckning = body.fastighetsbeteckning
     if (body.lead_id) insertData.lead_id = body.lead_id
@@ -524,6 +533,10 @@ export async function POST(request: NextRequest) {
 
     if (!skapad.success || !skapad.quote) {
       console.error('Quote insert error:', skapad.error)
+      if (insertData.first_work_id) {
+        const existing = await supabase.from('first_work').select('quote_id').eq('business_id', businessId).eq('id', insertData.first_work_id).maybeSingle()
+        if (!existing.error && existing.data?.quote_id) return NextResponse.json({ error: 'Jobbet är redan sparat.', existing_quote_id: existing.data.quote_id }, { status: 409 })
+      }
       return NextResponse.json({ error: skapad.error || 'Offerten kunde inte skapas' }, { status: 500 })
     }
     const quote = skapad.quote as Record<string, any>

@@ -1501,6 +1501,100 @@ Och sedan gå tillbaka till sitt riktiga arbete.
 # 27. CURRENT PROGRAM STATE
 ## Detta avsnitt SKA uppdateras löpande av varje session
 
+
+### PR #42 — ny main-konflikt 2026-09-13
+
+Main `e51654f9` förs in ovanpå PR-head `b211b68a`. Enda konflikten ligger
+i `ARCHITECTURE.md`: planeringsstart och Financial Kernel-kontraktet har
+lagts till på samma plats. Båda avsnitten behålls. Financial Kernel-avsnittet
+är oförändrat mot main, och startnudgarnas produktionskod är oförändrad mot
+den tidigare verifierade PR-versionen. Ingen databasändring eller live-
+kvittens skrivs i detta pass.
+
+52 riktade kontraktsprov är gröna (planeringsstart, first-focus,
+onboarding-lifecycle, admin-email-gate, Financial Kernel events och Money).
+Kompilering och byggverktygets typkontroll är gröna. Det fulla lokala bygget
+körs om efter ENOTEMPTY i den genererade `.next/export`-mappen.
+Slutresultat och CI/preview-status för den publicerade committen följs i
+PR #42 innan den görs redo för merge. Detta är ingen merge till main.
+
+### Avgränsad uppdatering 2026-09-13 — startnudgar för team och kalender
+
+**Gren:** `codex/team-calendar-start-nudges-20260913`, bas `082bb028`.
+
+**REUSED:** `KomIgangRail`, `deriveKomIgangTasks`, Team, Resursplanering,
+`business_preferences`, serverns företags-/rollkontroll och svenska datumhjälpare.
+Befintliga startnudgar: testsamtal, fakturadata/Fortnox, första offert,
+första uppdraget med Matte, kundsegment, kundinflöde och push när ett riktigt
+kort väntar. Railen visar en primär och högst två sekundära uppgifter under
+kontots första 30 dagar; kundens valda mål styr prioriteten.
+
+**NEW:** Två sekventiella uppgifter i samma rail. Teamet bekräftas i Team,
+med ”Jag jobbar själv” för en person; inbjudna räknas utan accepterat konto.
+Kalendersteget leder till Resursplanering och kräver att den utpekade nästa
+veckan visas och att användaren bekräftar kända jobb/frånvaro. Ingen
+automatisk klar-markering på kalenderkoppling, ett jobb eller tom kalender.
+En uttryckligen tom vecka får bekräftas. Fel person/ofullständiga tider,
+ändrat läst underlag, läsfel och trunkerade svar blockerar bekräftelse.
+
+**TRUTH:** Engångsstart för användningen, inte ett nytt återkommande
+veckokrav. Sparade kvittenser betyder inte att arbetstider är verifierade
+eller att framtida veckor är kompletta. Ingen ny mejl-/pushnudge, AI-körning,
+extern kommunikation eller ändring av beslutsräknaren.
+
+**VERIFIED:** 65 riktade kontraktstester inklusive faktisk route-/reader-
+harness; två browserprov av riktig komponent vid 375/1280 px med isolerad
+transport. TypeScript och `next build` gröna med 12 GB heap (befintliga
+metadata-/Sentry-varningar kvar). Databasens kolumner och unik
+preference-nyckel verifierade läsande; motsvarande urval provade i Nordström
+El AB (två aktiva medlemmar, inget startkvitto, inga poster i provveckan).
+Inga kunddata ändrades.
+
+**LIVE PROOF 2026-09-13:** Inloggad rundresa genomförd i PR #42:s länkade
+Vercel-preview med ursprunglig PR-head `51e28b4d`. Teamet bekräftades via UI
+med två medlemmar, inklusive en inbjuden (12:36:54 UTC). Veckan 14–20
+september visades först och bekräftades uttryckligen som tom (12:37:37 UTC).
+Båda kvittenserna lästes oberoende i `business_preferences`. Kalenderkortet
+förblev klart efter omladdning; både Team och Resursplanering förblev klara
+efter utloggning och ny inloggning medan kontot fortfarande var inom
+30-dagarsfönstret. Nordström El AB:s skapandedatum ändrades tillfälligt med
+Andreas godkännande och återställdes exakt till ursprungligt värde efter
+provet. De två testkvittenserna finns kvar; inga nya jobb/inbjudningar skapades.
+
+**MERGE 2026-09-13:** Main `41b2eb6d` tas in i PR-grenen med båda historikerna
+bevarade. Enda textkonflikten var två oberoende tillägg i `tasks/todo.md`;
+båda behålls. Produktkoden sammanfogas utan konflikt. Byggkontrollen hittade
+också en otillåten route-export i main: `BESLUTSFONSTER_DAGAR` i
+`app/api/min-garanti/route.ts`. Konstanten görs lokal i samma fil; värdet 90,
+beräkningen, auth och API-svaret ändras inte.
+
+**NOT PROVEN:** Det tidigare liveprovet gäller den länkade previewn före
+sammanfogningen; separat deployment-metadata kunde inte verifieras med
+Vercel-anslutningens behörighet. Ny preview efter sammanfogning och native
+mobil är separata grindar. Lokal verifiering av sammanfogningen är grön: 56 riktade kontrakt
+(kom-igang, first-focus, onboarding-lifecycle, adoption, home-brain), separat
+`tsc --noEmit`, samt `next build` med 12 GB heap efter exporträttningen.
+Adoption-provets 21 tester kördes om efter rättningen och är gröna.
+Bygget behåller befintliga Sentry-/metadata-varningar. Startnudgarnas
+produktionskod, auth och sparhjälpare är oförändrade mot liveprovets PR-head.
+Nästa steg: kontrollera den publicerade merge-commitens CI/preview före merge
+till main.
+
+**BELÄGGNINGSBESLUT:** Andreas valde under 70 % nästa kalendervecka från
+onsdag. Förslag: lugnt kort, ingen push, dölj vid 75 %, avfärdande per
+utpekad vecka. Ej aktiverat här. Repoverkligheten innehåller fortfarande
+en äldre 40 %-trigger i week-capacity, bokningstak i nämnaren och fasta
+8-timmarsdagar i personkapacitet. Att byta en konstant till 70 skulle
+inte genomföra beslutets beräkning och skydd. Nästa kapacitetsslice måste
+verifiera arbetstid/deltid/frånvaro, datakompletthet och färskhet och hålla
+kundens startbekräftelse skild från aktuell veckas beläggningsunderlag.
+
+**ÖVRIGA NUDGYTOR:** FirstQuoteGuide/WorkSampleResume i offertbyggaren,
+MalNudge i månadsgenomgången, samt äldre OnboardingChecklist under
+/dashboard/oversikt. Den äldre checklistans ”Bjud in kollega” länkar till
+referral och är inte ett personalsteg. Nytt arbete återanvänder huvudsidans
+KomIgangRail och skapar inte en tredje checklista.
+
 ### PROGRAM
 Brain Visibility Weekend
 
@@ -2412,3 +2506,15 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **VERIFIED:** Read-only uppslag bekräftar Nordström El AB, `biz_al7pjuu5smi`, med det tidigare testkontot. Lokala 17 policytester och 12 CI-kontrakt, testupptäckt samt typkontroll. **NOT VERIFIED:** Ingen autentiserad livekörning genomförd. Aktuellt lösenord i GitHub och åtkomst till preview inte verifierade. Browser fortfarande blockerad; ingen ny omgång browserförsök gjord här.
 
 **CUSTOMER IMPACT:** Återanvändbar testkörning för session, navigering och verkligt sparat/återöppnat utkast. **RISKS:** API-inloggning/skapande ersätter inte hela formulärresan; testutkast lämnas kvar; preview kan använda proddata. **STATUS CHANGES:** Release kvar på HOLD. **NEXT ACTION:** Följ `handymate-dashboard/docs/runbooks/NORDSTROM_EL_LIVE_TEST.md`: använd befintlig secret om giltig, starta manuellt från arbetsgrenen, läs verkligt resultat och åtgärda observerade fel. GitHub-anslutningen saknar ny workflow_dispatch och secret-administration; första starten behöver göras i GitHub/CLI.
+
+### Fortnox — akut inkommande synk, 2026-09-14
+
+**DONE/NEW:** Browserprovet på Nordström El AB visade att Synka nu bara läste redan kopplade betalstatusar. Hämta historik gav refresh HTTP 400 och frånkoppling. Rättat i separat PR-arbete: fem minuters refreshmarginal, serialiserad OAuth-förnyelse, separat företagsnamnssparning, korrekt CompanyInformation. Gemensam inkommande fakturakörning för knappar/cron; skapa eller uppdatera, stabil identitet, bevarade jobb/anteckningar/påminnelser och sanningsenliga fel/räknare.
+
+**REUSED:** Fortnox API-klient, befintlig historikhämtning, betalningsklassning och applyInvoicePayment.
+
+**VERIFIED:** 49 befintliga riktade Fortnox-kontrakt gröna, nya körbara regressioner för import/omsynk/OAuth och lokal PostgreSQL-verifiering av lås, RLS/privilegier och unikt index. Exakt slutlig test/build-status dokumenteras i PR:n.
+
+**NOT VERIFIED/RISKS:** Ingen ny live-synk eller återanslutning efter kodändringen. Automatisk säkerhetsgranskning avvisade körning av migrationen i produktion; godkännande krävs. SEK-standardfakturor stöds av uppdateringen; kredit/kontant, annan valuta och återöppnade betalda fakturor rapporteras för avstämning. Ingen faktura skickades i browserprovet.
+
+**CUSTOMER IMPACT/STATUS:** Fortnox kvarstår PROVE, inte färdig lanseringsacceptans. Nästa steg: godkänn och kör den granskade migrationen, deploya, återanslut testföretaget, hämta testfakturan och bevisa beständig ändring från Fortnox utan dubblett.

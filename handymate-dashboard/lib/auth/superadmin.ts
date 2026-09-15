@@ -12,6 +12,7 @@
 
 import type { SupabaseClient, User } from '@supabase/supabase-js'
 import type { NextRequest } from 'next/server'
+import { isAdminEmail } from './admin-email'
 
 export const IMPERSONATION_COOKIE = 'hm_impersonate'
 export const IMPERSONATION_MAX_AGE_SECONDS = 24 * 60 * 60 // 24h auto-expiry
@@ -27,12 +28,6 @@ export interface ImpersonationContext {
 // Superadmin-detection
 // ─────────────────────────────────────────────────────────────────
 
-// Email-baserad fallback (samma logik som lib/admin-auth.ts isAdmin)
-const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
-  .split(',')
-  .map(e => e.trim().toLowerCase())
-  .filter(Boolean)
-
 /**
  * Kollar om en authenticated Supabase user är markerad som superadmin.
  *
@@ -41,7 +36,8 @@ const ADMIN_EMAILS = (process.env.ADMIN_EMAILS || '')
  * 2. user.email slutar på @handymate.se
  * 3. user.email finns i ADMIN_EMAILS env-var (komma-separerad)
  *
- * Metod 2 + 3 är konsekvent med befintlig lib/admin-auth.ts isAdmin().
+ * Metod 2 + 3 är isAdminEmail() i lib/auth/admin-email.ts — samma grind som
+ * lib/admin-auth.ts isAdmin() och inloggningsrutten använder.
  */
 export function isSuperAdmin(user: User | null | undefined): boolean {
   if (!user) return false
@@ -49,11 +45,7 @@ export function isSuperAdmin(user: User | null | undefined): boolean {
   const appMeta = (user.app_metadata || {}) as Record<string, unknown>
   if (appMeta.is_superadmin === true) return true
   // Fallback: email-baserad
-  const email = (user.email || '').toLowerCase()
-  if (!email) return false
-  if (email.endsWith('@handymate.se')) return true
-  if (ADMIN_EMAILS.includes(email)) return true
-  return false
+  return isAdminEmail(user.email)
 }
 
 // ─────────────────────────────────────────────────────────────────

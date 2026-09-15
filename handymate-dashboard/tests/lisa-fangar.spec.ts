@@ -57,7 +57,7 @@ const FORBIDDEN: Array<{ name: string; pattern: RegExp }> = [
 const ALLOWLIST: Record<string, string> = {
   'lib/knowledge-defaults.ts:125':
     'Exempeltext för en låssmeds EGEN jourtjänst i en ifyllnadsmall ("ring oss dygnet runt") — kundens löfte om sitt eget företag, inte Handymates/Lisas.',
-  'app/dashboard/agent/page.tsx:1161':
+  'app/dashboard/agent/page.tsx:1162':
     'Rubrik om att agentmotorn (cron/automation-engine) körs kontinuerligt i bakgrunden — inget specifikt telefonsvars-löfte. Enskilda kundåtgärder är fortsatt arbetstids-grindade.',
   'app/dashboard/website/page.tsx:393':
     'Beskriver storefront-chatboten (klient-JS på kundens egen hemsida) — en annan funktion än telefonlinjen, utan respects_work_hours-grind.',

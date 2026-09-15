@@ -38,6 +38,7 @@ import ReactMarkdown from 'react-markdown'
 import SavedScoreboard from '@/components/dashboard/SavedScoreboard'
 import EarnedAutonomyPanel from '@/components/dashboard/EarnedAutonomyPanel'
 import { useBusiness } from '@/lib/BusinessContext'
+import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
 import { isAgentAllowed, getPlanLabel, getPlanPrice, type PlanType } from '@/lib/feature-gates'
 import MatteChatModal from '@/components/MatteChatModal'
 import AgentMemoriesModal from '@/components/AgentMemoriesModal'
@@ -1279,7 +1280,7 @@ export default function AgentDashboardPage() {
           </div>
 
           {/* Genererat värde */}
-          <AutomationValueWidget />
+          <WeeklyValueDigest />
 
           {/* Chart */}
           <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mb-6">
@@ -1505,64 +1506,3 @@ export default function AgentDashboardPage() {
 }
 
 // ─── Automation Value Widget ─────────────────────────────────
-
-function AutomationValueWidget() {
-  const [data, setData] = useState<{
-    total_value: number
-    items: Array<{ type: string; label: string; amount: number; status: string; date?: string }>
-    pending_count: number
-  } | null>(null)
-  const [expanded, setExpanded] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/automation/value')
-      .then(r => r.json())
-      .then(setData)
-      .catch(() => {})
-  }, [])
-
-  if (!data) return null
-
-  const hasValue = data.total_value > 0 || data.items.length > 0
-  const confirmedItems = data.items.filter(i => i.status === 'confirmed')
-
-  return (
-    <div className="bg-white rounded-xl border border-[#E2E8F0] p-5 mb-6">
-      {hasValue ? (
-        <>
-          <button onClick={() => setExpanded(!expanded)} className="w-full text-left">
-            <p className="text-xs text-gray-400 mb-1">Senaste 7 dagarna</p>
-            <div className="flex items-baseline gap-2">
-              <span className="text-3xl font-bold text-primary-700">
-                {data.total_value.toLocaleString('sv-SE')} kr
-              </span>
-              <span className="text-sm text-gray-500">genererat automatiskt</span>
-            </div>
-            {data.pending_count > 0 && (
-              <p className="text-xs text-gray-400 mt-1">{data.pending_count} leads under bevakning...</p>
-            )}
-          </button>
-          {expanded && confirmedItems.length > 0 && (
-            <div className="mt-4 pt-4 border-t border-gray-100 space-y-2">
-              {confirmedItems.map((item, i) => (
-                <div key={i} className="flex items-center justify-between text-sm">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-emerald-500">✅</span>
-                    <span className="text-gray-700 truncate">{item.label}</span>
-                  </div>
-                  <span className="font-medium text-gray-900 shrink-0 ml-2">{item.amount.toLocaleString('sv-SE')} kr</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      ) : (
-        <div>
-          <p className="text-sm text-gray-500">
-            Handymate bevakar dina offerter, fakturor och leads automatiskt — värdet visas här när automationerna genererar resultat.
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}

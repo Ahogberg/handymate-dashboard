@@ -25,6 +25,8 @@ import {
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
+import { svDateStr } from '@/lib/dates'
+import { PlanningStart } from '@/components/onboarding/PlanningStart'
 import { useCurrentUser } from '@/lib/CurrentUserContext'
 import { fetchPersonDays, type PersonDay } from '@/lib/schedule/person-day'
 import {
@@ -1747,6 +1749,10 @@ export default function SchedulePage() {
             </button>
           </div>
         </div>
+
+        <PlanningStart step="calendar" refreshKey={JSON.stringify(entries)}
+          visibleWeekStart={view === 'week' ? svDateStr(startOfWeek(currentDate, { weekStartsOn: 1 })) : undefined}
+          onShowWeek={week => { setCurrentDate(new Date(`${week}T12:00:00Z`)); setView('week') }} />
 
         {/* Controls row */}
         <div className="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">

@@ -1,3 +1,5 @@
+import { RUN_MINUTES, RUN_DEFAULT, ACTION_MINUTES, ACTION_DEFAULT } from './value/time-measured'
+import { valueEventsEnabled, readValueTime } from './value/events/read'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { getRecoveredRevenue } from './value/recovered-revenue'
 
@@ -27,24 +29,15 @@ import { getRecoveredRevenue } from './value/recovered-revenue'
 const ROLLING_DAYS = 7
 const DEFAULT_LEAD_VALUE = 5000 // konservativ schablon när lead saknar estimated_value
 
-// Viktad tidsåtgång per åtgärd (minuter) — mer trovärdig än en platt schablon.
-const RUN_MINUTES: Record<string, number> = { phone_call: 12, incoming_sms: 6 }
-const RUN_DEFAULT = 10
-const ACTION_MINUTES: Record<string, number> = {
-  send_sms: 6,
-  send_email: 6,
-  send_reminder: 12,
-  send_invoice_reminder: 12,
-  create_booking: 10,
-  schedule_followup: 10,
-  notify_owner: 4,
-  create_approval: 4,
-}
-const ACTION_DEFAULT = 6
-
 export interface WeeklyValue {
+  impact_available?: boolean
+  measured_minutes?: number
+  estimated_minutes?: number
+  measured_minutes_basis?: 'elapsed_workflow_time_not_labour_saved'
   range_days: number
   confirmed_kr: number
+  paid_kr?: number
+  accepted_quote_kr?: number
   /** Värdebevisen: agent + dagar-till-utfall gör varje rad till en berättelse. */
   confirmed_items: Array<{ label: string; amount: number; agent: string; dagar: number }>
   captured_count: number
@@ -143,9 +136,16 @@ export async function getWeeklyValue(
       dagar: Math.max(0, Math.round((a.occurred_at_ms - a.card_resolved_at_ms) / 86_400_000)),
     }))
 
+  const observedTime = valueEventsEnabled()
+    ? await readValueTime(supabase, businessId, sinceIso, new Date().toISOString())
+    : { measured_minutes: 0, estimated_minutes: timeMinutes, measured_minutes_basis: 'elapsed_workflow_time_not_labour_saved' as const }
+
   return {
+    ...observedTime,
     range_days: rangeDays,
     confirmed_kr: recovered.total_recovered_kr,
+    paid_kr: recovered.attributions.filter(a => a.event_kind === 'invoice_paid').reduce((sum, a) => sum + a.amount_kr, 0),
+    accepted_quote_kr: recovered.attributions.filter(a => a.event_kind === 'quote_accepted').reduce((sum, a) => sum + a.amount_kr, 0),
     confirmed_items: confirmedItems,
     captured_count: capturedCount,
     captured_kr: Math.round(capturedKr),

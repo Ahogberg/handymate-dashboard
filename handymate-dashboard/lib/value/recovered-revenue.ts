@@ -1,3 +1,5 @@
+import { usesKernelValue, readKernelPayments } from './kernel-evidence'
+import { invoicePaymentEvidence } from './invoice-payment-evidence'
 /**
  * Återvunnet-kärnan (gap 2, tasks/vilande-pengar-masterplan.md VP2) —
  * attribuerar VERIFIERADE intäktshändelser till godkända approval-kort:
@@ -348,6 +350,7 @@ export async function getRecoveredRevenue(
   const maxWindowDays = Math.max(...Object.values(ATTRIBUTION_WINDOW_DAYS))
   const cardsSinceIso = new Date(nowMs - (sinceDays + maxWindowDays) * DAY_MS).toISOString()
 
+  const kernelSource = await usesKernelValue(supabase, businessId)
   const cards: ApprovedCard[] = []
   try {
     const { data, error } = await supabase
@@ -360,7 +363,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] pending_approvals-uppslag misslyckades (ger 0 kr):', error.message)
-      if (opts.failOnReadError) throw error
+      if (opts.failOnReadError || kernelSource) throw error
     } else {
       for (const row of data || []) {
         const card = mapApprovalRowToCard(row)
@@ -369,7 +372,7 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] pending_approvals-uppslag kastade (ger 0 kr):', err?.message || err)
-    if (opts.failOnReadError) throw err
+    if (opts.failOnReadError || kernelSource) throw err
   }
 
   if (cards.length === 0) {
@@ -395,7 +398,7 @@ export async function getRecoveredRevenue(
         .in('change_id', pendingAtaIds)
       if (error) {
         console.warn('[recovered-revenue] project_change-uppslag misslyckades (ÄTA-kort utesluts):', error.message)
-        if (opts.failOnReadError) throw error
+        if (opts.failOnReadError || kernelSource) throw error
       } else {
         const invoiceByAta = new Map<string, string | null>(
           (data || []).map((r: any) => [String(r.change_id), r.invoice_id ? String(r.invoice_id) : null]),
@@ -408,7 +411,7 @@ export async function getRecoveredRevenue(
       }
     } catch (err: any) {
       console.warn('[recovered-revenue] project_change-uppslag kastade (ÄTA-kort utesluts):', err?.message || err)
-      if (opts.failOnReadError) throw err
+      if (opts.failOnReadError || kernelSource) throw err
     }
   }
 
@@ -424,7 +427,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] quotes-uppslag misslyckades (skippar offerter):', error.message)
-      if (opts.failOnReadError) throw error
+      if (opts.failOnReadError || kernelSource) throw error
     } else {
       for (const q of data || []) {
         if (!q.accepted_at) continue
@@ -440,37 +443,40 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] quotes-uppslag kastade (skippar offerter):', err?.message || err)
-    if (opts.failOnReadError) throw err
+    if (opts.failOnReadError || kernelSource) throw err
   }
 
   try {
-    const { data, error } = await supabase
+    const { data, error } = kernelSource
+      ? { data: await readKernelPayments(supabase, businessId, eventsSinceIso, new Date(nowMs).toISOString()), error: null }
+      : await supabase
       .from('invoice')
-      .select('invoice_id, customer_id, quote_id, total, paid_at, invoice_number')
+      .select('invoice_id, customer_id, quote_id, total, paid_amount, status, paid_at, invoice_number')
       .eq('business_id', businessId)
-      .eq('status', 'paid')
+      .in('status', ['paid', 'customer_paid'])
       .gte('paid_at', eventsSinceIso)
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] invoice-uppslag misslyckades (skippar fakturor):', error.message)
-      if (opts.failOnReadError) throw error
+      if (opts.failOnReadError || kernelSource) throw error
     } else {
       for (const inv of data || []) {
-        if (!inv.paid_at) continue
+        const evidence = invoicePaymentEvidence(inv)
+        if (!evidence.paid || evidence.paid_at_ms === null) continue
         events.push({
           kind: 'invoice_paid',
           event_id: String(inv.invoice_id),
           customer_id: inv.customer_id ? String(inv.customer_id) : null,
           quote_id: inv.quote_id ? String(inv.quote_id) : null,
-          amount_kr: Number(inv.total) || 0,
-          occurred_at_ms: new Date(inv.paid_at).getTime(),
-          label: `Faktura ${inv.invoice_number || ''} betald`.replace('  ', ' ').trim(),
+          amount_kr: evidence.paid_kr,
+          occurred_at_ms: evidence.paid_at_ms,
+          label: `Faktura ${inv.invoice_number || ''} – registrerad betalning`.replace('  ', ' ').trim(),
         })
       }
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] invoice-uppslag kastade (skippar fakturor):', err?.message || err)
-    if (opts.failOnReadError) throw err
+    if (opts.failOnReadError || kernelSource) throw err
   }
 
   try {
@@ -482,7 +488,7 @@ export async function getRecoveredRevenue(
       .limit(1000)
     if (error) {
       console.warn('[recovered-revenue] booking-uppslag misslyckades (skippar bokningar):', error.message)
-      if (opts.failOnReadError) throw error
+      if (opts.failOnReadError || kernelSource) throw error
     } else {
       for (const b of data || []) {
         if (!b.created_at) continue
@@ -498,7 +504,7 @@ export async function getRecoveredRevenue(
     }
   } catch (err: any) {
     console.warn('[recovered-revenue] booking-uppslag kastade (skippar bokningar):', err?.message || err)
-    if (opts.failOnReadError) throw err
+    if (opts.failOnReadError || kernelSource) throw err
   }
 
   const attributions = attributeRevenue(cards, events)

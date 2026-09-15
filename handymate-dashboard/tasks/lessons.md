@@ -677,3 +677,19 @@ i företagsstart, vunnet jobb eller fakturerbart arbete. Börja varje pass med d
 synliga resan och ett faktiskt resultat: vilket manuellt moment försvinner, vilken
 intäkt skyddas och var finns kvittot? En grön hjälpfunktion får aldrig ersätta ett
 sammanhängande kod- och klickprov av övergången.
+
+## 2026-09-14: Triggerprivilegier måste provas med källtabellens verkliga skrivroller
+
+En service-role-only producent bakom en SECURITY INVOKER-trigger stoppar även en RLS-tillåten
+medlemsskrivning. Prova authenticated INSERT/UPDATE, inte bara ägare och service_role.
+När triggern behöver definerprivilegier: lås search_path, behåll källans RLS och testa att
+medlemmen fortfarande nekas direkta producentanrop och andra företags rader.
+
+## 2026-09-14 — Parallella paket kräver basmerge efter första merge
+När parallella paket registrerar tester på samma package.json-rad: merga aktuell main, behåll båda paketens specar och härled den lokala ordningen från CI-listan. Kontrollera fullständig ordningsparitet och en spec per YAML-rad på den sammanslagna versionen före överlämning.
+
+## 2026-09-15 — Icke-monetärt arbete ska inte bli en nollrubrik
+Prova tid och förfrågningar separat från helt tomt kvitto. Att det finns arbete är inte samma sak som att det finns ett ekonomiskt utfall; bevara arbetsunderlaget utan en stor 0 kr-rubrik.
+
+## 2026-09-15 — Leverantörskontrollfel är inte ett definitivt cacheutfall
+Spara gärna pågående kontroll för samtidiga anrop, men kasta cacheposten vid kontrollfel. Testa 503 och avvisat anrop följt av återhämtning inom TTL; jämför postidentitet så att ett gammalt fel inte raderar en ny post.

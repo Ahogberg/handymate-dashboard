@@ -1,3 +1,4 @@
+import { withFortnoxLock } from './fortnox/operation-lock'
 import { createClient } from '@supabase/supabase-js'
 
 const FORTNOX_CLIENT_ID = process.env.FORTNOX_CLIENT_ID!
@@ -63,6 +64,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<FortnoxT
         'Content-Type': 'application/x-www-form-urlencoded',
         'Authorization': 'Basic ' + Buffer.from(`${FORTNOX_CLIENT_ID}:${FORTNOX_CLIENT_SECRET}`).toString('base64')
       },
+      signal: AbortSignal.timeout(15000),
       body: new URLSearchParams({
         grant_type: 'refresh_token',
         refresh_token: refreshToken
@@ -76,7 +78,7 @@ export async function refreshAccessToken(refreshToken: string): Promise<FortnoxT
 
   if (!response.ok) {
     const errorBody = await response.text()
-    console.error('Fortnox token refresh error:', response.status, errorBody)
+    console.error('Fortnox token refresh error:', response.status)
 
     // Permanent auth-fel: 400/401 med invalid_grant (revokerad/utgången
     // refresh_token). Allt annat (5xx, 429, tillfälliga fel) = transient.
@@ -128,7 +130,7 @@ export async function getFortnoxConfig(businessId: string): Promise<FortnoxConfi
 /**
  * Save Fortnox tokens for a business
  */
-export async function saveFortnoxTokens(
+async function persistFortnoxTokens(
   businessId: string,
   tokens: FortnoxTokens,
   companyName?: string
@@ -176,10 +178,20 @@ export async function saveFortnoxTokens(
   }
 }
 
+export async function saveFortnoxTokens(businessId: string, tokens: FortnoxTokens, companyName?: string): Promise<void> {
+  await withFortnoxLock(businessId, 'oauth', async () => persistFortnoxTokens(businessId, tokens, companyName))
+}
+
+/** Updating company metadata must never write an old token pair back after rotation. */
+export async function saveFortnoxCompanyName(businessId: string, companyName: string): Promise<void> {
+  const { error } = await getSupabase().from('business_config').update({ fortnox_company_name: companyName }).eq('business_id', businessId)
+  if (error) throw new Error('Kunde inte spara Fortnox-företaget')
+}
+
 /**
  * Clear Fortnox connection for a business
  */
-export async function clearFortnoxConnection(businessId: string): Promise<void> {
+async function clearFortnoxConnectionUnlocked(businessId: string): Promise<void> {
   const supabase = getSupabase()
 
   const { error: credentialError } = await supabase
@@ -207,8 +219,12 @@ export async function clearFortnoxConnection(businessId: string): Promise<void> 
   }
 }
 
+export async function clearFortnoxConnection(businessId: string): Promise<void> {
+  await withFortnoxLock(businessId, 'oauth', async () => clearFortnoxConnectionUnlocked(businessId))
+}
+
 /**
- * Refresh token if it expires within 1 hour.
+ * Refresh token if it expires within 5 minutes.
  *
  * Vid PERMANENT refresh-failure (token revokerad på Fortnox-sidan eller
  * refresh_token utgånget → invalid_grant): rensar fortnox_connected = false
@@ -222,6 +238,12 @@ export async function clearFortnoxConnection(businessId: string): Promise<void> 
  */
 export async function refreshTokenIfNeeded(businessId: string): Promise<string | null> {
   const config = await getFortnoxConfig(businessId)
+  if (config?.fortnox_access_token && new Date(config.fortnox_token_expires_at || 0).getTime() > Date.now() + 5 * 60 * 1000) return config.fortnox_access_token
+  return withFortnoxLock(businessId, 'oauth', async (assertOwned) => refreshTokenLocked(businessId, assertOwned))
+}
+
+async function refreshTokenLocked(businessId: string, assertOwned: () => Promise<void>): Promise<string | null> {
+  const config = await getFortnoxConfig(businessId)
 
   if (!config?.fortnox_access_token || !config?.fortnox_refresh_token) {
     return null
@@ -231,17 +253,18 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
     ? new Date(config.fortnox_token_expires_at)
     : new Date(0)
 
-  const oneHourFromNow = new Date(Date.now() + 60 * 60 * 1000)
+  const refreshThreshold = new Date(Date.now() + 5 * 60 * 1000)
 
-  // Token is still valid for more than 1 hour
-  if (expiresAt > oneHourFromNow) {
+  // Token is still valid for more than 5 minutes
+  if (expiresAt > refreshThreshold) {
     return config.fortnox_access_token
   }
 
   // Refresh the token
   try {
     const newTokens = await refreshAccessToken(config.fortnox_refresh_token)
-    await saveFortnoxTokens(businessId, newTokens)
+    await assertOwned()
+    await persistFortnoxTokens(businessId, newTokens)
     return newTokens.access_token
   } catch (error) {
     // Skilj på permanent auth-fel (revokerad token) och transient fel
@@ -272,7 +295,8 @@ export async function refreshTokenIfNeeded(businessId: string): Promise<string |
     // försöker igen — inget är revokerat på Fortnox-sidan.
     if (permanent) {
       try {
-        await clearFortnoxConnection(businessId)
+        await assertOwned()
+        await clearFortnoxConnectionUnlocked(businessId)
       } catch (clearErr) {
         console.error(`[fortnox/refresh] failed to mark disconnected for ${businessId}:`, clearErr)
       }
@@ -303,7 +327,9 @@ export async function fortnoxRequest<T = unknown>(
   const { logFortnoxApi } = await import('@/lib/fortnox/api-log')
   const startTime = Date.now()
 
-  const accessToken = await refreshTokenIfNeeded(businessId)
+  let accessToken: string | null
+  try { accessToken = await refreshTokenIfNeeded(businessId) }
+  catch { throw new FortnoxRequestNotSentError('Fortnox-anslutningen kunde inte förnyas. Försök igen.') }
 
   if (!accessToken) {
     await logFortnoxApi({
@@ -326,7 +352,8 @@ export async function fortnoxRequest<T = unknown>(
 
   const options: RequestInit = {
     method,
-    headers
+    headers,
+    ...(method === 'GET' ? { signal: AbortSignal.timeout(20000) } : {}),
   }
 
   if (data && (method === 'POST' || method === 'PUT')) {
@@ -379,12 +406,12 @@ export async function fortnoxRequest<T = unknown>(
  */
 export async function getFortnoxCompanyInfo(businessId: string): Promise<{ CompanyName: string } | null> {
   try {
-    const response = await fortnoxRequest<{ CompanySettings: { CompanyName: string } }>(
+    const response = await fortnoxRequest<{ CompanyInformation?: { CompanyName?: string }; CompanySettings?: { CompanyName?: string } }>(
       businessId,
       'GET',
       '/companyinformation'
     )
-    return { CompanyName: response.CompanySettings?.CompanyName || 'Okänt företag' }
+    return { CompanyName: response.CompanyInformation?.CompanyName || response.CompanySettings?.CompanyName || 'Okänt företag' }
   } catch (error) {
     console.error('Get company info error:', error)
     return null
@@ -810,6 +837,12 @@ export interface FortnoxInvoice {
   TaxReduction?: number
   TaxReductionType?: 'ROT' | 'RUT' | 'GREEN' | string
   FinalPayDate?: string
+  Net?: number
+  TotalVAT?: number
+  Sent?: boolean
+  Currency?: string
+  InvoiceType?: string
+  ExternalInvoiceReference1?: string
 }
 
 export interface FortnoxInvoiceResponse {
@@ -831,7 +864,7 @@ export async function getFortnoxInvoice(
   const response = await fortnoxRequest<FortnoxInvoiceResponse>(
     businessId,
     'GET',
-    `/invoices/${documentNumber}`
+    `/invoices/${encodeURIComponent(documentNumber)}`
   )
   return response.Invoice
 }
@@ -955,6 +988,7 @@ async function fetchFortnoxInvoicePages(
     const totalPages = response.MetaInformation?.['@TotalPages'] ?? 1
     const currentPage = response.MetaInformation?.['@CurrentPage'] ?? page
     if (rows.length === 0 || currentPage >= totalPages) break
+    if (page === INVOICE_PULL_MAX_PAGES) throw new Error('Fortnox-hämtningen överskrider sidgränsen. Ingen komplett synk kunde göras.')
   }
   return all
 }
@@ -1066,7 +1100,7 @@ export function mergeFortnoxInvoiceLists(
  * etablerat bolags obetalda lista ensam skulle slå taket är det redan ett
  * tecken på att importen behöver ses över separat.
  *
- * Filtrerar bort Cancelled klient-sidan som skyddsnät. FullyPaid filtreras
+ * Makulerade följer med så redan importerade fakturor kan uppdateras. FullyPaid filtreras
  * INTE längre bort (det är hela poängen med historik-pullen) — mappningen
  * (lib/fortnox/map-invoice.ts) sätter status:'paid' och outstanding:0 för
  * dem.
@@ -1084,7 +1118,7 @@ export async function getFortnoxInvoices(
       fetchFortnoxInvoicePages(businessId, `fromdate=${fromDate}`),
     ])
     const merged = mergeFortnoxInvoiceLists(unpaid, recent)
-    return merged.filter(inv => !inv.Cancelled)
+    return merged
   } catch (error) {
     console.error('Get Fortnox invoices error:', error)
     throw error

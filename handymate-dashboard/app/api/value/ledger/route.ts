@@ -1,3 +1,4 @@
+import { ledgerMethod } from '@/lib/value/events/read'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
@@ -26,11 +27,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Endast ägare och administratör' }, { status: 403 })
     }
 
+    const requestedMethod = request.nextUrl.searchParams.get('method')
+    if (requestedMethod !== null && requestedMethod !== '2' && requestedMethod !== '3') {
+      return NextResponse.json({ error: 'Ogiltig metod' }, { status: 400 })
+    }
+    const method = ledgerMethod(requestedMethod)
     const nu = new Date()
     const standardPeriod = `${nu.getUTCFullYear()}-${String(nu.getUTCMonth() + 1).padStart(2, '0')}`
     const period = request.nextUrl.searchParams.get('period') || standardPeriod
 
-    const ledger = await getManadsLedger(getServerSupabase(), business.business_id, period)
+    const ledger = await getManadsLedger(getServerSupabase(), business.business_id, period, method)
     if (!ledger) {
       return NextResponse.json({ error: 'Ogiltig period — använd formen ÅÅÅÅ-MM' }, { status: 400 })
     }

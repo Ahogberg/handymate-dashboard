@@ -309,6 +309,7 @@ export async function GET(request: NextRequest) {
           customerId: customer.customer_id,
           relatedId: project.project_id,
           messageType: 'review_request',
+          ...(!mandateResolution.covered ? {autonomyKey:'review_request' as const} : {}),
           recipient: 'customer',
           purpose: 'proactive',
         })
@@ -322,6 +323,7 @@ export async function GET(request: NextRequest) {
           status: smsResult.success ? 'success' : 'failed',
           context: {
             earned_autonomy: reviewAutonomous,
+            autonomy_key: 'review_request',
             mandate_id: mandateResolution.covered ? mandateResolution.mandate.id : null,
             customer_id: customer.customer_id,
             project_id: project.project_id,
@@ -341,7 +343,9 @@ export async function GET(request: NextRequest) {
         if (mandateResolution.covered) {
           const mandate = mandateResolution.mandate
           const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
-          const { error: cardErr } = await supabase.from('pending_approvals').insert({
+          const { error: cardErr } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
             id: cardId,
             business_id: biz.business_id,
             approval_type: 'review_request',
@@ -409,9 +413,11 @@ export async function GET(request: NextRequest) {
         } catch { /* non-blocking */ }
       }
 
-      const { error: insertError } = await supabase
+      const { error: insertError } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase
         .from('pending_approvals')
-        .insert({
+        .insert(row))({
           business_id: biz.business_id,
           approval_type: 'review_request',
           title: `Be ${firstName || 'kunden'} om recension`,

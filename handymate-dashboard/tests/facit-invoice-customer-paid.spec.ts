@@ -88,8 +88,8 @@ test.describe('Fortnox-synken — lib/fortnox/sync-payments.ts', () => {
     expect(s).not.toContain('payment_method')
   })
 
-  test('customer_paid ingår i kandidaterna (settle-kollen) — filtret är fortfarande (paid,cancelled)', () => {
-    expect(s).toContain(".not('status', 'in', '(paid,cancelled)')")
+  test('customer_paid ingår i kandidaterna (settle-kollen) — slutbehandlade och krediterade undantas', () => {
+    expect(s).toContain(".not('status', 'in', '(paid,cancelled,credited)')")
   })
 
   test('räknarna är additiva: marked_customer_paid + marked_settled', () => {
@@ -161,8 +161,8 @@ test.describe('PATCH /status går genom kärnan; fantomen payment_method är bor
     expect(s).toContain("import { applyInvoicePayment } from '@/lib/invoices/apply-payment'")
     expect(s).not.toContain('advanceProjectStage')
     expect(s).not.toContain('triggerEventCommunication')
-    expect(s, 'Golden Path tack-SMS finns kvar').toContain('/api/sms/send')
-    expect(s, 'tack-SMS gate:at på övergången').toContain('if (customerJustSettled)')
+    expect(read('lib/invoices/payment-thanks.ts'), 'Golden Path tack-SMS finns i delad modul').toContain('sendSmsViaElks(')
+    expect(s, 'tack-SMS gate:at på övergången').toContain('if (customerJustSettled && !result.kernel)')
   })
 
   test('UI + debug-rutt skriver paid_via, inte payment_method', () => {

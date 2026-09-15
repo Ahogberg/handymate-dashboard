@@ -606,7 +606,9 @@ export async function runCapacityFill(
     })
     const customerLabel = c.customer_name || 'kund'
 
-    const { error } = await supabase.from('pending_approvals').insert({
+    const { error } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
+      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
       business_id: businessId,
       approval_type: 'send_sms',
       title: `Fyll nästa vecka — ${customerLabel}`,

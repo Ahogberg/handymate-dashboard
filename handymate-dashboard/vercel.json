@@ -1,5 +1,6 @@
 {
   "framework": "nextjs",
+  "ignoreCommand": "bash scripts/vercel-ignore-build.sh",
   "crons": [
     {
       "path": "/api/cron/agent-context",
@@ -175,7 +176,7 @@
     },
     {
       "path": "/api/cron/meeting-worker",
-      "schedule": "*/5 * * * *"
+      "schedule": "*/15 * * * *"
     },
     {
       "path": "/api/cron/playbook-pattern",
@@ -204,6 +205,18 @@
     {
       "path": "/api/cron/veckorapport",
       "schedule": "0 14 * * 5"
+    },
+    {
+      "path": "/api/cron/financial-kernel",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/financial-kernel-shadow",
+      "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/morning-report-retry",
+      "schedule": "*/10 * * * *"
     }
   ]
 }

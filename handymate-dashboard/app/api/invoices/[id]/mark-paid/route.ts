@@ -1,3 +1,4 @@
+import { paymentCommandId, InvalidPaymentCommandKey } from '@/lib/invoices/payment-command-key'
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
@@ -34,6 +35,7 @@ export async function POST(
     }
 
     const body = await request.json().catch(() => ({}))
+    const commandId = paymentCommandId(request.headers.get('Idempotency-Key'), body.command_id)
 
     const result = await applyInvoicePayment({
       businessId: business.business_id,
@@ -43,6 +45,7 @@ export async function POST(
       paidVia: (body?.paid_via as string) || undefined,
       markedByUserId: currentUser?.id || null,
       source: 'manual',
+      commandKey: `manual:${params.id}:${commandId}`,
     })
 
     if (!result.ok) {
@@ -65,6 +68,7 @@ export async function POST(
           : 'Faktura markerad som betald.'
 
     return NextResponse.json({
+      command_id: commandId,
       success: true,
       status: result.status,
       transition: result.transition,
@@ -74,6 +78,7 @@ export async function POST(
       message,
     })
   } catch (err: any) {
+    if (err instanceof InvalidPaymentCommandKey) return NextResponse.json({ error: err.message }, { status: 400 })
     console.error('[mark-paid] error:', err)
     return NextResponse.json({ error: err?.message || 'Serverfel' }, { status: 500 })
   }

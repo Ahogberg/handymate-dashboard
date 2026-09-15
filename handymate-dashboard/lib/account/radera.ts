@@ -104,6 +104,28 @@ export const BEHALLS: string[] = [
   // oklassad (den har trivialt en "business_id"-kolumn: sin egen primärnyckel).
   'business_config',
 
+  // Financial Kernel C2: oföränderlig ekonomisk historik enligt kontraktet.
+  // Raderas aldrig här; retention/anonymisering måste utredas i spår G.
+  'financial_payment_commands',
+  'financial_effect_intents',
+  'financial_kernel_rollout',
+  'financial_shadow_snapshots',
+  'financial_shadow_runs',
+  'financial_shadow_comparisons',
+  'financial_shadow_divergences',
+  'financial_shadow_resolutions',
+  'financial_events',
+  // V1: immutable product-work history, NOT statutory accounting evidence.
+  // Unactivated: agree retention/anonymisation before applying v241/enabling V1.
+  // Must not be put in the ordinary DELETE loop: its immutability guard rejects it.
+  'value_events',
+  'financial_receivables',
+  'financial_payments',
+  'financial_payment_allocations',
+  'financial_receivable_adjustments',
+  'financial_event_consumers',
+  'financial_event_deliveries',
+
   // Fakturan är själva bokföringsverifikationen. Bokföringslagen kräver 7
   // års sparande, och den bär MEDVETET kundens namn/telefon/adress/
   // personnummer i klartext på raden (verifierat: invoice.personal_number,
@@ -141,7 +163,7 @@ export const RADERAS: string[] = [
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.
   'work_report_session', 'agent_followup_event', 'agent_followup',
   // ── Kundregister, offerter, bokningar, leads, affärer — kärnan ──
-  'customer', 'quotes', 'booking', 'leads', 'deal', 'project',
+  'customer', 'quotes', 'first_work', 'booking', 'leads', 'deal', 'project',
 
   // ── Det gamla telefoni-/ärende-lagret (se header) ──
   'call', 'transcript', 'case_record', 'action_log', 'emergency_escalation',
@@ -209,6 +231,8 @@ export const IRRELEVANT: string[] = [
   // Agent-/AI-inställningar och aggregerad, icke-personlig statistik.
   'agent_context', 'agent_settings', 'ai_learned_preferences',
   'business_insights', 'business_integration_credentials',
+  'handoff_items', 'handoff_digests', 'autonomy_consents', 'autonomy_controls',
+  'channel_notices', 'morning_report_runs',
   'business_patterns', 'business_preferences', 'business_twin_forecast',
   'business_counters', 'mission', 'mission_mandate', 'monthly_reviews',
   'next_best_action', 'operating_experiment', 'pricing_intelligence',
@@ -237,7 +261,7 @@ export const IRRELEVANT: string[] = [
   'product_components', 'products', 'quote_items', 'job_types', 'work_type',
   'vehicles', 'inventory', 'inventory_items', 'inventory_locations',
   'grossist_product', 'manual_supplier_products', 'supplier_product',
-  'supplier_connection', 'fortnox_sync', 'fuel_ledger',
+  'supplier_connection', 'fortnox_sync', 'fortnox_operation_lock', 'fuel_ledger',
   'custom_quote_categories', 'customer_segments', 'customer_tag',
   'contract_types', 'allowance_types', 'service_agreement_type',
   'lead_source', 'lead_sources', 'lead_scoring_rules', 'leads_monthly_usage',

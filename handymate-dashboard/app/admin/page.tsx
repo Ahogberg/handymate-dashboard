@@ -27,6 +27,7 @@ import {
 } from 'lucide-react'
 import PartnerCommissionModal from './components/PartnerCommissionModal'
 import SupportQueueTab from './components/SupportQueueTab'
+import FinancialKernelSection from './components/FinancialKernelSection'
 import RaddningskoTab from './components/RaddningskoTab'
 
 interface Customer {
@@ -400,7 +401,7 @@ export default function AdminDashboardPage() {
 
       <div className="relative max-w-7xl mx-auto">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+        <div className="flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <div className="w-12 h-12 bg-primary-700 rounded-xl flex items-center justify-center">
               <BarChart3 className="w-6 h-6 text-white" />
@@ -411,7 +412,14 @@ export default function AdminDashboardPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <a
+              href="/admin/revenue"
+              className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-800 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 transition-colors"
+            >
+              <TrendingUp className="w-4 h-4" aria-hidden="true" />
+              Revenue OS
+            </a>
             <a
               href="/admin/launch"
               className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary-800 bg-primary-50 border border-primary-200 rounded-xl hover:bg-primary-100 transition-colors"
@@ -905,7 +913,7 @@ export default function AdminDashboardPage() {
         )}
 
         {/* SUPPORT TAB */}
-        {activeTab === 'support' && <SupportQueueTab />}
+        {activeTab === 'support' && <><SupportQueueTab /><FinancialKernelSection businesses={customers} /></>}
 
         {/* RÄDDNINGS TAB */}
         {activeTab === 'rescue' && <RaddningskoTab />}

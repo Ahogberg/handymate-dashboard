@@ -1,0 +1,41 @@
+name: Revenue OS v2
+on:
+  pull_request:
+    paths:
+      - 'handymate-dashboard/lib/revenue/**'
+      - 'handymate-dashboard/app/admin/revenue/**'
+      - 'handymate-dashboard/app/api/admin/revenue/**'
+      - 'handymate-dashboard/app/case/**'
+      - 'handymate-dashboard/components/revenue/**'
+      - 'handymate-dashboard/sql/v2_revenue_os.sql'
+      - 'handymate-dashboard/tests/revenue/**'
+      - 'handymate-dashboard/supabase/migrations/*revenue_sales_workflow.sql'
+      - 'handymate-dashboard/supabase/migrations/*revenue_partner_leads.sql'
+      - 'handymate-dashboard/app/partners/leads/**'
+      - 'handymate-dashboard/app/api/partners/leads/**'
+      - 'handymate-dashboard/app/partners/dashboard/**'
+      - '.github/workflows/revenue-v2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  revenue:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: handymate-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run test:revenue-v2
+      - run: npx playwright install --with-deps chromium
+      - run: HANDYMATE_CHROMIUM_PATH="$(node -e "console.log(require('playwright').chromium.executablePath())")" npm run test:revenue-v2-ui
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: revenue-v2-browser
+          path: handymate-dashboard/test-results/revenue/

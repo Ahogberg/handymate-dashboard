@@ -1,3 +1,27 @@
+## Financial Kernel C5 — review corrections, 2026-09-14
+
+- [x] Read PR #66 review, C5 contract and current main.
+- [x] Reproduce and fix approval allocation/no-op, legacy replay and post-delivery issuance errors (78 targeted tests green).
+- [x] Run relevant regression/contract suites (78 passed), TypeScript (8 GiB heap) and production build.
+- [x] Update C5 package handoff and existing PR #66; v239 and flags remain undeployed. Current-head CI is recorded on the PR.
+
+---
+
+# Revenue OS v2 — 2026-09-13
+
+- [x] Läs aktuell main, strategi, befintlig kod och verkligt databasschema.
+- [x] 1. Säljarvardag: verifierad behörighet, kontakter, historik, nästa aktivitet, korrekt kö.
+- [x] 2. Förberedelse: Platsbanken som första källa, idempotent import, källbelagd brief och samtalsunderlag.
+- [x] 3. Genomgång från företaget, beständigt mötesdatum, personligt case och befintlig onboardingförifyllning.
+- [x] 4. Uppföljningsutkast, förfallna aktiviteter, tydliga fel och stopp vid svar/nej/paus.
+- [x] Verifiera SQL/API/UI, typkontroll och produktionsbygge.
+- [x] Publicera branch och draft-PR: PR #45.
+- [x] Rätta CI-felet: SQL-formatet läses av befintlig kolumnvakt; 15 prov och hela Revenue-sviten gröna lokalt.
+- [ ] Verifiera preview, roller, personligt case/onboarding och verklig källa.
+- [x] Dokumentera bevis och kvarvarande hinder före produktionsmerge i revenue-os-v2.md.
+
+Plan och acceptans: [revenue-os-v2.md](revenue-os-v2.md). Utskick sker inte automatiskt.
+
 # PR #38 readiness-pass 2026-09-12
 
 - [x] Hämta aktuell main och PR #38, skapa separat arbetskopia och riktig merge.
@@ -1491,6 +1515,16 @@ Färdig betyder att varje steg har en synlig nästa handling och en sparad kvitt
 Produktion visar verklig användbarhet men bevisar inte ny PR-kod. Inget skarpt
 utskick, fakturasändning, main-merge eller produktionsmigration ingår.
 
+# Team- och kalenderstart — 2026-09-13
+- [x] Inventera befintlig KomIgangRail, delade signaler, team och persondag.
+- [x] Lägg två sekventiella startuppgifter i befintlig rail; behåll målprioritering.
+- [x] Bekräfta team/ensamföretag och första planerade veckan på befintliga sidor.
+- [x] Verifiera tenant/roll, läsfel, tom vecka, inbjudna och återförsök.
+- [x] Dokumentera gränsen mot beläggningsvarningen och skapa granskbar PR.
+
+Verifiering och kvarstående integrations-/bygggrindar dokumenterade i
+`../docs/roadmap/BRAIN_VISIBILITY_WEEKEND.md`, avgränsad uppdatering 2026-09-13.
+
 ## Brain Visibility — projektbeslut 2026-09-10
 
 - [x] Inventera ProjectApprovalsBlock, ProjectTodoBlock och befintlig approvals-GET.
@@ -1506,3 +1540,84 @@ Scope: befintlig läsväg och presentationskomponenter; inga nya motorer/tabelle
 - [x] Återanvänd gemensam presentation och ta bort obestyrkt sändningslöfte.
 - [x] Verifiera typetiketter/knappar med isolerade presentationsprov och typkontroll.
 - [ ] Publicera i PR38 och kontrollera verklig granskningsdialog utan att bekräfta sändning.
+
+## PR #42 — konflikträttning 2026-09-13
+
+- [x] Jämför PR-head 51e28b4d med aktuell main 41b2eb6d.
+- [x] Behåll båda oberoende tilläggen i tasks/todo.md. Produktkoden sammanfogas utan konflikt.
+- [x] Dokumentera tidigare inloggat persistensprov och återställt skapandedatum.
+- [x] 56 riktade kontrakt och separat typkontroll gröna före byggkontrollen.
+- [x] Rätta main-versionens otillåtna route-export i min-garanti; behåll värde och beräkning.
+- [x] Nytt produktionsbygge och adoption-provets 21 tester gröna efter exporträttningen.
+Publicering och GitHubs mergestatus följs upp i PR #42; main-merge ingår inte.
+
+## PR #42 — andra main-sammanfogningen 2026-09-13
+
+- [x] Inventera main e51654f9 och PR-head b211b68a.
+- [x] Behåll både planeringsstart och Financial Kernel-kontraktet i ARCHITECTURE.md.
+- [x] 52 planerings-/auth-/Financial Kernel-kontrakt gröna; byggverktygets kompilering och typkontroll gröna.
+- Fullt bygge körs om efter lokal ENOTEMPTY i den genererade .next/export-mappen. Resultat och remote CI dokumenteras i PR #42.
+Publicering och aktuell mergestatus dokumenteras i PR #42.
+
+## Fortnox inkommande synk — 2026-09-14
+- [x] Reproducerat: Synka nu hämtar inget nytt; Hämta historik gav refresh HTTP 400.
+- [x] Rätta OAuth-förnyelse, företagssvar och samtidighet.
+- [x] Gemensam import/uppdatering i manuell synk och cron, bevara lokala kopplingar.
+- [ ] Regressioner, TypeScript, build och PR.
+- [ ] Live: återanslut testföretaget, importera faktura, ändra i Fortnox och synka igen.
+
+Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsprov gröna. TypeScript grön med 12 GB heap. PostgreSQL-lås/privilegier/unikhet verifierade lokalt med PGlite. Produktionsmigration avvisad av automatisk granskning: kräver Andreas godkännande. Build och slutligt publicerat träd redovisas i PR.
+
+## C6 basmerge efter V1 — 2026-09-14
+- [x] Merga main b06ab81f i C6 med båda paketens tester kvar i samma ordning lokalt och i CI.
+- [x] 88 riktade tester för C6, V1, honesty och CI-paritet gröna.
+- [ ] TypeScript, bygge och publicering; slutresultaten anges på #73.
+- [ ] Kontrollera CI på publicerat huvud inför Claudes merge.
+
+
+## H3a/H4 — 2026-09-15 (Codex)
+- [x] Read brief and inspect real provider/automation paths. H2 recommendation: explicit onboarding consent, no default customer sends.
+- [x] Channel preflight at creation/execution, durable daily notices and home status.
+- [x] Morning report: explicit outcome, one bounded retry and drift summary.
+- [ ] SQL, tenant, race, skipped-vs-failed and UI contracts; TypeScript/build/CI.
+- [ ] Reviewable PR + handoff for Claude; no production activation.
+## Kundvärde och upplevelse, nästa leverans — 2026-09-14
+- [x] Kartlagt main, V2/V3-skisser och pågående onboarding-PR #69.
+- [x] Rätta läsfel, ekonomibehörighet och missvisande veckokvitto.
+- [x] Sammanhängande, återförsökbar värdevisning med faktiska stadier och separat tidsunderlag.
+- [x] Dokumentera och förbered återstående V2-, native mobil- och pilotacceptans utan nya ekonomiska antaganden.
+- [ ] Testa riktiga komponenter och routes, typkontroll, bygge, grön PR.
+
+Publicerad i PR #75. Slutliga test-/byggresultat redovisas på PR-huvudet. V2, full V3/native och produktionspilot är fortfarande öppna enligt docs/strategy/CUSTOMER_VALUE_NEXT_ACCEPTANCE.md.
+
+## Första jobbet, överlämning och V2/V3 — 2026-09-14
+Andreas har uttryckligen beställt både första jobbet/trygg överlämning och V2/V3. Bygg/test bakom flaggor får ske före pilotaktivering; produktionspilot och retention är separata aktiveringsbeslut. Staplad på PR #75 tills den är mergad.
+- [x] Följ befintligt arbetsprov → sparad offert → godkänd handling; gör återgång och beständigt kvitto tydliga.
+- [x] Visa nästa steg ur faktiskt sparad uppföljning och beslut, även efter omladdning.
+- [x] V2: betrodd, idempotent value-ledger-konsument med kanoniska pengar och krediter/reverseringar; inga utskick.
+- [x] V3: samma API och beloppsunderlag i webb och native mobil; rena fel-/tom-/behörighetslägen.
+- [x] PGlite, riktiga route-/komponentprov samt lokal tsc/build. CI och publicerade huvud-SHA redovisas i PR:erna.
+- [ ] Verklig pilotacceptans och aktivering redovisas separat, aldrig ersatta av fixtures.
+
+V2/V3: helsviten lokalt 2418 godkända + 1 avsiktligt hoppat, 17 Node/API-prov och aktivitetstest gröna. Därefter 34 riktade prov gröna på slutlig SQL/cron, inklusive tre tillagda penningfall. Native: tsc, 245 Jest (bildmoduler mockade lokalt) och alla CJS-kontrakt gröna. Mobil-PR #10 kör även full iOS-readiness i CI med repots verkliga assets. Ingen pilot eller produktionsaktivering påstås klar.
+## 2026-09-15 — Review #75 M1
+- [x] Dölj nollrubrik vid enbart tid/förfrågningar; behåll underlaget.
+- [x] Prova faktisk komponent med tid, förfrågningar och äldre osplittrat kvitto.
+- [x] Publicera rättningen för Claudes omverifiering.
+
+Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågningsfall (split + äldre kontrakt). Slutlig CI redovisas i PR #75.
+
+## 2026-09-15 — #78 M1
+- [x] Släpp 46elks/Resend-kontrollfel från cachen; bevara samtidighet och definitiva utfall.
+- [x] Sex återhämtnings- och credential-raceprov; 14 kanalprov gröna före basmerge.
+- [x] Sammanfoga aktuell main, bevara H2-beslut och båda testlistornas ordning.
+- [ ] Slutverifiera på publicerat huvud; resultat i PR #78.
+
+## H1/H2 — 2026-09-15
+- [x] H1: klassificering enligt verklig handling, inkorg, beständig utgångssammanfattning och högst tre beslut.
+- [x] H2: atomiskt samtycke, fyra nycklar, bestående avstängning och dagligt kvitto.
+- [x] Delad morgonleverans, flaggor, behörigheter och H3b-integrationsgräns.
+- [x] SQL-/route-/komponentprov och tsc.
+- [x] Bygge och publicering: PR #81, v248 endast utkast.
+- [ ] Slutlig CI på PR #81; first-value-harness kompletterat med explicit flaggmiljö och av/på-prov.
+- [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.
