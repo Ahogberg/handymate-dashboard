@@ -123,6 +123,15 @@ export const BEHALLS: string[] = [
   'financial_payments',
   'financial_payment_allocations',
   'financial_receivable_adjustments',
+  // Financial Kernel C8 (v251, utkast): räkenskapsinformation bevaras sju år
+  // efter räkenskapsårets slut (blueprint §36.2) och överlever prenumerationen.
+  'ledger_accounts',
+  'ledger_fiscal_years',
+  'ledger_periods',
+  'ledger_journals',
+  'ledger_voucher_counters',
+  'ledger_entries',
+  'ledger_entry_lines',
   'financial_event_consumers',
   'financial_event_deliveries',
 
