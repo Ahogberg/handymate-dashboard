@@ -43,8 +43,15 @@ PR #75 har redan ersatt agentsidans gamla schablonwidget med veckokvittot. Aktiv
 
 Lokala prov omfattar riktig SQL under icke-superuser-migrationsägare, medlemstriggers/RLS, C3 före-ack-replay, ROT, delbetalning, kredit, reversal, avrundning/avskrivning, felaktig tenant, felande läsare, kontoradering samt riktiga React-komponenters återupptagning och nätverksfel. Native använder riktiga komponenter med mockade plattforms-/nätverksgränser och validerar samma API-kontrakt. Slutliga antal, byggresultat och CI-huvuden dokumenteras i PR:erna.
 
-Ingen produktions-SQL, flaggändring eller verklig kundkommunikation ingår här. v239 → v240 → v242 och C6-pilot kvarstår; V1:s v241, gallrings-/anonymiseringsbeslut, företagsvis backfill och metodjämförelse kvarstår. v243 tillkommer för V2. v244 och `FIRST_WORK_ENABLED` kan aktiveras separat när produktflödet är godkänt. V3 kräver `VALUE_EVENTS_ENABLED`, `VALUE_KERNEL_EVENTS_ENABLED` och `VALUE_IMPACT_ENABLED` samt företagsflaggan.
+Ingen produktions-SQL, flaggändring eller verklig kundkommunikation ingår här. v239 → v240 → v242 och C6-pilot kvarstår; V1:s v241, gallrings-/anonymiseringsbeslut, företagsvis backfill och metodjämförelse kvarstår. v245 tillkommer för V2. v244 och `FIRST_WORK_ENABLED` kan aktiveras separat när produktflödet är godkänt. V3 kräver `VALUE_EVENTS_ENABLED`, `VALUE_KERNEL_EVENTS_ENABLED` och `VALUE_IMPACT_ENABLED` samt företagsflaggan.
 
 Innan V2-piloten aktiveras: jämför legacyfacit med kernel för pilotens faktiska fakturor, säkerställ initial konsumentupphämtning och hantera äldre utfärdade fakturor utan kanonisk historik. De får inte tyst räknas bort. Ingen historisk registrerad betalning konverteras automatiskt här.
 
 Ett verkligt första-jobbet-prov återstår: namngivet företag, faktisk förfrågan, granskad offert, godkänd sändning och underlagslänk. Rapportera även misslyckanden och tider över 15 minuter. Fixtures, Expo-export och lokala tester bevisar inte en produktionsresa eller uppnått tidsmål. Kontaktanslutningarna fortsätter i PR #69.
+
+## Review #77 — B1, M2 och LOW (2026-09-15)
+M1 är rättad på #75 och samma komponenträttning med fyra prov finns även här; ombasering mot main återstår tills Claude mergat #75. V2-filen heter nu `v245_value_money_events.sql`, med oförändrat SQL-innehåll; v243 är redan upptaget av `v243_value_trigger_wrappers_private.sql` i #76. H3a/H4 i #78 flyttas därför till v246. Testreferenser och filundantaget i event-kontraktet följer namnbytet.
+
+`usesKernelValue` behandlar saknad företagskonfiguration som avstängd; läsfel förblir fel. Piloten ska räkna med upp till tio minuters eftersläpning efter en pengahändelse: under tiden vägrar läsaren belopp. UI-förtydligandet ”uppdateras strax” kvarstår som LOW; inga fel får döljas som noll eller ersättas med legacy-belopp.
+
+Runbook vid halt: kontrollera konsumenten `value-ledger` i `/api/admin/financial-kernel/consumers`. Rätta eller implementera den saknade kanoniska mappningen först; återuppta därefter via `POST /api/admin/financial-kernel/consumers/resume` med `business_id`, `consumer: "value-ledger"` och loggat `reason`. Återuppta aldrig för att kringgå en okänd kredit, återbetalning eller tvist. #76:s paketlogg sammanfogas av Claude enligt granskningsöverlämningen.

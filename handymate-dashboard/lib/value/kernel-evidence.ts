@@ -11,9 +11,9 @@ export async function usesKernelValue(
     .from('business_config')
     .select('financial_kernel_enabled')
     .eq('business_id', businessId)
-    .single()
-  if (error || !data) throw new Error('value_kernel_rollout_read_failed')
-  return data.financial_kernel_enabled === true
+    .maybeSingle()
+  if (error) throw new Error('value_kernel_rollout_read_failed')
+  return data?.financial_kernel_enabled === true
 }
 export function minorToKr(raw: unknown): number {
   if (typeof raw !== 'string' || !/^\d+$/.test(raw))

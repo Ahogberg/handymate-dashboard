@@ -96,3 +96,14 @@ test.describe('real receipt component interactions',()=>{
   await act(async()=>late(Response.json(receipt)));expect(host.textContent).not.toContain('Köksarbete');expect(host.textContent).toContain('Ännu finns inget registrerat utfall')
  })
 })
+
+for (const split of [true, false]) for (const kind of ['time', 'requests']) test(`only ${kind}, split=${split}: preserve work without a zero-money headline`, () => {
+ const html = render({...receipt, confirmed_kr: 0, paid_kr: split ? 0 : undefined, accepted_quote_kr: split ? 0 : undefined,
+  confirmed_items: [], captured_count: kind === 'requests' ? 3 : 0, autonomous_count: 0,
+  time_minutes: kind === 'time' ? 6 : 0, measured_minutes: kind === 'time' ? 45 : 0})
+ expect(html).not.toContain('0 kr')
+ expect(html).not.toContain('Registrerat betalt')
+ expect(html).toContain('Ännu finns inget registrerat ekonomiskt utfall')
+ expect(html).toContain(kind === 'requests' ? '3 nya förfrågningar' : '6 min uppskattad arbetsbesparing')
+ if (kind === 'time') expect(html).toContain('45 min. Detta är inte sparad arbetstid.')
+})

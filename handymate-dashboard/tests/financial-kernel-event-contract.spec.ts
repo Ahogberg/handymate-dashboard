@@ -191,7 +191,7 @@ test('kernel-kod och financial_events-migrationer använder bara katalogens namn
       const name = m[1]
       if (catalog.has(name) || NOT_EVENTS.has(name)) continue
       // V2 writes the separately documented value_events namespace, never financial_events or fireEvent.
-      if (rel === 'sql/v243_value_money_events.sql' && name === 'payment_received') {
+      if (rel === 'sql/v245_value_money_events.sql' && name === 'payment_received') {
         expect(src).not.toMatch(/INSERT\s+INTO\s+(?:public\.)?financial_events|append_financial_event\s*\(|fireEvent\s*\(/i)
         expect(src).toContain('INSERT INTO public.value_events')
         continue

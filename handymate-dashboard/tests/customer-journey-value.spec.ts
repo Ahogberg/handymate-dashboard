@@ -367,3 +367,17 @@ test.describe('first-job continuity in the real component', () => {
     expect(host.textContent).toContain('Använd mitt förberedda underlag')
   })
 })
+
+test('kernel rollout missing config is off, but read failures still fail closed', async () => {
+ const { usesKernelValue } = c5Modules({'./events/kernel-consumer': { kernelValueEnabled: () => true }})('lib/value/kernel-evidence.ts')
+ let result: any = {data: null, error: null}
+ const scopes: unknown[] = []
+ const query: any = {select: () => query, eq: (...args: unknown[]) => {scopes.push(args); return query}, maybeSingle: async () => result}
+ const db = {from: () => query}
+ expect(await usesKernelValue(db, 'own')).toBe(false)
+ result = {data: {financial_kernel_enabled: true}, error: null}
+ expect(await usesKernelValue(db, 'own')).toBe(true)
+ result = {data: null, error: {message: 'unavailable'}}
+ await expect(usesKernelValue(db, 'own')).rejects.toThrow('value_kernel_rollout_read_failed')
+ expect(scopes).toEqual([['business_id', 'own'], ['business_id', 'own'], ['business_id', 'own']])
+})

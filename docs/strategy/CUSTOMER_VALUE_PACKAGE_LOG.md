@@ -197,3 +197,6 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 ### V2/V3 implementation — Codex, 2026-09-14
 
 Andreas uttryckliga beställning tillåter implementation och tester före pilot. V2-konsumenten, första-jobbet-länken och V3 i webb/native är nu implementerade för granskning bakom separata flaggor. Se [acceptans och avvikelser](CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md). Tavlans pilotberoende gäller fortsatt aktivering/verkligt bevis. Ingen produktionsaktivering har utförts.
+
+### 2026-09-15 — Codex reviewrättning #77
+V2-migreringen byter från v243 till `v245_value_money_events.sql` utan SQL-ändring. v243 är redan körd för privata V1-triggerwrappers (#76); H3a/H4 reserverar v246 (#78). B1 löses på #75 före ombasering. Se CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md för review och pilotens halt/resume.

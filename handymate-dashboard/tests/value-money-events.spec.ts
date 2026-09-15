@@ -23,7 +23,7 @@ test.beforeAll(async () => {
   await f.db
     .exec(`GRANT SELECT ON ALL TABLES IN SCHEMA public TO deployer; ALTER TABLE pending_approvals OWNER TO deployer;
  ALTER TABLE v3_automation_logs OWNER TO deployer; ALTER TABLE quotes OWNER TO deployer; SET ROLE deployer;`)
-  for (const file of ['v241_value_events.sql', 'v243_value_money_events.sql'])
+  for (const file of ['v241_value_events.sql', 'v245_value_money_events.sql'])
     await f.db.exec(readFileSync('sql/' + file, 'utf8'))
   await f.db.exec('RESET ROLE')
 })
