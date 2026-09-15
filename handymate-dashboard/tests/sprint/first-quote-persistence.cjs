@@ -45,6 +45,7 @@ async function harness(m) {
   const db=database(state)
   const api=await load('app/api/quotes/route.ts',{
     'next/server':{NextRequest:Request,NextResponse:Response},'@/lib/supabase':{getServerSupabase:()=>db},
+    '@/lib/onboarding/first-work':{firstWorkEnabled:()=>state.firstWorkEnabled===true},
     '@/lib/auth':{getAuthenticatedBusiness:async()=>state.denied?null:{business_id:state.tenant}},
     '@/lib/permissions':{getCurrentUser:async()=>({id:'owner',name:'Test Owner'}),hasPermission:()=>!state.noPermission},
     '@/lib/quote-calculations':m.calc,'@/lib/quotes/apply-annual-cap':m.cap,'@/lib/quotes/resolve-reference-person':m.reference,
@@ -65,6 +66,26 @@ function context() {
     templateStyle:'modern',attachments:[],hasRotItems:false,hasRutItems:false,validDays:30}
 }
 const tests=[];const test=(name,fn)=>tests.push([name,fn])
+test('first-job reference stays on the saved quote and retry returns its existing identity',async m=>{
+  const h=await harness(m);h.state.firstWorkEnabled=true
+  const id='00000000-0000-0000-0000-000000000001'
+  h.state.tables.first_work=[{id,business_id:'biz_first',quote_id:null}]
+  const payload=m.payload.buildQuotePayload({...context(),firstWorkId:id})
+  const result=await h.post(payload);assert.equal(result.status,200)
+  const {quote}=await result.json();assert.equal(quote.first_work_id,id)
+  // The actual trigger/unique index is covered in first-work-sql.spec.ts.
+  h.state.tables.first_work[0].quote_id=quote.quote_id
+  const retry=await h.post(payload);assert.equal(retry.status,409)
+  assert.equal((await retry.json()).existing_quote_id,quote.quote_id);assert.equal(h.state.tables.quotes.length,1)
+})
+test('foreign first-job reference or disabled rollout cannot create an orphan quote',async m=>{
+  const h=await harness(m),id='00000000-0000-0000-0000-000000000001'
+  h.state.tables.first_work=[{id,business_id:'other',quote_id:null}]
+  const payload=m.payload.buildQuotePayload({...context(),firstWorkId:id})
+  assert.equal((await h.post(payload)).status,400)
+  h.state.firstWorkEnabled=true;assert.equal((await h.post(payload)).status,404)
+  assert.equal(h.state.tables.quotes?.length||0,0)
+})
 test('priced first draft survives actual POST, writer, GET and edit mapping',async m=>{
   const h=await harness(m), payload=m.payload.buildQuotePayload(context())
   const res=await h.post(payload);assert.equal(res.status,200);const {quote}=await res.json()

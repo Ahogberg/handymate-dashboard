@@ -22,10 +22,11 @@ export function WeeklyValueReceipt({ data }: { data: WeeklyValue }) {
       <p className="mt-3 text-xs text-gray-500">Utfall med direkt koppling till teamets arbete. Det visar inte hur mycket som hade uteblivit utan Handymate.</p>
       {data.confirmed_items.length > 0 && <ul className="mt-3 space-y-1 text-sm">{data.confirmed_items.slice(0, 5).map((item, i) => <li key={i}>{item.label} · {number(item.amount)} kr</li>)}</ul>}
       </> : <p className="mt-4 text-sm text-gray-700">Ännu finns inget registrerat ekonomiskt utfall under perioden. Här visas teamets övriga arbete.</p>}
-      <div className="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2"><div><p className="font-semibold">{data.captured_count} nya förfrågningar</p><p className="text-xs text-gray-500">Registrerade under perioden. Det bevisar inte att de annars hade gått förlorade.</p></div><div><p className="font-semibold">{number(data.time_minutes)} min uppskattad arbetsbesparing</p><p className="text-xs text-gray-500">Schablon per aktivitet, inte uppmätt arbetstid.</p>{data.autonomous_count > 0 && <p className="mt-1 text-xs">{data.autonomous_count} åtgärder registrerade som utförda självständigt.</p>}</div></div>
+      <div className="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2"><div><p className="font-semibold">{data.captured_count} nya förfrågningar</p><p className="text-xs text-gray-500">Registrerade under perioden. Det bevisar inte att de annars hade gått förlorade.</p></div><div><p className="font-semibold">{number(data.estimated_minutes ?? data.time_minutes)} min uppskattad arbetsbesparing</p><p className="text-xs text-gray-500">Schablon per aktivitet, inte uppmätt arbetstid.</p>{data.autonomous_count > 0 && <p className="mt-1 text-xs">{data.autonomous_count} åtgärder registrerade som utförda självständigt.</p>}</div></div>
       {(data.measured_minutes ?? 0) > 0 && <p className="mt-3 text-sm">Uppmätt genomloppstid mellan arbetssteg: {number(data.measured_minutes!)} min. Detta är inte sparad arbetstid.</p>}
       <p id={TIME_ESTIMATE_ANCHOR} className="mt-3 scroll-mt-24 text-xs text-gray-500"><strong>Så uppskattas tiden: </strong>{TIME_ESTIMATE_EXPLANATION}</p>
     </>}
+    {data.impact_available && <Link href="/dashboard/impact" className="mt-4 mr-4 inline-block text-sm font-medium text-teal-800 underline">Se värdet av teamets arbete</Link>}
     <Link href="/dashboard/pengar" className="mt-4 inline-block text-sm font-medium text-teal-800 underline">Följ identifierat → agerat → fakturerat → betalt</Link>
   </section>
 }

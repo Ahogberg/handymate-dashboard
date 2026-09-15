@@ -32,8 +32,8 @@ product *identified* and *acted on*; the kernel records what was *invoiced* and 
 |---|---|---|---|---|
 | V0 | P0: `/api/automation/value` separates estimated minutes from confirmed money | Claude | **done 2026-09-14** (this PR; `tests/automation-value-honesty.spec.ts`) | — |
 | V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **done 2026-09-14** (PR #72 merged; M1 fixed and re-verified; 5 LOW in §5; handoff [CUSTOMER_VALUE_V1_HANDOFF.md](CUSTOMER_VALUE_V1_HANDOFF.md)) | activation gate: v241 applied, retention/anonymisation decision, paged backfill + method 2/3 comparison, `VALUE_EVENTS_ENABLED` |
-| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | sketched (§4) | C6 merged 2026-09-14; blocked on the pilot flag being on (S1) |
-| V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | sketched (§4) | V1, V2 |
+| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | implemented for review, see latest handoff | Pilot flag and comparison gate still required for activation |
+| V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | implemented for review (web + native) | V1/V2 activation and pilot evidence |
 | — | Revenue-recovery loop closed to draft → sent → paid (audit action 2) | Codex | folded into V1 (acted) + V2 (paid); no separate package | — |
 | — | Onboarding scan → work → receipt in 15 minutes (audit action 3) | Codex | product package outside this log; receipt wording must follow rule 1 (say *prepared* / *acted*, never *earned*) | — |
 | — | Production proof of provider flows and the weekly receipt (audit action 4) | Codex + owner | evidence discipline shared with the kernel's R0 / shadow work | pilot business |
@@ -193,3 +193,10 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 | 2026-09-14 | Created after the ROI/WOW audit: V0 done (P0 fix), V1 brief, V2/V3 sketches, owner boundary against the Financial Kernel. | Claude |
 | 2026-09-14 | V1 implemented by Codex (PR #72) and reviewed: 1 MEDIUM (trigger wrappers vs member RLS writes), 5 LOW; activation gate recorded. V2 blocker updated after C5b merged. | V1 review |
 | 2026-09-14 | V1 M1 fixed by Codex, re-verified and merged (PR #72). C6 merged the same day; V2 is next once the pilot flag is on. | V1 merge |
+
+### V2/V3 implementation — Codex, 2026-09-14
+
+Andreas uttryckliga beställning tillåter implementation och tester före pilot. V2-konsumenten, första-jobbet-länken och V3 i webb/native är nu implementerade för granskning bakom separata flaggor. Se [acceptans och avvikelser](CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md). Tavlans pilotberoende gäller fortsatt aktivering/verkligt bevis. Ingen produktionsaktivering har utförts.
+
+### 2026-09-15 — Codex reviewrättning #77
+V2-migreringen byter från v243 till `v245_value_money_events.sql` utan SQL-ändring. v243 är redan körd för privata V1-triggerwrappers (#76); H3a/H4 reserverar v246 (#78). B1 löses på #75 före ombasering. Se CUSTOMER_JOURNEY_V2_V3_ACCEPTANCE.md för review och pilotens halt/resume.

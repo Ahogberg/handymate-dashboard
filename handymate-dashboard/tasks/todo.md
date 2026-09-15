@@ -1583,6 +1583,16 @@ Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsp
 
 Publicerad i PR #75. Slutliga test-/byggresultat redovisas på PR-huvudet. V2, full V3/native och produktionspilot är fortfarande öppna enligt docs/strategy/CUSTOMER_VALUE_NEXT_ACCEPTANCE.md.
 
+## Första jobbet, överlämning och V2/V3 — 2026-09-14
+Andreas har uttryckligen beställt både första jobbet/trygg överlämning och V2/V3. Bygg/test bakom flaggor får ske före pilotaktivering; produktionspilot och retention är separata aktiveringsbeslut. Staplad på PR #75 tills den är mergad.
+- [x] Följ befintligt arbetsprov → sparad offert → godkänd handling; gör återgång och beständigt kvitto tydliga.
+- [x] Visa nästa steg ur faktiskt sparad uppföljning och beslut, även efter omladdning.
+- [x] V2: betrodd, idempotent value-ledger-konsument med kanoniska pengar och krediter/reverseringar; inga utskick.
+- [x] V3: samma API och beloppsunderlag i webb och native mobil; rena fel-/tom-/behörighetslägen.
+- [x] PGlite, riktiga route-/komponentprov samt lokal tsc/build. CI och publicerade huvud-SHA redovisas i PR:erna.
+- [ ] Verklig pilotacceptans och aktivering redovisas separat, aldrig ersatta av fixtures.
+
+V2/V3: helsviten lokalt 2418 godkända + 1 avsiktligt hoppat, 17 Node/API-prov och aktivitetstest gröna. Därefter 34 riktade prov gröna på slutlig SQL/cron, inklusive tre tillagda penningfall. Native: tsc, 245 Jest (bildmoduler mockade lokalt) och alla CJS-kontrakt gröna. Mobil-PR #10 kör även full iOS-readiness i CI med repots verkliga assets. Ingen pilot eller produktionsaktivering påstås klar.
 ## 2026-09-15 — Review #75 M1
 - [x] Dölj nollrubrik vid enbart tid/förfrågningar; behåll underlaget.
 - [x] Prova faktisk komponent med tid, förfrågningar och äldre osplittrat kvitto.

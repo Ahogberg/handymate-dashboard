@@ -76,7 +76,7 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
       <div className="mt-3 flex flex-wrap gap-3">{(Object.keys(labels) as EffectResolution[]).map(resolution => <button key={resolution} disabled={busy} onClick={() => { setDecision({ id: intent.id, resolution }); setReason('') }} className="rounded-lg border px-3 py-2 text-sm text-teal-800">{labels[resolution]}</button>)}</div>
     </article>)}
     {!loading && consumers.filter(c => c.halted_at).map(consumer => <article key={consumer.consumer} className="mt-4 rounded-lg border p-4">
-      <h3 className="font-medium">Betalningsuppföljningen är pausad</h3><p className="text-sm">{consumer.backlog} händelser väntar.</p>
+      <h3 className="font-medium">{consumer.consumer === 'value-ledger' ? 'Värdeunderlaget är pausat' : 'Betalningsuppföljningen är pausad'}</h3><p className="text-sm">{consumer.backlog} händelser väntar.</p>
       <button disabled={busy} onClick={() => { setDecision({ id: consumer.consumer, resolution: 'resume' }); setReason('') }} className="mt-3 rounded-lg border px-3 py-2 text-sm text-teal-800">Återuppta</button>
     </article>)}
     {decision && <form onSubmit={event => { event.preventDefault(); void submit() }} className="mt-4 rounded-lg bg-gray-50 p-4">

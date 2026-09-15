@@ -163,7 +163,7 @@ export const RADERAS: string[] = [
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.
   'work_report_session', 'agent_followup_event', 'agent_followup',
   // ── Kundregister, offerter, bokningar, leads, affärer — kärnan ──
-  'customer', 'quotes', 'booking', 'leads', 'deal', 'project',
+  'customer', 'quotes', 'first_work', 'booking', 'leads', 'deal', 'project',
 
   // ── Det gamla telefoni-/ärende-lagret (se header) ──
   'call', 'transcript', 'case_record', 'action_log', 'emergency_escalation',

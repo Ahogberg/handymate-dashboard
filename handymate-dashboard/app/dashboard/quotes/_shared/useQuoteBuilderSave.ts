@@ -236,7 +236,10 @@ export function useQuoteBuilderSave({
           body: JSON.stringify(payload),
         })
         const data = await res.json()
-        if (!res.ok) {
+        if (res.status === 409 && ctx.firstWorkId && typeof data.existing_quote_id === 'string') {
+          toast.warning('Jobbet är redan sparat. Öppnar den befintliga offerten. Dina lokala ändringar finns kvar i återställningen.')
+          router.push(`/dashboard/quotes/${encodeURIComponent(data.existing_quote_id)}`)
+        } else if (!res.ok) {
           toast.error(data.error || 'Kunde inte spara offerten')
         } else if (mode === 'edit') {
           onSaved?.()
