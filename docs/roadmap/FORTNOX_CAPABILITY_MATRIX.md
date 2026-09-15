@@ -58,9 +58,9 @@ Här ligger den lucka du pekade på: planen provar konsultresan i november men s
 |---|---|---|---|---|---|---|---|
 | C1 | SIE-export | Konsult och myndighet ska kunna läsa året | **Inget byggt.** Paket **C10**; SE-granskningen §8 | C10 | Codex | SIE4 som läses in i ett annat system utan fel | November |
 | C2 | Rapportytor | Huvudbok, balans, resultat, verifikatlista, momsunderlag | **Inget byggt.** Ingen route under `app/dashboard` rör bokföring | Design + implementation ovanpå C8/C10 | **Claude design, Codex bygge** | Konsult utför en månadsavstämning i ytan | **Design september, bygge november** |
-| C3 | Deklarationsinlämning | Skicka moms- och arbetsgivardeklaration | Karin påminner om datum. Inlämning sker utanför Handymate | Beslut D3: producera underlag eller lämna in | **Ägare** | — | Beslut i september |
-| C4 | Konsultåtkomst | Redovisningskonsulten ska in i kundens bokföring med egen behörighet och spårbarhet | **Inget byggt.** Rollerna är `owner`, `admin`, `employee`; ingen konsultroll finns | Ny roll, rättigheter, inbjudan, loggning | Codex | Konsult arbetar en period med egen inloggning | Oktober |
-| C5 | Huvudstruktur och utseende | Hur bokföringsdelen hänger ihop med resten av Handymate | **Inget.** Dagens dashboard har 30 ytor, ingen för bokföring | Informationsarkitektur, navigation, de fem till sju skärmarna | **Claude** | Genomgång med Andreas och konsulten | **September — kan börja nu** |
+| C3 | Deklarationsinlämning | Skicka momsdeklaration | Karin påminner om datum. Inlämning sker utanför Handymate | **Inriktning satt 2026-09-15: förbereda och skicka, kunden signerar.** Signeringen görs alltid av den skattskyldige hos Skatteverket och kan inte göras via API av någon leverantör, inte heller Fortnox. Kvarstår: ansökan om partneråtkomst och organisationscertifikat, sedan C13 mot testmiljön | **Ägare (ansökan) + Codex (C13)** | Underlag som Skatteverket accepterar i testmiljön | Ansökan i september, kod i november |
+| C4 | Konsultåtkomst och byrå | **Beslut 2026-09-15: ja.** Har företaget en redovisningsbyrå ska byrån kunna logga in för sina klientföretag med egen behörighet | **Inget byggt.** Rollerna är `owner`, `admin`, `employee`; ingen konsultroll och ingen byråentitet finns | Ny roll, byråkoppling över flera företag, inbjudan, spår över vad konsulten gjort, och ägarens vy över vem som har åtkomst | Codex | Konsult arbetar en hel period med egen inloggning i två klientföretag | Oktober |
+| C5 | Huvudstruktur och utseende | Hur bokföringsdelen hänger ihop med resten av Handymate | **Designprompt skriven** 2026-09-15: [BOKFORING_UI_DESIGNPROMPT.md](../design/BOKFORING_UI_DESIGNPROMPT.md), åtta artboards med varumärkestokens ur koden | Köra prompten i Claude Design, sedan genomgång | **Claude + ägare** | Genomgång med Andreas, därefter med konsulten | **September — pågår** |
 
 ## D. Övergången från Fortnox
 
@@ -88,14 +88,14 @@ B och C hänger på den: C9, C10, C12 och C13 väntar alla på C8. Det är den e
 |---|---|---|
 | Namngiven redovisningskonsult | C1b, C9, B2, B4, hela facitstrategin | Öppen sedan starten |
 | P0 merchant of record (D1) | C9 | Öppen |
-| D3 producera eller lämna in deklaration | C13, C3 | Öppen |
+| D3 producera eller lämna in deklaration | C13, C3 | **Inriktning satt**: förbereda och skicka. Kvar: ansökan, som tar månader |
 | D4 brytdatum och övertagandeår | C4b, B7 | Öppen |
 
 Konsulten är den hårdaste. Utan namngiven konsult finns inget granskat facit, och utan facit kan
 konteringsreglerna byggas men aldrig godkännas. Det gör konsultvalet till september månads viktigaste beslut,
 inte ett administrativt ärende.
 
-**Designen är inte blockerad av något.** Avsnitt C rad 5 och rad 2 kan börja innan en enda verifikatrad finns.
+**Designen är inte blockerad av något, och är påbörjad.** Avsnitt C rad 5 och rad 2 kan börja innan en enda verifikatrad finns.
 Vad en konsult behöver se för att våga signera är besvarbart ur domänen i dag, och svaret avgör vilka flöden
 som måste byggas. Det är därför designen hör hemma i september och inte efter konteringsmotorn.
 
@@ -110,6 +110,7 @@ som ska flyttas — planen säger själv att ett företag vars nödvändiga flö
 
 ## Ändringslogg
 
+- **2026-09-15 (kväll):** Två beslut inskrivna. Byråer ska kunna logga in för sina klientföretag (rad C4). Inriktningen för D3 är förbereda och skicka där kunden signerar, vilket är det starkaste någon leverantör kan erbjuda. Designprompten för de åtta ytorna skriven (rad C5).
 - **2026-09-15:** Matrisen ifylld från kod av Claude. Femton förmågor lästa ur implementationen, tio paket
   identifierade som saknade, fyra ägargrindar listade. C8 konstaterad ofri. Design av huvudstruktur och
   rapportytor lagd i september eftersom inget blockerar den.
