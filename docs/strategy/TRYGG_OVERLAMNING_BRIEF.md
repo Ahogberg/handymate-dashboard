@@ -27,7 +27,7 @@ The volumes are small and mostly ours. The shapes are not.
 | H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **implemented, in review** (PR #81 `835c9949`, reviewed 2026-09-15: 3 MEDIUM — backfill shortens live expiries, digest-channel types become pushed cards, reminder outcome mapping; 6 LOW; 357 tests + tsc green locally) | M1–M3 fix → merge → v248; native Ja/Nej in push stays open |
 | H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **implemented, in review** (PR #81; explicit one-shot consent, four keys supervised, off with 30-day cooldown, revocation trigger, audit before provider call) | same PR as H1; cancel-on-off of queued sends waits for H3b |
 | H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **done 2026-09-15** (PR #78 merged `c09364e7` after M1 fix: failed provider check no longer cached, six new tests; 305 tests + tsc green locally, CI 13/13; v246 applied to production and verified) | activation: `CHANNEL_PREFLIGHT_ENABLED` on pilot; optional `RESEND_PREFLIGHT_API_KEY` if the production Resend key is sending-only |
-| H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | sketched (§5b); **Claude drafts DDL next** | — (H3a merged) |
+| H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | **ready — [H3B_OUTBOUND_INTENTS_BRIEF.md](H3B_OUTBOUND_INTENTS_BRIEF.md)**; Claude drafted `sql/v249_outbound_intents.sql` and proved it in PGlite (43/43) 2026-09-15 | #81 merged (v249 replaces v248's `stop_supervised_autonomy`) |
 | H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **done 2026-09-15** (PR #78; root cause 198/198 credit errors; seeded rule delivers the deterministic brief without the LLM, one retry via cron `*/10`, own driftlarm line; v246 `morning_report_runs` applied) | activation: `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
 
 Order: H3a and H4 first (they decide whether the customer can trust anything), then H1 and H2 together.
@@ -136,17 +136,16 @@ Invariants: (1) no `send_sms` card is created while the balance is zero; (2) a s
 failing channel is logged `skipped` with a `saldo`/`konfiguration` reason, never `failed`; (3) one notice
 per business, channel and day; (4) the banner and the notice are computed by the same function.
 
-### 5b. Durable outbound promises (sketch; DDL drafted by Claude after 5a lands)
+### 5b. Durable outbound promises (this package now has its own brief)
 
-Generalise `financial_effect_intents`: an `outbound_intents` table with `business_id, kind (sms|email|push),
-source (automation_log|approval|autonomy), source_id, recipient, template, status
-(pending|attempting|sent|failed|skipped|unknown), attempts, attempt_token, claimed_at, finished_at,
-last_error, provider_ref`, the same claim/finish/unknown RPC trio, a sweep in the existing 10-minute kernel
-cron, and the same admin resolution with actor and reason. Every outbound message from automations,
-approvals and autonomy becomes an intent first; the customer-facing status ("Skickat 08:12", "Väntar på
-saldo", "Kunde inte skickas") is read from it. Lost acknowledgements become `unknown`, never a second
-send. This is what makes Codex's priority 2 ("vad teamet gör härnäst, när det sker") a fact rather than
-a text.
+Written up in full, with the drafted migration and 43 proven checks, in
+[H3B_OUTBOUND_INTENTS_BRIEF.md](H3B_OUTBOUND_INTENTS_BRIEF.md). In short: `outbound_intents` generalises
+`financial_effect_intents` to SMS, e-mail and push, so every outbound message becomes a durable promise
+before a provider is called. The customer-facing status ("Skickat 08:12", "Väntar på saldo", "Kunde inte
+skickas") is read from that row, a lost acknowledgement becomes `unknown` rather than a second send, and
+`stop_supervised_autonomy` cancels the queue in the same transaction as the revoke — which is what closes
+H2's fourth invariant. The migration is `v249`, not the originally reserved `v247`, because it replaces a
+function that v248 introduces.
 
 ## 6. H4 — Morgonrapporten delivers or says why
 
