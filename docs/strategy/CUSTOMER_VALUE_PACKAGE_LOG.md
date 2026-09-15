@@ -32,8 +32,8 @@ product *identified* and *acted on*; the kernel records what was *invoiced* and 
 |---|---|---|---|---|
 | V0 | P0: `/api/automation/value` separates estimated minutes from confirmed money | Claude | **done 2026-09-14** (this PR; `tests/automation-value-honesty.spec.ts`) | — |
 | V1 | Value event log: append-only `value_events` for identified / acted / dismissed, measured time, ledger reads events | Codex | **done 2026-09-14** (PR #72 merged; M1 fixed and re-verified; 5 LOW in §5; handoff [CUSTOMER_VALUE_V1_HANDOFF.md](CUSTOMER_VALUE_V1_HANDOFF.md)) | activation gate: v241 applied, retention/anonymisation decision, paged backfill + method 2/3 comparison, `VALUE_EVENTS_ENABLED` |
-| V2 | Money stages from the kernel: consumer `value-ledger` on `invoice_issued` / `receivable_settled`; invoice-projection fallback for legacy-routed businesses | Codex | implemented for review, see latest handoff | Pilot flag and comparison gate still required for activation |
-| V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | implemented for review (web + native) | V1/V2 activation and pilot evidence |
+| V2 | Money stages from the kernel: consumer `value-ledger` (C3 lease) projecting `money_state_observed` / `invoice_issued` / `payment_received` (method 4); kernel businesses never fall back to invoice columns | Codex | **done 2026-09-15** (PR #77 merged `359cf284`; v245 applied to production; §5 review) | activation gate: `VALUE_KERNEL_EVENTS_ENABLED` + pilot S1 flag; LOW 2 ("uppdateras strax" copy) open |
+| V3 | Handymate Impact: one surface (web + mobile) over V1+V2 with the four stages, measured time, and the weekly receipt | Codex | **done 2026-09-15** (web in #77; mobile handymate-mobile#10 merged `d1195320`; v244 first_work applied) | `VALUE_IMPACT_ENABLED` after V2 is on for the pilot; do not ship mobile to TestFlight before the Impact route is live |
 | — | Revenue-recovery loop closed to draft → sent → paid (audit action 2) | Codex | folded into V1 (acted) + V2 (paid); no separate package | — |
 | — | Onboarding scan → work → receipt in 15 minutes (audit action 3) | Codex | product package outside this log; receipt wording must follow rule 1 (say *prepared* / *acted*, never *earned*) | — |
 | — | Production proof of provider flows and the weekly receipt (audit action 4) | Codex + owner | evidence discipline shared with the kernel's R0 / shadow work | pilot business |
@@ -167,6 +167,49 @@ log; its receipt copy must use *förberett* / *agerat* and may show measured min
 
 ## 5. Review record
 
+### Web receipt and evidence links (PR #75), Claude review 2026-09-14, orchestration §6 A + B
+
+Verified locally on `codex/customer-value-next` head `a085e9cb`: 165 tests green (customer-value-experience,
+automation-value-honesty, lisa-fangar, value-ledger*, value-events-producers, vardekvitto, recovered-revenue,
+parity, route-auth inventory, onboarding-wow, first-value-*, kundtext), `tsc` clean; `approval-<id>` anchors
+exist on the approvals page. Accepted: one shared receipt with paid and accepted-quote amounts split from
+deduplicated attributions; `invoicePaymentEvidence` shared by ledger and recovered-revenue; weekly API
+owner/admin-gated, strict reads → 503 with retry; company switch aborts in-flight reads; vardekvitto method 3.
+
+| Sev | Finding | Status |
+|---|---|---|
+| MEDIUM | "0 kr Registrerat betalt · 0 kr Accepterade offerter" headline when the week holds only estimated minutes, new requests or autonomous actions; the removed widget carried the rule against exactly that. Fix: money tiles only when money > 0, otherwise cold-start line plus the non-money rows; two tests. | fixed on `ebd39260` (`hasMoney` gate, four new cases), re-verified (118 tests, tsc) and merged 2026-09-15 as `0787a5fa` |
+| LOW | `/api/automation/value` + `lib/value/automation-value.ts` have no web consumer after the widget removal; retire in V3 once native is confirmed not to read them. | carry |
+| LOW | `lisa-fangar` allowlist pinned to a line number; content anchor would stop the churn. | carry |
+| — | The acceptance note's V2 contract list is adopted into the V2 brief as written. | noted |
+
+### V2 money events + V3 Impact + first work (PR #77, mobile handymate-mobile#10), Claude review 2026-09-15, orchestration §6 A + B
+
+Verified locally on `codex/customer-journey-v2v3` head `0f55fc79` (base #75 @ `a085e9cb`): 301 tests green
+(value-money-events, first-work-sql, customer-journey-value, customer-value-experience, all financial-kernel-*
+and value-* suites, parity, inventories), `first-quote-persistence.cjs` 8/8, `tsc` clean. Mobile `bc842b11`:
+jest 245/245 (two cold-container timeouts green on rerun), `tests/impact.cjs` green, `tsc` clean. Production
+check: every business with users has a `business_config` row (29/0 missing). Accepted: idempotent
+`record_value_money_event` under `financial_lock`, exactly-one issuance mapping, latest-observation snapshot
+(credit adjustments only reduce billed, paid only on settled customer receivable, ROT separate, reversal
+removes paid evidence, delayed replay reconstructs settlement by seq), unmapped credit/refund/dispute halts
+the consumer, readers refuse backlog/halt and never fall back, RESTRICTIVE policy hides money rows from
+member SELECT, Impact API owner/admin + 404 when flags off + 503 on read error, first_work DDL with
+immutable quote link, mobile validates the same contract and derives no amounts.
+
+| Sev | Finding | Status |
+|---|---|---|
+| BLOCKER | B1: #75's M1 ("0 kr" headline on time-only / requests-only weeks) is unfixed on the stack base; `WeeklyValueDigest.tsx` on #77 still renders it. Fix on #75, merge #75, rebase #77 to main. | resolved: #75 merged `0787a5fa`, #77 base switched to main |
+| MEDIUM | M2: `sql/v243_value_money_events.sql` collides with the applied `v243_value_trigger_wrappers_private.sql` (#76). Rename to v245 and update the two test references + docs. | fixed: `v245_value_money_events.sql` on `a1d0ab2d`; #78 took v246 |
+| LOW | `usesKernelValue` uses `.single()` (throws on missing config row) where `dispatch-flag.ts` uses `.maybeSingle()`. | carry |
+| LOW | Impact/ledger refused up to 10 min after a money event (cron `*/10`, cursor behind max seq); honest, but UI copy should read "uppdateras strax". | carry |
+| LOW | Credit/refund writer will halt `value-ledger` by design; runbook line (admin consumers route, logged reason) belongs in the acceptance doc. | carry |
+| LOW | Package-log edits in #77 and #76 will conflict; resolve on whichever merges second. | carry |
+| LOW | Contract test exempts `payment_received` by the v243 filename; must follow the M2 rename. | carry |
+| LOW (mobile) | `fetchImpact` treats 403 like 404 (hidden); do not ship to TestFlight before the Impact route is on production. | carry |
+
+Merge order: #75 → #77 (rebased to main) → mobile #10.
+
 ### V1 — value event log (PR #72), Claude review 2026-09-14, orchestration §6 A + B
 
 Verified locally on `codex/customer-value-v1` head `ea9b02b4`: 96 tests green (four V1 suites, value-ledger,
@@ -193,6 +236,11 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 | 2026-09-14 | Created after the ROI/WOW audit: V0 done (P0 fix), V1 brief, V2/V3 sketches, owner boundary against the Financial Kernel. | Claude |
 | 2026-09-14 | V1 implemented by Codex (PR #72) and reviewed: 1 MEDIUM (trigger wrappers vs member RLS writes), 5 LOW; activation gate recorded. V2 blocker updated after C5b merged. | V1 review |
 | 2026-09-14 | V1 M1 fixed by Codex, re-verified and merged (PR #72). C6 merged the same day; V2 is next once the pilot flag is on. | V1 merge |
+| 2026-09-14 | v241 applied to production (after v239/v240/v242) with v243 revoking API EXECUTE on the trigger wrappers. Producers are live (0 rows at apply time, dry-run backfill examined 192 cards for the largest tenant). Reading stays on method 2: `VALUE_EVENTS_ENABLED` unset; backfill and the retention decision remain owner gates. | Deploy |
+| 2026-09-14 | PR #75 (shared web receipt) reviewed: 1 MEDIUM (0 kr headline on non-money weeks), 2 LOW. Companion brief `TRYGG_OVERLAMNING_BRIEF.md` (H1–H4) written for the handover work. | #75 review |
+| 2026-09-15 | V2 + V3 + first work implemented by Codex (PR #77, mobile #10) and reviewed: 1 BLOCKER inherited from #75 (M1), 1 MEDIUM (v243 file rename), 5 LOW; mobile accepted pending #77. Board V2/V3 moved to "implemented, in review". | #77/#10 review |
+| 2026-09-15 | #75 merged as `0787a5fa` after M1 fix; #77 re-based on main (v245 money events, `maybeSingle` parity). Web receipt is live on main; no flag flipped. | #75 merge |
+| 2026-09-15 | #77 merged as `359cf284` (V2 money events, V3 Impact, first work) and mobile #10 as `d1195320`. v244 and v245 applied to production via Supabase MCP and verified read-only: `first_work` RLS on, quote column/triggers/FK present, four definer RPCs service-only; `value_events` constraints replaced (31 V1 rows intact, all satisfy the new shape), RESTRICTIVE `value_money_api_only` present, three money RPCs definer service-only, no `value-ledger` cursor yet. Advisor: only the expected INFO (RLS without policy on `first_work`), no new WARN. Flags `FIRST_WORK_ENABLED`, `VALUE_KERNEL_EVENTS_ENABLED`, `VALUE_IMPACT_ENABLED` unset. | #77/#10 merge + deploy |
 
 ### V2/V3 implementation — Codex, 2026-09-14
 

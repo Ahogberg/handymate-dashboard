@@ -48,7 +48,18 @@ Rules that keep this file honest:
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
 
-**Deployment state (2026-09-14):** `v235`–`v238` are applied to the production Supabase
+**Deployment state (2026-09-14, evening):** `v239`, `v240`, `v242` and `v241` (+ `v243`, trigger-wrapper
+EXECUTE revoke) applied to production by Claude via Supabase MCP in that order, each verified read-only
+directly after: all kernel/shadow/value tables exist with RLS; every RPC is SECURITY DEFINER, service_role-only
+EXECUTE, `authenticated` denied; service_role has no direct write privilege on the shadow tables or
+`value_events`; `guard_financial_kernel_phase` and the four v241 producer triggers are installed; phase is `off`
+for every business, the kernel work list is empty, `value_events` has 0 rows (dry-run backfill of the largest
+tenant examined 192 cards, wrote nothing). No flag flipped, no backfill written, `VALUE_EVENTS_ENABLED` unset.
+Supabase security advisors after the run: only pre-existing items (RLS-without-policy INFO on 30 tables incl.
+`financial_event_consumers`/`_deliveries` by design, `is_business_member` and `reset_demo_tenant` WARN, `vector`
+in public, leaked-password protection off); the new WARN on the v241 wrappers was closed by `v243`.
+
+**Deployment state (2026-09-14, morning):** `v235`–`v238` are applied to the production Supabase
 project (Handymate, eu-west-1). Verified read-only the same day: the seven `financial_*` tables
 exist with RLS enabled and no FORCE; every kernel RPC is SECURITY DEFINER with
 `search_path = public, pg_temp` and EXECUTE only for `postgres` and `service_role` (the three
@@ -1148,3 +1159,4 @@ No BLOCKER.
 | 2026-09-14 | C5b reviewed and merged (PR #71; review in §5, 3 LOW carried to C6). C6 brief written: phase history + `set_financial_kernel_phase` as the only flag writer, kill switch that keeps sweeping owed intents, Level 1 exact comparison with sighting-count confirmation, Levels 2–4 as `unsupported`, admin surface; v242 draft embedded and verified in PGlite (40 checks). C5b brief retired to git history. | Package C6 prep |
 | 2026-09-14 | C6 implemented by Codex (PR #73) and reviewed: no BLOCKER, 3 LOW; C5b LOW 1–2 closed in #73. | C6 review |
 | 2026-09-14 | C6 merged (PR #73, base merge `8400f720` verified: only the merge commit since the reviewed head, 170 specs in identical order). S2 definition after two clean S1 weeks; C12 stays sketched. | C6 merge |
+| 2026-09-14 | v239, v240, v242, v241 and v243 applied to production and verified; deployment state updated in §1. Owner steps left: pilot business (S1 via `set_financial_kernel_phase`), retention decision before `VALUE_EVENTS_ENABLED`, paged backfill. | Deploy |
