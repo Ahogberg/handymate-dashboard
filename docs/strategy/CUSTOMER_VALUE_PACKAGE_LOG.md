@@ -178,7 +178,7 @@ owner/admin-gated, strict reads → 503 with retry; company switch aborts in-fli
 
 | Sev | Finding | Status |
 |---|---|---|
-| MEDIUM | "0 kr Registrerat betalt · 0 kr Accepterade offerter" headline when the week holds only estimated minutes, new requests or autonomous actions; the removed widget carried the rule against exactly that. Fix: money tiles only when money > 0, otherwise cold-start line plus the non-money rows; two tests. | open on #75 — fix before merge |
+| MEDIUM | "0 kr Registrerat betalt · 0 kr Accepterade offerter" headline when the week holds only estimated minutes, new requests or autonomous actions; the removed widget carried the rule against exactly that. Fix: money tiles only when money > 0, otherwise cold-start line plus the non-money rows; two tests. | fixed on `ebd39260` (`hasMoney` gate, four new cases), re-verified (118 tests, tsc) and merged 2026-09-15 as `0787a5fa` |
 | LOW | `/api/automation/value` + `lib/value/automation-value.ts` have no web consumer after the widget removal; retire in V3 once native is confirmed not to read them. | carry |
 | LOW | `lisa-fangar` allowlist pinned to a line number; content anchor would stop the churn. | carry |
 | — | The acceptance note's V2 contract list is adopted into the V2 brief as written. | noted |
@@ -199,8 +199,8 @@ immutable quote link, mobile validates the same contract and derives no amounts.
 
 | Sev | Finding | Status |
 |---|---|---|
-| BLOCKER | B1: #75's M1 ("0 kr" headline on time-only / requests-only weeks) is unfixed on the stack base; `WeeklyValueDigest.tsx` on #77 still renders it. Fix on #75, merge #75, rebase #77 to main. | open |
-| MEDIUM | M2: `sql/v243_value_money_events.sql` collides with the applied `v243_value_trigger_wrappers_private.sql` (#76). Rename to v245 and update the two test references + docs. | open |
+| BLOCKER | B1: #75's M1 ("0 kr" headline on time-only / requests-only weeks) is unfixed on the stack base; `WeeklyValueDigest.tsx` on #77 still renders it. Fix on #75, merge #75, rebase #77 to main. | resolved: #75 merged `0787a5fa`, #77 base switched to main |
+| MEDIUM | M2: `sql/v243_value_money_events.sql` collides with the applied `v243_value_trigger_wrappers_private.sql` (#76). Rename to v245 and update the two test references + docs. | fixed: `v245_value_money_events.sql` on `a1d0ab2d`; #78 took v246 |
 | LOW | `usesKernelValue` uses `.single()` (throws on missing config row) where `dispatch-flag.ts` uses `.maybeSingle()`. | carry |
 | LOW | Impact/ledger refused up to 10 min after a money event (cron `*/10`, cursor behind max seq); honest, but UI copy should read "uppdateras strax". | carry |
 | LOW | Credit/refund writer will halt `value-ledger` by design; runbook line (admin consumers route, logged reason) belongs in the acceptance doc. | carry |
@@ -239,3 +239,4 @@ carry card titles); backfill per business in pages; method 2/3 comparison on rep
 | 2026-09-14 | v241 applied to production (after v239/v240/v242) with v243 revoking API EXECUTE on the trigger wrappers. Producers are live (0 rows at apply time, dry-run backfill examined 192 cards for the largest tenant). Reading stays on method 2: `VALUE_EVENTS_ENABLED` unset; backfill and the retention decision remain owner gates. | Deploy |
 | 2026-09-14 | PR #75 (shared web receipt) reviewed: 1 MEDIUM (0 kr headline on non-money weeks), 2 LOW. Companion brief `TRYGG_OVERLAMNING_BRIEF.md` (H1–H4) written for the handover work. | #75 review |
 | 2026-09-15 | V2 + V3 + first work implemented by Codex (PR #77, mobile #10) and reviewed: 1 BLOCKER inherited from #75 (M1), 1 MEDIUM (v243 file rename), 5 LOW; mobile accepted pending #77. Board V2/V3 moved to "implemented, in review". | #77/#10 review |
+| 2026-09-15 | #75 merged as `0787a5fa` after M1 fix; #77 re-based on main (v245 money events, `maybeSingle` parity). Web receipt is live on main; no flag flipped. | #75 merge |
