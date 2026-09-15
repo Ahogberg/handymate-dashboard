@@ -1582,3 +1582,10 @@ Verifiering: 19 nya körbara regressioner, 49 Fortnox-facit och 45 avstämningsp
 - [ ] Testa riktiga komponenter och routes, typkontroll, bygge, grön PR.
 
 Publicerad i PR #75. Slutliga test-/byggresultat redovisas på PR-huvudet. V2, full V3/native och produktionspilot är fortfarande öppna enligt docs/strategy/CUSTOMER_VALUE_NEXT_ACCEPTANCE.md.
+
+## 2026-09-15 — Review #75 M1
+- [x] Dölj nollrubrik vid enbart tid/förfrågningar; behåll underlaget.
+- [x] Prova faktisk komponent med tid, förfrågningar och äldre osplittrat kvitto.
+- [x] Publicera rättningen för Claudes omverifiering.
+
+Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågningsfall (split + äldre kontrakt). Slutlig CI redovisas i PR #75.

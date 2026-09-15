@@ -12,14 +12,16 @@ const number = (n: number) => n.toLocaleString('sv-SE', { maximumFractionDigits:
 export function WeeklyValueReceipt({ data }: { data: WeeklyValue }) {
   const hasWork = data.confirmed_kr > 0 || data.captured_count > 0 || data.autonomous_count > 0 || data.time_minutes > 0 || (data.measured_minutes ?? 0) > 0
   const split = typeof data.paid_kr === 'number' && typeof data.accepted_quote_kr === 'number'
+  const hasMoney = split ? data.paid_kr! + data.accepted_quote_kr! > 0 : data.confirmed_kr > 0
   return <section className="mb-6 rounded-2xl border border-teal-100 bg-white p-5 shadow-sm" aria-label="Din vecka med Handymate">
     <div className="flex flex-wrap items-center justify-between gap-2"><h2 className="text-base font-bold text-gray-900">Din vecka med Handymate</h2><span className="text-xs text-gray-500">Senaste {data.range_days} dagarna</span></div>
     {!hasWork ? <div className="mt-4"><p className="text-sm text-gray-700">Här visas vad teamets arbete har lett till. Ännu finns inget registrerat utfall under perioden.</p><Link href="/dashboard/quotes/new" className="mt-3 inline-block text-sm font-medium text-teal-800 underline">Förbered din första offert</Link><p className="mt-2 text-xs text-gray-500">Granska innehåll och pris innan du skickar något.</p></div> : <>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+      {hasMoney ? <><div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
         {split ? <><div><p className="text-2xl font-bold text-teal-800">{number(data.paid_kr!)} kr</p><p className="text-sm font-medium">Registrerat betalt</p></div><div><p className="text-2xl font-bold text-gray-900">{number(data.accepted_quote_kr!)} kr</p><p className="text-sm font-medium">Accepterade offerter</p><p className="text-xs text-gray-500">Inte samma sak som inbetalda pengar.</p></div></> : <div><p className="text-2xl font-bold">{number(data.confirmed_kr)} kr</p><p className="text-sm">Accepterade offerter och registrerade betalningar</p></div>}
       </div>
       <p className="mt-3 text-xs text-gray-500">Utfall med direkt koppling till teamets arbete. Det visar inte hur mycket som hade uteblivit utan Handymate.</p>
       {data.confirmed_items.length > 0 && <ul className="mt-3 space-y-1 text-sm">{data.confirmed_items.slice(0, 5).map((item, i) => <li key={i}>{item.label} · {number(item.amount)} kr</li>)}</ul>}
+      </> : <p className="mt-4 text-sm text-gray-700">Ännu finns inget registrerat ekonomiskt utfall under perioden. Här visas teamets övriga arbete.</p>}
       <div className="mt-4 grid gap-4 border-t pt-4 sm:grid-cols-2"><div><p className="font-semibold">{data.captured_count} nya förfrågningar</p><p className="text-xs text-gray-500">Registrerade under perioden. Det bevisar inte att de annars hade gått förlorade.</p></div><div><p className="font-semibold">{number(data.time_minutes)} min uppskattad arbetsbesparing</p><p className="text-xs text-gray-500">Schablon per aktivitet, inte uppmätt arbetstid.</p>{data.autonomous_count > 0 && <p className="mt-1 text-xs">{data.autonomous_count} åtgärder registrerade som utförda självständigt.</p>}</div></div>
       {(data.measured_minutes ?? 0) > 0 && <p className="mt-3 text-sm">Uppmätt genomloppstid mellan arbetssteg: {number(data.measured_minutes!)} min. Detta är inte sparad arbetstid.</p>}
       <p id={TIME_ESTIMATE_ANCHOR} className="mt-3 scroll-mt-24 text-xs text-gray-500"><strong>Så uppskattas tiden: </strong>{TIME_ESTIMATE_EXPLANATION}</p>
