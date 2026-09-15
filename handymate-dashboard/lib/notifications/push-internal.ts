@@ -47,13 +47,14 @@ export interface InternalPushResult {
   }
 }
 
-export async function sendInternalPush(payload: InternalPushPayload): Promise<InternalPushResult> {
+export async function sendInternalPush(payload: InternalPushPayload, options: { timeoutMs?: number } = {}): Promise<InternalPushResult> {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   try {
     const res = await fetch(`${appUrl}/api/push/send`, {
       method: 'POST',
       headers: internalPushHeaders(),
       body: JSON.stringify(payload),
+      ...(options.timeoutMs ? { signal: AbortSignal.timeout(options.timeoutMs) } : {}),
     })
     if (!res.ok) return { delivered: false, sent: 0, reason: `http_${res.status}` }
     const data = await res.json().catch(() => ({})) as {

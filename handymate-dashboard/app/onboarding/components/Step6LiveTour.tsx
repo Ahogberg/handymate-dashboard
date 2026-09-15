@@ -17,6 +17,7 @@
  * Beroenden: lucide-react, @/lib/agents/team.
  */
 
+import AutonomyConsentCard from '@/components/dashboard/AutonomyConsentCard'
 import { useEffect, useState } from 'react'
 import { ListChecks, Target, Crown, TrendingUp, Compass } from 'lucide-react'
 import { TEAM, getAgentById } from '@/lib/agents/team'
@@ -161,6 +162,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
   // Uppdraget först; rundturen är ett frivilligt sidospår. Normal dokumenthöjd
   // gör hela finalen nåbar även på små mobiler och med stor text.
   if (showAssignment || finished) return <div className="ob-screen" style={{ padding: 20, height: 'auto', minHeight: 0, flex: 1, overflowY: 'auto' }}>
+    {data.businessId && <AutonomyConsentCard businessId={data.businessId}/>}
     <FirstAssignmentFinal data={data} unpaidCount={instant?.unpaid_count ?? 0}
       openDealsCount={instant?.open_deals_count ?? 0} onFinish={onFinish} onFirstQuote={onFirstQuote} busy={busy} />
     <button type="button" className="ob-cta ghost" disabled={busy} onClick={() => { setShowAssignment(false); setTourStep(0) }}>Visa mig runt först</button>
@@ -168,6 +170,7 @@ export default function Step6LiveTour({ onFinish, onFirstQuote, data, busy }: St
 
   return (
     <div className="ob-screen" style={{ background: 'var(--ob-bg)' }}>
+      {data.businessId && <AutonomyConsentCard businessId={data.businessId}/>}
       <MockDashboard
         highlight={highlight}
         firstName={data.contactName?.split(' ')[0] ?? 'där'}

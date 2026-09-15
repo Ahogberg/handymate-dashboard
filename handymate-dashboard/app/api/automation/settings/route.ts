@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
+import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -66,12 +67,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const user = await getCurrentUser(request, business.business_id)
+  if (!user || !isOwnerOrAdmin(user)) return NextResponse.json({ error: 'Behörighet saknas.' }, { status: 403 })
+
   const supabase = getServerSupabase()
   const businessId = business.business_id
   const body = await request.json()
 
   // Remove fields that shouldn't be updated directly
-  const { id: _id, business_id: _bid, created_at: _ca, ...updates } = body
+  const { id: _id, business_id: _bid, created_at: _ca, earned_autonomy: _autonomy, ...updates } = body
 
   const { data, error } = await supabase
     .from('v3_automation_settings')
