@@ -21,6 +21,8 @@ const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 
 export interface SendSmsArgs {
+  autonomyKey?: import('@/lib/autonomy/earned-autonomy').AutonomyKey
+
   supabase: SupabaseClient
   businessId: string
   /** Används som 46elks `from`-fält (max 11 tecken). Default 'Handymate'. */
@@ -164,6 +166,15 @@ async function resolveSmsQuotaPlan(
  * lika fel som ingen räkning alls.
  */
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
+  if (args.autonomyKey && process.env.SUPERVISED_AUTONOMY_ENABLED === 'true') {
+    const {supervisedSend}=await import('@/lib/autonomy/supervised-send')
+    return supervisedSend(args.supabase,args.businessId,args.autonomyKey,'sms',()=>sendSmsWithoutAutonomyWrapper(args),r=>r.success?'success':r.channelSkipped?'skipped':'unknown',{
+      success:false,error:'Självständiga utskick är pausade. Kontrollera inställningarna.',channelSkipped:true,channelReason:'konfiguration',
+    }, {recordLog:args.messageType==='quote_expiry_nudge'})
+  }
+  return sendSmsWithoutAutonomyWrapper(args)
+}
+async function sendSmsWithoutAutonomyWrapper(args: SendSmsArgs): Promise<SendSmsResult> {
 
   const {
     supabase,

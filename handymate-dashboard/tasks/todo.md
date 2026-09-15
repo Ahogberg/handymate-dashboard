@@ -1612,3 +1612,12 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] Sex återhämtnings- och credential-raceprov; 14 kanalprov gröna före basmerge.
 - [x] Sammanfoga aktuell main, bevara H2-beslut och båda testlistornas ordning.
 - [ ] Slutverifiera på publicerat huvud; resultat i PR #78.
+
+## H1/H2 — 2026-09-15
+- [x] H1: klassificering enligt verklig handling, inkorg, beständig utgångssammanfattning och högst tre beslut.
+- [x] H2: atomiskt samtycke, fyra nycklar, bestående avstängning och dagligt kvitto.
+- [x] Delad morgonleverans, flaggor, behörigheter och H3b-integrationsgräns.
+- [x] SQL-/route-/komponentprov och tsc.
+- [x] Bygge och publicering: PR #81, v248 endast utkast.
+- [ ] Slutlig CI på PR #81; first-value-harness kompletterat med explicit flaggmiljö och av/på-prov.
+- [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.

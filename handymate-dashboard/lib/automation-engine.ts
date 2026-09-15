@@ -298,6 +298,7 @@ async function handleSendSms(
     message,
     customerId: (context.customer_id as string) || null,
     messageType: 'automation_rule',
+    ...(context.handoff_autonomy_key ? {autonomyKey: context.handoff_autonomy_key as import('@/lib/autonomy/earned-autonomy').AutonomyKey} : {}),
     recipient: 'customer',
     // Ett svar på något kunden just gjort får inte hållas tillbaka av
     // sjudagarsspärren; kampanjer och omvårdnad ska det. Se
@@ -996,7 +997,10 @@ export async function executeRule(
   }
   // Muta ALDRIG caller-ägda context (fireEvent delar payload-objektet över
   // regler i loopen) — härled en lokal kopia för den autonoma vägen.
-  const execContext = autonomousBypass ? { ...context, earned_autonomy: true } : context
+  const execContext = { ...context, ...(autonomousBypass ? { earned_autonomy: true } : {}),
+    // Server-derived only: mandate and human approval sends keep their existing path.
+    handoff_autonomy_key: autonomousBypass && !mandateStamp ? autonomyKey : null,
+  }
 
   // Vilken händelse som utlöste regeln. Följer med ner till åtgärden eftersom
   // send_sms behöver den för att välja syfte — ett svar på inkommande

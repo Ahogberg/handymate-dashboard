@@ -58,6 +58,7 @@ export async function GET(request: NextRequest) {
     // status=resolved är en samlingsterm för "inte längre pending" — samma
     // statusuppsättning som approvals/page.tsx tidigare frågade direkt mot
     // Supabase med .in('status', [...]) för sin "Hanterade"-flik.
+    if (process.env.HANDOFF_INBOX_ENABLED === 'true') query = query.eq('card_kind', 'decision')
     if (status === 'resolved') {
       query = query.in('status', RESOLVED_STATUSES)
     } else if (status === 'execution_failed') {

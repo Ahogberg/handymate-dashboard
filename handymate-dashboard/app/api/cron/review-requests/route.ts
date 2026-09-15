@@ -309,6 +309,7 @@ export async function GET(request: NextRequest) {
           customerId: customer.customer_id,
           relatedId: project.project_id,
           messageType: 'review_request',
+          ...(!mandateResolution.covered ? {autonomyKey:'review_request' as const} : {}),
           recipient: 'customer',
           purpose: 'proactive',
         })

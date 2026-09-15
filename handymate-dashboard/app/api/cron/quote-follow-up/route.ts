@@ -274,6 +274,7 @@ export async function GET(request: NextRequest) {
               customerId: q.customer_id,
               relatedId: q.quote_id,
               messageType: 'quote_expiry_nudge',
+              ...(!mandateResolution.covered ? {autonomyKey:'quote_followup_sms' as const} : {}),
               recipient: 'customer',
               purpose: 'proactive',
             })
