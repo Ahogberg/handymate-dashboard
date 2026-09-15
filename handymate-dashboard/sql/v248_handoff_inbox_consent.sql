@@ -45,23 +45,38 @@ ALTER TABLE public.pending_approvals ADD COLUMN IF NOT EXISTS card_kind text NOT
 CREATE INDEX handoff_items_unreported ON public.handoff_items(business_id,created_at) WHERE digest_day IS NULL;
 CREATE INDEX handoff_notices ON public.pending_approvals(business_id,created_at) WHERE card_kind='notice';
 CREATE OR REPLACE FUNCTION public.handoff_card_kind(p_type text) RETURNS text LANGUAGE sql IMMUTABLE SET search_path=public,pg_temp AS $$
- SELECT CASE WHEN p_type = ANY(ARRAY['agent_observation','agent_insight','monthly_review','monday_brief','quote_signed','ata_signed_notification','ata_declined_notification','profitability_warning','meeting_summary','autonomy_revoked','team_intro','expectation_drift_signal','promise_deadline_signal','mandate_paused_signal','external_delivery_failure_signal','payment_failed_signal','kort_gar_ut']) THEN 'notice' ELSE 'decision' END
+ SELECT CASE WHEN p_type = ANY(ARRAY['agent_observation','dispatch_suggestion','agent_insight','monthly_review','monday_brief','quote_signed','ata_signed_notification','ata_declined_notification','profitability_warning','meeting_summary','autonomy_revoked','team_intro','expectation_drift_signal','promise_deadline_signal','mandate_paused_signal','external_delivery_failure_signal','payment_failed_signal','kort_gar_ut']) THEN 'notice' ELSE 'decision' END
+$$;
+CREATE OR REPLACE FUNCTION public.handoff_expiry_days(p_type text) RETURNS integer LANGUAGE sql IMMUTABLE SET search_path=public,pg_temp AS $$
+ SELECT CASE
+  WHEN p_type='autonomy_offer' THEN 14
+  WHEN p_type = ANY(ARRAY['send_sms','send_email','send_quote','send_invoice','send_matte_customer_reply','quote_nudge','confirm_payment','create_booking','create_quote_draft','create_ata_draft','create_invoice_from_report','autopilot_package','review_request','scheduled_review_request','yearly_followup','proactive_care','warranty_followup','seasonal_campaign','customer_reactivation','customer_message','customer_quote_question','quote_request','quote_addition','propose_booking_times','propose_site_visit','reschedule_request','new_booking_request','publish_microsite','invoice_reminder','automation','price_adjustment','fakturera_projekt','playbook_pattern_confirmation','playbook_kickoff_suggestion','operating_experiment_proposal','operating_experiment_readout','missad_intakt','jobbpass_proposal','deal_flow_site_visit','cert_expiry_reminder','low_stock_alert','meeting_followup','project_log_note','customer_fact','agent_memory_confirmation']) THEN 7
+  ELSE NULL
+ END
 $$;
 CREATE OR REPLACE FUNCTION public.handoff_normalize_card() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
+DECLARE days integer;
 BEGIN
  NEW.card_kind:=public.handoff_card_kind(NEW.approval_type);
- IF NEW.card_kind='notice' THEN
+ days:=public.handoff_expiry_days(NEW.approval_type);
+ IF days IS NULL THEN
   NEW.expires_at:=NULL;
   IF TG_OP='UPDATE' AND OLD.status='pending' AND NEW.status='expired' THEN NEW.status:=OLD.status; NEW.resolved_at:=OLD.resolved_at; END IF;
  ELSIF TG_OP='INSERT' AND NEW.status='pending' THEN
-  NEW.expires_at:=coalesce(NEW.created_at,now()) + CASE WHEN NEW.approval_type='autonomy_offer' THEN interval '14 days' ELSE interval '7 days' END;
+  NEW.expires_at:=coalesce(NEW.created_at,now()) + make_interval(days=>days);
  END IF;
  RETURN NEW;
 END $$;
 CREATE TRIGGER handoff_normalize_card BEFORE INSERT OR UPDATE ON public.pending_approvals FOR EACH ROW EXECUTE FUNCTION public.handoff_normalize_card();
-UPDATE public.pending_approvals SET card_kind=public.handoff_card_kind(approval_type), expires_at=CASE WHEN public.handoff_card_kind(approval_type)='notice' THEN NULL
- WHEN status='pending' THEN created_at+CASE WHEN approval_type='autonomy_offer' THEN interval '14 days' ELSE interval '7 days' END
- ELSE expires_at END;
+UPDATE public.pending_approvals SET
+ card_kind=public.handoff_card_kind(approval_type),
+ expires_at=CASE
+  WHEN public.handoff_expiry_days(approval_type) IS NULL THEN NULL
+  WHEN status='pending' THEN greatest(
+   coalesce(expires_at,created_at+make_interval(days=>public.handoff_expiry_days(approval_type))),
+   now()+interval '1 day')
+  ELSE expires_at
+ END;
 CREATE OR REPLACE FUNCTION public.handoff_collect_expiry() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
 BEGIN
  IF OLD.status IS DISTINCT FROM 'expired' AND NEW.status='expired' AND NEW.card_kind='decision' THEN
@@ -107,8 +122,8 @@ BEGIN
  IF EXISTS(SELECT 1 FROM public.handoff_digests WHERE business_id=p_business_id AND day=d) THEN RETURN NULL; END IF;
  SELECT coalesce(jsonb_agg(to_jsonb(i) ORDER BY i.created_at,i.id),'[]') INTO items FROM public.handoff_items i WHERE business_id=p_business_id AND digest_day IS NULL AND (kind='expired' OR created_at < d::timestamp AT TIME ZONE 'Europe/Stockholm');
  SELECT coalesce(jsonb_agg(to_jsonb(x)),'[]') INTO decisions FROM (
- SELECT id,title,approval_type,created_at FROM public.pending_approvals WHERE business_id=p_business_id AND status='pending' AND card_kind='decision' AND (expires_at IS NULL OR expires_at>now()) AND (snoozed_until IS NULL OR snoozed_until<=now())
- ORDER BY created_at ASC,CASE WHEN (payload->>'amount_kr') ~ '^\d+(\.\d+)?$' THEN (payload->>'amount_kr')::numeric ELSE 0 END DESC,id LIMIT 3) x;
+ SELECT id,title,approval_type,created_at,expires_at FROM public.pending_approvals WHERE business_id=p_business_id AND status='pending' AND card_kind='decision' AND (expires_at IS NULL OR expires_at>now()) AND (snoozed_until IS NULL OR snoozed_until<=now())
+ ORDER BY expires_at ASC NULLS LAST,CASE WHEN expires_at IS NOT NULL AND (payload->>'amount_kr') ~ '^\d+(\.\d+)?$' THEN (payload->>'amount_kr')::numeric ELSE 0 END DESC,created_at ASC,id LIMIT 3) x;
  SELECT greatest(count(*)-jsonb_array_length(decisions),0)::integer INTO remaining FROM public.pending_approvals WHERE business_id=p_business_id AND status='pending' AND card_kind='decision' AND (expires_at IS NULL OR expires_at>now()) AND (snoozed_until IS NULL OR snoozed_until<=now());
  IF jsonb_array_length(items)=0 AND jsonb_array_length(decisions)=0 THEN RETURN NULL; END IF;
  snap:=jsonb_build_object('items',items,'decisions',decisions,'remaining',remaining);
@@ -197,7 +212,7 @@ DO $$ DECLARE t text; f record; BEGIN
   EXECUTE format('REVOKE ALL ON public.%I FROM PUBLIC,anon,authenticated,service_role',t);
   EXECUTE format('GRANT SELECT,DELETE ON public.%I TO service_role',t);
  END LOOP;
- FOR f IN SELECT oid::regprocedure sig FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=ANY(ARRAY['accept_earned_autonomy_offer','handoff_protect_revocations','record_autonomy_attempt','finish_autonomy_attempt','promote_supervised_autonomy','handoff_card_kind','handoff_normalize_card','handoff_collect_expiry','answer_autonomy_consent','stop_supervised_autonomy','claim_handoff_digest','finish_handoff_digest']) LOOP
+ FOR f IN SELECT oid::regprocedure sig FROM pg_proc WHERE pronamespace='public'::regnamespace AND proname=ANY(ARRAY['accept_earned_autonomy_offer','handoff_protect_revocations','record_autonomy_attempt','finish_autonomy_attempt','promote_supervised_autonomy','handoff_card_kind','handoff_expiry_days','handoff_normalize_card','handoff_collect_expiry','answer_autonomy_consent','stop_supervised_autonomy','claim_handoff_digest','finish_handoff_digest']) LOOP
   EXECUTE format('REVOKE ALL ON FUNCTION %s FROM PUBLIC,anon,authenticated',f.sig);
   EXECUTE format('GRANT EXECUTE ON FUNCTION %s TO service_role',f.sig);
  END LOOP;

@@ -1,5 +1,5 @@
 /** Classification follows the actual action contract; changing records still requires a decision. */
-export const CARD_KIND: Record<string, 'decision' | 'notice'> = {
+export const CARD_KIND = {
   agent_observation: 'notice',
   send_sms: 'decision',
   send_email: 'decision',
@@ -29,7 +29,7 @@ export const CARD_KIND: Record<string, 'decision' | 'notice'> = {
   propose_site_visit: 'decision',
   reschedule_request: 'decision',
   new_booking_request: 'decision',
-  dispatch_suggestion: 'decision',
+  dispatch_suggestion: 'notice',
   publish_microsite: 'decision',
   invoice_reminder: 'decision',
   automation: 'decision',
@@ -78,7 +78,8 @@ export const CARD_KIND: Record<string, 'decision' | 'notice'> = {
   external_delivery_failure_signal: 'notice',
   payment_failed_signal: 'notice',
   kort_gar_ut: 'notice',
-}
-export const cardKind = (type: string) => CARD_KIND[type] ?? 'decision'
+} as const satisfies Record<string, 'decision' | 'notice'>
+export const cardKind = (type: string) =>
+  (CARD_KIND as Record<string, 'decision' | 'notice'>)[type] ?? 'decision'
 export const handoffInboxEnabled = () =>
   process.env.HANDOFF_INBOX_ENABLED === 'true'

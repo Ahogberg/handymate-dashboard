@@ -1,13 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyCronSecret } from '@/lib/cron/verify-secret'
 import { getServerSupabase } from '@/lib/supabase'
-import { isAutonomous, getAutonomyCap, underAutonomyCap, recordAutonomyFailure } from '@/lib/autonomy/earned-autonomy'
+import {
+  isAutonomous,
+  getAutonomyCap,
+  underAutonomyCap,
+  recordAutonomyFailure,
+} from '@/lib/autonomy/earned-autonomy'
+import { invoiceReminderOutcome } from '@/lib/autonomy/invoice-reminder-outcome'
 import { deliverInvoiceReminder } from '@/lib/invoice-reminder-send'
-import { loadReminderConfig, composeReminderStep, createInvoiceReminderCard, type ReminderConfig } from '@/lib/invoice-reminder-card'
+import {
+  loadReminderConfig,
+  composeReminderStep,
+  createInvoiceReminderCard,
+  type ReminderConfig,
+} from '@/lib/invoice-reminder-card'
 import { svDateStr } from '@/lib/dates'
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
-import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
+import {
+  loadMandateResolutionCache,
+  resolveMandateForAction,
+  MANDATE_TRUTH_CLASS,
+  type MandateResolutionCache,
+} from '@/lib/mandates/resolve'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { loadV3InvoiceReminderOwnerBusinessIds } from '@/lib/cron/invoice-reminder-ownership'
 
@@ -44,7 +60,10 @@ export async function POST(request: NextRequest) {
     const { isAdmin } = await import('@/lib/admin-auth')
     const adminCheck = await isAdmin(request)
     if (!adminCheck.isAdmin) {
-      return NextResponse.json({ error: 'Endast admin får köra påminnelser för ett enskilt företag' }, { status: 403 })
+      return NextResponse.json(
+        { error: 'Endast admin får köra påminnelser för ett enskilt företag' },
+        { status: 403 },
+      )
     }
     return sendAutoReminders(scopeBusinessId)
   }
@@ -66,25 +85,36 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
     // Hämta alla förfallna fakturor (eller ett företags, vid admin-scope:ad körning)
     let invoiceQuery = supabase
       .from('invoice')
-      .select(`
+      .select(
+        `
         invoice_id, invoice_number, ocr_number, due_date, business_id, customer_id,
         total, customer_pays, rot_rut_type, reminder_count,
         last_reminder_at, next_reminder_at,
         customer:customer_id (name, phone_number, email)
-      `)
+      `,
+      )
       .in('status', ['sent', 'overdue'])
       .lt('due_date', todayStr)
-      .or(`next_reminder_at.is.null,next_reminder_at.lte.${today.toISOString()}`)
-    if (scopeBusinessId) invoiceQuery = invoiceQuery.eq('business_id', scopeBusinessId)
+      .or(
+        `next_reminder_at.is.null,next_reminder_at.lte.${today.toISOString()}`,
+      )
+    if (scopeBusinessId)
+      invoiceQuery = invoiceQuery.eq('business_id', scopeBusinessId)
     const { data: overdueInvoices, error } = await invoiceQuery
 
     if (error) throw error
     if (!overdueInvoices || overdueInvoices.length === 0) {
-      return NextResponse.json({ success: true, reminders_sent: 0, message: 'Inga påminnelser att skicka' })
+      return NextResponse.json({
+        success: true,
+        reminders_sent: 0,
+        message: 'Inga påminnelser att skicka',
+      })
     }
 
     // Gruppera fakturor per business_id för att hämta config en gång per företag
-    const businessIds = Array.from(new Set(overdueInvoices.map((inv: any) => inv.business_id)))
+    const businessIds = Array.from(
+      new Set(overdueInvoices.map((inv: any) => inv.business_id)),
+    )
     const configMap: Record<string, ReminderConfig> = {}
 
     for (const bizId of businessIds) {
@@ -93,15 +123,21 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
 
     // Dedup: kolla vilka företag som har aktiva V3 threshold-regler för fakturapåminnelser
     // Om ja → V3 evaluate-thresholds hanterar redan påminnelser, skippa cron-sändning
-    const v3HandlesInvoiceReminders = await loadV3InvoiceReminderOwnerBusinessIds(
-      supabase,
-      businessIds,
-    )
+    const v3HandlesInvoiceReminders =
+      await loadV3InvoiceReminderOwnerBusinessIds(supabase, businessIds)
 
     let remindersSent = 0
     let feesApplied = 0
     let approvalsCreated = 0
-    const results: Array<{ invoice_id: string; invoice_number: string; level: string; success: boolean; fee_added?: number; interest_added?: number; approval_created?: boolean }> = []
+    const results: Array<{
+      invoice_id: string
+      invoice_number: string
+      level: string
+      success: boolean
+      fee_added?: number
+      interest_added?: number
+      approval_created?: boolean
+    }> = []
 
     // Etapp W (Mission Mandates V1): en mandat-cache per företag, laddad
     // första gången det företaget förekommer i loopen nedan — INTE en
@@ -142,11 +178,21 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       // Miss/orsak ⇒ mandateResolution.covered är false, och allt nedan
       // reducerar exakt till dagens beteende.
       if (!mandateCacheByBusiness.has(inv.business_id)) {
-        mandateCacheByBusiness.set(inv.business_id, await loadMandateResolutionCache(supabase, inv.business_id))
+        mandateCacheByBusiness.set(
+          inv.business_id,
+          await loadMandateResolutionCache(supabase, inv.business_id),
+        )
       }
       const mandateResolution = await resolveMandateForAction(
-        supabase, inv.business_id, mandateCacheByBusiness.get(inv.business_id)!,
-        { actionKey: 'invoice_reminder', targetRef: inv.invoice_id, amountKr: amountToPay ?? null, nowIso: today.toISOString() },
+        supabase,
+        inv.business_id,
+        mandateCacheByBusiness.get(inv.business_id)!,
+        {
+          actionKey: 'invoice_reminder',
+          targetRef: inv.invoice_id,
+          amountKr: amountToPay ?? null,
+          nowIso: today.toISOString(),
+        },
       )
 
       // ── Grind: företag UTAN V3-regel gatas genom förtjänad autonomi ──
@@ -156,8 +202,14 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       let autonomous = mandateResolution.covered
       if (!autonomous) {
         try {
-          autonomous = await isAutonomous(supabase, inv.business_id, 'invoice_reminder')
-        } catch { autonomous = false }
+          autonomous = await isAutonomous(
+            supabase,
+            inv.business_id,
+            'invoice_reminder',
+          )
+        } catch {
+          autonomous = false
+        }
       }
 
       // Beloppsgräns: ett belopp över gränsen tar godkännande-vägen även för
@@ -169,7 +221,15 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       let capExceeded = false
       if (autonomous && !mandateResolution.covered) {
         let cap: number | null = null
-        try { cap = await getAutonomyCap(supabase, inv.business_id, 'invoice_reminder') } catch { cap = null }
+        try {
+          cap = await getAutonomyCap(
+            supabase,
+            inv.business_id,
+            'invoice_reminder',
+          )
+        } catch {
+          cap = null
+        }
         if (!underAutonomyCap(cap, amountToPay)) {
           capExceeded = true
           autonomous = false
@@ -177,17 +237,38 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       }
 
       if (autonomous) {
-        const delivery = process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' && !mandateResolution.covered
-          ? await (await import('@/lib/autonomy/supervised-send')).supervisedSend(
-            supabase,inv.business_id,'invoice_reminder',deliveryInput.customerPhone?'sms':'email',
-            ()=>deliverInvoiceReminder(supabase,deliveryInput),r=>r.skipped?'unknown':'success',
-            {smsSent:false,emailSent:false,feeAdded:0,interestAdded:0,skipped:true,orsak:'Självständiga påminnelser är pausade.'},
-            {fromAddress:`faktura@${process.env.RESEND_DOMAIN||'handymate.se'}`,recordLog:true})
-          : await deliverInvoiceReminder(supabase, deliveryInput)
+        const delivery =
+          process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' &&
+          !mandateResolution.covered
+            ? await (
+                await import('@/lib/autonomy/supervised-send')
+              ).supervisedSend(
+                supabase,
+                inv.business_id,
+                'invoice_reminder',
+                deliveryInput.customerPhone ? 'sms' : 'email',
+                () => deliverInvoiceReminder(supabase, deliveryInput),
+                invoiceReminderOutcome,
+                {
+                  smsSent: false,
+                  emailSent: false,
+                  feeAdded: 0,
+                  interestAdded: 0,
+                  skipped: true,
+                  orsak: 'Självständiga påminnelser är pausade.',
+                },
+                {
+                  fromAddress: `faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}`,
+                  recordLog: true,
+                },
+              )
+            : await deliverInvoiceReminder(supabase, deliveryInput)
         if (!delivery.skipped) {
           if (delivery.feeAdded > 0 || delivery.interestAdded > 0) {
             feesApplied++
-            console.log(`[send-reminders] Added fee=${delivery.feeAdded}kr interest=${delivery.interestAdded}kr to ${inv.invoice_number}`)
+            console.log(
+              `[send-reminders] Added fee=${delivery.feeAdded}kr interest=${delivery.interestAdded}kr to ${inv.invoice_number}`,
+            )
           }
           remindersSent++
           results.push({
@@ -199,15 +280,27 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
             interest_added: delivery.interestAdded,
           })
         } else {
-          results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+          results.push({
+            invoice_id: inv.invoice_id,
+            invoice_number: inv.invoice_number,
+            level,
+            success: false,
+          })
           if (mandateResolution.covered) {
             // Mandat-driven leverans misslyckades — registreras mot mandatets
             // EGNA auto-paus-tröskel, aldrig mot earned-autonomy-streaken.
-            await registerMandateDeliveryFailure(supabase, { mandateId: mandateResolution.mandate.id, businessId: inv.business_id })
+            await registerMandateDeliveryFailure(supabase, {
+              mandateId: mandateResolution.mandate.id,
+              businessId: inv.business_id,
+            })
           } else {
             // Autonomt utskick nådde ingen kund — räknas mot nedgraderings-
             // tröskeln (2 fel/14 dagar). Fail-safe internt, kastar aldrig.
-            await recordAutonomyFailure(supabase, inv.business_id, 'invoice_reminder')
+            await recordAutonomyFailure(
+              supabase,
+              inv.business_id,
+              'invoice_reminder',
+            )
           }
         }
 
@@ -219,9 +312,15 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
           const mandate = mandateResolution.mandate
           const cardId = `appr_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`
           const amountLabelMandate = amountToPay?.toLocaleString('sv-SE') ?? '0'
-          const { error: cardErr } = await (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
-      ? (row: Record<string, any>) => import('@/lib/channels/approval-insert').then(m => m.checkedApprovalInsert(supabase, row))
-      : (row: Record<string, any>) => supabase.from('pending_approvals').insert(row))({
+          const { error: cardErr } = await (
+            process.env.CHANNEL_PREFLIGHT_ENABLED === 'true'
+              ? (row: Record<string, any>) =>
+                  import('@/lib/channels/approval-insert').then((m) =>
+                    m.checkedApprovalInsert(supabase, row),
+                  )
+              : (row: Record<string, any>) =>
+                  supabase.from('pending_approvals').insert(row)
+          )({
             id: cardId,
             business_id: inv.business_id,
             approval_type: 'invoice_reminder',
@@ -245,9 +344,16 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
             },
             status: 'auto_approved',
             risk_level: 'medium',
-            expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+            expires_at: new Date(
+              Date.now() + 7 * 24 * 60 * 60 * 1000,
+            ).toISOString(),
           })
-          if (cardErr) console.error('[send-reminders] mandat-kort insert failed:', inv.invoice_id, cardErr)
+          if (cardErr)
+            console.error(
+              '[send-reminders] mandat-kort insert failed:',
+              inv.invoice_id,
+              cardErr,
+            )
         }
         continue
       }
@@ -255,15 +361,32 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       // ── Ej autonom → skapa godkännande (dedup mot öppet pending) ──
       // Kortbyggaren delas med onboardingens första verifierade handling
       // (lib/invoice-reminder-card.ts): samma payload, samma dedup.
-      const kort = await createInvoiceReminderCard(supabase, { businessId: inv.business_id, inv, customer, step, capExceeded })
-      if ('error' in kort) console.error('[send-reminders] approval insert failed:', inv.invoice_id, kort.error)
+      const kort = await createInvoiceReminderCard(supabase, {
+        businessId: inv.business_id,
+        inv,
+        customer,
+        step,
+        capExceeded,
+      })
+      if ('error' in kort)
+        console.error(
+          '[send-reminders] approval insert failed:',
+          inv.invoice_id,
+          kort.error,
+        )
       if (!('id' in kort)) {
-        results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false })
+        results.push({
+          invoice_id: inv.invoice_id,
+          invoice_number: inv.invoice_number,
+          level,
+          success: false,
+        })
         continue
       }
 
       // Push-notis (fire-and-forget)
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
       fetch(`${appUrl}/api/push/send`, {
         method: 'POST',
         headers: internalPushHeaders(),
@@ -279,14 +402,28 @@ async function sendAutoReminders(scopeBusinessId: string | null = null) {
       // Awaitas (inte fire-and-forget) — serverless-funktionen kan avslutas
       // innan en oawaitad promise hinner köra klart.
       try {
-        const { sendFirstEventSms } = await import('@/lib/onboarding/first-event-sms')
-        await sendFirstEventSms(inv.business_id, 'invoice_reminder', customer?.name || '')
+        const { sendFirstEventSms } =
+          await import('@/lib/onboarding/first-event-sms')
+        await sendFirstEventSms(
+          inv.business_id,
+          'invoice_reminder',
+          customer?.name || '',
+        )
       } catch (err) {
-        console.error('[send-reminders] first-event-sms error (non-blocking):', err)
+        console.error(
+          '[send-reminders] first-event-sms error (non-blocking):',
+          err,
+        )
       }
 
       approvalsCreated++
-      results.push({ invoice_id: inv.invoice_id, invoice_number: inv.invoice_number, level, success: false, approval_created: true })
+      results.push({
+        invoice_id: inv.invoice_id,
+        invoice_number: inv.invoice_number,
+        level,
+        success: false,
+        approval_created: true,
+      })
     }
 
     return NextResponse.json({

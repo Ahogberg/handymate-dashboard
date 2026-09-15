@@ -3,17 +3,28 @@ export interface MorningDecision {
   title: string
   created_at: string
   amount_kr?: number
+  expires_at?: string | null
 }
 export function pickMorningDecisions(
   rows: MorningDecision[],
 ): MorningDecision[] {
   return [...rows]
-    .sort(
-      (a, b) =>
+    .sort((a, b) => {
+      const aDeadline = a.expires_at
+        ? Date.parse(a.expires_at)
+        : Number.POSITIVE_INFINITY
+      const bDeadline = b.expires_at
+        ? Date.parse(b.expires_at)
+        : Number.POSITIVE_INFINITY
+      return (
+        aDeadline - bDeadline ||
+        (a.expires_at || b.expires_at
+          ? (b.amount_kr ?? 0) - (a.amount_kr ?? 0)
+          : 0) ||
         a.created_at.localeCompare(b.created_at) ||
-        (b.amount_kr ?? 0) - (a.amount_kr ?? 0) ||
-        a.id.localeCompare(b.id),
-    )
+        a.id.localeCompare(b.id)
+      )
+    })
     .slice(0, 3)
 }
 export function expirySummary(

@@ -1,8 +1,76 @@
 import { test, expect } from '@playwright/test'
 import { c5Modules } from './helpers/c5-module'
+import { invoiceReminderOutcome } from '../lib/autonomy/invoice-reminder-outcome'
 const originalEnv = { ...process.env }
 test.afterEach(() => {
   process.env = { ...originalEnv }
+})
+test('invoice reminder receipt reflects skipped, accepted and failed delivery', () => {
+  expect(
+    invoiceReminderOutcome({ skipped: true, smsSent: false, emailSent: false }),
+  ).toBe('skipped')
+  expect(
+    invoiceReminderOutcome({ skipped: false, smsSent: true, emailSent: false }),
+  ).toBe('success')
+  expect(
+    invoiceReminderOutcome({ skipped: false, smsSent: false, emailSent: true }),
+  ).toBe('success')
+  expect(
+    invoiceReminderOutcome({
+      skipped: false,
+      smsSent: false,
+      emailSent: false,
+    }),
+  ).toBe('failed')
+})
+test('H1 digest notice keeps both inbox row and existing activity receipt without push', async () => {
+  process.env.HANDOFF_INBOX_ENABLED = 'true'
+  delete process.env.CHANNEL_PREFLIGHT_ENABLED
+  const writes: Array<{ table: string; row: any }> = []
+  const pushes: any[] = []
+  const db = {
+    from(table: string) {
+      let row: any
+      const query: any = {
+        insert(value: any) {
+          row = value
+          writes.push({ table, row: value })
+          return query
+        },
+        select() {
+          return query
+        },
+        async single() {
+          return {
+            data: {
+              id: table === 'pending_approvals' ? 'notice-1' : 'activity-1',
+            },
+            error: null,
+          }
+        },
+      }
+      return query
+    },
+  }
+  const { skapaKort } = c5Modules({
+    '@/lib/supabase': { getServerSupabase: () => db },
+    '@/lib/notifications/approval-push': {
+      sendApprovalPush: async (value: any) => pushes.push(value),
+    },
+  })('lib/approvals/skapa-kort.ts')
+  expect(
+    await skapaKort(db, {
+      business_id: 'a',
+      approval_type: 'dispatch_suggestion',
+      title: 'Planera om',
+      description: 'Planera om dagens uppdrag.',
+    }),
+  ).toEqual({ id: 'notice-1', kanal: 'digest' })
+  expect(writes.map((write) => write.table)).toEqual([
+    'pending_approvals',
+    'automation_activity',
+  ])
+  expect(pushes).toEqual([])
 })
 function enable() {
   process.env.SUPERVISED_AUTONOMY_ENABLED = 'true'
@@ -180,28 +248,24 @@ test('settings endpoint cannot grant autonomy; member cannot alter settings', as
   const member = routes('member')
   expect(
     (
-      await member
-        .load('app/api/automation/settings/route.ts')
-        .PUT(
-          req({
-            earned_autonomy: { booking_reminder: { status: 'autonomous' } },
-          }),
-        )
+      await member.load('app/api/automation/settings/route.ts').PUT(
+        req({
+          earned_autonomy: { booking_reminder: { status: 'autonomous' } },
+        }),
+      )
     ).status,
   ).toBe(403)
   expect(member.writes).toEqual([])
   const owner = routes()
   expect(
     (
-      await owner
-        .load('app/api/automation/settings/route.ts')
-        .PUT(
-          req({
-            business_id: 'b',
-            earned_autonomy: { booking_reminder: { status: 'autonomous' } },
-            work_start: '08:00',
-          }),
-        )
+      await owner.load('app/api/automation/settings/route.ts').PUT(
+        req({
+          business_id: 'b',
+          earned_autonomy: { booking_reminder: { status: 'autonomous' } },
+          work_start: '08:00',
+        }),
+      )
     ).status,
   ).toBe(200)
   expect(owner.writes[0]).toMatchObject({

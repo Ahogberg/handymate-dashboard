@@ -8,15 +8,27 @@ import {
   autonomyOffToken,
   verifyAutonomyOffToken,
 } from '../lib/autonomy/off-token'
-test('morning has three oldest decisions; money breaks ties, expiry names at most three', () => {
+test('morning prioritizes deadlines, then money, while internal gates fill by age', () => {
   expect(
     pickMorningDecisions([
-      { id: '1', title: 'a', created_at: '2026-01-01', amount_kr: 1 },
-      { id: '2', title: 'b', created_at: '2026-01-01', amount_kr: 20 },
-      { id: '3', title: 'c', created_at: '2026-02-01' },
-      { id: '4', title: 'd', created_at: '2026-03-01' },
+      { id: 'gate-old', title: 'a', created_at: '2026-01-01', amount_kr: 999 },
+      { id: 'gate-new', title: 'b', created_at: '2026-02-01' },
+      {
+        id: 'send-low',
+        title: 'c',
+        created_at: '2026-03-01',
+        amount_kr: 1,
+        expires_at: '2026-04-01',
+      },
+      {
+        id: 'send-high',
+        title: 'd',
+        created_at: '2026-03-01',
+        amount_kr: 20,
+        expires_at: '2026-04-01',
+      },
     ]).map((x) => x.id),
-  ).toEqual(['2', '1', '3'])
+  ).toEqual(['send-high', 'send-low', 'gate-old'])
   expect(
     expirySummary(
       [1, 2, 3, 4].map((n) => ({ kind: 'expired', title: `Förslag ${n}` })),

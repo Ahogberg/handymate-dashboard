@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { PGlite } from '@electric-sql/pglite'
 import { readFileSync } from 'fs'
-async function fixture() {
+async function fixture(beforeMigration = '') {
   const db = new PGlite()
   await db.exec(`
  CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role BYPASSRLS;
@@ -10,6 +10,7 @@ async function fixture() {
  CREATE TABLE v3_automation_logs(id text primary key,business_id text,rule_name text,trigger_type text,action_type text,status text,context jsonb,result jsonb);
  CREATE TABLE v3_automation_settings(id text default gen_random_uuid()::text,business_id text unique,earned_autonomy jsonb default '{}');
  `)
+  if (beforeMigration) await db.exec(beforeMigration)
   await db.exec(readFileSync('sql/v248_handoff_inbox_consent.sql', 'utf8'))
   return db
 }
@@ -26,7 +27,7 @@ test('notice expiry is impossible; actual mutation remains a decision; per-type 
         )
       ).rows,
     ).toEqual([
-      { id: 'c', card_kind: 'decision', days: '7' },
+      { id: 'c', card_kind: 'decision', days: null },
       { id: 'd', card_kind: 'decision', days: '7' },
       { id: 'n', card_kind: 'notice', days: null },
       { id: 'o', card_kind: 'decision', days: '14' },
@@ -42,9 +43,61 @@ test('notice expiry is impossible; actual mutation remains a decision; per-type 
       ).rows[0],
     ).toEqual({ status: 'pending', expires_at: null })
     expect(
+      (
+        await db.query<any>(
+          `select status,expires_at from pending_approvals where id='c'`,
+        )
+      ).rows[0],
+    ).toEqual({ status: 'pending', expires_at: null })
+    expect(
       (await db.query<any>(`select count(*)::int n from handoff_items`)).rows[0]
         .n,
-    ).toBe(3)
+    ).toBe(2)
+  } finally {
+    await db.close()
+  }
+})
+test('backfill never shortens a live decision and clears internal gate deadlines', async () => {
+  const db = await fixture(`
+    INSERT INTO pending_approvals(id,business_id,approval_type,title,created_at,expires_at)
+    VALUES
+      ('old-null','a','send_sms','Äldre SMS',now()-interval '20 days',NULL),
+      ('old-live','a','send_sms','Levande SMS',now()-interval '20 days',now()+interval '10 days'),
+      ('gate','a','karin_deadline','Intern grind',now()-interval '30 days',now()+interval '2 days');
+  `)
+  try {
+    const rows = (
+      await db.query<any>(`
+        SELECT id,expires_at>now() future,
+          round(extract(epoch from (expires_at-now()))/86400) days
+        FROM pending_approvals ORDER BY id`)
+    ).rows
+    expect(rows).toEqual([
+      { id: 'gate', future: null, days: null },
+      { id: 'old-live', future: true, days: '10' },
+      { id: 'old-null', future: true, days: '1' },
+    ])
+  } finally {
+    await db.close()
+  }
+})
+test('deadline decisions outrank older internal gates in the morning receipt', async () => {
+  const db = await fixture()
+  try {
+    await db.exec(`
+      INSERT INTO pending_approvals(id,business_id,approval_type,title,created_at,payload)
+      VALUES
+        ('gate-old','a','project_debrief','Äldsta grind',now()-interval '30 days','{}'),
+        ('gate-new','a','installation_register','Nyare grind',now()-interval '20 days','{}'),
+        ('sms','a','send_sms','Kundmeddelande',now()-interval '6 days','{"amount_kr":1}');
+    `)
+    const claim = (await db.query<any>(`select claim_handoff_digest('a') s`))
+      .rows[0].s
+    expect(claim.decisions.map((row: any) => row.id)).toEqual([
+      'sms',
+      'gate-old',
+      'gate-new',
+    ])
   } finally {
     await db.close()
   }
@@ -338,11 +391,34 @@ test('H1/H2 coexist with the real v241 producers: one dismissal and one acted ev
     await db.close()
   }
 })
-test('late consent preserves prior earned cap and an explicit prior off',async()=>{
- const db=await fixture();try{
- await db.exec(`INSERT INTO v3_automation_settings(business_id,earned_autonomy) VALUES('a','{"invoice_reminder":{"status":"autonomous","cap_kr":9000}}'); SELECT stop_supervised_autonomy('a','review_request'); SELECT answer_autonomy_consent('a','owner',true);`)
- expect((await db.query<any>(`select earned_autonomy->'invoice_reminder' state from v3_automation_settings where business_id='a'`)).rows[0].state).toEqual({status:'autonomous',cap_kr:9000})
- expect((await db.query<any>(`select granted from autonomy_controls where business_id='a' and key='review_request'`)).rows[0].granted).toBe(false)
- expect((await db.query<any>(`select count(*)::int n from autonomy_controls where business_id='a' and granted`)).rows[0].n).toBe(2)
- }finally{await db.close()}
+test('late consent preserves prior earned cap and an explicit prior off', async () => {
+  const db = await fixture()
+  try {
+    await db.exec(
+      `INSERT INTO v3_automation_settings(business_id,earned_autonomy) VALUES('a','{"invoice_reminder":{"status":"autonomous","cap_kr":9000}}'); SELECT stop_supervised_autonomy('a','review_request'); SELECT answer_autonomy_consent('a','owner',true);`,
+    )
+    expect(
+      (
+        await db.query<any>(
+          `select earned_autonomy->'invoice_reminder' state from v3_automation_settings where business_id='a'`,
+        )
+      ).rows[0].state,
+    ).toEqual({ status: 'autonomous', cap_kr: 9000 })
+    expect(
+      (
+        await db.query<any>(
+          `select granted from autonomy_controls where business_id='a' and key='review_request'`,
+        )
+      ).rows[0].granted,
+    ).toBe(false)
+    expect(
+      (
+        await db.query<any>(
+          `select count(*)::int n from autonomy_controls where business_id='a' and granted`,
+        )
+      ).rows[0].n,
+    ).toBe(2)
+  } finally {
+    await db.close()
+  }
 })
