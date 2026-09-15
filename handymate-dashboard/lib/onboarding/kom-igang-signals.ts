@@ -43,6 +43,7 @@ export async function hamtaKomIgangSignals(
   return {
     kundinflode: {
       any_lead_verified: channelHealth.any_lead_verified,
+      all_selected_leads_verified: channelHealth.all_selected_leads_verified,
       any_channel_verified: channelHealth.any_channel_verified,
       fler_jobb: firstFocus === 'fler_jobb',
       kanaler: channelHealth.channels.map(c => `${names[c.channel]}: ${c.label.toLowerCase()}`).join(' · '),

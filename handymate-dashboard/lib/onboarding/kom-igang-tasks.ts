@@ -50,6 +50,7 @@ export interface KomIgangSignals {
    *  - kanaler: en läsbar rad per kanal ("Telefon: provsamtal mottaget · …").
    */
   kundinflode?: {
+    all_selected_leads_verified?: boolean
     any_lead_verified: boolean
     any_channel_verified: boolean
     fler_jobb: boolean
@@ -90,15 +91,16 @@ export function deriveKomIgangTasks(s: KomIgangSignals): KomIgangTask[] {
   // Kundinflödet: en uppgift som aldrig säger "fungerar" förrän en riktig
   // förfrågan blivit lead + affär (any_lead_verified). Nådd kanal ändrar bara
   // formuleringen. Väljs "Få in fler jobb" går den först, annars efter Lisa.
+  const inflowDone = s.kundinflode?.all_selected_leads_verified ?? s.kundinflode?.any_lead_verified ?? false
   const inflode: KomIgangTask | null = s.kundinflode ? {
     key: 'kundinflode', agent: 'hanna',
-    label: s.kundinflode.any_lead_verified
-      ? 'Kundinflödet är bevisat — en riktig förfrågan blev lead och affär'
+    label: inflowDone
+      ? 'Kundärenden finns från de valda kontaktvägarna — granska ert senaste prov'
       : s.kundinflode.any_channel_verified
         ? 'Kundinflödet är nått men inte bevisat — låt en provförfrågan bli lead och affär'
         : 'Bevisa att nya kunder når dig — skicka en provförfrågan hela vägen',
     varde: s.kundinflode.kanaler || 'Handymate säger aldrig att kundinflödet fungerar förrän en riktig förfrågan blivit lead och affär.',
-    minuter: 5, href: '/dashboard/settings/integrations', klar: s.kundinflode.any_lead_verified,
+    minuter: 5, href: '/dashboard/settings/integrations', klar: inflowDone,
   } : null
   const alla: KomIgangTask[] = [
     ...(inflode && s.kundinflode?.fler_jobb ? [inflode] : []),
