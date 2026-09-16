@@ -120,6 +120,9 @@ export async function sendBookingReminders(
           messageType: 'booking_reminder',
           recipient: 'customer',
           purpose: 'transactional',
+          autonomyKey: 'booking_reminder',
+          outbound: { source: 'cron', sourceId: `booking:${booking.booking_id}:${booking.scheduled_start}`,
+            dedupeKey: `booking-reminder:${booking.booking_id}:${booking.scheduled_start}`, template: 'booking-day-before' },
         })
         if (r.success) sent++
         else console.error('[booking-reminders] SMS misslyckades:', r.error, { bookingId: booking.booking_id })

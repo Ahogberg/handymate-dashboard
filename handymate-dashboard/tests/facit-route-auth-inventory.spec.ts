@@ -226,5 +226,6 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // H4: morning-report-retry is an authenticated internal cron → 167.
   // 2026-09-15: admin/revenue/partner-leads (requireRevenue + manager)
   // och partners/leads (verifierad partner-token + aktuellt avtal) → 169.
-  expect(utanStandard.length).toBeLessThanOrEqual(169)
+  // H3b: one endpoint with GET/POST, verified superadmin actor → 170.
+  expect(utanStandard.length).toBeLessThanOrEqual(170)
 })
