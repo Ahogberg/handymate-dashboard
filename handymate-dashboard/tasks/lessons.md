@@ -693,3 +693,10 @@ Prova tid och förfrågningar separat från helt tomt kvitto. Att det finns arbe
 
 ## 2026-09-15 — Leverantörskontrollfel är inte ett definitivt cacheutfall
 Spara gärna pågående kontroll för samtidiga anrop, men kasta cacheposten vid kontrollfel. Testa 503 och avvisat anrop följt av återhämtning inom TTL; jämför postidentitet så att ett gammalt fel inte raderar en ny post.
+
+## 2026-09-16 — Symlänkad node_modules i worktree får aldrig följa med i en commit
+`ln -s` för node_modules i en worktree + `git add -A` vid konfliktlösning committade en självrefererande symlänk (#80), som vid nästa checkout ersatte de riktiga beroendena. Lägg symlänken utanför repots spårning (eller `git add` bara namngivna filer), och kör `git status --short` före varje commit i worktrees.
+
+## 2026-09-16 — En "delad" funktion måste bevisas på varje väg, inte en
+Codex fixade de sex namngivna ROT-ställena men fyra fakturavägar och kreditvägen låg kvar på gamla logiken, och specen "all paths" körde en väg. Briefen ska räkna upp alla anropare (grep `.from('invoices')`/`createInvoice(`) och acceptansen ska köra tal genom varje, inte textskanna källfiler.
+

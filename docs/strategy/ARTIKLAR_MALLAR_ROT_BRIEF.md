@@ -172,6 +172,16 @@ Ingen flagga. v252 körs efter granskning och merge, med verifieringen i filens 
 skapas får rätt bas direkt; befintliga fakturor och skickade offerter är oförändrade. Innan bred kommunikation
 till kunder: en ROT-faktura med blandad artikel exporteras till Fortnox i piloten och kontrolleras rad för rad.
 
+**Driftläge 2026-09-16 (Claude):** #86 mergad till main (`71c10ea9`) efter två granskningsomgångar (sju blockers
+rättade av Codex i `ec30b9b`, två restpunkter av Claude i `17a132a1`: legacyfallback `type === 'labor'` i basen och
+Restid i manuella fakturabyggaren). v252 körd i produktion samma dag via Supabase MCP och verifierad: 0 item-rader
+utan delning, 0 rader där summan avviker, alla sex villkor validerade (`quote_items_split_sum`,
+`products_share_sum_check`, `products_default_travel_share_check`, `products_share_source_check`,
+`product_components_rot_only_labour`, `product_components_component_type_check`), 25 resartiklar
+(Framkörning/Servicebil, alla utan ROT), `share_source = seed` på alla 2 075 artiklar, 0 offerter utan
+`travel_total`. Backfillens utfall på de 122 raderna: 61 material, 32 arbete, 19 nollrader, 6 resa, 4 blandade.
+Kvar före bred kommunikation: Fortnox-piloten rad för rad och Skatteverket-kontrollen ovan.
+
 ## 9. Startvärden och deras ursprung (inte grindar)
 
 Inget kritiskt i plattformen får vila på en persons antaganden. Det kritiska, att ROT bara räknas på
@@ -188,6 +198,8 @@ jobbtyper och artiklar en bransch brukar återanvända, hanteras så här:
 | Skatteverket-kontroll | Bekräfta mot Skatteverkets aktuella sidor att 30 %, 50 000/75 000 och "arbetskostnad inkl. moms" stämmer för 2026, och att framkörning inte är arbete. | Före aktivering. |
 
 ## 10. Handoff
+
+**Claude 2026-09-16 — granskad i två omgångar, mergad (#86 → `71c10ea9`), v252 körd i produktion (se §8).**
 
 **Codex 2026-09-16 — branch `codex/artiklar-rot`, PR #86.** Paketet omfattar fas 1–6: SQL-kontraktet,
 gemensam rad-/ROT-bas, artikel- och komponentredigering, samtliga fakturavägar, dokument/Fortnox/SKV,
