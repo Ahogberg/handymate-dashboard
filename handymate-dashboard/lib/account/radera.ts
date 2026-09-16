@@ -158,6 +158,8 @@ export const BEHALLS: string[] = [
 // scopad ordning (se header för varför en enda naiv ordning inte räcker).
 // ─────────────────────────────────────────────────────────────────────────
 export const RADERAS: string[] = [
+  'outbound_messages',
+  'outbound_intents',
   'quote_acceptance_completion', // återhämtningsjournal för kundens offertaccept
   'lead_intake_request', // mottagna förfrågningar innehåller kundens kontaktuppgifter
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.

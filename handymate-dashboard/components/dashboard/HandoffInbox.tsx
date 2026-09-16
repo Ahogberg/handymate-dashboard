@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react'
 import { autonomyDigest } from '@/lib/notifications/autonomy-digest'
 import { AUTONOMY_META, type AutonomyKey } from '@/lib/autonomy/earned-autonomy'
+import { outboundStatusText } from '@/lib/outbound/status'
 export default function HandoffInbox({ businessId }: { businessId: string }) {
   return <Inbox key={businessId} businessId={businessId} />
 }
@@ -74,6 +75,19 @@ function Inbox({ businessId }: { businessId: string }) {
       </div>
     )
   if (!data) return <p role="status">Hämtar inkorgen…</p>
+  const outbound = new Map<string, any[]>((data.outbound || []).reduce((entries: any[], row: any) => {
+    const current = entries.find(([id]) => id === row.source_id)
+    if (current) current[1].push(row)
+    else entries.push([row.source_id, [row]])
+    return entries
+  }, []))
+  const delivery = (sourceId: string) => (outbound.get(sourceId) || []).map((row: any) => (
+    <span key={row.kind} className="mr-3 text-xs text-gray-500">
+      {row.kind === 'sms' ? 'SMS' : row.kind === 'email' ? 'E-post' : 'Notis'}: {outboundStatusText({
+        ...row, cancel_requested: !!row.cancel_requested_at,
+      })}
+    </span>
+  ))
   const old: Record<string, any[]> = {},
     recent: any[] = []
   for (const n of [...data.notices].sort((a, b) =>
@@ -110,6 +124,7 @@ function Inbox({ businessId }: { businessId: string }) {
               >
                 {a.title} — granska beslut
               </a>
+              <span className="block">{delivery(a.id)}</span>
             </p>
           ))}
           {d.snapshot.remaining > 0 && (
@@ -170,6 +185,7 @@ function Inbox({ businessId }: { businessId: string }) {
         <article key={n.id} className="rounded-xl border bg-white p-4">
           <h3 className="font-semibold">{n.title}</h3>
           <p className="text-sm">{n.description}</p>
+          <p>{delivery(n.id)}</p>
         </article>
       ))}
       {Object.entries(old)

@@ -22,6 +22,18 @@ const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
 
 export interface SendSmsArgs {
   autonomyKey?: import('@/lib/autonomy/earned-autonomy').AutonomyKey
+  /** Stable producer identity. Required for durable recovery; a retry reuses
+   * the same values. The body is persisted in outbound_messages, never in the
+   * delivery intent. */
+  outbound?: {
+    source: import('@/lib/outbound/intents').OutboundSource
+    sourceId: string
+    dedupeKey: string
+    template: string
+    autonomyKey?: import('@/lib/autonomy/earned-autonomy').AutonomyKey
+    auditId?: string
+  }
+  outboundReconcile?: { type: 'invoice_reminder'; input: Record<string, unknown> }
 
   supabase: SupabaseClient
   businessId: string
@@ -74,6 +86,7 @@ export interface SendSmsArgs {
 
 export interface SendSmsResult {
   success: boolean
+  outboundStatus?: import('@/lib/outbound/intents').OutboundStatus
   /** Vårt eget sms_log.sms_id om INSERT lyckades */
   smsId?: string
   /** 46elks egna id (när success=true) */
@@ -168,12 +181,77 @@ async function resolveSmsQuotaPlan(
 export async function sendSmsViaElks(args: SendSmsArgs): Promise<SendSmsResult> {
   if (args.autonomyKey && process.env.SUPERVISED_AUTONOMY_ENABLED === 'true') {
     const {supervisedSend}=await import('@/lib/autonomy/supervised-send')
-    return supervisedSend(args.supabase,args.businessId,args.autonomyKey,'sms',()=>sendSmsWithoutAutonomyWrapper(args),r=>r.success?'success':r.channelSkipped?'skipped':'unknown',{
+    return supervisedSend(args.supabase,args.businessId,args.autonomyKey,'sms',(auditId)=>sendSmsWithDurability(args,auditId),r=>r.success?'success':r.outboundStatus==='pending'?'unknown':r.channelSkipped?'skipped':'unknown',{
       success:false,error:'Självständiga utskick är pausade. Kontrollera inställningarna.',channelSkipped:true,channelReason:'konfiguration',
     }, {recordLog:args.messageType==='quote_expiry_nudge'})
   }
-  return sendSmsWithoutAutonomyWrapper(args)
+  return sendSmsWithDurability(args)
 }
+async function sendSmsWithDurability(args: SendSmsArgs, auditId?: string): Promise<SendSmsResult> {
+  if (process.env.OUTBOUND_INTENTS_ENABLED !== 'true') return sendSmsWithoutAutonomyWrapper(args)
+  // Supervised sends may never bypass H3b once it is enabled. A producer
+  // without a stable identity is a contract error, not permission to call
+  // the provider without a recoverable promise.
+  if (!args.outbound) {
+    if (args.autonomyKey) return { success: false, outboundStatus: 'skipped', channelSkipped: true,
+      channelReason: 'konfiguration', error: 'Utskicket saknar ett beständigt leverans-ID och har pausats.' }
+    return sendSmsWithoutAutonomyWrapper(args)
+  }
+  const phone = normalizeSwedishPhone(args.to)
+  if (!phone || !phone.startsWith('+')) return { success: false, error: `Ogiltigt telefonnummer: "${args.to}"` }
+  const { withOutboundSource } = await import('@/lib/outbound/source')
+  let providerResult: SendSmsResult | null = null
+  const outcome = await withOutboundSource<import('@/lib/outbound/source').SmsEnvelope>(args.supabase, {
+    promise: {
+      businessId: args.businessId, kind: 'sms', source: args.outbound.source,
+      sourceId: args.outbound.sourceId, dedupeKey: args.outbound.dedupeKey,
+      recipient: phone, template: args.outbound.template, autonomyKey: args.outbound.autonomyKey ?? args.autonomyKey,
+      ...(args.outbound.auditId || auditId ? { context: { auditId: args.outbound.auditId || auditId } } : {}),
+    },
+    envelope: {
+      message: args.message, businessName: args.businessName, customerId: args.customerId,
+      relatedId: args.relatedId, messageType: args.messageType, approvalId: args.approvalId,
+      recipient: args.recipient, purpose: args.purpose, reconcile: args.outboundReconcile,
+    },
+  }, async (_intent, envelope) => {
+    providerResult = await sendSmsWithoutAutonomyWrapper({
+      ...args, ...envelope, outbound: undefined, outboundReconcile: undefined, autonomyKey: undefined, to: phone,
+    })
+    const result = smsProviderOutcome(providerResult)
+    if (result.status === 'sent' && envelope.reconcile?.type === 'invoice_reminder') {
+      const receipt = await (await import('@/lib/invoice-reminder-send')).reconcileInvoiceReminder(args.supabase, envelope.reconcile.input as any, { smsSent: true })
+      if (!receipt.reconciled) throw new Error(receipt.error || 'Påminnelsekvittensen kunde inte sparas')
+    }
+    return result
+  })
+  if (outcome.status === 'sent') {
+    // TypeScript does not track assignment into the async callback above,
+    // so retain the runtime provider receipt through an explicit boundary.
+    const delivered = providerResult as SendSmsResult | null
+    if (delivered) return { ...delivered, outboundStatus: 'sent' }
+    return { success: true, outboundStatus: 'sent', elksId: outcome.providerRef, idempotent: true }
+  }
+  if (outcome.status === 'skipped' || outcome.status === 'pending') return { success: false, outboundStatus: outcome.status, channelSkipped: true, channelReason: 'konfiguration', error: 'Utskicket väntar tills kanalen kan användas.' }
+  return { success: false, outboundStatus: outcome.status, status: null, error: outcome.status === 'unknown'
+    ? 'Leveransbesked saknas. Skicka inte igen innan utfallet har kontrollerats.'
+    : 'SMS-tjänsten avvisade utskicket.' }
+}
+
+export function smsProviderOutcome(result: SendSmsResult): import('@/lib/outbound/promise').ProviderOutcome {
+  if (result.success && result.elksId) return { status: 'sent', providerRef: result.elksId }
+  if (result.success) return { status: 'unknown', error: '46elks svar saknar leveransreferens' }
+  if (result.channelSkipped || result.blockedReason) return { status: 'skipped', error: result.error }
+  if (result.status != null && result.status >= 400 && result.status < 500 && ![408, 409].includes(result.status)) {
+    return { status: 'failed', error: result.error }
+  }
+  return { status: 'unknown', error: result.error }
+}
+
+/** Used only by the H3b source resolver after the source/version/fence checks. */
+export async function sendPersistedSms(args: SendSmsArgs): Promise<SendSmsResult> {
+  return sendSmsWithoutAutonomyWrapper({ ...args, outbound: undefined, outboundReconcile: undefined, autonomyKey: undefined })
+}
+
 async function sendSmsWithoutAutonomyWrapper(args: SendSmsArgs): Promise<SendSmsResult> {
 
   const {

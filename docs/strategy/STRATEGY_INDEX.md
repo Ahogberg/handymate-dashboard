@@ -19,6 +19,7 @@
 - [`CUSTOMER_VALUE_PACKAGE_LOG.md`](CUSTOMER_VALUE_PACKAGE_LOG.md) — customer-value packages after the 2026-09-14 ROI/WOW audit: V0 (estimated time never shown as confirmed money, done), V1 value event log, V2 money stages from kernel events, V3 Handymate Impact; owner boundary against the Financial Kernel. The canonical event catalogue, envelope rules, feature flags and module ownership live in `handymate-dashboard/ARCHITECTURE.md` §FK.0–FK.6 and are enforced by `tests/financial-kernel-event-contract.spec.ts`.
 - [`EXTERNA_PARTER_BOKFORING.md`](EXTERNA_PARTER_BOKFORING.md) — pedagogisk lista (2026-09-14, ägare Christoffer) över de fem externa parter bokföringen kräver: redovisningskonsult, pilotbolag, Skatteverkets partner-API, bankdata, betalleverantör; vad varje part låser upp, ledtid, och besluten D1/D3/D4 som styr ordningen.
 - [`TRYGG_OVERLAMNING_BRIEF.md`](TRYGG_OVERLAMNING_BRIEF.md) — Codex brief (2026-09-14) for "Handymate tog det vidare": H1 never a silent expiry, H2 autonomy on from day one under a daily digest, H3 channel pre-flight and durable outbound promises, H4 a morning report that delivers or says why; grounded in the 60-day production shapes (expiry ≈ approval, 0 autonomous actions, failures are configuration).
+- [H3b — Durable outbound promises](H3B_OUTBOUND_INTENTS_BRIEF.md) — `outbound_intents`, the kernel's intent pattern applied to SMS, e-mail and push. Drafted migration v249 and its PGlite acceptance.
 
 ### Business / platform strategy
 
@@ -30,6 +31,8 @@
 - [`../storfirman-product-strategy.md`](../storfirman-product-strategy.md) — larger-company product strategy.
 
 ### Execution roadmaps
+
+- [`../roadmap/FORTNOX_REPLACEMENT_2027.md`](../roadmap/FORTNOX_REPLACEMENT_2027.md) — Andreas mål om Fortnox-ersättning från 1 januari 2027; föreslagen september–decemberplan, beslutspunkt 30 november, konsultgranskat historiskt facit och avgränsad livepilot. Gemensam tidsplan för Codex och Claude; ändrar inga aktiveringsgrindar.
 
 - [`../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md`](../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md)
 - [`../roadmap/BRAIN_VISIBILITY_WEEKEND.md`](../roadmap/BRAIN_VISIBILITY_WEEKEND.md)

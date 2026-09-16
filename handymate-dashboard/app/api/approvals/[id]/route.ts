@@ -1005,6 +1005,7 @@ async function executeApprovalPayload(
       approvalId,
       recipient: 'customer',
       purpose: opts.purpose,
+      outbound: { source: 'approval', sourceId: approvalId, dedupeKey: `approval:${approvalId}:sms`, template: opts.messageType },
     })
 
     // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks räknar
@@ -1144,7 +1145,8 @@ async function executeApprovalPayload(
           const supabase = await getSupabase()
           const businessName = await getBusinessName()
           const result = await sendSmsViaElks({ supabase, businessId, businessName, to: reviewed.to, message: reviewed.message,
-            relatedId: reviewed.relatedId || null, messageType: 'auto_invoice_result', approvalId, recipient: 'internal', purpose: 'internal' })
+            relatedId: reviewed.relatedId || null, messageType: 'auto_invoice_result', approvalId, recipient: 'internal', purpose: 'internal',
+            outbound: { source: 'approval', sourceId: approvalId, dedupeKey: `approval:${approvalId}:sms`, template: 'auto-invoice-result' } })
           return { action: 'send_sms', sms_sent: result.success, sms_id: result.smsId, error: result.error, recipient: reviewed.to }
         }
         const to = (payload.to as string | undefined) || (payload.customer_phone as string | undefined)
@@ -2572,7 +2574,10 @@ async function executeApprovalPayload(
         }
         const { deliverInvoiceReminder } = await import('@/lib/invoice-reminder-send')
         const supabaseIR = getServerSupabase()
-        const r = await deliverInvoiceReminder(supabaseIR, delivery)
+        const r = await deliverInvoiceReminder(supabaseIR, {
+          ...delivery,
+          outboundSource: { source: 'approval', sourceId: approval.id },
+        })
         // ═══ EN SKIPPAD LEVERANS ÄR ETT FEL, INTE EN TYSTNAD (2026-08-10) ═══
         //
         // Returnerade tidigare bara sent:false — inget `error`, inget
