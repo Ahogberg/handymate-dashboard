@@ -58,6 +58,8 @@ const EVENT_LIKE = /'((?:[a-z]+_)+(?:created|issued|credited|adjusted|settled|in
  * ska ha en motivering; en rad utan motivering är en genväg.
  */
 const NOT_EVENTS = new Set<string>([
+  'financial_period_locked', // C8 SQL exception for a closed posting period, not an event
+  'financial_voucher_already_reversed', // C8 SQL exception for a second reversal, not an event
   'customer_settled', // V2 observation JSON boolean; not a published financial event
   'already_paid', // C5 command state, not a published event
   'to_paid', // legacy PaymentTransition returned by the C5 facade
@@ -185,7 +187,7 @@ test('kernel-kod och financial_events-migrationer använder bara katalogens namn
   const offenders: string[] = []
   for (const file of files) {
     const src = stripComments(fs.readFileSync(file, 'utf8'))
-    const rel = path.relative(ROOT, file)
+    const rel = path.relative(ROOT, file).split(path.sep).join('/')
     const isBridge = path.resolve(file) === path.resolve(BRIDGE_TS)
     for (const m of Array.from(src.matchAll(EVENT_LIKE))) {
       const name = m[1]

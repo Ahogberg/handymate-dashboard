@@ -125,6 +125,16 @@ export const BEHALLS: string[] = [
   'financial_receivable_adjustments',
   'financial_event_consumers',
   'financial_event_deliveries',
+  // C8: preserve ledger history, its account/year/series references and audit.
+  // Retention/anonymisation is handled with the rest of the financial kernel.
+  'financial_ledger_accounts',
+  'financial_fiscal_years',
+  'financial_fiscal_periods',
+  'financial_voucher_series',
+  'financial_vouchers',
+  'financial_voucher_lines',
+  'financial_period_lock_audit',
+  'financial_ledger_rules',
 
   // Fakturan är själva bokföringsverifikationen. Bokföringslagen kräver 7
   // års sparande, och den bär MEDVETET kundens namn/telefon/adress/
