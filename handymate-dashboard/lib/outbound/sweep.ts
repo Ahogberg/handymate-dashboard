@@ -1,6 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
-import { claimOutboundIntents, listOwedOutboundIntents, deferOutboundIntent, MAX_OUTBOUND_ATTEMPTS, type ClaimedOutbound } from './intents'
+import { claimOutboundIntents, listOwedOutboundIntents, deferOutboundIntent, finishOutboundIntent, MAX_OUTBOUND_ATTEMPTS, type ClaimedOutbound } from './intents'
 import { dispatchClaimedOutbound, checkedPreflight, type Preflight, type ProviderOutcome } from './promise'
 
 /** The resolver must re-read the authorized source under businessId, validate
@@ -27,8 +27,19 @@ export async function sweepOutboundIntents(db: SupabaseClient, resolve: Outbound
       try {
         const check = await checkedPreflight(db, business.business_id, intent.kind, intent.context ?? {}, options.preflight)
         if (!check.ok) {
-          await deferOutboundIntent(db, business.business_id, intent.id, check.reason ?? 'kontrollfel', intent.attempt_token)
-          summary.deferred++
+          try {
+            await deferOutboundIntent(db, business.business_id, intent.id, check.reason ?? 'kontrollfel', intent.attempt_token)
+            summary.deferred++
+          } catch (error) {
+            // A failed defer write must not abort the all-tenant sweep. The
+            // in-flight claim will age to unknown unless a later recovery can
+            // prove its state, which is safer than sending through a failed gate.
+            summary.errors++
+            await rapporteraTystFel(db, business.business_id, 'outbound:defer_failed', 'Utskicket kunde inte skjutas upp säkert. Kontrollera leveransläget manuellt.', {
+              intent_id: intent.id,
+              error: error instanceof Error ? error.message : 'defer_failed',
+            }).catch(() => undefined)
+          }
           continue
         }
         const send = await resolve(db, business.business_id, intent)
@@ -38,11 +49,29 @@ export async function sweepOutboundIntents(db: SupabaseClient, resolve: Outbound
           summary.exhausted++
           await rapporteraTystFel(db, business.business_id, 'outbound:exhausted', 'Utskicket behöver hanteras manuellt efter flera misslyckade försök.', { intent_id: intent.id })
         }
-      } catch {
+      } catch (error) {
         summary.errors++
-        // Source read errors are before provider invocation; preserve the
-        // promise for recovery instead of consuming the delivery attempt cap.
-        await deferOutboundIntent(db, business.business_id, intent.id, 'kontrollfel', intent.attempt_token)
+        // Source/version errors happen before provider invocation and are not
+        // transient preflight deferrals. Consume the attempt so a corrupt or
+        // missing source reaches the normal manual-review ceiling instead of
+        // being reclaimed forever every ten minutes.
+        const message = error instanceof Error ? error.message : 'outbound_source_error'
+        try {
+          const failed = await finishOutboundIntent(db, business.business_id, intent, 'failed', null, message)
+          await rapporteraTystFel(db, business.business_id, 'outbound:source_failed', 'Utskickets beständiga källa kunde inte verifieras. Ett automatiskt återförsök räknas mot försökstaket.', {
+            intent_id: intent.id,
+            error: message,
+          }).catch(() => undefined)
+          if (failed.status === 'failed' && intent.attempts >= MAX_OUTBOUND_ATTEMPTS) {
+            summary.exhausted++
+            await rapporteraTystFel(db, business.business_id, 'outbound:exhausted', 'Utskicket behöver hanteras manuellt efter flera misslyckade försök.', { intent_id: intent.id }).catch(() => undefined)
+          }
+        } catch (finishError) {
+          await rapporteraTystFel(db, business.business_id, 'outbound:finish_failed', 'Utskickets felutfall kunde inte sparas. Kontrollera leveransläget manuellt.', {
+            intent_id: intent.id,
+            error: finishError instanceof Error ? finishError.message : 'finish_failed',
+          }).catch(() => undefined)
+        }
       }
     }
   }
