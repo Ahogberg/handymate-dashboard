@@ -27,7 +27,7 @@ The volumes are small and mostly ours. The shapes are not.
 | H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **done 2026-09-15** (PR #81 merged `263ce4a5` after the three MEDIUM fixes; v248 applied and verified) | `HANDOFF_INBOX_ENABLED` on the pilot; native Ja/Nej in push still open |
 | H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **done 2026-09-15** (PR #81; explicit one-shot consent, four keys supervised, off with 30-day cooldown and revocation trigger) | `SUPERVISED_AUTONOMY_ENABLED` + `AUTONOMY_OFF_SECRET`; cancel-on-off of queued sends lands with H3b (v249) |
 | H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **done 2026-09-15** (PR #78 merged `c09364e7` after M1 fix: failed provider check no longer cached, six new tests; 305 tests + tsc green locally, CI 13/13; v246 applied to production and verified) | activation: `CHANNEL_PREFLIGHT_ENABLED` on pilot; optional `RESEND_PREFLIGHT_API_KEY` if the production Resend key is sending-only |
-| H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | **ready — [H3B_OUTBOUND_INTENTS_BRIEF.md](H3B_OUTBOUND_INTENTS_BRIEF.md)**; Claude drafted `sql/v249_outbound_intents.sql` and proved it in PGlite (43/43) 2026-09-15 | #81 merged (v249 replaces v248's `stop_supervised_autonomy`) |
+| H3b | Durable outbound promises: `outbound_intents` + `outbound_messages` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | **done 2026-09-16** (PR #83 merged `6732ebd6` after review M1–M5/L1–L5 fixed; v249 applied and verified; [implementation handoff](../../handymate-dashboard/docs/strategy/H3B_IMPLEMENTATION.md)) | `OUTBOUND_INTENTS_ENABLED` on the pilot together with `CHANNEL_PREFLIGHT_ENABLED`; one recovered deferred send and one resolved `unknown` before widening; retention of `outbound_messages` still to decide |
 | H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **done 2026-09-15** (PR #78; root cause 198/198 credit errors; seeded rule delivers the deterministic brief without the LLM, one retry via cron `*/10`, own driftlarm line; v246 `morning_report_runs` applied) | activation: `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
 
 Order: H3a and H4 first (they decide whether the customer can trust anything), then H1 and H2 together.
@@ -179,6 +179,20 @@ Same §7 block as the other logs, under a new §Handoffs here. Claude reviews H1
 §6 A + B; H3b gets a DDL draft and PGlite probe from Claude before Codex implements it.
 
 ## Handoffs
+
+### 2026-09-16 — Claude: #83 merged, v249 applied (deployment state)
+
+Re-reviewed on `04c62e45` + the one-line spec fix `137d3d5c`: the blocker (first-value harness) and M1–M5 are closed
+as reviewed — push keeps the legacy path unless an autonomy key is claimed, a deferred supervised send leaves the audit
+open for the sweep, permanent source errors consume an attempt and alarm, partial push acceptance is terminal `sent`,
+and `autonomy_key` reaches the ledger only while `SUPERVISED_AUTONOMY_ENABLED` is on. `outbound_messages` is now keyed
+on `(business_id, dedupe_key)`. CI 13/13 on the merged head.
+
+`v249_outbound_intents.sql` applied to production via Supabase MCP and verified read-only: two tables with RLS and
+`SELECT, DELETE` for service_role only, no anon/authenticated grants, 12 of 12 functions present, EXECUTE for
+service_role on the RPCs and on `stop_supervised_autonomy` (which now calls `cancel_outbound_intents`), none for
+anon/authenticated, `outbound_lock` executable by no role, zero rows in both tables. Advisor: only the expected INFO
+(RLS enabled without a policy) on the two new tables; no new WARN. All flags remain unset.
 
 ### 2026-09-15 — Claude: #81 merged, v248 applied (deployment state)
 
