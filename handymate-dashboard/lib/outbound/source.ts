@@ -47,7 +47,8 @@ export async function recordOutboundSource<T extends OutboundEnvelope>(db: Supab
   return outboundRpc<RecordedOutbound>(db, 'record_outbound_message', {
     p_business_id: p.businessId, p_kind: p.kind, p_source: p.source, p_source_id: p.sourceId,
     p_dedupe_key: p.dedupeKey, p_recipient: p.recipient, p_template: p.template,
-    p_autonomy_key: p.autonomyKey ?? null, p_context: p.context ?? null,
+    p_autonomy_key: process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' ? p.autonomyKey ?? null : null,
+    p_context: p.context ?? null,
     p_version: version, p_envelope: source.envelope, p_defer_reason: null,
   })
 }
@@ -58,10 +59,11 @@ export async function withOutboundSource<T extends OutboundEnvelope>(db: Supabas
     intent => send(intent, source.envelope), preflight)
 }
 export async function readOutboundSource<T extends OutboundEnvelope>(db: SupabaseClient, businessId: string, intent: ClaimedOutbound): Promise<T> {
-  const { data, error } = await db.from('outbound_messages').select('recipient,template,version,context,envelope')
-    .eq('business_id', businessId).eq('source', intent.source).eq('source_id', intent.source_id).eq('kind', intent.kind).maybeSingle()
+  const { data, error } = await db.from('outbound_messages').select('source,source_id,kind,recipient,template,version,context,envelope')
+    .eq('business_id', businessId).eq('dedupe_key', intent.dedupe_key).maybeSingle()
   if (error || !data) throw new Error('outbound_source_not_found')
-  if (data.recipient !== intent.recipient || data.template !== intent.template || data.version !== intent.context?.version ||
+  if (data.source !== intent.source || data.source_id !== intent.source_id || data.kind !== intent.kind ||
+      data.recipient !== intent.recipient || data.template !== intent.template || data.version !== intent.context?.version ||
       outboundVersion(data.envelope as T) !== data.version) throw new Error('outbound_source_changed')
   return data.envelope as T
 }
