@@ -57,7 +57,11 @@ export async function recordOutboundIntent(db: SupabaseClient, p: OutboundPromis
   return outboundRpc<{ id?: string; status?: OutboundStatus; provider_ref?: string | null; cancel_requested?: boolean; created: boolean; blocked?: boolean; deferred?: boolean }>(db, 'record_outbound_intent', {
     p_business_id: p.businessId, p_kind: p.kind, p_source: p.source, p_source_id: p.sourceId,
     p_dedupe_key: p.dedupeKey, p_recipient: p.recipient, p_template: p.template,
-    p_autonomy_key: p.autonomyKey ?? null, p_context: p.context ?? null, p_defer_reason: deferReason,
+    // The SQL autonomy fence is meaningful only while supervised autonomy is
+    // enabled. OUTBOUND may be rolled out first without turning existing
+    // booking/review/follow-up traffic into blocked promises.
+    p_autonomy_key: process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' ? p.autonomyKey ?? null : null,
+    p_context: p.context ?? null, p_defer_reason: deferReason,
   })
 }
 export function claimOutboundIntents(db: SupabaseClient, businessId: string, ids: string[] | null = null, limit = 1) {
