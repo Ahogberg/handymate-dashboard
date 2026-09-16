@@ -200,6 +200,7 @@ async function sendSmsWithDurability(args: SendSmsArgs, auditId?: string): Promi
   const phone = normalizeSwedishPhone(args.to)
   if (!phone || !phone.startsWith('+')) return { success: false, error: `Ogiltigt telefonnummer: "${args.to}"` }
   const { withOutboundSource } = await import('@/lib/outbound/source')
+  let providerResult: SendSmsResult | null = null
   const outcome = await withOutboundSource<import('@/lib/outbound/source').SmsEnvelope>(args.supabase, {
     promise: {
       businessId: args.businessId, kind: 'sms', source: args.outbound.source,
@@ -213,16 +214,20 @@ async function sendSmsWithDurability(args: SendSmsArgs, auditId?: string): Promi
       recipient: args.recipient, purpose: args.purpose, reconcile: args.outboundReconcile,
     },
   }, async (_intent, envelope) => {
-    const result = smsProviderOutcome(await sendSmsWithoutAutonomyWrapper({
+    providerResult = await sendSmsWithoutAutonomyWrapper({
       ...args, ...envelope, outbound: undefined, outboundReconcile: undefined, autonomyKey: undefined, to: phone,
-    }))
+    })
+    const result = smsProviderOutcome(providerResult)
     if (result.status === 'sent' && envelope.reconcile?.type === 'invoice_reminder') {
       const receipt = await (await import('@/lib/invoice-reminder-send')).reconcileInvoiceReminder(args.supabase, envelope.reconcile.input as any, { smsSent: true })
       if (!receipt.reconciled) throw new Error(receipt.error || 'Påminnelsekvittensen kunde inte sparas')
     }
     return result
   })
-  if (outcome.status === 'sent') return { success: true, elksId: outcome.providerRef, idempotent: true }
+  if (outcome.status === 'sent') {
+    if (providerResult) return { ...providerResult, outboundStatus: 'sent' }
+    return { success: true, outboundStatus: 'sent', elksId: outcome.providerRef, idempotent: true }
+  }
   if (outcome.status === 'skipped' || outcome.status === 'pending') return { success: false, outboundStatus: outcome.status, channelSkipped: true, channelReason: 'konfiguration', error: 'Utskicket väntar tills kanalen kan användas.' }
   return { success: false, outboundStatus: outcome.status, status: null, error: outcome.status === 'unknown'
     ? 'Leveransbesked saknas. Skicka inte igen innan utfallet har kontrollerats.'
