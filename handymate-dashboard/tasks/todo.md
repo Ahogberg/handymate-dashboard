@@ -1654,3 +1654,10 @@ Checkpointen ovan är ersatt av slutleveransen nedan. Ingen produktionsskrivning
 - [x] Kör kontraktssvit, typkontroll och produktionsbygge; publicera färdig granskningshandoff i #83.
 
 Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är gröna. Hela kontraktssviten är grön efter att push-policyns källprov flyttats till den nya transportmodulen; typkontroll och Next-produktionsbygge går igenom. v249 är fortsatt ett utkast, flaggan är av och ingen extern leverans eller produktionsskrivning gjordes. Native Ja/Nej ligger fortsatt separat enligt briefens §7.
+- [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.
+## Planeringsfeedback 2026-09-15
+
+- [x] Återställ de fem önskemålen efter att opublicerad arbetskopia städats bort.
+- [x] Verifiera servergränser, idempotens, timmar och mobil-/datorvy på nytt.
+- [x] Koppla planeringskontroller till CI.
+- [x] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande: https://github.com/Ahogberg/handymate-dashboard/pull/80.
