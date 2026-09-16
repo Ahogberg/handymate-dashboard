@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { AGREEMENT_VERSION, hasAcceptedCurrentAgreement } from '@/lib/partners/agreement'
 import { getPartnerFromToken, getPartnerTokenFromRequest } from '@/lib/partners/auth'
 
 
@@ -23,5 +24,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ partner: null }, { status: 401 })
   }
 
-  return NextResponse.json({ partner })
+  // Avtalsgrinden behöver samma två härledda fält som portalens
+  // dashboardrutt räknar fram (app/api/partners/dashboard/route.ts) — samma
+  // namn och samma härledning, så de två vägarna aldrig kan säga olika sak
+  // om samma partner. Säljmaterialsidorna läser bara den här rutten.
+  return NextResponse.json({
+    partner: {
+      ...partner,
+      agreement_required: !hasAcceptedCurrentAgreement(partner),
+      current_agreement_version: AGREEMENT_VERSION,
+    },
+  })
 }

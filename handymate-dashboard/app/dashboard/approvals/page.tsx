@@ -1,5 +1,7 @@
 'use client'
 
+import HandoffInbox from '@/components/dashboard/HandoffInbox'
+import AutonomyConsentCard from '@/components/dashboard/AutonomyConsentCard'
 import { fetchApprovalList } from '@/lib/approvals/list-client'
 import { classify } from '@/lib/approvals/action-contract'
 import { historyStatus } from '@/lib/approvals/history-status'
@@ -283,7 +285,9 @@ export default function ApprovalsPage() {
   const [listError, setListError] = useState<string | null>(null)
   const listRequest = useRef(0)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
-  const [activeTab, setActiveTab] = useState<'pending' | 'resolved'>('pending')
+  const [activeTab, setActiveTab] = useState<'pending' | 'resolved' | 'inbox'>('pending')
+  const [inboxAvailable,setInboxAvailable]=useState(false)
+  useEffect(()=>{const c=new AbortController();setInboxAvailable(false);fetch('/api/handoff',{signal:c.signal,cache:'no-store'}).then(r=>{if(!c.signal.aborted){setInboxAvailable(r.ok); if(r.ok && new URLSearchParams(window.location.search).get('inbox')==='1')setActiveTab('inbox')}}).catch(()=>{});return()=>c.abort()},[business.business_id])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editText, setEditText] = useState('')
   const [expandedPackage, setExpandedPackage] = useState<string | null>(null)
@@ -338,6 +342,7 @@ export default function ApprovalsPage() {
 
   async function fetchApprovals() {
     if (!business?.business_id) return
+    if(activeTab==='inbox'){listRequest.current++;setLoading(false);setListError(null);return}
     const requestId = ++listRequest.current
     setLoading(true)
     setListError(null)
@@ -762,7 +767,7 @@ export default function ApprovalsPage() {
           gamla ramade primary-50-varianten). */}
       <div className="px-4 sm:px-8 pb-4">
         <div className="flex gap-1 p-1 bg-slate-100 rounded-xl">
-          {(['pending', 'resolved'] as const).map(tab => (
+          {(inboxAvailable ? ['pending', 'resolved', 'inbox'] as const : ['pending', 'resolved'] as const).map(tab => (
             <button
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -782,7 +787,7 @@ export default function ApprovalsPage() {
                   )}
                 </span>
               ) : (
-                'Hanterade'
+                tab === 'inbox' ? 'Inkorg' : 'Hanterade'
               )}
             </button>
           ))}
@@ -838,7 +843,7 @@ export default function ApprovalsPage() {
 
       {/* Content */}
       <div className="px-4 sm:px-8 pb-8">
-        {loading ? (
+        {activeTab === 'inbox' ? <><AutonomyConsentCard businessId={business.business_id}/><HandoffInbox businessId={business.business_id}/></> : loading ? (
           <div className="flex items-center justify-center py-16">
             <RefreshCw className="w-6 h-6 text-gray-400 animate-spin" />
           </div>

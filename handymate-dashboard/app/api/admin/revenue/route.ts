@@ -11,6 +11,8 @@ import {
   STAGES,
 } from '@/lib/revenue/domain'
 import { fetchCandidates } from '@/lib/revenue/source'
+import { qualification } from '@/lib/revenue/qualification'
+import { crmExport } from '@/lib/revenue/export'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
@@ -55,7 +57,7 @@ async function command(
   type: string,
   input: Record<string, unknown>,
 ) {
-  const { data, error } = await ctx.db.rpc('revenue_v2_command', {
+  const { data, error } = await ctx.db.rpc(type === 'qualify' || type.startsWith('sequence_') ? 'revenue_sales_command' : 'revenue_v2_command', {
     p_actor: ctx.userId,
     p_email: ctx.email,
     p_manager: ctx.manager,
@@ -91,6 +93,16 @@ export async function GET(request: NextRequest) {
         { status: 403 },
       )
     const params = request.nextUrl.searchParams
+    if (params.get('export') === 'crm') {
+      const { data, error } = await ctx.db.rpc('revenue_crm_export', { p_email: ctx.email, p_manager: ctx.manager })
+      if (error) throw error
+      if (!Array.isArray(data) || data.length > 5000) return failure(new Error('Exporten omfattar fler än 5 000 företag. Be en säljledare avgränsa portföljen.'), 400)
+      return new NextResponse(crmExport(data), { headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="handymate-revenue-crm.csv"',
+        'Cache-Control': 'private, no-store',
+      } })
+    }
     if (params.has('account_id')) {
       const accountId = id(params.get('account_id'))
       const a = await account(ctx, accountId)
@@ -130,6 +142,8 @@ export async function GET(request: NextRequest) {
           .eq('account_id', accountId)
           .order('created_at', { ascending: false })
           .limit(50),
+        ctx.db.from('revenue_sequences').select('*').eq('account_id', accountId)
+          .order('created_at', { ascending: false }).limit(20),
       ])
       for (const result of results) if (result.error) throw result.error
       return NextResponse.json(
@@ -140,6 +154,7 @@ export async function GET(request: NextRequest) {
           signals: results[2].data,
           sessions: results[3].data,
           drafts: results[4].data,
+          sequences: results[5].data,
           manager: ctx.manager,
         },
         { headers: { 'Cache-Control': 'private, no-store' } },
@@ -163,12 +178,15 @@ export async function GET(request: NextRequest) {
     if (!ctx.manager) runQuery = runQuery.eq('actor_id', ctx.userId)
     const runs = await runQuery
     if (runs.error) throw runs.error
+    const metrics = await ctx.db.rpc('revenue_sales_metrics', { p_email: ctx.email, p_manager: ctx.manager })
+    if (metrics.error) throw metrics.error
     return NextResponse.json(
       {
         ...data,
         manager: ctx.manager,
         email: ctx.email,
         source_runs: runs.data,
+        metrics: metrics.data,
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
     )
@@ -310,7 +328,15 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       )
     let input: Record<string, unknown> = { account_id: accountId }
-    if (type === 'contact') {
+    if (type === 'qualify' || type.startsWith('sequence_')) {
+      if (!Number.isInteger(body.version)) return failure(new Error('Uppdatera sidan innan du sparar.'), 400)
+      input.version = body.version
+      if (type === 'qualify') input = { ...input, ...qualification(body) }
+      else if (type === 'sequence_start') input = { ...input, contact_id: id(body.contact_id), due_at: date(body.due_at) }
+      else if (type === 'sequence_approve') input = { ...input, sequence_id: id(body.sequence_id), body: text(body.body, 10000) }
+      else if (type === 'sequence_complete') input = { ...input, sequence_id: id(body.sequence_id), outcome: text(body.outcome, 40), summary: text(body.summary, 5000) }
+      else if (type !== 'sequence_stop') return failure(new Error('Okänd åtgärd.'), 400)
+    } else if (type === 'contact') {
       input = {
         ...input,
         name: text(body.name, 200),
@@ -378,7 +404,7 @@ export async function POST(request: NextRequest) {
         activityType !== 'note' &&
         !['replied', 'declined', 'pause', 'opt_out'].includes(outcome)
       )
-        input.draft_body = followupBody(a.company_name, summary)
+        input.draft_body = followupBody(a.company_name, summary, undefined, outcome)
     } else if (type === 'next') {
       const stage = text(body.status, 40)
       if (

@@ -16,19 +16,20 @@ import fs from 'fs'
 import path from 'path'
 
 const ROOT = path.resolve(__dirname, '..')
-const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
+const read = (p: string) =>
+  fs.readFileSync(path.join(ROOT, p), 'utf8').replace(/\r\n/g, '\n')
 
 /** Strippar // och /* *\/ -kommentarer (inte innehållet i strängar/mallsträngar). */
 function utanKommentarer(src: string): string {
-  return src
-    .replace(/\/\*[\s\S]*?\*\//g, '')
-    .replace(/(^|[^:])\/\/.*$/gm, '$1')
+  return src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1')
 }
 
 const maintenance = read('app/api/cron/maintenance/route.ts')
 const maintenanceRen = utanKommentarer(maintenance)
 const activityRoute = read('app/api/automations/activity/route.ts')
-const kortGarUt = fs.existsSync(path.join(ROOT, 'app/api/cron/kort-gar-ut/route.ts'))
+const kortGarUt = fs.existsSync(
+  path.join(ROOT, 'app/api/cron/kort-gar-ut/route.ts'),
+)
   ? read('app/api/cron/kort-gar-ut/route.ts')
   : ''
 const kortGarUtRen = utanKommentarer(kortGarUt)
@@ -36,7 +37,9 @@ const kortkanal = read('lib/approvals/kortkanal.ts')
 const kortkanalRen = utanKommentarer(kortkanal)
 const skapaKort = read('lib/approvals/skapa-kort.ts')
 const skapaKortRen = utanKommentarer(skapaKort)
-const vercelJson = JSON.parse(read('vercel.json')) as { crons: { path: string; schedule: string }[] }
+const vercelJson = JSON.parse(read('vercel.json')) as {
+  crons: { path: string; schedule: string }[]
+}
 
 test.describe('Del 1 — maintenance: utgångna kort lämnar spår', () => {
   test('selectar business_id, approval_type och title vid expiry, inte bara id', () => {
@@ -90,7 +93,10 @@ test.describe('Del 1 — maintenance: utgångna kort lämnar spår', () => {
 test.describe('Del 4 — team_intro-kort som aldrig stängdes', () => {
   test('maintenance sätter status till approved (inte expired) efter 7 dagar', () => {
     const idx = maintenanceRen.indexOf("approval_type', 'team_intro'")
-    expect(idx, 'team_intro-regeln hittades inte i maintenance').toBeGreaterThan(-1)
+    expect(
+      idx,
+      'team_intro-regeln hittades inte i maintenance',
+    ).toBeGreaterThan(-1)
     const block = maintenanceRen.slice(Math.max(0, idx - 400), idx + 100)
     expect(block).toContain("status: 'approved'")
     expect(block).toContain("resolved_by: 'system'")
@@ -140,11 +146,15 @@ test.describe('Del 2 — cron/kort-gar-ut', () => {
     expect(mapIdx).toBeLessThan(sendIdx)
     // Sändningen ligger i en for-loop över kontona (perKonto), inte i loopen
     // som byggde listan av utgående kort.
-    expect(kortGarUtRen).toMatch(/for \(const \[businessId, antal\] of Array\.from\(perKonto\)\)/)
+    expect(kortGarUtRen).toMatch(
+      /for \(const \[businessId, antal\] of Array\.from\(perKonto\)\)/,
+    )
   })
 
   test('dedupe-nyckeln innehåller "kort_gar_ut", business_id och datum', () => {
-    expect(kortGarUtRen).toContain("from '@/lib/notifications/push-dispatch-log'")
+    expect(kortGarUtRen).toContain(
+      "from '@/lib/notifications/push-dispatch-log'",
+    )
     expect(kortGarUtRen).toContain('nyligenSkickad(')
     expect(kortGarUtRen).toContain('bokforPush(')
     expect(kortGarUtRen).toMatch(/`kort_gar_ut:\$\{businessId\}:\$\{datum\}`/)
@@ -159,21 +169,28 @@ test.describe('Del 2 — cron/kort-gar-ut', () => {
 
 test.describe('Del 2 — vercel.json', () => {
   test('finns exakt en cron-rad för kort-gar-ut', () => {
-    const rader = vercelJson.crons.filter(c => c.path === '/api/cron/kort-gar-ut')
+    const rader = vercelJson.crons.filter(
+      (c) => c.path === '/api/cron/kort-gar-ut',
+    )
     expect(rader).toHaveLength(1)
   })
 
   test('schemat är en giltig engångs-per-dag-rad (Hobby-plan-säker)', () => {
-    const rad = vercelJson.crons.find(c => c.path === '/api/cron/kort-gar-ut')
+    const rad = vercelJson.crons.find((c) => c.path === '/api/cron/kort-gar-ut')
     expect(rad, 'cron-raden saknas i vercel.json').toBeTruthy()
     expect(rad!.schedule).toMatch(/^\d{1,2} \d{1,2} \* \* \*$/)
   })
 
   test('kolliderar inte med någon befintlig schemarad', () => {
-    const scheman = vercelJson.crons.map(c => c.schedule)
-    const varSchema = vercelJson.crons.find(c => c.path === '/api/cron/kort-gar-ut')!.schedule
-    const kollisioner = scheman.filter(s => s === varSchema)
-    expect(kollisioner, `schemat ${varSchema} krockar med en annan rutt`).toHaveLength(1)
+    const scheman = vercelJson.crons.map((c) => c.schedule)
+    const varSchema = vercelJson.crons.find(
+      (c) => c.path === '/api/cron/kort-gar-ut',
+    )!.schedule
+    const kollisioner = scheman.filter((s) => s === varSchema)
+    expect(
+      kollisioner,
+      `schemat ${varSchema} krockar med en annan rutt`,
+    ).toHaveLength(1)
   })
 })
 
@@ -186,16 +203,21 @@ test.describe('Del 2 — cron-auth-taket och route-auth-inventeringen', () => {
     // Invarianten Pass B faktiskt brydde sig om består: totalt = ägda + 1
     // (karin-deadlines-undantaget).
     const cronAuth = read('tests/cron-auth.spec.ts')
-    const tal = Array.from(cronAuth.matchAll(/toHaveLength\((\d+)\)/g)).map(m => Number(m[1]))
-    expect(tal, 'förväntade exakt två toHaveLength(N) i cron-auth.spec.ts').toHaveLength(2)
+    const tal = Array.from(cronAuth.matchAll(/toHaveLength\((\d+)\)/g)).map(
+      (m) => Number(m[1]),
+    )
+    expect(
+      tal,
+      'förväntade exakt två toHaveLength(N) i cron-auth.spec.ts',
+    ).toHaveLength(2)
     const [totalt, agda] = tal
     expect(totalt - agda).toBe(1)
   })
 
   test('facit-route-auth-inventory har höjt eller behållit taket för utan-standardgrind', () => {
     const inv = read('tests/facit-route-auth-inventory.spec.ts')
-    // C5b adds four verified superadmin routes and one cron; H4 adds one verified retry cron; documented cap is 167.
-    expect(inv).toMatch(/toBeLessThanOrEqual\(167\)/)
+    // C5b adds four verified superadmin routes and one cron; H4 adds one verified retry cron; Revenue adds two partner lead routes; documented cap is 169.
+    expect(inv).toMatch(/toBeLessThanOrEqual\(169\)/)
   })
 })
 
@@ -231,8 +253,12 @@ test.describe('Del 3 — kortkanal.ts', () => {
 test.describe('Del 3 — skapa-kort.ts grenar på kanalFor', () => {
   test('importerar kanalFor och grenar FÖRE pending_approvals-inserten', () => {
     expect(skapaKortRen).toContain("from '@/lib/approvals/kortkanal'")
-    const grenIdx = skapaKortRen.indexOf("kanalFor(kort.approval_type) === 'digest'")
-    const insertIdx = skapaKortRen.indexOf(".from('pending_approvals')\n    .insert(")
+    const grenIdx = skapaKortRen.indexOf(
+      "const digest = kanalFor(kort.approval_type) === 'digest'",
+    )
+    const insertIdx = skapaKortRen.indexOf(
+      ".from('pending_approvals')\n    .insert(",
+    )
     expect(grenIdx).toBeGreaterThan(-1)
     expect(insertIdx).toBeGreaterThan(-1)
     expect(grenIdx).toBeLessThan(insertIdx)
@@ -253,7 +279,9 @@ test.describe('Del 3 — skapa-kort.ts grenar på kanalFor', () => {
   })
 
   test('den vanliga (kort-)grenen är orörd: insert före push, return { id } kvar', () => {
-    const insertIdx = skapaKortRen.indexOf(".from('pending_approvals')\n    .insert(")
+    const insertIdx = skapaKortRen.indexOf(
+      ".from('pending_approvals')\n    .insert(",
+    )
     const pushIdx = skapaKortRen.indexOf('sendApprovalPush(')
     const returnIdx = skapaKortRen.indexOf('return { id }')
     expect(insertIdx).toBeLessThan(pushIdx)
@@ -281,7 +309,9 @@ test.describe('Del 3 — de fyra skapande call-sites använder skapaKort', () =>
 
   test('lib/dispatch.ts: dispatch_suggestion-inserten går via skapaKort, ingen rå insert kvar för den typen', () => {
     const src = utanKommentarer(read('lib/dispatch.ts'))
-    expect(src).not.toMatch(/\.from\('pending_approvals'\)\s*\.insert\(\s*\{\s*id:\s*approvalId/)
+    expect(src).not.toMatch(
+      /\.from\('pending_approvals'\)\s*\.insert\(\s*\{\s*id:\s*approvalId/,
+    )
     const kortIdx = src.indexOf('skapaKort(supabase, {')
     const typIdx = src.indexOf("approval_type: 'dispatch_suggestion'")
     expect(kortIdx).toBeGreaterThan(-1)
@@ -304,13 +334,19 @@ test.describe('Del 3 — de fyra skapande call-sites använder skapaKort', () =>
 
   test('lib/dispatch.ts och suggest-checklist.ts anropar brusgrind FÖRE skapaKort (oförändrad ordning)', () => {
     const dispatch = utanKommentarer(read('lib/dispatch.ts'))
-    const grindD = dispatch.indexOf("brusgrind(supabase, params.businessId, 'dispatch_suggestion')")
+    const grindD = dispatch.indexOf(
+      "brusgrind(supabase, params.businessId, 'dispatch_suggestion')",
+    )
     const kortD = dispatch.indexOf('skapaKort(supabase, {')
     expect(grindD).toBeGreaterThan(-1)
     expect(kortD).toBeGreaterThan(grindD)
 
-    const checklist = utanKommentarer(read('lib/egenkontroll/suggest-checklist.ts'))
-    const grindC = checklist.indexOf("brusgrind(supabase, businessId, 'checklist_forslag')")
+    const checklist = utanKommentarer(
+      read('lib/egenkontroll/suggest-checklist.ts'),
+    )
+    const grindC = checklist.indexOf(
+      "brusgrind(supabase, businessId, 'checklist_forslag')",
+    )
     const kortC = checklist.indexOf('skapaKort(supabase, {')
     expect(grindC).toBeGreaterThan(-1)
     expect(kortC).toBeGreaterThan(grindC)
@@ -325,6 +361,8 @@ test.describe('Del 3 — de fyra skapande call-sites använder skapaKort', () =>
 
   test('lib/agents/shared/save-and-push.ts: business_knowledge länkas bara när kortet inte är digest', () => {
     const src = utanKommentarer(read('lib/agents/shared/save-and-push.ts'))
-    expect(src).toMatch(/kort\?\.\s*id\s*&&\s*knowledgeId\s*&&\s*kort\.kanal\s*!==\s*'digest'/)
+    expect(src).toMatch(
+      /kort\?\.\s*id\s*&&\s*knowledgeId\s*&&\s*kort\.kanal\s*!==\s*'digest'/,
+    )
   })
 })

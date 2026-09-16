@@ -88,6 +88,11 @@ jobs:
           tests/channel-preflight.spec.ts
           tests/handoff-reliability-sql.spec.ts
           tests/morning-report-reliability.spec.ts
+          tests/card-kind-contract.spec.ts
+          tests/handoff-consent-sql.spec.ts
+          tests/autonomy-digest.spec.ts
+          tests/handoff-runtime.spec.ts
+          tests/handoff-ui.spec.ts
           tests/schema-contract.spec.ts
           tests/financial-kernel-event-contract.spec.ts
           tests/financial-kernel-c5-brief-probes.spec.ts

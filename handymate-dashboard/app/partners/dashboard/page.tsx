@@ -25,6 +25,7 @@ import {
   Mail, MessageCircle, Smartphone, ChevronRight,
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
+import AssignedLeads from './components/AssignedLeads'
 import AgreementGate from '../components/AgreementGate'
 import PortalPreview from './components/PortalPreview'
 import StatementSection from './components/StatementSection'
@@ -299,6 +300,8 @@ export default function PartnerDashboardPage() {
       </nav>
 
       <main className="max-w-6xl mx-auto px-4 sm:px-6 py-8 flex flex-col gap-6">
+        <Link href="/partners/leads" className="self-end text-sm font-medium text-teal-700">Öppna leadsvyn →</Link>
+        <AssignedLeads />
         {/* ─── Sidhuvud ─── */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -524,6 +527,7 @@ export default function PartnerDashboardPage() {
           </div>
           <div className="flex flex-col gap-1.5">
             {[
+              { href: '/partners/material/genomgang', titel: 'Säljgenomgången', detalj: 'Kör mötet och skicka kundens länk med din kod' },
               { href: '/partners/material/partnerdeck', titel: 'Partnerdeck för mobilen', detalj: '11 slides att visa i kundmötet' },
               { href: '/partners/material/leave-behind', titel: 'Leave-behind (A4)', detalj: 'Skriv ut med din kontakt förifylld' },
               { href: '/partners/material/demo-manus', titel: 'Demo-manus, 20 minuter', detalj: 'Talarstöd och vanliga invändningar' },

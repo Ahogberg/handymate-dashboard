@@ -17,12 +17,14 @@ function H2({ children }: { children: React.ReactNode }) {
 }
 
 export default function DemoManusPage() {
-  const { partner, loading, referralUrl } = usePartnerMe()
+  const { partner, loading, grind, referralUrl } = usePartnerMe()
 
   if (loading) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center"><Loader2 className="w-8 h-8 text-primary-700 animate-spin" /></div>
   }
   if (!partner) return null
+  // Avtalsgrind: inget säljmaterial förrän gällande partneravtal är godkänt.
+  if (grind) return grind
 
   return (
     <div className="min-h-screen bg-slate-50 print:bg-white">

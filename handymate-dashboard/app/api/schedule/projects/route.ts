@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
   if(!projects.length) return NextResponse.json({projects:[]})
   const ids=projects.map(p=>p.project_id)
   const [times,entries]=await Promise.all([
-   readAll(()=>db.from('time_entry').select('id, project_id, duration_minutes').eq('business_id',bid).in('project_id',ids).order('id')),
+   readAll(()=>db.from('time_entry').select('time_entry_id, project_id, duration_minutes').eq('business_id',bid).in('project_id',ids).order('time_entry_id')),
    readAll(()=>db.from('schedule_entry').select('id, project_id, business_user_id, start_datetime, end_datetime, all_day, status').eq('business_id',bid).in('project_id',ids).neq('status','cancelled').order('id'))
   ])
   return NextResponse.json({projects:projects.map(p=>({...p,...planningBudget(p.budget_hours,times.filter(t=>t.project_id===p.project_id).reduce((n,t)=>n+Math.max(0,Number(t.duration_minutes)||0),0)),planned_hours:plannedTeamHours(entries.filter(e=>e.project_id===p.project_id)),scheduled_member_ids:Array.from(new Set(entries.filter(e=>e.project_id===p.project_id && e.status==='scheduled').map(e=>e.business_user_id)))}))})

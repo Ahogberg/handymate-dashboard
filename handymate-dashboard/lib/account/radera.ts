@@ -231,6 +231,7 @@ export const IRRELEVANT: string[] = [
   // Agent-/AI-inställningar och aggregerad, icke-personlig statistik.
   'agent_context', 'agent_settings', 'ai_learned_preferences',
   'business_insights', 'business_integration_credentials',
+  'handoff_items', 'handoff_digests', 'autonomy_consents', 'autonomy_controls',
   'channel_notices', 'morning_report_runs',
   'business_patterns', 'business_preferences', 'business_twin_forecast',
   'business_counters', 'mission', 'mission_mandate', 'monthly_reviews',

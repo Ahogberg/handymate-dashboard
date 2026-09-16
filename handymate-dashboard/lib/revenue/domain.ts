@@ -48,6 +48,8 @@ export const PAINS = {
 } as const
 export type Pain = keyof typeof PAINS
 export type Account = {
+  website: string | null
+  qualification: import('./qualification').Qualification | null
   id: string
   company_name: string
   org_number: string | null
@@ -195,6 +197,8 @@ export function followupBody(
   company: string,
   summary: string,
   caseUrl?: string,
+  outcome?: string,
 ) {
+  if (outcome === 'no_response') return `Hej!\n\nJag försökte nå dig angående administrationen runt jobben på ${company}. Vill du boka 20 minuter för att gå igenom var den tar mest tid?\n\nVänliga hälsningar\nHandymate`
   return `Hej!\n\nTack för samtalet om ${company}.\n\nDet här tog vi upp:\n${summary}\n\n${caseUrl ? `Här är er personliga genomgång: ${caseUrl}\n\n` : ''}Vill du att vi bokar nästa steg tillsammans?\n\nVänliga hälsningar\nHandymate`
 }

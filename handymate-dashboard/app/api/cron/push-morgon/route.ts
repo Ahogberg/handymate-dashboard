@@ -56,6 +56,11 @@ async function slappHallna(force: boolean) {
   }
 
   const supabase = getServerSupabase()
+  let handoffError = false
+  if (process.env.HANDOFF_INBOX_ENABLED === 'true') {
+    try { await (await import('@/lib/notifications/handoff-morning')).sendHandoffMorning(supabase, force) }
+    catch (error) { console.error('[push-morgon] handoff failed', error); handoffError = true }
+  }
   let rader: HallenPush[]
   try {
     rader = await hamtaHallna(supabase)
@@ -105,11 +110,12 @@ async function slappHallna(force: boolean) {
   }
 
   return NextResponse.json({
-    success: true,
+    success: !handoffError,
+    ...(handoffError ? { error: 'Morgonkvittot kunde inte färdigställas.' } : {}),
     forced: force,
     held: rader.length,
     expired: utgangna.length,
     released: skicka.length,
     groups: utfall,
-  })
+  }, { status: handoffError ? 503 : 200 })
 }
