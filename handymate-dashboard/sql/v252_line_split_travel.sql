@@ -37,10 +37,25 @@ UPDATE public.products SET default_travel_share = 1, default_labor_share = 0, ro
 UPDATE public.products SET default_travel_share = 0 WHERE default_travel_share IS NULL;
 ALTER TABLE public.products ALTER COLUMN default_travel_share SET DEFAULT 0;
 
--- ── 2. Komponenter får en tredje typ ──
+-- ── 2. Komponenter: tredje typen resa, och det delade radschemat (Christoffers underlag) ──
+-- En komponent är en rad under artikeln: namn (description), artikelnummer, enhet, antal, à-pris ut
+-- (unit_price) bredvid självkostnaden (unit_cost), valfri katalogkoppling (linked_product_id) och en egen
+-- ROT-flagga som default följer typen men kan sättas uttryckligen. Hur många rader som helst per typ.
 ALTER TABLE public.product_components DROP CONSTRAINT IF EXISTS product_components_component_type_check;
 ALTER TABLE public.product_components ADD CONSTRAINT product_components_component_type_check
   CHECK (component_type IN ('arbete', 'material', 'resa'));
+ALTER TABLE public.product_components
+  ADD COLUMN IF NOT EXISTS article_number TEXT,
+  ADD COLUMN IF NOT EXISTS unit_price NUMERIC,
+  ADD COLUMN IF NOT EXISTS linked_product_id TEXT REFERENCES public.products(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS is_rot_eligible BOOLEAN;
+UPDATE public.product_components SET is_rot_eligible = (component_type = 'arbete') WHERE is_rot_eligible IS NULL;
+ALTER TABLE public.product_components ALTER COLUMN is_rot_eligible SET DEFAULT false;
+ALTER TABLE public.product_components DROP CONSTRAINT IF EXISTS product_components_rot_only_labour;
+ALTER TABLE public.product_components ADD CONSTRAINT product_components_rot_only_labour
+  CHECK (NOT is_rot_eligible OR component_type = 'arbete');
+COMMENT ON COLUMN public.product_components.unit_price IS
+  'À-pris ut mot kund per komponentenhet. unit_cost är självkostnaden; skillnaden × antal är radens marginal. NULL = raden bär ingen egen prissättning (andelen på artikeln gäller).';
 
 -- ── 3. Offertraden: tre belopp som alltid summerar till radens total ──
 ALTER TABLE public.quote_items ADD COLUMN IF NOT EXISTS travel_amount NUMERIC;
@@ -100,3 +115,4 @@ COMMIT;
 --   SELECT count(*) FROM quote_items WHERE item_type='item' AND (labor_amount IS NULL OR material_amount IS NULL OR travel_amount IS NULL);  -- 0
 --   SELECT conname, convalidated FROM pg_constraint WHERE conname IN ('quote_items_split_sum','products_share_sum_check');   -- båda true
 --   SELECT count(*) FROM products WHERE default_travel_share = 1;  -- resartiklarna
+--   SELECT count(*) FROM product_components WHERE is_rot_eligible AND component_type <> 'arbete';  -- 0

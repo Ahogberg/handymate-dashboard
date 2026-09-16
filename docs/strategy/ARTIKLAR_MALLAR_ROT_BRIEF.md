@@ -3,7 +3,9 @@
 > Claude, 2026-09-16, efter Andreas fråga om artikelsystemet, offertmallarna och ROT-redovisningen, och
 > Christoffers förslag att bryta ner varje artikel i arbete, material och resor. Beslut med Andreas samma dag:
 > delningen ligger **inuti raden** (en kundrad per artikel), Claude skriver brief, Codex bygger.
-> Migrationen `sql/v252_line_split_travel.sql` är utkastad och bevisad i PGlite (§6, 27/27). Samma regler som
+> Underlag från Christoffer: "Article Breakdown for ROT-Compliant Quoting" (byggs nu, invävt i §1 och §4) samt
+> "Work-Type Categorization" och "Staged Timeline" (framtida faser, registrerade i §11, byggs inte nu).
+> Migrationen `sql/v252_line_split_travel.sql` är utkastad och bevisad i PGlite (§6, 29/29). Samma regler som
 > övriga briefer: handoff-block under §10, Claude granskar mot orkestreringens §6 A + B + D.
 
 ## 0. Varför
@@ -32,6 +34,9 @@ I dag, verifierat i kod och produktion 2026-09-16:
 | **ROT-basen är alltid Σ `labor_amount` över berättigade rader, via en enda funktion.** `lib/rot-rut-basis.ts` (flyttad ut ur `quote-to-invoice-items.ts`) med `rotRutLaborBasis(items, type)` och `splitLine(total, laborShare, travelShare)`. De sex ställena nedan anropar den, följt av `rotRutDeductionInclVat` och årstaket i `lib/rot-rut-limits.ts`: (a) `lib/invoice-calculations.ts:23-27`, (b) `app/api/quotes/route.ts:424-428` och `:907-911`, (c) `lib/agreements/invoice-visit.ts:126-127`, (d) `app/api/agent/trigger/tool-router.ts:891-893, 1001`, (e) `app/api/invoices/from-quote/route.ts:125-134` och `lib/invoices/project-invoice-draft.ts:234-240`, (f) `components/invoices/ProjectInvoiceModal.tsx:131,148-149`. | Ett ställe att ha rätt på. (a) är Andreas fall på fakturan, där Skatteverket tittar. (f) gör i dag varje tidpost ROT-berättigad, även Restid, Material, Möte och Admin (`components/time/TimeEntryModal.tsx:45-51`). |
 | **Tidposter är arbete bara när de är arbete.** `work` → `labor_amount = total`; `travel` → `travel_amount = total`, aldrig ROT; `material_pickup`, `meeting`, `admin` → material respektive 0 ROT-bas. | Restid är resa, inte arbete. |
 | **Artikeln bär delningen.** `products.default_travel_share` (ny, default 0) bredvid `default_labor_share`, summa ≤ 1 (`products_share_sum_check`); resten är material. `product_components.component_type` får `'resa'`. Komponenter är den normala vägen att sätta delningen, inte en dold funktion. | `resolveLaborShare` i `lib/products/build-item-snapshot.ts` härleder redan andelen ur komponenterna; den får en tvilling för resa. |
+| **Raderna under artikeln är redigerbara per offert och har ett delat schema.** En komponent är en rad med namn, artikelnummer, enhet, antal, à-pris ut och självkostnad, av typen arbete, material eller resa, hur många som helst per typ. Den kan hämtas ur katalogen (`linked_product_id`) eller skrivas på plats för just den offerten, och en fritt skriven rad kan sparas tillbaka till katalogen. I offerten lever raderna i `component_snapshot` (frysta vid infogning, redigerbara där); när rader finns är de auktoritativa: radens total = Σ antal × à-pris, och arbete/material/resa = Σ per typ. Artikelns andelar är reservvägen för artiklar utan rader. Artikelns namn, prisvisning och reservationstext ändras inte. | Christoffers underlag, ordagrant: nedbrytningen ska vara rader med samma schema, inte en procentsats. Andelarna finns kvar för de 2 000 seedade artiklarna tills någon skrivit rader. |
+| **Varje rad bär en egen ROT-flagga**, `is_rot_eligible`, som default följer typen (arbete → sant) men kan slås av, och som CHECK förbjuder på material och resa. ROT-basen är Σ radbelopp med flaggan satt. | Christoffers krav: logiken ska hålla om reglerna ändras, utan att typen ensam avgör. Att flaggan aldrig kan sättas på material eller resa är det Skatteverket kräver i dag. |
+| **Kostnad mot utpris per artikel.** Artikelvyn i offerten visar Σ självkostnad (antal × `unit_cost`) och Σ utpris (antal × `unit_price`) över raderna, alltså marginalen per artikel. `quotes.expected_margin_snapshot` fortsätter bära offertens helhet. | Christoffers underlag. Självkostnaden fanns redan på komponenten; utpriset saknades. |
 | **`rot_work_cost`/`rut_work_cost` (ex moms) skrivs på varje fakturaväg.** `lib/invoices/create-invoice.ts:210-212` får dem ur `rotRutLaborBasis`, inte bara `from-project`-vägen. | Skatteverket-filen (`lib/skv/validate-rot-request.ts:146-154`), kärnans kund/Skatteverket-delning (`sql/v238:192-228` via `customer_pays`/`rot_rut_deduction`) och Fortnox ska utgå från samma tal. |
 | **Fortnox: en blandad rad delas vid export.** Fortnox sätter `HouseWork` på hela radbeloppet, så en rad med `0 < labor_amount < total` exporteras som en HouseWork-rad (arbete) och en vanlig rad (material + resa) via ny `splitRowsForHouseWork` i fakturamapparen; `isHouseWorkRow` returnerar false när `labor_amount = 0` även om raden är flaggad. Bara fakturor som inte redan synkats. | Annars får Fortnox och därmed Skatteverket ROT på material. |
 | **Backfill med snäv heuristik, aldrig omräkning av skickade offerter.** Kategori → enhet → ROT/RUT-flagga → material (se §3). `rot_deduction` på befintliga offerter skrivs inte om; nytt värde vid nästa sparning. `quote_templates.job_type_slug` backfillas inte (v187: uttryckligt val, ingen namngissning); seedningen sätter den framåt i kod. | Historik är historik. Ett fel i en skickad offert rättas av människan som skickar nästa version. |
@@ -56,7 +61,7 @@ behöver en rad i handoffen.
 | Del | Gör |
 |---|---|
 | `products.default_travel_share` | Ny, `0–1`, default 0; `products_share_sum_check`: labor + travel ≤ 1. Backfill: `arbete` utan andel → 1; `material`/`hyra` utan andel → 0; artiklar vars namn börjar på `resa`, `resor`, `restid`, `framkörning`, `servicebil`, `milersättning`, `utkörning` → resa 1, arbete 0, `rot_eligible = false` (snäv lista: `res%` träffar reservdelar). |
-| `product_components.component_type` | `IN ('arbete','material','resa')`. |
+| `product_components` | `component_type IN ('arbete','material','resa')`; nya `article_number`, `unit_price` (à-pris ut, bredvid `unit_cost`), `linked_product_id` → `products`, `is_rot_eligible` (backfill: sant för arbete) med CHECK `product_components_rot_only_labour`. |
 | `quote_items.travel_amount` | Ny. Backfill A: rader med `labor_amount` får `material = total − labor − travel`, `travel = 0`. Backfill B, rader utan: `arbete_*` → arbete; `resa` → resa; `material_*`/`hyra`/`ue`/`ovrigt` → material; timenhet → arbete; ROT/RUT-flaggad → arbete; annars material. `quote_items_split_sum` läggs `NOT VALID` och valideras direkt (produktion: 0 rader avviker i dag, 137 rader totalt). Rubrik-, text-, delsumme- och rabattrader är undantagna. |
 | `quotes.travel_total` | Ny, default 0, backfillad som Σ `travel_amount` per offert. |
 
@@ -87,6 +92,11 @@ Fas 3 — artiklar och komponenter i UI
   app/api/products/route.ts, app/api/product-catalog/route.ts, app/api/admin/backfill-products/route.ts
   app/dashboard/quotes/_shared/QuoteProductSearchModal.tsx            ("Arbete X % · Material Y % · Resa Z %")
   lib/seed-defaults.ts                             (resartiklar: default_travel_share 1, rot_eligible false)
+  komponentraderna i offerten (RowEditSheet + component_snapshot)   (delat schema: namn, artikelnummer, enhet, antal, à-pris, typ, ROT-flagga;
+                                                    lägg till/ta bort rader, hämta ur katalogen eller skriv fritt, "spara som artikel";
+                                                    radens total och delning härleds ur raderna när de finns; kostnad mot utpris per artikel)
+  lib/products/build-item-snapshot.ts              (SnapshotComponent får article_number, unit_price, is_rot_eligible, linked_product_id;
+                                                    resolveLaborShare läser is_rot_eligible, inte bara typen)
 
 Fas 4 — fakturavägar, dokument, Fortnox, Skatteverket
   lib/types/invoice.ts, lib/invoices/quote-to-invoice-items.ts        (material_amount, travel_amount, category_slug följer med)
@@ -117,14 +127,15 @@ Fas 6 — tester (§6)
 7. En Fortnox-rad är antingen helt HouseWork eller inte alls; en blandad Handymate-rad exporteras som två.
 8. Redan sparade offerters `rot_deduction` ändras inte av migrationen; `quote_templates.job_type_slug` sätts aldrig genom namngissning.
 9. Varje seedad mall har en jobbtyp; varje `qstd_*`-rad och varje agentgenererad rad har en delning innan den sparas.
-10. `calculateQuoteTotals`/`calculateInvoiceTotals` behåller signatur och returnycklar (bara `travelTotal` tillkommer); kärnans events och receivable-delning skrivs aldrig om.
+10. När en rad har komponentrader är radens total Σ antal × à-pris över raderna, och arbete/material/resa Σ per typ; en komponentrad med ROT-flagga är alltid av typen arbete.
+11. `calculateQuoteTotals`/`calculateInvoiceTotals` behåller signatur och returnycklar (bara `travelTotal` tillkommer); kärnans events och receivable-delning skrivs aldrig om.
 
 ## 6. Acceptans
 
-**SQL, 27 kontroller gröna i PGlite på utkastet** (Claude 2026-09-16, fixtur som speglar v12+v67, quote_overhaul+v10+v13+v47+v67 och `quotes`). Codex gör om dem till `tests/line-split-sql.spec.ts`; en kontroll som måste försvagas behöver en rad i handoffen.
+**SQL, 29 kontroller gröna i PGlite på utkastet** (Claude 2026-09-16, fixtur som speglar v12+v67, quote_overhaul+v10+v13+v47+v67 och `quotes`). Codex gör om dem till `tests/line-split-sql.spec.ts`; en kontroll som måste försvagas behöver en rad i handoffen.
 
 - **Artiklar (7):** arbete utan andel → 1/0; material och hyra utan andel → 0; befintlig andel behålls; resartikel på namn → resa 1, arbete 0, aldrig ROT; "Reservdel" träffas inte; andel > 1 och summa > 1 avvisas, summa ≤ 1 godtas; ny artikel får resa 0.
-- **Komponenter (1):** `resa` godtas, okänd typ avvisas.
+- **Komponenter (3):** `resa` godtas, okänd typ avvisas; det delade radschemat (artikelnummer, enhet, antal, självkostnad, à-pris) godtas, ROT-flagga på material avvisas, befintlig resa-komponent har flaggan av; katalogkoppling godtas och okänd artikel avvisas.
 - **Backfill (11):** `arbete_*` → arbete; `resa` → resa; `material_*` → material; `hyra` → material; timenhet → arbete; `st` + ROT-flagga → arbete; `st` utan flagga → material; befintlig arbetsdel → resten material, 0 resa; befintlig exakt delning behålls öre-exakt (740,74 + 493,82); rubrik och rabatt lämnas utan delning; ingen item-rad utan delning.
 - **Invarianten (6):** villkoret är validerat; item-rad utan delning avvisas; delar som inte summerar avvisas; exakt delning godtas, även negativ item-rad; rubrik utan delning godtas; en ändring av `total` som bryter summan avvisas.
 - **Huvud och idempotens (2):** `quotes.travel_total` = Σ resa; migrationen kan köras igen.
@@ -133,7 +144,8 @@ Fas 6 — tester (§6)
 
 | Spec | Bevisar |
 |---|---|
-| `line-split-invariant.spec.ts` | `splitLine` öre-exakt, andelssumma ≤ 1, `resa`-komponent i `resolveLaborShare`-tvillingen. |
+| `line-split-invariant.spec.ts` | `splitLine` öre-exakt, andelssumma ≤ 1, `resa`-komponent i `resolveLaborShare`-tvillingen; med komponentrader är radens total Σ antal × à-pris och delningen Σ per typ. |
+| `component-rows-editor.spec.ts` | lägg till/ta bort rader av valfri typ, hämta ur katalogen, skriv fritt och spara som artikel, ROT-flaggan kan bara sättas på arbete, kostnad mot utpris per artikel. |
 | `rot-basis-shared.spec.ts` | `rotRutLaborBasis` på blandade rader, resa-rader, legacy-JSON; kvoten 0,375 på alla sex vägar (regression för b). |
 | `invoice-calculations-rot-split.spec.ts` | (a): blandad rad 60/40 ger bas 60 %, inte 100 %. |
 | `project-invoice-restid.spec.ts` | (f): Restid/Material/Möte/Admin ger 0 bas; `work` ger hela. |
@@ -168,3 +180,10 @@ till kunder: en ROT-faktura med blandad artikel exporteras till Fortnox i pilote
 _Codex fyller i: paket/scope, filer, avvikelser från §1 med skäl, migrationens avvikelser från §3, de 27
 SQL-kontrollernas utfall, TypeScript-specarna med utfall, körda kommandon (`tsc`, `next build`, kontraktssviten och
 `first-value.yml`-stegen), och vad som återstår. Claude granskar mot orkestreringens §6 A + B + D och matrisen._
+
+## 11. Framtida faser (registrerade, byggs inte nu)
+
+| Fas | Christoffers idé | Vad som redan finns att bygga på | Beror på |
+|---|---|---|---|
+| Arbetstyper på artiklar | Tagga artiklar med den typ av jobb de hör till (fasadmålning, nytt badrum, altan, avlopp …) så att hantverkaren filtrerar snabbare och agenten matchar artiklar och standardreservationer utan att gissa. Öppet: en eller flera typer per artikel, fast lista eller egna, hur agenten läser strukturen, hur typens reservationer möter artikelns egna. | `job_types` per företag, `quote_templates.job_type_slug` och `qstd_*`-mallens artikelrader är redan en koppling artikel ↔ jobbtyp per mall; reservationer finns i `reservation_texts`/`reservation_triggers` (v91) och `quotes.reservations_snapshot`. Det som saknas är en direkt märkning på artikeln (många-till-många) och att triggers kan hänga på jobbtypen. | Fas 5 här (jobbtypsmallen som standardstart) och att artikelraderna är stabila. |
+| Etappindelning av stora artiklar | En stor artikel (hela badrummet) delas i etapper (rivning, VVS, plattsättning, avslut) med ansvarig per etapp och en uppskattad total tid; efter kundens godkännande blir etapperna arbetsschemat. Öppet: sekventiellt eller överlappande, koppling etapp ↔ komponentrader, hur förseningar kommuniceras, om kunden ser tidslinjen. | Projektets planering (#80: flera dagar × personer, timbudget, `schedule_entry`), `estimated_hours` på raden och `project_assignment`. Etappen blir ett mellanled mellan artikel och schemaposter. | Komponentraderna (denna brief) stabila; planeringen från #80 i drift. |
