@@ -225,7 +225,10 @@ async function sendSmsWithDurability(args: SendSmsArgs, auditId?: string): Promi
     return result
   })
   if (outcome.status === 'sent') {
-    if (providerResult) return { ...providerResult, outboundStatus: 'sent' }
+    // TypeScript does not track assignment into the async callback above,
+    // so retain the runtime provider receipt through an explicit boundary.
+    const delivered = providerResult as SendSmsResult | null
+    if (delivered) return { ...delivered, outboundStatus: 'sent' }
     return { success: true, outboundStatus: 'sent', elksId: outcome.providerRef, idempotent: true }
   }
   if (outcome.status === 'skipped' || outcome.status === 'pending') return { success: false, outboundStatus: outcome.status, channelSkipped: true, channelReason: 'konfiguration', error: 'Utskicket väntar tills kanalen kan användas.' }
