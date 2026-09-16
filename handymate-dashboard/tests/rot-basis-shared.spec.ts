@@ -21,6 +21,16 @@ test('legacy-rad utan delning faller tillbaka på radtotalen, men noll gör det 
   ], 'rut')).toBe(1000)
 })
 
+test('legacy-rad utan flaggor räknas som arbete bara när type är labor', () => {
+  expect(rotRutLaborBasis([
+    { item_type: 'item', type: 'labor', total: 1000 },
+    { item_type: 'item', type: 'material', total: 400 },
+    { item_type: 'item', type: 'labor', total: 300, rot_rut_type: null },
+  ], 'rot')).toBe(1300)
+  expect(rotRutLaborBasis([{ item_type: 'item', type: 'labor', total: 1000, is_rot_eligible: false, rot_rut_type: undefined }], 'rot')).toBe(1000)
+  expect(rotRutLaborBasis([{ item_type: 'item', type: 'labor', total: 1000, rot_rut_type: 'rut' }], 'rot')).toBe(0)
+})
+
 test('25 procent moms ger ROT-kvoten 0,375 på den delade basen', () => {
   const base = rotRutLaborBasis([{ item_type: 'item', total: 1000, labor_amount: 600, is_rot_eligible: true }], 'rot')
   expect(rotRutDeductionInclVat('rot', base) / base).toBe(0.375)

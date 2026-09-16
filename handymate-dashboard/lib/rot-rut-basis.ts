@@ -7,6 +7,8 @@ export interface RotRutBasisItem {
   total?: number | null
   labor_amount?: number | null
   rot_rut_type?: string | null
+  /** Äldre rader utan flaggor: 'labor' | 'material' (samma fält som isHouseWorkRow läser). */
+  type?: string | null
   is_rot_eligible?: boolean | null
   is_rut_eligible?: boolean | null
 }
@@ -62,7 +64,7 @@ export function rotRutLaborBasis(items: RotRutBasisItem[], type: RotRutBasisType
     .filter(item => {
       const resolved = getBasisRotRutType(item)
       if (resolved) return resolved === type
-      return item.item_type === 'labor'
+      return item.type === 'labor'
     })
     .reduce((sum, item) => {
       const lineTotal = Number(item.total ?? (Number(item.quantity ?? 0) * Number(item.unit_price ?? 0)))
