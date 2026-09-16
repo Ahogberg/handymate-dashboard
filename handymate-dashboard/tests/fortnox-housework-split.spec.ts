@@ -16,6 +16,14 @@ test('blandad Handymate-rad blir en HouseWork-rad och en vanlig Fortnox-rad', ()
   expect(rows.reduce((sum, row) => sum + Number(row.Price || 0), 0)).toBe(1000)
 })
 
+test('delad timrad behåller antal och enhet så Fortnox rapporterar rätt timmar', () => {
+  const split = splitRowsForHouseWork([{ ...mixed, quantity: 3, unit: 'tim', unit_price: 1000, total: 3000,
+    labor_amount: 1800, material_amount: 900, travel_amount: 300 }])
+  expect(split.map(row => [row.quantity, row.unit, row.unit_price])).toEqual([[3, 'tim', 600], [3, 'tim', 400]])
+  const rows = buildFortnoxInvoiceRows(split, { houseWork: { rotType: 'rot', houseWorkType: 'CONSTRUCTION' } })
+  expect(rows[0].HouseWorkHoursToReport).toBe(3)
+})
+
 test('labor_amount noll kan aldrig bli HouseWork även om flaggan är satt', () => {
   expect(isHouseWorkRow({ labor_amount: 0, is_rot_eligible: true }, 'rot')).toBe(false)
 })

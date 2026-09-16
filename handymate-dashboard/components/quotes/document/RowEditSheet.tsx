@@ -73,6 +73,7 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
   const [shareLaborPct, setShareLaborPct] = useState(0)
   const [shareTravelPct, setShareTravelPct] = useState(0)
   const [confirmingShare, setConfirmingShare] = useState(false)
+  const [shareError, setShareError] = useState<string | null>(null)
   const [componentSearch, setComponentSearch] = useState('')
   const [componentHits, setComponentHits] = useState<any[]>([])
 
@@ -115,15 +116,15 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
   const componentSale = components.reduce((sum, component) => sum + Number(component.quantity_per_unit || 0) * Number(component.unit_price || 0), 0)
 
   const writeComponents = (next: any[]) => onUpdate(item.id, 'component_snapshot', {
+    ...(item.component_snapshot || {}),
     product_id: item.component_snapshot?.product_id ?? item.linked_product_id ?? null,
     product_name: item.component_snapshot?.product_name ?? item.description,
     sku: item.component_snapshot?.sku ?? item.article_number ?? null,
     sales_price: item.component_snapshot?.sales_price ?? item.unit_price,
     labor_share: item.component_snapshot?.labor_share ?? (item.is_rot_eligible ? 1 : 0),
     travel_share: item.component_snapshot?.travel_share ?? 0,
-    share_source: item.component_snapshot?.share_source ?? 'owner',
-    share_confirmed_at: item.component_snapshot?.share_confirmed_at ?? new Date().toISOString(),
-    ...(item.component_snapshot || {}),
+    share_source: item.component_snapshot?.share_source ?? null,
+    share_confirmed_at: item.component_snapshot?.share_confirmed_at ?? null,
     components: next,
   })
   const updateComponent = (index: number, patch: Record<string, unknown>) => {
@@ -145,6 +146,7 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
   const confirmSeedShare = async () => {
     if (!item.linked_product_id || shareLaborPct + shareTravelPct > 100) return
     setConfirmingShare(true)
+    setShareError(null)
     const confirmedAt = new Date().toISOString()
     try {
       const response = await fetch('/api/products', {
@@ -157,7 +159,11 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
           share_confirmed_at: confirmedAt,
         }),
       })
-      if (!response.ok) return
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}))
+        setShareError(data.error || 'Kunde inte bekräfta fördelningen. Försök igen.')
+        return
+      }
       onUpdate(item.id, 'component_snapshot', {
         ...item.component_snapshot,
         labor_share: shareLaborPct / 100,
@@ -341,12 +347,13 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
             </label>
           )}
 
-          {isEditable && item.component_snapshot?.share_source === 'seed' && !item.component_snapshot?.share_confirmed_at && item.is_rot_eligible && (
+          {isEditable && item.component_snapshot?.share_source === 'seed' && !item.component_snapshot?.share_confirmed_at && (item.is_rot_eligible || item.is_rut_eligible) && (
             <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
               <p className="text-sm font-semibold text-amber-900">
                 Arbete {shareLaborPct} % av {item.total.toLocaleString('sv-SE')} kr, stämmer det?
               </p>
               <p className="text-xs text-amber-800">Det här är en seedad uppskattning. Bekräfta eller justera innan offerten skickas.</p>
+              {shareError && <p role="alert" className="text-xs font-medium text-red-700">{shareError}</p>}
               <div className="grid grid-cols-2 gap-2">
                 <label className="text-xs text-amber-900">Arbete %
                   <input className={FIELD_CLS} type="number" min={0} max={100 - shareTravelPct} value={shareLaborPct}

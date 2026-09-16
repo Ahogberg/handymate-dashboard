@@ -14,6 +14,7 @@ import type { QuoteItem } from '@/lib/types/quote'
 import { splitLine } from '@/lib/rot-rut-basis'
 
 const ATTACHMENTS_BUCKET = 'customer-documents'
+export const dynamic = 'force-dynamic'
 
 function legacyItemsForCalculation(items: any[], deductionType: string | null | undefined): QuoteItem[] {
   return (items || []).map((item, index) => {
@@ -660,11 +661,6 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
 
-    // Avdraget är en del av det kunden fick se. När offerten väl har skickats
-    // får en senare redigering aldrig skriva om de sparade avdragsbeloppen.
-    const deductionIsFrozen = Boolean(existing.sent_at)
-      || !['draft', 'pending_approval'].includes(existing.status || '')
-
     // ═══ LIVSCYKELSPÄRR (2026-08-07) ═══
     //
     // Statusen hämtades förut bara för att sätta `sent_at`. Ingen gren avvisade
@@ -794,14 +790,12 @@ export async function PUT(request: NextRequest) {
         updates.rot_rut_type = body.rot_rut_type || null
       }
       updates.rot_rut_eligible = totals.rotWorkCost + totals.rutWorkCost
-      if (!deductionIsFrozen) {
-        updates.rot_deduction = rotDeduction
-        updates.rot_customer_pays = rotCustomerPays
-        updates.rut_deduction = rutDeduction
-        updates.rut_customer_pays = rutCustomerPays
-        updates.rot_rut_deduction = totalDeduction
-        updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total
-      }
+      updates.rot_deduction = rotDeduction
+      updates.rot_customer_pays = rotCustomerPays
+      updates.rut_deduction = rutDeduction
+      updates.rut_customer_pays = rutCustomerPays
+      updates.rot_rut_deduction = totalDeduction
+      updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total
 
       // Byt ut quote_items-raderna utan att någonsin tappa data:
       // (1) hämta gamla radernas id, (2) infoga de NYA raderna först,
@@ -912,14 +906,14 @@ export async function PUT(request: NextRequest) {
       updates.rut_work_cost = totals.rutWorkCost
 
       if (body.rot_rut_type !== undefined) updates.rot_rut_type = body.rot_rut_type
-      if (!deductionIsFrozen && body.rot_rut_type) {
+      if (body.rot_rut_type) {
         const deduction = body.rot_rut_type === 'rot' ? totals.rotDeduction : totals.rutDeduction
         updates.rot_deduction = totals.rotDeduction
         updates.rut_deduction = totals.rutDeduction
         updates.rot_rut_eligible = body.rot_rut_type === 'rot' ? totals.rotWorkCost : totals.rutWorkCost
         updates.rot_rut_deduction = deduction
         updates.customer_pays = totals.total - deduction
-      } else if (!deductionIsFrozen && (body.rot_rut_type === '' || body.rot_rut_type === null)) {
+      } else if (body.rot_rut_type === '' || body.rot_rut_type === null) {
         updates.rot_rut_type = null
         updates.rot_rut_eligible = 0
         updates.rot_rut_deduction = 0

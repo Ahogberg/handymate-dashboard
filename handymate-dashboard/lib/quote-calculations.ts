@@ -1,17 +1,14 @@
 import { QuoteItem, PaymentPlanEntry, QuoteTotals, RotRutType } from '@/lib/types/quote'
 import { estimateHours, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import { rotRutDeductionInclVat, gronTeknikDeductionInclVat } from '@/lib/rot-rut'
-import { rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
+import { getBasisRotRutType, rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 
 /**
  * Get the effective ROT/RUT type for an item.
  * Prefers rot_rut_type dropdown value, falls back to boolean flags.
  */
 export function getItemRotRutType(item: QuoteItem): RotRutType {
-  if (item.rot_rut_type !== undefined) return item.rot_rut_type
-  if (item.is_rot_eligible) return 'rot'
-  if (item.is_rut_eligible) return 'rut'
-  return null
+  return getBasisRotRutType(item)
 }
 
 /**

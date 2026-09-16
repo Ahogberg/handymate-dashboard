@@ -14,6 +14,7 @@
 import type { QuoteItem, PaymentPlanEntry, RotRutType } from '@/lib/types/quote'
 import { normalizeBranch } from '@/lib/branch'
 import { splitLine } from '@/lib/rot-rut-basis'
+import { slugifyJobType } from '@/lib/job-types'
 
 function genItemId(): string {
   return 'qi_' + Math.random().toString(36).substr(2, 12)
@@ -492,20 +493,20 @@ function maleriTemplates(): DefaultQuoteTemplate[] {
  */
 export function getDefaultQuoteTemplates(branch?: string | null): DefaultQuoteTemplate[] {
   const normalized = normalizeTemplateBranch(branch)
-  const link = (templates: Omit<DefaultQuoteTemplate, 'job_type_slug' | 'job_type_name'>[], jobTypeSlug: string, jobTypeName: string): DefaultQuoteTemplate[] =>
-    templates.map(template => ({ ...template, job_type_slug: jobTypeSlug, job_type_name: jobTypeName }))
-  const allround = link(allroundTemplates(), 'allmant-arbete', 'Allmänt arbete')
+  const link = (templates: Omit<DefaultQuoteTemplate, 'job_type_slug' | 'job_type_name'>[], jobTypeName: string): DefaultQuoteTemplate[] =>
+    templates.map(template => ({ ...template, job_type_slug: slugifyJobType(jobTypeName), job_type_name: jobTypeName }))
+  const allround = link(allroundTemplates(), 'Allmänt arbete')
 
   switch (normalized) {
     case 'construction':
     case 'carpenter':
-      return [...allround, ...link(byggTemplates(), 'byggarbete', 'Byggarbete')]
+      return [...allround, ...link(byggTemplates(), 'Byggarbete')]
     case 'electrician':
-      return [...allround, ...link(elTemplates(), 'elarbete', 'Elarbete')]
+      return [...allround, ...link(elTemplates(), 'Elarbete')]
     case 'plumber':
-      return [...allround, ...link(vvsTemplates(), 'vvs-arbete', 'VVS-arbete')]
+      return [...allround, ...link(vvsTemplates(), 'VVS-arbete')]
     case 'painter':
-      return [...allround, ...link([...maleriTemplates(), enkelReparationTemplate()], 'malararbete', 'Måleriarbete')]
+      return [...allround, ...link([...maleriTemplates(), enkelReparationTemplate()], 'Måleriarbete')]
     default:
       return allround
   }

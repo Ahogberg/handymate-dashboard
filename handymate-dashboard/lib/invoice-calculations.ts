@@ -22,7 +22,7 @@ export function calculateInvoiceTotals(
   const rutWorkCost = rotRutLaborBasis(regularItems, 'rut')
 
   for (const item of regularItems) {
-    const lineTotal = item.quantity * item.unit_price
+    const lineTotal = Number(item.total ?? item.quantity * item.unit_price)
     if (item.labor_amount != null && item.material_amount != null && item.travel_amount != null) {
       laborTotal += Number(item.labor_amount)
       materialTotal += Number(item.material_amount)

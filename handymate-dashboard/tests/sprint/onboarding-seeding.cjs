@@ -12,10 +12,11 @@ async function fixture(failure) {
  const seed=await load('lib/seed-defaults.ts',{
   '@/lib/supabase':{getServerSupabase:()=>db}, '@/lib/pipeline':pipeline,
   '@/lib/quote-standard-text-defaults':{getDefaultStandardTexts:()=>[{name:'Terms',text_type:'payment_terms',content:'Terms'}]},
-  '@/lib/product-defaults':{applyHourlyRateToDefaults:rows=>rows,getStarterProducts:()=>[{name:'Work',unit:'tim',category:'arbete',unit_price:950}]},
+  '@/lib/product-defaults':{applyHourlyRateToDefaults:rows=>rows,getStarterProducts:()=>[{name:'Work',unit:'tim',category:'arbete',unit_price:950}],productDefaultTravelShare:()=>0},
   '@/lib/reservation-defaults':{getDefaultReservations:()=>[]},
   '@/lib/quote-template-defaults':{normalizeTemplateBranch:v=>v,getDefaultQuoteTemplates:()=>[{name:'First',default_items:[]},{name:'Second',default_items:[]}]},
   '@/lib/agreement-type-defaults':{getDefaultAgreementTypes:()=>[]},
+  '@/lib/job-types':{ensureOnboardingJobTypes:async()=>[]},
  })
  return {state,run:()=>seed.seedAllDefaults(db,'biz_test','electrician',[],950)}
 }

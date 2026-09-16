@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { expandSynonyms, rankBySearchMatch } from '@/lib/products/search-ranking'
+import { invalidSharePair } from '@/lib/products/share-validation'
 
 // getAuthenticatedBusiness läser request.headers direkt — utan denna export
 // kan rutten frysas i Full Route Cache och servera ETT företags artikelbank
@@ -117,16 +118,6 @@ export async function GET(request: NextRequest) {
  * default_labor_share måste vara null eller 0–1. OBS: 0 är ett GILTIGT värde
  * (ren materialprodukt) — därför uttrycklig typ/range-koll, aldrig falsy-koll.
  */
-function invalidLaborShare(value: unknown): boolean {
-  if (value === null) return false
-  return typeof value !== 'number' || Number.isNaN(value) || value < 0 || value > 1
-}
-
-function invalidSharePair(labor: unknown, travel: unknown): boolean {
-  if (invalidLaborShare(labor) || invalidLaborShare(travel)) return true
-  return Number(labor ?? 0) + Number(travel ?? 0) > 1
-}
-
 /**
  * POST /api/products — Skapa ny produkt
  */
@@ -212,8 +203,8 @@ export async function POST(request: NextRequest) {
         // ?? — 0 är giltigt värde (ren material), inte falsy-fallback
         default_labor_share: body.default_labor_share ?? null,
         default_travel_share: body.default_travel_share ?? 0,
-        share_source: body.share_source ?? 'owner',
-        share_confirmed_at: body.share_confirmed_at ?? new Date().toISOString(),
+        share_source: body.share_source ?? null,
+        share_confirmed_at: body.share_confirmed_at ?? null,
       })
       .select()
       .single()
@@ -302,8 +293,8 @@ export async function PUT(request: NextRequest) {
       }
       if (body.default_labor_share !== undefined) updates.default_labor_share = body.default_labor_share
       if (body.default_travel_share !== undefined) updates.default_travel_share = body.default_travel_share
-      updates.share_source = body.share_source ?? 'owner'
-      updates.share_confirmed_at = body.share_confirmed_at ?? new Date().toISOString()
+      if (body.share_source !== undefined) updates.share_source = body.share_source
+      if (body.share_confirmed_at !== undefined) updates.share_confirmed_at = body.share_confirmed_at
     }
 
     // Auto-calculate markup

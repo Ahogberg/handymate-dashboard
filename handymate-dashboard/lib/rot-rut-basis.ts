@@ -6,6 +6,7 @@ export interface RotRutBasisItem {
   unit_price?: number | null
   total?: number | null
   labor_amount?: number | null
+  rot_rut_type?: string | null
   is_rot_eligible?: boolean | null
   is_rut_eligible?: boolean | null
 }
@@ -41,6 +42,15 @@ export function splitTimeEntryLine(total: number, category: TimeEntryCategory | 
   }
 }
 
+export function getBasisRotRutType(item: RotRutBasisItem): RotRutBasisType | null {
+  if (item.rot_rut_type !== undefined) {
+    return item.rot_rut_type === 'rot' || item.rot_rut_type === 'rut' ? item.rot_rut_type : null
+  }
+  if (item.is_rot_eligible) return 'rot'
+  if (item.is_rut_eligible) return 'rut'
+  return null
+}
+
 /**
  * Gemensam ROT-/RUT-bas för offert, faktura, avtal och agentvägar.
  * `labor_amount = 0` är en giltig ren material-/reserad; bara legacy-rader
@@ -49,7 +59,11 @@ export function splitTimeEntryLine(total: number, category: TimeEntryCategory | 
 export function rotRutLaborBasis(items: RotRutBasisItem[], type: RotRutBasisType): number {
   return round2((items || [])
     .filter(item => (item.item_type || 'item') === 'item')
-    .filter(item => type === 'rot' ? item.is_rot_eligible === true : item.is_rut_eligible === true)
+    .filter(item => {
+      const resolved = getBasisRotRutType(item)
+      if (resolved) return resolved === type
+      return item.item_type === 'labor'
+    })
     .reduce((sum, item) => {
       const lineTotal = Number(item.total ?? (Number(item.quantity ?? 0) * Number(item.unit_price ?? 0)))
       const labor = item.labor_amount == null ? lineTotal : Number(item.labor_amount)

@@ -121,7 +121,9 @@ test('05 Reservdel träffas inte av reseheuristiken', async () => {
 
 test('06 ogiltig enkelandel och summa över 1 avvisas, summa 1 godtas', async () => {
   await expect(db.exec("insert into products(id,business_id,name,default_labor_share,default_travel_share) values('bad_one','a','Fel',1.01,0)"))
-    .rejects.toThrow(/products_default_labor_share_check|check constraint/i)
+    .rejects.toThrow(/products_default_labor_share_check/)
+  await expect(db.exec("insert into products(id,business_id,name,default_labor_share,default_travel_share) values('bad_travel','a','Fel',0,1.01)"))
+    .rejects.toThrow(/products_default_travel_share_check/)
   await expect(db.exec("insert into products(id,business_id,name,default_labor_share,default_travel_share) values('bad_sum','a','Fel',0.8,0.3)"))
     .rejects.toThrow(/products_share_sum_check/)
   await db.exec("insert into products(id,business_id,name,default_labor_share,default_travel_share) values('good_sum','a','Rätt',0.8,0.2)")
@@ -222,4 +224,6 @@ test('30 migrationen är idempotent', async () => {
   await db.exec(readFileSync('sql/v252_line_split_travel.sql', 'utf8'))
   expect(await one("select count(*)::int count from quote_items where item_type='item' and abs(labor_amount+material_amount+travel_amount-coalesce(total,0)) >= 0.01"))
     .toEqual({ count: 0 })
+  expect(await one("select share_source from products where id='p_work'"))
+    .toEqual({ share_source: 'seed' })
 })

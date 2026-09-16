@@ -66,7 +66,7 @@ const round2 = (n: number) => Math.round(n * 100) / 100
 export function componentSaleTotal(components: SnapshotComponent[]): number | null {
   if (components.length === 0 || !components.some(component => component.unit_price != null)) return null
   return round2(components.reduce(
-    (sum, component) => sum + component.quantity_per_unit * Number(component.unit_price ?? 0),
+    (sum, component) => sum + component.quantity_per_unit * (Number(component.unit_price) > 0 ? Number(component.unit_price) : component.unit_cost),
     0,
   ))
 }
@@ -108,7 +108,7 @@ export function resolveLineShares(
   defaultTravelShare: number | null | undefined = 0,
 ): { laborShare: number | null; travelShare: number | null } {
   if (components.length > 0) {
-    const value = (component: SnapshotComponent) => component.quantity_per_unit * Number(component.unit_price ?? component.unit_cost)
+    const value = (component: SnapshotComponent) => component.quantity_per_unit * (Number(component.unit_price) > 0 ? Number(component.unit_price) : component.unit_cost)
     const total = components.reduce((sum, component) => sum + value(component), 0)
     if (total > 0) {
       const labor = components

@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { generateOCR } from '@/lib/ocr'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { toCreditItem } from '@/lib/invoices/credit-items'
 
 /**
  * POST - Skapa kreditfaktura (hel eller delkredit)
@@ -55,23 +56,15 @@ export async function POST(request: NextRequest) {
 
     if (credit_type === 'full') {
       // Full kreditering: kopiera alla items, negera belopp
-      creditItems = (original.items || []).map((item: any) => ({
-        ...item,
-        id: 'ii_' + Math.random().toString(36).substr(2, 12),
-        total: -Math.abs(item.total || 0),
-        unit_price: -Math.abs(item.unit_price || 0),
-      }))
+      creditItems = (original.items || []).map((item: any) =>
+        toCreditItem(item, 'ii_' + Math.random().toString(36).substr(2, 12)))
     } else {
       // Delkreditering: använd angivna items
       if (!partialItems || partialItems.length === 0) {
         return NextResponse.json({ error: 'Inga rader angivna för delkredit' }, { status: 400 })
       }
-      creditItems = partialItems.map((item: any) => ({
-        ...item,
-        id: item.id || 'ii_' + Math.random().toString(36).substr(2, 12),
-        total: -Math.abs(item.total || (item.quantity * item.unit_price) || 0),
-        unit_price: -Math.abs(item.unit_price || 0),
-      }))
+      creditItems = partialItems.map((item: any) =>
+        toCreditItem(item, item.id || 'ii_' + Math.random().toString(36).substr(2, 12)))
     }
 
     // Beräkna krediterade totaler

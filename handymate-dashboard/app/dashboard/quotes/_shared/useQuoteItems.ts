@@ -78,8 +78,8 @@ export function useQuoteItems(
               travel_share: shares.travelShare,
             }
             if (componentTotal !== null) {
-              updated.total = componentTotal
-              updated.unit_price = updated.quantity > 0 ? componentTotal / updated.quantity : componentTotal
+              updated.unit_price = componentTotal
+              updated.total = componentTotal * updated.quantity
             }
           }
           // Category auto-detection: set ROT/RUT based on category
@@ -112,10 +112,13 @@ export function useQuoteItems(
           if (updated.item_type === 'item') {
             const frozenLabor = updated.component_snapshot?.labor_share
             const frozenTravel = updated.component_snapshot?.travel_share
-            const travelShare = frozenTravel ?? (updated.category_slug === 'resa' ? 1 : 0)
-            const laborShare = frozenLabor ?? (travelShare > 0 ? 0 :
+            const requestedTravel = updated.category_slug === 'resa' ? 1 : frozenTravel
+            const travelShare = Math.min(1, Math.max(0, Number.isFinite(Number(requestedTravel)) ? Number(requestedTravel) : 0))
+            const requestedLabor = updated.category_slug === 'resa' ? 0 : frozenLabor
+            const laborShare = requestedLabor ?? (travelShare > 0 ? 0 :
               (updated.is_rot_eligible || updated.is_rut_eligible || updated.category_slug?.startsWith('arbete_') || ['tim', 'timmar', 'timme', 'hour', 'hours', 'h'].includes(updated.unit)) ? 1 : 0)
-            Object.assign(updated, splitLine(updated.total, laborShare, travelShare))
+            const safeLaborShare = Math.min(1 - travelShare, Math.max(0, Number.isFinite(Number(laborShare)) ? Number(laborShare) : 0))
+            Object.assign(updated, splitLine(updated.total, safeLaborShare, travelShare))
           }
           return updated
         }),

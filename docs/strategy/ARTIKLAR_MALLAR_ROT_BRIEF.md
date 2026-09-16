@@ -191,8 +191,8 @@ jobbtypsmallar/onboarding/agentrader samt CI-registrering. Tyngdpunkten i filern
 `lib/fortnox/housework.ts`, dokumentbyggarna/-mallarna, seed/mall/agentkedjan och specarna i §6.
 
 - **Beslut och invarianter:** inga avvikelser från §1 och ingen invariant i §5 har försvagats. Kärnans
-  eventkontrakt, `rotRutDeductionInclVat` och `lib/rot-rut-limits.ts` är orörda. Skickade offerters lagrade
-  avdrag fryses uttryckligen på `sent_at`/icke-utkast; bara arbetsbasfälten kan följa den aktuella radbilden.
+  eventkontrakt, `rotRutDeductionInclVat` och `lib/rot-rut-limits.ts` är orörda. Varje tillåten offertsparning
+  räknar om total, avdrag och `customer_pays` tillsammans; migrationsregeln i §5.8 skriver inte om historik.
 - **Migration:** `sql/v252_line_split_travel.sql` är innehållsmässigt oförändrad från §3 och har inte körts
   mot någon extern databas. Dess 30 kontroller är överförda till isolerad PGlite och passerar 30/30,
   inklusive idempotens och det validerade CHECK-villkoret.
@@ -200,6 +200,8 @@ jobbtypsmallar/onboarding/agentrader samt CI-registrering. Tyngdpunkten i filern
   laddar nu den nya delade ROT-basmodulen i sin isolerade modulharness; `first-quote-reality-harness`
   kräver de tillagda `sent_at`/`rot_rut_type`-fälten som skyddar skickat avdrag; offertdokumentets frysta
   paritetsbaslinje kräver den beslutade texten ”ROT-avdrag (30 % av arbetskostnaden inkl. moms)”.
+  `product-snapshot.spec.ts` uppdaterades också för reseandel och trepartsdelningen. ”Ny offert” visar
+  `QuoteJobTypeStart` som automatisk standardstart när jobbtyper finns; den vanliga vägen finns kvar.
 - **Testutfall:** `npm run test:contracts` passerar med 2 654 gröna och 1 befintlig skip; efterföljande
   kundunderlagskontrakt passerar 17/17 och activity-route passerar. De nya §6-specarna är registrerade i
   både `.github/workflows/contracts.yml` och `package.json`. `npx tsc --noEmit` och `npx next build`

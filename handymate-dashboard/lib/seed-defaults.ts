@@ -423,11 +423,19 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
 
   if (defaultTemplates.length === 0) return
 
-  await ensureOnboardingJobTypes(
-    supabase,
-    businessId,
-    Array.from(new Set(defaultTemplates.map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
-  )
+  let jobTypesReady = true
+  try {
+    await ensureOnboardingJobTypes(
+      supabase,
+      businessId,
+      Array.from(new Set(defaultTemplates.map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
+    )
+  } catch (error) {
+    // En äldre/arkiverad jobbtyp kan krocka på namn. Mallarna är fortfarande
+    // värdefulla och ska seedas; kopplingen kan aktiveras när jobbtypen rättas.
+    console.warn('[seedQuoteTemplates] Kunde inte säkra alla jobbtyper:', error)
+    jobTypesReady = false
+  }
 
   const defaultTexts = getDefaultStandardTexts(normalizedBranch)
   const texts: Record<string, string> = {}
@@ -441,7 +449,7 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       name: t.name,
       description: t.description,
       category: t.category,
-      job_type_slug: t.job_type_slug,
+      job_type_slug: jobTypesReady ? t.job_type_slug : null,
       // Inlednings-/avslutningstext seedas INTE längre (pilot-beslut 2026-07)
       // — redundanta mot quotes.description. getDefaultStandardTexts()
       // returnerar inte längre dessa typer, se lib/quote-standard-text-defaults.ts.

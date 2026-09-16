@@ -26,10 +26,9 @@ test('25 procent moms ger ROT-kvoten 0,375 på den delade basen', () => {
   expect(rotRutDeductionInclVat('rot', base) / base).toBe(0.375)
 })
 
-test('skickad offert fryser redan lagrat avdrag', () => {
+test('varje tillåten offertsparning räknar om avdrag och kundbelopp tillsammans', () => {
   const source = fs.readFileSync(path.join(__dirname, '../app/api/quotes/route.ts'), 'utf8')
-  expect(source).toContain('const deductionIsFrozen')
-  expect(source).toContain("!['draft', 'pending_approval'].includes(existing.status || '')")
-  expect(source).toContain('existing.sent_at')
-  expect(source).toMatch(/if \(!deductionIsFrozen\) \{[\s\S]*updates\.rot_deduction/)
+  expect(source).not.toContain('deductionIsFrozen')
+  expect(source).toContain('updates.rot_deduction = rotDeduction')
+  expect(source).toContain('updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total')
 })

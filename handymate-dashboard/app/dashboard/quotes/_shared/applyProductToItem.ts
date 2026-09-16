@@ -93,8 +93,8 @@ export function applyProductToItem(
     is_rot_eligible: c.is_rot_eligible ?? c.component_type === 'arbete',
     linked_product_id: c.linked_product_id ?? null,
   }))
-  const total = componentSaleTotal(components) ?? qty * unitPrice
-  const effectiveUnitPrice = qty > 0 ? total / qty : total
+  const effectiveUnitPrice = componentSaleTotal(components) ?? unitPrice
+  const total = effectiveUnitPrice * qty
 
   const snapshot = buildItemSnapshot(
     {

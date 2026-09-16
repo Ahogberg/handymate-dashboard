@@ -287,14 +287,16 @@ export function ProductEditorModal({
     }
     // Andel arbete är bara relevant utan komponenter (komponenterna vinner annars)
     if (components.length === 0) {
-      if (sharePct + travelSharePct > 100) {
+      if ((shareEnabled ? sharePct : 0) + travelSharePct > 100) {
         onError('Arbetsandel och reseandel får tillsammans inte överstiga 100 %')
         return
       }
       payload.default_labor_share = shareEnabled ? Math.min(100, Math.max(0, sharePct)) / 100 : null
       payload.default_travel_share = Math.min(100, Math.max(0, travelSharePct)) / 100
-      payload.share_source = 'owner'
-      payload.share_confirmed_at = new Date().toISOString()
+      if (shareEnabled || travelSharePct > 0) {
+        payload.share_source = 'owner'
+        payload.share_confirmed_at = new Date().toISOString()
+      }
     } else {
       payload.share_source = 'components'
       payload.share_confirmed_at = new Date().toISOString()
