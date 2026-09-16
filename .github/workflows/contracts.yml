@@ -134,6 +134,9 @@ jobs:
           tests/financial-kernel-receivables-sql.spec.ts
           tests/financial-kernel-golden-path-replay.spec.ts
           tests/financial-kernel-golden-paths.spec.ts
+          tests/ledger-sql.spec.ts
+          tests/ledger-golden-path-vouchers.spec.ts
+          tests/ledger-posting-engine.spec.ts
           tests/betalsanning-sidodorrar.spec.ts
           tests/automation-value-honesty.spec.ts
           tests/customer-value-experience.spec.ts

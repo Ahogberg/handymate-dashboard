@@ -1678,13 +1678,19 @@ Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är
 - [x] Läs briefens §1, §2, §5 samt källorna och befintliga facit som §2 pekar ut.
 - [x] Fas 1: översätt v252-utkastets 30 kontroller till `tests/line-split-sql.spec.ts`; kör inte migrationen mot Supabase (30/30 i isolerad PGlite).
 - [x] Fas 2: delad ROT-bas/splitLine, sex rättningar, resedelning och radinvariant (86/86 riktade kontrakt; TypeScript och produktionsbuild gröna).
-- [ ] Verifiera fas 1–2, commit/push och öppna tidig PR från `codex/artiklar-rot` mot `main`.
-- [ ] Fas 3: artikel-/komponent-UI, delat radschema och bekräftelse av seedad andel.
-- [ ] Fas 4: alla fakturavägar, dokument, Fortnox-split och Skatteverket-underlag.
-- [ ] Fas 5: jobbtypsmall som standardstart och delning på alla agentgenererade rader.
-- [ ] Fas 6: samtliga acceptansspecar, registrerade i workflow och `test:contracts`.
-- [ ] Slutgrind: riktade tester, kontrakt, `npx tsc --noEmit`, `npx next build`, §10-handoff och slutpush.
+- [x] Fas 3–6 och slutgrind: mergade i #86 efter två granskningsomgångar (2026-09-16); v252 körd i produktion och verifierad (brief §8).
 
-Branch: `codex/artiklar-rot`. Migrationen lämnas okörd för Claude-granskning.
+## C8 Ledger schema + posting engine — 2026-09-16 (Claude bygger, Codex usage slut)
+
+- [x] `lib/ledger/service.ts`: åtta wrappers över v251, minor units som validerade strängar, ingen tolerans.
+- [x] `lib/financial-kernel/events/types.ts`: fyra FK.1-payloads typade; ARCHITECTURE.md FK.1-raderna ✅.
+- [x] `tests/helpers/ledger-database.ts` + `tests/ledger-sql.spec.ts`: briefens 48 kontroller mot riktiga v251 i PGlite (48/48).
+- [x] `lib/ledger/posting-engine.ts` + `tests/ledger-posting-engine.spec.ts`: regelregister (tomt), utkast, BigInt-balans, konsument `ledger-posting` mot riktig `consumeOnce` (7/7).
+- [x] `tests/ledger-golden-path-vouchers.spec.ts`: 39 verifikat i 18 golden paths bokförs, läses rad för rad, numreras utan luckor, replay idempotent (6/6).
+- [x] Registrering i `contracts.yml` och `test:contracts`; handoff i briefens §9; paketloggens C8-rad.
+- [ ] Adversariell granskning med två oberoende läsare, rätta fynd, `tsc`, `test:six-outcomes`, `next build`.
+- [ ] Commit, push, PR, CI grön, squash-merge; därefter v251 i produktion med §8-verifieringen.
+
+Granskning (fylls i): se briefens §9 "Review".
 
 ---

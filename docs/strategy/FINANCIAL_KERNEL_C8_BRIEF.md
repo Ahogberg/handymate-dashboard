@@ -201,8 +201,36 @@ by service_role, `ledger_post` callable by none, zero rows.
 
 ## 9. Handoff
 
-_Codex fills this in, with the orchestration §7 fields: package/scope, files, architecture sections relied on,
-canonical events touched (the four, payloads now typed), DB/RPC changes, flags (none), golden paths
-added/updated, invariants affected, unresolved questions, open decisions encountered (§38) and left alone,
-Swedish regime coverage (via the golden-path replay), and "human accounting review required" — no for the
-mechanics in this package, yes before C9 by a named person. Claude reviews against orchestration §6 A–E._
+**Claude 2026-09-16 — built by Claude (Codex usage exhausted; owner decision the same day), branch `claude/jolly-hopper-t1d1jn`.**
+Because the same hand wrote brief, code and handoff, the §6 A–E review was run by two independent adversarial
+readers before the PR (findings and fixes listed under "Review" below) and the CI gate is unchanged.
+
+- **Package/scope:** C8 exactly as §4. Files: `lib/ledger/service.ts` (eight wrappers over the v251 RPCs, minor
+  units as validated strings, no Number on money), `lib/ledger/posting-engine.ts` (`PostingRule`, `JournalDraft`,
+  `createRuleRegistry` shipping empty, `accountFor` that throws on a missing account, `validateDraft` with BigInt,
+  `postEvent`, `ledgerPostingHandler` as consumer `ledger-posting`), `lib/financial-kernel/events/types.ts` (the
+  four payloads typed per FK.1), `ARCHITECTURE.md` (FK.1 rows ✅), `tests/helpers/ledger-database.ts`,
+  `tests/ledger-sql.spec.ts` (48), `tests/ledger-golden-path-vouchers.spec.ts` (39 vouchers, replay, numbering),
+  `tests/ledger-posting-engine.spec.ts` (7), registration in `contracts.yml` and `package.json`.
+- **Architecture relied on:** FK.0 rule 3 (no tolerance: `validateDraft` and the RPC both compare exact BigInt/BIGINT),
+  FK.1 (payload shapes), FK.2 (correlation inherited from the source event inside `ledger_post`), FK.5 (`lib/ledger/`
+  reads no provider object), blueprint §13/§14/§22/§36.1–2.
+- **Canonical events touched:** `journal_entry_posted`, `journal_entry_reversed`, `period_locked`, `period_unlocked` —
+  payloads typed; appended only by SQL (`financial_append` inside the RPC transaction), never by TypeScript.
+- **DB/RPC changes:** `sql/v251_ledger_posting_engine.sql` unchanged from §3 (byte-identical to the drafted file).
+  Not applied anywhere but PGlite until merge; then §8.
+- **Flags:** none. **Cron:** not wired (`app/api/cron/financial-kernel/route.ts` untouched); C9 wires `ledger-posting`
+  behind `auto_post_accounting_enabled`.
+- **Golden paths:** none added or changed; all 39 vouchers in the 18 paths now replay through `post_journal_entry`
+  (series F 18, B 20, L 1; fiscal years 2026 and 2027) and read back line for line, numbers gapless per series and
+  year in fixture order, replay idempotent, GP36's 3740 rounding line explicit.
+- **Invariants affected:** none weakened. §5.11 holds: `grep -n "tolerance\|EPSILON\|Math.abs" lib/ledger/` is empty.
+- **Unresolved questions:** who may unlock (Q16) stays "superadmin, enforced in TypeScript by C10"; the RPC only
+  audits. `resolveContext` (account map per business) is injected; C9 decides where the map lives.
+- **Open decisions encountered and left alone (§38):** series set (Q15), account numbers, VAT codes, "reversal dated in
+  first open period" policy, rounding account (C1b), merchant of record (P0).
+- **Swedish regime coverage:** via the golden-path replay: standard, reverse-charge construction, ROT/RUT split and
+  cash basis all pass through one code path that never inspects the regime.
+- **Human accounting review required:** no for the mechanics in this package; yes, by a named person, before C9
+  registers a rule or confirms an account (`ledger_accounts.confirmed_by`).
+- **Review (two independent adversarial readers, 2026-09-16):** _fylls i efter granskningen_.
