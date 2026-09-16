@@ -314,6 +314,7 @@ test('rollout fences and durable SMS receipt preserve compatibility', () => {
   const push = readFileSync('app/api/push/send/route.ts', 'utf8')
   expect(intents).toContain("process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' ? p.autonomyKey")
   expect(source).toContain("process.env.SUPERVISED_AUTONOMY_ENABLED === 'true' ? p.autonomyKey")
+  expect(sms).toContain('const delivered = providerResult as SendSmsResult | null')
   expect(sms).toContain("if (delivered) return { ...delivered, outboundStatus: 'sent' }")
   expect(push).toContain('if (!identity && autonomyRequested)')
 })
