@@ -18,8 +18,9 @@ function outboundIdentity(value: unknown): { source: OutboundSource; sourceId: s
     ...(read('autonomy_key') ? { autonomyKey: read('autonomy_key') } : {}) }
 }
 
-/** Authenticated logical-recipient push. H3b treats a mixed device/provider
- * result as unknown, so an accepted device is never notified twice by sweep. */
+/** Authenticated logical-recipient push. Durable producer identities use H3b;
+ * legacy callers remain on the existing delivery path unless they claim an
+ * autonomy key, which must never bypass a recoverable promise. */
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -39,23 +40,26 @@ export async function POST(request: NextRequest) {
     } as const
     if (process.env.OUTBOUND_INTENTS_ENABLED === 'true') {
       const identity = outboundIdentity(body.outbound)
-      if (!identity) return NextResponse.json({ error: 'Durable push identity required' }, { status: 400 })
-      const { withOutboundSource } = await import('@/lib/outbound/source')
-      let providerResult: PushDeliveryResult | null = null
-      const outcome = await withOutboundSource<PushEnvelope>(db, {
-        promise: { businessId: business_id, kind: 'push', source: identity.source, sourceId: identity.sourceId,
-          dedupeKey: identity.dedupeKey, recipient: target_user_id || `business:${business_id}`,
-          template: identity.template, autonomyKey: identity.autonomyKey,
-          context: target_user_id ? { targetUserId: target_user_id } : undefined },
-        envelope: { title: input.title, body: input.body, url: input.url, tag: input.tag,
-          targetUserId: target_user_id || null, data: input.data, ttlSeconds: input.ttlSeconds, priority: input.priority },
-      }, async (_intent, envelope) => {
-        providerResult = await deliverPush(db, { businessId: business_id, ...envelope })
-        return pushProviderOutcome(providerResult)
-      })
-      if (providerResult) return NextResponse.json({ success: true, ...(providerResult as PushDeliveryResult), intent_status: outcome.status })
-      return NextResponse.json({ success: true, delivered: outcome.status === 'sent', sent: outcome.status === 'sent' ? 1 : 0,
-        status: outcome.status, ...(outcome.status === 'pending' ? { reason: 'deferred' } : {}) })
+      const autonomyRequested = isRecord(body.outbound) && typeof body.outbound.autonomy_key === 'string' && body.outbound.autonomy_key.trim().length > 0
+      if (!identity && autonomyRequested) return NextResponse.json({ error: 'Durable push identity required' }, { status: 400 })
+      if (identity) {
+        const { withOutboundSource } = await import('@/lib/outbound/source')
+        let providerResult: PushDeliveryResult | null = null
+        const outcome = await withOutboundSource<PushEnvelope>(db, {
+          promise: { businessId: business_id, kind: 'push', source: identity.source, sourceId: identity.sourceId,
+            dedupeKey: identity.dedupeKey, recipient: target_user_id || `business:${business_id}`,
+            template: identity.template, autonomyKey: identity.autonomyKey,
+            context: target_user_id ? { targetUserId: target_user_id } : undefined },
+          envelope: { title: input.title, body: input.body, url: input.url, tag: input.tag,
+            targetUserId: target_user_id || null, data: input.data, ttlSeconds: input.ttlSeconds, priority: input.priority },
+        }, async (_intent, envelope) => {
+          providerResult = await deliverPush(db, { businessId: business_id, ...envelope })
+          return pushProviderOutcome(providerResult)
+        })
+        if (providerResult) return NextResponse.json({ success: true, ...(providerResult as PushDeliveryResult), intent_status: outcome.status })
+        return NextResponse.json({ success: true, delivered: outcome.status === 'sent', sent: outcome.status === 'sent' ? 1 : 0,
+          status: outcome.status, ...(outcome.status === 'pending' ? { reason: 'deferred' } : {}) })
+      }
     }
     if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
       const { gateChannel } = await import('@/lib/channels/preflight')
