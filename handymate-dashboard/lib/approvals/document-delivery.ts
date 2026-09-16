@@ -61,7 +61,6 @@ export async function deliverReviewedDocument(db: SupabaseClient, doc: ReviewedD
       await record('rejected', { error: 'PDF-uppladdningen misslyckades före utskick' })
       return failure('PDF-filen kunde inte sparas. Inget mejl skickades.', true)
     }
-    providerCalled = true
     if (typeof process !== 'undefined' && process.env.OUTBOUND_INTENTS_ENABLED === 'true') {
       const { withOutboundSource } = await import('@/lib/outbound/source')
       const { reviewedDocumentReceipt } = await import('@/lib/outbound/resolve')
@@ -73,6 +72,7 @@ export async function deliverReviewedDocument(db: SupabaseClient, doc: ReviewedD
           context: { version: doc.version, ...(doc.email.fromAddress ? { fromAddress: doc.email.fromAddress } : {}) } },
         envelope,
       }, async (_intent, persistedEnvelope) => {
+        providerCalled = true
         const result = emailProviderOutcome(await sendEmail({ ...doc.email, businessId: doc.businessId,
           attachments: [{ filename: 'jobbrapport.pdf', content: doc.pdf.toString('base64') }],
           idempotencyKey: `reviewed-document/${id}/${doc.version}` }))
@@ -83,6 +83,7 @@ export async function deliverReviewedDocument(db: SupabaseClient, doc: ReviewedD
       if (promised.status === 'pending') return failure('Dokumentet är sparat och väntar på att mejlkanalen blir tillgänglig.', true)
       return failure(promised.status === 'failed' ? 'Mejltjänsten avvisade dokumentet.' : 'Dokumentet är sparat, men mejlets leverans är okänd. Inget automatiskt omutskick görs.', true)
     }
+    providerCalled = true
     const result = await sendEmail({ ...doc.email, businessId: doc.businessId,
       attachments: [{ filename: 'jobbrapport.pdf', content: doc.pdf.toString('base64') }],
       idempotencyKey: `reviewed-document/${id}/${doc.version}` })
