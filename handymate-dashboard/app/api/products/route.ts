@@ -122,6 +122,11 @@ function invalidLaborShare(value: unknown): boolean {
   return typeof value !== 'number' || Number.isNaN(value) || value < 0 || value > 1
 }
 
+function invalidSharePair(labor: unknown, travel: unknown): boolean {
+  if (invalidLaborShare(labor) || invalidLaborShare(travel)) return true
+  return Number(labor ?? 0) + Number(travel ?? 0) > 1
+}
+
 /**
  * POST /api/products — Skapa ny produkt
  */
@@ -139,8 +144,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Namn och försäljningspris krävs' }, { status: 400 })
     }
 
-    if (body.default_labor_share !== undefined && invalidLaborShare(body.default_labor_share)) {
-      return NextResponse.json({ error: 'Andel arbete måste vara mellan 0 och 1' }, { status: 400 })
+    if (invalidSharePair(body.default_labor_share ?? null, body.default_travel_share ?? 0)) {
+      return NextResponse.json({ error: 'Arbetsandel och reseandel måste vara 0–100 % och får tillsammans inte överstiga 100 %' }, { status: 400 })
     }
 
     if (body.rot_eligible && body.rut_eligible) {
@@ -206,6 +211,9 @@ export async function POST(request: NextRequest) {
         category_id: body.category_id ?? null,
         // ?? — 0 är giltigt värde (ren material), inte falsy-fallback
         default_labor_share: body.default_labor_share ?? null,
+        default_travel_share: body.default_travel_share ?? 0,
+        share_source: body.share_source ?? 'owner',
+        share_confirmed_at: body.share_confirmed_at ?? new Date().toISOString(),
       })
       .select()
       .single()
@@ -280,11 +288,22 @@ export async function PUT(request: NextRequest) {
     if (body.is_active !== undefined) updates.is_active = body.is_active
     if (body.is_favorite !== undefined) updates.is_favorite = body.is_favorite
     if (body.category_id !== undefined) updates.category_id = body.category_id
-    if (body.default_labor_share !== undefined) {
-      if (invalidLaborShare(body.default_labor_share)) {
-        return NextResponse.json({ error: 'Andel arbete måste vara mellan 0 och 1' }, { status: 400 })
+    if (body.default_labor_share !== undefined || body.default_travel_share !== undefined) {
+      const { data: current } = await supabase
+        .from('products')
+        .select('default_labor_share, default_travel_share')
+        .eq('id', body.id)
+        .eq('business_id', business.business_id)
+        .maybeSingle()
+      const labor = body.default_labor_share !== undefined ? body.default_labor_share : current?.default_labor_share
+      const travel = body.default_travel_share !== undefined ? body.default_travel_share : current?.default_travel_share
+      if (invalidSharePair(labor ?? null, travel ?? 0)) {
+        return NextResponse.json({ error: 'Arbetsandel och reseandel måste vara 0–100 % och får tillsammans inte överstiga 100 %' }, { status: 400 })
       }
-      updates.default_labor_share = body.default_labor_share
+      if (body.default_labor_share !== undefined) updates.default_labor_share = body.default_labor_share
+      if (body.default_travel_share !== undefined) updates.default_travel_share = body.default_travel_share
+      updates.share_source = body.share_source ?? 'owner'
+      updates.share_confirmed_at = body.share_confirmed_at ?? new Date().toISOString()
     }
 
     // Auto-calculate markup

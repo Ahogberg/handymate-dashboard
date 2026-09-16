@@ -1,7 +1,7 @@
 'use client'
 
-import { useEffect } from 'react'
-import { ArrowDown, ArrowUp, Bookmark, Check, Trash2, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { ArrowDown, ArrowUp, Bookmark, Check, Plus, Trash2, X } from 'lucide-react'
 import type { QuoteItem, QuoteItemType } from '@/lib/types/quote'
 import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
 import { standardPriceOffer } from '@/lib/products/pricing-state'
@@ -70,6 +70,30 @@ const FIELD_CLS =
  * istället för att uppfinna en egen datavåg.
  */
 export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose, linkedProductPrice, onSaveAsStandard, onSaveToBank }: RowEditSheetProps) {
+  const [shareLaborPct, setShareLaborPct] = useState(0)
+  const [shareTravelPct, setShareTravelPct] = useState(0)
+  const [confirmingShare, setConfirmingShare] = useState(false)
+  const [componentSearch, setComponentSearch] = useState('')
+  const [componentHits, setComponentHits] = useState<any[]>([])
+
+  useEffect(() => {
+    setShareLaborPct(Math.round(Number(item?.component_snapshot?.labor_share ?? 0) * 100))
+    setShareTravelPct(Math.round(Number(item?.component_snapshot?.travel_share ?? 0) * 100))
+  }, [item?.id, item?.component_snapshot?.labor_share, item?.component_snapshot?.travel_share])
+
+  useEffect(() => {
+    if (!item || componentSearch.trim().length < 2) {
+      setComponentHits([])
+      return
+    }
+    const controller = new AbortController()
+    fetch(`/api/products?search=${encodeURIComponent(componentSearch)}&include=components`, { signal: controller.signal })
+      .then(response => response.ok ? response.json() : { products: [] })
+      .then(data => setComponentHits((data.products || []).slice(0, 5)))
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [componentSearch, item?.id])
+
   useEffect(() => {
     if (!item) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
@@ -83,6 +107,68 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
   }, [item, onClose])
 
   if (!item) return null
+
+  const components: any[] = Array.isArray(item.component_snapshot?.components)
+    ? item.component_snapshot.components
+    : []
+  const componentCost = components.reduce((sum, component) => sum + Number(component.quantity_per_unit || 0) * Number(component.unit_cost || 0), 0)
+  const componentSale = components.reduce((sum, component) => sum + Number(component.quantity_per_unit || 0) * Number(component.unit_price || 0), 0)
+
+  const writeComponents = (next: any[]) => onUpdate(item.id, 'component_snapshot', {
+    product_id: item.component_snapshot?.product_id ?? item.linked_product_id ?? null,
+    product_name: item.component_snapshot?.product_name ?? item.description,
+    sku: item.component_snapshot?.sku ?? item.article_number ?? null,
+    sales_price: item.component_snapshot?.sales_price ?? item.unit_price,
+    labor_share: item.component_snapshot?.labor_share ?? (item.is_rot_eligible ? 1 : 0),
+    travel_share: item.component_snapshot?.travel_share ?? 0,
+    share_source: item.component_snapshot?.share_source ?? 'owner',
+    share_confirmed_at: item.component_snapshot?.share_confirmed_at ?? new Date().toISOString(),
+    ...(item.component_snapshot || {}),
+    components: next,
+  })
+  const updateComponent = (index: number, patch: Record<string, unknown>) => {
+    const next = components.map((component, componentIndex) => componentIndex === index ? { ...component, ...patch } : component)
+    writeComponents(next)
+  }
+  const addComponent = (source?: any) => writeComponents([...components, {
+    component_type: source?.default_travel_share === 1 ? 'resa' : source?.rot_eligible ? 'arbete' : 'material',
+    description: source?.name ?? '',
+    article_number: source?.sku ?? null,
+    quantity_per_unit: 1,
+    unit: source?.unit ?? 'st',
+    unit_cost: source?.purchase_price ?? 0,
+    unit_price: source?.sales_price ?? 0,
+    is_rot_eligible: Boolean(source?.rot_eligible),
+    linked_product_id: source?.id ?? null,
+  }])
+
+  const confirmSeedShare = async () => {
+    if (!item.linked_product_id || shareLaborPct + shareTravelPct > 100) return
+    setConfirmingShare(true)
+    const confirmedAt = new Date().toISOString()
+    try {
+      const response = await fetch('/api/products', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: item.linked_product_id,
+          default_labor_share: shareLaborPct / 100,
+          default_travel_share: shareTravelPct / 100,
+          share_source: 'owner',
+          share_confirmed_at: confirmedAt,
+        }),
+      })
+      if (!response.ok) return
+      onUpdate(item.id, 'component_snapshot', {
+        ...item.component_snapshot,
+        labor_share: shareLaborPct / 100,
+        travel_share: shareTravelPct / 100,
+        share_source: 'owner',
+        share_confirmed_at: confirmedAt,
+      })
+    } finally {
+      setConfirmingShare(false)
+    }
+  }
 
   const isEditable = item.item_type === 'item' || item.item_type === 'discount' || item.item_type === 'option'
   const isOption = item.item_type === 'option'
@@ -253,6 +339,92 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
               />
               <span className="text-sm font-medium text-teal-700">Förvald — ikryssat när kunden öppnar offerten</span>
             </label>
+          )}
+
+          {isEditable && item.component_snapshot?.share_source === 'seed' && !item.component_snapshot?.share_confirmed_at && item.is_rot_eligible && (
+            <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 space-y-2">
+              <p className="text-sm font-semibold text-amber-900">
+                Arbete {shareLaborPct} % av {item.total.toLocaleString('sv-SE')} kr, stämmer det?
+              </p>
+              <p className="text-xs text-amber-800">Det här är en seedad uppskattning. Bekräfta eller justera innan offerten skickas.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <label className="text-xs text-amber-900">Arbete %
+                  <input className={FIELD_CLS} type="number" min={0} max={100 - shareTravelPct} value={shareLaborPct}
+                    onChange={event => setShareLaborPct(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} />
+                </label>
+                <label className="text-xs text-amber-900">Resa %
+                  <input className={FIELD_CLS} type="number" min={0} max={100 - shareLaborPct} value={shareTravelPct}
+                    onChange={event => setShareTravelPct(Math.max(0, Math.min(100, Number(event.target.value) || 0)))} />
+                </label>
+              </div>
+              <button type="button" disabled={confirmingShare || shareLaborPct + shareTravelPct > 100}
+                onClick={confirmSeedShare} className="min-h-[44px] w-full rounded-xl bg-amber-900 px-3 text-sm font-semibold text-white disabled:opacity-50">
+                {confirmingShare ? 'Sparar…' : 'Bekräfta fördelningen'}
+              </button>
+            </div>
+          )}
+
+          {isEditable && (
+            <div className="rounded-xl border border-slate-200 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">Rader under artikeln</p>
+                  <p className="text-xs text-slate-500">Kostnad {componentCost.toLocaleString('sv-SE')} kr · Utpris {componentSale.toLocaleString('sv-SE')} kr</p>
+                </div>
+                <button type="button" onClick={() => addComponent()} className="inline-flex min-h-[44px] items-center gap-1 text-sm font-semibold text-primary-700">
+                  <Plus className="h-4 w-4" /> Rad
+                </button>
+              </div>
+              <input className={FIELD_CLS} value={componentSearch} onChange={event => setComponentSearch(event.target.value)} placeholder="Hämta artikel ur katalogen…" />
+              {componentHits.length > 0 && (
+                <div className="rounded-lg border border-slate-200 divide-y">
+                  {componentHits.map(hit => (
+                    <button key={hit.id} type="button" onClick={() => { addComponent(hit); setComponentSearch(''); setComponentHits([]) }}
+                      className="flex min-h-[44px] w-full items-center justify-between px-3 text-left text-sm hover:bg-slate-50">
+                      <span>{hit.name}</span><span className="text-slate-500">{Number(hit.sales_price || 0).toLocaleString('sv-SE')} kr</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              {components.map((component, index) => (
+                <div key={index} className="rounded-lg border border-slate-200 p-2 space-y-2">
+                  <div className="flex gap-2">
+                    <select className={FIELD_CLS} value={component.component_type}
+                      onChange={event => updateComponent(index, { component_type: event.target.value, is_rot_eligible: event.target.value === 'arbete' ? component.is_rot_eligible !== false : false })}>
+                      <option value="arbete">Arbete</option><option value="material">Material</option><option value="resa">Resa</option>
+                    </select>
+                    <button type="button" aria-label="Ta bort komponentrad" onClick={() => writeComponents(components.filter((_, i) => i !== index))}
+                      className="min-h-[44px] min-w-[44px] text-red-600"><Trash2 className="mx-auto h-4 w-4" /></button>
+                  </div>
+                  <input className={FIELD_CLS} value={component.description || ''} onChange={event => updateComponent(index, { description: event.target.value })} placeholder="Namn" />
+                  <input className={FIELD_CLS} value={component.article_number || ''} onChange={event => updateComponent(index, { article_number: event.target.value })} placeholder="Artikelnummer" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <input aria-label="Antal" className={FIELD_CLS} type="number" min={0} value={component.quantity_per_unit ?? 1} onChange={event => updateComponent(index, { quantity_per_unit: Number(event.target.value) })} />
+                    <select aria-label="Enhet" className={FIELD_CLS} value={component.unit || 'st'} onChange={event => updateComponent(index, { unit: event.target.value })}>
+                      {UNIT_OPTIONS.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}
+                    </select>
+                    <input aria-label="À-pris" className={FIELD_CLS} type="number" min={0} value={component.unit_price ?? 0} onChange={event => updateComponent(index, { unit_price: Number(event.target.value) })} />
+                    <input aria-label="Självkostnad" className={FIELD_CLS} type="number" min={0} value={component.unit_cost ?? 0} onChange={event => updateComponent(index, { unit_cost: Number(event.target.value) })} />
+                  </div>
+                  {component.component_type === 'arbete' && (
+                    <label className="flex min-h-[44px] items-center gap-2 text-sm"><input type="checkbox" checked={component.is_rot_eligible !== false}
+                      onChange={event => updateComponent(index, { is_rot_eligible: event.target.checked })} /> ROT-berättigat arbete</label>
+                  )}
+                  {!component.linked_product_id && component.description && (
+                    <button type="button" className="min-h-[44px] w-full rounded-lg bg-slate-100 text-sm font-semibold text-slate-700"
+                      onClick={async () => {
+                        const response = await fetch('/api/products', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({
+                          name: component.description, sku: component.article_number || null, unit: component.unit || 'st', sales_price: Number(component.unit_price || 0),
+                          purchase_price: Number(component.unit_cost || 0), category: component.component_type === 'arbete' ? 'arbete' : 'material',
+                          rot_eligible: component.component_type === 'arbete' && component.is_rot_eligible !== false,
+                          default_labor_share: component.component_type === 'arbete' ? 1 : 0, default_travel_share: component.component_type === 'resa' ? 1 : 0,
+                        }) })
+                        if (response.ok) { const data = await response.json(); updateComponent(index, { linked_product_id: data.product?.id || null }) }
+                      }}>Spara som artikel</button>
+                  )}
+                </div>
+              ))}
+            </div>
           )}
 
           {/* Dölj för kund (v90): raden syns inte i kundens dokument men

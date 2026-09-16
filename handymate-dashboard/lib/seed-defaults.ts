@@ -1,10 +1,11 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
-import { applyHourlyRateToDefaults, getStarterProducts } from '@/lib/product-defaults'
+import { applyHourlyRateToDefaults, getStarterProducts, productDefaultTravelShare } from '@/lib/product-defaults'
 import { getDefaultReservations } from '@/lib/reservation-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
 import { ensureDefaultStages } from '@/lib/pipeline'
+import { ensureOnboardingJobTypes } from '@/lib/job-types'
 
 type SupabaseClient = ReturnType<typeof getServerSupabase>
 
@@ -316,7 +317,10 @@ export async function seedProducts(supabase: SupabaseClient, businessId: string,
       // 0 skulle se ut som 100 % marginal i efterkalkylen.
       purchase_price: null,
       default_labor_share: p.labor_share,
-      rot_eligible: p.deduction === 'rot',
+      default_travel_share: productDefaultTravelShare(p),
+      share_source: 'seed',
+      share_confirmed_at: null,
+      rot_eligible: productDefaultTravelShare(p) === 0 && p.deduction === 'rot',
       rut_eligible: p.deduction === 'rut',
       is_active: true,
       // Löpande arbete är det hantverkaren når oftast — snabbvalsknapparna i
@@ -419,6 +423,12 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
 
   if (defaultTemplates.length === 0) return
 
+  await ensureOnboardingJobTypes(
+    supabase,
+    businessId,
+    Array.from(new Set(defaultTemplates.map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
+  )
+
   const defaultTexts = getDefaultStandardTexts(normalizedBranch)
   const texts: Record<string, string> = {}
   for (const t of defaultTexts) texts[t.text_type] = t.content
@@ -431,6 +441,7 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       name: t.name,
       description: t.description,
       category: t.category,
+      job_type_slug: t.job_type_slug,
       // Inlednings-/avslutningstext seedas INTE längre (pilot-beslut 2026-07)
       // — redundanta mot quotes.description. getDefaultStandardTexts()
       // returnerar inte längre dessa typer, se lib/quote-standard-text-defaults.ts.

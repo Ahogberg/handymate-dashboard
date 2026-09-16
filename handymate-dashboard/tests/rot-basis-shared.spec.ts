@@ -1,4 +1,6 @@
 import { expect, test } from '@playwright/test'
+import fs from 'node:fs'
+import path from 'node:path'
 import { rotRutLaborBasis } from '../lib/rot-rut-basis'
 import { rotRutDeductionInclVat } from '../lib/rot-rut'
 
@@ -22,4 +24,12 @@ test('legacy-rad utan delning faller tillbaka på radtotalen, men noll gör det 
 test('25 procent moms ger ROT-kvoten 0,375 på den delade basen', () => {
   const base = rotRutLaborBasis([{ item_type: 'item', total: 1000, labor_amount: 600, is_rot_eligible: true }], 'rot')
   expect(rotRutDeductionInclVat('rot', base) / base).toBe(0.375)
+})
+
+test('skickad offert fryser redan lagrat avdrag', () => {
+  const source = fs.readFileSync(path.join(__dirname, '../app/api/quotes/route.ts'), 'utf8')
+  expect(source).toContain('const deductionIsFrozen')
+  expect(source).toContain("!['draft', 'pending_approval'].includes(existing.status || '')")
+  expect(source).toContain('existing.sent_at')
+  expect(source).toMatch(/if \(!deductionIsFrozen\) \{[\s\S]*updates\.rot_deduction/)
 })

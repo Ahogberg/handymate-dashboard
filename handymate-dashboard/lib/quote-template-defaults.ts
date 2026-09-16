@@ -13,6 +13,7 @@
 
 import type { QuoteItem, PaymentPlanEntry, RotRutType } from '@/lib/types/quote'
 import { normalizeBranch } from '@/lib/branch'
+import { splitLine } from '@/lib/rot-rut-basis'
 
 function genItemId(): string {
   return 'qi_' + Math.random().toString(36).substr(2, 12)
@@ -53,6 +54,7 @@ function line(description: string, quantity: number, unit: string, unit_price: n
     unit,
     unit_price,
     total: quantity * unit_price,
+    ...splitLine(quantity * unit_price, rotRutType === 'rot' || rotRutType === 'rut' ? 1 : 0),
     is_rot_eligible: rotRutType === 'rot',
     is_rut_eligible: rotRutType === 'rut',
     rot_rut_type: rotRutType,
@@ -71,6 +73,7 @@ function option(description: string, quantity: number, unit: string, unit_price:
     unit,
     unit_price,
     total: quantity * unit_price,
+    ...splitLine(quantity * unit_price, rotRutType === 'rot' || rotRutType === 'rut' ? 1 : 0),
     is_rot_eligible: rotRutType === 'rot',
     is_rut_eligible: rotRutType === 'rut',
     rot_rut_type: rotRutType,
@@ -129,6 +132,10 @@ export interface DefaultQuoteTemplate {
   default_payment_plan: PaymentPlanEntry[]
   rot_enabled: boolean
   rut_enabled: boolean
+  /** Sätts alltid av getDefaultQuoteTemplates; optional internt medan
+      branschbyggarna konstruerar innehållet före kopplingen. */
+  job_type_slug?: string
+  job_type_name?: string
 }
 
 // ─── Branschnyckel-normalisering ────────────────────────────────────────
@@ -485,18 +492,20 @@ function maleriTemplates(): DefaultQuoteTemplate[] {
  */
 export function getDefaultQuoteTemplates(branch?: string | null): DefaultQuoteTemplate[] {
   const normalized = normalizeTemplateBranch(branch)
-  const allround = allroundTemplates()
+  const link = (templates: Omit<DefaultQuoteTemplate, 'job_type_slug' | 'job_type_name'>[], jobTypeSlug: string, jobTypeName: string): DefaultQuoteTemplate[] =>
+    templates.map(template => ({ ...template, job_type_slug: jobTypeSlug, job_type_name: jobTypeName }))
+  const allround = link(allroundTemplates(), 'allmant-arbete', 'Allmänt arbete')
 
   switch (normalized) {
     case 'construction':
     case 'carpenter':
-      return [...allround, ...byggTemplates()]
+      return [...allround, ...link(byggTemplates(), 'byggarbete', 'Byggarbete')]
     case 'electrician':
-      return [...allround, ...elTemplates()]
+      return [...allround, ...link(elTemplates(), 'elarbete', 'Elarbete')]
     case 'plumber':
-      return [...allround, ...vvsTemplates()]
+      return [...allround, ...link(vvsTemplates(), 'vvs-arbete', 'VVS-arbete')]
     case 'painter':
-      return [...allround, ...maleriTemplates(), enkelReparationTemplate()]
+      return [...allround, ...link([...maleriTemplates(), enkelReparationTemplate()], 'malararbete', 'Måleriarbete')]
     default:
       return allround
   }

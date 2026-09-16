@@ -72,6 +72,9 @@ export interface HouseWorkRowInput {
   is_rut_eligible?: boolean | null
   /** Äldre rader: 'labor' | 'material'. */
   type?: string | null
+  labor_amount?: number | null
+  material_amount?: number | null
+  travel_amount?: number | null
 }
 
 export interface HouseWorkRowFields {
@@ -85,9 +88,52 @@ const HOUR_UNITS = new Set(['tim', 'h', 'timme', 'timmar', 'hour', 'hours', 'hr'
 /** Är raden arbete som ger skattereduktion? Flaggan på raden vinner; äldre
     rader utan flaggor räknas som arbete om type==='labor'. */
 export function isHouseWorkRow(item: HouseWorkRowInput, type: RotRutType): boolean {
+  if (item.labor_amount === 0) return false
   if (type === 'rot' && typeof item.is_rot_eligible === 'boolean') return item.is_rot_eligible
   if (type === 'rut' && typeof item.is_rut_eligible === 'boolean') return item.is_rut_eligible
   return item.type === 'labor'
+}
+
+/** Fortnox kan bara märka en hel fakturarad som HouseWork. En blandad rad
+ * delas därför vid export; Handymates sparade fakturarad och snapshot rörs
+ * aldrig. */
+export function splitRowsForHouseWork<T extends HouseWorkRowInput & {
+  item_type?: string | null
+  description?: string | null
+  name?: string | null
+  quantity?: number | null
+  unit_price?: number | null
+}>(items: T[]): T[] {
+  return items.flatMap(item => {
+    if ((item.item_type || 'item') !== 'item' || item.labor_amount == null) return [item]
+    const labor = Number(item.labor_amount)
+    const total = Number(item.quantity ?? 1) * Number(item.unit_price ?? 0)
+    if (!(labor > 0) || Math.abs(labor) >= Math.abs(total)) return [item]
+    const remainder = Math.round((total - labor) * 100) / 100
+    const description = item.description || item.name || ''
+    return [
+      {
+        ...item,
+        description: `${description} – arbete`,
+        quantity: 1,
+        unit_price: labor,
+        labor_amount: labor,
+        material_amount: 0,
+        travel_amount: 0,
+      },
+      {
+        ...item,
+        description: `${description} – material och resa`,
+        quantity: 1,
+        unit_price: remainder,
+        labor_amount: 0,
+        material_amount: Number(item.material_amount ?? 0),
+        travel_amount: Number(item.travel_amount ?? 0),
+        is_rot_eligible: false,
+        is_rut_eligible: false,
+      },
+    ] as T[]
+  })
 }
 
 /**

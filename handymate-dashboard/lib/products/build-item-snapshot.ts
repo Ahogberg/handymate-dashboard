@@ -35,6 +35,8 @@ export interface SnapshotProduct {
   sales_price: number
   default_labor_share: number | null
   default_travel_share?: number | null
+  share_source?: 'seed' | 'owner' | 'components' | 'import' | null
+  share_confirmed_at?: string | null
 }
 
 export interface ItemSnapshotResult {
@@ -47,6 +49,8 @@ export interface ItemSnapshotResult {
         klient-side från detta värde utan att behöva API:t igen. */
     labor_share: number | null
     travel_share: number | null
+    share_source: 'seed' | 'owner' | 'components' | 'import' | null
+    share_confirmed_at: string | null
     components: SnapshotComponent[]
   } | null
   labor_share: number | null // null = ingen split (legacy-beteende)
@@ -58,6 +62,21 @@ export interface ItemSnapshotResult {
 }
 
 const round2 = (n: number) => Math.round(n * 100) / 100
+
+export function componentSaleTotal(components: SnapshotComponent[]): number | null {
+  if (components.length === 0 || !components.some(component => component.unit_price != null)) return null
+  return round2(components.reduce(
+    (sum, component) => sum + component.quantity_per_unit * Number(component.unit_price ?? 0),
+    0,
+  ))
+}
+
+export function componentCostTotal(components: SnapshotComponent[]): number {
+  return round2(components.reduce(
+    (sum, component) => sum + component.quantity_per_unit * component.unit_cost,
+    0,
+  ))
+}
 
 /**
  * Arbetsandel = arbetskomponenternas kostnadsandel av total komponentkostnad.
@@ -159,6 +178,8 @@ export function buildItemSnapshot(
       sales_price: product.sales_price,
       labor_share: laborShare,
       travel_share: travelShare,
+      share_source: components.length > 0 ? 'components' : product.share_source ?? null,
+      share_confirmed_at: product.share_confirmed_at ?? null,
       components,
     },
     labor_share: laborShare,

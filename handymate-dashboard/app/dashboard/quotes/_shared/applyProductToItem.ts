@@ -1,6 +1,7 @@
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 import {
   buildItemSnapshot,
+  componentSaleTotal,
   type SnapshotComponent,
 } from '@/lib/products/build-item-snapshot'
 
@@ -14,7 +15,7 @@ import {
 
 /** Komponentrad som API:t returnerar (product_components-rad, v67). */
 export interface ProductComponentRow {
-  component_type: string
+  component_type: 'arbete' | 'material' | 'resa'
   description: string
   quantity_per_unit: number
   unit: string
@@ -42,6 +43,8 @@ export interface ProductWithComponents {
   is_favorite?: boolean
   default_labor_share?: number | null
   default_travel_share?: number | null
+  share_source?: 'seed' | 'owner' | 'components' | 'import' | null
+  share_confirmed_at?: string | null
   category_id?: string | null
   components?: ProductComponentRow[]
 }
@@ -78,7 +81,6 @@ export function applyProductToItem(
   // Tidigare nollades radpriset → AI-matchade prislösa artiklar gav rader
   // som såg klara ut men var 0 kr.
   const unitPrice = product.sales_price > 0 ? product.sales_price : (item.unit_price || 0)
-  const total = qty * unitPrice
 
   const components: SnapshotComponent[] = (product.components ?? []).map(c => ({
     component_type: c.component_type === 'arbete' ? 'arbete' : c.component_type === 'resa' ? 'resa' : 'material',
@@ -91,6 +93,8 @@ export function applyProductToItem(
     is_rot_eligible: c.is_rot_eligible ?? c.component_type === 'arbete',
     linked_product_id: c.linked_product_id ?? null,
   }))
+  const total = componentSaleTotal(components) ?? qty * unitPrice
+  const effectiveUnitPrice = qty > 0 ? total / qty : total
 
   const snapshot = buildItemSnapshot(
     {
@@ -100,6 +104,8 @@ export function applyProductToItem(
       sales_price: product.sales_price,
       default_labor_share: product.default_labor_share ?? null,
       default_travel_share: product.default_travel_share ?? 0,
+      share_source: product.share_source ?? null,
+      share_confirmed_at: product.share_confirmed_at ?? null,
     },
     components,
     qty,
@@ -117,7 +123,7 @@ export function applyProductToItem(
     description: product.name,
     quantity: qty,
     unit: normalizeUnit(product.unit),
-    unit_price: unitPrice,
+    unit_price: effectiveUnitPrice,
     total,
     article_number: product.sku ?? undefined,
     cost_price: product.purchase_price ?? undefined,

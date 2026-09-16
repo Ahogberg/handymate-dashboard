@@ -616,4 +616,11 @@ test.describe('parsern', () => {
       metod: 'eq',
     })
   })
+
+  test('v252 deklarerar resekolumnerna på rad, artikel och offerthuvud', () => {
+    const sql = fs.readFileSync(path.join(ROOT, 'sql', 'v252_line_split_travel.sql'), 'utf8')
+    expect(sql).toContain('travel_amount')
+    expect(sql).toContain('default_travel_share')
+    expect(sql).toContain('travel_total')
+  })
 })

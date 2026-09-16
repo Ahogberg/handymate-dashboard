@@ -184,9 +184,34 @@ jobbtyper och artiklar en bransch brukar återanvända, hanteras så här:
 
 ## 10. Handoff
 
-_Codex fyller i: paket/scope, filer, avvikelser från §1 med skäl, migrationens avvikelser från §3, de 27
-SQL-kontrollernas utfall, TypeScript-specarna med utfall, körda kommandon (`tsc`, `next build`, kontraktssviten och
-`first-value.yml`-stegen), och vad som återstår. Claude granskar mot orkestreringens §6 A + B + D och matrisen._
+**Codex 2026-09-16 — branch `codex/artiklar-rot`, PR #86.** Paketet omfattar fas 1–6: SQL-kontraktet,
+gemensam rad-/ROT-bas, artikel- och komponentredigering, samtliga fakturavägar, dokument/Fortnox/SKV,
+jobbtypsmallar/onboarding/agentrader samt CI-registrering. Tyngdpunkten i filerna är
+`lib/rot-rut-basis.ts`, offert-/fakturaberäkningarna och skapandevägarna, produkt-API/UI och snapshots,
+`lib/fortnox/housework.ts`, dokumentbyggarna/-mallarna, seed/mall/agentkedjan och specarna i §6.
+
+- **Beslut och invarianter:** inga avvikelser från §1 och ingen invariant i §5 har försvagats. Kärnans
+  eventkontrakt, `rotRutDeductionInclVat` och `lib/rot-rut-limits.ts` är orörda. Skickade offerters lagrade
+  avdrag fryses uttryckligen på `sent_at`/icke-utkast; bara arbetsbasfälten kan följa den aktuella radbilden.
+- **Migration:** `sql/v252_line_split_travel.sql` är innehållsmässigt oförändrad från §3 och har inte körts
+  mot någon extern databas. Dess 30 kontroller är överförda till isolerad PGlite och passerar 30/30,
+  inklusive idempotens och det validerade CHECK-villkoret.
+- **Kontroller som uppdaterats:** inga assertions har tagits bort eller lättats. `project-invoice-journey`
+  laddar nu den nya delade ROT-basmodulen i sin isolerade modulharness; `first-quote-reality-harness`
+  kräver de tillagda `sent_at`/`rot_rut_type`-fälten som skyddar skickat avdrag; offertdokumentets frysta
+  paritetsbaslinje kräver den beslutade texten ”ROT-avdrag (30 % av arbetskostnaden inkl. moms)”.
+- **Testutfall:** `npm run test:contracts` passerar med 2 654 gröna och 1 befintlig skip; efterföljande
+  kundunderlagskontrakt passerar 17/17 och activity-route passerar. De nya §6-specarna är registrerade i
+  både `.github/workflows/contracts.yml` och `package.json`. `npx tsc --noEmit` och `npx next build`
+  avslutar med exit 0 (bygget har repots kända env-/metadata-varningar under statisk generering).
+- **`first-value.yml`:** `test:approval-integration` passerar. De övriga kommandonas icke-UI-delar
+  passerar (durable 34, report continuity 17, my-day 18, customer-relief 11); UI-delarna kunde inte
+  starta eftersom Chromium saknades. `npx playwright install chromium` gjorde fem CDN-försök och
+  timeoutade efter 30 sekunder per försök, så `test:first-value-ui` och den separata
+  `first-value-production.ui.spec.ts` återstår för CI-miljön där workflowet installerar Chromium.
+- **Återstår före aktivering:** Claude granskar PR:n mot orkestreringens §6 A + B + D och matrisen, kör
+  v252 efter merge, verifierar aktuell Skatteverket-information enligt §9 samt provar en blandad
+  ROT-faktura rad för rad i Fortnox-piloten. Migrationen är medvetet inte körd här.
 
 ## 11. Framtida faser (registrerade, byggs inte nu)
 

@@ -64,6 +64,7 @@ interface QuoteData {
   base_totals?: ReturnType<typeof calculatePublicQuoteTotals>
   labor_total: number
   material_total: number
+  travel_total: number
   subtotal: number
   discount_amount?: number
   discount_percent?: number

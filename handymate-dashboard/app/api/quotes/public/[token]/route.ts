@@ -598,6 +598,7 @@ export async function POST(
       signedTotals = {
         labor_total: recomputed.laborTotal,
         material_total: recomputed.materialTotal,
+        travel_total: recomputed.travelTotal,
         subtotal: recomputed.subtotal,
         discount_amount: recomputed.discountAmount,
         vat_amount: recomputed.vat,

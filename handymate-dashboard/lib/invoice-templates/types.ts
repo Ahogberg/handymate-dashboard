@@ -80,6 +80,7 @@ export interface InvoiceTemplateInvoice {
   vatAmount: number
   vatRate: number
   totalIncVat: number
+  laborCost?: number              // varav arbetskostnad exkl. moms
   rotDeduction?: number           // ROT-avdrag (om tillämpat)
   rutDeduction?: number           // RUT-avdrag (om tillämpat)
   rotRutType?: 'rot' | 'rut' | null

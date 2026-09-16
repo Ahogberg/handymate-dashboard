@@ -562,6 +562,9 @@ export function recalculateItems(items: QuoteItem[]): QuoteItem[] {
     // Option-rader beräknas som item (spread behåller option_selected/option_default)
     if (item.item_type === 'item' || item.item_type === 'option') {
       const total = item.quantity * item.unit_price
+      // Paketjämförelsen måste kunna klassificera en ofullständig/prislös rad
+      // som ogiltig utan att delningshjälparen kastar innan valideringen körs.
+      if (!Number.isFinite(total)) return { ...item, total }
       const laborShare = item.component_snapshot?.labor_share
       if (laborShare !== null && laborShare !== undefined) {
         const travelShare = item.component_snapshot?.travel_share ?? 0

@@ -14,6 +14,7 @@ import { getCategoryRotRut, type CustomCategory } from '@/lib/constants/categori
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 import type { SelectedProduct } from '@/lib/suppliers/types'
 import { splitLine } from '@/lib/rot-rut-basis'
+import { componentSaleTotal, resolveLineShares, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import {
   applyProductToItem,
   normalizeUnit,
@@ -66,6 +67,20 @@ export function useQuoteItems(
             updated.total = updated.quantity * updated.unit_price
           } else if (updated.item_type === 'discount') {
             updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
+          }
+          if (field === 'component_snapshot' && Array.isArray(value?.components)) {
+            const components = value.components as SnapshotComponent[]
+            const componentTotal = componentSaleTotal(components)
+            const shares = resolveLineShares(components, value.labor_share, value.travel_share)
+            updated.component_snapshot = {
+              ...value,
+              labor_share: shares.laborShare,
+              travel_share: shares.travelShare,
+            }
+            if (componentTotal !== null) {
+              updated.total = componentTotal
+              updated.unit_price = updated.quantity > 0 ? componentTotal / updated.quantity : componentTotal
+            }
           }
           // Category auto-detection: set ROT/RUT based on category
           if (field === 'category_slug' && value) {

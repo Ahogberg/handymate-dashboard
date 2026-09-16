@@ -138,6 +138,7 @@ export function buildInvoiceTemplateData(
   const vatRate = Number(invoice.vat_rate || 25)
   const vatAmount = Number(invoice.vat_amount || (subtotalExVat * vatRate / 100))
   const totalIncVat = Number(invoice.total || (subtotalExVat + vatAmount))
+  const laborCost = Number(invoice.rot_work_cost ?? invoice.rut_work_cost ?? invoice.labor_total ?? 0)
 
   // ROT/RUT
   const rotRutType: 'rot' | 'rut' | null = invoice.rot_rut_type || null
@@ -246,6 +247,7 @@ export function buildInvoiceTemplateData(
       vatAmount,
       vatRate,
       totalIncVat,
+      laborCost: laborCost > 0 ? laborCost : undefined,
       rotDeduction,
       rutDeduction,
       rotRutType,

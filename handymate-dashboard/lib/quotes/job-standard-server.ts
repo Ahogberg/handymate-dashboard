@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { QuoteSetupError, nextTemplateVersion } from './job-type-setup-server'
 import { toSetupTemplate } from './job-type-setup'
 import type { PlanType } from '@/lib/feature-gates'
+import { splitLine } from '@/lib/rot-rut-basis'
 
 export function validateStandardRows(value: unknown): { productId: string; quantity: number }[] {
   if (!Array.isArray(value) || !value.length || value.length > 100) throw new QuoteSetupError(400, 'Välj mellan 1 och 100 artikelrader.')
@@ -27,6 +28,7 @@ async function productRows(db: SupabaseClient, businessId: string, value: unknow
     return { standard_product: true, item_type: 'item', description: product.name, quantity: row.quantity, unit: product.unit,
       unit_price: 0, linked_product_id: product.id, article_number: product.sku ?? null,
       is_rot_eligible: !!product.rot_eligible, is_rut_eligible: !!product.rut_eligible,
+      ...splitLine(0, Number(product.default_labor_share ?? (product.rot_eligible || product.rut_eligible ? 1 : 0)), Number(product.default_travel_share ?? 0)),
       discount_percent: 0 }
   })
 }
