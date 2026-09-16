@@ -61,11 +61,11 @@ CREATE TABLE public.outbound_messages (
   context JSONB NULL,
   envelope JSONB NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  PRIMARY KEY (business_id, source, source_id, kind),
-  UNIQUE (business_id, dedupe_key),
+  PRIMARY KEY (business_id, dedupe_key),
   CHECK (octet_length(envelope::text) <= 2097152)
 );
 CREATE INDEX outbound_messages_created ON public.outbound_messages (business_id, created_at);
+CREATE INDEX outbound_messages_source ON public.outbound_messages (business_id, source, source_id, kind);
 
 CREATE FUNCTION public.outbound_lock(p_business_id TEXT) RETURNS VOID
 LANGUAGE plpgsql SECURITY DEFINER SET search_path = public, pg_temp AS $fn$
@@ -136,10 +136,10 @@ BEGIN
     p_recipient,p_template,p_autonomy_key,coalesce(p_context,'{}'::jsonb)||jsonb_build_object('version',p_version),p_defer_reason);
   IF coalesce((result->>'blocked')::boolean,false) THEN RETURN result; END IF;
   SELECT * INTO m FROM public.outbound_messages
-    WHERE business_id=p_business_id AND source=p_source AND source_id=p_source_id AND kind=p_kind;
+    WHERE business_id=p_business_id AND dedupe_key=p_dedupe_key;
   IF FOUND THEN
-    IF (m.dedupe_key,m.recipient,m.template,m.autonomy_key,m.version,m.context,m.envelope)
-       IS DISTINCT FROM (p_dedupe_key,p_recipient,p_template,p_autonomy_key,p_version,p_context,p_envelope) THEN
+    IF (m.source,m.source_id,m.kind,m.recipient,m.template,m.autonomy_key,m.version,m.context,m.envelope)
+       IS DISTINCT FROM (p_source,p_source_id,p_kind,p_recipient,p_template,p_autonomy_key,p_version,p_context,p_envelope) THEN
       RAISE EXCEPTION 'outbound_source_conflict' USING ERRCODE='check_violation';
     END IF;
   ELSE
