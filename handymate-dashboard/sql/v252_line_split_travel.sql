@@ -37,6 +37,19 @@ UPDATE public.products SET default_travel_share = 1, default_labor_share = 0, ro
 UPDATE public.products SET default_travel_share = 0 WHERE default_travel_share IS NULL;
 ALTER TABLE public.products ALTER COLUMN default_travel_share SET DEFAULT 0;
 
+-- Andelens ursprung. Ett seedat värde är ett förslag tills företaget bekräftat eller ändrat det;
+-- plattformen ska alltid kunna skilja förslag från beslut (samma mönster som confirmed_by i C8).
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS share_source TEXT,
+  ADD COLUMN IF NOT EXISTS share_confirmed_at TIMESTAMPTZ;
+ALTER TABLE public.products DROP CONSTRAINT IF EXISTS products_share_source_check;
+ALTER TABLE public.products ADD CONSTRAINT products_share_source_check
+  CHECK (share_source IS NULL OR share_source IN ('seed', 'owner', 'components', 'import'));
+UPDATE public.products SET share_source = 'seed' WHERE share_source IS NULL;
+ALTER TABLE public.products ALTER COLUMN share_source SET DEFAULT 'owner';
+COMMENT ON COLUMN public.products.share_source IS
+  'Varifrån arbets-/reseandelen kommer: seed (startlista, förslag), owner (företaget satte den), components (härledd ur raderna), import. share_confirmed_at sätts när företaget bekräftar eller ändrar andelen.';
+
 -- ── 2. Komponenter: tredje typen resa, och det delade radschemat (Christoffers underlag) ──
 -- En komponent är en rad under artikeln: namn (description), artikelnummer, enhet, antal, à-pris ut
 -- (unit_price) bredvid självkostnaden (unit_cost), valfri katalogkoppling (linked_product_id) och en egen
@@ -116,3 +129,4 @@ COMMIT;
 --   SELECT conname, convalidated FROM pg_constraint WHERE conname IN ('quote_items_split_sum','products_share_sum_check');   -- båda true
 --   SELECT count(*) FROM products WHERE default_travel_share = 1;  -- resartiklarna
 --   SELECT count(*) FROM product_components WHERE is_rot_eligible AND component_type <> 'arbete';  -- 0
+--   SELECT share_source, count(*) FROM products GROUP BY 1;  -- befintliga: seed

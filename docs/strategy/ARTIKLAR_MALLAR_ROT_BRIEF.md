@@ -5,7 +5,7 @@
 > delningen ligger **inuti raden** (en kundrad per artikel), Claude skriver brief, Codex bygger.
 > Underlag från Christoffer: "Article Breakdown for ROT-Compliant Quoting" (byggs nu, invävt i §1 och §4) samt
 > "Work-Type Categorization" och "Staged Timeline" (framtida faser, registrerade i §11, byggs inte nu).
-> Migrationen `sql/v252_line_split_travel.sql` är utkastad och bevisad i PGlite (§6, 29/29). Samma regler som
+> Migrationen `sql/v252_line_split_travel.sql` är utkastad och bevisad i PGlite (§6, 30/30). Samma regler som
 > övriga briefer: handoff-block under §10, Claude granskar mot orkestreringens §6 A + B + D.
 
 ## 0. Varför
@@ -60,7 +60,7 @@ behöver en rad i handoffen.
 
 | Del | Gör |
 |---|---|
-| `products.default_travel_share` | Ny, `0–1`, default 0; `products_share_sum_check`: labor + travel ≤ 1. Backfill: `arbete` utan andel → 1; `material`/`hyra` utan andel → 0; artiklar vars namn börjar på `resa`, `resor`, `restid`, `framkörning`, `servicebil`, `milersättning`, `utkörning` → resa 1, arbete 0, `rot_eligible = false` (snäv lista: `res%` träffar reservdelar). |
+| `products.default_travel_share`, `share_source`, `share_confirmed_at` | Ny, `0–1`, default 0; ursprung på andelen (befintliga → `seed`, nya → `owner`); `products_share_sum_check`: labor + travel ≤ 1. Backfill: `arbete` utan andel → 1; `material`/`hyra` utan andel → 0; artiklar vars namn börjar på `resa`, `resor`, `restid`, `framkörning`, `servicebil`, `milersättning`, `utkörning` → resa 1, arbete 0, `rot_eligible = false` (snäv lista: `res%` träffar reservdelar). |
 | `product_components` | `component_type IN ('arbete','material','resa')`; nya `article_number`, `unit_price` (à-pris ut, bredvid `unit_cost`), `linked_product_id` → `products`, `is_rot_eligible` (backfill: sant för arbete) med CHECK `product_components_rot_only_labour`. |
 | `quote_items.travel_amount` | Ny. Backfill A: rader med `labor_amount` får `material = total − labor − travel`, `travel = 0`. Backfill B, rader utan: `arbete_*` → arbete; `resa` → resa; `material_*`/`hyra`/`ue`/`ovrigt` → material; timenhet → arbete; ROT/RUT-flaggad → arbete; annars material. `quote_items_split_sum` läggs `NOT VALID` och valideras direkt (produktion: 0 rader avviker i dag, 137 rader totalt). Rubrik-, text-, delsumme- och rabattrader är undantagna. |
 | `quotes.travel_total` | Ny, default 0, backfillad som Σ `travel_amount` per offert. |
@@ -132,9 +132,9 @@ Fas 6 — tester (§6)
 
 ## 6. Acceptans
 
-**SQL, 29 kontroller gröna i PGlite på utkastet** (Claude 2026-09-16, fixtur som speglar v12+v67, quote_overhaul+v10+v13+v47+v67 och `quotes`). Codex gör om dem till `tests/line-split-sql.spec.ts`; en kontroll som måste försvagas behöver en rad i handoffen.
+**SQL, 30 kontroller gröna i PGlite på utkastet** (Claude 2026-09-16, fixtur som speglar v12+v67, quote_overhaul+v10+v13+v47+v67 och `quotes`). Codex gör om dem till `tests/line-split-sql.spec.ts`; en kontroll som måste försvagas behöver en rad i handoffen.
 
-- **Artiklar (7):** arbete utan andel → 1/0; material och hyra utan andel → 0; befintlig andel behålls; resartikel på namn → resa 1, arbete 0, aldrig ROT; "Reservdel" träffas inte; andel > 1 och summa > 1 avvisas, summa ≤ 1 godtas; ny artikel får resa 0.
+- **Artiklar (8):** arbete utan andel → 1/0; material och hyra utan andel → 0; befintlig andel behålls; resartikel på namn → resa 1, arbete 0, aldrig ROT; "Reservdel" träffas inte; andel > 1 och summa > 1 avvisas, summa ≤ 1 godtas; ny artikel får resa 0; befintliga andelar märks `seed`, en ny artikel `owner`, okänd källa avvisas.
 - **Komponenter (3):** `resa` godtas, okänd typ avvisas; det delade radschemat (artikelnummer, enhet, antal, självkostnad, à-pris) godtas, ROT-flagga på material avvisas, befintlig resa-komponent har flaggan av; katalogkoppling godtas och okänd artikel avvisas.
 - **Backfill (11):** `arbete_*` → arbete; `resa` → resa; `material_*` → material; `hyra` → material; timenhet → arbete; `st` + ROT-flagga → arbete; `st` utan flagga → material; befintlig arbetsdel → resten material, 0 resa; befintlig exakt delning behålls öre-exakt (740,74 + 493,82); rubrik och rabatt lämnas utan delning; ingen item-rad utan delning.
 - **Invarianten (6):** villkoret är validerat; item-rad utan delning avvisas; delar som inte summerar avvisas; exakt delning godtas, även negativ item-rad; rubrik utan delning godtas; en ändring av `total` som bryter summan avvisas.
@@ -167,13 +167,20 @@ Ingen flagga. v252 körs efter granskning och merge, med verifieringen i filens 
 skapas får rätt bas direkt; befintliga fakturor och skickade offerter är oförändrade. Innan bred kommunikation
 till kunder: en ROT-faktura med blandad artikel exporteras till Fortnox i piloten och kontrolleras rad för rad.
 
-## 9. Ägargrindar (Christoffer)
+## 9. Startvärden och deras ursprung (inte grindar)
 
-| Grind | Vad | Blockerar |
+Inget kritiskt i plattformen får vila på en persons antaganden. Det kritiska, att ROT bara räknas på
+arbetsdelen och att varje rad har en delning, ligger i kod och databasvillkor (§5) och beror inte på någon.
+Det som är innehåll, alltså vilken andel en seedad startartikel har innan företaget rört den och vilka
+jobbtyper och artiklar en bransch brukar återanvända, hanteras så här:
+
+| Mekanism | Vad | Var |
 |---|---|---|
-| Standardandelar per artikel | Gå igenom startlistan i `lib/seed-defaults.ts` per bransch och sätta arbete/material/resa-andel per artikel. Skatteverket godtar en skälig fördelning vid fast pris, men den ska gå att motivera, och det är hantverkarens blick som gör den rimlig. | Fas 3 seedning; inte koden. |
-| Jobbtyper och artiklar per bransch | Vilka jobbtyper och vilka artiklar en elektriker, rörmokare, snickare och målare faktiskt återanvänder. | Fas 5 mallinnehåll; inte koden. |
-| Skatteverket-kontroll | Bekräfta mot Skatteverkets aktuella sidor att 30 %, 50 000/75 000 och "arbetskostnad inkl. moms" stämmer för 2026, och vad som gäller resor i samband med arbetet (framkörning är inte arbete). | Aktivering. |
+| Ursprung på varje andel | `products.share_source` (`seed`, `owner`, `components`, `import`) och `share_confirmed_at`. Ett seedat värde är ett förslag tills företaget bekräftat eller ändrat det. Samma mönster som `confirmed_by` på kontona i C8. | v252; fas 3 skriver `owner` vid redigering och `components` när rader finns. |
+| Företaget bekräftar sina egna andelar | Första gången en artikel med `share_source = 'seed'` används i en ROT-offert visar radredigeraren andelen ("Arbete 60 % av 2 400 kr, stämmer det?") och sparar ja eller justering som `owner` + `share_confirmed_at`. Ansvaret för en skälig fördelning ligger hos företaget som fakturerar. | Fas 3; spec `share-confirmation.spec.ts`. |
+| Datan rättar förslagen | Rapporterad tid × timpris mot radens arbetsdel per artikel och företag ger en mätt andel; avvikelse över en tröskel blir en notis i inkorgen (H1), inte en tyst ändring. | Uppföljning efter pilot, inte i detta paket; beroende av tidrapporten per rad (`estimated_hours`, `business_user_id`). |
+| Flera källor för startvärdena | Christoffers hantverkarblick är en källa, tillsammans med Skatteverkets exempel och pilotens verkliga offerter. Varje seedad andel och varje seedad jobbtypslista är märkt som förslag i `lib/seed-defaults.ts` med källa i kommentaren. | Fas 3 och 5. |
+| Skatteverket-kontroll | Bekräfta mot Skatteverkets aktuella sidor att 30 %, 50 000/75 000 och "arbetskostnad inkl. moms" stämmer för 2026, och att framkörning inte är arbete. | Före aktivering. |
 
 ## 10. Handoff
 
