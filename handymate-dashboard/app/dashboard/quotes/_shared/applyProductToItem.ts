@@ -19,6 +19,10 @@ export interface ProductComponentRow {
   quantity_per_unit: number
   unit: string
   unit_cost: number
+  article_number?: string | null
+  unit_price?: number | null
+  is_rot_eligible?: boolean
+  linked_product_id?: string | null
 }
 
 /**
@@ -37,6 +41,7 @@ export interface ProductWithComponents {
   rut_eligible?: boolean
   is_favorite?: boolean
   default_labor_share?: number | null
+  default_travel_share?: number | null
   category_id?: string | null
   components?: ProductComponentRow[]
 }
@@ -76,11 +81,15 @@ export function applyProductToItem(
   const total = qty * unitPrice
 
   const components: SnapshotComponent[] = (product.components ?? []).map(c => ({
-    component_type: c.component_type === 'arbete' ? 'arbete' : 'material',
+    component_type: c.component_type === 'arbete' ? 'arbete' : c.component_type === 'resa' ? 'resa' : 'material',
     description: c.description,
     quantity_per_unit: c.quantity_per_unit,
     unit: c.unit,
     unit_cost: c.unit_cost,
+    article_number: c.article_number ?? null,
+    unit_price: c.unit_price ?? null,
+    is_rot_eligible: c.is_rot_eligible ?? c.component_type === 'arbete',
+    linked_product_id: c.linked_product_id ?? null,
   }))
 
   const snapshot = buildItemSnapshot(
@@ -90,6 +99,7 @@ export function applyProductToItem(
       sku: product.sku ?? null,
       sales_price: product.sales_price,
       default_labor_share: product.default_labor_share ?? null,
+      default_travel_share: product.default_travel_share ?? 0,
     },
     components,
     qty,
@@ -118,6 +128,7 @@ export function applyProductToItem(
     component_snapshot: snapshot.component_snapshot,
     labor_amount: snapshot.labor_amount,
     material_amount: snapshot.material_amount,
+    travel_amount: snapshot.travel_amount,
     estimated_hours: snapshot.estimated_hours,
   }
 }

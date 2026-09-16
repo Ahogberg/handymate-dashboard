@@ -11,8 +11,28 @@ import { createQuote, resolveItemSplit } from '@/lib/quotes/create-quote'
 import { calculateQuoteValidUntil } from '@/lib/quotes/validity'
 import { signAttachmentList } from '@/lib/storage-signing'
 import type { QuoteItem } from '@/lib/types/quote'
+import { splitLine } from '@/lib/rot-rut-basis'
 
 const ATTACHMENTS_BUCKET = 'customer-documents'
+
+function legacyItemsForCalculation(items: any[], deductionType: string | null | undefined): QuoteItem[] {
+  return (items || []).map((item, index) => {
+    const quantity = Number(item.quantity ?? 0)
+    const unitPrice = Number(item.unit_price ?? item.price ?? 0)
+    const total = quantity * unitPrice
+    const labor = item.type === 'labor'
+    return {
+      id: item.id || `legacy_${index}`,
+      item_type: 'item', description: item.description || item.name || '', quantity,
+      unit: item.unit || 'st', unit_price: unitPrice, total,
+      is_rot_eligible: labor && deductionType === 'rot',
+      is_rut_eligible: labor && deductionType === 'rut',
+      rot_rut_type: labor && (deductionType === 'rot' || deductionType === 'rut') ? deductionType : null,
+      sort_order: item.sort_order ?? index,
+      ...splitLine(total, labor ? 1 : 0, 0),
+    } as QuoteItem
+  })
+}
 
 /**
  * Produktbank (v67): invariant-backstopp för arbete/material-spliten.
@@ -261,6 +281,7 @@ export async function POST(request: NextRequest) {
         items: source.items,
         labor_total: source.labor_total,
         material_total: source.material_total,
+        travel_total: source.travel_total ?? 0,
         subtotal: source.subtotal,
         discount_percent: source.discount_percent,
         discount_amount: source.discount_amount,
@@ -366,7 +387,7 @@ export async function POST(request: NextRequest) {
     const vatRate = body.vat_rate ?? 25
     const discountPercent = body.discount_percent ?? 0
 
-    let laborTotal = 0, materialTotal = 0, subtotal = 0, discountAmount = 0
+    let laborTotal = 0, materialTotal = 0, travelTotal = 0, subtotal = 0, discountAmount = 0
     let vatAmount = 0, total = 0
     let rotWorkCost = 0, rotDeduction = 0, rotCustomerPays = 0
     let rutWorkCost = 0, rutDeduction = 0, rutCustomerPays = 0
@@ -374,11 +395,15 @@ export async function POST(request: NextRequest) {
     let rotRutCapped = false
     let rotRutCapWarning: string | undefined
 
-    if (structuredItems.length > 0) {
+    const calculationItems = structuredItems.length > 0
+      ? structuredItems
+      : legacyItemsForCalculation(legacyItems, body.rot_rut_type)
+    if (calculationItems.length > 0) {
       // Use new calculation engine
-      const totals = calculateQuoteTotals(structuredItems, discountPercent, vatRate)
+      const totals = calculateQuoteTotals(calculationItems, discountPercent, vatRate)
       laborTotal = totals.laborTotal
       materialTotal = totals.materialTotal
+      travelTotal = totals.travelTotal
       subtotal = totals.subtotal
       discountAmount = totals.discountAmount
       vatAmount = totals.vat
@@ -409,32 +434,10 @@ export async function POST(request: NextRequest) {
       rotRutEligible = rotWorkCost + rutWorkCost
       rotRutDeduction = rotDeduction + rutDeduction
       customerPays = (rotDeduction > 0 || rutDeduction > 0) ? total - rotRutDeduction : total
-    } else if (legacyItems.length > 0) {
-      // Legacy calculation
-      laborTotal = legacyItems.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-      materialTotal = legacyItems.filter((i: any) => i.type === 'material').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-      const serviceTotal = legacyItems.filter((i: any) => i.type === 'service').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-      subtotal = laborTotal + materialTotal + serviceTotal
-      discountAmount = subtotal * (discountPercent / 100)
-      const afterDiscount = subtotal - discountAmount
-      vatAmount = afterDiscount * (vatRate / 100)
-      total = afterDiscount + vatAmount
-
-      if (body.rot_rut_type) {
-        rotRutEligible = laborTotal
-        const rate = body.rot_rut_type === 'rot' ? 0.30 : 0.50
-        const maxDed = body.rot_rut_type === 'rot' ? 50000 : 75000
-        rotRutDeduction = Math.min(rotRutEligible * rate, maxDed)
-        customerPays = total - rotRutDeduction
-      } else {
-        customerPays = total
-      }
     }
 
-    const processedLegacyItems = legacyItems.map((i: any) => ({
-      ...i,
-      total: (i.quantity || 0) * (i.unit_price || 0)
-    }))
+    const processedLegacyItems = legacyItemsForCalculation(legacyItems, body.rot_rut_type)
+      .map((calculated, index) => ({ ...legacyItems[index], ...calculated }))
 
     // De rika fälten. Invarianterna (id, nummer, token, datum) sätts av
     // byggaren; det här är allt den INTE behöver förstå.
@@ -442,6 +445,7 @@ export async function POST(request: NextRequest) {
       items: structuredItems.length > 0 ? [] : processedLegacyItems,
       labor_total: laborTotal,
       material_total: materialTotal,
+      travel_total: travelTotal,
       subtotal,
       discount_percent: discountPercent,
       discount_amount: discountAmount,
@@ -647,7 +651,7 @@ export async function PUT(request: NextRequest) {
 
     const { data: existing } = await supabase
       .from('quotes')
-      .select('quote_id, business_id, status, customer_id, created_at')
+      .select('quote_id, business_id, status, customer_id, created_at, sent_at, rot_rut_type')
       .eq('quote_id', quote_id)
       .eq('business_id', business.business_id)
       .single()
@@ -655,6 +659,11 @@ export async function PUT(request: NextRequest) {
     if (!existing) {
       return NextResponse.json({ error: 'Quote not found' }, { status: 404 })
     }
+
+    // Avdraget är en del av det kunden fick se. När offerten väl har skickats
+    // får en senare redigering aldrig skriva om de sparade avdragsbeloppen.
+    const deductionIsFrozen = Boolean(existing.sent_at)
+      || !['draft', 'pending_approval'].includes(existing.status || '')
 
     // ═══ LIVSCYKELSPÄRR (2026-08-07) ═══
     //
@@ -760,6 +769,7 @@ export async function PUT(request: NextRequest) {
 
       updates.labor_total = totals.laborTotal
       updates.material_total = totals.materialTotal
+      updates.travel_total = totals.travelTotal
       updates.subtotal = totals.subtotal
       updates.discount_percent = discountPercent
       updates.discount_amount = totals.discountAmount
@@ -770,11 +780,7 @@ export async function PUT(request: NextRequest) {
 
       // ROT/RUT new split
       updates.rot_work_cost = totals.rotWorkCost
-      updates.rot_deduction = rotDeduction
-      updates.rot_customer_pays = rotCustomerPays
       updates.rut_work_cost = totals.rutWorkCost
-      updates.rut_deduction = rutDeduction
-      updates.rut_customer_pays = rutCustomerPays
 
       // Legacy compat
       const totalDeduction = rotDeduction + rutDeduction
@@ -788,8 +794,14 @@ export async function PUT(request: NextRequest) {
         updates.rot_rut_type = body.rot_rut_type || null
       }
       updates.rot_rut_eligible = totals.rotWorkCost + totals.rutWorkCost
-      updates.rot_rut_deduction = totalDeduction
-      updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total
+      if (!deductionIsFrozen) {
+        updates.rot_deduction = rotDeduction
+        updates.rot_customer_pays = rotCustomerPays
+        updates.rut_deduction = rutDeduction
+        updates.rut_customer_pays = rutCustomerPays
+        updates.rot_rut_deduction = totalDeduction
+        updates.customer_pays = totalDeduction > 0 ? totals.total - totalDeduction : totals.total
+      }
 
       // Byt ut quote_items-raderna utan att någonsin tappa data:
       // (1) hämta gamla radernas id, (2) infoga de NYA raderna först,
@@ -841,6 +853,7 @@ export async function PUT(request: NextRequest) {
           // Produktbank (v67): snapshot-fälten — ?? så att 0 bevaras
           labor_amount: split.labor_amount,
           material_amount: split.material_amount,
+          travel_amount: split.travel_amount,
           estimated_hours: item.estimated_hours ?? null,
           component_snapshot: item.component_snapshot ?? null,
           show_components_to_customer: item.show_components_to_customer ?? false,
@@ -880,43 +893,37 @@ export async function PUT(request: NextRequest) {
         }
       }
     } else if (body.items !== undefined) {
-      // Legacy JSONB items recalculation
       const items = body.items || []
-      const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-      const materialTotal = items.filter((i: any) => i.type === 'material').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-      const serviceTotal = items.filter((i: any) => i.type === 'service').reduce((s: number, i: any) => s + ((i.quantity || 0) * (i.unit_price || 0)), 0)
-      const subtotal = laborTotal + materialTotal + serviceTotal
-      const discountAmt = subtotal * (discountPercent / 100)
-      const afterDiscount = subtotal - discountAmt
-      const vatAmount = afterDiscount * (vatRate / 100)
-      const total = afterDiscount + vatAmount
-
-      const processedItems = items.map((i: any) => ({ ...i, total: (i.quantity || 0) * (i.unit_price || 0) }))
+      const calculatedItems = legacyItemsForCalculation(items, body.rot_rut_type ?? existing.rot_rut_type)
+      const totals = calculateQuoteTotals(calculatedItems, discountPercent, vatRate)
+      const processedItems = calculatedItems.map((calculated, index) => ({ ...items[index], ...calculated }))
 
       updates.items = processedItems
-      updates.labor_total = laborTotal
-      updates.material_total = materialTotal
-      updates.subtotal = subtotal
+      updates.labor_total = totals.laborTotal
+      updates.material_total = totals.materialTotal
+      updates.travel_total = totals.travelTotal
+      updates.subtotal = totals.subtotal
       updates.discount_percent = discountPercent
-      updates.discount_amount = discountAmt
+      updates.discount_amount = totals.discountAmount
       updates.vat_rate = vatRate
-      updates.vat_amount = vatAmount
-      updates.total = total
+      updates.vat_amount = totals.vat
+      updates.total = totals.total
+      updates.rot_work_cost = totals.rotWorkCost
+      updates.rut_work_cost = totals.rutWorkCost
 
       if (body.rot_rut_type !== undefined) updates.rot_rut_type = body.rot_rut_type
-      if (body.rot_rut_type) {
-        const rotRutEligible = laborTotal
-        const rate = body.rot_rut_type === 'rot' ? 0.30 : 0.50
-        const maxDed = body.rot_rut_type === 'rot' ? 50000 : 75000
-        const rotRutDeduction = Math.min(rotRutEligible * rate, maxDed)
-        updates.rot_rut_eligible = rotRutEligible
-        updates.rot_rut_deduction = rotRutDeduction
-        updates.customer_pays = total - rotRutDeduction
-      } else if (body.rot_rut_type === '' || body.rot_rut_type === null) {
+      if (!deductionIsFrozen && body.rot_rut_type) {
+        const deduction = body.rot_rut_type === 'rot' ? totals.rotDeduction : totals.rutDeduction
+        updates.rot_deduction = totals.rotDeduction
+        updates.rut_deduction = totals.rutDeduction
+        updates.rot_rut_eligible = body.rot_rut_type === 'rot' ? totals.rotWorkCost : totals.rutWorkCost
+        updates.rot_rut_deduction = deduction
+        updates.customer_pays = totals.total - deduction
+      } else if (!deductionIsFrozen && (body.rot_rut_type === '' || body.rot_rut_type === null)) {
         updates.rot_rut_type = null
         updates.rot_rut_eligible = 0
         updates.rot_rut_deduction = 0
-        updates.customer_pays = total
+        updates.customer_pays = totals.total
       }
     } else {
       if (body.discount_percent !== undefined) updates.discount_percent = body.discount_percent

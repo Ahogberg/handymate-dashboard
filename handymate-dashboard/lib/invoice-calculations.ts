@@ -1,5 +1,6 @@
 import { InvoiceItem, InvoiceTotals } from '@/lib/types/invoice'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { rotRutLaborBasis } from '@/lib/rot-rut-basis'
 
 /**
  * Calculate all invoice totals from structured items
@@ -15,18 +16,19 @@ export function calculateInvoiceTotals(
   // Sum by ROT/RUT eligibility
   let laborTotal = 0
   let materialTotal = 0
+  let travelTotal = 0
   let serviceTotal = 0
-  let rotWorkCost = 0
-  let rutWorkCost = 0
+  const rotWorkCost = rotRutLaborBasis(regularItems, 'rot')
+  const rutWorkCost = rotRutLaborBasis(regularItems, 'rut')
 
   for (const item of regularItems) {
     const lineTotal = item.quantity * item.unit_price
-    if (item.is_rot_eligible) {
+    if (item.labor_amount != null && item.material_amount != null && item.travel_amount != null) {
+      laborTotal += Number(item.labor_amount)
+      materialTotal += Number(item.material_amount)
+      travelTotal += Number(item.travel_amount)
+    } else if (item.is_rot_eligible || item.is_rut_eligible) {
       laborTotal += lineTotal
-      rotWorkCost += lineTotal
-    } else if (item.is_rut_eligible) {
-      laborTotal += lineTotal
-      rutWorkCost += lineTotal
     } else if (item.type === 'labor' || item.unit === 'tim' || item.unit === 'timmar' || item.unit === 'hour' || item.unit === 'h') {
       laborTotal += lineTotal
     } else {
@@ -37,7 +39,7 @@ export function calculateInvoiceTotals(
   // Discount rows (negative amounts)
   const discountFromRows = discountItems.reduce((sum, item) => sum + Math.abs(item.total), 0)
 
-  const subtotal = laborTotal + materialTotal + serviceTotal
+  const subtotal = laborTotal + materialTotal + travelTotal + serviceTotal
   const discountAmount = subtotal * (discountPercent / 100) + discountFromRows
   const afterDiscount = subtotal - discountAmount
   const vat = afterDiscount * (vatRate / 100)
@@ -59,6 +61,7 @@ export function calculateInvoiceTotals(
   return {
     laborTotal,
     materialTotal,
+    travelTotal,
     serviceTotal,
     subtotal,
     discountAmount,

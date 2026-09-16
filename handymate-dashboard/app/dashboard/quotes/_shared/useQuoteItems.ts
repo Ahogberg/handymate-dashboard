@@ -13,6 +13,7 @@ import { createDefaultItem, generateItemId } from '@/lib/quote-calculations'
 import { getCategoryRotRut, type CustomCategory } from '@/lib/constants/categories'
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 import type { SelectedProduct } from '@/lib/suppliers/types'
+import { splitLine } from '@/lib/rot-rut-basis'
 import {
   applyProductToItem,
   normalizeUnit,
@@ -92,6 +93,14 @@ export function useQuoteItems(
           if (field === 'is_rut_eligible' && value === true) {
             updated.is_rot_eligible = false
             updated.rot_rut_type = 'rut'
+          }
+          if (updated.item_type === 'item') {
+            const frozenLabor = updated.component_snapshot?.labor_share
+            const frozenTravel = updated.component_snapshot?.travel_share
+            const travelShare = frozenTravel ?? (updated.category_slug === 'resa' ? 1 : 0)
+            const laborShare = frozenLabor ?? (travelShare > 0 ? 0 :
+              (updated.is_rot_eligible || updated.is_rut_eligible || updated.category_slug?.startsWith('arbete_') || ['tim', 'timmar', 'timme', 'hour', 'hours', 'h'].includes(updated.unit)) ? 1 : 0)
+            Object.assign(updated, splitLine(updated.total, laborShare, travelShare))
           }
           return updated
         }),
@@ -177,6 +186,9 @@ export function useQuoteItems(
         total: product.sell_price,
         is_rot_eligible: false,
         is_rut_eligible: false,
+        labor_amount: 0,
+        material_amount: product.sell_price,
+        travel_amount: 0,
         sort_order: 0,
       }
       setItems(prev => {
@@ -231,6 +243,9 @@ export function useQuoteItems(
         total: priceItem.unit_price,
         is_rot_eligible: priceItem.category === 'labor',
         is_rut_eligible: false,
+        labor_amount: priceItem.category === 'labor' ? priceItem.unit_price : 0,
+        material_amount: priceItem.category === 'labor' ? 0 : priceItem.unit_price,
+        travel_amount: 0,
         sort_order: 0,
       }
       setItems(prev => {

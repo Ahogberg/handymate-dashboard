@@ -38,6 +38,8 @@ export interface QuoteItem {
   labor_amount?: number | null
   /** Härledd: total − labor_amount (aldrig egen beräkning). */
   material_amount?: number | null
+  /** Resa/framkörning. Aldrig ROT-/RUT-grundande. */
+  travel_amount?: number | null
   /** Kalkylerade timmar = quantity × Σ(arbetskomponenters quantity_per_unit). */
   estimated_hours?: number | null
   /** Fryst kopia av produktens komponenter + namn/sku/pris/labor_share vid
@@ -144,6 +146,7 @@ export interface PaymentPlanEntry {
 export interface QuoteTotals {
   laborTotal: number
   materialTotal: number
+  travelTotal: number
   serviceTotal: number
   subtotal: number
   discountAmount: number

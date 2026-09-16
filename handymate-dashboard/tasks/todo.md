@@ -1661,3 +1661,18 @@ Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är
 - [x] Verifiera servergränser, idempotens, timmar och mobil-/datorvy på nytt.
 - [x] Koppla planeringskontroller till CI.
 - [x] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande: https://github.com/Ahogberg/handymate-dashboard/pull/80.
+## Artiklar, mallar och ROT på arbetsdelen — 2026-09-16
+
+- [x] Läs briefens §1, §2, §5 samt källorna och befintliga facit som §2 pekar ut.
+- [x] Fas 1: översätt v252-utkastets 30 kontroller till `tests/line-split-sql.spec.ts`; kör inte migrationen mot Supabase (30/30 i isolerad PGlite).
+- [x] Fas 2: delad ROT-bas/splitLine, sex rättningar, resedelning och radinvariant (86/86 riktade kontrakt; TypeScript och produktionsbuild gröna).
+- [ ] Verifiera fas 1–2, commit/push och öppna tidig PR från `codex/artiklar-rot` mot `main`.
+- [ ] Fas 3: artikel-/komponent-UI, delat radschema och bekräftelse av seedad andel.
+- [ ] Fas 4: alla fakturavägar, dokument, Fortnox-split och Skatteverket-underlag.
+- [ ] Fas 5: jobbtypsmall som standardstart och delning på alla agentgenererade rader.
+- [ ] Fas 6: samtliga acceptansspecar, registrerade i workflow och `test:contracts`.
+- [ ] Slutgrind: riktade tester, kontrakt, `npx tsc --noEmit`, `npx next build`, §10-handoff och slutpush.
+
+Branch: `codex/artiklar-rot`. Migrationen lämnas okörd för Claude-granskning.
+
+---

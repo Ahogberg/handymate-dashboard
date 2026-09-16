@@ -14,12 +14,18 @@
  * (ren materialprodukt), inte en falsy-fallback.
  */
 
+import { splitLine } from '@/lib/rot-rut-basis'
+
 export interface SnapshotComponent {
-  component_type: 'arbete' | 'material'
+  component_type: 'arbete' | 'material' | 'resa'
   description: string
   quantity_per_unit: number
   unit: string
   unit_cost: number
+  article_number?: string | null
+  unit_price?: number | null
+  is_rot_eligible?: boolean
+  linked_product_id?: string | null
 }
 
 export interface SnapshotProduct {
@@ -28,6 +34,7 @@ export interface SnapshotProduct {
   sku: string | null
   sales_price: number
   default_labor_share: number | null
+  default_travel_share?: number | null
 }
 
 export interface ItemSnapshotResult {
@@ -39,11 +46,14 @@ export interface ItemSnapshotResult {
     /** Fryst arbetsandel — mängdändring i editorn räknar om spliten
         klient-side från detta värde utan att behöva API:t igen. */
     labor_share: number | null
+    travel_share: number | null
     components: SnapshotComponent[]
   } | null
   labor_share: number | null // null = ingen split (legacy-beteende)
+  travel_share: number | null
   labor_amount: number | null
   material_amount: number | null
+  travel_amount: number | null
   estimated_hours: number | null
 }
 
@@ -69,6 +79,32 @@ export function resolveLaborShare(
     )
   }
   return defaultLaborShare ?? null // ?? — 0 är giltigt!
+}
+
+/** Arbets- och reseandel ur samma frysta komponentunderlag. À-pris ut är
+ * auktoritativt när det finns; gamla komponenter faller tillbaka på kostnad. */
+export function resolveLineShares(
+  components: SnapshotComponent[],
+  defaultLaborShare: number | null | undefined,
+  defaultTravelShare: number | null | undefined = 0,
+): { laborShare: number | null; travelShare: number | null } {
+  if (components.length > 0) {
+    const value = (component: SnapshotComponent) => component.quantity_per_unit * Number(component.unit_price ?? component.unit_cost)
+    const total = components.reduce((sum, component) => sum + value(component), 0)
+    if (total > 0) {
+      const labor = components
+        .filter(component => component.component_type === 'arbete' && component.is_rot_eligible !== false)
+        .reduce((sum, component) => sum + value(component), 0) / total
+      const travel = components
+        .filter(component => component.component_type === 'resa')
+        .reduce((sum, component) => sum + value(component), 0) / total
+      return { laborShare: labor, travelShare: travel }
+    }
+  }
+  return {
+    laborShare: defaultLaborShare ?? null,
+    travelShare: defaultTravelShare ?? 0,
+  }
 }
 
 /**
@@ -107,8 +143,14 @@ export function buildItemSnapshot(
   quantity: number,
   rowTotal: number
 ): ItemSnapshotResult {
-  const laborShare = resolveLaborShare(components, product.default_labor_share)
-  const { labor_amount, material_amount } = splitAmount(rowTotal, laborShare)
+  const { laborShare, travelShare } = resolveLineShares(
+    components,
+    product.default_labor_share,
+    product.default_travel_share,
+  )
+  const split = laborShare === null
+    ? { labor_amount: null, material_amount: null, travel_amount: null }
+    : splitLine(rowTotal, laborShare, travelShare ?? 0)
   return {
     component_snapshot: {
       product_id: product.id,
@@ -116,11 +158,12 @@ export function buildItemSnapshot(
       sku: product.sku ?? null,
       sales_price: product.sales_price,
       labor_share: laborShare,
+      travel_share: travelShare,
       components,
     },
     labor_share: laborShare,
-    labor_amount,
-    material_amount,
+    travel_share: travelShare,
+    ...split,
     estimated_hours: estimateHours(components, quantity),
   }
 }

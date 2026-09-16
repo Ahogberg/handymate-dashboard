@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { splitLine } from '@/lib/rot-rut-basis'
 
 /**
  * Den kanoniska offertbyggaren — den ENDA vägen in i quotes + quote_items
@@ -54,6 +55,7 @@ export interface CanonicalQuoteItem {
   linked_product_id?: string | null
   labor_amount?: number | null
   material_amount?: number | null
+  travel_amount?: number | null
   estimated_hours?: number | null
   component_snapshot?: unknown
   show_components_to_customer?: boolean
@@ -104,25 +106,29 @@ function slumpId(prefix: string): string {
  * Samma beteende som api/quotes alltid haft; nu bor det här.
  */
 export function resolveItemSplit(
-  item: { description?: string; labor_amount?: number | null; material_amount?: number | null },
+  item: { description?: string; item_type?: string; labor_amount?: number | null; material_amount?: number | null; travel_amount?: number | null; is_rot_eligible?: boolean; is_rut_eligible?: boolean },
   rowTotal: number
-): { labor_amount: number | null; material_amount: number | null } {
+): { labor_amount: number | null; material_amount: number | null; travel_amount: number | null } {
+  if (item.item_type && item.item_type !== 'item') {
+    return { labor_amount: null, material_amount: null, travel_amount: null }
+  }
   const labor = item.labor_amount ?? null
   if (labor === null) {
-    return { labor_amount: null, material_amount: item.material_amount ?? null }
+    return splitLine(rowTotal, item.is_rot_eligible || item.is_rut_eligible ? 1 : 0, 0)
   }
   const material = item.material_amount ?? null
-  if (material === null || Math.abs(labor + material - rowTotal) > 0.01) {
-    const derived = Math.round((rowTotal - labor) * 100) / 100
+  const travel = item.travel_amount ?? 0
+  if (material === null || Math.abs(labor + material + travel - rowTotal) >= 0.01) {
+    const derived = Math.round((rowTotal - labor - travel) * 100) / 100
     if (material !== null) {
       console.warn(
         `[quotes] Split-invariant korrigerad för rad "${item.description}": ` +
-        `labor ${labor} + material ${material} != total ${rowTotal} → material_amount ${derived}`
+        `labor ${labor} + material ${material} + travel ${travel} != total ${rowTotal} → material_amount ${derived}`
       )
     }
-    return { labor_amount: labor, material_amount: derived }
+    return { labor_amount: labor, material_amount: derived, travel_amount: travel }
   }
-  return { labor_amount: labor, material_amount: material }
+  return { labor_amount: labor, material_amount: material, travel_amount: travel }
 }
 
 /** Nästa lediga nummer i år — count+1, skyddat av v98:s unika index. */
@@ -190,6 +196,7 @@ export async function createQuote(
         customer_pays: total - rotRutDeduction,
         labor_total: rader.reduce((s, r) => s + (resolveItemSplit(r, radTotal(r)).labor_amount ?? 0), 0),
         material_total: rader.reduce((s, r) => s + (resolveItemSplit(r, radTotal(r)).material_amount ?? 0), 0),
+        travel_total: rader.reduce((s, r) => s + (resolveItemSplit(r, radTotal(r)).travel_amount ?? 0), 0),
       }
     : {}
 
@@ -270,6 +277,7 @@ export async function createQuote(
         linked_product_id: r.linked_product_id ?? null,
         labor_amount: split.labor_amount,
         material_amount: split.material_amount,
+        travel_amount: split.travel_amount,
         estimated_hours: r.estimated_hours ?? null,
         component_snapshot: r.component_snapshot ?? null,
         show_components_to_customer: r.show_components_to_customer ?? false,

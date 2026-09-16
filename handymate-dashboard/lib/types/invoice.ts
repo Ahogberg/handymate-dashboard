@@ -30,6 +30,9 @@ export interface InvoiceItem {
    * lib/invoices/quote-to-invoice-items.ts.
    */
   labor_amount?: number | null
+  material_amount?: number | null
+  travel_amount?: number | null
+  category_slug?: string | null
   /**
    * Produktkopplingen (Prisslingan V2 A1): behåller artikelbanks-länken hela
    * vägen till fakturan (marginaluppföljning, Fortnox ArticleNumber,
@@ -52,6 +55,7 @@ export interface InvoiceItem {
 export interface InvoiceTotals {
   laborTotal: number
   materialTotal: number
+  travelTotal: number
   serviceTotal: number
   subtotal: number
   discountAmount: number

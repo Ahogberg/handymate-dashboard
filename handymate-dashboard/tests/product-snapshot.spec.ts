@@ -211,21 +211,23 @@ test.describe('recalculateItems — snapshot-omräkning vid mängd/pris-ändring
     expect(row.estimated_hours).toBeNull()
   })
 
-  test('rad UTAN snapshot → orörd legacy-väg (bara total räknas om)', () => {
+  test('rad UTAN snapshot får obligatorisk materialdelning när den saknar ROT/RUT', () => {
     const [row] = recalculateItems([
       snapshotItem({
         quantity: 3, unit_price: 100,
+        is_rot_eligible: false, rot_rut_type: null,
         component_snapshot: undefined,
         labor_amount: undefined, material_amount: undefined, estimated_hours: undefined,
       }),
     ])
     expect(row.total).toBe(300)
-    expect(row.labor_amount).toBeUndefined()
-    expect(row.material_amount).toBeUndefined()
+    expect(row.labor_amount).toBe(0)
+    expect(row.material_amount).toBe(300)
+    expect(row.travel_amount).toBe(0)
     expect(row.estimated_hours).toBeUndefined()
   })
 
-  test('snapshot med labor_share null → orörd (ingen split påtvingas)', () => {
+  test('snapshot med labor_share null faller tillbaka på radens flagga', () => {
     const [row] = recalculateItems([
       snapshotItem({
         quantity: 2, unit_price: 100, labor_amount: null, material_amount: null,
@@ -236,8 +238,9 @@ test.describe('recalculateItems — snapshot-omräkning vid mängd/pris-ändring
       }),
     ])
     expect(row.total).toBe(200)
-    expect(row.labor_amount).toBeNull()
-    expect(row.material_amount).toBeNull()
+    expect(row.labor_amount).toBe(200)
+    expect(row.material_amount).toBe(0)
+    expect(row.travel_amount).toBe(0)
   })
 
   test('tillvalsrad med snapshot räknas om likadant (spread behåller option-fälten)', () => {
