@@ -39,7 +39,7 @@ Rules that keep this file honest:
 | C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
 | C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **done 2026-09-14** (PR #73 merged after base merge `8400f720`; review §5: no BLOCKER, 3 LOW; [C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md)) | flip itself: v239 → v240 → v242 applied, crons live, PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
-| C8 | Ledger schema + posting engine | Codex | **brief ready 2026-09-15** ([C8 brief](FINANCIAL_KERNEL_C8_BRIEF.md); v251 drafted, 48/48 in PGlite) | — (C2, C3 done) |
+| C8 | Ledger schema + posting engine | Claude (Codex usage exhausted 2026-09-16) | **built 2026-09-16** ([C8 brief](FINANCIAL_KERNEL_C8_BRIEF.md) §9 handoff; 48 SQL + 39 golden-path vouchers + 7 engine checks green; PR pending review/merge, then v251 applied) | — |
 | C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
 | C10 | Read-only Ledger projections + SIE export | Codex | not started | C8 |
 | C11 | Bank/reconciliation | Codex | not started | C4, bank access (Sprint −1) |
