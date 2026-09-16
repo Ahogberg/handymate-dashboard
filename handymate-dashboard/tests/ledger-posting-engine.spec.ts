@@ -64,14 +64,12 @@ const consume = (handler: ReturnType<typeof ledgerPostingHandler>, opts: { maxAt
 
 test('the handler posts one entry per event through the consumer, with the event as source and the key ledger:<event>:<rule>:v<n>', async () => {
   const ev = await issued()
-  const posted: string[] = []
-  const handler = ledgerPostingHandler(registryWith(customerInvoice), async () => CTX, (_e, out) => posted.push(...out.map(o => o.entry.id)))
+  const handler = ledgerPostingHandler(registryWith(customerInvoice), async () => CTX)
   expect(handler.consumer).toBe(LEDGER_POSTING_CONSUMER)
   const result = await consume(handler)
   expect(result).toMatchObject({ claimed: 1, delivered: 1, failed: 0, halted: false })
   const [e] = await entries()
   expect(e).toMatchObject({ source_event_id: ev.eventId, idempotency_key: postingIdempotencyKey(ev.eventId, customerInvoice), posting_rule_id: 'test.customer_invoice', posting_rule_version: 1, actor_type: 'system', voucher_number: 1 })
-  expect(posted).toEqual([e.id])
   const lines = await rows<{ account: string; debit_minor: string; credit_minor: string }>(db, 'SELECT a.number account, l.debit_minor::text debit_minor, l.credit_minor::text credit_minor FROM ledger_entry_lines l JOIN ledger_accounts a ON a.id=l.account_id ORDER BY l.line_no')
   expect(lines).toEqual([{ account: '1510', debit_minor: '1250000', credit_minor: '0' }, { account: '3001', debit_minor: '0', credit_minor: '1000000' }, { account: '2611', debit_minor: '0', credit_minor: '250000' }])
   const appended = await events(db, 'journal_entry_posted')
@@ -81,21 +79,36 @@ test('the handler posts one entry per event through the consumer, with the event
   expect(await entries()).toHaveLength(1)
 })
 
-test('at-least-once: the same event delivered twice posts once, and the replay returns the same entry', async () => {
+test('at-least-once through the consumer: posted but not acked (crash after the RPC) is redelivered and posts once', async () => {
   const ev = await issued()
-  const registry = registryWith(customerInvoice)
-  const first = await postEvent(rpc, ev, registry, CTX)
-  const second = await postEvent(rpc, ev, registry, CTX)
-  expect(first[0].inserted).toBe(true); expect(second[0].inserted).toBe(false); expect(second[0].entry.id).toBe(first[0].entry.id)
+  const inner = ledgerPostingHandler(registryWith(customerInvoice), async () => CTX)
+  let crashOnce = true
+  // Samma handler, men första leveransen dör efter bokföringen och före ack — som en processkrasch eller förlorad lease.
+  const crashing = { consumer: inner.consumer, async handle(e: FinancialEventEnvelope, kernel: KernelDb) {
+    await inner.handle(e, kernel)
+    if (crashOnce) { crashOnce = false; throw new Error('process lost after posting, before ack') }
+  } }
+  expect(await consume(crashing)).toMatchObject({ claimed: 1, delivered: 0, failed: 1, halted: false })
+  expect(await entries()).toHaveLength(1)
+  // Omleveransen tar det ursprungliga eventet igen plus journal_entry_posted som första försöket hann skriva.
+  const redelivered = await consume(crashing)
+  expect(redelivered).toMatchObject({ claimed: 2, delivered: 2, failed: 0 })
   expect(await entries()).toHaveLength(1); expect(await events(db, 'journal_entry_posted')).toHaveLength(1)
+  const delivery = (await rows<{ attempts: number; delivered_at: string | null }>(db, 'SELECT attempts, delivered_at FROM financial_event_deliveries WHERE event_id=$1', [ev.eventId]))[0]
+  expect(delivery.attempts).toBe(2); expect(delivery.delivered_at).not.toBeNull()
+  // Och direkt mot motorn: andra anropet är en replay av samma verifikat.
+  const again = await postEvent(rpc, ev, registryWith(customerInvoice), CTX)
+  expect(again[0].inserted).toBe(false); expect(again[0].entry.id).toBe((await entries())[0].id)
 })
 
 test('determinism: the same event and rule version give byte-identical drafts; a new version is a new key', async () => {
   const ev = await issued()
-  const a = JSON.stringify(customerInvoice.draft(ev as FinancialEventEnvelope<'invoice_issued'>, CTX))
-  const b = JSON.stringify(customerInvoice.draft(ev as FinancialEventEnvelope<'invoice_issued'>, CTX))
-  expect(a).toBe(b)
-  expect(postingIdempotencyKey(ev.eventId, { id: 'r', version: 1 })).not.toBe(postingIdempotencyKey(ev.eventId, { id: 'r', version: 2 }))
+  const frozen = '{"series":"A","journalType":"standard","effectiveDate":"2026-03-10","currency":"SEK","description":"Faktura F-1","lines":[{"account":"1510","debitMinor":"1250000"},{"account":"3001","creditMinor":"1000000"},{"account":"2611","creditMinor":"250000"}]}'
+  // Mot en fryst literal, inte mot ett andra anrop i samma process: en regel som läser klockan eller miljön faller här.
+  expect(JSON.stringify(customerInvoice.draft(ev as FinancialEventEnvelope<'invoice_issued'>, CTX))).toBe(frozen)
+  expect(JSON.stringify(customerInvoice.draft(ev as FinancialEventEnvelope<'invoice_issued'>, CTX))).toBe(frozen)
+  expect(postingIdempotencyKey(ev.eventId, customerInvoice)).toBe(`ledger:${ev.eventId}:test.customer_invoice:v1`)
+  expect(postingIdempotencyKey(ev.eventId, { id: 'test.customer_invoice', version: 2 })).toBe(`ledger:${ev.eventId}:test.customer_invoice:v2`)
 })
 
 test('a rule that names an account missing from the context stops the consumer with no entry and no event', async () => {

@@ -11,10 +11,18 @@
  * tomt i C8 — reglerna och kontonumren är C9:s och konsultens (brief §0), och
  * konsumenten kopplas till cronen först där, bakom auto_post_accounting_enabled.
  *
- * Fel är stopp, aldrig delvis bokföring: ett utkast som inte balanserar eller
- * pekar på ett konto som saknas i kontexten kastar innan något RPC anropas;
- * consume.ts registrerar misslyckandet och stoppar konsumenten efter max
- * försök, med eventet kvar i kön.
+ * Fel är stopp: ett utkast som inte balanserar eller pekar på ett konto som
+ * saknas i kontexten kastar innan något RPC anropas, och consume.ts registrerar
+ * misslyckandet och stoppar konsumenten efter max försök med eventet kvar i kön.
+ * Bokföringen är atomär per utkast (ett RPC-anrop = en transaktion) och
+ * slutförd per event genom omförsök: ger ett regelset två utkast och det andra
+ * faller, står det första kvar bokfört, leveransen misslyckas, och nästa försök
+ * får det första som replay (inserted=false) och bokför det andra. Samma nyckel
+ * kan aldrig ge två verifikat.
+ *
+ * Regelkontrakt: draft() är ren, läser ingen klocka och kastar aldrig ett
+ * meddelande som innehåller payloadvärden (meddelandet hamnar i
+ * financial_event_deliveries.last_error).
  */
 import type { KernelDb } from '../financial-kernel/events/publish'
 import type { FinancialEventEnvelope } from '../financial-kernel/events/types'
@@ -92,7 +100,8 @@ export function postingIdempotencyKey(eventId: string, rule: Pick<PostingRule, '
   return `ledger:${eventId}:${rule.id}:v${rule.version}`
 }
 
-const INTEGER = /^\d+$/
+/** Kanonisk heltalssträng i minor units: ingen ledande nolla, högst 18 siffror (v251:s gräns; BIGINT). */
+const INTEGER = /^(0|[1-9][0-9]{0,17})$/
 const ZERO = BigInt(0)
 /** Balans och radform kontrolleras här med BigInt innan något lämnar processen; RPC:n kontrollerar igen. */
 export function validateDraft(draft: JournalDraft): void {
@@ -126,8 +135,10 @@ export interface PostingOutcome { ruleId: string; ruleVersion: number; inserted:
 
 /**
  * Ritar och bokför allt registret har för eventet. Utkasten ritas och valideras
- * alla först; först sedan bokförs de i regelordning. Ett fel i ett utkast ⇒
- * inget bokförs för eventet i den här leveransen.
+ * alla först, så ett ogiltigt utkast stoppar leveransen innan något RPC anropas.
+ * Därefter bokförs de i regelordning, ett RPC-anrop (en transaktion) per utkast;
+ * ett fel mitt i listan lämnar de tidigare bokförda, och omförsöket får dem som
+ * replay via nyckeln.
  */
 export async function postEvent(db: KernelDb, event: FinancialEventEnvelope, registry: RuleRegistry, ctx: PostingRuleContext): Promise<PostingOutcome[]> {
   const drafts = registry.rulesFor(event.eventType).flatMap(rule => {
@@ -155,15 +166,15 @@ export async function postEvent(db: KernelDb, event: FinancialEventEnvelope, reg
 export function ledgerPostingHandler(
   registry: RuleRegistry,
   resolveContext: (businessId: string, db: KernelDb) => Promise<PostingRuleContext>,
-  onPosted?: (event: FinancialEventEnvelope, outcomes: PostingOutcome[]) => void,
 ): FinancialEventHandler {
   return {
     consumer: LEDGER_POSTING_CONSUMER,
     async handle(event, db) {
+      // Ett event utan regel ackas utan bokföring: kursorn är strikt ordnad (v236), så ett
+      // oackat event skulle blockera alla senare för konsumenten.
       if (registry.rulesFor(event.eventType).length === 0) return
       const ctx = await resolveContext(event.businessId, db)
-      const outcomes = await postEvent(db, event, registry, ctx)
-      onPosted?.(event, outcomes)
+      await postEvent(db, event, registry, ctx)
     },
   }
 }

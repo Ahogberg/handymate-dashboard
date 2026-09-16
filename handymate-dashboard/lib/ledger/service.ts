@@ -21,7 +21,8 @@ export interface LedgerFiscalYearView { id: string; startsOn: string; endsOn: st
 export interface LedgerJournalView { id: string; series: string; name: string }
 export interface LedgerAccountView {
   id: string; number: string; name: string; type: LedgerAccountType; active: boolean; source: LedgerAccountSource
-  confirmedBy?: string; confirmedAt?: string
+  /** Namngiven person; confirmed_at sätts av RPC:n i samma ögonblick och läses via C10:s projektioner. */
+  confirmedBy?: string
 }
 
 /** En rad in till RPC:n. Exakt en sida > 0; belopp som heltalssträngar i minor units. */
@@ -59,7 +60,6 @@ function int(value: unknown): number {
   if (typeof value !== 'number' || !Number.isInteger(value)) throw new TypeError('Expected integer')
   return value
 }
-function optional(value: unknown): string | undefined { return value == null ? undefined : text(value) }
 function oneOf<T extends string>(value: unknown, allowed: readonly T[]): T {
   const s = text(value)
   if (!allowed.includes(s as T)) throw new TypeError(`Unexpected value ${s}`)
@@ -82,7 +82,6 @@ export function ledgerAccount(value: unknown): LedgerAccountView {
     type: oneOf(r.type, ['asset', 'liability', 'equity', 'revenue', 'expense'] as const), active: bool(r.active),
     source: oneOf(r.source, ['proposal', 'sie_import', 'manual'] as const),
     ...(r.confirmed_by == null ? {} : { confirmedBy: text(r.confirmed_by) }),
-    ...(r.confirmed_at == null ? {} : { confirmedAt: text(r.confirmed_at) }),
   }
 }
 export function ledgerLine(value: unknown): LedgerLineView {
@@ -124,6 +123,8 @@ function periodChange(value: unknown): LedgerPeriodChange {
 export function ledgerLineArgs(line: LedgerLineInput): Record<string, unknown> {
   const debit = line.debitMinor ?? '0', credit = line.creditMinor ?? '0'
   if (!/^\d+$/.test(debit) || !/^\d+$/.test(credit)) throw new TypeError('Line amounts must be non-negative integer strings')
+  if ((debit !== '0' && !/^[1-9]/.test(debit)) || (credit !== '0' && !/^[1-9]/.test(credit))) throw new TypeError('Line amounts must be canonical integer strings')
+  if ((BigInt(debit) > BigInt(0)) === (BigInt(credit) > BigInt(0))) throw new TypeError('A line carries exactly one side')
   return {
     account: line.account, debit_minor: debit, credit_minor: credit,
     ...(line.vatCode === undefined ? {} : { vat_code: line.vatCode }),
@@ -168,7 +169,9 @@ export async function postJournalEntry(db: KernelDb, businessId: string, input: 
     p_business_id: businessId, p_series: input.series, p_journal_type: input.journalType, p_effective_date: input.effectiveDate,
     p_description: input.description, p_lines: input.lines.map(ledgerLineArgs), p_source_event_id: input.sourceEventId ?? null,
     p_posting_rule_id: input.ruleId, p_posting_rule_version: input.ruleVersion, p_idempotency_key: input.idempotencyKey,
-    p_actor_type: input.actor.type, p_actor_id: input.actor.id ?? null, p_currency: input.currency ?? 'SEK',
+    p_actor_type: input.actor.type, p_actor_id: input.actor.id ?? null,
+    // Valutan är RPC:ns default när den utelämnas; det landsneutrala lagret hårdkodar ingen.
+    ...(input.currency === undefined ? {} : { p_currency: input.currency }),
   })
   return { inserted: bool(r.inserted), entry: ledgerEntry(r) }
 }

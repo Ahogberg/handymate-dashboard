@@ -9,7 +9,7 @@ import { readFileSync } from 'fs'
 import type { KernelDb } from '../../lib/financial-kernel/events/publish'
 
 /** v235/v236-funktioner som returnerar TABLE (PostgREST: array). Ledgerns åtta RPC:er är skalära JSONB. */
-const SET_RETURNING = ['append_financial_event', 'claim_financial_events', 'begin_financial_event_attempt', 'ack_financial_event', 'fail_financial_event', 'release_financial_consumer_lease', 'get_financial_consumer_status', 'resume_financial_consumer']
+const SET_RETURNING = ['append_financial_event', 'claim_financial_events', 'begin_financial_event_attempt', 'fail_financial_event', 'get_financial_consumer_status']
 
 export const USER_A = '00000000-0000-0000-0000-000000000001'
 export const USER_B = '00000000-0000-0000-0000-000000000002'
@@ -28,8 +28,10 @@ export async function ledgerDatabase(): Promise<{ db: PGlite; rpc: KernelDb }> {
     GRANT USAGE ON SCHEMA public, auth TO anon, authenticated, service_role;
     GRANT USAGE, CREATE ON SCHEMA public TO deployer;
     GRANT REFERENCES ON business_config TO deployer;
-    ALTER DEFAULT PRIVILEGES FOR ROLE deployer IN SCHEMA public GRANT ALL ON TABLES TO service_role;
-    ALTER DEFAULT PRIVILEGES FOR ROLE deployer IN SCHEMA public GRANT ALL ON SEQUENCES TO service_role;`)
+    -- Som Supabase: nya tabeller är läsbara av anon/authenticated/service_role tills migrationen tar bort det,
+    -- så v251:s REVOKE-rader är det som bär rollkontrollerna, inte fixturen.
+    ALTER DEFAULT PRIVILEGES FOR ROLE deployer IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+    ALTER DEFAULT PRIVILEGES FOR ROLE deployer IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;`)
   const tenantSql = readFileSync('sql/testbed_tenant_isolation.sql', 'utf8')
   const member = tenantSql.match(/CREATE OR REPLACE FUNCTION public\.is_business_member[\s\S]*?\$function\$;/)
   if (!member) throw Error('Missing real membership function')
@@ -38,11 +40,13 @@ export async function ledgerDatabase(): Promise<{ db: PGlite; rpc: KernelDb }> {
   const receivables = readFileSync('sql/v238_financial_receivables.sql', 'utf8')
   const kernelHelpers = receivables.match(/CREATE OR REPLACE FUNCTION public\.financial_(?:lock|append)\([\s\S]*?\$fn\$;/g)
   if (!kernelHelpers || kernelHelpers.length !== 2) throw Error('Missing financial_lock/financial_append in v238')
+  const kernelRevokes = receivables.match(/^REVOKE ALL ON FUNCTION public\.financial_(?:lock|append)\([^\n]*$/gm)
+  if (!kernelRevokes || kernelRevokes.length !== 2) throw Error('Missing REVOKE for financial_lock/financial_append in v238')
   await db.exec('SET ROLE deployer')
   try {
     await db.exec(readFileSync('sql/v235_financial_events.sql', 'utf8'))
     await db.exec(readFileSync('sql/v236_financial_event_consumers.sql', 'utf8'))
-    await db.exec(kernelHelpers.join('\n'))
+    await db.exec(kernelHelpers.concat(kernelRevokes).join('\n'))
     await db.exec(readFileSync('sql/v251_ledger_posting_engine.sql', 'utf8'))
   } finally { await db.exec('RESET ROLE') }
   const rpc: KernelDb = {

@@ -1,8 +1,11 @@
 /**
  * Ledger (Paket C8) — varje verifikat i tests/financial-kernel/golden-paths.ts bokförs genom
  * post_journal_entry i PGlite och läses tillbaka rad för rad. Det gör golden paths körbara från
- * C8 och visar regimneutralitet: standard, omvänd skattskyldighet, ROT/RUT och kontantmetod går
- * genom samma kod utan att den tittar på regimen. Kontonumren är förslag (confirmed_by = null).
+ * C8: standard, omvänd skattskyldighet, ROT/RUT och kontantmetod bokförs genom samma RPC med
+ * samma radform. Kontonumren är förslag (confirmed_by = null); kontotypen är en fixturkonstant
+ * eftersom klassificeringen är konsultens (brief §5.10) och inte asserteras här. Källeventen är
+ * provenanspinnar: rätt eventtyp och datum ur golden path, men syntetisk källa och payload.
+ * Kör som ägare utan roller; rollerna bevisas i ledger-sql.spec.ts 45–48.
  */
 import { test, expect } from '@playwright/test'
 import type { PGlite } from '@electric-sql/pglite'
@@ -15,7 +18,9 @@ test.describe.configure({ mode: 'serial' })
 test.beforeAll(async () => { test.setTimeout(180_000); db = (await ledgerDatabase()).db })
 test.afterAll(async () => { await db?.close() })
 
-const accountType = (number: string) => number.startsWith('1') ? 'asset' : number.startsWith('2') ? 'liability' : number.startsWith('3') || number.startsWith('8') ? 'revenue' : 'expense'
+/** Fixturtyp, inte en klassificering: paketet beslutar ingen kontoplan (§5.10) och typen asserteras inte. */
+const FIXTURE_ACCOUNT_TYPE = 'asset'
+const VOUCHERS_IN_FIXTURE = 39
 const minor = (decimal: string | null) => decimal === null ? '0' : fromDecimalString(decimal, 'SEK').amountMinor.toString()
 const toLines = (v: Voucher): LineJson[] => v.lines.map(([acc, d, c]) => ({ account: acc, debit_minor: minor(d), credit_minor: minor(c) }))
 const fiscalYearOf = (date: string) => date.slice(0, 4)
@@ -26,7 +31,7 @@ test('the ledger accepts every proposed account as an unconfirmed proposal and e
   await openFy(db, 'a', '2026-01-01', '2026-12-31'); await openFy(db, 'a', '2027-01-01', '2027-12-31')
   for (const series of ['F', 'B', 'L', 'M', 'IB']) await journal(db, 'a', series, `Serie ${series}`)
   for (const [number, meta] of Object.entries(PROPOSED_ACCOUNTS)) {
-    const a = await account(db, 'a', number, accountType(number), { name: meta.name, source: 'proposal' })
+    const a = await account(db, 'a', number, FIXTURE_ACCOUNT_TYPE, { name: meta.name, source: 'proposal' })
     expect(a.confirmed_by).toBeNull()
   }
   expect((await rows<{ n: number }>(db, 'SELECT count(*)::int n FROM ledger_accounts WHERE confirmed_by IS NOT NULL'))[0].n).toBe(0)
@@ -45,11 +50,13 @@ test('every golden-path voucher posts through post_journal_entry and reads back 
       const debit = lines.reduce((s, l) => s + BigInt(l.debit_minor), BigInt(0))
       expect(entry.total_minor).toBe(debit.toString())
       expect(entry.source_event_id).toBe(src); expect(entry.status).toBe('posted'); expect(entry.series).toBe(voucher.series)
+      expect(entry.correlation_id).toBe(`fin_invoice_GP${gp.id}`); expect(entry.posting_rule_id).toBe('gp')
       posted.push({ gp: gp.id, index, voucher, entry })
     }
   }
-  expect(posted).toHaveLength(GOLDEN_PATHS.reduce((n, g) => n + g.vouchers.length, 0))
-  expect(posted.length).toBeGreaterThanOrEqual(39)
+  // Pinnat: ett nytt verifikat i fixturen ska synas här och få en radkontroll ovan, inte glida in tyst.
+  expect(posted).toHaveLength(VOUCHERS_IN_FIXTURE)
+  expect(GOLDEN_PATHS).toHaveLength(18)
 })
 
 test('voucher numbers run gapless per series and fiscal year, in fixture order', async () => {
@@ -80,9 +87,10 @@ test('replaying every voucher with its key returns the same entry and appends no
   expect(before).toBe(posted.length)
 })
 
-test('no account was confirmed and no regime was inspected on the way: the books hold one code path for all four regimes', async () => {
+test('all regimes in the fixture went through the same RPC, and no account was confirmed on the way', async () => {
   const regimes = new Set(GOLDEN_PATHS.map(g => `${g.regime.vatRegime}/${g.regime.accountingMethod}/${g.regime.taxReduction ?? '-'}`))
   expect(regimes.size).toBeGreaterThanOrEqual(3)
+  expect(new Set(posted.map(p => p.entry.posting_rule_id))).toEqual(new Set(['gp']))
   expect((await rows<{ n: number }>(db, 'SELECT count(*)::int n FROM ledger_accounts WHERE confirmed_by IS NOT NULL'))[0].n).toBe(0)
   expect((await rows<{ n: number }>(db, 'SELECT count(*)::int n FROM ledger_entries'))[0].n).toBe(posted.length)
 })

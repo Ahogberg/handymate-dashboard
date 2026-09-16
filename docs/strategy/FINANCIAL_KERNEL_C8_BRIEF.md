@@ -233,4 +233,23 @@ readers before the PR (findings and fixes listed under "Review" below) and the C
   cash basis all pass through one code path that never inspects the regime.
 - **Human accounting review required:** no for the mechanics in this package; yes, by a named person, before C9
   registers a rule or confirms an account (`ledger_accounts.confirmed_by`).
-- **Review (two independent adversarial readers, 2026-09-16):** _fylls i efter granskningen_.
+- **Review (two independent adversarial readers, 2026-09-16), all fixed before the PR:** (1) blocker: consumer
+  redelivery was proven only at RPC level — now a handler that posts and crashes before ack is redelivered through
+  `consumeOnce` and the books hold one entry and one event; (2) blocker: seven of the eight service wrappers had no
+  caller — checks 01–09, 10, 31–42, 44 now run through `lib/ledger/service.ts` with named `p_*` arguments, so a
+  misspelled argument or parser fails the suite; (3) `validateDraft` bounded to v251's 18 digits and canonical
+  integers; `ledgerLineArgs` refuses a line with neither side; (4) the engine docstring no longer claims atomicity
+  across a multi-draft rule set: atomic per draft, complete per event by retry; the `onPosted` hook was removed
+  (a throwing callback would fail a delivery whose books were correct); (5) determinism asserted against a frozen
+  literal, not a second call in the same process; (6) fixture: `financial_lock`/`financial_append` REVOKEs carried
+  over from v238 (anon can no longer forge an event in the fixture) and default table privileges granted to
+  anon/authenticated as on Supabase, so v251's own REVOKEs are what the role checks prove; boolean RPCs no longer
+  reported as arrays; (7) SQL spec: check 16 tests a neither-side line first, check 30 shows the INSERT passing and
+  only COMMIT failing (deferred trigger), the four loose regexes assert the named constraint, check 42 asserts the
+  full `period_unlocked` payload, check 27 asserts the 3740 line; (8) golden-path spec: account type is an
+  explicit fixture constant (no classification decided), voucher count pinned to 39 and paths to 18, correlation
+  asserted, the "no regime inspected" claim replaced by what is observed (one rule id on every entry).
+  **Checks weakened:** none. **Known limits, honest:** PGlite is single-connection, so §5.2's gaplessness is proven
+  serially, not under contention; an entry inserted behind the RPC with zero lines never reaches the balance
+  trigger (AFTER INSERT on lines) — both outside §6's 48 and unchanged from the drafted DDL; `confirmed_at` is
+  written by the RPC but not returned by `upsert_ledger_account` (C10 projections read it).

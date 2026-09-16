@@ -1688,9 +1688,9 @@ Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är
 - [x] `lib/ledger/posting-engine.ts` + `tests/ledger-posting-engine.spec.ts`: regelregister (tomt), utkast, BigInt-balans, konsument `ledger-posting` mot riktig `consumeOnce` (7/7).
 - [x] `tests/ledger-golden-path-vouchers.spec.ts`: 39 verifikat i 18 golden paths bokförs, läses rad för rad, numreras utan luckor, replay idempotent (6/6).
 - [x] Registrering i `contracts.yml` och `test:contracts`; handoff i briefens §9; paketloggens C8-rad.
-- [ ] Adversariell granskning med två oberoende läsare, rätta fynd, `tsc`, `test:six-outcomes`, `next build`.
+- [x] Adversariell granskning med två oberoende läsare (2 blockers + 8 should-fix rättade, se brief §9), `tsc`, `test:six-outcomes`, `next build` gröna.
 - [ ] Commit, push, PR, CI grön, squash-merge; därefter v251 i produktion med §8-verifieringen.
 
-Granskning (fylls i): se briefens §9 "Review".
+Granskning: se briefens §9 "Review". Kvar: PR, CI, merge, v251 i produktion.
 
 ---

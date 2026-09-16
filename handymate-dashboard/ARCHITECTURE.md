@@ -815,7 +815,7 @@ datamodelländring; evidens för köparstatus och UI för regimval är C9.
 
 | Event | Triggas när | Primär payload | Paket | Finns |
 |-------|-------------|----------------|-------|-------|
-| `journal_entry_posted` | En verifikation är atomärt bokförd med balanserade rader. Verifikationsnumret tilldelas i samma transaktion (blueprint §36.1). | `{ journal_entry_id, journal_type, voucher_series, voucher_number, effective_date, period_id, rule_id, rule_version, source_event_id }` | C8 | ✅ |
+| `journal_entry_posted` | En verifikation är atomärt bokförd med balanserade rader. Verifikationsnumret tilldelas i samma transaktion (blueprint §36.1). | `{ journal_entry_id, journal_type, voucher_series, voucher_number, effective_date, period_id, rule_id, rule_version, source_event_id\|null }` | C8 | ✅ |
 | `journal_entry_reversed` | En verifikation vänds med en ny verifikation. Bokförd historik ändras aldrig på plats. | `{ journal_entry_id, reversal_entry_id, reason }` | C8 | ✅ |
 | `period_locked` | En räkenskapsperiod låses för bokföring. | `{ period_id, fiscal_year_id, locked_by }` | C8 | ✅ |
 | `period_unlocked` | En låst period öppnas igen (privilegierad, alltid auditerad). | `{ period_id, fiscal_year_id, unlocked_by, reason }` | C8 | ✅ |
