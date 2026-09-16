@@ -6,6 +6,12 @@ import {
 } from './earned-autonomy'
 import { supervisedAutonomyEnabled } from './consent-grant'
 import { gateChannel, type Channel } from '@/lib/channels/preflight'
+
+function outboundPending(result: unknown): boolean {
+  return typeof result === 'object' && result !== null &&
+    'outboundStatus' in result && (result as { outboundStatus?: unknown }).outboundStatus === 'pending'
+}
+
 /** Audit only, not H3b's future dispatch queue. Persist uncertainty before invoking a provider. */
 export async function supervisedSend<T>(
   db: SupabaseClient,
@@ -43,6 +49,10 @@ export async function supervisedSend<T>(
   }
   try {
     const result = await send(id)
+    // H3b preflight may defer before any provider call. In that state the
+    // outbound sweep owns the final autonomy receipt; closing it as unknown
+    // here would make a later successful delivery permanently look uncertain.
+    if (outboundPending(result)) return result
     const finish = await db.rpc('finish_autonomy_attempt', {
       p_business_id: businessId,
       p_id: id,
