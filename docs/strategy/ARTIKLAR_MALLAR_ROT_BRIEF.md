@@ -39,7 +39,7 @@ I dag, verifierat i kod och produktion 2026-09-16:
 | **Kostnad mot utpris per artikel.** Artikelvyn i offerten visar Σ självkostnad (antal × `unit_cost`) och Σ utpris (antal × `unit_price`) över raderna, alltså marginalen per artikel. `quotes.expected_margin_snapshot` fortsätter bära offertens helhet. | Christoffers underlag. Självkostnaden fanns redan på komponenten; utpriset saknades. |
 | **`rot_work_cost`/`rut_work_cost` (ex moms) skrivs på varje fakturaväg.** `lib/invoices/create-invoice.ts:210-212` får dem ur `rotRutLaborBasis`, inte bara `from-project`-vägen. | Skatteverket-filen (`lib/skv/validate-rot-request.ts:146-154`), kärnans kund/Skatteverket-delning (`sql/v238:192-228` via `customer_pays`/`rot_rut_deduction`) och Fortnox ska utgå från samma tal. |
 | **Fortnox: en blandad rad delas vid export.** Fortnox sätter `HouseWork` på hela radbeloppet, så en rad med `0 < labor_amount < total` exporteras som en HouseWork-rad (arbete) och en vanlig rad (material + resa) via ny `splitRowsForHouseWork` i fakturamapparen; `isHouseWorkRow` returnerar false när `labor_amount = 0` även om raden är flaggad. Bara fakturor som inte redan synkats. | Annars får Fortnox och därmed Skatteverket ROT på material. |
-| **Backfill med snäv heuristik, aldrig omräkning av skickade offerter.** Kategori → enhet → ROT/RUT-flagga → material (se §3). `rot_deduction` på befintliga offerter skrivs inte om; nytt värde vid nästa sparning. `quote_templates.job_type_slug` backfillas inte (v187: uttryckligt val, ingen namngissning); seedningen sätter den framåt i kod. | Historik är historik. Ett fel i en skickad offert rättas av människan som skickar nästa version. |
+| **Backfill med snäv heuristik, aldrig omräkning av skickade offerter.** Kategori → enhet → ROT/RUT-flagga → material (se §3). Migrationen skriver aldrig om `rot_deduction` på befintliga offerter; varje sparning i appen räknar däremot om alla belopp konsekvent (`total`, `rot_work_cost`, `rot_deduction`, `customer_pays` hör ihop). Ingen frysning av avdraget efter `sent_at`: livscykelspärren skyddar redan accepterade offerter, och en skickad offert som redigeras är en ny version. (Förtydligat 2026-09-16 efter #86, där en frysning gav `customer_pays ≠ total − avdrag`.) `quote_templates.job_type_slug` backfillas inte (v187: uttryckligt val, ingen namngissning); seedningen sätter den framåt i kod. | Historik är historik. Ett fel i en skickad offert rättas av människan som skickar nästa version. |
 | **Jobbtypsmallen är standardstarten.** `seedQuoteTemplates` ger varje branschmall en `job_type_slug` och säkrar jobbtypen via `ensureOnboardingJobTypes`; `qstd_*`-raderna bär artikelns delning; "Ny offert" förvalet är jobbtypsstart när företaget har jobbtyper (vanliga vägen finns kvar); agenternas offertkontext föredrar jobbtypsmallens rader och varje genererad rad får en delning via `splitLine` innan den sparas. | Mallen är bara värd något om den är startpunkten. 2 av 39 offerter i dag. |
 | **Ändras inte.** Kärnans eventkontrakt och receivable-delning, `calculateQuoteTotals` signatur (bara additivt `travelTotal`), `rotRutDeductionInclVat` och taken, NUMERIC kronor i dessa tabeller, `quotes.items`-JSON (2 legacy-offerter läser den, rörs inte). | |
 
@@ -81,6 +81,11 @@ Fas 2 — delad ROT-bas + de sex rättningarna
   app/api/agent/trigger/tool-router.ts             (d; create_quote-rader får delning från matchad artikel)
   app/api/invoices/from-quote/route.ts, lib/invoices/project-invoice-draft.ts   (e: ingen bakvänd härledning)
   components/invoices/ProjectInvoiceModal.tsx      (f: tidpostens kategori styr; Restid aldrig ROT)
+  app/api/invoices/from-time-entries/route.ts, app/api/invoices/route.ts,
+  app/api/projects/[id]/create-final-invoice/route.ts, app/api/projects/[id]/invoice-preview/route.ts,
+  app/api/invoices/credit/route.ts                 (tillagda 2026-09-16 efter #86: samma bas och splitTimeEntryLine;
+                                                    ingen egen kopia av labor_amount ?? radtotal; kreditrader negerar
+                                                    alla tre delarna så rot_work_cost ≤ 0 på en kreditnota)
   lib/quote-calculations.ts                        (travel_amount på radtypen, travelTotal additivt)
   app/dashboard/quotes/_shared/applyProductToItem.ts, lib/products/build-item-snapshot.ts
                                                    (resolveLaborShare → {laborShare, travelShare}; snapshot skriver travel_amount)
@@ -167,6 +172,16 @@ Ingen flagga. v252 körs efter granskning och merge, med verifieringen i filens 
 skapas får rätt bas direkt; befintliga fakturor och skickade offerter är oförändrade. Innan bred kommunikation
 till kunder: en ROT-faktura med blandad artikel exporteras till Fortnox i piloten och kontrolleras rad för rad.
 
+**Driftläge 2026-09-16 (Claude):** #86 mergad till main (`71c10ea9`) efter två granskningsomgångar (sju blockers
+rättade av Codex i `ec30b9b`, två restpunkter av Claude i `17a132a1`: legacyfallback `type === 'labor'` i basen och
+Restid i manuella fakturabyggaren). v252 körd i produktion samma dag via Supabase MCP och verifierad: 0 item-rader
+utan delning, 0 rader där summan avviker, alla sex villkor validerade (`quote_items_split_sum`,
+`products_share_sum_check`, `products_default_travel_share_check`, `products_share_source_check`,
+`product_components_rot_only_labour`, `product_components_component_type_check`), 25 resartiklar
+(Framkörning/Servicebil, alla utan ROT), `share_source = seed` på alla 2 075 artiklar, 0 offerter utan
+`travel_total`. Backfillens utfall på de 122 raderna: 61 material, 32 arbete, 19 nollrader, 6 resa, 4 blandade.
+Kvar före bred kommunikation: Fortnox-piloten rad för rad och Skatteverket-kontrollen ovan.
+
 ## 9. Startvärden och deras ursprung (inte grindar)
 
 Inget kritiskt i plattformen får vila på en persons antaganden. Det kritiska, att ROT bara räknas på
@@ -183,6 +198,8 @@ jobbtyper och artiklar en bransch brukar återanvända, hanteras så här:
 | Skatteverket-kontroll | Bekräfta mot Skatteverkets aktuella sidor att 30 %, 50 000/75 000 och "arbetskostnad inkl. moms" stämmer för 2026, och att framkörning inte är arbete. | Före aktivering. |
 
 ## 10. Handoff
+
+**Claude 2026-09-16 — granskad i två omgångar, mergad (#86 → `71c10ea9`), v252 körd i produktion (se §8).**
 
 **Codex 2026-09-16 — branch `codex/artiklar-rot`, PR #86.** Paketet omfattar fas 1–6: SQL-kontraktet,
 gemensam rad-/ROT-bas, artikel- och komponentredigering, samtliga fakturavägar, dokument/Fortnox/SKV,

@@ -922,8 +922,9 @@ GPL code is read, never copied).
 **Artiklar/ROT (utanför kärnan, rör fakturans ROT-bas).** Briefed 2026-09-16 in
 [`ARTIKLAR_MALLAR_ROT_BRIEF.md`](ARTIKLAR_MALLAR_ROT_BRIEF.md): mandatory labour/material/travel split per line,
 ROT base = Σ labour only, `rot_work_cost` written on every invoice path (the kernel's customer/tax_authority
-split in v238 reads it), Fortnox HouseWork rows split for mixed lines. v252 drafted (27 PGlite checks). Not a
-kernel package; listed here because C9's ROT posting rule and the SKV file depend on the corrected base.
+split in v238 reads it), Fortnox HouseWork rows split for mixed lines. **Done 2026-09-16:** PR #86 merged
+(`71c10ea9`) after two review rounds, v252 applied to production and verified (brief §8). Not a kernel package;
+listed here because C9's ROT posting rule and the SKV file depend on the corrected base, which now exists.
 
 **C1b — rounding policy.** Cannot start until a named accounting consultant confirms the
 rounding account (parent §5 proposes 3740; that is a proposal). Add the person's name to §1 of
