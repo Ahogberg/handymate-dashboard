@@ -11,6 +11,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
 import { InvoiceItem } from '@/lib/types/invoice'
 import { recalculateItems, createDefaultInvoiceItem } from '@/lib/invoice-calculations'
+import { splitLine, splitTimeEntryLine } from '@/lib/rot-rut-basis'
 import Link from 'next/link'
 import { InvoiceEditor, type InvoiceEditorCustomer, type InvoiceStyle } from '../_shared/InvoiceEditor'
 
@@ -22,6 +23,8 @@ interface TimeEntry {
   duration_minutes?: number
   hourly_rate: number | null
   materials_cost?: number | null
+  /** Tidpostens kategori (TimeEntryModal): bara 'work' är arbete. */
+  work_category?: 'work' | 'travel' | 'material_pickup' | 'meeting' | 'admin' | null
   description: string | null
   customer_id: string | null
   customer?: { name: string }
@@ -166,16 +169,24 @@ export default function NewInvoicePage() {
       // förbudet i app/api/invoices/from-project/route.ts).
       const rate = entry.hourly_rate || defaultHourlyRate || 0
       const laborItem = createDefaultInvoiceItem('item', items.length + newItems.length)
+      // Tidpostens kategori styr delningen: bara 'work' är arbete och kan ge
+      // ROT/RUT. Restid, materialhämtning, möte och admin blir aldrig arbete
+      // (brief ARTIKLAR_MALLAR_ROT §1; samma regel som from-project/from-time-entries).
+      const lineTotal = Math.round(hours * rate * 100) / 100
+      const split = splitTimeEntryLine(lineTotal, entry.work_category)
       newItems.push({
         ...laborItem,
         description: entry.description || `Arbete ${new Date(entry.work_date).toLocaleDateString('sv-SE')}`,
         quantity: Math.round(hours * 100) / 100,
         unit: 'timmar',
         unit_price: rate,
-        total: Math.round(hours * rate * 100) / 100,
+        total: lineTotal,
         type: 'labor',
-        is_rot_eligible: rotRutType === 'rot',
-        is_rut_eligible: rotRutType === 'rut',
+        labor_amount: split.labor_amount,
+        material_amount: split.material_amount,
+        travel_amount: split.travel_amount,
+        is_rot_eligible: split.is_rot_eligible && rotRutType === 'rot',
+        is_rut_eligible: split.is_rot_eligible && rotRutType === 'rut',
       })
 
       if (entry.materials_cost && entry.materials_cost > 0) {
@@ -188,6 +199,7 @@ export default function NewInvoicePage() {
           unit_price: entry.materials_cost,
           total: entry.materials_cost,
           type: 'material',
+          ...splitLine(entry.materials_cost, 0, 0),
         })
       }
 

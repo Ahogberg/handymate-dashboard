@@ -3,23 +3,24 @@
 const assert = require('node:assert/strict')
 const { load } = require('./onboarding-completion.cjs')
 async function modules() {
-  const snapshot = await load('lib/products/build-item-snapshot.ts', {})
+  const basis = await load('lib/rot-rut-basis.ts', {})
+  const snapshot = await load('lib/products/build-item-snapshot.ts', {'@/lib/rot-rut-basis':basis})
   const rot = await load('lib/rot-rut.ts', {})
   const calc = await load('lib/quote-calculations.ts', {
     '@/lib/types/quote': { QuoteItem:null, PaymentPlanEntry:null, QuoteTotals:null, RotRutType:null },
-    '@/lib/products/build-item-snapshot': snapshot, '@/lib/rot-rut': rot,
+    '@/lib/products/build-item-snapshot': snapshot, '@/lib/rot-rut': rot, '@/lib/rot-rut-basis': basis,
   })
-  const generated = await load('lib/quotes/generated-to-quote-items.ts', { '@/lib/quote-calculations':calc })
+  const generated = await load('lib/quotes/generated-to-quote-items.ts', { '@/lib/quote-calculations':calc, '@/lib/rot-rut-basis':basis })
   const mapper = await load('app/dashboard/quotes/_shared/loadEditQuote.ts', {
     '@/lib/quote-calculations':calc, '@/lib/quotes/generated-to-quote-items':generated,
   })
   const storage = { extractStoragePath:()=>null, signAttachmentList:async(_db,_bucket,rows)=>rows }
   const payload = await load('app/dashboard/quotes/_shared/buildQuotePayload.ts', { '@/lib/quote-calculations':calc, '@/lib/storage-signing':storage })
-  const writer = await load('lib/quotes/create-quote.ts', {})
+  const writer = await load('lib/quotes/create-quote.ts', {'@/lib/rot-rut-basis':basis})
   const cap = await load('lib/quotes/apply-annual-cap.ts', { '@/lib/rot-rut-limits':{calculateCappedDeduction:()=>{throw Error('Unexpected annual-cap query')}} })
   const reference = await load('lib/quotes/resolve-reference-person.ts', {})
   const validity = await load('lib/quotes/validity.ts', {})
-  return {calc,mapper,storage,payload,writer,cap,reference,validity}
+  return {basis,calc,mapper,storage,payload,writer,cap,reference,validity}
 }
 function database(state) {
   return {from(table) {
@@ -51,6 +52,7 @@ async function harness(m) {
     '@/lib/quote-calculations':m.calc,'@/lib/quotes/apply-annual-cap':m.cap,'@/lib/quotes/resolve-reference-person':m.reference,
     '@/lib/quotes/lifecycle':{lockedChanges:()=>{throw Error('Unexpected edit')},lockedChangeMessage:()=>''},
     '@/lib/quotes/create-quote':m.writer,'@/lib/quotes/validity':m.validity,'@/lib/storage-signing':m.storage,
+    '@/lib/rot-rut-basis':m.basis,
   })
   const post=body=>api.POST(new Request('https://unit.invalid/api/quotes',{method:'POST',body:JSON.stringify(body)}))
   const get=id=>{const nextUrl=new URL(`https://unit.invalid/api/quotes?quoteId=${id}`);return api.GET({nextUrl})}

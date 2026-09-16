@@ -39,6 +39,7 @@ import {
   resolveLegacyItemFields,
 } from '@/lib/quote-calculations'
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
+import { splitLine } from '@/lib/rot-rut-basis'
 
 /** Formen på en rad i ai-generate-svarets `quote.items`/`quote.options`
     (GeneratedQuoteItem, lib/ai-quote-generator.ts) — `description`/
@@ -157,7 +158,7 @@ export function mapGeneratedItemToQuoteItem(
   const uncertain =
     sourceIsAi && !priceMissing && typeof item.confidence === 'number' && item.confidence < AI_ITEM_CONFIDENCE_THRESHOLD
 
-  return applyOptionRowDefaults(
+  const mapped = applyOptionRowDefaults(
     setItemRotRut(
       {
         id: generateItemId(),
@@ -185,6 +186,10 @@ export function mapGeneratedItemToQuoteItem(
       rotRutFranSanning(item, suggestedDeductionType),
     ),
   )
+  return {
+    ...mapped,
+    ...splitLine(mapped.total, mapped.is_rot_eligible || mapped.is_rut_eligible ? 1 : 0, 0),
+  }
 }
 
 /**

@@ -4,6 +4,7 @@ import { getFortnoxInvoices, getFortnoxInvoice, isFortnoxConnected, type Fortnox
 import { mapFortnoxInvoice } from './map-invoice'
 import { withFortnoxLock } from './operation-lock'
 import { logFortnoxOperation } from './api-log'
+import { rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 
 type Existing = { invoice_id: string; status: string; invoice_type: string; customer_id: string | null; fortnox_document_number: string | null; fortnox_invoice_number: string | null; fortnox_sync_status: string | null; fortnox_synced_at?: string | null }
 
@@ -18,15 +19,22 @@ export function invoiceContentFromFortnox(fi: FortnoxInvoice) {
     if (!Number.isFinite(quantity) || !Number.isFinite(price)) throw new Error('Ofullständig fakturarad från Fortnox')
     const source = row as typeof row & { Total?: number; Discount?: number; DiscountType?: string }
     if (source.Total == null && Number(source.Discount || 0) !== 0) throw new Error('Rabatterad fakturarad saknar radbelopp')
-    return { id: `fortnox-${index}`, description: row.Description, quantity, unit: row.Unit || 'st', unit_price: price,
-      total: source.Total != null ? Number(source.Total) : quantity * price, vat_rate: row.VAT ?? 25 }
+    const total = source.Total != null ? Number(source.Total) : quantity * price
+    const houseWork = Boolean((row as any).HouseWork)
+    return { id: `fortnox-${index}`, item_type: 'item', description: row.Description, quantity, unit: row.Unit || 'st', unit_price: price,
+      total, vat_rate: row.VAT ?? 25, ...splitLine(total, houseWork ? 1 : 0, 0),
+      rot_rut_type: houseWork && fi.TaxReductionType ? fi.TaxReductionType.toLowerCase() : null,
+      is_rot_eligible: houseWork && fi.TaxReductionType === 'ROT', is_rut_eligible: houseWork && fi.TaxReductionType === 'RUT' }
   })
+  const type = fi.TaxReductionType === 'ROT' ? 'rot' : fi.TaxReductionType === 'RUT' ? 'rut' : null
   return {
     invoice_number: fi.DocumentNumber,
     total: Number(fi.Total),
     ...(fi.Net != null ? { subtotal: Number(fi.Net) } : {}),
     ...(fi.TotalVAT != null ? { vat_amount: Number(fi.TotalVAT) } : {}),
     invoice_date: fi.InvoiceDate, due_date: fi.DueDate || null, items,
+    rot_work_cost: type === 'rot' ? rotRutLaborBasis(items, 'rot') : 0,
+    rut_work_cost: type === 'rut' ? rotRutLaborBasis(items, 'rut') : 0,
     ...(fi.TaxReductionType === 'ROT' || fi.TaxReductionType === 'RUT' ? {
       rot_rut_type: fi.TaxReductionType.toLowerCase(), rot_rut_deduction: Number(fi.TaxReduction || 0),
       customer_pays: fi.TotalToPay ?? Number(fi.Total) - Number(fi.TaxReduction || 0),

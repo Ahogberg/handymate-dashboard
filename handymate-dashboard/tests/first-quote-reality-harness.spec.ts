@@ -103,7 +103,7 @@ test('autospar förankrar giltighetsdatum i offertens skapandedatum', () => {
   expect(calculateQuoteValidUntil('2026-08-01T12:00:00Z', 30)).toBe('2026-08-31')
   expect(calculateQuoteValidUntil('2026-08-01T12:00:00+02:00', 60)).toBe('2026-09-30')
   const route = read('app/api/quotes/route.ts')
-  expect(route).toContain("select('quote_id, business_id, status, customer_id, created_at')")
+  expect(route).toContain("select('quote_id, business_id, status, customer_id, created_at, sent_at, rot_rut_type')")
   expect(route).toContain('calculateQuoteValidUntil(existing.created_at, body.valid_days)')
   expect(route).not.toMatch(/if \(body\.valid_days !== undefined\)[\s\S]{0,180}const validUntil = new Date\(\)/)
 })

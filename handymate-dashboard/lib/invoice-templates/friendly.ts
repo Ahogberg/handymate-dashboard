@@ -71,7 +71,10 @@ export const renderFriendly: InvoiceTemplateRenderFn = (data: InvoiceTemplateDat
   if (isPaid) badges.push('<span class="badge rot"><span class="dot"></span>Betald</span>')
 
   const rotRow = data.invoice.rotDeduction
-    ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.invoice.rotDeduction)}</span></div>`
+    ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30 % av arbetskostnaden inkl. moms)</span><span class="val">−${formatCurrency(data.invoice.rotDeduction)}</span></div>`
+    : ''
+  const laborRow = data.invoice.laborCost
+    ? `<div class="total-row"><span class="lbl">varav arbetskostnad</span><span class="val">${formatCurrency(data.invoice.laborCost)}</span></div>`
     : ''
   const rutRow = data.invoice.rutDeduction
     ? `<div class="total-row rot"><span class="lbl">RUT-avdrag (50% av arbete)</span><span class="val">−${formatCurrency(data.invoice.rutDeduction)}</span></div>`
@@ -308,6 +311,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #E5E7EB; color
       <div class="total-row"><span class="lbl">Summa exkl. moms</span><span class="val">${formatCurrency(data.invoice.subtotalExVat)}</span></div>
       <div class="total-row"><span class="lbl">Moms ${data.invoice.vatRate}%</span><span class="val">${formatCurrency(data.invoice.vatAmount)}</span></div>
       <div class="total-row"><span class="lbl">Summa inkl. moms</span><span class="val">${formatCurrency(data.invoice.totalIncVat)}</span></div>
+      ${laborRow}
       ${rotRow}
       ${rutRow}
       ${lateRow}

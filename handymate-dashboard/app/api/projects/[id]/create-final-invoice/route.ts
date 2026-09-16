@@ -6,6 +6,7 @@ import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { ATA_FAKTURERBARA_STATUSAR } from '@/lib/ata/lifecycle'
+import { rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 
 export const dynamic = 'force-dynamic'
 
@@ -278,6 +279,11 @@ export async function POST(
           // Removal-ÄTA: negativ unit_price så subtotal-summering kan
           // tas rakt över alla rader utan filter på change_type.
           const price = isRemoval ? -Math.abs(rawPrice) : rawPrice
+          const lineTotal = qty * price
+          const sourceTotal = Number(ai.total ?? qty * rawPrice)
+          const laborShare = sourceTotal ? Math.abs(Number(ai.labor_amount ?? sourceTotal)) / Math.abs(sourceTotal) : 0
+          const travelShare = sourceTotal ? Math.abs(Number(ai.travel_amount ?? 0)) / Math.abs(sourceTotal) : 0
+          const split = splitLine(lineTotal, Math.min(1, laborShare), Math.min(1 - Math.min(1, laborShare), travelShare))
           items.push({
             id: `ii_${Math.random().toString(36).slice(2, 14)}`,
             item_type: 'item',
@@ -285,7 +291,8 @@ export async function POST(
             quantity: qty,
             unit: ai.unit || 'st',
             unit_price: price,
-            total: qty * price,
+            total: lineTotal,
+            ...split,
             is_rot_eligible: !!(ai.is_rot_eligible ?? (ai.rot_rut_type === 'rot')),
             is_rut_eligible: !!(ai.is_rut_eligible ?? (ai.rot_rut_type === 'rut')),
             sort_order: sortOrder++,
@@ -329,12 +336,8 @@ export async function POST(
     // ── 7. ROT/RUT ──────────────────────────────────────────────
     // Per berättigad rad: labor_amount (arbetsandelen, v67) ?? radens total.
     // ?? (ALDRIG ||): labor_amount 0 = ren material och skall ge bas 0.
-    const rotLabor = regularItems
-      .filter(i => i.is_rot_eligible)
-      .reduce((s, i) => s + Number(i.labor_amount ?? Number(i.quantity) * Number(i.unit_price)), 0)
-    const rutLabor = regularItems
-      .filter(i => i.is_rut_eligible)
-      .reduce((s, i) => s + Number(i.labor_amount ?? Number(i.quantity) * Number(i.unit_price)), 0)
+    const rotLabor = rotRutLaborBasis(regularItems, 'rot')
+    const rutLabor = rotRutLaborBasis(regularItems, 'rut')
 
     let rotRutType: 'rot' | 'rut' | null = null
     let rotRutDeduction = 0

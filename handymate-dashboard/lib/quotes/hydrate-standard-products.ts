@@ -29,7 +29,7 @@ export async function hydrateStandardProducts(db: SupabaseClient, businessId: st
     const product = products.find(p => p.id === item.linked_product_id)
     // Keep identity/unit for the ordinary resolver's missing/incompatible warning.
     if (!product || !sameUnit(product.unit, item.unit)) return { ...item, unit_price: 0, total: 0, component_snapshot: null,
-      labor_amount: null, material_amount: null, estimated_hours: null, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null }
+      labor_amount: 0, material_amount: 0, travel_amount: 0, estimated_hours: null, is_rot_eligible: false, is_rut_eligible: false, rot_rut_type: null }
     const hydrated = applyProductToItem({ ...item, unit_price: 0 }, { ...product,
       sales_price: Number(product.sales_price) > 0 ? Number(product.sales_price) : 0,
       components: components.filter(c => c.product_id === product.id) }, item.quantity)

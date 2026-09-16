@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { X, Plus, Trash2, Receipt, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { rotRutLaborBasis, splitLine, splitTimeEntryLine } from '@/lib/rot-rut-basis'
 
 interface InvoiceLine {
   id: string
@@ -16,6 +17,10 @@ interface InvoiceLine {
   total: number
   is_rot_eligible: boolean
   is_rut_eligible: boolean
+  work_category?: 'work' | 'travel' | 'material_pickup' | 'meeting' | 'admin'
+  labor_amount?: number | null
+  material_amount?: number | null
+  travel_amount?: number | null
   /** A5 (Prisslingan V2): satt av from-project när timpris saknades. */
   price_missing?: boolean
 }
@@ -107,6 +112,8 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
       const updated = { ...l, [field]: value }
       if (field === 'quantity' || field === 'unit_price') {
         updated.total = Math.round(updated.quantity * updated.unit_price)
+        const category = updated.work_category || (updated.source === 'time_entry' ? 'work' : 'material_pickup')
+        Object.assign(updated, splitTimeEntryLine(updated.total, category))
       }
       return updated
     }))
@@ -130,6 +137,8 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
       total: source === 'time_entry' ? (data?.config.default_hourly_rate ?? 0) : 0,
       is_rot_eligible: source === 'time_entry',
       is_rut_eligible: false,
+      work_category: source === 'time_entry' ? 'work' : 'material_pickup',
+      ...splitLine(source === 'time_entry' ? (data?.config.default_hourly_rate ?? 0) : 0, source === 'time_entry' ? 1 : 0, 0),
     }
     setLines(prev => [...prev, newLine])
   }
@@ -144,8 +153,8 @@ export default function ProjectInvoiceModal({ projectId, onClose }: Props) {
   const vatAmount = Math.round(netAmount * 0.25)
   const grossTotal = netAmount + vatAmount
 
-  const rotEligible = [...laborLines, ...extraLines].filter(l => l.is_rot_eligible).reduce((s, l) => s + l.total, 0)
-  const rutEligible = [...laborLines, ...extraLines].filter(l => l.is_rut_eligible).reduce((s, l) => s + l.total, 0)
+  const rotEligible = rotRutLaborBasis([...laborLines, ...materialLines, ...extraLines].map(line => ({ ...line, item_type: 'item' })), 'rot')
+  const rutEligible = rotRutLaborBasis([...laborLines, ...materialLines, ...extraLines].map(line => ({ ...line, item_type: 'item' })), 'rut')
   // Skatteverket: avdraget räknas på arbetskostnaden inkl moms, efter rabatt.
   const discountFactor = subtotal > 0 ? netAmount / subtotal : 1
   const rotDeduction = rotRutType === 'rot' ? Math.round(rotRutDeductionInclVat('rot', rotEligible, { vatRate: 25, discountFactor })) : 0

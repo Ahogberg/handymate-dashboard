@@ -13,6 +13,8 @@ import { createDefaultItem, generateItemId } from '@/lib/quote-calculations'
 import { getCategoryRotRut, type CustomCategory } from '@/lib/constants/categories'
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 import type { SelectedProduct } from '@/lib/suppliers/types'
+import { splitLine } from '@/lib/rot-rut-basis'
+import { componentSaleTotal, resolveLineShares, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import {
   applyProductToItem,
   normalizeUnit,
@@ -66,6 +68,20 @@ export function useQuoteItems(
           } else if (updated.item_type === 'discount') {
             updated.total = -(Math.abs(updated.quantity) * Math.abs(updated.unit_price))
           }
+          if (field === 'component_snapshot' && Array.isArray(value?.components)) {
+            const components = value.components as SnapshotComponent[]
+            const componentTotal = componentSaleTotal(components)
+            const shares = resolveLineShares(components, value.labor_share, value.travel_share)
+            updated.component_snapshot = {
+              ...value,
+              labor_share: shares.laborShare,
+              travel_share: shares.travelShare,
+            }
+            if (componentTotal !== null) {
+              updated.unit_price = componentTotal
+              updated.total = componentTotal * updated.quantity
+            }
+          }
           // Category auto-detection: set ROT/RUT based on category
           if (field === 'category_slug' && value) {
             const catRotRut = getCategoryRotRut(value, customCategories)
@@ -92,6 +108,17 @@ export function useQuoteItems(
           if (field === 'is_rut_eligible' && value === true) {
             updated.is_rot_eligible = false
             updated.rot_rut_type = 'rut'
+          }
+          if (updated.item_type === 'item') {
+            const frozenLabor = updated.component_snapshot?.labor_share
+            const frozenTravel = updated.component_snapshot?.travel_share
+            const requestedTravel = updated.category_slug === 'resa' ? 1 : frozenTravel
+            const travelShare = Math.min(1, Math.max(0, Number.isFinite(Number(requestedTravel)) ? Number(requestedTravel) : 0))
+            const requestedLabor = updated.category_slug === 'resa' ? 0 : frozenLabor
+            const laborShare = requestedLabor ?? (travelShare > 0 ? 0 :
+              (updated.is_rot_eligible || updated.is_rut_eligible || updated.category_slug?.startsWith('arbete_') || ['tim', 'timmar', 'timme', 'hour', 'hours', 'h'].includes(updated.unit)) ? 1 : 0)
+            const safeLaborShare = Math.min(1 - travelShare, Math.max(0, Number.isFinite(Number(laborShare)) ? Number(laborShare) : 0))
+            Object.assign(updated, splitLine(updated.total, safeLaborShare, travelShare))
           }
           return updated
         }),
@@ -177,6 +204,9 @@ export function useQuoteItems(
         total: product.sell_price,
         is_rot_eligible: false,
         is_rut_eligible: false,
+        labor_amount: 0,
+        material_amount: product.sell_price,
+        travel_amount: 0,
         sort_order: 0,
       }
       setItems(prev => {
@@ -231,6 +261,9 @@ export function useQuoteItems(
         total: priceItem.unit_price,
         is_rot_eligible: priceItem.category === 'labor',
         is_rut_eligible: false,
+        labor_amount: priceItem.category === 'labor' ? priceItem.unit_price : 0,
+        material_amount: priceItem.category === 'labor' ? 0 : priceItem.unit_price,
+        travel_amount: 0,
         sort_order: 0,
       }
       setItems(prev => {

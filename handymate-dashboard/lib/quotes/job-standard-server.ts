@@ -2,6 +2,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { QuoteSetupError, nextTemplateVersion } from './job-type-setup-server'
 import { toSetupTemplate } from './job-type-setup'
 import type { PlanType } from '@/lib/feature-gates'
+import { splitLine } from '@/lib/rot-rut-basis'
 
 export function validateStandardRows(value: unknown): { productId: string; quantity: number }[] {
   if (!Array.isArray(value) || !value.length || value.length > 100) throw new QuoteSetupError(400, 'Välj mellan 1 och 100 artikelrader.')
@@ -24,9 +25,13 @@ async function productRows(db: SupabaseClient, businessId: string, value: unknow
   return rows.map(row => {
     const product = data?.find(p => p.id === row.productId)
     if (!product || !product.unit) throw new QuoteSetupError(400, 'En artikel saknas, är inaktiv eller saknar enhet. Läs in artiklarna igen.')
+    const travelShare = Math.min(1, Math.max(0, Number(product.default_travel_share ?? 0)))
+    const requestedLabor = Number(product.default_labor_share ?? (product.rot_eligible || product.rut_eligible ? 1 : 0))
+    const laborShare = Math.min(1 - travelShare, Math.max(0, Number.isFinite(requestedLabor) ? requestedLabor : 0))
     return { standard_product: true, item_type: 'item', description: product.name, quantity: row.quantity, unit: product.unit,
       unit_price: 0, linked_product_id: product.id, article_number: product.sku ?? null,
       is_rot_eligible: !!product.rot_eligible, is_rut_eligible: !!product.rut_eligible,
+      ...splitLine(0, laborShare, travelShare),
       discount_percent: 0 }
   })
 }

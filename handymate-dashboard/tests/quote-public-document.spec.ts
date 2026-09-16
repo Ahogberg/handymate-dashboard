@@ -33,7 +33,7 @@ function baseData(items: QuoteTemplateItem[], displayLevel: QuoteTemplateData['d
 
 function totals(overrides: Partial<QuoteTotals> = {}): QuoteTotals {
   return {
-    laborTotal: 0, materialTotal: 0, serviceTotal: 0, subtotal: 1000, discountAmount: 0, afterDiscount: 1000,
+    laborTotal: 0, materialTotal: 0, travelTotal: 0, serviceTotal: 0, subtotal: 1000, discountAmount: 0, afterDiscount: 1000,
     vat: 250, total: 1250, rotWorkCost: 0, rotDeduction: 0, rotCustomerPays: 0, rutWorkCost: 0, rutDeduction: 0,
     rutCustomerPays: 0, gronBase: 0, gronDeduction: 0, gronCustomerPays: 0, totalDeduction: 0,
     customerPaysAfterDeductions: 1250,

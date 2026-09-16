@@ -53,6 +53,12 @@ export interface ProductDefault {
   deduction: 'rot' | 'rut' | null
 }
 
+/** Samma snäva reseheuristik som v252. `res%` används medvetet inte eftersom
+ * det skulle märka exempelvis Reservdel som resa. */
+export function productDefaultTravelShare(product: Pick<ProductDefault, 'name'>): number {
+  return /^(resa|resor|restid|framkörning|servicebil|milersättning|utkörning)(\b|\s)/i.test(product.name.trim()) ? 1 : 0
+}
+
 /** Rader som gäller alla branscher — läggs till sist i varje sortiment. */
 const COMMON_EXTRAS: ProductDefault[] = [
   { sku: 'HM-GEN-901', name: 'Framkörning', description: 'Resa till och från arbetsplatsen', unit: 'st', unit_price: 450, category: 'övrigt', legacy_category: 'service', labor_share: 0, deduction: null },

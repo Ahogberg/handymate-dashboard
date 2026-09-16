@@ -30,6 +30,7 @@ import { arTestId, arTestNamn } from '@/lib/testdata'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { mapQuoteItemsToInvoiceItems } from '@/lib/invoices/quote-to-invoice-items'
+import { rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 import { fetchPriceContextProducts, matchProductByName } from '@/lib/products/price-context'
 import { generateQuoteFromInput } from '@/lib/ai-quote-generator'
 import { generatedQuoteToQuoteItems } from '@/lib/quotes/generated-to-quote-items'
@@ -633,8 +634,21 @@ async function createQuote(
   const tenantFel = await assertCustomerInBusiness(supabase, businessId, params.customer_id)
   if (tenantFel) return { success: false, error: tenantFel }
 
-  const items = (params.items as any[]).map(i => ({ ...i, total: i.quantity * i.unit_price }))
-  const laborTotal = items.filter(i => i.type === 'labor').reduce((s, i) => s + i.total, 0)
+  const items = (params.items as any[]).map(i => {
+    const total = Number(i.quantity ?? 0) * Number(i.unit_price ?? 0)
+    const isLabor = i.type === 'labor'
+    return {
+      ...i,
+      item_type: 'item',
+      total,
+      is_rot_eligible: isLabor && params.rot_rut_type === 'rot',
+      is_rut_eligible: isLabor && params.rot_rut_type === 'rut',
+      ...splitLine(total, isLabor ? 1 : 0, 0),
+    }
+  })
+  const laborTotal = params.rot_rut_type === 'rot' || params.rot_rut_type === 'rut'
+    ? rotRutLaborBasis(items, params.rot_rut_type)
+    : items.filter(i => i.type === 'labor').reduce((sum, item) => sum + item.total, 0)
   const materialTotal = items.filter(i => i.type === 'material').reduce((s, i) => s + i.total, 0)
   const subtotal = laborTotal + materialTotal
 
@@ -697,6 +711,9 @@ async function createQuote(
       is_rot_eligible: isLabor && rotRutType === 'rot',
       is_rut_eligible: isLabor && rotRutType === 'rut',
       rot_rut_type: isLabor && (rotRutType === 'rot' || rotRutType === 'rut') ? rotRutType : null,
+      labor_amount: i.labor_amount,
+      material_amount: i.material_amount,
+      travel_amount: i.travel_amount,
       ...(bankTraff ? { linked_product_id: bankTraff.id, article_number: bankTraff.sku ?? undefined } : {}),
     }
   })
@@ -888,9 +905,7 @@ async function createQuoteDraft(
   let rotRutCapped = false
   let rotRutWarning: string | undefined
   if (rotRutType && customerId) {
-    const laborTotal = quoteItems
-      .filter(i => i.item_type === 'item' && (i.is_rot_eligible || i.is_rut_eligible))
-      .reduce((s, i) => s + i.total, 0)
+    const laborTotal = rotRutLaborBasis(quoteItems, rotRutType)
     const capped = await calculateCappedDeduction(customerId, businessId, rotRutType, laborTotal, { vatRate })
     rotRutDeduction = capped.deduction
     rotRutCapped = capped.capped
@@ -988,6 +1003,12 @@ async function createInvoice(
     return { success: false, error: 'Ange quote_id eller items' }
   }
 
+  items = items.map((item: any) => {
+    if ((item.item_type || 'item') !== 'item' || item.labor_amount != null) return item
+    const lineTotal = Number(item.total ?? (Number(item.quantity ?? 0) * Number(item.unit_price ?? 0)))
+    return { ...item, total: lineTotal, ...splitLine(lineTotal, item.is_rot_eligible || item.is_rut_eligible ? 1 : 0, 0) }
+  })
+
   const subtotal = items.reduce((s: number, i: any) => s + (i.total || i.quantity * i.unit_price), 0)
 
   // Fetch VAT rate + fakturanummer-config från business_config
@@ -998,7 +1019,9 @@ async function createInvoice(
   const vatAmount = Math.round(subtotal * (vatRate / 100))
   const total = subtotal + vatAmount
 
-  const laborTotal = items.filter((i: any) => i.type === 'labor').reduce((s: number, i: any) => s + (i.total || 0), 0)
+  const laborTotal = rotRutType === 'rot' || rotRutType === 'rut'
+    ? rotRutLaborBasis(items, rotRutType)
+    : 0
 
   // Årstakskontroll (VÅG 1b) — samma mönster som createQuote ovan och
   // app/api/invoices/from-quote: räkna om avdraget mot kundens redan
@@ -1038,6 +1061,8 @@ async function createInvoice(
     quote_id: params.quote_id || null, invoice_number: invoiceNumber, status: 'draft',
     items, subtotal, vat_rate: vatRate, vat_amount: vatAmount, total,
     rot_rut_type: rotRutType, rot_rut_deduction: rotRutDeduction, customer_pays: total - rotRutDeduction,
+    rot_work_cost: rotRutType === 'rot' ? laborTotal : 0,
+    rut_work_cost: rotRutType === 'rut' ? laborTotal : 0,
     invoice_date: new Date().toISOString().split('T')[0],
     due_date: dueDate.toISOString().split('T')[0],
     created_at: new Date().toISOString(),

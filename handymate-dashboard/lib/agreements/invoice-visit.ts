@@ -22,6 +22,7 @@
 
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { createInvoice } from '@/lib/invoices/create-invoice'
+import { rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 
 type SupabaseClient = any
 
@@ -98,17 +99,25 @@ export async function invoiceAgreementVisit(
     // Spegla auto-invoice-on-complete.ts steg 3 (quoteItems-mappningen) —
     // samma fält-shape i invoice.items, källan är bara price_items i stället
     // för quote.items.
-    const items = rawItems.map((item: any, i: number) => ({
-      id: 'ii_sa_' + Math.random().toString(36).substr(2, 8),
-      item_type: item.item_type || 'item',
-      description: item.description || '',
-      quantity: item.quantity || 1,
-      unit: item.unit || 'st',
-      unit_price: item.unit_price || 0,
-      total: (item.quantity || 1) * (item.unit_price || 0),
-      is_rot_eligible: item.is_rot_eligible || item.rot_rut_type === 'rot' || false,
-      sort_order: item.sort_order ?? i,
-    }))
+    const items = rawItems.map((item: any, i: number) => {
+      const total = Number(item.quantity ?? 1) * Number(item.unit_price ?? 0)
+      const isRot = item.is_rot_eligible === true || item.rot_rut_type === 'rot'
+      const isRut = item.is_rut_eligible === true || item.rot_rut_type === 'rut'
+      const split = item.labor_amount == null
+        ? splitLine(total, isRot || isRut ? 1 : 0, 0)
+        : {
+            labor_amount: Number(item.labor_amount),
+            travel_amount: Number(item.travel_amount ?? 0),
+            material_amount: Number(item.material_amount ?? total - Number(item.labor_amount) - Number(item.travel_amount ?? 0)),
+          }
+      return {
+        id: 'ii_sa_' + Math.random().toString(36).substr(2, 8),
+        item_type: item.item_type || 'item', description: item.description || '',
+        quantity: item.quantity || 1, unit: item.unit || 'st', unit_price: item.unit_price || 0,
+        total, is_rot_eligible: isRot, is_rut_eligible: isRut, ...split,
+        sort_order: item.sort_order ?? i,
+      }
+    })
 
     const customerId = booking.customer_id || agreement.customer_id
     const vatRate = 25
@@ -123,8 +132,7 @@ export async function invoiceAgreementVisit(
     let customerPays: number | null = null
 
     if (rotRutType) {
-      const rate = rotRutType === 'rut' ? 0.5 : 0.3
-      const eligibleLabor = items.filter(i => i.is_rot_eligible).reduce((sum, i) => sum + (i.total || 0), 0)
+      const eligibleLabor = rotRutLaborBasis(items, rotRutType as 'rot' | 'rut')
       if (eligibleLabor > 0) {
         const capped = await calculateCappedDeduction(customerId, businessId, rotRutType as 'rot' | 'rut', eligibleLabor, { vatRate })
         rotRutDeduction = capped.deduction

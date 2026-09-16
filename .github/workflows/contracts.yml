@@ -72,6 +72,17 @@ jobs:
         # prod-sviten, inte här.
         run: >-
           npx playwright test
+          tests/line-split-sql.spec.ts
+          tests/line-split-invariant.spec.ts
+          tests/component-rows-editor.spec.ts
+          tests/rot-basis-shared.spec.ts
+          tests/invoice-calculations-rot-split.spec.ts
+          tests/project-invoice-restid.spec.ts
+          tests/fortnox-housework-split.spec.ts
+          tests/invoice-rot-work-cost-all-paths.spec.ts
+          tests/quote-template-job-type-default.spec.ts
+          tests/document-varav-arbetskostnad.spec.ts
+          tests/share-confirmation.spec.ts
           tests/trade-start-packages.spec.ts
           tests/customer-intake-ui.spec.ts
           tests/project-receipts.spec.ts

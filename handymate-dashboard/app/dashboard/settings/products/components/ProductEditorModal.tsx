@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2, Plus, Save, Search, Trash2, X } from 'lucide-react'
-import { resolveLaborShare, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
+import { resolveLineShares, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import { PRODUCT_UNIT_OPTIONS } from '@/components/products/ProductModal'
 import type { ComponentPayload, ProductCategory, ProductReservation, ProductRow } from '../types'
 
@@ -19,11 +19,15 @@ const VAT_OPTIONS = [
 ]
 
 interface ComponentDraft {
-  component_type: 'arbete' | 'material'
+  component_type: 'arbete' | 'material' | 'resa'
   description: string
+  article_number: string
   quantity_per_unit: string
   unit: string
   unit_cost: string
+  unit_price: string
+  is_rot_eligible: boolean
+  linked_product_id: string | null
 }
 
 interface ProductEditorModalProps {
@@ -93,14 +97,19 @@ export function ProductEditorModal({
   const [sharePct, setSharePct] = useState(
     (product?.default_labor_share ?? initialValues?.laborShare) != null ? Math.round((product?.default_labor_share ?? initialValues?.laborShare ?? 0) * 100) : 60
   )
+  const [travelSharePct, setTravelSharePct] = useState(Math.round((product?.default_travel_share ?? 0) * 100))
 
   const [rows, setRows] = useState<ComponentDraft[]>(
     (product?.components ?? []).map(c => ({
       component_type: c.component_type,
       description: c.description,
+      article_number: c.article_number ?? '',
       quantity_per_unit: String(c.quantity_per_unit),
       unit: c.unit,
       unit_cost: String(c.unit_cost),
+      unit_price: String(c.unit_price ?? c.unit_cost),
+      is_rot_eligible: c.component_type === 'arbete' && c.is_rot_eligible !== false,
+      linked_product_id: c.linked_product_id ?? null,
     }))
   )
 
@@ -171,12 +180,16 @@ export function ProductEditorModal({
           quantity_per_unit: parseFloat(r.quantity_per_unit) || 0,
           unit: r.unit,
           unit_cost: parseFloat(r.unit_cost) || 0,
+          article_number: r.article_number.trim() || null,
+          unit_price: parseFloat(r.unit_price) || 0,
+          is_rot_eligible: r.component_type === 'arbete' && r.is_rot_eligible,
+          linked_product_id: r.linked_product_id,
         }))
         .filter(c => c.quantity_per_unit > 0),
     [rows]
   )
   const calcCost = calcComponents.reduce((s, c) => s + c.quantity_per_unit * c.unit_cost, 0)
-  const liveShare = resolveLaborShare(calcComponents, shareEnabled ? sharePct / 100 : null)
+  const liveShares = resolveLineShares(calcComponents, shareEnabled ? sharePct / 100 : null, travelSharePct / 100)
 
   // Live marginal — samma formel som PUT/POST /api/products räknar
   // markup_percent med, bara en förhandsvisning innan sparning.
@@ -194,7 +207,7 @@ export function ProductEditorModal({
   function addRow() {
     setRows(prev => [
       ...prev,
-      { component_type: 'arbete', description: '', quantity_per_unit: '1', unit: 'tim', unit_cost: '' },
+      { component_type: 'arbete', description: '', article_number: '', quantity_per_unit: '1', unit: 'tim', unit_cost: '', unit_price: '', is_rot_eligible: true, linked_product_id: null },
     ])
   }
 
@@ -231,6 +244,7 @@ export function ProductEditorModal({
       const untouched =
         r.description.trim() === '' &&
         (r.unit_cost.trim() === '' || parseFloat(r.unit_cost) === 0) &&
+        (r.unit_price.trim() === '' || parseFloat(r.unit_price) === 0) &&
         (r.quantity_per_unit.trim() === '' || r.quantity_per_unit.trim() === '1')
       return !untouched
     })
@@ -238,16 +252,21 @@ export function ProductEditorModal({
     for (const r of keptRows) {
       const qty = parseFloat(r.quantity_per_unit)
       const cost = parseFloat(r.unit_cost)
-      if (!r.description.trim() || Number.isNaN(qty) || qty <= 0 || Number.isNaN(cost) || cost < 0) {
-        onError('Varje komponent behöver beskrivning, mängd över 0 och kostnad (0 eller mer)')
+      const price = parseFloat(r.unit_price)
+      if (!r.description.trim() || Number.isNaN(qty) || qty <= 0 || Number.isNaN(cost) || cost < 0 || Number.isNaN(price) || price < 0) {
+        onError('Varje komponent behöver beskrivning, mängd över 0, kostnad och à-pris (0 eller mer)')
         return
       }
       components.push({
         component_type: r.component_type,
         description: r.description.trim(),
+        article_number: r.article_number.trim() || null,
         quantity_per_unit: qty,
         unit: r.unit || 'st',
         unit_cost: cost,
+        unit_price: price,
+        is_rot_eligible: r.component_type === 'arbete' && r.is_rot_eligible,
+        linked_product_id: r.linked_product_id,
       })
     }
 
@@ -268,7 +287,19 @@ export function ProductEditorModal({
     }
     // Andel arbete är bara relevant utan komponenter (komponenterna vinner annars)
     if (components.length === 0) {
+      if ((shareEnabled ? sharePct : 0) + travelSharePct > 100) {
+        onError('Arbetsandel och reseandel får tillsammans inte överstiga 100 %')
+        return
+      }
       payload.default_labor_share = shareEnabled ? Math.min(100, Math.max(0, sharePct)) / 100 : null
+      payload.default_travel_share = Math.min(100, Math.max(0, travelSharePct)) / 100
+      if (shareEnabled || travelSharePct > 0) {
+        payload.share_source = 'owner'
+        payload.share_confirmed_at = new Date().toISOString()
+      }
+    } else {
+      payload.share_source = 'components'
+      payload.share_confirmed_at = new Date().toISOString()
     }
 
     if (!product && initialValues?.category) payload.category = initialValues.category
@@ -485,35 +516,20 @@ export function ProductEditorModal({
                 <span className="text-sm text-slate-700">Ange andel arbete</span>
               </label>
               {shareEnabled && (
-                <div className="mt-3">
-                  <div className="flex items-center gap-3">
-                    <input
-                      type="range"
-                      min={0}
-                      max={100}
-                      step={1}
-                      value={sharePct}
-                      onChange={e => setSharePct(Number(e.target.value))}
-                      className="flex-1 accent-[#0F766E]"
-                    />
-                    <div className="relative w-24 shrink-0">
-                      <input
-                        type="number"
-                        min={0}
-                        max={100}
-                        value={sharePct}
-                        onChange={e => {
-                          const v = Number(e.target.value)
-                          setSharePct(Number.isNaN(v) ? 0 : Math.min(100, Math.max(0, v)))
-                        }}
-                        className={`${INPUT_CLS} pr-7`}
-                      />
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400">%</span>
-                    </div>
-                  </div>
-                  <p className="text-sm font-medium text-slate-700 mt-2">Andel arbete: {sharePct} %</p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <label className="text-xs text-slate-500">Arbetsandel
+                    <input type="number" min={0} max={100 - travelSharePct} value={sharePct}
+                      onChange={e => setSharePct(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className={INPUT_CLS} />
+                  </label>
+                  <label className="text-xs text-slate-500">Reseandel
+                    <input type="number" min={0} max={100 - sharePct} value={travelSharePct}
+                      onChange={e => setTravelSharePct(Math.min(100, Math.max(0, Number(e.target.value) || 0)))} className={INPUT_CLS} />
+                  </label>
+                  <p className="col-span-2 text-sm font-medium text-slate-700">
+                    Arbete {sharePct} % · Material {Math.max(0, 100 - sharePct - travelSharePct)} % · Resa {travelSharePct} %
+                  </p>
                   <p className="text-xs text-slate-400 mt-0.5">
-                    Används för ROT-beräkning när komponenter saknas
+                    Arbete och resa får tillsammans vara högst 100 %. Resten är material.
                   </p>
                 </div>
               )}
@@ -561,7 +577,7 @@ export function ProductEditorModal({
                         </button>
                         <button
                           type="button"
-                          onClick={() => updateRow(index, { component_type: 'material' })}
+                          onClick={() => updateRow(index, { component_type: 'material', is_rot_eligible: false })}
                           className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
                             row.component_type === 'material'
                               ? 'bg-primary-700 text-white'
@@ -569,6 +585,15 @@ export function ProductEditorModal({
                           }`}
                         >
                           Material
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => updateRow(index, { component_type: 'resa', is_rot_eligible: false })}
+                          className={`px-3 py-1.5 text-xs font-semibold transition-colors ${
+                            row.component_type === 'resa' ? 'bg-primary-700 text-white' : 'bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          Resa
                         </button>
                       </div>
                       <button
@@ -587,7 +612,9 @@ export function ProductEditorModal({
                       placeholder={row.component_type === 'arbete' ? 'T.ex. Målningsarbete' : 'T.ex. Grundfärg'}
                       className={INPUT_CLS}
                     />
-                    <div className="grid grid-cols-3 gap-2">
+                    <input type="text" value={row.article_number} onChange={e => updateRow(index, { article_number: e.target.value })}
+                      placeholder="Artikelnummer (valfritt)" className={INPUT_CLS} />
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
                       <div>
                         <label className="block text-[11px] text-slate-400 mb-1">Mängd per {unitLabel}</label>
                         <input
@@ -631,16 +658,24 @@ export function ProductEditorModal({
                           </span>
                         </div>
                       </div>
+                      <div>
+                        <label className="block text-[11px] text-slate-400 mb-1">À-pris ut</label>
+                        <input type="number" min="0" step="0.01" value={row.unit_price}
+                          onChange={e => updateRow(index, { unit_price: e.target.value })} placeholder="0" className={INPUT_CLS} />
+                      </div>
                     </div>
+                    {row.component_type === 'arbete' && (
+                      <label className="flex items-center gap-2 text-xs text-slate-600">
+                        <input type="checkbox" checked={row.is_rot_eligible}
+                          onChange={e => updateRow(index, { is_rot_eligible: e.target.checked })} /> ROT-berättigat arbete
+                      </label>
+                    )}
                   </div>
                 ))}
 
                 {rows.length > 0 && (
                   <p className="text-sm font-semibold text-primary-700 bg-primary-50 border border-primary-100 rounded-xl px-4 py-2.5">
-                    Kalkylkostnad per {unitLabel}: {formatKr(calcCost)} kr · Arbetsandel:{' '}
-                    {liveShare != null
-                      ? `${(liveShare * 100).toLocaleString('sv-SE', { maximumFractionDigits: 1 })} %`
-                      : '–'}
+                    Kalkylkostnad per {unitLabel}: {formatKr(calcCost)} kr · Arbete {Math.round((liveShares.laborShare ?? 0) * 100)} % · Resa {Math.round((liveShares.travelShare ?? 0) * 100)} %
                   </p>
                 )}
               </div>

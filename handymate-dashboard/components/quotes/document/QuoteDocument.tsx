@@ -470,9 +470,10 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 ) : null}
                 <div className="total-row"><span className="lbl">Moms {data.invoice.vatRate}%</span><span className="val">{formatCurrency(data.invoice.vatAmount)}</span></div>
                 <div className="total-row"><span className="lbl">Summa inkl. moms</span><span className="val">{formatCurrency(data.invoice.totalIncVat)}</span></div>
+                {data.invoice.laborCost ? <div className="total-row"><span className="lbl">varav arbetskostnad</span><span className="val">{formatCurrency(data.invoice.laborCost)}</span></div> : null}
                 {data.invoice.rotDeduction ? (
                   <div className="total-row rot">
-                    <span className="lbl">ROT-avdrag (30% av arbete)</span>
+                    <span className="lbl">ROT-avdrag (30 % av arbetskostnaden inkl. moms)</span>
                     <span className="val">−{formatCurrency(data.invoice.rotDeduction)}</span>
                   </div>
                 ) : null}
@@ -513,9 +514,10 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 ) : null}
                 <div className="total-row"><span className="lbl">Moms 25%</span><span className="val">{formatCurrency(data.quote.vatAmount)}</span></div>
                 <div className="total-row"><span className="lbl">Summa inkl. moms</span><span className="val">{formatCurrency(data.quote.totalIncVat)}</span></div>
+                {data.quote.laborCost ? <div className="total-row"><span className="lbl">varav arbetskostnad</span><span className="val">{formatCurrency(data.quote.laborCost)}</span></div> : null}
                 {data.quote.rotDeduction ? (
                   <div className="total-row rot">
-                    <span className="lbl">ROT-avdrag (30% av arbete)</span>
+                    <span className="lbl">ROT-avdrag (30 % av arbetskostnaden inkl. moms)</span>
                     <span className="val">−{formatCurrency(data.quote.rotDeduction)}</span>
                   </div>
                 ) : null}

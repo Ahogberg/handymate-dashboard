@@ -16,21 +16,29 @@ export interface ProductCategory {
 
 export interface ProductComponent {
   id?: string
-  component_type: 'arbete' | 'material'
+  component_type: 'arbete' | 'material' | 'resa'
   description: string
   quantity_per_unit: number
   unit: string
   unit_cost: number
+  article_number?: string | null
+  unit_price?: number | null
+  is_rot_eligible?: boolean
+  linked_product_id?: string | null
   sort_order?: number
 }
 
 /** Payload-rad till PUT /api/products/[id]/components */
 export interface ComponentPayload {
-  component_type: 'arbete' | 'material'
+  component_type: 'arbete' | 'material' | 'resa'
   description: string
   quantity_per_unit: number
   unit: string
   unit_cost: number
+  article_number?: string | null
+  unit_price?: number | null
+  is_rot_eligible: boolean
+  linked_product_id?: string | null
 }
 
 /** Svarsraden från GET /api/reservations och GET /api/products/[id]/reservations */
@@ -58,6 +66,9 @@ export interface ProductRow {
   is_favorite: boolean
   category_id: string | null
   default_labor_share: number | null
+  default_travel_share: number | null
+  share_source: 'seed' | 'owner' | 'components' | 'import' | null
+  share_confirmed_at: string | null
   /** Bifogas när listan hämtas med include=components */
   components?: ProductComponent[]
 }

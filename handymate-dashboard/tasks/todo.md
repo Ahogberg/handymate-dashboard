@@ -1,3 +1,15 @@
+## Artiklar, mallar och ROT — 2026-09-16
+
+- [x] Fas 1: 30/30 v252-kontroller i isolerad PGlite; ingen extern migration körd.
+- [x] Fas 2: gemensam ROT/RUT-bas och raddelning, sex rättningar och `rot_work_cost` på alla fakturavägar.
+- [x] Fas 3–5: artikel-/komponent-UI, dokument/Fortnox/SKV samt jobbtypsmallar/onboarding/agentrader.
+- [x] Fas 6: specar registrerade i contracts-workflow och `test:contracts` (2 654 pass, 1 befintlig skip).
+- [x] `npx tsc --noEmit` och `npx next build` exit 0; draft-PR #86 öppnad mot main.
+- [ ] CI kör Chromium-delarna i `first-value.yml`; lokal browser-installation blockerades av CDN-timeout.
+- [ ] Claude granskar och kör v252 efter merge; Fortnox-pilot och aktuell SKV-verifiering före aktivering.
+
+---
+
 ## Financial Kernel C5 — review corrections, 2026-09-14
 
 - [x] Read PR #66 review, C5 contract and current main.
@@ -1661,3 +1673,18 @@ Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är
 - [x] Verifiera servergränser, idempotens, timmar och mobil-/datorvy på nytt.
 - [x] Koppla planeringskontroller till CI.
 - [x] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande: https://github.com/Ahogberg/handymate-dashboard/pull/80.
+## Artiklar, mallar och ROT på arbetsdelen — 2026-09-16
+
+- [x] Läs briefens §1, §2, §5 samt källorna och befintliga facit som §2 pekar ut.
+- [x] Fas 1: översätt v252-utkastets 30 kontroller till `tests/line-split-sql.spec.ts`; kör inte migrationen mot Supabase (30/30 i isolerad PGlite).
+- [x] Fas 2: delad ROT-bas/splitLine, sex rättningar, resedelning och radinvariant (86/86 riktade kontrakt; TypeScript och produktionsbuild gröna).
+- [ ] Verifiera fas 1–2, commit/push och öppna tidig PR från `codex/artiklar-rot` mot `main`.
+- [ ] Fas 3: artikel-/komponent-UI, delat radschema och bekräftelse av seedad andel.
+- [ ] Fas 4: alla fakturavägar, dokument, Fortnox-split och Skatteverket-underlag.
+- [ ] Fas 5: jobbtypsmall som standardstart och delning på alla agentgenererade rader.
+- [ ] Fas 6: samtliga acceptansspecar, registrerade i workflow och `test:contracts`.
+- [ ] Slutgrind: riktade tester, kontrakt, `npx tsc --noEmit`, `npx next build`, §10-handoff och slutpush.
+
+Branch: `codex/artiklar-rot`. Migrationen lämnas okörd för Claude-granskning.
+
+---

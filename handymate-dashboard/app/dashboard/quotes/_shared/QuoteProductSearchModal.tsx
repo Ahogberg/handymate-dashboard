@@ -5,6 +5,7 @@ import { formatKronor } from '@/lib/format-price'
 import { Loader2, Search, X } from 'lucide-react'
 import type { ProductWithComponents } from './applyProductToItem'
 import { priceState } from '@/lib/products/pricing-state'
+import { resolveLineShares } from '@/lib/products/build-item-snapshot'
 
 /** Bakåtkompatibelt alias — modalen returnerar numera hela produkten
  *  (inkl. komponenter + default_labor_share) för applyProductToItem. */
@@ -136,6 +137,16 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
           ) : results.length > 0 ? (
             <div className="space-y-1">
               {results.map(p => (
+                (() => {
+                  const shares = resolveLineShares(
+                    p.components ?? [],
+                    p.default_labor_share,
+                    p.default_travel_share,
+                  )
+                  const labor = Math.round((shares.laborShare ?? 0) * 100)
+                  const travel = Math.round((shares.travelShare ?? 0) * 100)
+                  const material = Math.max(0, 100 - labor - travel)
+                  return (
                 <button
                   key={p.id}
                   onClick={() => {
@@ -160,6 +171,9 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
                       )}
                     </div>
                     {p.sku && <p className="text-[11px] text-slate-400 truncate mt-0.5">{p.sku}</p>}
+                    <p className="text-[11px] text-slate-500 mt-0.5">
+                      Arbete {labor} % · Material {material} % · Resa {travel} %
+                    </p>
                   </div>
                   <div className="text-right ml-4 shrink-0">
                     {/* UX1b: prislösa → "Sätt pris", aldrig "0 kr". */}
@@ -175,6 +189,8 @@ export function QuoteProductSearchModal({ open, onClose, onSelect }: QuoteProduc
                     )}
                   </div>
                 </button>
+                  )
+                })()
               ))}
             </div>
           ) : (
