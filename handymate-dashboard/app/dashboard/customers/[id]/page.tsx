@@ -976,7 +976,7 @@ function CustomerDetailContent() {
                 )}
 
                 <Link
-                  href={`/dashboard/quotes/new?customerId=${customer.customer_id}`}
+                  href={`/dashboard/quotes/new?customer_id=${customer.customer_id}`}
                   className="flex-1 min-w-[60px] flex flex-col items-center justify-center gap-1.5 min-h-[64px] p-2 rounded-xl border border-primary-200 bg-primary-50 text-primary-700 hover:bg-primary-100 transition-all"
                 >
                   <FileText className="w-5 h-5" />
@@ -1528,7 +1528,7 @@ function CustomerDetailContent() {
                   <div className="p-4 border-b border-gray-100 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-gray-900">Offerter ({quotes.length})</h3>
                     <a
-                      href={`/dashboard/quotes/new?customerId=${customer.customer_id}`}
+                      href={`/dashboard/quotes/new?customer_id=${customer.customer_id}`}
                       className="text-xs text-primary-700 hover:text-primary-700 font-medium"
                     >
                       + Ny offert

@@ -275,6 +275,8 @@ jobs:
           tests/forsta-jobbresan.spec.ts
           tests/quote-content-lock.spec.ts
           tests/offertens-radtyper.spec.ts
+          tests/snabboffert-startvagar.spec.ts
+          tests/offertstarten-en-skarm.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

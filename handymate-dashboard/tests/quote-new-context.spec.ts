@@ -29,7 +29,7 @@ test('ny offert håller lead- och deal-kopplingar åtskilda', () => {
 })
 
 test('lead-id skickas aldrig till deal-API:t', () => {
-  expect(source).toContain("const dealId = searchParams?.get('deal_id')")
+  expect(source).toContain("dealId, preparationId } = readQuoteStartParams(searchParams)")
   expect(source).not.toMatch(/const dealId\s*=.*get\('lead_id'\)/)
   expect(source).toContain('fetchDealAndPrefill(dealId, !!customerId)')
 })

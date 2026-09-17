@@ -21,7 +21,6 @@ import { generatedQuoteToQuoteItems, rotRutEfterArtikelkoppling } from '@/lib/qu
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
 import { useQuoteSectionNavigation } from './useQuoteSectionNavigation'
-import { FirstQuoteGuide } from '@/components/onboarding/FirstQuoteGuide'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
 import { canApplyJobTypeStart, loadJobTypeStart, type JobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
 import { byggPafyllnadsrader } from '@/lib/quotes/job-type-append'
@@ -49,7 +48,6 @@ import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/bus
 import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
-import QuotePreparationInput from '@/components/customer-preparation/QuotePreparationInput'
 import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
@@ -66,6 +64,8 @@ import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
 import { useQuoteRecovery } from './useQuoteRecovery'
+import { readQuoteStartParams, hasQuoteStartSignal as startSignalOf } from '@/lib/quotes/start-params'
+import { loadPreparationQuoteInput } from '@/lib/customer-preparation/quote-handoff'
 import { QuotePriceMemory } from './QuotePriceMemory'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
 import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
@@ -80,14 +80,10 @@ import { panelStatus } from '@/lib/quotes/panel-status'
 // QuoteBuilder.tsx själv flyttade till _shared/, se new/page.tsx).
 import { DanielsBedomning } from '../new/components/DanielsBedomning'
 import { VisitRuleEditor } from '@/components/quotes/VisitRuleEditor'
-import { WorkSampleResume } from '@/components/onboarding/WorkSampleResume'
-import { workSampleDraft } from '@/lib/onboarding/work-sample'
 import { QuoteNewAIHelper } from '../new/components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from '../new/components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from '../new/components/QuoteNewAttachmentsCard'
-import { QuoteNewStartChooser } from '../new/components/QuoteNewStartChooser'
 import { QuickIntake } from '../new/components/quick/QuickIntake'
-import { QuickBlankStart } from '../new/components/quick/QuickBlankStart'
 import { QuickBuilding } from '../new/components/quick/QuickBuilding'
 import {
   sectionSummary,
@@ -400,7 +396,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
   /** Mallväljaren, öppnad från Snabboffertens intag. Ersätter startväljaren
       som helhet — se kommentaren vid showTemplatePicker nedan. */
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
 
   // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet (bottom-
   // sheet-radeditorn) är öppen — satt av QuoteDocumentSurfaces onRowTap när
@@ -441,13 +436,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // canvas-editorn (quickMode = null) via finishQuickStart() nedan — se
   // completenessSummaries/QuoteCompletenessStrip för vad som ersatte
   // kvittots granskningskrav: en alltid synlig, icke-blockerande chip-rad.
-  const [quickMode, setQuickMode] = useState<'intake' | 'blank' | 'building' | 'fragor' | null>(null)
+  const [quickMode, setQuickMode] = useState<'intake' | 'building' | 'fragor' | null>(null)
   // Frågeflödet per jobbtyp (2026-09-17): upplägget är hämtat och verifierat
   // men INTE inlagt förrän frågorna är besvarade eller hoppade över. Sätts
   // och töms alltid tillsammans med quickMode 'fragor'; returläget är det
   // hantverkaren stod i när upplägget trycktes (intaget eller editorn).
   const [pendingIntake, setPendingIntake] = useState<{ start: JobTypeStart; questions: IntakeQuestion[] } | null>(null)
-  const intakeReturnMode = useRef<'intake' | 'blank' | 'building' | null>(null)
+  const intakeReturnMode = useRef<'intake' | 'building' | null>(null)
   const [intakeAnswers, setIntakeAnswers] = useState<IntakeAnswerSet | null>(null)
   /** Snabbofferten öppnas automatiskt EN gång vid kallstart. Utan den här
       vakten hade "Öppna fullständiga editorn" (som sätter quickMode = null)
@@ -456,7 +451,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [quickInput, setQuickInput] = useState('')
   const jobStartSnapshot = useRef<QuoteStartSnapshot>({ items, jobType: quoteJobType, input: quickInput, mode: quickMode, busy: false })
   jobStartSnapshot.current = { items, jobType: quoteJobType, input: quickInput,
-    mode: `${quickMode}:${templatePickerOpen}`, busy: generating || quickMode === 'building',
+    mode: `${quickMode}`, busy: generating || quickMode === 'building',
     formSignature: JSON.stringify([selectedCustomer, title, description, notIncluded, ataTerms, paymentTermsText,
       termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities, pricingSettings?.hourly_rate, templateId]),
   }
@@ -935,11 +930,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       setAiTextInput(reliefDraft.text)
       setSourceTranscript(reliefDraft.text)
     }
-    const transcript = searchParams?.get('transcript')
-    const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
-    const prefillTitle = searchParams?.get('title')
-    const prefillDescription = searchParams?.get('description')
-    const dealId = searchParams?.get('deal_id')
+    // EN läsare för adressraden (rivningen A3): lib/quotes/start-params.ts.
+    const { transcript, customerId, title: prefillTitle, description: prefillDescription, dealId, preparationId } = readQuoteStartParams(searchParams)
     if (transcript) {
       setSourceTranscript(transcript)
       setAiTextInput(transcript)
@@ -947,7 +939,18 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     }
     if (customerId) setSelectedCustomer(customerId)
     if (prefillTitle) setTitle(prefillTitle)
-    if (prefillDescription) setDescription(prefillDescription)
+    // Beskrivningen når intagets ruta också — förut stod den bara på
+    // offerten medan intaget öppnade tomt.
+    if (prefillDescription) { setDescription(prefillDescription); setQuickInput(prev => prev || prefillDescription) }
+    // Kundunderlaget (?preparation_id): direkt i rutan, ingen panel. Samma
+    // tre fält som panelens "Lägg till svaren i offertunderlaget" fyllde.
+    if (customerId && preparationId) {
+      void loadPreparationQuoteInput(customerId, preparationId).then(text => {
+        setQuickInput(previous => [previous, text].filter(Boolean).join('\n\n'))
+        setAiTextInput(previous => [previous, text].filter(Boolean).join('\n\n'))
+        setSourceTranscript(previous => [previous, text].filter(Boolean).join('\n\n'))
+      }).catch(err => setReliefError(`${err instanceof Error ? err.message : 'Kunde inte läsa kundunderlaget.'} Öppna kundkortet.`))
+    }
     if (!referencePerson && business.contact_name) setReferencePerson(business.contact_name)
     if (dealId && customerId) fetchDealDocuments(customerId)
     // Deal-lookup (Etapp 2): körs bara en gång per mount (ref-flagga skyddar
@@ -1644,17 +1647,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     }
   }
 
-  /** Blank-starten (2026-08-14) — kund+titel är redan satta av QuickBlankStart
-   *  via title/setTitle och selectedCustomer/setSelectedCustomer direkt (samma
-   *  page-state, ingen kopia). items är redan [] (ny offert). Nollställer bara
-   *  AI-relaterade fält defensivt innan den fulla editorn öppnas utan innehåll. */
-  function startBlankQuickDraft() {
-    if (!title.trim()) return
-    setDescription('')
-    setSourceTranscript('')
-    finishQuickStart()
-  }
-
   // ═══════════════════════════════════════════════════════════════════
   // Template handlers
   // ═══════════════════════════════════════════════════════════════════
@@ -2073,6 +2065,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     businessId: business.business_id,
     scope: searchParams?.toString() || 'blank',
     enabled: !isEditMode && !loading && dealContextReady,
+    // Rivningen A3: kopian läggs på plats direkt, ingen helskärmsfråga först.
+    autoRestore: true,
+    onReset: () => {
+      setItems([]); setTitle(''); setDescription(''); setQuickInput(''); setAiTextInput(''); setPhotos([]); setAiBedomning(null)
+      setSourceTranscript(null); setAiGenerated(false); setIntakeAnswers(null); setQuoteJobType(null); setFirstWorkId(undefined)
+      setQuickMode('intake')
+    },
     value: { context: getQuoteContext(), items, quickInput, photos, aiTextInput, aiBedomning },
     hasContent: items.length > 0 || photos.length > 0 || attachments.length > 0 || [title, description, quickInput, aiTextInput, notIncluded, projectAddress].some(value => !!value.trim()),
     onRestore: saved => {
@@ -2169,13 +2168,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // Startsteget döljs så fort NÅGON styrsignal redan pekat ut vad offerten
   // ska bli — transcript (AI-flödet öppnas redan automatiskt ovan),
   // deal/lead-koppling, vald kund, eller en förifylld titel.
-  const hasQuoteStartSignal = !!(
-    firstQuoteIntent ||
-    searchParams?.get('transcript') ||
-    searchParams?.get('deal_id') || searchParams?.get('lead_id') ||
-    searchParams?.get('customerId') || searchParams?.get('customer_id') ||
-    searchParams?.get('title')
-  )
+  const hasQuoteStartSignal = !!firstQuoteIntent || startSignalOf(readQuoteStartParams(searchParams))
   /**
    * KALLSTART GÅR DIREKT TILL SNABBOFFERTEN (2026-08-06).
    *
@@ -2235,21 +2228,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       </div>
     )
   }
-
-  if (!isEditMode && recovery.pending) return (
-    <main className="mx-auto max-w-xl p-6 pt-12">
-      <div className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium text-teal-700">Fortsätt där du slutade</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Du har en påbörjad offert</h1>
-        <p className="mt-3 text-sm text-slate-600">En återställningskopia finns i den här fliken från {new Date(recovery.pending.savedAt).toLocaleTimeString('sv-SE')}. Den är inte ett bekräftat serverutkast.</p>
-        {recovery.status && <p role="status" className="mt-3 text-sm text-amber-800">{recovery.status}</p>}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={recovery.restore} className="min-h-[48px] rounded-xl bg-teal-700 px-4 font-medium text-white">Återställ arbetet</button>
-          <button type="button" onClick={recovery.discard} className="min-h-[48px] rounded-xl border px-4 text-slate-600">Börja om och ta bort kopian</button>
-        </div>
-      </div>
-    </main>
-  )
 
   // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): egen layout, egen fil
   // (QuoteEditView.tsx) — se den filens docblock för varför den INTE ligger
@@ -2370,7 +2348,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     )
   }
 
-  const jobTypeStart = !isEditMode && items.length === 0 && !jobStartApplied && dealContextReady && !templatePickerOpen ? (
+  const jobTypeStart = !isEditMode && items.length === 0 && !jobStartApplied && dealContextReady ? (
     <QuoteJobTypeStart jobType={quoteJobType} inherited={!!inheritedJobType}
       initialIntent={firstQuoteIntent} automatic={!jobStartAttempted.current}
       onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart} />
@@ -2379,20 +2357,10 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // Påfyllning: samma remsa, monteras först när det finns något att fylla på.
   // Även i redigeringsläge — ett sparat badrumsjobb kan få elen tillagd i
   // efterhand, det är ingen "start".
-  const jobTypeFyllPa = items.length > 0 && !templatePickerOpen ? (
+  const jobTypeFyllPa = items.length > 0 ? (
     <QuoteJobTypeStart pafyllnad jobType={quoteJobType} inherited={false} initialIntent={null} automatic={false}
       onSelectJobType={() => {}} onApply={applyJobTypeAppend} />
   ) : null
-
-  const preparationInput = !isEditMode && selectedCustomer ? <QuotePreparationInput
-    key={selectedCustomer} customerId={selectedCustomer} preparationId={searchParams?.get('preparation_id')}
-    onApply={text => {
-      setQuickInput(previous => [previous, text].filter(Boolean).join('\n\n'))
-      setAiTextInput(previous => [previous, text].filter(Boolean).join('\n\n'))
-      setSourceTranscript(previous => [previous, text].filter(Boolean).join('\n\n'))
-      if (items.length === 0) setQuickMode('intake')
-      else setShowAiHelper(true)
-    }} /> : null
 
   // ═══ FRÅGEFLÖDET: fullskärm mellan upplägg-trycket och offerten ═══════
   // "Hoppa över" ger upplägget orört (samma resultat som före 2026-09-17),
@@ -2415,20 +2383,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   if (quickMode === 'intake') {
     return (
       <>
-      {/* Mallistan ligger ÖVER intaget, som blir kvar monterat under. Stänger
-          man den utan att välja något är man tillbaka där man var — annars
-          hade ett ångrat mallval landat i den fullständiga editorn, alltså
-          precis den yta man försökte undvika. */}
-      <QuoteNewStartChooser
-        show={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
-      />
       <QuickIntake
         jobTypeStart={<>{reliefError && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{reliefError} <a href="/dashboard/avlastning" className="underline">Till mitt underlag</a></p>}{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
-          <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
-            onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
-            onSource={text => setQuickInput(text)} />{jobTypeStart}{preparationInput}</>}
+{jobTypeStart}</>}
         customers={customers}
         selectedCustomer={selectedCustomer}
         onSelectCustomer={setSelectedCustomer}
@@ -2445,32 +2402,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         // "Öppna fullständiga editorn" strax intill, alltså samma sorts
         // dubblett vi nyss städade bort.
         onClose={() => router.push('/dashboard/quotes')}
-        onOpenFullEditor={() => { leaveQuickMode(true); setQuickMode(null) }}
+        // "Bygg själv": det skrivna följer med som beskrivning, sedan rakt in
+        // i dokumentet via samma avslutning som alla andra startvägar.
+        onBuildYourself={() => { leaveQuickMode(true); finishQuickStart() }}
         building={false}
-        // Ingen carryText här: mallen sätter sin egen titel och beskrivning,
-        // så texten hade skrivits över i nästa andetag ändå.
-        onUseTemplate={() => { leaveQuickMode(false); setTemplatePickerOpen(true) }}
         hasContent={items.length > 0}
-        onSkipDescription={() => setQuickMode('blank')}
       />
       </>
-    )
-  }
-
-  // Blank-starten (Andreas fynd 2026-08-14): samma guidade granskning som
-  // AI-vägen, bara utan beskrivningen — se startBlankQuickDraft ovan.
-  if (quickMode === 'blank') {
-    return (
-      <QuickBlankStart
-        customers={customers}
-        selectedCustomer={selectedCustomer}
-        onSelectCustomer={setSelectedCustomer}
-        title={title}
-        onTitleChange={setTitle}
-        onStart={startBlankQuickDraft}
-        onClose={() => setQuickMode('intake')}
-        onOpenFullEditor={() => { leaveQuickMode(false); setQuickMode(null) }}
-      />
     )
   }
 
@@ -2492,14 +2430,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   return (
     <div className={`min-h-screen bg-slate-50${jobStartApplied ? ' first-quote-arrival' : ''}`}>
-      {/* Mallväljaren. Öppnas bara från Snabboffertens intag — den är inte
-          längre ett startval utan en av två utgångar därifrån. */}
-      <QuoteNewStartChooser
-        show={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
-      />
-
       {/* FAS 1 (offert-omtaget, 2026-08-31): den tvingade steg-för-steg-
           granskningen ("quickMode === 'review' || 'overview'") är BORTA.
           AI-utkast, blankt och mall landar alla direkt här — samma canvas-
@@ -2550,20 +2480,10 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             OAVSETT skärmstorlek utan att kundkortets mobilordning rörs.
             Grindvillkoret bor kvar på jobTypeStart-variabeln högre upp —
             orört. */}
-        {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
+        {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600 flex flex-wrap items-center gap-x-3">{recovery.status}
+          {recovery.restored && <button type="button" onClick={recovery.discardRestored} className="min-h-[44px] underline text-slate-700">Börja om</button>}</p>}
         {jobTypeStart}
         {jobTypeFyllPa}
-        {preparationInput}
-        {!isEditMode && <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
-          onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
-          onSource={text => { setQuickInput(text); setAiTextInput(text) }} />}
-        {firstQuoteIntent && jobStartApplied && <FirstQuoteGuide key={business.business_id}
-          companyName={business.business_name} hasCustomer={!!selectedCustomer}
-          onCustomer={() => {
-            const target = document.querySelector<HTMLElement>('[data-first-quote-customer]')
-            target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-            target?.querySelector<HTMLElement>('input, button, select')?.focus({ preventScroll: true })
-          }} onSection={scrollToSection} />}
         {jobStartApplied && <p className="text-sm text-teal-800 mb-4" role="status">
           Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
         </p>}

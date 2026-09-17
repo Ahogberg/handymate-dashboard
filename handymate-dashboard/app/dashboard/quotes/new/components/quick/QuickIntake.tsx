@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Camera, FileText, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
+import { ArrowLeft, Camera, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
 /** Bara det intaget faktiskt behöver. Strukturell typ i stället för en import
     av sidans Customer: det finns tre olika Customer-typer i kodbasen, och den
@@ -32,14 +32,16 @@ interface IntakeCustomer {
  * innan AI:n bygger vidare på det. Att skicka ett orättat transkript direkt
  * till genereringen hade gjort felet dyrare att upptäcka.
  *
- * ═══ VÄGVALET ÄR FÖRSTKLASSIGT (designpasset 2026-08-10, Andreas fynd) ═══
+ * ═══ TVÅ KNAPPAR, EN EDITOR (rivningen A3, 2026-09-17) ═══
  *
- * "Öppna editorn direkt" låg som en grå fotnot under en jättelik inaktiverad
- * knapp — en vägtull med gömd nödutgång för den som kan editorn. Nu ligger
- * den i headerhöjd och mallvalet är en riktig sekundärknapp bredvid Bygg
- * utkast. Standarden förblir beskriv-vägen (den byggdes åt piloten som blev
- * galen på editorns ~33 kontroller); rymningarna är synliga, och D2-vanan
- * ("vill du alltid börja så här?") minns valet efter tredje gången.
+ * Intaget är den enda startskärmen. Det finns två vägar ut: "Bygg utkast"
+ * (Matte bygger ur beskrivningen) och "Bygg själv" (rakt in i dokumentet,
+ * texten följer med som beskrivning). Tidigare fanns fyra: en headerlänk
+ * "Öppna editorn direkt", en mellanskärm som frågade efter titel och kund
+ * innan editorn (som dokumentet ändå frågar efter), och "Använd en mall"
+ * med en mallista — 2 av 39 offerter i produktionen hade en mall, och
+ * mallar nås via jobbtypens upplägg. Fyra knappar som landade på två
+ * ställen är två knappar för mycket.
  */
 
 /** Exempelchips mot tomma-sidan-paralysen. Klick FYLLER rutan — texten är
@@ -66,30 +68,11 @@ interface QuickIntakeProps {
   maxPhotos: number
   onBuild: () => void
   onClose: () => void
-  /** "Öppna fullständiga editorn" — samma offert, andra verktyget. */
-  onOpenFullEditor: () => void
+  /** "Bygg själv" — rakt in i dokumentet, det skrivna följer med. */
+  onBuildYourself: () => void
   building: boolean
-  /**
-   * "Använd en mall i stället". Sedan startväljaren togs bort (2026-08-06) är
-   * mallvalet en av två utgångar härifrån, inte ett eget startval.
-   */
-  onUseTemplate: () => void
-  /**
-   * true när offerten redan har rader. Mallänken DÖLJS då: handleTemplateSelect
-   * skriver över titel, beskrivning och rader, så en mall vald efter att AI
-   * byggt ett utkast hade raderat arbetet utan förvarning. Att dölja länken
-   * gör krocken omöjlig i stället för att varna om den — ett beslut mindre i
-   * ett flöde vi försöker tömma på beslut.
-   */
+  /** true när offerten redan har rader — då göms "Bygg själv", editorn finns redan. */
   hasContent: boolean
-  /**
-   * En tredje väg in i samma guidade, sektion-för-sektion-upplevelse — bara
-   * utan AI-beskrivningen. Andreas fynd (2026-08-14): steg-för-steg ska vara
-   * standard oavsett starttyp, inte bara AI-vägen. Leder till en egen liten
-   * skärm (kund + titel) i stället för direkt till 'blank', så granskningen
-   * alltid har en titel att visa.
-   */
-  onSkipDescription: () => void
 }
 
 export function QuickIntake({
@@ -105,11 +88,9 @@ export function QuickIntake({
   maxPhotos,
   onBuild,
   onClose,
-  onOpenFullEditor,
+  onBuildYourself,
   building,
-  onUseTemplate,
   hasContent,
-  onSkipDescription,
 }: QuickIntakeProps) {
   const recording = useAudioRecording()
   const [transcribing, setTranscribing] = useState(false)
@@ -185,14 +166,6 @@ export function QuickIntake({
           >
             <ArrowLeft className="w-4 h-4" />
             Tillbaka
-          </button>
-          <button
-            type="button"
-            onClick={onOpenFullEditor}
-            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-primary-700 px-2 py-2 transition-colors"
-          >
-            Öppna editorn direkt
-            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 
@@ -367,21 +340,11 @@ export function QuickIntake({
             {!hasContent && (
               <button
                 type="button"
-                onClick={onSkipDescription}
+                onClick={onBuildYourself}
                 className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
               >
                 <PenLine className="w-4 h-4" />
                 Bygg själv
-              </button>
-            )}
-            {!hasContent && (
-              <button
-                type="button"
-                onClick={onUseTemplate}
-                className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                Använd en mall
               </button>
             )}
           </div>

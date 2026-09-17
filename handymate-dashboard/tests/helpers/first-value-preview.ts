@@ -14,7 +14,7 @@ export async function firstValuePreview() {
     'lib/onboarding/first-focus.ts', 'lib/onboarding/first-mission-handoff.ts',
     'lib/onboarding/first-assignment-options.ts', 'lib/onboarding/kom-igang-tasks.ts',
     'app/onboarding/components/FirstAssignmentFinal.tsx',
-    'components/onboarding/FirstQuoteGuide.tsx', 'components/jarvis/KomIgangRail.tsx',
+    'components/jarvis/KomIgangRail.tsx',
     'components/jarvis/FirstMissionHandoff.tsx',
   ]
   const css = (await postcss([tailwind({ ...config, content: files })]).process('@tailwind base; @tailwind components; @tailwind utilities;', { from: undefined })).css
@@ -54,8 +54,6 @@ export async function firstValuePreview() {
             data: { businessId: tenant, firstFocus:'fler_jobb', firstQuoteSelection: { jobTypeSlug:'service', templateId:'service' } },
             unpaidCount:0, openDealsCount:0, onFirstQuote:()=>setView('offert'), onFinish:()=>setView('hem') }), h('button', { className:'ob-cta ghost' }, 'Visa mig runt först'))) :
           view === 'offert' ? h('div', null,
-            h(modules['@/components/onboarding/FirstQuoteGuide'].FirstQuoteGuide, { companyName:business.business_name, hasCustomer:customer,
-              onCustomer:()=>document.getElementById('customer').focus(), onSection:section=>{ setTarget(section); navigate(section); } }),
             h('div', { className:'rounded-xl border border-slate-200 bg-white p-5' },
               h('h2', { className:'text-xl font-semibold mb-3' }, 'Exempeloffert · Servicebesök'),
               h('label', null, 'Kund ', h('select', { id:'customer', onChange:e=>setCustomer(Boolean(e.target.value)), value:customer?'a':'' }, h('option', { value:'' }, 'Välj kund'), h('option', { value:'a' }, 'Exempelkund'))),

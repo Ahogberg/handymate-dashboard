@@ -732,3 +732,13 @@ raden är alltså rätt, inte en bugg. **Regel: innan något kallas lucka — l�
 typens egen kommentar och alla konsumenter, inte bara den ena.**
 "Dold för kunden", "inte vald" och "ska inte faktureras" är tre olika saker och
 bara den första finns i dag.
+
+## 2026-09-17 — `npx playwright` är inte repots Playwright (samma fälla som `npx tsc`)
+
+`npx playwright test …` plockade version 1.63 som kräver `chromium_headless_shell-1243`,
+medan miljön bara har `-1194`. Alla browserspecar föll med "Executable doesn't
+exist" och det såg ut som att mina testomskrivningar var trasiga. Källskanningen
+kördes ändå, så felet dolde sig bland riktiga resultat.
+**Regel: kör alltid `./node_modules/.bin/playwright` och `./node_modules/.bin/tsc`,
+aldrig `npx <verktyg>` för något som finns i node_modules.** Och när ett helt
+block tester faller med SAMMA fel är det miljön, inte koden — leta där först.

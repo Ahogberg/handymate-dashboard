@@ -95,7 +95,7 @@ test.describe('kopplingen i byggaren', () => {
   })
 
   test('remsan monteras i påfyllningsläge först när offerten har rader', () => {
-    expect(builder).toMatch(/const jobTypeFyllPa = items\.length > 0 && !templatePickerOpen \? \(\s*<QuoteJobTypeStart pafyllnad/)
+    expect(builder).toMatch(/const jobTypeFyllPa = items\.length > 0 \? \(\s*<QuoteJobTypeStart pafyllnad/)
     expect(builder).toMatch(/onApply=\{applyJobTypeAppend\}/)
     // och renderas bredvid startremsan, inte bara deklareras
     expect(builder).toMatch(/\{jobTypeStart\}\s*\{jobTypeFyllPa\}/)

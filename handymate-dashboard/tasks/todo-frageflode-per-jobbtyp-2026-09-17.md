@@ -191,3 +191,27 @@ Felet var att de tappade sin doldhet och blev synliga för kunden.
   firmans timpris till 0 kr
 - Klickprovet registrering → första offert (golden path station 2 är
   uttryckligen "assertion, ej ny registrering")
+
+## Rivning A3 — starten blir en skärm (2026-09-17)
+
+Sju ytor ur inventeringens paket A. Intaget är den enda startskärmen med två
+knappar: "Bygg utkast" och "Bygg själv". Allt landar via `finishQuickStart()`.
+
+- [x] 1.3 `QuickBlankStart` + `startBlankQuickDraft` + `'blank'` — raderat; "Bygg själv" → `leaveQuickMode(true); finishQuickStart()`
+- [x] 1.4 "Öppna editorn direkt" — borta
+- [x] 1.5 "Använd en mall" + `QuoteNewStartChooser` (×2) + `templatePickerOpen` — raderat
+- [x] 1.7 `WorkSampleResume` (×2) + `workSampleDraft` — raderat. Avvikande fynd:
+      provet hade ALDRIG blivit en offert (`first_work_id` 0 av 39) och
+      inventeringens antagna ersättning (first_quote-överlämningen) bär inte
+      provet. Onboardingen visar det fortfarande i steg 2
+- [x] 1.8 `QuotePreparationInput` — raderat; `?preparation_id` → `loadPreparationQuoteInput` direkt i intagets ruta
+- [x] 1.9 `FirstQuoteGuide` — raderat; statusraden "Ditt underlag är på plats" kvar
+- [x] 1.11 helskärmsfrågan — `useQuoteRecovery({ autoRestore, onReset })`, raden "Återställt från den här fliken · Börja om"
+- [x] 1.12 `lib/quotes/start-params.ts` — en läsare; alla ingångar skriver `customer_id`; `description`/`preparation_id`/`relief` räknas som startsignal och `description` når intagets ruta
+- [x] `tests/snabboffert-startvagar.spec.ts` var OGATAD och låste det som revs — omskriven och gatad
+- [x] `tests/offertstarten-en-skarm.spec.ts` — ny, gatad
+- [x] `quote-experience.ui`, `customer-journey-value`, `first-value-journey.ui` + hjälpare — omskrivna
+- [x] `tests/first-value-production.ui.spec.ts` (ogatad skärmdumpssvit) — resume-vyn borttagen, fortfarande ogatad med flit
+
+Kvar i paket A: inget. Nästa: paket B (dubbletter), C (verktyg), D (runtomkring),
+sedan byggpaketen B1/B2/B4.

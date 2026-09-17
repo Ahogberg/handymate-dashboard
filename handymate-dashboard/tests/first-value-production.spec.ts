@@ -18,7 +18,6 @@ const followRule: handoff.HandoffRule = { id: 'r', name: 'Uppföljning', trigger
 test('arbetsprovet tar bara med omfattning; pris, avdrag och främmande länkar faller bort', () => {
   const safe = sample.readWorkSample({ ...prepared, customerId: 'foreign', total: 8000, items: [{ ...prepared.items[0], unitPrice: 900, linked_product_id: 'foreign' }] })!
   expect(safe).toEqual(prepared)
-  expect(sample.workSampleDraft(safe)).toMatchObject({ suggestedDeductionType: 'none', items: [{ quantity: 6, unitPrice: 0, confidence: 0 }] })
   expect(sample.readWorkSample({ ...prepared, items: [{ ...prepared.items[0], quantity: -1 }] })).toBeNull()
   expect(sample.readWorkSample({ ...prepared, items: [null] })).toBeNull()
   expect(sample.readWorkSample({ ...prepared, createdAt: 'invalid' })).toBeNull()

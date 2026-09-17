@@ -30,11 +30,7 @@ for(const width of [375,1280]) {
     await page.getByRole('button',{name:'Behåll underlaget och fortsätt'}).click()
     expect((await saved).postDataJSON()).toEqual({source:sample.source,sample})
     await expect(page.getByText('Sparat på servern')).toBeVisible()
-    await page.getByRole('button',{name:'resume',exact:true}).click()
-    await page.getByRole('button',{name:'Använd mitt förberedda underlag'}).click()
-    await expect(page.getByTestId('description')).toHaveText('Kunden står för dörrarna.')
-    await page.getByRole('button',{name:'Ersätt med arbetsprovet'}).click()
-    await expect(page.getByTestId('description')).toHaveText(sample.description)
+    // Rivningen A3 (2026-09-17): arbetsprovsbannern i offertstarten är borta.
     await page.getByRole('button',{name:'handoff',exact:true}).click()
     await expect(page.getByRole('link',{name:'Granska förslaget'})).toHaveAttribute('href','/dashboard/approvals?focus=a')
     await page.screenshot({path:info.outputPath(`overlamning-${width}.png`),fullPage:true})
@@ -72,9 +68,6 @@ test('AI-fel och sparfel behåller förfrågan; annat företag får inte se samm
   await expect(page.getByRole('alert')).toContainText('Kunde inte spara')
   await page.evaluate(()=> (window as any).fixture.setBusiness('firm-b'))
   await expect(page.getByLabel('Din förfrågan')).toHaveValue('')
-  await page.getByRole('button',{name:'resume',exact:true}).click()
-  await expect(page.getByRole('alert')).toContainText('Kunde inte kontrollera')
-  await expect(page.getByRole('button',{name:'Använd mitt förberedda underlag'})).toHaveCount(0)
 })
 test('sen regelsparning kan aldrig skriva över ett nytt jobb',async({page})=>{
   await setup(page)
