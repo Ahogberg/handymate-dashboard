@@ -180,8 +180,9 @@ tills det parallella passet landat en jobbtyp-koppling på offerten.
 
 ### Commit
 
-Se `git log` på branchen `claude/gracious-brown-07lm99` för commit-hashen
-(skrivs in här efter push, se sista raden i den här rapporten).
+Commit `82ee1fd9` ("Rivning B: dokumentet blir den enda platsen för rabatt,
+avdrag och texter"), ovanpå nattplanens egen commit `7ba04130`. Pushad till
+`origin/claude/gracious-brown-07lm99`.
 
 ## Paket C — verktygen (2.12–2.17)
 
