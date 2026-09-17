@@ -141,21 +141,35 @@ export interface GuaranteeFacts {
   short: string
 }
 
-export function getGuaranteeFacts(foundersAvailable: boolean): GuaranteeFacts {
+export type BillingIntervalForGuarantee = 'monthly' | 'yearly'
+
+/**
+ * @param interval Vad kunden får tillbaka beror på planen (beslut Andreas
+ *   2026-09-17): årsplan hela årsavgiften, månadsplan de betalda månads-
+ *   avgifterna. Utan intervall (partnermaterial, FAQ) skrivs båda ut.
+ */
+export function getGuaranteeFacts(
+  foundersAvailable: boolean,
+  interval?: BillingIntervalForGuarantee,
+): GuaranteeFacts {
   if (GUARANTEE_MODEL === 'usage') {
     const surfaces = ADOPTION_TROSKEL
     const of = YTA_NYCKLAR.length
     const windowDays = ADOPTION_FONSTER_DAGAR
+    const aterbetalning =
+      interval === 'yearly' ? 'hela året tillbaka'
+      : interval === 'monthly' ? 'tillbaka det du betalat'
+      : 'tillbaka det du betalat — hela året på årsplan'
     return {
       model: 'usage',
       days: USAGE_GUARANTEE_DECISION_DAYS,
-      refund: 'year',
+      refund: interval === 'monthly' ? 'period' : 'year',
       condition: { surfaces, of, windowDays },
       headline: 'Använd det. Annars kostar det inget.',
       body:
         `Använd Handymate på ${surfaces} av ${of} ytor under dina första ${windowDays} dagar. ` +
         `Gör du det och ändå inte tycker att det är värt pengarna, säg till före dag ${USAGE_GUARANTEE_DECISION_DAYS} ` +
-        `så får du hela året tillbaka. Du behåller all data, och vi hjälper dig exportera den.`,
+        `så får du ${aterbetalning}. Du behåller all data, och vi hjälper dig exportera den.`,
       short: 'Använd det. Annars kostar det inget.',
     }
   }

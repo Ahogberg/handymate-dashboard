@@ -76,7 +76,9 @@ test.describe('en kanonisk garantisanning', () => {
     // är money_back, så bytet inte överraskar).
     const src = read('lib/feature-gates.ts')
     expect(src).toContain('Använd Handymate på ${surfaces} av ${of} ytor under dina första ${windowDays} dagar.')
-    expect(src).toContain('så får du hela året tillbaka. Du behåller all data, och vi hjälper dig exportera den.')
+    expect(src).toContain("interval === 'yearly' ? 'hela året tillbaka'")
+    expect(src).toContain("interval === 'monthly' ? 'tillbaka det du betalat'")
+    expect(src).toContain('så får du ${aterbetalning}. Du behåller all data, och vi hjälper dig exportera den.')
   })
 
   test('grundarbannern citerar garantin, hittar inte på en egen', () => {

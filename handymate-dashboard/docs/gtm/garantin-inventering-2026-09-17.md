@@ -233,9 +233,13 @@ publiceras, inte bara grundarna. Bytet får inte ske före §10 i heroutkastet.
   `jamfor.html` ×2, `support.html` ×1) ändras i samma PR, så mergen = hela
   landningshalvan. Dashboard-halvan är då en rad.
 
-  **Två [BESLUT] i utkastet som juristen inte kan avgöra åt er:**
-  1. Vad återbetalas på **månadsplan**? Källtexten säger "hela året" och är
-     skriven för årsplan. Beslutet "alla kunder" gjorde frågan skarp.
-     Förslag i utkastet: betalda månadsavgifter fram till dess.
-  2. Bokföringen till halva listpriset för alltid — rekommenderat i
-     beslutsfilen §2.3, aldrig beslutat.
+  **Båda besluten tagna av Andreas samma dag, inskrivna i utkastet:**
+  1. **Månadsplan** återbetalar de månadsavgifter som betalats fram till
+     dess; årsplan hela årsavgiften. `getGuaranteeFacts()` tar nu ett
+     `interval` och säger "hela året tillbaka" bara på årsplan — köpytorna
+     skickar med sitt intervall, partnermaterialet får båda utskrivna.
+  2. **Bokföringen till halva listpriset för alltid** — behålls, med
+     heroutkastets §6-formulering ordagrant. Bör skrivas in i
+     `founders-offer.ts` filhuvud i flippasset så koden och villkoren säger
+     samma sak.
+  Kvar före merge: juridisk genomläsning av §6–§9.

@@ -198,7 +198,7 @@ export default function BillingPage() {
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly')
   // Garantin läses från EN källa (getGuaranteeFacts) — facit i
   // tests/guarantee-truth.spec.ts.
-  const guarantee = getGuaranteeFacts(Boolean(billing?.founders_available))
+  const guarantee = getGuaranteeFacts(Boolean(billing?.founders_available), billingInterval)
 
   useEffect(() => {
     if (!business?.business_id) return

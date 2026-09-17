@@ -191,7 +191,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   // Garantin läses från EN källa (lib/feature-gates.ts getGuaranteeFacts) —
   // den här ytan visar texten, formulerar inte om den. Facit:
   // tests/guarantee-truth.spec.ts.
-  const guarantee = getGuaranteeFacts(Boolean(data.foundersAvailable))
+  const guarantee = getGuaranteeFacts(Boolean(data.foundersAvailable), billingInterval)
 
   return (
     <div className="ob-screen">
