@@ -7,6 +7,7 @@
 import fs from 'fs'
 import path from 'path'
 import { test, expect } from '@playwright/test'
+import { bolagsverketHosts, configuredEnv } from '../lib/bolagsverket/client'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (relative: string) => fs.readFileSync(path.join(ROOT, relative), 'utf8')
@@ -74,30 +75,56 @@ test.describe('regressionen 2026-09-17 — "Kunde inte nå Bolagsverket just nu"
   // Körloggen sa `token-hämtning misslyckades: 404`. Tokens mintas på
   // PORTAL-värden; uppslaget går mot gateway-värden. Att peka token mot
   // gatewayen ger 404 och ser ut som ett nätverksfel.
-  test('token hämtas från portal-värden, aldrig från gateway-värden', () => {
-    const tokenDefault = client.match(/const DEFAULT_TOKEN_URL = '([^']+)'/)
-    expect(tokenDefault, 'DEFAULT_TOKEN_URL saknas').not.toBeNull()
-    expect(tokenDefault![1]).toContain('portal')
-    expect(tokenDefault![1]).not.toContain('gw.api')
+  test('token mintas på portal-värden, uppslaget går mot gateway-värden', () => {
+    for (const env of ['accept', 'production'] as const) {
+      const { tokenUrl, apiBaseUrl } = bolagsverketHosts(env)
+      expect(tokenUrl, env).toContain('portal')
+      expect(tokenUrl, env).toContain('/oauth2/token')
+      expect(apiBaseUrl, env).toContain('gw')
+      expect(apiBaseUrl, env).not.toContain('portal')
+      expect(apiBaseUrl, env).toContain('/vardefulla-datamangder/v1')
+    }
   })
 
-  test('uppslaget går fortfarande mot gateway-värden', () => {
-    const apiDefault = client.match(/const DEFAULT_API_BASE_URL = '([^']+)'/)
-    expect(apiDefault).not.toBeNull()
-    expect(apiDefault![1]).toContain('gw.api')
+  test('miljöväljaren tar båda värdarna på en gång — de kan inte glida isär', () => {
+    // En token från acceptansmiljön avvisas av produktionsgatewayen.
+    const accept = bolagsverketHosts('accept')
+    expect(accept.tokenUrl).toContain('portal-accept2')
+    expect(accept.apiBaseUrl).toContain('gw-accept2')
+    const prod = bolagsverketHosts('production')
+    expect(prod.tokenUrl).not.toContain('accept')
+    expect(prod.apiBaseUrl).not.toContain('accept')
   })
 
-  test('båda värdarna är env-överstyrbara — acceptansmiljön kräver ingen deploy', () => {
+  test('produktion är aldrig en gissning — bara ordet accept väljer acceptansmiljön', () => {
+    expect(configuredEnv('accept')).toBe('accept')
+    expect(configuredEnv(' ACCEPT ')).toBe('accept')
+    for (const v of [undefined, null, '', 'prod', 'production', 'test', 'accept2']) {
+      expect(configuredEnv(v), String(v)).toBe('production')
+    }
+  })
+
+  test('blandade miljöer stoppas före nätverket, med en tydlig loggrad', () => {
+    const fnBody = client.slice(client.indexOf('function endpoints()'))
+    expect(fnBody).toContain('mismatch')
+    const lookup = client.slice(client.indexOf('export async function lookupCompany'))
+    const guard = lookup.indexOf('if (mismatch)')
+    const tokenFetch = lookup.indexOf('fetchAccessToken(')
+    expect(guard).toBeGreaterThan(-1)
+    expect(guard, 'vakten måste ligga före token-hämtningen').toBeLessThan(tokenFetch)
+    expect(lookup).toContain('token- och uppslagsvärd i olika miljöer')
+  })
+
+  test('värdarna läses per anrop — ett modulkonstant-värde fryses in i bygget', () => {
+    expect(client).toContain('process.env.BOLAGSVERKET_ENV')
     expect(client).toContain('process.env.BOLAGSVERKET_TOKEN_URL')
     expect(client).toContain('process.env.BOLAGSVERKET_API_BASE_URL')
-    // Läses per anrop; ett modulkonstant-värde fryses in i bygget.
-    expect(client).toMatch(/function tokenUrl\(\)/)
-    expect(client).toMatch(/function apiBaseUrl\(\)/)
+    expect(client).toMatch(/function endpoints\(\)/)
   })
 
-  test('de fyra variablerna är dokumenterade i .env.local.example', () => {
+  test('de fem variablerna är dokumenterade i .env.local.example', () => {
     const env = read('.env.local.example')
-    for (const namn of ['BOLAGSVERKET_CLIENT_ID', 'BOLAGSVERKET_CLIENT_SECRET', 'BOLAGSVERKET_TOKEN_URL', 'BOLAGSVERKET_API_BASE_URL']) {
+    for (const namn of ['BOLAGSVERKET_CLIENT_ID', 'BOLAGSVERKET_CLIENT_SECRET', 'BOLAGSVERKET_ENV', 'BOLAGSVERKET_TOKEN_URL', 'BOLAGSVERKET_API_BASE_URL']) {
       expect(env, `${namn} odokumenterad`).toContain(namn)
     }
   })
@@ -113,7 +140,7 @@ test.describe('regressionen 2026-09-17 — "Kunde inte nå Bolagsverket just nu"
     // Utan URL:en gick det inte att se att 404:an var fel VÄRD och inte fel nyckel.
     const fel = Array.from(client.matchAll(/console\.error\('\[bolagsverket\][^']*'([^)]*)\)/g))
     expect(fel.length).toBeGreaterThan(2)
-    for (const m of fel) expect(m[1], `saknar url: ${m[0]}`).toContain('url')
+    for (const m of fel) expect(m[1], `saknar url: ${m[0]}`).toContain('rl')
   })
 
   test('nekad behörighet skiljs från otillgänglig tjänst, hela vägen ut till texten', () => {

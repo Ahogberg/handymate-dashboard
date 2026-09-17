@@ -23,9 +23,12 @@
  *      `portal.api.bolagsverket.se`. Den gamla gateway-URL:en gav 404.
  *   2. `identitetsbeteckning` är TOLV siffror (PeOrgNr), inte tio — se
  *      orgNumberIdentity i lib/karin/org-number.ts.
- * Båda värdarna är env-överstyrbara: Bolagsverket delar ut nycklar till
- * acceptansmiljön först (`portal-accept2`/`gw-accept2`), och en miljöbyte
- * ska inte kräva en deploy.
+ * Miljön väljs med `BOLAGSVERKET_ENV` (`accept`/`production`), som tar BÅDA
+ * värdarna på en gång. Bolagsverket delar ut nycklar till acceptansmiljön
+ * först, och en token därifrån avvisas av produktionsgatewayen — värdarna hör
+ * ihop parvis och får aldrig sättas var för sig. De två URL-variablerna finns
+ * kvar som undantag; sätts de så att värdarna hamnar i olika miljöer stoppas
+ * uppslaget av vakten i `endpoints()` i stället för att ge ett obegripligt 401.
  *
  * Fail-soft genomgående, samma disciplin som app/api/onboarding/
  * scrape-website/route.ts: saknade credentials, nätverksfel och
@@ -35,16 +38,49 @@
  */
 import { orgNumberIdentity } from '@/lib/karin/org-number'
 
-const DEFAULT_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token'
-const DEFAULT_API_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1'
 const SCOPE = 'vardefulla-datamangder:read'
 
-/** Läses per anrop, inte vid modulladdning — annars fryses värdet in i bygget. */
-function tokenUrl(): string {
-  return process.env.BOLAGSVERKET_TOKEN_URL || DEFAULT_TOKEN_URL
+export type BolagsverketEnv = 'accept' | 'production'
+
+/**
+ * Värdparet per miljö. Token och uppslag MÅSTE höra ihop: en token från
+ * acceptansmiljön avvisas av produktionsgatewayen och tvärtom — ett 401 som
+ * inte säger något om vad som är fel. Båda acceptansvärdarna ligger dessutom
+ * på samma lastbalanserare hos Bolagsverket, så de hör ihop även i deras ände.
+ * Ren funktion — facit i tests/bolagsverket-onboarding.spec.ts.
+ */
+export function bolagsverketHosts(env: BolagsverketEnv): { tokenUrl: string; apiBaseUrl: string } {
+  return env === 'accept'
+    ? {
+        tokenUrl: 'https://portal-accept2.api.bolagsverket.se/oauth2/token',
+        apiBaseUrl: 'https://gw-accept2.api.bolagsverket.se/vardefulla-datamangder/v1',
+      }
+    : {
+        tokenUrl: 'https://portal.api.bolagsverket.se/oauth2/token',
+        apiBaseUrl: 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1',
+      }
 }
-function apiBaseUrl(): string {
-  return process.env.BOLAGSVERKET_API_BASE_URL || DEFAULT_API_BASE_URL
+
+/** `accept` bara när det står uttryckligen — vilken miljö vi är i gissas aldrig. */
+export function configuredEnv(value: string | null | undefined): BolagsverketEnv {
+  return value?.trim().toLowerCase() === 'accept' ? 'accept' : 'production'
+}
+
+/** En värd tillhör acceptansmiljön om den bär `-accept` i namnet. */
+function hostEnv(url: string): BolagsverketEnv {
+  return /-accept/.test(url) ? 'accept' : 'production'
+}
+
+/**
+ * Läses per anrop, inte vid modulladdning — annars fryses värdet in i bygget.
+ * BOLAGSVERKET_ENV är normalvägen; de två URL-variablerna finns kvar som
+ * undantag och är enda sättet att få värdarna att glida isär, därav vakten.
+ */
+function endpoints(): { tokenUrl: string; apiBaseUrl: string; mismatch: boolean } {
+  const parad = bolagsverketHosts(configuredEnv(process.env.BOLAGSVERKET_ENV))
+  const tokenUrl = process.env.BOLAGSVERKET_TOKEN_URL || parad.tokenUrl
+  const apiBaseUrl = process.env.BOLAGSVERKET_API_BASE_URL || parad.apiBaseUrl
+  return { tokenUrl, apiBaseUrl, mismatch: hostEnv(tokenUrl) !== hostEnv(apiBaseUrl) }
 }
 
 export interface BolagsverketAddress {
@@ -92,10 +128,9 @@ export function isTokenValid(token: CachedToken | null, nowMs: number): boolean 
   return token.expiresAtMs - 60_000 > nowMs
 }
 
-async function fetchAccessToken(clientId: string, clientSecret: string): Promise<TokenResult> {
+async function fetchAccessToken(clientId: string, clientSecret: string, url: string): Promise<TokenResult> {
   if (isTokenValid(cachedToken, Date.now())) return { ok: true, accessToken: (cachedToken as CachedToken).accessToken }
 
-  const url = tokenUrl()
   try {
     const res = await fetch(url, {
       method: 'POST',
@@ -181,14 +216,22 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
   const clientSecret = process.env.BOLAGSVERKET_CLIENT_SECRET
   if (!clientId || !clientSecret) return { ok: false, reason: 'not_configured' }
 
+  const { tokenUrl, apiBaseUrl, mismatch } = endpoints()
+  if (mismatch) {
+    // Gå inte ut och hämta en token som gatewayen ändå kommer att avvisa —
+    // 401:an hade sett ut som ett nyckelfel i stället för en felkonfiguration.
+    console.error('[bolagsverket] token- och uppslagsvärd i olika miljöer:', tokenUrl, apiBaseUrl)
+    return { ok: false, reason: 'not_configured' }
+  }
+
   // Tolv siffror (PeOrgNr), inte tio — Bolagsverket avvisar det tiosiffriga.
   const identitetsbeteckning = orgNumberIdentity(orgNumber)
   if (!identitetsbeteckning) return { ok: false, reason: 'not_found' }
 
-  const token = await fetchAccessToken(clientId, clientSecret)
+  const token = await fetchAccessToken(clientId, clientSecret, tokenUrl)
   if (!token.ok) return { ok: false, reason: token.reason }
 
-  const url = `${apiBaseUrl()}/organisationer`
+  const url = `${apiBaseUrl}/organisationer`
   try {
     const res = await fetch(url, {
       method: 'POST',

@@ -1703,5 +1703,8 @@ Granskning: se briefens §9 "Review". Driftläge: briefens §8. C9 är nästa pa
 - [x] `identitetsbeteckning` byggs tolvsiffrigt (`orgNumberIdentity`) i stället för tio.
 - [x] `not_authorized` skiljd från `request_failed`; status och URL i varje loggrad.
 - [x] Fyra miljövariabler dokumenterade i `.env.local.example`; facit i karin-org-number (26) och bolagsverket-onboarding (29).
-- [ ] Skarpt prov: fyll i ett org.nr i onboardingens steg 2 och bekräfta att namn/adress fylls i. Går inte att prova härifrån — utgående trafik mot bolagsverket.se är blockerad och nycklarna finns bara i Vercel.
+- [x] Andreas token-endpoint visade sig vara acceptansmiljön (`portal-accept2`). `BOLAGSVERKET_ENV=accept|production` väljer båda värdarna på en gång; vakt stoppar blandade miljöer före nätverket.
+- [ ] Sätt `BOLAGSVERKET_ENV=accept` i Vercel (eller de två URL-variablerna) och gör skarpt prov: fyll i ett org.nr i onboardingens steg 2 och bekräfta att namn/adress fylls i. Går inte att prova härifrån — utgående trafik mot bolagsverket.se är blockerad och nycklarna finns bara i Vercel.
+- [ ] Om svaret blir timeout i stället för en HTTP-status: anmäl Vercels utgående IP-adresser till Bolagsverket (testmiljöerna ligger bakom brandvägg enligt deras anslutningsanvisning).
+- [ ] Stäm av `parseOrganisationResponse` mot den tekniska dokumentation som följde med nycklarna — svarsfälten är fortfarande gissade.
 
