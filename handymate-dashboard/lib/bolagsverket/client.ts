@@ -11,10 +11,18 @@
  * innan den litar på den, ger `null`/`invalid_response` hellre än att
  * gissa fram ett fält eller krascha.
  *
- * VERIFIERA mot den riktiga tekniska dokumentationen som följer med
- * API-nycklarna (efter Bolagsverkets "kundanmälan", se tasks/todo.md)
- * innan produktionsanvändning — särskilt `/organisationer`-svarets
- * exakta fältnamn.
+ * VERIFIERAT 2026-09-17 mot Bolagsverkets "Connection establishment guide for
+ * Värdefulla Datamängder" v1.01: värdarna, `POST /organisationer`, grant type,
+ * `Content-Type`, nycklarna i kroppen (inte Basic auth), `Bearer`-prefixet och
+ * `expires_in` i sekunder stämmer alla. KVAR ATT VERIFIERA mot OpenAPI-filen
+ * (devportal → "Download Swagger"): `/organisationer`-anropets payload-schema,
+ * alltså om `identitetsbeteckning` är tolv siffror, och svarets exakta fältnamn
+ * som `parseOrganisationResponse` läser.
+ *
+ * Testmiljön accept2 tar bara vissa organisationsnummer (anvisningens §6.1).
+ * Ett annat nummer ger ett svar som RÄKNAR UPP de tillåtna — inte ett företag.
+ * Det svaret passerar inte `parseOrganisationResponse` och landar därför som
+ * `invalid_response`; det är väntat i testmiljön, inte en parsningsbugg.
  *
  * RÄTTAT 2026-09-17 efter skarpt fel i onboardingen ("Kunde inte nå
  * Bolagsverket just nu", körloggen: `token-hämtning misslyckades: 404`):
@@ -38,7 +46,16 @@
  */
 import { orgNumberIdentity } from '@/lib/karin/org-number'
 
-const SCOPE = 'vardefulla-datamangder:read'
+/**
+ * Båda scopen, mellanslagsseparerade, precis som anslutningsanvisningens
+ * exempel (§5.1). Anvisningen är uttrycklig: "the API resources are also
+ * protected by scopes which must be declared in the request when fetching a
+ * token. If they are not present in the token, subsequent calls to the APIs
+ * resources using that token will fail." `read` räcker för /organisationer och
+ * `ping` för /isalive — vi hämtar båda i samma token, som exemplet gör, hellre
+ * än att servera en token som saknar det anropet behöver.
+ */
+const SCOPE = 'vardefulla-datamangder:read vardefulla-datamangder:ping'
 
 export type BolagsverketEnv = 'accept' | 'production'
 

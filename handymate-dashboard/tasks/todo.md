@@ -1706,5 +1706,7 @@ Granskning: se briefens §9 "Review". Driftläge: briefens §8. C9 är nästa pa
 - [x] Andreas token-endpoint visade sig vara acceptansmiljön (`portal-accept2`). `BOLAGSVERKET_ENV=accept|production` väljer båda värdarna på en gång; vakt stoppar blandade miljöer före nätverket.
 - [ ] Sätt `BOLAGSVERKET_ENV=accept` i Vercel (eller de två URL-variablerna) och gör skarpt prov: fyll i ett org.nr i onboardingens steg 2 och bekräfta att namn/adress fylls i. Går inte att prova härifrån — utgående trafik mot bolagsverket.se är blockerad och nycklarna finns bara i Vercel.
 - [ ] Om svaret blir timeout i stället för en HTTP-status: anmäl Vercels utgående IP-adresser till Bolagsverket (testmiljöerna ligger bakom brandvägg enligt deras anslutningsanvisning).
-- [ ] Stäm av `parseOrganisationResponse` mot den tekniska dokumentation som följde med nycklarna — svarsfälten är fortfarande gissade.
+- [x] Anslutningsanvisningen v1.01 läst: värdparen, POST /organisationer, grant type, Content-Type, nycklar i kroppen, Bearer och expires_in stämmer alla mot koden. Ett fel hittat och rättat: bara ett av två scope begärdes.
+- [ ] Ladda ner OpenAPI-filen (devportal → Download Swagger) och stäm av två saker som anvisningen INTE svarar på: `/organisationer`-anropets payload (är `identitetsbeteckning` tolv siffror?) och svarets fältnamn som `parseOrganisationResponse` läser.
+- [ ] Testmiljön accept2 tar bara vissa org.nr (anvisningens §6.1, excelfilen "Testdata API Värdefulla datamängder"). Använd ett av dem vid prov mot accept2 — ett annat nummer ger ett uppräkningssvar som landar som `invalid_response`.
 

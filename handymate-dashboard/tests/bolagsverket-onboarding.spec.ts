@@ -129,6 +129,23 @@ test.describe('regressionen 2026-09-17 — "Kunde inte nå Bolagsverket just nu"
     }
   })
 
+  test('båda scopen begärs — en token utan rätt scope får API-anropen att falla', () => {
+    // Anslutningsanvisningen §5.1: scopen måste deklareras när token hämtas,
+    // annars misslyckas efterföljande anrop. read = /organisationer, ping = /isalive.
+    const scope = client.match(/const SCOPE = '([^']+)'/)
+    expect(scope, 'SCOPE saknas').not.toBeNull()
+    expect(scope![1].split(' ').sort()).toEqual(['vardefulla-datamangder:ping', 'vardefulla-datamangder:read'])
+  })
+
+  test('token hämtas som anvisningen säger: formulärkropp, inte Basic auth', () => {
+    const fn = client.slice(client.indexOf('async function fetchAccessToken'), client.indexOf('function extractFirstNamn'))
+    expect(fn).toContain("'Content-Type': 'application/x-www-form-urlencoded'")
+    expect(fn).toContain('grant_type: ')
+    expect(fn).toContain('client_id: ')
+    expect(fn).toContain('client_secret: ')
+    expect(fn).not.toMatch(/Basic |btoa\(/)
+  })
+
   test('identitetsbeteckning byggs som tolv siffror, inte en rå siffersträng', () => {
     expect(client).toContain("import { orgNumberIdentity } from '@/lib/karin/org-number'")
     expect(client).toContain('orgNumberIdentity(orgNumber)')
