@@ -42,16 +42,8 @@ const QUOTE_DOCUMENT = fs.readFileSync(
   path.join(__dirname, '..', 'components', 'quotes', 'document', 'QuoteDocument.tsx'),
   'utf8',
 )
-const QUOTE_COMPLETENESS = fs.readFileSync(
-  path.join(__dirname, '..', 'lib', 'quotes', 'quote-completeness.ts'),
-  'utf8',
-)
 const NEW_CUSTOMER_SECTION = fs.readFileSync(
   path.join(QUOTES_DIR, 'new', 'components', 'QuoteNewCustomerSection.tsx'),
-  'utf8',
-)
-const BUILDER_HEADER = fs.readFileSync(
-  path.join(QUOTES_DIR, '_shared', 'QuoteBuilderHeader.tsx'),
   'utf8',
 )
 
@@ -61,17 +53,10 @@ test.describe('Del 1 (redan skeppad, 2026-08-17) — onAtaTermsChange, läsande 
     expect(QUOTE_DOCUMENT, 'onAtaTermsChange saknas i QuoteDocument.tsx').toContain('onAtaTermsChange')
   })
 
-  test('den forna gating-kartan (SECTION_KEYS) är verkligen borta, inte bara omdöpt', () => {
-    // Fas 1: lib/quotes/section-handlers.ts → quote-completeness.ts, med
-    // gating-mekanismen (SECTION_KEYS/sectionHandlers/nextSection) helt
-    // borttagen, inte flyttad. Om den smyger tillbaka hit har någon
-    // återinfört en handler-filtrerande grind. Matchar mot faktisk KOD
-    // (deklaration/anrop), inte fri text — filens egen historik-docblock
-    // NÄMNER namnen i förbigående utan att det betyder att de finns kvar.
-    expect(QUOTE_COMPLETENESS).not.toMatch(/\bSECTION_KEYS\s*[:=]/)
-    expect(QUOTE_COMPLETENESS).not.toMatch(/\bfunction sectionHandlers\s*\(/)
-    expect(QUOTE_COMPLETENESS).not.toMatch(/\bfunction nextSection\s*\(/)
-  })
+  // RIVNING PAKET C (2026-09-17, rad 2.16): lib/quotes/quote-completeness.ts
+  // (dit gating-mekanismen flyttade och sedan trimmades till rena
+  // sammanfattningsfunktioner) är själv raderad — inget kvar att källskanna
+  // för SECTION_KEYS/sectionHandlers/nextSection.
 })
 
 test.describe('QuickReceipt och QuoteNewMoreAboutProject är raderade filer', () => {
@@ -153,95 +138,12 @@ test.describe('"Mer"-raden är den ENDA vägen till de tre kvarvarande panelerna
   })
 })
 
-test.describe('completeness-chipraden ersätter kvittots granskningskrav', () => {
-  // Design-polish-etappen (offertskaparen-design-polish, 2026-08-31) flyttade
-  // remsans RENDERING in i QuoteBuilderHeader.tsx (header-rad 2, samma sticky-
-  // wrapper som rad 1) så den slutar scrolla bort under headern. Den låg
-  // tidigare i en egen <div className="mb-4"> direkt i QuoteBuilder.tsx —
-  // det stället testas inte längre, bara den nya monteringspunkten.
-  test('QuoteCompletenessStrip monteras i QuoteBuilderHeader, alltid synlig (ingen quickMode-gate)', () => {
-    const mountIdx = BUILDER_HEADER.indexOf('<QuoteCompletenessStrip')
-    expect(mountIdx, 'QuoteCompletenessStrip monteras inte i QuoteBuilderHeader.tsx').toBeGreaterThan(-1)
-  })
-
-  test('QuoteBuilder.tsx skickar completenessSummaries till headern, inte bakom en quickMode-gate', () => {
-    const mountIdx = BUILDER.indexOf('<QuoteBuilderHeader')
-    expect(mountIdx, 'QuoteBuilderHeader monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
-    const propsBlock = BUILDER.slice(mountIdx, BUILDER.indexOf('/>', mountIdx))
-    // Slutgranskningsfix (offertskaparen-design-polish, "Helt tomt läge"):
-    // proppen är sedan dess villkorad på hasQuoteContent (DESIGN-SPEC.md),
-    // inte längre den råa completenessSummaries-referensen rakt av — se
-    // egen test.describe nedan för hasQuoteContent-villkoret självt. Det
-    // som fortfarande gäller, och som denna test bevakar, är att INGEN
-    // quickMode-gate ligger emellan (se assertionen längre ner).
-    expect(propsBlock).toContain('completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}')
-    // Ingen `{quickMode === '...' && (` precis före monteringen — headern
-    // (och därmed chip-raden) ska vara ovillkorlig så fort man är i den
-    // fulla editorn (quickMode null-grenen, dit alla tre starterna redan
-    // konvergerat).
-    const before = BUILDER.slice(Math.max(0, mountIdx - 200), mountIdx)
-    expect(before).not.toContain("quickMode === 'overview'")
-    expect(before).not.toContain("quickMode === 'review'")
-  })
-
-  test('edit-läget (QuoteEditView.tsx) får också en completeness-remsa — inte bara create-läget', () => {
-    const EDIT_VIEW = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteEditView.tsx'), 'utf8')
-    const mountIdx = EDIT_VIEW.indexOf('<QuoteBuilderHeader')
-    expect(mountIdx, 'QuoteBuilderHeader monteras inte i QuoteEditView.tsx').toBeGreaterThan(-1)
-    const propsBlock = EDIT_VIEW.slice(mountIdx, EDIT_VIEW.indexOf('/>', mountIdx))
-    expect(propsBlock).toContain('completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}')
-    expect(propsBlock).toContain('onSelectSection={onSelectSection}')
-  })
-})
-
-test.describe('"Helt tomt läge" (DESIGN-SPEC.md) — completeness-remsan döljs helt, inte bara attention-styling', () => {
-  // Slutgranskningsfynd (offertskaparen-design-polish): DESIGN-SPEC.md
-  // (rad ~62-65) kräver att BÅDE header-radens strip och mobilens
-  // bottenfälts-chiprad döljs HELT när offerten saknar meningsfullt
-  // innehåll (`items.length > 0 || selectedCustomer`) — inte bara att
-  // attention/amber-styling stängs av. Utan detta visade en helt ny, tom
-  // offert en amber "Offerten har inga rader"-chip i bottenfältet SAMTIDIGT
-  // som Fas E:s lugna tomt-läge i canvasen — två motsägande budskap på
-  // samma skärm, den vanligaste "dag ett"-vägen (ny offert, mobil).
-  const EDIT_VIEW = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteEditView.tsx'), 'utf8')
-  const BOTTOM_BAR = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteBuilderBottomBar.tsx'), 'utf8')
-
-  test('QuoteBuilder.tsx (create) och QuoteEditView.tsx beräknar exakt samma villkor', () => {
-    const NEEDLE = 'const hasQuoteContent = items.length > 0 || !!selectedCustomer'
-    expect(BUILDER, 'hasQuoteContent saknas i QuoteBuilder.tsx').toContain(NEEDLE)
-    expect(EDIT_VIEW, 'hasQuoteContent saknas i QuoteEditView.tsx').toContain(NEEDLE)
-  })
-
-  test('QuoteBuilder.tsx trådar hasQuoteContent in i QuoteBuilderBottomBar', () => {
-    const mountIdx = BUILDER.indexOf('<QuoteBuilderBottomBar')
-    expect(mountIdx, 'QuoteBuilderBottomBar monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
-    const propsBlock = BUILDER.slice(mountIdx, BUILDER.indexOf('/>', mountIdx))
-    expect(propsBlock).toContain('hasQuoteContent={hasQuoteContent}')
-  })
-
-  test('QuoteEditView.tsx trådar hasQuoteContent in i QuoteBuilderBottomBar', () => {
-    const mountIdx = EDIT_VIEW.indexOf('<QuoteBuilderBottomBar')
-    expect(mountIdx, 'QuoteBuilderBottomBar monteras inte i QuoteEditView.tsx').toBeGreaterThan(-1)
-    const propsBlock = EDIT_VIEW.slice(mountIdx, EDIT_VIEW.indexOf('/>', mountIdx))
-    expect(propsBlock).toContain('hasQuoteContent={hasQuoteContent}')
-  })
-
-  test('QuoteBuilderBottomBar.tsx: chip-raden är gated på hasQuoteContent, knapparna är det INTE', () => {
-    expect(BOTTOM_BAR).toContain('hasQuoteContent: boolean')
-    expect(BOTTOM_BAR).toContain('{hasQuoteContent && (')
-
-    // Knapparnas rot-<div> (den som håller Spara utkast/Skicka offert) ska
-    // finnas UTANFÖR den villkorade chip-raden — dvs. efter dess stängande
-    // `)}`, inte inuti den.
-    const gateIdx = BOTTOM_BAR.indexOf('{hasQuoteContent && (')
-    const buttonsIdx = BOTTOM_BAR.indexOf('<div className="relative flex items-stretch gap-2">')
-    expect(buttonsIdx, 'knapparnas rot-div hittades inte').toBeGreaterThan(-1)
-    expect(buttonsIdx, 'knapparna ligger inuti (eller före) chip-radens villkor')
-      .toBeGreaterThan(gateIdx)
-
-    const saveDraftIdx = BOTTOM_BAR.indexOf('onClick={onSaveDraft}')
-    const sendQuoteIdx = BOTTOM_BAR.indexOf('onClick={onSendQuote}')
-    expect(saveDraftIdx).toBeGreaterThan(buttonsIdx)
-    expect(sendQuoteIdx).toBeGreaterThan(buttonsIdx)
-  })
-})
+// RIVNING PAKET C (2026-09-17, rad 2.16): completeness-chipraden
+// (QuoteCompletenessStrip, header-rad 2, bottenfältets chip-rad,
+// hasQuoteContent-gatingen och lib/quotes/quote-completeness.ts) är
+// borttagen i sin helhet — Skicka-knappens egen orsakstext ("Välj kund
+// först") räcker. De två test.describe-block som källskannade den
+// ("completeness-chipraden ersätter kvittots granskningskrav" och
+// "Helt tomt läge") är borttagna med den; se
+// tests/quote-builder-single-cta-surface.spec.ts för Skicka-knappens
+// orsakstext (oförändrad av denna rivning).

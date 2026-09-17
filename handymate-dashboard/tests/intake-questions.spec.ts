@@ -152,10 +152,23 @@ test.describe('seedningen — en fråga per kopplad rad och per tillval, sedan b
     expect(seedIntakeQuestions('electrician', 'Laddbox', manga)).toHaveLength(INTAKE_SEED_MAX)
     expect(INTAKE_SEED_MAX).toBe(12)
   })
-  test('närliggande bransch lånar paketen; okänd bransch ger ändå rad- och öppen fråga', () => {
+  test('närliggande bransch lånar paketen; okänd bransch ger ändå rad-, besöks- och öppen fråga', () => {
     expect(seedIntakeQuestions('carpenter', 'Fönster och dörrar', []).some(q => q.id === 'paket_1')).toBe(true)
     const other = seedIntakeQuestions('other', 'Servicebesök', [{ id: 'qi_t', description: 'Arbete', unit: 'tim', kind: 'quantity' }])
-    expect(other.map(q => q.id)).toEqual(['rad_arbete', 'paverkar_tiden'])
+    expect(other.map(q => q.id)).toEqual(['rad_arbete', 'planerade_besok', 'paverkar_tiden'])
+  })
+  // RIVNING PAKET C (2026-09-17, rad 2.14): ersätter VisitRuleEditor +
+  // /api/quotes/visit-rule — en fritextfråga i stället för en egen editor
+  // med sparad regel per jobbtyp.
+  test('besöksfrågan seedas efter branschpaketet och före den öppna frågan', () => {
+    const seeded = seedIntakeQuestions('electrician', 'Laddbox', [{ id: 'qi_1', description: 'Laddbox', unit: 'st', kind: 'quantity' }])
+    const ids = seeded.map(q => q.id)
+    const besokIndex = ids.indexOf('planerade_besok')
+    expect(besokIndex).toBeGreaterThan(-1)
+    expect(seeded[besokIndex].kind).toBe('text')
+    expect(seeded[besokIndex].label).toBe('Hur många besök räknar du med?')
+    expect(besokIndex).toBeGreaterThan(ids.lastIndexOf('paket_2'))
+    expect(besokIndex).toBeLessThan(ids.indexOf('paverkar_tiden'))
   })
   test('seedade frågor är giltiga enligt formen och binder mot samma upplägg', () => {
     const mal = intakeTargetsFromRows(rader())

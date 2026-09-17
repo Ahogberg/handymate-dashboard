@@ -90,11 +90,15 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    * och INTE en del av QuoteDocumentHandlers.
    *
    * GENUIN ASYMMETRI, inte en lucka att täppa till: AI-beskrivningsflödet
-   * (QuoteNewAIHelper) finns bara i create-flödet (QuoteBuilder.tsx →
-   * showAiHelper-state). Redigeringsvyn (QuoteEditView.tsx) har ingen
-   * motsvarighet och ska inte få en uppfunnen sådan här — den lämnar denna
-   * prop outnyttjad. Utelämnad → länken renderas inte alls, bara den
-   * primära "+ Lägg till rad"-knappen visas i tomrutan.
+   * (Snabbofferten/QuickIntake, öppnas via quickMode='intake') finns bara i
+   * create-flödet (QuoteBuilder.tsx). RIVNING PAKET C (2026-09-17, rad
+   * 2.12): länken öppnade tidigare den nu borttagna QuoteNewAIHelper-panelen
+   * (showAiHelper-state) — den öppnar nu intaget i stället, samma väg som
+   * "Beskriv jobbet i stället"-länken på övriga ställen. Redigeringsvyn
+   * (QuoteEditView.tsx) har ingen motsvarighet och ska inte få en
+   * uppfunnen sådan här — den lämnar denna prop outnyttjad. Utelämnad →
+   * länken renderas inte alls, bara den primära "+ Lägg till rad"-knappen
+   * visas i tomrutan.
    */
   onOpenAiHelp?: () => void
   /**

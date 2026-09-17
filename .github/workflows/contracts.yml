@@ -277,6 +277,7 @@ jobs:
           tests/offertens-radtyper.spec.ts
           tests/snabboffert-startvagar.spec.ts
           tests/offertstarten-en-skarm.spec.ts
+          tests/rivning-c-verktygen.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

@@ -1,6 +1,6 @@
 'use client'
 
-import type { Dispatch, SetStateAction, ReactNode } from 'react'
+import type { Dispatch, SetStateAction } from 'react'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
@@ -12,7 +12,6 @@ import type {
   QuoteItem,
   QuoteStandardText,
 } from '@/lib/types/quote'
-import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 import type { CustomCategory } from '@/lib/constants/categories'
 
@@ -21,7 +20,6 @@ import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
-import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
 // RIVNING PAKET B (2026-09-17): QuoteStylePicker monteras inte längre här
 // (komponenten lever kvar, InvoiceEditor.tsx använder den fortfarande för
 // fakturans egen stil). QuoteRotSection och QuoteStandardTextsSection är
@@ -67,16 +65,8 @@ interface Customer {
  * QuoteBuilder.tsx svårläst utan att vinna något.
  */
 export interface QuoteEditViewProps {
-  visitRuleEditor?: ReactNode
   quoteId: string
   quoteNumber: string
-  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31) — samma
-      sammanfattning som create-läget beräknar (sectionSummary/SECTION_ORDER
-      i lib/quotes/quote-completeness.ts), ägd av QuoteBuilder.tsx eftersom
-      den här komponenten är ren presentation (se docblock ovan). Renderas
-      som header-RAD 2 i QuoteBuilderHeader. */
-  completenessSummaries: Record<QuoteSection, SectionSummary>
-  onSelectSection: (section: QuoteSection) => void
   autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error'
   saving: boolean
   onSendQuote: () => void
@@ -183,7 +173,7 @@ export interface QuoteEditViewProps {
 
 export function QuoteEditView(props: QuoteEditViewProps) {
   const {
-    quoteId, quoteNumber, completenessSummaries, onSelectSection,
+    quoteId, quoteNumber,
     autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
     reservations, recalculated,
     customers, selectedCustomer, setSelectedCustomer, validDays, setValidDays, title, setTitle, description, setDescription,
@@ -208,13 +198,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
   // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
   const canSend = !!selectedCustomer
 
-  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): samma villkor
-  // som QuoteBuilder.tsx (create-läget) — döljer completeness-remsan (både
-  // header-rad 2 och bottenfältets chip-rad) helt tills offerten har
-  // meningsfullt innehåll. Beräknas lokalt av samma skäl som `canSend` ovan:
-  // den här komponenten är ren presentation men äger sitt eget JSX-träd.
-  const hasQuoteContent = items.length > 0 || !!selectedCustomer
-
   return (
     <div className="min-h-screen bg-slate-50">
       {/* Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
@@ -229,8 +212,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
           mode="edit"
           quoteNumber={quoteNumber}
           title={title}
-          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
-          onSelectSection={onSelectSection}
           autoSaveStatus={autoSaveStatus}
           saving={saving}
           canSend={canSend}
@@ -283,8 +264,10 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               setProjectAddress={setProjectAddress}
             />
 
-            {props.visitRuleEditor}
-            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
+            {/* RIVNING PAKET C (2026-09-17, rad 2.14): VisitRuleEditor
+                borttagen, se motivering i QuoteBuilder.tsx. */}
+            {/* RIVNING PAKET C (2026-09-17, rad 2.13): QuotePackageComparison
+                borttagen, se motivering i QuoteBuilder.tsx. */}
 
             {/* RIVNING PAKET B (2026-09-17, rad 2.3/2.5/2.6): QuoteRotSection,
                 QuoteStandardTextsSection och QuoteTotalsSection borttagna —
@@ -338,26 +321,25 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               activeDeductionType={activeDeductionType}
               standardTexts={textsByType}
               // onOpenAiHelp intentionally omitted: edit-läget har ingen
-              // AI-utkasts-flöde (showAiHelper/QuoteNewAIHelper finns bara i
-              // create-läget i QuoteBuilder.tsx) — utan proppen visar
-              // dokumentets tomma-läge bara "Lägg till rad", ingen "eller
-              // beskriv jobbet"-länk. Se QuoteDocument.tsx:s onOpenAiHelp-docblock.
+              // AI-utkasts-flöde (Snabbofferten finns bara i create-läget
+              // i QuoteBuilder.tsx) — utan proppen visar dokumentets tomma-
+              // läge bara "Lägg till rad", ingen "eller beskriv jobbet"-länk.
+              // Se QuoteDocument.tsx:s onOpenAiHelp-docblock.
             />
           </div>
         </div>
       </div>
 
       {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
-          bottenfält — samma completeness-data och Spara/Skicka-handlers som
-          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate).
-          Edit-läget har aldrig haft sendDisabledReason/sendConfirmPending/
-          onConfirmSend/onCancelSend (se QuoteBuilderHeader.tsx:s docblock —
-          den "extra bekräftelsen" hörde bara till create-flödet), så de
-          utelämnas här precis som i mountningen av headern ovan. */}
+          bottenfält — samma Spara/Skicka-handlers som headern ovan (nu
+          desktop-only, se dess `hidden lg:flex`-gate). Edit-läget har
+          aldrig haft sendDisabledReason/sendConfirmPending/onConfirmSend/
+          onCancelSend (se QuoteBuilderHeader.tsx:s docblock — den "extra
+          bekräftelsen" hörde bara till create-flödet), så de utelämnas här
+          precis som i mountningen av headern ovan. RIVNING PAKET C
+          (2026-09-17, rad 2.16): completeness-chipparna (summaries/
+          hasQuoteContent/onSelect) är borttagna. */}
       <QuoteBuilderBottomBar
-        summaries={completenessSummaries}
-        hasQuoteContent={hasQuoteContent}
-        onSelect={onSelectSection}
         saving={saving}
         canSend={canSend}
         onSendQuote={onSendQuote}

@@ -122,18 +122,13 @@ test('arbetsprov: avslag före AI, inget abonnemang ändras, tillåten begäran 
     }
   } finally { if (old === undefined) delete process.env.ANTHROPIC_API_KEY; else process.env.ANTHROPIC_API_KEY = old }
 })
-test('regel: behörighet, aktiv jobbtyp, databasfel och stabil identitet vid retry', async () => {
-  for (const [options, expected] of [[{ admin:false },403],[{ noJob:true },400],[{ fail:'job_types' },503],[{ fail:'business_knowledge' },503],[{},200]] as const) {
-    const f = fixtures(options); const api = route('app/api/quotes/visit-rule/route.ts', f.modules)
-    expect((await api.POST(request('/api/quotes/visit-rule', rule))).status).toBe(expected)
-    if (expected !== 403) expect(f.calls[0].filters).toEqual(expect.arrayContaining([['business_id','firm-a'],['slug','dorrar'],['is_active',true]]))
-    if (expected === 200) {
-      await api.POST(request('/api/quotes/visit-rule', rule))
-      const writes = f.calls.filter(c => c.write).map(c => c.write)
-      expect(writes[0]).toEqual(writes[1]); expect(writes[0]).toMatchObject({ business_id:'firm-a', job_type:'dorrar', data_basis:rule })
-    }
-  }
-})
+// RIVNING PAKET C (2026-09-17, rad 2.14): /api/quotes/visit-rule är borttagen
+// (VisitRuleEditor + rutten, ersatt av en seedad fråga i intaget) — testet
+// av rutten ("regel: behörighet, aktiv jobbtyp, ...") togs bort med den.
+// fetchBusinessRules-testet ovan (verkliga regelhämtaren) står kvar: den
+// läser TIDIGARE sparade regler direkt ur business_knowledge, oberoende
+// av rutten, och lib/quotes/visit-rule.ts (readVisitRule/applyVisitRule)
+// lever kvar av samma skäl.
 test('överlämning: företagsgräns på varje läsning och inget positivt kvitto vid delfel', async () => {
   for (const [options, expected] of [[{ signedIn:false },401],[{ admin:false },403],[{ noQuote:true },404],[{ fail:'v3_automation_logs' },503],[{ fail:'pending_approvals' },503],[{},200]] as const) {
     const f = fixtures(options); const api = route('app/api/quotes/[id]/handoff/route.ts', f.modules)

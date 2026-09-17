@@ -66,11 +66,13 @@ test.describe('adressraden — en läsare, en dialekt', () => {
 })
 
 test.describe('kundunderlaget går direkt i rutan', () => {
-  test('?preparation_id laddas i mount-effekten och fyller intag, AI-text och underlag', () => {
+  test('?preparation_id laddas i mount-effekten och fyller intag och underlag', () => {
     expect(BUILDER).toContain('void loadPreparationQuoteInput(customerId, preparationId)')
     const idx = BUILDER.indexOf('void loadPreparationQuoteInput(customerId, preparationId)')
     const block = BUILDER.slice(idx, idx + 700)
-    for (const s of ['setQuickInput(', 'setAiTextInput(', 'setSourceTranscript(']) expect(block).toContain(s)
+    // RIVNING PAKET C (2026-09-17, rad 2.12): setAiTextInput fanns bara för
+    // den nu borttagna QuoteNewAIHelper-panelen — quickInput är rutan.
+    for (const s of ['setQuickInput(', 'setSourceTranscript(']) expect(block).toContain(s)
     expect(block, 'ett läsfel blir synligt').toContain('setReliefError(')
     expect(finns('components/customer-preparation/QuotePreparationInput.tsx')).toBe(false)
     expect(BUILDER).not.toContain('QuotePreparationInput')

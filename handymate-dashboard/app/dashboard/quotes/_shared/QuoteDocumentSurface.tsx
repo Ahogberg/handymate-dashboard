@@ -7,7 +7,7 @@ import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/d
 import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
 import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
-import type { QuoteSection } from '@/lib/quotes/quote-completeness'
+import type { QuoteSection } from './useQuoteSectionNavigation'
 import type { ReservationSuggestion } from '@/lib/reservations/match'
 import type { QuoteStandardText } from '@/lib/types/quote'
 

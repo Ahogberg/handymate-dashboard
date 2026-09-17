@@ -7,8 +7,9 @@ import { X } from 'lucide-react'
  * (den fristående "N reservationer matchar dina offertrader"-bannern) är
  * borttagen härifrån — förslagen renderas nu inuti dokumentets egen
  * Reservationer-sektion (QuoteDocument.tsx, `reservationSuggestions`-proppen),
- * inte i assistentkolumnen utanför dokumentet. Discovery-vägen är i stället
- * completeness-chippen (redan amber+räknare, se lib/quotes/quote-completeness.ts).
+ * inte i assistentkolumnen utanför dokumentet. Discovery-vägen var
+ * completeness-chippen (amber+räknare) — de är själva borttagna sedan
+ * (RIVNING PAKET C, 2026-09-17, rad 2.16); den här sektionen är oberoende.
  *
  * ReservationMutedNotice nedan är en ANNAN, orelaterad affordans (inlärningens
  * tystnings-kvitto) och lämnas orörd i samma fil.

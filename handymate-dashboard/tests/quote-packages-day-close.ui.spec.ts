@@ -24,7 +24,12 @@ function bundle(entry: string) {
   }
   return {entry:add(entry),modules}
 }
-async function mount(page:Page, kind:'packages'|'report') {
+// RIVNING PAKET C (2026-09-17, rad 2.13): QuotePackageComparison.tsx är
+// borttagen (30 rader, 4 tillvalsrader i hela databasen) — "packages"-läget
+// och dess test togs bort härifrån. Filnamnet behålls: day-close-testerna
+// nedan (bilddiktering, kvittoretry) delade fixtur/bundlare med paketvyn
+// sedan tidigare och är orörda.
+async function mount(page:Page) {
   const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
   const calls:any[]=[]
   let confirmationAttempts=0
@@ -49,31 +54,19 @@ async function mount(page:Page, kind:'packages'|'report') {
     return route.abort()
   })
   await page.goto('http://wave2.test/')
-  const css=await postcss([tailwind({...config,content:['components/day-close/*.tsx','components/quotes/QuotePackageComparison.tsx']})]).process('@tailwind base;@tailwind components;@tailwind utilities;',{from:undefined})
+  const css=await postcss([tailwind({...config,content:['components/day-close/*.tsx']})]).process('@tailwind base;@tailwind components;@tailwind utilities;',{from:undefined})
   await page.addStyleTag({content:css.css})
   for(const file of ['react/umd/react.development.js','react-dom/umd/react-dom.development.js']) await page.addScriptTag({content:fs.readFileSync('node_modules/'+file,'utf8')})
-  const b=bundle(kind==='packages'?'components/quotes/QuotePackageComparison.tsx':'components/day-close/DayClose.tsx')
+  const b=bundle('components/day-close/DayClose.tsx')
   await page.addScriptTag({content:`
     const bundle=${JSON.stringify(b)}; const cache={react:{exports:React}};
     function load(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;new Function('require','module','exports',bundle.modules[id].code)(n=>load(bundle.modules[id].deps[n]),m,m.exports);return m.exports}
     const Component=load(bundle.entry).default;
-    function Host(){const [items,setItems]=React.useState([{id:'base',item_type:'item',description:'Montering',quantity:1,unit:'st',unit_price:1000,total:1000,cost_price:500,sort_order:0,is_rot_eligible:false,is_rut_eligible:false},{id:'extra',item_type:'option',description:'Extra uttag',quantity:1,unit:'st',unit_price:500,total:500,cost_price:200,sort_order:1,is_rot_eligible:false,is_rut_eligible:false,option_selected:false}]);window.readItems=()=>items;return React.createElement(Component,${kind==='packages'?' {items,discountPercent:10,vatRate:25,onApply:setItems}':' {projectId:"p",projectName:"Storgatan 12",onSaved:()=>{window.refreshCount=(window.refreshCount||0)+1}}'});}
+    function Host(){return React.createElement(Component,{projectId:"p",projectName:"Storgatan 12",onSaved:()=>{window.refreshCount=(window.refreshCount||0)+1}});}
     ReactDOM.createRoot(document.getElementById('root')).render(React.createElement(Host));
   `})
   return {calls,errors}
 }
-for(const width of [375,1280]) test(`package choice applies canonical option flags at ${width}px`,async({page})=>{
-  await page.setViewportSize({width,height:1000});const h=await mount(page,'packages')
-  await page.getByRole('button',{name:/Jämför offertpaket/}).click()
-  await page.getByLabel('Extra uttag').check()
-  await page.getByRole('button',{name:'Använd rekommenderat'}).click()
-  expect((await page.evaluate(()=>(window as any).readItems()))[1]).toMatchObject({option_selected:true,option_default:true,unit_price:500})
-  await expect(page.getByRole('status')).toContainText('utkastet')
-  expect(h.calls).toEqual([])
-  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
-  await page.screenshot({path:`test-results/wave2-packages-${width}.png`,fullPage:true})
-  expect(h.errors).toEqual([])
-})
 test('dictation fills editable text without submitting a report',async({page})=>{
   await page.addInitScript(()=>{
     Object.defineProperty(navigator,'mediaDevices',{value:{getUserMedia:async()=>({getTracks:()=>[{stop:()=>{(window as any).micStopped=true}}]})}})
@@ -85,7 +78,7 @@ test('dictation fills editable text without submitting a report',async({page})=>
     }
     ;(window as any).MediaRecorder=Recorder
   })
-  const h=await mount(page,'report')
+  const h=await mount(page)
   await page.getByRole('button',{name:/Avsluta arbetsdagen/}).click()
   await page.getByRole('button',{name:'Diktera (högst en minut)'}).click()
   await expect(page.getByRole('button',{name:'Ta fram förslag'})).toBeDisabled()
@@ -100,7 +93,7 @@ test('dictation fills editable text without submitting a report',async({page})=>
   expect(h.errors).toEqual([])
 })
 for(const width of [375,1280]) test(`day close: failure retry keeps same token and preserves earlier receipts at ${width}px`,async({page})=>{
-  await page.setViewportSize({width,height:1000});const h=await mount(page,'report')
+  await page.setViewportSize({width,height:1000});const h=await mount(page)
   await page.getByRole('button',{name:/Avsluta arbetsdagen/}).click()
   await page.getByLabel('Vad vill du registrera?').fill('Registrera tre timmar på mig och spara en anteckning: montering klar.')
   await page.getByRole('button',{name:'Ta fram förslag'}).click()
@@ -124,7 +117,7 @@ for(const width of [375,1280]) test(`day close: failure retry keeps same token a
   expect(h.errors).toEqual([])
 })
 test('discarding proposals starts the next request without old instructions',async({page})=>{
-  const h=await mount(page,'report')
+  const h=await mount(page)
   await page.getByRole('button',{name:/Avsluta arbetsdagen/}).click()
   await page.getByLabel('Vad vill du registrera?').fill('Registrera tre timmar.')
   await page.getByRole('button',{name:'Ta fram förslag'}).click()

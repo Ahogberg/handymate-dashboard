@@ -6,12 +6,10 @@ Andreas (han sover). Uppdateras löpande, ett paket per commit.
 ## Status i korthet
 
 - **Paket B: KLART, grönt, pushat.** Rad 2.1–2.6, 2.10 gjorda. Rad 2.20
-  **hoppad över** (se motivering nedan).
-- **Paket C: EJ PÅBÖRJAT.** Paket B tog hela nattens tidsbudget — det visade
-  sig vara ett djupare ingrepp än radantalet i planen antydde (avdragsväxeln
-  och standardtextväljaren behövde flyttas in i den delade dokumentmotorn
-  `QuoteDocument.tsx`, som även faktura-editorn använder, vilket krävde
-  försiktig verifiering rad för rad innan varje borttagning).
+  **hoppad över** (se motivering nedan — rättad i nästa commit, se
+  Paket C-avsnittet).
+- **Paket C: KLART, grönt.** Rad 2.12–2.17 gjorda, egen commit. Rad 2.20
+  görs som en EGEN commit direkt efter, med samma grind.
 - **Paket D: EJ PÅBÖRJAT.**
 - Fynd om 3.5/3.7/3.10/3.13 (görs inte i natt) är listade längst ner, hämtade
   ur inventeringsdokumentet — ingen ny kod skriven för dem.
@@ -186,15 +184,213 @@ avdrag och texter"), ovanpå nattplanens egen commit `7ba04130`. Pushad till
 
 ## Paket C — verktygen (2.12–2.17)
 
-**Inte påbörjat.** Paket B tog längre än planens grova radantal antydde,
-eftersom två av borttagningarna (avdragsväxeln, standardtextväljaren) inte
-kunde "bara tas bort" — de bar ett värde (bulkavdrag på alla rader i ett
-klick, snabbval av sparad standardtext) som ingen annan yta redan täckte, och
-fick därför flyttas in i den delade dokumentmotorn med försiktig verifiering
-(dokumentmotorn används oförändrad av fakturans egen editor, se ovan). Att
-göra det snabbt och slarvigt hade riskerat att bryta antingen offertens eller
-fakturans redigering. Natten tog slut innan paket C kunde påbörjas med samma
-noggrannhet.
+Nästa agent tog vid på commit `c3511773` och körde paket C rad för rad enligt
+planen, med grep-före-radering på varje borttagning.
+
+### 2.12 — QuoteNewAIHelper bort, AI-vägen är intaget
+
+`app/dashboard/quotes/new/components/QuoteNewAIHelper.tsx` (210 rader,
+foto-analys + fritext-generering INNE i editorn) raderad. Kontrollerat
+FÖRE radering: monterades bara en gång, i `QuoteBuilder.tsx`, ingen annan
+läsare.
+
+- Tomrutans "beskriv jobbet"-länk (`onOpenAiHelp` på `QuoteDocumentSurface`)
+  öppnade förut panelen (`setShowAiHelper(true)`) — öppnar nu intaget
+  (`setQuickMode('intake')`), liksom `?transcript=`-djuplänken (som förut
+  bara fyllde och expanderade panelen; öppnar nu intaget med texten redan i
+  rutan).
+- `applyAiResult` (den delade konverteringsfunktionen AI-svar → radlista)
+  nås fortfarande — av `buildQuickDraft` (Snabbofferten), som redan använde
+  den. `analyzePhoto`/`generateFromText` (panelens EGNA anrop till
+  `/api/quotes/ai-generate`) är borttagna — tre anropsställen till den
+  routen blir ett.
+- Dödkod som följde med ur samma yta: `generating`-state (panelens egen
+  spinner-flagga, aldrig satt av något annat), `sourceImageBase64`,
+  `aiTextInput`, `photoDescription`, `showAiHelper`. `photos`/
+  `handlePhotoFile`/`removePhoto`/`MAX_PHOTOS` lever kvar — delas med
+  intaget.
+- Fynd: "Baserad på X foton"-chippen i headern (`aiPhotoCount`) hade bara en
+  producent (`analyzePhoto`). För att inte tyst göra chippen permanent
+  inaktiv flyttades räkningen till `buildQuickDraft` (samma
+  `data.photoCount`-fält från samma API-svar) — ingen ny logik, bara samma
+  räkning på den enda kvarvarande foto-vägen.
+
+### 2.13 — QuotePackageComparison bort
+
+`components/quotes/QuotePackageComparison.tsx` (30 rader, "Jämför
+offertpaket" Bas/Rekommenderat/Utökat) raderad. Monterades i BÅDA
+`QuoteBuilder.tsx` och `QuoteEditView.tsx` — båda ställena kontrollerade och
+städade. De rena beräkningsfunktionerna (`lib/quotes/package-comparison.ts`,
+`applyPackage`/`comparePackage`) rörs INTE — testade direkt av
+`tests/quote-packages-day-close.spec.ts` (i test:contracts) och planerade
+att återkomma som "bra/bättre/bäst" per jobbtyp.
+
+`tests/quote-packages-day-close.ui.spec.ts` (ogatad browserspec, delar
+fixtur/bundlare med en helt orelaterad day-close-svit i samma fil sedan
+tidigare) skrevs om: "packages"-testfallet och mount-läget borttaget,
+day-close-testerna orörda.
+
+### 2.14 — VisitRuleEditor + /api/quotes/visit-rule bort
+
+`components/quotes/VisitRuleEditor.tsx` (88 rader) och
+`app/api/quotes/visit-rule/route.ts` (46 rader) raderade. Ersatt av EN
+seedad fritextfråga, "Hur många besök räknar du med?", i
+`seedIntakeQuestions` (`lib/quotes/intake-questions.ts`), placerad efter
+branschpaketets frågor och före den öppna "påverkar tiden"-frågan.
+
+**Kontrollerat FÖRE radering** (grep, enligt regeln): `lib/quotes/
+visit-rule.ts` (den rena `readVisitRule`/`applyVisitRule`-modulen) har en
+ANNAN, oberoende läsare: `lib/ai-quote-generator.ts` läser TIDIGARE sparade
+besöksregler direkt ur `business_knowledge` (helt oberoende av den borttagna
+API-rutten) och applicerar dem på AI-genererade beskrivningar. Den modulen
+och den läsvägen är därför **orörda** — bara skrivvägen (editorn + rutten)
+är borttagen, ersatt av den seedade frågan för NYA besöksuppgifter framöver.
+
+Facit uppdaterade: `tests/first-value-production.spec.ts` (testet av själva
+API-rutten borttaget; testet av `fetchBusinessRules` i
+`ai-quote-generator.ts` orört, eftersom det är en annan läsare av samma
+tabell), `tests/helpers/first-value-production-preview.ts` och
+`tests/first-value-production.ui.spec.ts` (ogatad — "regel"-vyn och tre
+tester som bara provade den borttagna editorns egen preview/lås-mekanism
+borttagna), `tests/intake-questions.spec.ts` (nytt test för besöksfrågans
+placering, ett exakt-array-test uppdaterat).
+
+### 2.15 — QuoteQuickstartCard bort
+
+`app/dashboard/quotes/_shared/QuoteQuickstartCard.tsx` (119 rader)
+kontrollerades FÖRST: monterades ingenstans (bara importerad för typen
+`QuickstartRow` och en oanropad hjälpfunktion `addQuickstartRow` i
+`QuoteBuilder.tsx`, redan död kod innan denna rivning). Raderad tillsammans
+med den döda hjälpfunktionen och importen.
+
+### 2.16 — completeness-chipraden bort
+
+`app/dashboard/quotes/_shared/QuoteCompletenessStrip.tsx` (15 rader) och
+`lib/quotes/quote-completeness.ts` (152 rader, `sectionSummary`/
+`SECTION_ORDER`/`sortSectionsByAttention`) raderade. Skicka-knappens egen
+orsakstext ("Välj kund först") ersätter dem — den fanns redan.
+
+**Typen `QuoteSection`** (dokumentets `data-section`-nycklar) flyttade till
+`useQuoteSectionNavigation.ts` — den enda återstående läsaren, precis som
+planen bad om. `scrollToSection`-hooken lever kvar, kompilerar och fungerar
+(bevisat i facit), men har just nu ingen aktiv anropare i UI:t sedan
+chipparna som klickade den är borta — ett fynd, inte ett fel: hooken är en
+generell "hoppa till sektion i dokumentet"-primitiv som kan få en ny
+anropare senare utan att skrivas om.
+
+`QuoteBuilderHeader.tsx` (header-rad 2) och `QuoteBuilderBottomBar.tsx`
+(mobilens chip-rad) trimmade: `completenessSummaries`/`hasQuoteContent`/
+`onSelectSection`/`onSelect`-propparna och all rendering av dem borttagen ur
+BÅDA filerna, samt ur `QuoteBuilder.tsx` och `QuoteEditView.tsx` som skickade
+in dem.
+
+Facit: `tests/quote-completeness.spec.ts` (testade uteslutande den
+raderade modulen — raderad i sin helhet, ogatad sedan innan, ingen ändring
+i grindarna behövdes), `tests/quotes-mer-i-flodet.spec.ts` (två
+`test.describe`-block om completeness-remsan borttagna, en `QUOTE_
+COMPLETENESS`-filläsning som annars hade kastat vid modulläsning),
+`tests/quote-experience.ui.spec.ts` (mount-hosten skickade
+`completenessSummaries`/`onSelectSection`/`summaries`/`hasQuoteContent`/
+`onSelect` till de riktiga komponenterna och klickade en completeness-chip
+för att bevisa navigering — chip-klicket borttaget ur testet, resten
+orört).
+
+### 2.17 — fyra ytor blir en: "Matte säger"
+
+`QuoteNewEfterkalkylBanner.tsx` (87), `QuoteNewPriceWarningsBanner.tsx`
+(64) och `DanielsBedomning.tsx` (115) raderade, plus Daniel-buffertkortets
+inline-JSX i `QuoteBuilder.tsx`. Ny fil: `app/dashboard/quotes/new/
+components/MatteSager.tsx` (217 rader) — EN yta, monterad EN gång, direkt
+under headern (samma plats DanielsBedomning hade), som visar det som finns
+av: motorns eget resonemang (Kvittoprincipen Fall 1, med expand/collapse
+och regel/lärdom/kundfakta-listorna oförändrade i sak), prisvarningar,
+efterkalkylinsikt och Daniels buffertförslag. Renderar `null` när inget av
+delarna har något att visa. Ingen ny AI-logik — samma state
+(`aiBedomning`/`priceWarnings`/`priceAlts`/`efterkalkylInsight`/
+`daniel_buffert_h`) som redan beräknades i `QuoteBuilder.tsx`, bara en
+gemensam presentationsyta.
+
+**Beslut, dokumenterat i koden:** de fyra ytorna använde tidigare TVÅ olika
+agent-röster (Daniel för bedömning/buffert, Matte för prisvarningar/
+efterkalkyl). Planen namnger den sammanslagna ytan "Matte säger" — alla
+fyra visas nu under Mattes avatar/namn. En medveten förenkling (fyra röster
+→ en), inte ett misstag.
+
+**Fynd, inte fixat:** `daniel_buffert_h` (`?buffert=N`-notisen) beräknas
+bara när `isEditMode` är sant, men renderas i en JSX-gren som `QuoteBuilder.
+tsx` returnerar TIDIGARE än (via `<QuoteEditView>`) om `isEditMode` är
+sant — notisen har alltså varit strukturellt oåtkomlig för riktiga
+redigeringssidor sedan innan denna rivning. Rivningen flyttar bara
+RENDERINGEN (från en egen `<div>` till `<MatteSager>`), rör inte villkoret
+eller var det renderas, så beteendet är identiskt — bara namngivet och
+skrivet upp här i stället för tyst ärvt vidare. Kräver ett beslut om
+`daniel_buffert_h` ska trådas till `QuoteEditView` också (utanför detta
+uppdrags scope: "ingen ny AI-logik — bara en yta").
+
+Facit: `tests/daniel-agentrad.spec.ts` — testet "redigeraren visar Daniels
+notis vid ?buffert=N" skrivet om: pekar nu på `MatteSager.tsx` för själva
+notistexten (som flyttade dit) och på `QuoteBuilder.tsx` för att
+`?buffert=`-läsningen och `danielBufferHours`-tråden till `MatteSager`
+finns kvar oförändrad.
+
+### Nytt facit: tests/rivning-c-verktygen.spec.ts
+
+16 tester, en `test.describe` per rad (2.12–2.17), källskanning utan
+browser/session. Registrerad i BÅDA grindarna (`package.json` `test:
+contracts`, sist i listan efter `offertstarten-en-skarm.spec.ts`, och
+`.github/workflows/contracts.yml`, sist i det vikta run-blocket före
+`--no-deps`).
+
+### Rader bort (mätt med `wc -l`, HEAD `c3511773` mot arbetsträdet)
+
+| Fil | Före | Efter |
+|---|---:|---:|
+| `QuoteNewAIHelper.tsx` | 210 | 0 (raderad) |
+| `QuotePackageComparison.tsx` | 30 | 0 (raderad) |
+| `VisitRuleEditor.tsx` | 88 | 0 (raderad) |
+| `app/api/quotes/visit-rule/route.ts` | 46 | 0 (raderad) |
+| `QuoteQuickstartCard.tsx` | 119 | 0 (raderad) |
+| `QuoteCompletenessStrip.tsx` | 15 | 0 (raderad) |
+| `lib/quotes/quote-completeness.ts` | 152 | 0 (raderad) |
+| `DanielsBedomning.tsx` | 115 | 0 (raderad) |
+| `QuoteNewEfterkalkylBanner.tsx` | 87 | 0 (raderad) |
+| `QuoteNewPriceWarningsBanner.tsx` | 64 | 0 (raderad) |
+| `QuoteBuilder.tsx` | 2840 | 2694 (−146) |
+| `QuoteEditView.tsx` | 423 | 405 (−18) |
+| `QuoteBuilderHeader.tsx` | 348 | 326 (−22) |
+| `QuoteBuilderBottomBar.tsx` | 175 | 110 (−65) |
+| `useQuoteSectionNavigation.ts` | 32 | 45 (+13, typen flyttade hit) |
+| `lib/quotes/intake-questions.ts` | 434 | 439 (+5, besöksfrågan) |
+| `MatteSager.tsx` (ny) | 0 | 217 |
+| **Summa** | **5178** | **2136** (netto **−942**) |
+
+### Mutationer (fyra, alla röda innan återställning)
+
+1. `onOpenAiHelp={() => setQuickMode('intake')}` → `() => {}` i
+   `QuoteBuilder.tsx` → `rivning-c-verktygen.spec.ts` rött på 2.12:s
+   "öppnar intaget"-test (1 failed, 15 passed). Återställt.
+2. Bytte den seedade frågans label till `'X'` i `intake-questions.ts` →
+   rött på 2.14:s placeringstest (1 failed, 15 passed). Återställt.
+3. Lade tillbaka `hasQuoteContent?: boolean` i `QuoteBuilderHeaderProps` →
+   rött på 2.16:s "tar inte längre emot completenessSummaries/
+   hasQuoteContent"-test (1 failed, 15 passed). Återställt.
+4. Kommenterade bort `if (!hasAnything) return null` i `MatteSager.tsx` →
+   rött på 2.17:s "renderar ingenting när inget finns"-test (1 failed, 15
+   passed). Återställt, `diff` mot backup identisk efteråt.
+
+### Verifiering
+
+- `./node_modules/.bin/tsc --noEmit` → 0 fel.
+- `npm run test:contracts` (miljövariabler satta) → **2862 passed, 1
+  skipped** av 2863 (baslinjen 2846 + 16 nya i `rivning-c-verktygen.spec.
+  ts` = 2862; det enda skippet är `tests/send-invoice-core.spec.ts`s
+  hårdkodade `test.skip(...)`, verifierat pre-existerande och orört av
+  denna rivning).
+- `npx next build` → `✓ Compiled successfully`, samma kända brus
+  (`supabaseUrl is required`).
+- `git status --short` kontrollerad — matchar exakt paket C:s filomfång,
+  inga läckta 2.20-ändringar (se nästa avsnitt för varför det kontrollerades
+  separat).
 
 ## Paket D — runtomkring
 
@@ -228,26 +424,34 @@ ny kod skriven eller kod läst utöver dokumentet för dessa fyra rader:
   kunder, inte bara UI. Kräver ett uttryckligt beslut av Andreas, inte en
   agent som river på egen hand klockan natt.
 
-## Sammanfattning
+## Sammanfattning (efter paket C, innan rad 2.20)
 
-**Pushat:** Paket B (rad 2.1–2.6, 2.10) — dokumentet är nu den enda platsen
-för titel, beskrivning, rabatt, ROT/RUT-avdragsväxeln och de fyra
-standardtexterna (med "Välj standardtext" flyttad dit); referens- och
-adressfält bor i kundkortet; stilväljaren och "Mer"-radens tre borttagna
-paneler är borta ur offertflödet (komponenten själv lever kvar åt fakturan).
-Grönt: tsc 0 fel, 2846/2846 kontraktstest, ren build, fyra mutationer
+**Pushat/klart hittills:**
+
+- **Paket B** (rad 2.1–2.6, 2.10) — dokumentet är nu den enda platsen för
+  titel, beskrivning, rabatt, ROT/RUT-avdragsväxeln och de fyra
+  standardtexterna (med "Välj standardtext" flyttad dit); referens- och
+  adressfält bor i kundkortet; stilväljaren och "Mer"-radens tre borttagna
+  paneler är borta ur offertflödet (komponenten själv lever kvar åt
+  fakturan). Rad 2.20 hoppades ursprungligen över av en felaktig motivering
+  — rättas i nästa commit.
+- **Paket C** (rad 2.12–2.17) — AI-hjälpen inne i editorn, paketjämförelsen,
+  besöksregel-editorn (ersatt av en seedad fråga), en dödkod-komponent,
+  hela completeness-chipraden och fyra separata Matte/Daniel-ytor (slagna
+  ihop till "Matte säger") är borta. Nytt facit `tests/rivning-c-
+  verktygen.spec.ts` (16 test, registrerat i båda grindarna).
+
+Grönt för paket C: tsc 0 fel, 2862/2863 kontraktstest passed (1
+pre-existerande skip, verifierat orört), ren build, fyra mutationer
 bekräftat röda och återställda.
 
-**Lämnat:** Rad 2.20 (gjordes inte — jobbtypskopplingen på offerten saknas
-ännu, se motivering ovan), hela paket C och paket D (inte påbörjade — natten
-tog slut efter paket B).
+**Kvar:** Rad 2.20 (görs i nästa commit — se rättelsen ovan), hela paket D.
 
-**Viktigaste fyndet:** Flera av "ta bort"-raderna i planen (2.3 texternas
-standardväljare, 2.5/2.6 avdragsväxeln, och i förlängningen 2.20/3.10:s
-mallar) är inte rena dubbletter att radera — de bär ett värde som måste
-flyttas till en ny, korrekt plats INNAN den gamla ytan får tas bort, annars
-försvinner en funktion i onödan. Där den nya platsen redan fanns (rabatt- och
-textfälten i dokumentet) gick rivningen snabbt. Där den inte fanns
-(avdragsväxeln, jobbtyp-kopplingen på offerten) tog flytten längre tid än
-planens radantal antydde, och i 2.20/3.10:s fall finns den nya platsen inte
-alls än — de får vänta på "det parallella passet".
+**Viktigaste fyndet i paket C:** samma mönster som paket B — en yta som ser
+ut som ren dödkod kan dölja en riktig, oberoende läsare någon annanstans.
+`lib/quotes/visit-rule.ts` (2.14) såg ut att höra ihop med den borttagna
+editorn och rutten, men `lib/ai-quote-generator.ts` läser TIDIGARE sparade
+regler direkt ur databasen, helt oberoende — modulen fick leva kvar även om
+den enda UI-vägen till att SKRIVA nya regler ersattes av en seedad fråga.
+Att bara grep:a efter komponentnamnet (`VisitRuleEditor`) hade missat detta;
+grep på hela modulnamnet (`visit-rule`) hittade den andra läsaren.

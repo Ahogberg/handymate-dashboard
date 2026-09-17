@@ -44,19 +44,18 @@ test('deal.job_type sätter quoteJobType-state vid deal-prefill', () => {
   expect(source).toMatch(/if \(deal\.job_type\) \{\s*setInheritedJobType\(deal\.job_type\)\s*setQuoteJobType\(deal\.job_type\)/)
 })
 
-test('alla tre AI-generate-anrop skickar jobType från quoteJobType när en deal satt den', () => {
-  // Tre call sites: analyzePhoto (foto), generateFromText (AI-hjälpen text),
-  // buildQuickDraft (Snabbofferten) — se docblock ovanför buildQuickDraft.
+test('AI-generate-anropet skickar jobType från quoteJobType när en deal satt den', () => {
+  // RIVNING PAKET C (2026-09-17, rad 2.12): analyzePhoto (foto) och
+  // generateFromText (AI-hjälpen text) är borttagna med QuoteNewAIHelper —
+  // AI-vägen är intaget. Kvar är ETT call site: buildQuickDraft
+  // (Snabbofferten), se docblock ovanför den.
   const aiGenerateCallCount = (source.match(/fetch\('\/api\/quotes\/ai-generate'/g) || []).length
-  expect(aiGenerateCallCount).toBe(3)
+  expect(aiGenerateCallCount).toBe(1)
 
-  // analyzePhoto: jobType är en direkt nyckel i JSON.stringify-objektet.
-  expect(source).toMatch(/textDescription: photoDescription \|\| undefined,\s*customerId: selectedCustomer \|\| undefined,\s*jobType: quoteJobType \|\| undefined,/)
-
-  // generateFromText och buildQuickDraft: jobType sätts villkorligt på
-  // body-objektet innan fetch — samma mönster som customerId där.
+  // buildQuickDraft: jobType sätts villkorligt på body-objektet innan
+  // fetch — samma mönster som customerId där.
   const conditionalJobTypeAssignments = (source.match(/if \(quoteJobType\) body\.jobType = quoteJobType/g) || []).length
-  expect(conditionalJobTypeAssignments).toBe(2)
+  expect(conditionalJobTypeAssignments).toBe(1)
 })
 
 // Epic 2-uppföljning (2026-08-31): en jobbtyp med FLERA kopplade mallar
@@ -65,11 +64,11 @@ test('alla tre AI-generate-anrop skickar jobType från quoteJobType när en deal
 // mall handleNewTemplateSelect redan applicerat i editorn ändå inte
 // disambiguera AI-anropet. templateId-state finns redan (mallval +
 // jobbtypsstart delar samma handleNewTemplateSelect) — den behövde bara
-// trådas till samma tre anrop som jobType.
-test('alla tre AI-generate-anrop skickar även templateId när en mall är applicerad', () => {
-  expect(source).toMatch(/jobType: quoteJobType \|\| undefined,\s*templateId: templateId \|\| undefined,/)
+// trådas till anropet. RIVNING PAKET C (2026-09-17, rad 2.12): bara
+// buildQuickDraft kvar, se testet ovan.
+test('AI-generate-anropet skickar även templateId när en mall är applicerad', () => {
   const conditionalTemplateIdAssignments = (source.match(/if \(templateId\) body\.templateId = templateId/g) || []).length
-  expect(conditionalTemplateIdAssignments).toBe(2)
+  expect(conditionalTemplateIdAssignments).toBe(1)
 })
 
 test('utan deal ELLER uttryckligt jobbtypsval gissas ingen jobbtyp vid kallstart', () => {

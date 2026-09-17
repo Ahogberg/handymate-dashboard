@@ -1,28 +1,8 @@
 'use client'
 
-import { useState } from 'react'
 import { Loader2, Send } from 'lucide-react'
-import {
-  SECTION_LABELS,
-  sortSectionsByAttention,
-  type QuoteSection,
-  type SectionSummary,
-} from '@/lib/quotes/quote-completeness'
 
 interface QuoteBuilderBottomBarProps {
-  /** Samma completeness-sammanfattning som header-radens QuoteCompletenessStrip
-      (desktop) — se sortSectionsByAttention för varför RENDERINGEN skiljer sig
-      (horisontell scroll, amber-chips först) trots samma underliggande data. */
-  summaries: Record<QuoteSection, SectionSummary>
-  /** DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): styr BARA
-      chip-raden ovanför knapparna — Spara utkast/Skicka offert ska förbli
-      monterade och användbara även på en helt tom offert (annars kan
-      hantverkaren aldrig spara sig ur ett tomt utkast på mobil). `summaries`
-      förblir required: föräldern räknar fortfarande fram sammanfattningen
-      varje render (den behövs så fort hasQuoteContent blir true), den
-      används bara inte för att RENDERA chip-raden när detta är false. */
-  hasQuoteContent: boolean
-  onSelect: (section: QuoteSection) => void
   saving: boolean
   canSend: boolean
   /** Create-läge ENDAST — samma fält som QuoteBuilderHeader redan har, se
@@ -53,9 +33,6 @@ interface QuoteBuilderBottomBarProps {
  * villkoren i ena filen måste de speglas i den andra.
  */
 export function QuoteBuilderBottomBar({
-  summaries,
-  hasQuoteContent,
-  onSelect,
   saving,
   canSend,
   sendDisabledReason,
@@ -65,55 +42,13 @@ export function QuoteBuilderBottomBar({
   onSendQuote,
   onSaveDraft,
 }: QuoteBuilderBottomBarProps) {
-  const [showAllSections, setShowAllSections] = useState(false)
-  const orderedSections = sortSectionsByAttention(summaries)
-
   return (
     <div
       className="lg:hidden fixed inset-x-0 bottom-0 z-40 bg-white border-t border-slate-200 shadow-[0_-4px_16px_rgba(15,23,42,0.06)] px-3 pt-2.5 pb-[max(1rem,env(safe-area-inset-bottom))]"
     >
-      {/* Chip-raden — horisontellt scrollbar, amber (attention) chips
-          först (sortSectionsByAttention), sedan lugna slate-chips i
-          SECTION_ORDER. Samma klick-beteende som QuoteCompletenessStrip:
-          scrollar till ämnet i dokumentet.
-
-          DESIGN-SPEC.md ("Helt tomt läge"): hela raden döljs (inte bara
-          attention-styling) när offerten saknar innehåll — utan detta
-          visade en helt ny, tom offert en amber "Inkluderat — Offerten har
-          inga rader"-chip här SAMTIDIGT som canvasen bredvid visade Fas E:s
-          lugna tomt-läge, två motsägande budskap på samma skärm. Knapparna
-          nedan förblir OVILLKORLIGT monterade — bara chip-raden gates. */}
-      {hasQuoteContent && (
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2.5">
-          {(showAllSections ? orderedSections : orderedSections.slice(0, 1)).map(section => {
-            const summary = summaries[section]
-            const hasAttention = !!summary.attention
-            return (
-              <button
-                key={section}
-                type="button"
-                onClick={() => onSelect(section)}
-                title={`${SECTION_LABELS[section]} — tryck för att hoppa dit`}
-                className={`shrink-0 min-h-[40px] inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold whitespace-nowrap transition-colors ${
-                  hasAttention
-                    ? 'bg-amber-50 text-amber-800 border border-amber-200'
-                    : 'bg-white text-slate-600 border border-slate-200'
-                }`}
-              >
-                <span
-                  aria-hidden
-                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${hasAttention ? 'bg-amber-500' : 'bg-primary-600'}`}
-                />
-                {SECTION_LABELS[section]}
-                <span className={hasAttention ? 'text-amber-700' : 'text-slate-400'}>
-                  {summary.attention || summary.text}
-                </span>
-              </button>
-            )
-          })}
-          <button type="button" aria-expanded={showAllSections} onClick={() => setShowAllSections(!showAllSections)} className="min-h-[44px] shrink-0 px-2 text-xs font-medium text-teal-800 underline">{showAllSections ? 'Visa nästa' : 'Alla delar'}</button>
-        </div>
-      )}
+      {/* RIVNING PAKET C (2026-09-17, rad 2.16): chip-raden ("nästa sak att
+          kontrollera", QuoteCompletenessStrip/summaries/sortSectionsByAttention)
+          är borttagen — Skicka-knappens egen orsakstext nedan räcker. */}
 
       {/* ETAPP 1f-motsvarigheten till headerns orsakstext: renderas i NORMALT
           flöde (inte absolut positionerad) ovanför knapparna. Fas B-

@@ -329,6 +329,11 @@ export function seedIntakeQuestions(trade: string | null | undefined, jobTypeNam
   const tradeKey = trade ? (TRADE_FALLBACK[trade] || trade) : undefined
   const pack = getTradeStartPackage(tradeKey, jobTypeName)
   pack?.questions.forEach((label, index) => questions.push({ id: uniqueId(`paket_${index + 1}`, taken), label, kind: 'text' }))
+  // RIVNING PAKET C (2026-09-17, rad 2.14): ersätter VisitRuleEditor + egen
+  // API-rutt (en mekanism i stället för två). Fritext, precis som övriga
+  // branschfrågor — ingen egen beskrivningsmutation eller sparad regel;
+  // svaret går som text till Matte tillsammans med resten av intaget.
+  questions.push({ id: uniqueId('planerade_besok', taken), label: 'Hur många besök räknar du med?', kind: 'text' })
   questions.push({ id: uniqueId('paverkar_tiden', taken), label: 'Något som påverkar tiden — åtkomst, skick, bortforsling?', kind: 'text' })
   return questions.slice(0, INTAKE_SEED_MAX)
 }

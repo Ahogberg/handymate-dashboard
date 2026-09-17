@@ -199,7 +199,16 @@ test.describe('källskanning — montering och kvittoetikett', () => {
   test('redigeraren visar Daniels notis vid ?buffert=N utan att lägga på timmar', () => {
     const builder = read('app/dashboard/quotes/_shared/QuoteBuilder.tsx')
     expect(builder).toContain("searchParams?.get('buffert')")
-    expect(builder).toContain('Lägg dem på arbetsraden.')
+    // RIVNING PAKET C (2026-09-17, rad 2.17): notisens TEXT flyttade från en
+    // egen inline-JSX-ruta i QuoteBuilder.tsx till "Matte säger"
+    // (MatteSager.tsx) — fyra ytor (prisvarningar, efterkalkylinsikt,
+    // Daniels buffertkort, DanielsBedomning) slogs ihop till en. Källan för
+    // buffert-siffran (searchParams-läsningen ovan) och det faktum att den
+    // ALDRIG läggs på automatiskt är oförändrat.
+    expect(builder).toContain('danielBufferHours={daniel_buffert_h}')
+    const matteSager = read('app/dashboard/quotes/new/components/MatteSager.tsx')
+    expect(matteSager).toContain('Lägg dem på arbetsraden.')
+    expect(matteSager).not.toContain("from('quote_items')")
   })
 })
 
