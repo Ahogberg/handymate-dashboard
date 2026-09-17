@@ -217,6 +217,25 @@ publiceras, inte bara grundarna. Bytet får inte ske före §10 i heroutkastet.
   Bygg` är `is_demo_tenant = true`. Grinden räknar nu 0 av 20 tagna.
   Flaggan var säker att sätta — demoåterställningen är grindad på
   `DEMO_BUSINESS_ID`, inte på flaggan.
-- Bytet till `'usage'`: §10-villkoren, särskilt punkt 7 (juridisk
-  genomläsning). När det är gjort är bytet en rad i `feature-gates.ts` plus
-  landningssidan.
+- Bytet till `'usage'`: **beslut Andreas 2026-09-17 — villkorssidan
+  först, sedan juridisk genomläsning, sedan brytaren.** Rättelse: det finns
+  redan användarvillkor, i `handymate-landing/integritet.html` (§1–10 under
+  "Användarvillkor"); heroutkastet §11 sa det. Utkastet ligger i landnings-
+  repot på branchen `claude/villkor-garanti-20260917`: §6 priser omskrivet
+  (var "månadsvis i förskott", saknade årsplanen och volymerna), nytt §7
+  garanti med `getGuaranteeFacts('usage')` ordagrant + hur det räknas +
+  var kunden ser räknaren + hur den åberopas, nytt §8 grundarkunder
+  (prislås på kärnan, direktlinje; Accounting-halva-priset märkt [BESLUT]),
+  §9 uppsägning rättat (årsplanen löper tolv månader; räkenskapsinformation
+  bevaras sju år — den gamla texten lovade permanent radering efter 30
+  dagar, i strid med bokföringslagen och `tasks/plan-kontoradering.md`).
+  Landningssidans **sex** garantirader (inte tre: `index.html` ×3,
+  `jamfor.html` ×2, `support.html` ×1) ändras i samma PR, så mergen = hela
+  landningshalvan. Dashboard-halvan är då en rad.
+
+  **Två [BESLUT] i utkastet som juristen inte kan avgöra åt er:**
+  1. Vad återbetalas på **månadsplan**? Källtexten säger "hela året" och är
+     skriven för årsplan. Beslutet "alla kunder" gjorde frågan skarp.
+     Förslag i utkastet: betalda månadsavgifter fram till dess.
+  2. Bokföringen till halva listpriset för alltid — rekommenderat i
+     beslutsfilen §2.3, aldrig beslutat.

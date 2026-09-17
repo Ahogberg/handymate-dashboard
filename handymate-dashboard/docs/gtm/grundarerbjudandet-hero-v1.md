@@ -151,4 +151,4 @@ Ingen rad i det här dokumentet går live innan följande är sant. Garantin få
 
 - Ersätt `<section class="lansering" id="lanseringHero">` i `handymate-landing/index.html` med erbjudandesektionen. CSS-blocket `.lansering*` och skriptet längst ned (raderna märkta "DEN 14 SEPTEMBER") tas bort samtidigt.
 - Citatrutans plats i `index.html` har en kommentar som beskriver hur den sätts tillbaka; texten i §7 kan gå in där direkt.
-- Garantitexterna speglas i användarvillkoren på `/integritet`, annars gäller de inte.
+- Garantitexterna speglas i användarvillkoren på `/integritet`, annars gäller de inte. **Utkast klart 2026-09-17** i landningsrepot (`claude/villkor-garanti-20260917`), med två [BESLUT] kvar — se `garantin-inventering-2026-09-17.md` §7. Mergen av den PR:en och `GUARANTEE_MODEL = 'usage'` i dashboard-repot är ett och samma pass.
