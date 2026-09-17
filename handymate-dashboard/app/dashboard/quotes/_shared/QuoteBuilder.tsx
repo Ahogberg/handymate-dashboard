@@ -96,16 +96,14 @@ import {
   SECTION_ORDER,
   type QuoteSection,
 } from '@/lib/quotes/quote-completeness'
-import {
-  shouldAskPreferred,
-  getPreferredStart,
-  setPreferredStart,
-  recordEscape,
-  hasBeenAskedPreferred,
-  markAskedPreferred,
-  type EscapeRoute,
-} from '@/lib/quotes/quick-preferences'
-import { QuickStartPreferenceBanner } from '../new/components/quick/QuickStartPreferenceBanner'
+// STARTVANAN BORTTAGEN (rivningen paket A, 2026-09-17, Andreas: "strippa bort
+// saker som inte tillför"). lib/quotes/quick-preferences.ts, banderollen
+// "Vill du alltid börja så här?" och de fem localStorage-nycklarna är borta.
+// Var offerten börjar är ett designbeslut, inte en inställning per person och
+// enhet: tre sparade startlägen betydde tre versioner av appen att hålla i
+// huvudet, och den som svarat "börja i editorn" fick aldrig se frågeflödet.
+// Kallstart öppnar nu alltid intaget, och vägen tillbaka dit finns kvar för
+// alla med tom offert.
 import { QuoteNewPriceWarningsBanner } from '../new/components/QuoteNewPriceWarningsBanner'
 import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from '../new/components/QuoteNewEfterkalkylBanner'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
@@ -444,8 +442,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   //
   // FAS 1 (offert-omtaget, 2026-08-31): 'review'/'overview' är BORTA.
   // Grundaren konstaterade att den tvingade steg-för-steg-granskningen inte
-  // fungerade i praktiken — koden höll själv med (SKIP_SEQUENCE_AFTER i
-  // lib/quotes/quick-preferences.ts kopplade bort den efter fem offerter).
+  // fungerade i praktiken — koden höll själv med (den dåvarande
+  // startvanan kopplade bort granskningen efter fem offerter).
   // AI-utkast, blankt eller mall landar nu ALLA direkt i den fulla
   // canvas-editorn (quickMode = null) via finishQuickStart() nedan — se
   // completenessSummaries/QuoteCompletenessStrip för vad som ersatte
@@ -2247,54 +2245,28 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   useEffect(() => {
     if (isEditMode || loading || !coldStart || quickMode !== null || quickStartDoneRef.current) return
     quickStartDoneRef.current = true
-
-    // Etapp D2: hantverkarens egen vana väger tyngre än vårt default. Den som
-    // svarat ja på "vill du alltid börja så här?" slipper mellansteget.
-    const preferred = getPreferredStart()
-    if (preferred === 'editor') return          // stanna i offertskaparen
-    if (preferred === 'template') { setTemplatePickerOpen(true); return }
+    // En kallstart öppnar alltid intaget. Ingen sparad vana att läsa.
     setQuickMode('intake')
   }, [loading, coldStart, quickMode])
 
   /**
-   * Etapp D2: den väg ut ur Snabbofferten som hantverkaren just tagit för
-   * tredje gången. Sätts av utgångarna nedan och visar frågan EN gång.
-   */
-  const [askPreferredFor, setAskPreferredFor] = useState<EscapeRoute | null>(null)
-
-  /**
-   * Hantverkarens sparade startläge. Läses en gång efter montering — inte i
-   * en useState-initierare, eftersom localStorage inte finns under
-   * serverrenderingen och värdena då skulle skilja sig mellan server och
-   * klient.
-   *
-   * Används bara för att kunna ta sig TILLBAKA till Snabbofferten. Den som
-   * svarat "börja alltid i offertskaparen" hade annars ingen väg dit igen —
-   * och banderollen lovar uttryckligen att man kan ändra sig.
-   */
-  const [preferredStart, setPreferredStartState] = useState<'quick' | 'editor' | 'template'>('quick')
-  useEffect(() => { setPreferredStartState(getPreferredStart()) }, [])
-
-  /**
-   * Tar hand om en väg ut ur Snabbofferten: räknar, och frågar vid tredje.
+   * Lämnar Snabbofferten och bär med sig det som skrivits.
    *
    * `carryText` finns för att inget skrivet ska gå förlorat. Skriver man halva
    * beskrivningen i intaget och sedan byter till offertskaparen låg texten
    * tidigare kvar i quickInput utan att någonsin tillämpas — och eftersom det
    * inte finns någon väg tillbaka till intaget var den i praktiken tappad.
+   *
+   * Räknandet av utgångar och frågan "vill du alltid börja så här?" är borta
+   * (rivningen paket A, 2026-09-17) — se kommentaren vid importerna.
    */
-  function leaveQuickMode(route: EscapeRoute, carryText: boolean) {
+  function leaveQuickMode(carryText: boolean) {
     jobStartAttempted.current = true
-    if (carryText) {
-      const typed = quickInput.trim()
-      // Skriver aldrig över något som redan står där.
-      if (typed && !description.trim()) setDescription(typed)
-      if (typed && !sourceTranscript) setSourceTranscript(typed)
-    }
-    const count = recordEscape(route)
-    if (shouldAskPreferred(count, hasBeenAskedPreferred(route))) {
-      setAskPreferredFor(route)
-    }
+    if (!carryText) return
+    const typed = quickInput.trim()
+    // Skriver aldrig över något som redan står där.
+    if (typed && !description.trim()) setDescription(typed)
+    if (typed && !sourceTranscript) setSourceTranscript(typed)
   }
 
   if (loading) {
@@ -2525,11 +2497,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         // "Öppna fullständiga editorn" strax intill, alltså samma sorts
         // dubblett vi nyss städade bort.
         onClose={() => router.push('/dashboard/quotes')}
-        onOpenFullEditor={() => { leaveQuickMode('editor', true); setQuickMode(null) }}
+        onOpenFullEditor={() => { leaveQuickMode(true); setQuickMode(null) }}
         building={false}
         // Ingen carryText här: mallen sätter sin egen titel och beskrivning,
         // så texten hade skrivits över i nästa andetag ändå.
-        onUseTemplate={() => { leaveQuickMode('template', false); setTemplatePickerOpen(true) }}
+        onUseTemplate={() => { leaveQuickMode(false); setTemplatePickerOpen(true) }}
         hasContent={items.length > 0}
         onSkipDescription={() => setQuickMode('blank')}
       />
@@ -2549,7 +2521,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         onTitleChange={setTitle}
         onStart={startBlankQuickDraft}
         onClose={() => setQuickMode('intake')}
-        onOpenFullEditor={() => { leaveQuickMode('editor', false); setQuickMode(null) }}
+        onOpenFullEditor={() => { leaveQuickMode(false); setQuickMode(null) }}
       />
     )
   }
@@ -2677,43 +2649,15 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr] lg:grid-rows-[auto_1fr] gap-5 items-start">
           {/* ── Assistentkolumnen, del 1: varningar + kund ────────── */}
           <div className="order-1 lg:order-none lg:col-start-1 lg:row-start-1 flex flex-col gap-4">
-            {/* Etapp D2: "vill du alltid börja så här?" — ställs en gång, när
-                hantverkaren tagit samma väg ut för tredje gången. Banderoll
-                och inte dialog: frågan dyker upp precis när han är på väg att
-                börja jobba, och ska gå att ignorera helt. */}
-            {askPreferredFor && (
-              <QuickStartPreferenceBanner
-                route={askPreferredFor}
-                onAccept={() => {
-                  setPreferredStart(askPreferredFor)
-                  markAskedPreferred(askPreferredFor)
-                  setAskPreferredFor(null)
-                  toast.success('Sparat — vi börjar här nästa gång.')
-                }}
-                onDecline={() => {
-                  // Ett nej är också ett svar. Markeras som ställd så frågan
-                  // aldrig kommer tillbaka.
-                  markAskedPreferred(askPreferredFor)
-                  setAskPreferredFor(null)
-                }}
-              />
-            )}
-
             {/* Vägen TILLBAKA till Snabbofferten — för ALLA med tom offert,
-                inte bara den som sparat bort den (fix 2026-08-17, Andreas
-                fynd): med default-preferensen 'quick' fanns ingen väg
-                tillbaka alls efter att man lämnat intaget i samma session,
-                och inget i synfältet signalerade ens att det guidade läget
-                finns. Villkoret items.length === 0 består — aldrig en knapp
-                som slänger påbörjat arbete. */}
+                fynd 2026-08-17): inget i synfältet signalerade annars att det
+                guidade läget finns när man väl lämnat intaget. Villkoret
+                items.length === 0 består — aldrig en knapp som slänger
+                påbörjat arbete. */}
             {quickMode === null && items.length === 0 && (
               <button
                 type="button"
-                onClick={() => {
-                  setPreferredStart('quick')
-                  setPreferredStartState('quick')
-                  setQuickMode('intake')
-                }}
+                onClick={() => setQuickMode('intake')}
                 className="w-full px-4 py-3 bg-white border border-slate-200 hover:border-primary-700 rounded-2xl text-sm font-medium text-primary-700 transition-colors text-left"
               >
                 Beskriv jobbet i stället — vi bygger utkastet

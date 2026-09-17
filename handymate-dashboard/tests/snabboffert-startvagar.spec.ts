@@ -95,14 +95,41 @@ test.describe('intaget — tre riktiga knappar, inte en hjälte och två fotnote
 })
 
 test.describe('vägen tillbaka från editorn', () => {
-  test('tillbaka-knappen är INTE grindad på preferredStart (fix 2026-08-17)', () => {
-    // Före fixen: preferredStart !== 'quick' && ... — vilket gjorde att
-    // default-preferensens användare saknade väg tillbaka helt efter att
-    // ha lämnat intaget. Nu: bara editor-läge + tom offert.
+  test('tillbaka-knappen är öppen för alla med tom offert', () => {
     const idx = PAGE.indexOf('Beskriv jobbet i stället')
     expect(idx, 'tillbaka-knappen finns').toBeGreaterThan(-1)
     const guard = PAGE.slice(Math.max(0, idx - 600), idx)
     expect(guard).toContain("quickMode === null && items.length === 0 && (")
-    expect(guard, 'preferens-grinden är borttagen').not.toContain("preferredStart !== 'quick' &&")
+  })
+})
+
+// RIVNINGEN PAKET A (2026-09-17): startvanan är borta — inga sparade startlägen,
+// ingen banderoll, inga localStorage-nycklar. Kallstart öppnar ALLTID intaget.
+// Facit så att den inte smyger tillbaka som "en liten inställning".
+test.describe('startvanan är borta', () => {
+  test('ingen kod läser eller skriver ett sparat startläge', () => {
+    for (const spar of ["from '@/lib/quotes/quick-preferences'", 'preferredStart', 'askPreferredFor',
+                        'recordEscape(', 'shouldAskPreferred', '<QuickStartPreferenceBanner']) {
+      expect(PAGE, `${spar} ska vara borta ur QuoteBuilder`).not.toContain(spar)
+    }
+    const finns = (p: string) => fs.existsSync(path.join(__dirname, '..', p))
+    expect(finns('lib/quotes/quick-preferences.ts'), 'startvanans modul är raderad').toBe(false)
+    expect(finns('app/dashboard/quotes/new/components/quick/QuickStartPreferenceBanner.tsx'), 'banderollen är raderad').toBe(false)
+    expect(finns('tests/quick-preferences.spec.ts'), 'facit för startvanan är raderat').toBe(false)
+  })
+  test('kallstarten går rakt till intaget, utan gren', () => {
+    const idx = PAGE.indexOf('quickStartDoneRef.current = true')
+    expect(idx).toBeGreaterThan(-1)
+    const efter = PAGE.slice(idx, idx + 400)
+    expect(efter).toContain("setQuickMode('intake')")
+    expect(efter, 'ingen preferensgren kvar').not.toContain('getPreferredStart')
+    expect(efter, 'mallistan öppnas inte automatiskt').not.toContain('setTemplatePickerOpen(true)')
+  })
+  test('leaveQuickMode bär fortfarande med skriven text', () => {
+    const idx = PAGE.indexOf('function leaveQuickMode')
+    expect(idx).toBeGreaterThan(-1)
+    const kropp = PAGE.slice(idx, idx + 600)
+    expect(kropp).toContain('if (typed && !description.trim()) setDescription(typed)')
+    expect(kropp).toContain('if (typed && !sourceTranscript) setSourceTranscript(typed)')
   })
 })
