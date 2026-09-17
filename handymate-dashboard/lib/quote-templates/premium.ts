@@ -77,7 +77,10 @@ export const renderPremium: TemplateRenderFn = (data: QuoteTemplateData): string
     : ''
 
   const rotRow = data.quote.rotDeduction
-    ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30% av arbete)</span><span class="val">−${formatCurrency(data.quote.rotDeduction)}</span></div>`
+    ? `<div class="total-row rot"><span class="lbl">ROT-avdrag (30 % av arbetskostnaden inkl. moms)</span><span class="val">−${formatCurrency(data.quote.rotDeduction)}</span></div>`
+    : ''
+  const laborRow = data.quote.laborCost
+    ? `<div class="total-row sub"><span class="lbl">varav arbetskostnad</span><span class="val">${formatCurrency(data.quote.laborCost)}</span></div>`
     : ''
   const rutRow = data.quote.rutDeduction
     ? `<div class="total-row rot"><span class="lbl">RUT-avdrag (50% av arbete)</span><span class="val">−${formatCurrency(data.quote.rutDeduction)}</span></div>`
@@ -298,6 +301,7 @@ body { font-family: 'DM Sans', system-ui, sans-serif; background: #D8D8D2; color
         <div class="total-row sub"><span class="lbl">Summa exkl. moms</span><span class="val">${formatCurrency(data.quote.subtotalExVat)}</span></div>
         <div class="total-row sub"><span class="lbl">Moms 25%</span><span class="val">${formatCurrency(data.quote.vatAmount)}</span></div>
         <div class="total-row sub"><span class="lbl">Summa inkl. moms</span><span class="val">${formatCurrency(data.quote.totalIncVat)}</span></div>
+        ${laborRow}
         ${rotRow}
         ${rutRow}
         <div class="total-grand"><span class="lbl">Att betala</span><span class="val">${formatCurrency(data.quote.amountToPay)}</span></div>

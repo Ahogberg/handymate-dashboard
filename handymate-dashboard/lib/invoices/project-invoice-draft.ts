@@ -231,13 +231,11 @@ export async function byggProjektFakturaUnderlag(
   const total = Math.round((subtotal + vatAmount) * 100) / 100
 
   if (rotRutType) {
-    const rate = rotRutType === 'rut' ? 0.5 : 0.3
     // A1: basen från raderna — labor_amount ?? radtotal per berättigad rad
     // (delade rotRutLaborBasis; tidigare räknades HELA radtotalen även när
     // arbetsandelen var känd → för högt avdrag som Skatteverket nekar).
-    // Legacy-rader utan flaggor: härled ur offertens kopierade avdrag.
-    const radBas = rotRutLaborBasis(allItems, rotRutType as 'rot' | 'rut')
-    const eligibleLabor = radBas > 0 ? radBas : (rotRutDeduction ? rotRutDeduction / rate : 0)
+    // Ingen baklängeshärledning ur lagrat avdrag: radernas arbetsdel är basen.
+    const eligibleLabor = rotRutLaborBasis(allItems, rotRutType as 'rot' | 'rut')
     if (eligibleLabor > 0) {
       const capped = await calculateCappedDeduction(
         project.customer_id,

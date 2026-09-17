@@ -204,6 +204,7 @@ export function buildQuoteTemplateData(
   const vatRate = Number(quote.vat_rate || 25)
   const vatAmount = Number(quote.vat_amount || (subtotalExVat * vatRate / 100))
   const totalIncVat = Number(quote.total || (subtotalExVat + vatAmount))
+  const laborCost = Number(quote.rot_work_cost ?? quote.rut_work_cost ?? quote.labor_total ?? 0)
 
   const rotDeduction = Number(
     quote.rot_deduction || quote.rot_rut_deduction || 0,
@@ -314,6 +315,7 @@ export function buildQuoteTemplateData(
       subtotalExVat,
       vatAmount,
       totalIncVat,
+      laborCost: laborCost > 0 ? laborCost : undefined,
       rotDeduction: rotDeduction > 0 ? rotDeduction : undefined,
       rutDeduction: rutDeduction > 0 ? rutDeduction : undefined,
       amountToPay,

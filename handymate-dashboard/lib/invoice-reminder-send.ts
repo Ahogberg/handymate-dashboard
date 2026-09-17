@@ -3,6 +3,7 @@ import { sendSmsViaElks } from '@/lib/sms-send'
 import { loadAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
 import { loadBranding } from '@/lib/branding/get-branding'
 import { emailLayout } from '@/lib/email-templates'
+import { sendEmail } from '@/lib/email'
 
 /**
  * Övergång (varumärkeslagret 2026-09-07): kort skapade före bytet bär ett
@@ -58,6 +59,10 @@ export interface ReminderDeliveryInput {
   interestAmount: number
   penaltyInterest: number
   daysOverdue: number
+  /** Approval when a human sent it, cron/autonomy otherwise. */
+  outboundSource?: { source: 'approval' | 'cron' | 'autonomy'; sourceId: string }
+  outboundAutonomyKey?: 'invoice_reminder'
+  outboundAuditId?: string
 }
 
 /**
@@ -121,7 +126,7 @@ export async function deliverInvoiceReminder(
     currentCount, nextReminderAt, reminderFee, interestAmount, penaltyInterest, daysOverdue,
   } = input
 
-  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true') {
+  if (process.env.CHANNEL_PREFLIGHT_ENABLED === 'true' && process.env.OUTBOUND_INTENTS_ENABLED !== 'true') {
     const { gateApprovalChannels } = await import('@/lib/channels/preflight')
     const blocked = await gateApprovalChannels(supabase, input.businessId, 'invoice_reminder', { delivery: input })
     if (blocked) return { smsSent: false, emailSent: false, feeAdded: 0, interestAdded: 0, skipped: true, orsak: blocked.message }
@@ -136,6 +141,9 @@ export async function deliverInvoiceReminder(
   let smsSent = false
   let emailSent = false
   let smsFel: string | null = null
+  const round = currentCount + 1
+  const source = input.outboundSource || { source: 'cron' as const, sourceId: `invoice-reminder:${invoiceId}:${round}` }
+  const reconcile = { type: 'invoice_reminder' as const, input: { ...input, outboundSource: source } }
 
   // ── Skicka SMS ──
   if (customerPhone && process.env.ELKS_API_USER) {
@@ -150,6 +158,9 @@ export async function deliverInvoiceReminder(
       messageType: 'invoice_reminder',
       recipient: 'customer',
       purpose: 'transactional',
+      outbound: { source: source.source, sourceId: source.sourceId, dedupeKey: `reminder:${invoiceId}:${round}:sms`, template: 'invoice-reminder-sms',
+        autonomyKey: input.outboundAutonomyKey, auditId: input.outboundAuditId },
+      outboundReconcile: reconcile,
     })
     smsSent = r.success
     // Felet kastades tidigare bort — spärrhakens/46elks besked är exakt den
@@ -160,8 +171,6 @@ export async function deliverInvoiceReminder(
   // ── Skicka e-post (från andra påminnelsen) ──
   if (emailToo && customerEmail && process.env.RESEND_API_KEY) {
     try {
-      const { Resend } = await import('resend')
-      const resend = new Resend(process.env.RESEND_API_KEY)
       // Varumärke + stämpel läggs på vid leveransen (inte i
       // invoice-reminder-card, som bara komponerar innehållet) — en query
       // per utskick, aldrig blockerande. Legacy-kort med helt dokument får
@@ -174,13 +183,15 @@ export async function deliverInvoiceReminder(
         const branding = await loadBranding(supabase, businessId)
         html = emailLayout(branding, messages.emailBody)
       }
-      const emailResult = await resend.emails.send({
-        from: `${businessName} <faktura@${process.env.RESEND_DOMAIN ?? 'handymate.se'}>`,
-        to: customerEmail,
-        subject: messages.emailSubject,
-        html,
+      const emailResult = await sendEmail({
+        businessId, customerId, fromName: businessName,
+        fromAddress: `faktura@${process.env.RESEND_DOMAIN ?? 'handymate.se'}`,
+        to: customerEmail, subject: messages.emailSubject, html,
+        idempotencyKey: `reminder:${invoiceId}:${round}:email`,
+        outbound: { source: source.source, sourceId: source.sourceId, dedupeKey: `reminder:${invoiceId}:${round}:email`, template: 'invoice-reminder-email', autonomyKey: input.outboundAutonomyKey, auditId: input.outboundAuditId },
+        outboundReconcile: reconcile,
       })
-      if (emailResult.error || !emailResult.data?.id) errors.push(emailResult.error?.message || 'E-posttjänsten bekräftade inte utskicket.')
+      if (!emailResult.success || !emailResult.messageId) errors.push(emailResult.error || 'E-posttjänsten bekräftade inte utskicket.')
       else emailSent = true
     } catch (err) {
       errors.push('E-posttjänsten kunde inte bekräfta utskicket.')
@@ -201,109 +212,82 @@ export async function deliverInvoiceReminder(
     return { smsSent: false, emailSent: false, feeAdded: 0, interestAdded: 0, skipped: true, orsak }
   }
 
-  // ── Avgift + ränta (BARA när något faktiskt gick ut) ──
-  let feeAdded = 0
-  let interestAdded = 0
+  const receipt = await reconcileInvoiceReminder(supabase, input, { smsSent, emailSent })
+  if (!receipt.reconciled) errors.push(receipt.error || 'Påminnelsen skickades, men kvittensen kunde inte sparas.')
+  errors.push(...receipt.errors)
+  return { smsSent, emailSent, feeAdded: receipt.feeAdded, interestAdded: receipt.interestAdded, skipped: false, errors }
+}
 
+export interface ReminderReconciliationResult {
+  reconciled: boolean
+  reused?: boolean
+  feeAdded: number
+  interestAdded: number
+  error?: string
+  errors: string[]
+}
+
+/** Reconcile one reminder round with a single reminder_count CAS. Both channel
+ * intents may recover concurrently; only one can apply fees and advance the
+ * invoice. Later calls return the durable prior receipt without mutations. */
+export async function reconcileInvoiceReminder(
+  supabase: SupabaseClient,
+  input: ReminderDeliveryInput,
+  channels: { smsSent?: boolean; emailSent?: boolean } = {},
+): Promise<ReminderReconciliationResult> {
+  const { invoiceId, invoiceNumber, businessId, customerId, level, currentCount,
+    nextReminderAt, reminderFee, interestAmount, penaltyInterest, daysOverdue } = input
+  const empty = { feeAdded: 0, interestAdded: 0, errors: [] as string[] }
+  const { data: invoice, error } = await supabase.from('invoice')
+    .select('items,total,subtotal,vat_amount,rot_rut_deduction,customer_pays,rot_rut_type,rot_rut_percent,reminder_count')
+    .eq('invoice_id', invoiceId).eq('business_id', businessId).maybeSingle()
+  if (error || !invoice) return { ...empty, reconciled: false, error: 'Fakturans påminnelsekvittens kunde inte verifieras.' }
+  const storedCount = Number(invoice.reminder_count || 0)
+  if (storedCount >= currentCount + 1) {
+    const rows = Array.isArray(invoice.items) ? invoice.items : []
+    const feeAdded = rows.some((item: any) => item.type === 'reminder_fee' && String(item.name || '').includes(`påminnelse ${currentCount + 1}`)) ? reminderFee : 0
+    const interestAdded = interestAmount > 0 && rows.some((item: any) => item.type === 'penalty_interest') ? Math.round(interestAmount) : 0
+    return { reconciled: true, reused: true, feeAdded, interestAdded, errors: [] }
+  }
+  if (storedCount !== currentCount) return { ...empty, reconciled: false, error: 'Fakturan har ändrats sedan påminnelsen förbereddes.' }
+
+  const items = Array.isArray(invoice.items) ? [...invoice.items] : []
+  let feeAdded = 0, interestAdded = 0
   if (currentCount >= 1 && (reminderFee > 0 || interestAmount > 0)) {
-    try {
-      const { data: currentInvoice, error: currentError } = await supabase
-        .from('invoice')
-        .select('items, total, subtotal, vat_amount, rot_rut_deduction, customer_pays, rot_rut_type, rot_rut_percent')
-        .eq('invoice_id', invoiceId).eq('business_id', businessId)
-        .single()
-
-      if (currentError || !currentInvoice) throw new Error('Fakturans avgifter kunde inte verifieras.')
-      if (currentInvoice) {
-        const items = Array.isArray(currentInvoice.items) ? [...currentInvoice.items] : []
-
-        const existingFeeCount = items.filter((i: any) => i.type === 'reminder_fee').length
-        if (reminderFee > 0 && existingFeeCount < currentCount) {
-          items.push({
-            type: 'reminder_fee',
-            name: `Påminnelseavgift (påminnelse ${currentCount + 1})`,
-            quantity: 1,
-            unit_price: reminderFee,
-            total: reminderFee,
-            vat_rate: 0,
-          })
-          feeAdded = reminderFee
-        }
-
-        if (interestAmount > 0) {
-          const existingInterestIdx = items.findIndex((i: any) => i.type === 'penalty_interest')
-          const roundedInterest = Math.round(interestAmount)
-
-          if (existingInterestIdx >= 0) {
-            items[existingInterestIdx].unit_price = roundedInterest
-            items[existingInterestIdx].total = roundedInterest
-            items[existingInterestIdx].name = `Dröjsmålsränta (${penaltyInterest}%, ${daysOverdue} dagar)`
-          } else {
-            items.push({
-              type: 'penalty_interest',
-              name: `Dröjsmålsränta (${penaltyInterest}%, ${daysOverdue} dagar)`,
-              quantity: 1,
-              unit_price: roundedInterest,
-              total: roundedInterest,
-              vat_rate: 0,
-            })
-          }
-          interestAdded = roundedInterest
-        }
-
-        // A4 (Prisslingan V2): ren, facit-låst beräkning — se
-        // beraknaPaminnelseTotaler nedan + tests/reminder-totals.spec.ts.
-        const feesAndInterest = items
-          .filter((i: any) => i.type === 'reminder_fee' || i.type === 'penalty_interest')
-          .reduce((sum: number, i: any) => sum + (i.total ?? 0), 0)
-        const totaler = beraknaPaminnelseTotaler(currentInvoice, feesAndInterest)
-        const updateData: Record<string, any> = {
-          items,
-          total: totaler.total,
-          customer_pays: totaler.customer_pays,
-        }
-
-        const { data: feeRows, error: feeError } = await supabase.from('invoice').update(updateData).eq('invoice_id', invoiceId).eq('business_id', businessId).select('invoice_id')
-        if (feeError || feeRows?.length !== 1) throw new Error('Fakturaavgifterna kunde inte sparas.')
-      }
-    } catch (feeErr) {
-      feeAdded = 0; interestAdded = 0
-      errors.push('Påminnelsen skickades, men avgift och ränta kunde inte sparas.')
-      console.error(`[invoice-reminder-send] Fee/interest error ${invoiceNumber}:`, feeErr)
+    const existingFeeCount = items.filter((item: any) => item.type === 'reminder_fee').length
+    if (reminderFee > 0 && existingFeeCount < currentCount) {
+      items.push({ type: 'reminder_fee', name: `Påminnelseavgift (påminnelse ${currentCount + 1})`,
+        quantity: 1, unit_price: reminderFee, total: reminderFee, vat_rate: 0 })
+      feeAdded = reminderFee
+    }
+    if (interestAmount > 0) {
+      const rounded = Math.round(interestAmount)
+      const index = items.findIndex((item: any) => item.type === 'penalty_interest')
+      const value = { type: 'penalty_interest', name: `Dröjsmålsränta (${penaltyInterest}%, ${daysOverdue} dagar)`,
+        quantity: 1, unit_price: rounded, total: rounded, vat_rate: 0 }
+      if (index >= 0) items[index] = { ...items[index], ...value }
+      else items.push(value)
+      interestAdded = rounded
     }
   }
-
-  // ── Uppdatera påminnelse-räknare ──
-  const nextCount = currentCount + 1
-  const { data: reminderRows, error: updErr } = await supabase
-    .from('invoice')
-    .update({
-      status: 'overdue',
-      reminder_count: nextCount,
-      last_reminder_at: new Date().toISOString(),
-      next_reminder_at: nextReminderAt,
-    })
-    .eq('invoice_id', invoiceId).eq('business_id', businessId).select('invoice_id')
-  if (updErr || reminderRows?.length !== 1) errors.push('Påminnelsen skickades, men nästa påminnelsetid kunde inte sparas.')
-  if (updErr) console.error('[invoice-reminder-send] invoice update failed (räknare ej uppdaterad):', invoiceId, updErr)
-
-  // ── Logga aktivitet ──
-  // Sanering 2026-08-05: tabellen heter customer_activity — gamla namnet
-  // activity finns inte, så påminnelser syntes aldrig i kundtidslinjen.
-  const { error: activityError } = await supabase.from('customer_activity').insert({
-    business_id: businessId,
-    customer_id: customerId,
-    activity_type: 'auto_reminder_sent',
-    description: `Automatisk påminnelse ${nextCount} skickad för faktura ${invoiceNumber}${smsSent ? ' (SMS)' : ''}${emailSent ? ' (email)' : ''}${feeAdded > 0 ? ` — avgift ${feeAdded} kr tillagd` : ''}${interestAdded > 0 ? ` — ränta ${interestAdded} kr tillagd` : ''}`,
-    metadata: {
-      invoice_id: invoiceId,
-      level,
-      reminder_count: nextCount,
-      fee_added: feeAdded,
-      interest_added: interestAdded,
-    },
+  const fees = items.filter((item: any) => ['reminder_fee','penalty_interest'].includes(item.type))
+    .reduce((sum: number, item: any) => sum + Number(item.total || 0), 0)
+  const totals = beraknaPaminnelseTotaler(invoice, fees)
+  const now = new Date().toISOString()
+  const updated = await supabase.from('invoice').update({ items, total: totals.total, customer_pays: totals.customer_pays,
+    status: 'overdue', reminder_count: currentCount + 1, last_reminder_at: now, next_reminder_at: nextReminderAt })
+    .eq('invoice_id', invoiceId).eq('business_id', businessId).eq('reminder_count', currentCount).select('invoice_id')
+  if (updated.error || updated.data?.length !== 1) {
+    const winner = await supabase.from('invoice').select('reminder_count').eq('invoice_id', invoiceId)
+      .eq('business_id', businessId).maybeSingle()
+    if (!winner.error && Number(winner.data?.reminder_count || 0) >= currentCount + 1) return { ...empty, reconciled: true, reused: true }
+    return { ...empty, reconciled: false, error: 'Påminnelsen skickades, men nästa påminnelsetid kunde inte sparas.' }
+  }
+  const activity = await supabase.from('customer_activity').insert({
+    business_id: businessId, customer_id: customerId, activity_type: 'auto_reminder_sent',
+    description: `Automatisk påminnelse ${currentCount + 1} skickad för faktura ${invoiceNumber}${channels.smsSent ? ' (SMS)' : ''}${channels.emailSent ? ' (email)' : ''}${feeAdded > 0 ? ` — avgift ${feeAdded} kr tillagd` : ''}${interestAdded > 0 ? ` — ränta ${interestAdded} kr tillagd` : ''}`,
+    metadata: { invoice_id: invoiceId, level, reminder_count: currentCount + 1, fee_added: feeAdded, interest_added: interestAdded },
   })
-
-  if (activityError) errors.push('Påminnelsen skickades, men kundhistoriken kunde inte uppdateras.')
-  return { smsSent, emailSent, feeAdded, interestAdded, skipped: false, errors }
+  return { reconciled: true, feeAdded, interestAdded,
+    errors: activity.error ? ['Påminnelsen skickades, men kundhistoriken kunde inte uppdateras.'] : [] }
 }

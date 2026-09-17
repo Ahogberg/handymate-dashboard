@@ -11,20 +11,22 @@ const effectNames: Record<string, string> = {
 }
 const labels = { delivered: 'Levererat', abandon: 'Avbryt', retry: 'Försök igen' }
 type Consumer = { consumer: string; halted_at: string | null; backlog: string }
+type Outbound = { id: string; kind: 'sms'|'email'|'push'; template: string; status: string; attempts: number; last_error?: string | null }
 
 export default function FinancialKernelSection({ businesses }: { businesses: { business_id: string; business_name: string }[] }) {
   const [businessId, setBusinessId] = useState('')
   const [intents, setIntents] = useState<UnresolvedEffectIntent[]>([])
   const [consumers, setConsumers] = useState<Consumer[]>([])
+  const [outbound, setOutbound] = useState<Outbound[]>([])
   const [loading, setLoading] = useState(false), [busy, setBusy] = useState(false)
   const [error, setError] = useState(''), [receipt, setReceipt] = useState('')
-  const [decision, setDecision] = useState<{ id: string; resolution: EffectResolution | 'resume' } | null>(null)
+  const [decision, setDecision] = useState<{ id: string; resolution: EffectResolution | 'resume'; kind?: 'outbound' } | null>(null)
   const [reason, setReason] = useState('')
   const [shadowBusy, setShadowBusy] = useState(false)
   const generation = useRef(0)
   async function refresh(id: string) {
     const current = ++generation.current
-    setLoading(true); setError(''); setIntents([]); setConsumers([])
+    setLoading(true); setError(''); setIntents([]); setConsumers([]); setOutbound([])
     if (!id) { setLoading(false); return }
     try {
       const query = '?business_id=' + encodeURIComponent(id)
@@ -34,7 +36,10 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
         if (!response.ok) throw new Error(data.error || 'Kunde inte hämta uppföljningen')
         return data
       }))
-      if (generation.current === current) { setIntents(results[0].intents); setConsumers(results[1].consumers) }
+      const outboundResponse = await fetch('/api/admin/outbound/intents' + query, { cache: 'no-store' })
+      const outboundData = await outboundResponse.json()
+      if (!outboundResponse.ok) throw new Error(outboundData.error || 'Kunde inte hämta meddelandeleveranserna')
+      if (generation.current === current) { setIntents(results[0].intents); setConsumers(results[1].consumers); setOutbound(outboundData.intents || []) }
     } catch (error) { if (generation.current === current) setError(error instanceof Error ? error.message : String(error)) }
     finally { if (generation.current === current) setLoading(false) }
   }
@@ -44,9 +49,10 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
     setBusy(true); setError(''); setReceipt('')
     try {
       const resume = decision.resolution === 'resume'
-      const response = await fetch('/api/admin/financial-kernel/' + (resume ? 'consumers/resume' : 'intents/' + encodeURIComponent(decision.id) + '/resolve'), {
+      const outboundDecision = decision.kind === 'outbound'
+      const response = await fetch(outboundDecision ? '/api/admin/outbound/intents' : '/api/admin/financial-kernel/' + (resume ? 'consumers/resume' : 'intents/' + encodeURIComponent(decision.id) + '/resolve'), {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ business_id: businessId, reason: reason.trim(), ...(resume ? { consumer: decision.id } : { resolution: decision.resolution }) }),
+        body: JSON.stringify({ business_id: businessId, reason: reason.trim(), ...(outboundDecision ? { id: decision.id, resolution: decision.resolution } : resume ? { consumer: decision.id } : { resolution: decision.resolution }) }),
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || 'Beslutet kunde inte bekräftas')
@@ -68,12 +74,18 @@ export default function FinancialKernelSection({ businesses }: { businesses: { b
     {loading && <p role="status" className="mt-4 text-sm">Hämtar uppföljning…</p>}
     {error && <p role="alert" className="mt-4 text-sm text-red-700">{error}</p>}
     {receipt && <p role="status" className="mt-4 text-sm text-teal-800">{receipt}</p>}
-    {!loading && !error && businessId && intents.length === 0 && !consumers.some(c => c.halted_at) && <p className="mt-4 text-sm text-gray-600">Inga utskick eller pausade uppföljningar kräver beslut.</p>}
+    {!loading && !error && businessId && intents.length === 0 && outbound.length === 0 && !consumers.some(c => c.halted_at) && <p className="mt-4 text-sm text-gray-600">Inga utskick eller pausade uppföljningar kräver beslut.</p>}
     {!loading && intents.map(intent => <article key={intent.id} className="mt-4 rounded-lg border p-4">
       <h3 className="font-medium">{effectNames[intent.effect] || intent.effect}</h3>
       <p className="text-sm text-gray-600">Faktura: {intent.invoice_id} · {intent.status === 'unknown' ? 'Leveransen behöver kontrolleras' : 'Alla försök har misslyckats'} · {intent.attempts} försök</p>
       {intent.last_error && <p className="mt-2 break-words text-sm text-gray-600">{intent.last_error}</p>}
       <div className="mt-3 flex flex-wrap gap-3">{(Object.keys(labels) as EffectResolution[]).map(resolution => <button key={resolution} disabled={busy} onClick={() => { setDecision({ id: intent.id, resolution }); setReason('') }} className="rounded-lg border px-3 py-2 text-sm text-teal-800">{labels[resolution]}</button>)}</div>
+    </article>)}
+    {!loading && outbound.map(intent => <article key={`outbound:${intent.id}`} className="mt-4 rounded-lg border p-4">
+      <h3 className="font-medium">{intent.kind === 'sms' ? 'SMS' : intent.kind === 'email' ? 'E-post' : 'Notis'} · {intent.template}</h3>
+      <p className="text-sm text-gray-600">{intent.status === 'unknown' ? 'Leveransen behöver kontrolleras' : 'Alla försök har misslyckats'} · {intent.attempts} försök</p>
+      {intent.last_error && <p className="mt-2 break-words text-sm text-gray-600">{intent.last_error}</p>}
+      <div className="mt-3 flex flex-wrap gap-3">{(Object.keys(labels) as EffectResolution[]).map(resolution => <button key={resolution} disabled={busy} onClick={() => { setDecision({ id: intent.id, resolution, kind: 'outbound' }); setReason('') }} className="rounded-lg border px-3 py-2 text-sm text-teal-800">{labels[resolution]}</button>)}</div>
     </article>)}
     {!loading && consumers.filter(c => c.halted_at).map(consumer => <article key={consumer.consumer} className="mt-4 rounded-lg border p-4">
       <h3 className="font-medium">{consumer.consumer === 'value-ledger' ? 'Värdeunderlaget är pausat' : 'Betalningsuppföljningen är pausad'}</h3><p className="text-sm">{consumer.backlog} händelser väntar.</p>

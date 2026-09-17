@@ -16,7 +16,7 @@
  * item.article_number skickas villkorat.
  */
 
-import { houseWorkRowFields, type HouseWorkRowInput } from '@/lib/fortnox/housework'
+import { houseWorkRowFields, splitRowsForHouseWork, type HouseWorkRowInput } from '@/lib/fortnox/housework'
 import type { RotRutType } from '@/lib/skv/categories'
 
 export interface FortnoxInvoiceRow {
@@ -65,7 +65,8 @@ export function buildFortnoxInvoiceRows(
   } = {},
 ): FortnoxInvoiceRow[] {
   const rows: FortnoxInvoiceRow[] = []
-  for (const item of items || []) {
+  const exportItems = opts.houseWork ? splitRowsForHouseWork(items || []) : (items || [])
+  for (const item of exportItems) {
     const typ = item.item_type || 'item'
     // Delsummor är ren presentation — beloppet ligger redan i raderna ovanför.
     if (typ === 'subtotal') continue

@@ -33,10 +33,12 @@ export interface FinancialEventPayloads {
   reconciliation_matched: never
   reconciliation_unmatched: never
   reconciliation_reversed: never
-  journal_entry_posted: never
-  journal_entry_reversed: never
-  period_locked: never
-  period_unlocked: never
+  // Ledger (C8). Appended by sql/v251_ledger_posting_engine.sql inside the posting/lock transaction; never by TypeScript.
+  journal_entry_posted: { journal_entry_id: string; journal_type: string; voucher_series: string; voucher_number: number;
+    effective_date: string; period_id: string; rule_id: string; rule_version: number; source_event_id: string | null }
+  journal_entry_reversed: { journal_entry_id: string; reversal_entry_id: string; reason: string }
+  period_locked: { period_id: string; fiscal_year_id: string; locked_by: string }
+  period_unlocked: { period_id: string; fiscal_year_id: string; unlocked_by: string; reason: string }
   payment_divergence_detected: never
   accounting_divergence_detected: never
   supplier_invoice_approved: never

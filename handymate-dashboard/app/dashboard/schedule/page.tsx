@@ -23,6 +23,10 @@ import {
   Filter,
   RefreshCw
 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
+import { ProjectPlanningPanel, type PlanningProject } from '@/components/schedule/ProjectPlanningPanel'
+import { entryOnPlanningDate, intervalsOverlap } from '@/lib/schedule/planning'
+import { svDayRange, svNaiveToIso } from '@/lib/dates'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
 import { svDateStr } from '@/lib/dates'
@@ -96,10 +100,7 @@ interface TimeOffRequest {
   business_user?: { id: string; name: string }
 }
 
-interface Project {
-  project_id: string
-  name: string
-}
+type Project = PlanningProject
 
 type CalendarView = 'day' | 'week' | 'month'
 type PageMode = 'calendar' | 'utilization'
@@ -208,6 +209,20 @@ function getEntryColor(entry: ScheduleEntry, members: TeamMember[]): string {
 export default function SchedulePage() {
   const business = useBusiness()
   const { user: currentUser, isOwnerOrAdmin } = useCurrentUser()
+
+  const params = useSearchParams()
+  const linkedProject = params.get('project') || params.get('project_id') || ''
+  const [selectedProject, setSelectedProject] = useState(linkedProject)
+  const [projectError, setProjectError] = useState('')
+  const [projectLoading, setProjectLoading] = useState(false)
+  const [batchDates, setBatchDates] = useState<string[]>([])
+  const [batchMembers, setBatchMembers] = useState<string[]>([])
+  const [serverConflicts, setServerConflicts] = useState<any[]>([])
+  const [uncertainSave, setUncertainSave] = useState(false)
+  const pendingBatch = useRef<Record<string, unknown>|null>(null)
+  const submitLock = useRef(false)
+  useEffect(() => { setSelectedProject(linkedProject) }, [linkedProject])
+  useEffect(() => { pendingBatch.current=null; setUncertainSave(false); setEntryModalOpen(false); setProjects([]) }, [business.business_id])
 
   // View state
   const [view, setView] = useState<CalendarView>('week')
@@ -344,7 +359,7 @@ export default function SchedulePage() {
       const res = await fetch('/api/team')
       if (!res.ok) throw new Error('Fetch team failed')
       const data = await res.json()
-      const members: TeamMember[] = data.members || []
+      const members: TeamMember[] = (data.members || []).filter((m: TeamMember) => m.is_active)
       setTeamMembers(members)
       // Select all members by default if no selection yet
       setSelectedMembers((prev) => {
@@ -412,16 +427,14 @@ export default function SchedulePage() {
 
   const fetchProjects = useCallback(async () => {
     if (!business.business_id) return
+    setProjectLoading(true)
     try {
-      const { data } = await supabase
-        .from('project')
-        .select('project_id, name')
-        .eq('business_id', business.business_id)
-        .in('status', ['planning', 'active', 'paused'])
-      setProjects(data || [])
-    } catch {
-      console.error('Could not fetch projects')
-    }
+      const res=await fetch('/api/schedule/projects')
+      const data=await res.json()
+      if(!res.ok) throw new Error(data.error || 'Kunde inte hämta jobb')
+      setProjects(data.projects || []); setProjectError('')
+    } catch(error) { setProjects([]); setProjectError(error instanceof Error ? error.message : 'Kunde inte hämta jobb') }
+    finally { setProjectLoading(false) }
   }, [business.business_id])
 
   // Initial load
@@ -526,8 +539,7 @@ export default function SchedulePage() {
   const getEntriesForDay = useCallback(
     (day: Date) =>
       filteredEntries.filter((e) => {
-        const eDate = parseISO(e.start_datetime)
-        return isSameDay(eDate, day)
+        return entryOnPlanningDate(e, svDateStr(day))
       }),
     [filteredEntries]
   )
@@ -548,18 +560,10 @@ export default function SchedulePage() {
 
   const checkConflicts = useCallback(
     (userId: string, date: string, startTime: string, endTime: string, allDay: boolean, excludeId?: string) => {
-      if (allDay) {
-        setConflicts([])
-        return
-      }
-      const startDt = `${date}T${startTime}:00`
-      const endDt = `${date}T${endTime}:00`
-      const found = entries.filter((e) => {
-        if (e.id === excludeId) return false
-        if (e.business_user_id !== userId) return false
-        if (e.all_day) return false
-        return e.start_datetime < endDt && e.end_datetime > startDt
-      })
+      const range=svDayRange(date,date)
+      const startDt=allDay ? range.from : svNaiveToIso(`${date}T${startTime}:00`)
+      const endDt=allDay ? range.toExclusive : svNaiveToIso(`${date}T${endTime}:00`)
+      const found=entries.filter(e=>e.id!==excludeId && e.status!=='cancelled' && e.business_user_id===userId && intervalsOverlap(e.start_datetime,e.end_datetime,startDt,endDt))
       setConflicts(found)
     },
     [entries]
@@ -570,14 +574,19 @@ export default function SchedulePage() {
   // ---------------------------------------------------------------------------
 
   const openCreateModal = (prefillDate?: Date, prefillHour?: number) => {
-    const d = prefillDate || new Date()
+    if(uncertainSave && pendingBatch.current) { setEntryModalOpen(true); return }
+    if(selectedProject && !projects.some(p=>p.project_id===selectedProject)) { showToast('Valt jobb är inte tillgängligt.', 'error'); return }
+    const d = prefillDate || currentDate
+    pendingBatch.current=null; setServerConflicts([])
+    setBatchDates([format(d,'yyyy-MM-dd')])
+    setBatchMembers([currentUser?.id || teamMembers[0]?.id || ''])
     const hour = prefillHour ?? 8
     setEditingEntry(null)
     setConflicts([])
     setEntryForm({
       business_user_id: currentUser?.id || (teamMembers[0]?.id ?? ''),
-      project_id: '',
-      title: '',
+      project_id: selectedProject,
+      title: projects.find(p=>p.project_id===selectedProject)?.name || '',
       date: format(d, 'yyyy-MM-dd'),
       all_day: false,
       start_time: `${hour.toString().padStart(2, '0')}:00`,
@@ -591,7 +600,9 @@ export default function SchedulePage() {
 
   const openEditModal = (entry: ScheduleEntry) => {
     // External entries (e.g. Google Calendar) are read-only
-    if (entry.type === 'external') return
+    if (entry.type === 'external' || entry.id.startsWith('time_off_')) return
+    if(uncertainSave) { setEntryModalOpen(true); return }
+    pendingBatch.current=null; setServerConflicts([])
     setEditingEntry(entry)
     setConflicts([])
     const start = parseISO(entry.start_datetime)
@@ -611,7 +622,8 @@ export default function SchedulePage() {
     setEntryModalOpen(true)
   }
 
-  const handleEntrySubmit = async () => {
+  const handleEntrySubmit = async (allowConflicts = false) => {
+    if(submitLock.current) return
     if (!entryForm.title.trim()) {
       showToast('Titel kravs', 'error')
       return
@@ -621,6 +633,7 @@ export default function SchedulePage() {
       return
     }
 
+    submitLock.current=true
     setActionLoading(true)
     try {
       const startDatetime = entryForm.all_day
@@ -650,33 +663,41 @@ export default function SchedulePage() {
           body: JSON.stringify(body)
         })
       } else {
-        res = await fetch('/api/schedule', {
+        if(!pendingBatch.current) pendingBatch.current={request_id:crypto.randomUUID(),business_user_ids:batchMembers,dates:batchDates,project_id:entryForm.project_id || null,title:entryForm.title.trim(),description:entryForm.description.trim() || null,type:entryForm.type,all_day:entryForm.all_day,start_time:entryForm.start_time,end_time:entryForm.end_time,color:entryForm.color || null}
+        setUncertainSave(true)
+        res = await fetch('/api/schedule/batch', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body)
+          body: JSON.stringify({...pendingBatch.current, allow_conflicts: allowConflicts})
         })
       }
 
       if (!res.ok) {
         const errData = await res.json().catch(() => null)
+        if(!editingEntry && res.status===409 && errData?.code==='schedule_conflicts') { setUncertainSave(false); setServerConflicts(errData.conflicts || []); return }
+        if(!editingEntry && res.status<500) { pendingBatch.current=null; setUncertainSave(false); if(res.status===409) { setEntryModalOpen(false); fetchEntries(); fetchProjects() } }
         throw new Error(errData?.error || 'Nagot gick fel')
       }
 
       const data = await res.json()
+      pendingBatch.current=null; setUncertainSave(false); setServerConflicts([])
       if (data.conflicts && data.conflicts.length > 0) {
         showToast('Sparad, men det finns overlappande poster', 'success')
       } else {
-        showToast(editingEntry ? 'Post uppdaterad!' : 'Post skapad!', 'success')
+        showToast(editingEntry ? 'Post uppdaterad!' : `${data.entries?.length || 1} pass skapade!`, 'success')
       }
 
       setEntryModalOpen(false)
-      fetchEntries()
+      fetchEntries(); fetchProjects()
     } catch (err) {
       showToast(err instanceof Error ? err.message : 'Nagot gick fel', 'error')
     } finally {
+      submitLock.current=false
       setActionLoading(false)
     }
   }
+
+  useEffect(()=>{ if(!uncertainSave && !submitLock.current) { pendingBatch.current=null; setServerConflicts([]) } },[entryForm,batchDates,batchMembers])
 
   const handleEntryDelete = async () => {
     if (!editingEntry) return
@@ -687,7 +708,7 @@ export default function SchedulePage() {
       showToast('Post borttagen!', 'success')
       setEntryModalOpen(false)
       setDeleteConfirmId(null)
-      fetchEntries()
+      fetchEntries(); fetchProjects()
     } catch {
       showToast('Kunde inte ta bort posten', 'error')
     } finally {
@@ -725,7 +746,7 @@ export default function SchedulePage() {
       return {
         ...prev,
         project_id: projectId,
-        title: project && !prev.title ? project.name : prev.title
+        title: !prev.title || prev.title===projects.find(p=>p.project_id===prev.project_id)?.name ? project?.name || '' : prev.title
       }
     })
   }
@@ -934,7 +955,7 @@ export default function SchedulePage() {
     if (!hasAllDay) return null
 
     return (
-      <div className="flex border-b border-gray-200">
+      <div data-testid="all-day-row" className="sticky top-0 z-20 bg-white shadow-sm flex border-b border-gray-200">
         <div className="w-14 flex-shrink-0 text-[10px] text-gray-400 p-1 text-right pr-2">Heldag</div>
         <div className="flex-1 grid" style={{ gridTemplateColumns: `repeat(${days.length}, 1fr)` }}>
           {days.map((day) => {
@@ -948,13 +969,13 @@ export default function SchedulePage() {
                     <button
                       key={entry.id}
                       onClick={() => { if (!isExternal) openEditModal(entry) }}
-                      className={`text-[10px] px-1.5 py-0.5 rounded truncate text-left ${
+                      className={`text-xs px-1.5 py-0.5 rounded truncate text-left ${
                         isExternal ? 'opacity-75 border border-dashed border-gray-300 cursor-default' : ''
                       }`}
                       style={{ backgroundColor: `${color}30`, color: color }}
                     >
                       {isExternal && <CalendarDays className="w-2.5 h-2.5 inline mr-0.5" />}
-                      {entry.title}
+                      {entry.business_user?.name || teamMembers.find(m=>m.id===entry.business_user_id)?.name}: {entry.title} · Heldag
                     </button>
                   )
                 })}
@@ -972,7 +993,7 @@ export default function SchedulePage() {
 
   function renderTimeGrid(days: Date[]) {
     return (
-      <div className="overflow-auto max-h-[calc(100vh-280px)]" ref={gridRef}>
+      <div data-testid="schedule-time-grid" className="overflow-auto max-h-[calc(100vh-280px)]" ref={gridRef}>
         {/* All-day row */}
         {renderAllDayRow(days)}
 
@@ -1334,7 +1355,7 @@ export default function SchedulePage() {
       {/* ============================================================== */}
       {entryModalOpen && (
         <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm">
-          <div className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-lg sm:mx-4 max-h-[90vh] overflow-y-auto">
+          <div role="dialog" aria-modal="true" aria-label="Planera personal" className="bg-white border border-[#E2E8F0] rounded-t-2xl sm:rounded-xl p-6 w-full sm:max-w-lg sm:mx-4 max-h-[90vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-semibold text-gray-900">
                 {editingEntry ? 'Redigera post' : 'Ny post'}
@@ -1344,29 +1365,18 @@ export default function SchedulePage() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <fieldset disabled={actionLoading || uncertainSave} className="space-y-4">
               {/* Person */}
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Person *</label>
-                <select
-                  value={entryForm.business_user_id}
-                  onChange={(e) => setEntryForm({ ...entryForm, business_user_id: e.target.value })}
-                  className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
-                >
-                  <option value="">Valj person...</option>
-                  {teamMembers.map((m) => (
-                    <option key={m.id} value={m.id}>
-                      {m.name}
-                    </option>
-                  ))}
-                </select>
+                {editingEntry ? <select value={entryForm.business_user_id} onChange={e=>setEntryForm({...entryForm,business_user_id:e.target.value})} className="w-full border rounded-lg p-2">{teamMembers.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</select> : <div className="flex flex-wrap gap-3">{teamMembers.filter(m=>isOwnerOrAdmin || currentUser?.can_see_all_projects || m.id===currentUser?.id).map(m=><label key={m.id} className="flex items-center gap-2 border rounded-lg p-2"><input type="checkbox" checked={batchMembers.includes(m.id)} onChange={()=>setBatchMembers(prev=>prev.includes(m.id)?prev.filter(id=>id!==m.id):[...prev,m.id])}/>{m.name}</label>)}</div>}
               </div>
 
               {/* Project */}
               <div>
                 <label className="block text-sm text-gray-500 mb-1">Projekt (valfritt)</label>
                 <select
-                  value={entryForm.project_id}
+                  aria-label="Jobb" value={entryForm.project_id}
                   onChange={(e) => handleProjectChange(e.target.value)}
                   className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 >
@@ -1397,16 +1407,17 @@ export default function SchedulePage() {
                 <input
                   type="date"
                   value={entryForm.date}
-                  onChange={(e) => setEntryForm({ ...entryForm, date: e.target.value })}
+                  onChange={(e) => { setEntryForm({ ...entryForm, date: e.target.value }); setBatchDates([e.target.value]) }}
                   className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-[#0F766E]"
                 />
               </div>
 
+              {!editingEntry && <div><p className="text-sm mb-2">Välj dagar samma vecka</p><div className="flex flex-wrap gap-2">{entryForm.date && Array.from({length:7},(_,i)=>addDays(startOfWeek(parseISO(entryForm.date),{weekStartsOn:1}),i)).map(day=>{const date=format(day,'yyyy-MM-dd');return <button type="button" key={date} aria-pressed={batchDates.includes(date)} onClick={()=>setBatchDates(prev=>prev.includes(date)?prev.filter(d=>d!==date):[...prev,date].sort())} className={`border rounded-lg px-3 py-2 ${batchDates.includes(date)?'bg-teal-100 border-teal-600':''}`}>{format(day,'EEE d/M',{locale:sv})}</button>})}</div><p className="mt-2 text-sm">{batchDates.length} dagar × {batchMembers.length} personer = {batchDates.length*batchMembers.length} pass</p></div>}
               {/* All-day toggle */}
               <label className="flex items-center gap-3 cursor-pointer">
                 <button
                   type="button"
-                  onClick={() => setEntryForm({ ...entryForm, all_day: !entryForm.all_day })}
+                  aria-label="Heldag" aria-pressed={entryForm.all_day} onClick={() => setEntryForm({ ...entryForm, all_day: !entryForm.all_day })}
                   className={`w-10 h-6 rounded-full transition-colors ${
                     entryForm.all_day ? 'bg-primary-700' : 'bg-gray-200'
                   } relative`}
@@ -1519,7 +1530,9 @@ export default function SchedulePage() {
                   </div>
                 </div>
               )}
-            </div>
+            </fieldset>
+            {uncertainSave && <p role="alert" className="mt-3 text-amber-700">Sparningen är inte bekräftad. Kontrollera samma sparning innan du ändrar planen.</p>}
+            {serverConflicts.length>0 && <div role="alert" className="mt-3 p-3 bg-amber-50">Överlappning för {Array.from(new Set(serverConflicts.map(c=>c.member_name))).join(", ")}. <button disabled={actionLoading} className="underline" onClick={()=>handleEntrySubmit(true)}>Spara trots överlappning</button></div>}
 
             {/* Actions */}
             <div className="flex items-center justify-between mt-6">
@@ -1563,12 +1576,12 @@ export default function SchedulePage() {
                   Avbryt
                 </button>
                 <button
-                  onClick={handleEntrySubmit}
+                  onClick={()=>handleEntrySubmit()}
                   disabled={actionLoading}
                   className="flex items-center px-5 py-2.5 bg-primary-700 rounded-xl font-medium text-white hover:opacity-90 disabled:opacity-50 transition-opacity"
                 >
                   {actionLoading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                  {editingEntry ? 'Spara' : 'Skapa'}
+                  {uncertainSave ? 'Kontrollera sparningen' : editingEntry ? 'Spara' : 'Spara plan'}
                 </button>
               </div>
             </div>
@@ -1750,6 +1763,8 @@ export default function SchedulePage() {
           </div>
         </div>
 
+        <ProjectPlanningPanel projects={projects} selected={selectedProject} onSelect={setSelectedProject} onPlan={()=>openCreateModal()} error={projectError} loading={projectLoading} onRetry={fetchProjects} members={teamMembers} />
+        {uncertainSave && !entryModalOpen && <div role="alert" className="p-3 mb-4 bg-amber-50 rounded-lg">Sparningen är inte bekräftad. <button className="underline" onClick={()=>setEntryModalOpen(true)}>Kontrollera sparningen</button></div>}
         <PlanningStart step="calendar" refreshKey={JSON.stringify(entries)}
           visibleWeekStart={view === 'week' ? svDateStr(startOfWeek(currentDate, { weekStartsOn: 1 })) : undefined}
           onShowWeek={week => { setCurrentDate(new Date(`${week}T12:00:00Z`)); setView('week') }} />

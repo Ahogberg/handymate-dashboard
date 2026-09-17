@@ -2,6 +2,7 @@ import { generateOCR } from '@/lib/ocr'
 import { createHash, randomUUID } from 'node:crypto'
 import { svDateStr } from '@/lib/dates'
 import type { InvoiceType, InvoiceStatus } from '@/lib/types/invoice'
+import { rotRutLaborBasis } from '@/lib/rot-rut-basis'
 
 /**
  * Gemensam createInvoice()-kärna — ETAPP 6a (offert-masterplan.md,
@@ -107,6 +108,13 @@ export interface CreateInvoiceResult {
       men blockerar INTE fakturaskapandet (migrationsordningen får aldrig
       knäcka prod). */
   usedNumberFallback: boolean
+}
+
+export function invoiceRotWorkCosts(items: any[]) {
+  return {
+    rot_work_cost: rotRutLaborBasis(items, 'rot'),
+    rut_work_cost: rotRutLaborBasis(items, 'rut'),
+  }
 }
 
 /** "FV-2026-042" — ren funktion, facit-testad direkt (tests/create-invoice-core.spec.ts). */
@@ -229,6 +237,10 @@ export async function createInvoice(
   // annat default eller triggar ett schema-cache-fel på miljöer utan v74.
   if (input.bookingId !== undefined) row.booking_id = input.bookingId
   if (input.extraFields) Object.assign(row, input.extraFields)
+  // Skatteverkets arbetskostnad kommer alltid från samma radbas, oavsett
+  // vilken av fakturavägarna som anropar kärnan. Extra fields får inte skriva
+  // över den här pengainvarianten.
+  Object.assign(row, invoiceRotWorkCosts(input.items))
 
   if (input.sources || input.requestKey) {
     row.invoice_id = row.invoice_id || `inv_${randomUUID()}`

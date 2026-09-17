@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isAdmin } from '@/lib/admin-auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { getStarterProducts, resolveBranches } from '@/lib/product-defaults'
+import { getStarterProducts, productDefaultTravelShare, resolveBranches } from '@/lib/product-defaults'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,7 +129,10 @@ export async function POST(request: NextRequest) {
           sales_price: p.unit_price,
           purchase_price: null,
           default_labor_share: p.labor_share,
-          rot_eligible: p.deduction === 'rot',
+          default_travel_share: productDefaultTravelShare(p),
+          share_source: 'seed',
+          share_confirmed_at: null,
+          rot_eligible: productDefaultTravelShare(p) === 0 && p.deduction === 'rot',
           rut_eligible: p.deduction === 'rut',
           is_active: true,
           is_favorite: p.category === 'arbete' && p.unit === 'tim',

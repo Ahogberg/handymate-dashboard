@@ -4,6 +4,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { rotRutLaborBasis } from '@/lib/rot-rut-basis'
 
 // Force-dynamic — preview-data är realtidssnap av signerade ÄTA +
 // quote_items, får inte cachas.
@@ -332,26 +333,14 @@ export async function GET(
     const ataEligibleWork = (typ: 'rot' | 'rut') =>
       signedAtas.reduce((s, ata) => {
         const sign = ata.change_type === 'removal' ? -1 : 1
-        for (const it of ata.items as any[]) {
-          const berattigad =
-            typ === 'rot'
-              ? (it.is_rot_eligible ?? (it.rot_rut_type === 'rot'))
-              : (it.is_rut_eligible ?? (it.rot_rut_type === 'rut'))
-          if (berattigad) {
-            s += sign * Math.abs((Number(it.quantity ?? 1) || 0) * (Number(it.unit_price) || 0))
-          }
-        }
-        return s
+        const rows = (ata.items as any[]).map(it => ({ ...it, item_type: it.item_type || 'item',
+          total: sign * Math.abs(Number(it.total ?? (Number(it.quantity ?? 1) * Number(it.unit_price ?? 0)))),
+          labor_amount: it.labor_amount == null ? null : sign * Math.abs(Number(it.labor_amount)) }))
+        return s + rotRutLaborBasis(rows, typ)
       }, 0)
 
-    const rotWorkCost = Math.max(0, quoteItems
-      .filter(it => it.item_type === 'item' && it.is_rot_eligible)
-      .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
-      + ataEligibleWork('rot'))
-    const rutWorkCost = Math.max(0, quoteItems
-      .filter(it => it.item_type === 'item' && it.is_rut_eligible)
-      .reduce((s, it) => s + Number(it.labor_amount ?? (Number(it.quantity) || 0) * (Number(it.unit_price) || 0)), 0)
-      + ataEligibleWork('rut'))
+    const rotWorkCost = Math.max(0, rotRutLaborBasis(quoteItems, 'rot') + ataEligibleWork('rot'))
+    const rutWorkCost = Math.max(0, rotRutLaborBasis(quoteItems, 'rut') + ataEligibleWork('rut'))
 
     let rotRutSummary:
       | { type: 'ROT' | 'RUT'; eligible_amount: number; deduction_percent: 30 | 50; deduction_amount: number; customer_pays: number }

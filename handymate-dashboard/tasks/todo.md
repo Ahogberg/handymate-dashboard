@@ -1,3 +1,15 @@
+## Artiklar, mallar och ROT — 2026-09-16
+
+- [x] Fas 1: 30/30 v252-kontroller i isolerad PGlite; ingen extern migration körd.
+- [x] Fas 2: gemensam ROT/RUT-bas och raddelning, sex rättningar och `rot_work_cost` på alla fakturavägar.
+- [x] Fas 3–5: artikel-/komponent-UI, dokument/Fortnox/SKV samt jobbtypsmallar/onboarding/agentrader.
+- [x] Fas 6: specar registrerade i contracts-workflow och `test:contracts` (2 654 pass, 1 befintlig skip).
+- [x] `npx tsc --noEmit` och `npx next build` exit 0; draft-PR #86 öppnad mot main.
+- [ ] CI kör Chromium-delarna i `first-value.yml`; lokal browser-installation blockerades av CDN-timeout.
+- [ ] Claude granskar och kör v252 efter merge; Fortnox-pilot och aktuell SKV-verifiering före aktivering.
+
+---
+
 ## Financial Kernel C5 — review corrections, 2026-09-14
 
 - [x] Read PR #66 review, C5 contract and current main.
@@ -1620,4 +1632,65 @@ Verifiering: faktisk komponent, 24 tester gröna inklusive fyra tids-/förfrågn
 - [x] SQL-/route-/komponentprov och tsc.
 - [x] Bygge och publicering: PR #81, v248 endast utkast.
 - [ ] Slutlig CI på PR #81; first-value-harness kompletterat med explicit flaggmiljö och av/på-prov.
+- [ ] Native Ja/Nej: separat mobil integration enligt briefens §7, inte del av H3b.
+
+## H3b — 2026-09-15
+- [x] Läs #82, utkast v249 och de verkliga sändvägarna.
+- [x] RPC-service och de 43 SQL-kontrollerna mot v248 + v249 (plus fem skärpningsprov).
+- [x] Gemensamt leveranskontrakt med token, återförsök och okända utfall, 18 runtimeprov gröna.
+- [x] Källbunden återupptagning, tre strypunkter, autonomi och tiominuterssvep.
+- [x] Admin, kundkvitto, kontoradering och kontraktsgrind.
+- [ ] Native push i mobil-repot, separat granskning.
+- [x] Typkontroll, tester, bygge och PR-handoff.
+
+H3b checkpoint: 48 SQL-prov och 18 runtimeprov gröna. Typkontroll och
+produktionsbygge gröna. Källåterupptagning och ursprungsåtgärdens kvittens
+måste kopplas innan cron/sändvägar aktiveras; detaljer i briefens Handoff.
+Checkpointen ovan är ersatt av slutleveransen nedan. Ingen produktionsskrivning.
+
+### H3b återupptagning — kvittenser
+- [x] Återansluten arbetsmiljö och verifierad ren utgångspunkt.
+- [x] Bevara leverantörsreferens och avstängningsfakta vid återläsning.
+- [x] Läs faktiskt utfall efter förlorad claim; saknat underlag blir osäkerhet.
+- [x] 72 outbound-prov gröna, inklusive sex nya återläsnings-/samtidighetsfall.
+- [x] Källintegrationerna i H3b-paketet är slutförda; ingen aktivering.
+
+### H3b slutleverans — 2026-09-15
+- [x] Basera #83 på aktuell main och bevara båda kontraktslistorna.
+- [x] Inför en beständig, tenantbunden sändkälla för meddelanden som idag bara finns i minnet; intenten lagrar fortsatt aldrig brödtext eller bilagor.
+- [x] Koppla SMS, e-post och push till record → preflight → claim → provider → finish med stabilt producent-ID för H2:s fyra övervakade handlingar och den granskade dokumentleveransen.
+- [x] Återläs källan i svepet, kontrollera version/mottagare och stäm av ursprungsåtgärdens kvittens exakt en gång.
+- [x] Kör outbound-svepet separat från kernelarbetet inom tiominuterscronens tidsbudget.
+- [x] Visa verklig leveransstatus i överlämningsinkorgen och behåll adminhantering för okänt/uttömt utfall.
+- [x] Prova synkron leverans, kraschåterhämtning, avstängning, delvis push, tenantgränser och kvittensåterställning.
+- [x] Kör kontraktssvit, typkontroll och produktionsbygge; publicera färdig granskningshandoff i #83.
+
+Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är gröna. Hela kontraktssviten är grön efter att push-policyns källprov flyttats till den nya transportmodulen; typkontroll och Next-produktionsbygge går igenom. v249 är fortsatt ett utkast, flaggan är av och ingen extern leverans eller produktionsskrivning gjordes. Native Ja/Nej ligger fortsatt separat enligt briefens §7.
 - [ ] Native Ja/Nej och H3b cancellation: separat integrationsgranskning, inte done.
+## Planeringsfeedback 2026-09-15
+
+- [x] Återställ de fem önskemålen efter att opublicerad arbetskopia städats bort.
+- [x] Verifiera servergränser, idempotens, timmar och mobil-/datorvy på nytt.
+- [x] Koppla planeringskontroller till CI.
+- [x] Publicera grenen och öppna PR enligt kundens uttryckliga godkännande: https://github.com/Ahogberg/handymate-dashboard/pull/80.
+## Artiklar, mallar och ROT på arbetsdelen — 2026-09-16
+
+- [x] Läs briefens §1, §2, §5 samt källorna och befintliga facit som §2 pekar ut.
+- [x] Fas 1: översätt v252-utkastets 30 kontroller till `tests/line-split-sql.spec.ts`; kör inte migrationen mot Supabase (30/30 i isolerad PGlite).
+- [x] Fas 2: delad ROT-bas/splitLine, sex rättningar, resedelning och radinvariant (86/86 riktade kontrakt; TypeScript och produktionsbuild gröna).
+- [x] Fas 3–6 och slutgrind: mergade i #86 efter två granskningsomgångar (2026-09-16); v252 körd i produktion och verifierad (brief §8).
+
+## C8 Ledger schema + posting engine — 2026-09-16 (Claude bygger, Codex usage slut)
+
+- [x] `lib/ledger/service.ts`: åtta wrappers över v251, minor units som validerade strängar, ingen tolerans.
+- [x] `lib/financial-kernel/events/types.ts`: fyra FK.1-payloads typade; ARCHITECTURE.md FK.1-raderna ✅.
+- [x] `tests/helpers/ledger-database.ts` + `tests/ledger-sql.spec.ts`: briefens 48 kontroller mot riktiga v251 i PGlite (48/48).
+- [x] `lib/ledger/posting-engine.ts` + `tests/ledger-posting-engine.spec.ts`: regelregister (tomt), utkast, BigInt-balans, konsument `ledger-posting` mot riktig `consumeOnce` (7/7).
+- [x] `tests/ledger-golden-path-vouchers.spec.ts`: 39 verifikat i 18 golden paths bokförs, läses rad för rad, numreras utan luckor, replay idempotent (6/6).
+- [x] Registrering i `contracts.yml` och `test:contracts`; handoff i briefens §9; paketloggens C8-rad.
+- [x] Adversariell granskning med två oberoende läsare (2 blockers + 8 should-fix rättade, se brief §9), `tsc`, `test:six-outcomes`, `next build` gröna.
+- [x] PR #89 mergad efter grön CI; v251 körd i produktion 2026-09-17 och verifierad enligt §8.
+
+Granskning: se briefens §9 "Review". Driftläge: briefens §8. C9 är nästa paket (väntar på namngiven konsult, P0, C1b).
+
+---

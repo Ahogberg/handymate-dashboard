@@ -4,6 +4,7 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { calculateCappedDeduction } from '@/lib/rot-rut-limits'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
+import { rotRutLaborBasis, splitLine, splitTimeEntryLine } from '@/lib/rot-rut-basis'
 
 /**
  * POST - Skapa faktura från tidrapporter
@@ -76,6 +77,8 @@ export async function POST(request: NextRequest) {
         )
       }
 
+      const lineTotal = Math.round(hours * rate * 100) / 100
+      const split = splitTimeEntryLine(lineTotal, entry.work_category)
       items.push({
         id: 'ii_' + Math.random().toString(36).substr(2, 12),
         item_type: 'item',
@@ -83,10 +86,12 @@ export async function POST(request: NextRequest) {
         quantity: Math.round(hours * 100) / 100,
         unit: 'timmar',
         unit_price: rate,
-        total: Math.round(hours * rate * 100) / 100,
+        total: lineTotal,
         type: 'labor',
-        is_rot_eligible: rot_rut_type === 'rot',
-        is_rut_eligible: rot_rut_type === 'rut',
+        ...split,
+        rot_rut_type: split.is_rot_eligible ? rot_rut_type : null,
+        is_rot_eligible: split.is_rot_eligible && rot_rut_type === 'rot',
+        is_rut_eligible: split.is_rot_eligible && rot_rut_type === 'rut',
         sort_order: items.length,
         price_missing: rate === 0,
         business_user_id: entry.business_user_id ?? null,
@@ -109,6 +114,7 @@ export async function POST(request: NextRequest) {
       if (materialError) throw materialError
       for (const mat of materials || []) {
         materialIds.push(mat.material_id)
+        const total = mat.total_sell || 0
         items.push({
           id: 'ii_' + Math.random().toString(36).substr(2, 12),
           item_type: 'item',
@@ -116,10 +122,11 @@ export async function POST(request: NextRequest) {
           quantity: mat.quantity,
           unit: mat.unit || 'st',
           unit_price: mat.sell_price || 0,
-          total: mat.total_sell || 0,
+          total,
           type: 'material',
           is_rot_eligible: false,
           is_rut_eligible: false,
+          ...splitLine(total, 0, 0),
           sort_order: items.length,
         })
       }
@@ -158,9 +165,7 @@ export async function POST(request: NextRequest) {
     let rotRutDeduction = 0
     let customerPays = total
     if (rot_rut_type && resolvedCustomerId) {
-      const eligibleLabor = items
-        .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible)
-        .reduce((s: number, i: any) => s + (i.total || 0), 0)
+      const eligibleLabor = rotRutLaborBasis(items, rot_rut_type as 'rot' | 'rut')
       if (eligibleLabor > 0) {
         const capped = await calculateCappedDeduction(resolvedCustomerId, business_id, rot_rut_type as 'rot' | 'rut', eligibleLabor, { vatRate })
         rotRutDeduction = capped.deduction

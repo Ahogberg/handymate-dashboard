@@ -72,6 +72,17 @@ jobs:
         # prod-sviten, inte här.
         run: >-
           npx playwright test
+          tests/line-split-sql.spec.ts
+          tests/line-split-invariant.spec.ts
+          tests/component-rows-editor.spec.ts
+          tests/rot-basis-shared.spec.ts
+          tests/invoice-calculations-rot-split.spec.ts
+          tests/project-invoice-restid.spec.ts
+          tests/fortnox-housework-split.spec.ts
+          tests/invoice-rot-work-cost-all-paths.spec.ts
+          tests/quote-template-job-type-default.spec.ts
+          tests/document-varav-arbetskostnad.spec.ts
+          tests/share-confirmation.spec.ts
           tests/trade-start-packages.spec.ts
           tests/customer-intake-ui.spec.ts
           tests/project-receipts.spec.ts
@@ -93,6 +104,8 @@ jobs:
           tests/autonomy-digest.spec.ts
           tests/handoff-runtime.spec.ts
           tests/handoff-ui.spec.ts
+          tests/outbound-intents-sql.spec.ts
+          tests/outbound-promise.spec.ts
           tests/schema-contract.spec.ts
           tests/financial-kernel-event-contract.spec.ts
           tests/financial-kernel-c5-brief-probes.spec.ts
@@ -121,6 +134,9 @@ jobs:
           tests/financial-kernel-receivables-sql.spec.ts
           tests/financial-kernel-golden-path-replay.spec.ts
           tests/financial-kernel-golden-paths.spec.ts
+          tests/ledger-sql.spec.ts
+          tests/ledger-golden-path-vouchers.spec.ts
+          tests/ledger-posting-engine.spec.ts
           tests/betalsanning-sidodorrar.spec.ts
           tests/automation-value-honesty.spec.ts
           tests/customer-value-experience.spec.ts
@@ -273,3 +289,6 @@ jobs:
 
       - name: Livetestets företags- och skrivgrindar (utan nätverk)
         run: node --test tests/live-journey/policy.test.cjs
+
+      - name: Planering — flerpass, återförsök och timbudget
+        run: npm run test:planning

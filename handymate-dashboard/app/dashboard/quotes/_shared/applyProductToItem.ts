@@ -1,6 +1,7 @@
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
 import {
   buildItemSnapshot,
+  componentSaleTotal,
   type SnapshotComponent,
 } from '@/lib/products/build-item-snapshot'
 
@@ -14,11 +15,15 @@ import {
 
 /** Komponentrad som API:t returnerar (product_components-rad, v67). */
 export interface ProductComponentRow {
-  component_type: string
+  component_type: 'arbete' | 'material' | 'resa'
   description: string
   quantity_per_unit: number
   unit: string
   unit_cost: number
+  article_number?: string | null
+  unit_price?: number | null
+  is_rot_eligible?: boolean
+  linked_product_id?: string | null
 }
 
 /**
@@ -37,6 +42,9 @@ export interface ProductWithComponents {
   rut_eligible?: boolean
   is_favorite?: boolean
   default_labor_share?: number | null
+  default_travel_share?: number | null
+  share_source?: 'seed' | 'owner' | 'components' | 'import' | null
+  share_confirmed_at?: string | null
   category_id?: string | null
   components?: ProductComponentRow[]
 }
@@ -73,15 +81,20 @@ export function applyProductToItem(
   // Tidigare nollades radpriset → AI-matchade prislösa artiklar gav rader
   // som såg klara ut men var 0 kr.
   const unitPrice = product.sales_price > 0 ? product.sales_price : (item.unit_price || 0)
-  const total = qty * unitPrice
 
   const components: SnapshotComponent[] = (product.components ?? []).map(c => ({
-    component_type: c.component_type === 'arbete' ? 'arbete' : 'material',
+    component_type: c.component_type === 'arbete' ? 'arbete' : c.component_type === 'resa' ? 'resa' : 'material',
     description: c.description,
     quantity_per_unit: c.quantity_per_unit,
     unit: c.unit,
     unit_cost: c.unit_cost,
+    article_number: c.article_number ?? null,
+    unit_price: c.unit_price ?? null,
+    is_rot_eligible: c.is_rot_eligible ?? c.component_type === 'arbete',
+    linked_product_id: c.linked_product_id ?? null,
   }))
+  const effectiveUnitPrice = componentSaleTotal(components) ?? unitPrice
+  const total = effectiveUnitPrice * qty
 
   const snapshot = buildItemSnapshot(
     {
@@ -90,6 +103,9 @@ export function applyProductToItem(
       sku: product.sku ?? null,
       sales_price: product.sales_price,
       default_labor_share: product.default_labor_share ?? null,
+      default_travel_share: product.default_travel_share ?? 0,
+      share_source: product.share_source ?? null,
+      share_confirmed_at: product.share_confirmed_at ?? null,
     },
     components,
     qty,
@@ -107,7 +123,7 @@ export function applyProductToItem(
     description: product.name,
     quantity: qty,
     unit: normalizeUnit(product.unit),
-    unit_price: unitPrice,
+    unit_price: effectiveUnitPrice,
     total,
     article_number: product.sku ?? undefined,
     cost_price: product.purchase_price ?? undefined,
@@ -118,6 +134,7 @@ export function applyProductToItem(
     component_snapshot: snapshot.component_snapshot,
     labor_amount: snapshot.labor_amount,
     material_amount: snapshot.material_amount,
+    travel_amount: snapshot.travel_amount,
     estimated_hours: snapshot.estimated_hours,
   }
 }

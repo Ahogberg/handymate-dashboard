@@ -1,0 +1,137 @@
+# Förmågematris — ersätta Fortnox inför 2027
+
+> Första arbetsleveransen i [FORTNOX_REPLACEMENT_2027.md](FORTNOX_REPLACEMENT_2027.md), ifylld av Claude
+> 2026-09-15 från faktisk kod, [paketloggen](../strategy/FINANCIAL_KERNEL_PACKAGE_LOG.md) och
+> [den svenska domängranskningen](../strategy/FINANCIAL_KERNEL_SE_LEDGER_REVIEW.md).
+> Uppdateras vid varje milstolpe. Raderna är lästa ur koden, inte uppskattade.
+
+## Hur statusorden används
+
+Planen kräver att varje rad skiljer fyra lägen, och de är inte grader av samma sak:
+
+| Ord | Betyder |
+|---|---|
+| **Byggd** | Koden finns och är mergad. |
+| **Testad** | Automatiska kontrakt bevisar beteendet. Grön CI är inte kundbevis. |
+| **Pilotverifierad** | Ett riktigt företag har kört flödet i drift och utfallet är granskat. |
+| **Aktiverad** | Flaggan är på för den kundgruppen i produktion. |
+
+Inget i matrisen är pilotverifierat i dag. Kärnan är två dygn gammal och står i `off` för samtliga 29 företag,
+vilket är förväntat och inte ett fel: den har medvetet inte släppts på ett företag ännu.
+
+## A. Det som redan bär kundens pengaflöde
+
+Handymate fakturerar i dag och synkar till Fortnox, som gör själva bokföringen. Kolumnen visar vad vi äger.
+
+| Förmåga | Kundbehov och avgränsning | Aktuell implementation | Saknat arbete | Ansvarig | Godkännandeprov | Målperiod |
+|---|---|---|---|---|---|---|
+| Kundfakturor | Skapa, skicka, kreditera, PDF, från offert/projekt/tidrapport | **Byggd + testad.** ROT-basen rättad 2026-09-16 (#86, v252 körd): obligatorisk delning arbete/material/resa per rad, ROT bara på arbetsdelen via `lib/rot-rut-basis.ts` på alla vägar inkl. kredit, `rot_work_cost` på varje fakturaväg, blandade rader delas vid Fortnox-export. Se [artikel-/ROT-briefen](../strategy/ARTIKLAR_MALLAR_ROT_BRIEF.md) §8 | Fortnox-pilot rad för rad före bred kommunikation; konteringen saknas (rad B1) | Claude/Codex | 30 SQL-kontroller + 11 specar i briefens §6, alla i CI | — |
+| Leverantörsfakturor | Registrera, matcha, attestera | **Byggd.** `sql/v11_supplier_invoices.sql`, `app/api/supplier-invoices`, Fortnox-import och matchning | Kontering och momsavdrag (B1, B2). Attestflöde mot bokföring | Codex | Nytt kontrakt vid B1 | Oktober |
+| Betalningar och allokering | Betalning kopplas till rätt fordran, delbetalning, ROT-del, återföring | **Byggd + testad.** Kärnan C4/C5/C5b: `financial_receivables`, `financial_payments`, `financial_payment_allocations`, `execute_payment_command` | Pilotverifiering. Bankinläsning saknas (C11) | Codex | Kernel-sviterna; sedan S1-skugga på pilot | Oktober |
+| ROT/RUT | Underlag, tak, fördelning per etapp, ansökan | **Byggd + testad.** `lib/rot-rut.ts`, `lib/rot-rut-limits.ts`, `lib/rot/*`, Fortnox `housework.ts` | Kontering av skattereduktionen (SE-granskning §2.3). Direktansökan mot Skatteverket är extern | Codex + ägare | ROT-kontrakten + konsultgranskad kontering | Oktober |
+| Spårbarhet | Varje siffra ska kunna härledas till sin källa | **Byggd + testad.** `financial_events` som append-only händelselogg med idempotens, lease och skuggjämförelse | Koppling från verifikat till händelse när B1 finns | Codex | Kernel-kontrakten | Oktober |
+| Skattedeadlines | Påminnelse om moms- och arbetsgivardeklaration | **Byggd.** `lib/karin/obligations.ts`, `calendar.ts` | Det är en kalenderpåminnelse, inte en deklaration. Se C3 nedan | — | — | Klart |
+
+## B. Bokföringslagret — det som faktiskt ersätter Fortnox
+
+Detta är kärnan i frågan. Händelsekatalogen reserverar redan `journal_entry_posted`, `journal_entry_reversed`,
+`period_locked` och `period_unlocked` under rubriken *Ledger (bokföring)*. Ingenting producerar dem ännu.
+
+| # | Förmåga | Kundbehov och avgränsning | Aktuell implementation | Saknat arbete | Ansvarig | Godkännandeprov | Målperiod |
+|---|---|---|---|---|---|---|---|
+| B1 | Kontoplan och konteringsmotor | Varje affärshändelse blir ett verifikat med debet och kredit | **Brief skriven 2026-09-15**, [C8-briefen](../strategy/FINANCIAL_KERNEL_C8_BRIEF.md): v251 utkastad och bevisad i PGlite (48/48). Inget byggt i kod ännu | C8: verifikatschema, konteringsmotor, verifikatserier | Codex | 48 SQL-kontroller + golden path-återspelning + motorprov, se briefens §6 | **Oktober — Codex kan börja nu** |
+| B2 | Svenska konteringsregler | Försäljning, omvänd byggmoms, ROT, dröjsmålsränta, PSP-avgift, kundförlust | **Domänen utredd, inget byggt.** [SE-granskningen](../strategy/FINANCIAL_KERNEL_SE_LEDGER_REVIEW.md) §1–2 har reglerna och kontoförslaget; paket **C9** | C9: reglerna som kod, efter konsultgranskning | Codex + konsult | Konsultgranskat facit per regel | Oktober |
+| B3 | Bokföringsmetod | Fakturerings- kontra kontantmetod | **Delvis byggd.** `accounting_method: 'accrual' \| 'cash'` bärs redan på `invoice_issued` i kärnans händelsetyper; SE-granskningen §3 har reglerna | Metoden måste styra konteringen i C9 | Codex | Facit för båda metoderna på samma faktura | Oktober |
+| B4 | Avrundning | Öresavrundning med eget konto | **Interimslösning.** `lib/financial-kernel/policies/se-rounding.ts` säger uttryckligen att C1b ersätter den och att inget konto är valt | C1b | Codex + konsult | Konsultbeslut om konto | Oktober |
+| B5 | Krediter och rättelser | Kreditfaktura, återföring, rättelse i stängd period | **Delvis byggd.** Kreditfaktura finns i fakturalagret; kärnan har återföring av allokering. SE-granskningen §4 har reglerna | Konteringssidan (C9) och periodlås (B6) | Codex | Facit per rättelsetyp | Oktober |
+| B6 | Räkenskapsår och perioder | Periodlås, verifikatserier, spärr mot bokning i stängd period | **I C8-briefen**, utkast v251: räkenskapsår 1–18 månader, månadsperioder, lås i datumordning, auditerad upplåsning med skäl | Del av C8 | Codex | Bokning i låst period nekas (kontroll 38 och 43 i briefen) | Oktober |
+| B7 | Ingående balanser och brytdatum | Ta över mitt i ett år eller vid årsskifte | **Inget byggt.** Paket **C4b** | C4b | Codex | Balansprov mot konsultgranskat underlag | November |
+| B8 | Momsrapport | Momsdeklarationens underlag | **Inget byggt.** Paket **C13** | C13 | Codex | Facit mot konsultgranskad period | November |
+| B9 | Bankavstämning | Läs in kontohändelser, matcha mot fordringar | **Inget byggt.** Paket **C11** | C11 + bankåtkomst | Codex + ägare | Matchningsfacit på pilotens riktiga konto | November |
+| B10 | Kundreskontra över tid | Åldersfördelning, påminnelser, kundförlust | **Delvis byggd.** Fordringar och påminnelser finns; paket **C14** för livscykeln | C14 | Codex | Reskontrafacit | November |
+
+## C. Rapporter, konsult och export — och därmed gränssnittet
+
+Här ligger den lucka du pekade på: planen provar konsultresan i november men schemalägger aldrig att bygga den.
+
+| # | Förmåga | Kundbehov och avgränsning | Aktuell implementation | Saknat arbete | Ansvarig | Godkännandeprov | Målperiod |
+|---|---|---|---|---|---|---|---|
+| C1 | SIE-export | Konsult och myndighet ska kunna läsa året | **Inget byggt.** Paket **C10**; SE-granskningen §8 | C10 | Codex | SIE4 som läses in i ett annat system utan fel | November |
+| C2 | Rapportytor | Huvudbok, balans, resultat, verifikatlista, momsunderlag | **Designade**, se C5. Ingen route under `app/dashboard` rör bokföring ännu | Implementation ovanpå C8/C10 | Codex | Konsult utför en månadsavstämning i ytan | Bygge november |
+| C3 | Deklarationsinlämning | Skicka momsdeklaration | Karin påminner om datum. Inlämning sker utanför Handymate | **Inriktning satt 2026-09-15: förbereda och skicka, kunden signerar.** Signeringen görs alltid av den skattskyldige hos Skatteverket och kan inte göras via API av någon leverantör, inte heller Fortnox. Kvarstår: ansökan om partneråtkomst och organisationscertifikat, sedan C13 mot testmiljön | **Ägare (ansökan) + Codex (C13)** | Underlag som Skatteverket accepterar i testmiljön | Ansökan i september, kod i november |
+| C4 | Konsultåtkomst och byrå | **Beslut 2026-09-15: ja.** Har företaget en redovisningsbyrå ska byrån kunna logga in för sina klientföretag med egen behörighet | **Inget byggt.** Rollerna är `owner`, `admin`, `employee`; ingen konsultroll och ingen byråentitet finns | Ny roll, byråkoppling över flera företag, inbjudan, spår över vad konsulten gjort, och ägarens vy över vem som har åtkomst | Codex | Konsult arbetar en hel period med egen inloggning i två klientföretag | Oktober |
+| C6 | Kvitton och utlägg | Hantverkarens kortköp med fotograferat kvitto; den vanligaste bokföringshändelse hen själv rör | **Inget byggt.** Ingen kvittoyta, ingen tolkning | Fotoflöde i mobilen, Karins tolkning och kontoförslag, tre lägen (säker, frågar, oläsligt); ingår i C9-regelboken | Codex + Claude (Karins regler) | 60 riktiga kvitton från piloten tolkade, konsulten godkänner utfallet | Oktober |
+| C7 | Leverantörsbetalningar | Reskontra med förfallodatum, attest, och en väg att betala: betalfil till banken eller manuell markering | **Delvis.** Leverantörsfakturor och Fortnox-matchning finns; ingen reskontravy, ingen betalning | Reskontra, attestflöde, betalfil (bankgiro/ISO 20022) eller manuell kvittens. **Utan detta kan kunden inte lämna Fortnox** | Codex + ägare (bankformat) | En riktig betalfil accepterad av pilotens bank | November |
+| C8 | Manuella verifikat | Konsulten periodiserar och rättar själv | **Inget byggt.** Del av C8-motorn men behöver egen yta | Skapa verifikat för hand, återföring som pekar på originalet, inget Karin-märke | Codex | Konsult bokför en periodisering och en rättelse | Oktober |
+| C9 | Arkiv | Bokföringslagen: räkenskapsinformation bevaras i sju år, per period, uttagbar | **Delvis.** `evidence-manifest.ts` samlar underlag per faktura; ingen arkivyta, ingen retention per period | Arkivvy per period, kvittofoton och bankfiler inkluderade, export | Codex | Konsult tar ut ett helt kvartals underlag | November |
+| C5 | Huvudstruktur och utseende | Hur bokföringsdelen hänger ihop med resten av Handymate | **Designad 2026-09-15.** Tredje canvasen godkänd mot v2 punkt för punkt: [BOKFORING_UI_CANVAS_2026-09-15.dc.html](../design/BOKFORING_UI_CANVAS_2026-09-15.dc.html), elva artboards, Karin som bokförare med förtroendetrappa och av-knapp per typ, regelhänvisning på varje verifikat, byrån som egen ingång i samma produkt | Genomgång med redovisningskonsulten när en finns; hens reaktion på trappan avgör | **Ägare + konsult** | Konsulten accepterar förtroendemodellen | September: design klar. Genomgång: när konsult är på plats |
+
+### Karin bokför — svaret på "är de trygga med AI i bokföringen"
+
+Frågan ställdes 2026-09-15 vid genomgången av den första canvasen. Svaret kommer från roadmapen, som redan
+avgjort det: §2.1 säger att Handymate Accounting inte är ett bokföringsverktyg utan en tjänst som bokför själv
+och eskalerar undantag; §8 ger förtroendemodellen (hög säkerhet och deterministisk validering → bokför enligt
+företagets policy; medel → godkännandekö; låg → människa; allt spårbart). Fortnox och Visma har redan
+automatiska bokföringsförslag, så konsulterna är vana vid att programvara föreslår. Det nya är inte AI i
+bokföringen utan tre saker som gör den trygg: Karin bokför bara inom konsultens regelbok, allt hon gör syns i
+morgonkvittot och kan stängas av per typ med ett tryck (H2:s trappa), och hon rör aldrig periodlås, moms­inlämning
+eller rättelse i stängd period. Ansvaret ligger enligt bokföringslagen alltid hos företaget, oavsett verktyg,
+så Karin ändrar inte ansvarsbilden — hon ändrar vad konsulten lägger sin tid på.
+
+## D. Övergången från Fortnox
+
+| Förmåga | Aktuell implementation | Saknat arbete | Ansvarig | Målperiod |
+|---|---|---|---|---|
+| Skuggverifiering mot Fortnox | **Byggd + testad** för betalningar (C6, S1-läge, nivå 1-jämförelse, kill switch) | **C12** utökar skuggan till bokföringen när C8 finns | Codex | November |
+| Historisk återspelning | Inget kört | Isolerad testmiljö, Christoffers år som referens | Codex + konsult | Oktober |
+| Företagsvis övergångsplan | Inget | Balanser, öppna poster, historikåtkomst, ansvar | Ägare + konsult | December |
+
+## E. Uttryckligt utanför första kundgruppen
+
+Planen kräver att dessa klassificeras, inte lämnas öppna: **lön** är utanför, **deklarationsinlämning** är
+beslut D3, **betalväxel** är paket C7 och inte nödvändigt för att lämna Fortnox, **årsredovisning** är
+utanför och sker hos konsulten. Ingen av dessa markeras färdig av matrisen.
+
+## Beroenden — det viktigaste i hela dokumentet
+
+**C8, konteringsmotorn, är ofri just nu och har en brief sedan 2026-09-15.** Paketloggen anger dess blockerare till C2 och C3, och båda är
+mergade sedan 2026-09-13 respektive 09-14. Ingenting hindrar att den börjar i dag, och nästan allt i avsnitt
+B och C hänger på den: C9, C10, C12 och C13 väntar alla på C8. Det är den enskilt viktigaste raden i matrisen.
+
+**Fyra grindar är dina, inte Codex.** De blockerar mer än de ser ut att göra:
+
+| Grind | Blockerar | Läge |
+|---|---|---|
+| Namngiven redovisningskonsult | C1b, C9, B2, B4, hela facitstrategin | Öppen sedan starten |
+| P0 merchant of record (D1) | C9 | Öppen |
+| D3 producera eller lämna in deklaration | C13, C3 | **Inriktning satt**: förbereda och skicka. Kvar: ansökan, som tar månader |
+| D4 brytdatum och övertagandeår | C4b, B7 | Öppen |
+
+Konsulten är den hårdaste. Utan namngiven konsult finns inget granskat facit, och utan facit kan
+konteringsreglerna byggas men aldrig godkännas. Det gör konsultvalet till september månads viktigaste beslut,
+inte ett administrativt ärende.
+
+**Designen är inte blockerad av något, och är påbörjad.** Avsnitt C rad 5 och rad 2 kan börja innan en enda verifikatrad finns.
+Vad en konsult behöver se för att våga signera är besvarbart ur domänen i dag, och svaret avgör vilka flöden
+som måste byggas. Det är därför designen hör hemma i september och inte efter konteringsmotorn.
+
+## Vad matrisen säger om den 30 november
+
+Faktureringen, betalningarna, ROT och spårbarheten är byggda och testade. Bokföringslagret är noll rader kod
+med utredd domän. Mellan dessa två ligger tio paket, varav fyra väntar på beslut som bara du kan fatta.
+
+Bedömningen är alltså inte att januari är omöjligt, utan att den avgörs av två saker i september: att en
+konsult är på plats, och att C8 startar. Släpar någon av dem är det omfattningen som ska krympa, inte datumet
+som ska flyttas — planen säger själv att ett företag vars nödvändiga flöden saknar stöd inte kvalificerar.
+
+## Ändringslogg
+
+- **2026-09-16 (kväll):** #86 mergad och v252 körd i produktion; rad Kundfakturor: ROT-basen rättad på alla fakturavägar, återstår Fortnox-pilot rad för rad.
+- **2026-09-16:** Artikel-, mall- och ROT-briefen skriven ([ARTIKLAR_MALLAR_ROT_BRIEF.md](../strategy/ARTIKLAR_MALLAR_ROT_BRIEF.md)) efter granskning av kod och produktion: artiklarna är kopplade till offerterna, delningen arbete/material finns i schemat men används i 10 av 122 rader, ROT räknas på hela raden på sex ställen (fakturamotorn främst), 2 av 39 offerter har använt en mall. v252 utkastad och bevisad (27/27). Rad Kundfakturor uppdaterad.
+- **2026-09-15 (natt, senare):** C8-briefen skriven ([FINANCIAL_KERNEL_C8_BRIEF.md](../strategy/FINANCIAL_KERNEL_C8_BRIEF.md)): konton, räkenskapsår, månadsperioder, verifikatserier med lucklös numrering i samma transaktion, återföring som nytt verifikat, periodlås med auditerad upplåsning, och en tom regelmotor som kernelkonsument. Inget konto, ingen serie, ingen regel och ingen flagga beslutas i C8. Rad B1 och B6 uppdaterade.
+- **2026-09-15 (natt):** Designen klar. Tredje canvasen kontrollerad mot v2: av-knapp per händelsetyp med efterläge, regelhänvisning på varje Karin-verifikat, byrån som samma produkt. Sparad som designreferens i `docs/design/`. Regelnumren i canvasen (regel 2, 3, 4, 5, 11, 12) är designens platshållare, inte C9:s regelbok — den skrivs med konsulten.
+- **2026-09-15 (sent):** Första canvasen granskad. Fyra ytor saknades och är nu rader C6–C9: kvitton och utlägg, leverantörsbetalningar, manuella verifikat, arkiv. Karin som bokförare bekräftad mot roadmapens §2.1 och §8; version 2 av designprompten skriven.
+- **2026-09-15 (kväll):** Två beslut inskrivna. Byråer ska kunna logga in för sina klientföretag (rad C4). Inriktningen för D3 är förbereda och skicka där kunden signerar, vilket är det starkaste någon leverantör kan erbjuda. Designprompten för de åtta ytorna skriven (rad C5).
+- **2026-09-15:** Matrisen ifylld från kod av Claude. Femton förmågor lästa ur implementationen, tio paket
+  identifierade som saknade, fyra ägargrindar listade. C8 konstaterad ofri. Design av huvudstruktur och
+  rapportytor lagd i september eftersom inget blockerar den.

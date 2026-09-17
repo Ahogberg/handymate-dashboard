@@ -42,6 +42,9 @@ export interface MappedInvoiceItem {
   article_number: string | null
   /** Arbetsandelen av raden (v67) — ROT-basens sanning. ?? -kopierad: 0 giltigt. */
   labor_amount: number | null
+  material_amount: number | null
+  travel_amount: number | null
+  category_slug: string | null
   /** Produktkopplingen — utan den bryts marginaluppföljning, Fortnox
       ArticleNumber och prisåterkopplingen till artikelbanken vid fakturan. */
   linked_product_id: string | null
@@ -91,6 +94,9 @@ export function mapQuoteItemsToInvoiceItems(
         cost_price: item.cost_price ?? null,
         article_number: item.article_number ?? null,
         labor_amount: item.labor_amount ?? null,
+        material_amount: item.material_amount ?? null,
+        travel_amount: item.travel_amount ?? null,
+        category_slug: item.category_slug ?? null,
         linked_product_id: item.linked_product_id ?? null,
       }
     })
@@ -103,16 +109,4 @@ export function mapQuoteItemsToInvoiceItems(
  * ?? är avsiktligt: labor_amount 0 = ren material och ska ge bas 0, inte
  * falla tillbaka på radtotalen. Rabatt-/rubrik-/delsummerader räknas aldrig.
  */
-export function rotRutLaborBasis(
-  items: Array<Pick<MappedInvoiceItem, 'item_type' | 'quantity' | 'unit_price' | 'labor_amount'> &
-    { is_rot_eligible?: boolean; is_rut_eligible?: boolean }>,
-  type: 'rot' | 'rut',
-): number {
-  return (items || [])
-    .filter(i => (i.item_type || 'item') === 'item')
-    .filter(i => (type === 'rot' ? i.is_rot_eligible : i.is_rut_eligible))
-    .reduce((sum, i) => {
-      const rad = Number(i.quantity || 0) * Number(i.unit_price || 0)
-      return sum + Number(i.labor_amount ?? rad)
-    }, 0)
-}
+export { rotRutLaborBasis } from '@/lib/rot-rut-basis'

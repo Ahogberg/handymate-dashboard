@@ -122,16 +122,11 @@ export async function POST(request: NextRequest) {
     let rotRutDeduction = quote.rot_rut_deduction || 0
     let customerPays = quote.customer_pays || total
     if (quote.rot_rut_type && quote.customer_id) {
-      const rate = quote.rot_rut_type === 'rot' ? 0.30 : 0.50
       // Basen från RADERNA (A1): labor_amount ?? radtotal per berättigad rad —
       // nu när mapparen bevarar labor_amount är radbasen sanningen. Legacy-
-      // offerter utan radflaggor: fall tillbaka på quotens lagrade
-      // arbetskostnad, sist härledning ur avdraget (gamla beteendet).
-      const radBas = rotRutLaborBasis(items, quote.rot_rut_type as 'rot' | 'rut')
-      const workCost = quote.rot_rut_type === 'rot' ? quote.rot_work_cost : quote.rut_work_cost
-      const laborCost = radBas > 0
-        ? radBas
-        : (workCost || (quote.rot_rut_deduction ? quote.rot_rut_deduction / rate : 0))
+      // Radbasen är den enda sanningen. `labor_amount = 0` får aldrig
+      // ersättas av en baklängeshärledning från ett gammalt avdrag.
+      const laborCost = rotRutLaborBasis(items, quote.rot_rut_type as 'rot' | 'rut')
       if (laborCost > 0) {
         const capped = await calculateCappedDeduction(
           quote.customer_id,

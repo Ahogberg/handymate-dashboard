@@ -232,9 +232,7 @@ export async function POST(request: NextRequest) {
       // A1: respektera arbetsandelen när den finns — labor_amount ?? radtotal
       // (?? så att 0 = ren material ger bas 0). Filtret behålls brett
       // (type==='labor' utan flaggor täcker manuella/klientbyggda rader).
-      const laborCost = items
-        .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible || i.type === 'labor')
-        .reduce((sum: number, i: any) => sum + Number(i.labor_amount ?? (i.quantity * i.unit_price)), 0)
+      const laborCost = rotRutLaborBasis(items, rot_rut_type as 'rot' | 'rut')
 
       const cappedResult = await calculateCappedDeduction(
         customer_id,
@@ -248,9 +246,7 @@ export async function POST(request: NextRequest) {
       customerPays = total - rotRutDeduction
       rotRutWarning = cappedResult.warning
     } else if (rot_rut_type && !customer_id) {
-      const laborCost = items
-        .filter((i: any) => i.is_rot_eligible || i.is_rut_eligible || i.type === 'labor')
-        .reduce((sum: number, i: any) => sum + (i.quantity * i.unit_price), 0)
+      const laborCost = rotRutLaborBasis(items, rot_rut_type as 'rot' | 'rut')
       // Utan kund kan årstaket inte kollas — men momsbasen och 50/75k-taket
       // ska ändå vara rätt (delade kärnan, samma som customer_id-grenen ovan).
       rotRutDeduction =

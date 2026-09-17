@@ -123,6 +123,15 @@ export const BEHALLS: string[] = [
   'financial_payments',
   'financial_payment_allocations',
   'financial_receivable_adjustments',
+  // Financial Kernel C8 (v251, utkast): räkenskapsinformation bevaras sju år
+  // efter räkenskapsårets slut (blueprint §36.2) och överlever prenumerationen.
+  'ledger_accounts',
+  'ledger_fiscal_years',
+  'ledger_periods',
+  'ledger_journals',
+  'ledger_voucher_counters',
+  'ledger_entries',
+  'ledger_entry_lines',
   'financial_event_consumers',
   'financial_event_deliveries',
 
@@ -158,6 +167,8 @@ export const BEHALLS: string[] = [
 // scopad ordning (se header för varför en enda naiv ordning inte räcker).
 // ─────────────────────────────────────────────────────────────────────────
 export const RADERAS: string[] = [
+  'outbound_messages',
+  'outbound_intents',
   'quote_acceptance_completion', // återhämtningsjournal för kundens offertaccept
   'lead_intake_request', // mottagna förfrågningar innehåller kundens kontaktuppgifter
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { isAdmin } from '@/lib/admin-auth'
 import { getServerSupabase } from '@/lib/supabase'
@@ -79,6 +80,8 @@ export async function POST(request: NextRequest) {
         total: 2600,
         type: 'labor',
         is_rot_eligible: true,
+        rot_rut_type: 'rot',
+        ...splitLine(2600, 1, 0),
       },
       {
         id: 'ii_test2',
@@ -90,6 +93,8 @@ export async function POST(request: NextRequest) {
         total: 450,
         type: 'material',
         is_rot_eligible: false,
+        rot_rut_type: null,
+        ...splitLine(450, 0, 0),
       },
     ]
 
@@ -109,6 +114,8 @@ export async function POST(request: NextRequest) {
       vat_rate: 25,
       vat_amount: vatAmount,
       total,
+      rot_rut_type: 'rot',
+      rot_work_cost: rotRutLaborBasis(items, 'rot'),
       customer_pays: total,
       invoice_date: new Date().toISOString().split('T')[0],
       due_date: dueDate.toISOString().split('T')[0],

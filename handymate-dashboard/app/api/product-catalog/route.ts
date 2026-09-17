@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
-import { getProductCatalog, resolveBranches, type ProductDefault } from '@/lib/product-defaults'
+import { getProductCatalog, productDefaultTravelShare, resolveBranches, type ProductDefault } from '@/lib/product-defaults'
 import { rankBySearchMatch, scoreProductMatch } from '@/lib/products/search-ranking'
 
 // Auth läses i helpern. Utan force-dynamic kan första företagets katalogläge
@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 
 type CatalogProduct = Omit<ProductDefault, 'unit_price' | 'legacy_category'> & {
   imported: boolean
+  travel_share: number
 }
 
 async function loadContext(businessId: string) {
@@ -61,6 +62,7 @@ function publicCatalogRow(
     unit: product.unit,
     category: product.category,
     labor_share: product.labor_share,
+    travel_share: productDefaultTravelShare(product),
     deduction: product.deduction,
     imported: isImported(product, importedSkus, importedNames),
   }
@@ -155,13 +157,16 @@ export async function POST(request: NextRequest) {
         purchase_price: null,
         sales_price: 0,
         markup_percent: null,
-        rot_eligible: product.deduction === 'rot',
+        rot_eligible: productDefaultTravelShare(product) === 0 && product.deduction === 'rot',
         rut_eligible: product.deduction === 'rut',
         vat_rate: 0.25,
         is_active: true,
         is_favorite: false,
         category_id: null,
         default_labor_share: product.labor_share,
+        default_travel_share: productDefaultTravelShare(product),
+        share_source: 'import',
+        share_confirmed_at: null,
       })
       if (error) {
         // Samtidiga dubbelklick eller två flikar får inte göra en redan

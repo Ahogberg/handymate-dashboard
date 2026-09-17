@@ -24,11 +24,11 @@ The volumes are small and mostly ours. The shapes are not.
 
 | Package | What | Owner | Status | Blocked on |
 |---|---|---|---|---|
-| H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **ready — brief §3** | — |
-| H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **ready — brief §4**; owner decision taken 2026-09-15 (explicit consent, no implicit default-on) | H3a merged (pre-flight is a precondition) |
-| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **implemented, in review** (PR #78 `ec1364ea`, reviewed 2026-09-15: 1 MEDIUM — failed provider check cached 10 min; 6 LOW; 337 tests + tsc green locally) | M1 fix → merge; then `v245_handoff_reliability.sql`, `CHANNEL_PREFLIGHT_ENABLED` on pilot |
-| H3b | Durable outbound promises: `outbound_intents` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | sketched (§5b); Claude drafts DDL after H3a | H3a |
-| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **implemented, in review** (PR #78; root cause = 198/198 credit errors; seeded rule now delivers the deterministic brief without the LLM — owner should note the product change) | merge with H3a; `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
+| H1 | Never a silent expiry: notices vs decisions, expiry becomes a visible summary, three decisions a day | Codex | **done 2026-09-15** (PR #81 merged `263ce4a5` after the three MEDIUM fixes; v248 applied and verified) | `HANDOFF_INBOX_ENABLED` on the pilot; native Ja/Nej in push still open |
+| H2 | Autonomy for the four allowlisted keys after one explicit onboarding consent, supervised by the daily digest, one-tap off | Codex | **done 2026-09-15** (PR #81; explicit one-shot consent, four keys supervised, off with 30-day cooldown and revocation trigger) | `SUPERVISED_AUTONOMY_ENABLED` + `AUTONOMY_OFF_SECRET`; cancel-on-off of queued sends lands with H3b (v249) |
+| H3a | Channel pre-flight: no card and no send without a working channel; the home screen says what is missing | Codex | **done 2026-09-15** (PR #78 merged `c09364e7` after M1 fix: failed provider check no longer cached, six new tests; 305 tests + tsc green locally, CI 13/13; v246 applied to production and verified) | activation: `CHANNEL_PREFLIGHT_ENABLED` on pilot; optional `RESEND_PREFLIGHT_API_KEY` if the production Resend key is sending-only |
+| H3b | Durable outbound promises: `outbound_intents` + `outbound_messages` modelled on `financial_effect_intents` for SMS, e-mail and push | Codex | **done 2026-09-16** (PR #83 merged `6732ebd6` after review M1–M5/L1–L5 fixed; v249 applied and verified; [implementation handoff](../../handymate-dashboard/docs/strategy/H3B_IMPLEMENTATION.md)) | `OUTBOUND_INTENTS_ENABLED` on the pilot together with `CHANNEL_PREFLIGHT_ENABLED`; one recovered deferred send and one resolved `unknown` before widening; retention of `outbound_messages` still to decide |
+| H4 | Morgonrapporten delivers or says why: root cause of `run_agent` failures, one retry, its own driftlarm line | Codex | **done 2026-09-15** (PR #78; root cause 198/198 credit errors; seeded rule delivers the deterministic brief without the LLM, one retry via cron `*/10`, own driftlarm line; v246 `morning_report_runs` applied) | activation: `MORNING_REPORT_RELIABILITY_ENABLED` on pilot |
 
 Order: H3a and H4 first (they decide whether the customer can trust anything), then H1 and H2 together.
 Codex's own priority 1 (first real job) runs in parallel; its single metric is in §7.
@@ -53,7 +53,7 @@ and `app/api/agent/trigger/tool-router.ts` (per-type expiries), `lib/approvals/s
 |---|---|
 | **Two kinds of card, declared per type: `decision` and `notice`.** A `decision` needs the customer (money, a customer-facing send, a commitment). A `notice` is information Handymate prepared (checklist, microsite draft, team intro, debrief, deadline note). Notices never expire into nothing: they live in *Inkorg* without a deadline, and a notice older than 30 days is folded into a monthly "Vi la det åt sidan" line, never deleted. | Expiry data shows the high-expiry types are notices. Asking for approval where nothing is at stake trains the customer to ignore cards. |
 | **A decision that reaches `expires_at` is reported, not dropped.** Status still becomes `expired` (v241's trigger already writes `opportunity_dismissed`), but the sweep collects the day's expiries per business and the next morning push carries "3 förslag fick inget svar" with the three titles and one link. `payload.expiry_reported_at` marks it. Per-type expiries (missed-revenue, quote-follow-up, tool-router) route through the same collector. | The customer must learn what Handymate stopped doing on their behalf. Today the only trace is a log line. |
-| **Three decisions a day.** The morning push (existing `push-morgon` / `tyst-tid`) shows at most three open decisions. Cards with a deadline come first: soonest deadline, then highest money, then age. Never-expiring internal gates fill any remaining slots by age; the rest wait. A decision is answerable from the push with "Ja / Nej" where the card type supports it (start with `send_sms` and `invoice_reminder`). | Old internal gates must not occupy all three slots forever while customer sends approach their deadline. The craftsman's channel is the phone. |
+| **Three decisions a day.** The morning push (existing `push-morgon` / `tyst-tid`) shows at most three open decisions. Cards with a deadline come first: soonest deadline, then highest money, then age. Never-expiring internal gates fill any remaining slots by age; the rest wait. A decision is answerable from the push with "Ja / Nej" where the card type supports it (start with `send_sms` and `invoice_reminder`). | Median pending age 6.8 days says the pile is the problem, not the decisions. Old internal gates must not occupy all three slots forever while customer sends approach their deadline. The craftsman's channel is the phone. |
 | **Expiry windows are explicit per type, never a default.** Money and customer-facing sends: 7 days. Autonomy offers: 14 days. Notices and internal work gates: none. The fourteen internal gates are `four_eyes_quote`, `four_eyes_project_close`, `review_auto_invoice`, `time_attestation`, `tidrapport_forslag`, `checklist_forslag`, `egenkontroll_foto`, `egenkontroll_avvikelse`, `job_report`, `lead_review`, `installation_register`, `manual_project_create`, `project_debrief`, `karin_deadline`. | Owner decision (Andreas, 2026-09-15): silently dropping a four-eyes check or statutory acknowledgement is worse than an old open card. A new type must not silently inherit seven days. |
 
 ### Scope
@@ -75,7 +75,8 @@ tests/morning-decisions.spec.ts            (≤3, ordering, quiet hours untouche
 1. Every `approval_type` that can be created is classified `decision` or `notice` and has an explicit `7 | 14 | null` expiry entry; the contract test lists them by scanning `skapaKort` callers and `tool-router`.
 2. A `notice` is never created with `expires_at` and is never set to `expired` by any cron.
 3. Every `decision` that becomes `expired` appears in exactly one morning push summary for its business, within 24 h, and carries `payload.expiry_reported_at` afterwards. A card already reported is never reported again.
-4. The morning push never lists more than three decisions; when more are open it says how many wait.
+4. The morning push never lists more than three decisions; when more are open it says how many wait. A decision with a deadline always outranks a never-expiring internal gate, however old the gate is.
+6. `expiryFor(type)` is explicit per type — days or `null`. A type missing from the map is a build error via the contract test, never a silent 7 days, and the same split is mirrored in the migration's normalising trigger.
 5. v241's producers are untouched: an expiry still yields exactly one `opportunity_dismissed`.
 
 ## 4. H2 — Autonomy on from day one, supervised
@@ -135,17 +136,16 @@ Invariants: (1) no `send_sms` card is created while the balance is zero; (2) a s
 failing channel is logged `skipped` with a `saldo`/`konfiguration` reason, never `failed`; (3) one notice
 per business, channel and day; (4) the banner and the notice are computed by the same function.
 
-### 5b. Durable outbound promises (sketch; DDL drafted by Claude after 5a lands)
+### 5b. Durable outbound promises (this package now has its own brief)
 
-Generalise `financial_effect_intents`: an `outbound_intents` table with `business_id, kind (sms|email|push),
-source (automation_log|approval|autonomy), source_id, recipient, template, status
-(pending|attempting|sent|failed|skipped|unknown), attempts, attempt_token, claimed_at, finished_at,
-last_error, provider_ref`, the same claim/finish/unknown RPC trio, a sweep in the existing 10-minute kernel
-cron, and the same admin resolution with actor and reason. Every outbound message from automations,
-approvals and autonomy becomes an intent first; the customer-facing status ("Skickat 08:12", "Väntar på
-saldo", "Kunde inte skickas") is read from it. Lost acknowledgements become `unknown`, never a second
-send. This is what makes Codex's priority 2 ("vad teamet gör härnäst, när det sker") a fact rather than
-a text.
+Written up in full, with the drafted migration and 43 proven checks, in
+[H3B_OUTBOUND_INTENTS_BRIEF.md](H3B_OUTBOUND_INTENTS_BRIEF.md). In short: `outbound_intents` generalises
+`financial_effect_intents` to SMS, e-mail and push, so every outbound message becomes a durable promise
+before a provider is called. The customer-facing status ("Skickat 08:12", "Väntar på saldo", "Kunde inte
+skickas") is read from that row, a lost acknowledgement becomes `unknown` rather than a second send, and
+`stop_supervised_autonomy` cancels the queue in the same transaction as the revoke — which is what closes
+H2's fourth invariant. The migration is `v249`, not the originally reserved `v247`, because it replaces a
+function that v248 introduces.
 
 ## 6. H4 — Morgonrapporten delivers or says why
 
@@ -179,6 +179,55 @@ Same §7 block as the other logs, under a new §Handoffs here. Claude reviews H1
 §6 A + B; H3b gets a DDL draft and PGlite probe from Claude before Codex implements it.
 
 ## Handoffs
+
+### 2026-09-16 — Claude: #83 merged, v249 applied (deployment state)
+
+Re-reviewed on `04c62e45` + the one-line spec fix `137d3d5c`: the blocker (first-value harness) and M1–M5 are closed
+as reviewed — push keeps the legacy path unless an autonomy key is claimed, a deferred supervised send leaves the audit
+open for the sweep, permanent source errors consume an attempt and alarm, partial push acceptance is terminal `sent`,
+and `autonomy_key` reaches the ledger only while `SUPERVISED_AUTONOMY_ENABLED` is on. `outbound_messages` is now keyed
+on `(business_id, dedupe_key)`. CI 13/13 on the merged head.
+
+`v249_outbound_intents.sql` applied to production via Supabase MCP and verified read-only: two tables with RLS and
+`SELECT, DELETE` for service_role only, no anon/authenticated grants, 12 of 12 functions present, EXECUTE for
+service_role on the RPCs and on `stop_supervised_autonomy` (which now calls `cancel_outbound_intents`), none for
+anon/authenticated, `outbound_lock` executable by no role, zero rows in both tables. Advisor: only the expected INFO
+(RLS enabled without a policy) on the two new tables; no new WARN. All flags remain unset.
+
+### 2026-09-15 — Claude: #81 merged, v248 applied (deployment state)
+
+Re-reviewed on `e61d3d05`: the three MEDIUM are closed (backfill no longer shortens a live window, digest types stay
+notices and keep their activity history, reminder outcomes classify correctly) and the owner decision is implemented as
+an explicit per-type expiry axis that fails to compile when a new card type is added without a policy. Locally 435 tests,
+the recovery harness and `tsc` green; CI 13/13.
+
+`v248_handoff_inbox_consent.sql` applied to production via Supabase MCP and verified read-only: four tables with RLS and
+no client grants, eleven SECURITY DEFINER RPCs with EXECUTE for service_role only (the two classification functions are
+pure `IMMUTABLE` SQL, by design), all three triggers installed, 165 cards reclassified as notices, 15 pending internal
+gates now hold no deadline, and **zero** pending cards sit past a deadline — so no batch expiry on the first maintenance
+run. All four new tables are empty. Advisor: only the expected INFO (RLS enabled without a policy, the same shape as
+every other service-only table); no new WARN. Both flags remain unset.
+
+The H3a review's last carry is also closed: `v250_handoff_reliability_grants.sql` applied and verified, so
+`channel_notices` and `morning_report_runs` are `SELECT, DELETE` for service_role only like every other
+service-only table. All four usages in the codebase are reads; the three RPCs remain callable.
+
+
+
+### 2026-09-15 — Claude: #78 merged, v246 applied (deployment state)
+
+`v246_handoff_reliability.sql` applied to production via Supabase MCP after the merge and verified read-only:
+`channel_notices` and `morning_report_runs` with RLS, `record_channel_notice` / `claim_morning_report` /
+`finish_morning_report` SECURITY DEFINER with EXECUTE for service_role only, `morning_report_due` index, 0 rows,
+10 seeded morning-report rules match the claim predicate. Advisor: no new WARN. Both flags unset.
+
+One LOW for H3b's DDL: v246 revokes table privileges from PUBLIC/anon/authenticated but not from service_role,
+so service_role keeps Supabase's default ALL on both tables (v244 revoked service_role too). The app only
+writes through the RPCs, so nothing is exposed; tighten to SELECT,DELETE when H3b's migration touches these
+tables. Review record: 1 MEDIUM (fixed on `c0859d92`), 6 LOW carried (execution-time `kontrollfel` is
+fail-closed; missing-recipient copy on invoice reminders; `channel_notices` has no reader until H1; the
+morning report no longer uses the LLM — owner informed; `[class]` prefix on all `run_agent` errors; numbering).
+
 
 ### 2026-09-15 — Codex H3a/H4 implementation for Claude review
 

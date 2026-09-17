@@ -277,6 +277,8 @@ export async function GET(request: NextRequest) {
               ...(!mandateResolution.covered ? {autonomyKey:'quote_followup_sms' as const} : {}),
               recipient: 'customer',
               purpose: 'proactive',
+              outbound: { source: 'cron', sourceId: `quote-expiry:${q.quote_id}`,
+                dedupeKey: `quote-expiry:${q.quote_id}`, template: 'quote-expiry-nudge' },
             })
             if (smsResult.success) {
               // Etapp K (SMS-kvoten i strypunkten, 2026-08-17): sendSmsViaElks

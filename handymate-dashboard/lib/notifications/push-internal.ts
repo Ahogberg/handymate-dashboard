@@ -33,6 +33,13 @@ export interface InternalPushPayload {
   /** Klassens TTL/prioritet (lib/notifications/push-policy.ts). Utelämnad = beslut-klassens. */
   ttl_seconds?: number
   priority?: 'high' | 'normal'
+  outbound?: {
+    source: 'approval' | 'automation_log' | 'autonomy' | 'cron' | 'manual'
+    source_id: string
+    dedupe_key: string
+    template: string
+    autonomy_key?: string
+  }
 }
 
 export interface InternalPushResult {

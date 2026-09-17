@@ -39,11 +39,11 @@ Rules that keep this file honest:
 | C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
 | C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **done 2026-09-14** (PR #73 merged after base merge `8400f720`; review §5: no BLOCKER, 3 LOW; [C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md)) | flip itself: v239 → v240 → v242 applied, crons live, PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
-| C8 | Ledger schema + posting engine | Codex | not started | C2, C3 |
-| C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
-| C10 | Read-only Ledger projections + SIE export | Codex | not started | C8 |
+| C8 | Ledger schema + posting engine | Claude (Codex usage exhausted 2026-09-16) | **done 2026-09-17** (PR #89 merged after two adversarial reviews; v251 applied to production and verified, [C8 brief](FINANCIAL_KERNEL_C8_BRIEF.md) §8/§9) | — |
+| C9 | SE posting rules | Codex | not started | P0, C1b, named accountant (C8 done) |
+| C10 | Read-only Ledger projections + SIE export | Codex | not started | — (C8 done) |
 | C11 | Bank/reconciliation | Codex | not started | C4, bank access (Sprint −1) |
-| C12 | Fortnox shadow verifier | Codex | not started | C6, C8 |
+| C12 | Fortnox shadow verifier | Codex | not started | C6 (C8 done) |
 | C13 | VAT return primitives | Codex | not started | C9, D3 (file vs produce) |
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
@@ -455,7 +455,15 @@ Contract / remaining work
   R0/P0/C1b and owner decisions remain unchanged. **No v239 in production and no feature
   flag activation before C5 merge and the owner's C6 pilot selection.**
 
-## 3. Next package — Codex brief: C6 shadow payment mode (S1 for one pilot business)
+## 3. Next package — Codex brief: C8 Ledger schema + posting engine
+
+> 2026-09-15: C6 is done (#73). The next package is **C8**, briefed in its own file:
+> [`FINANCIAL_KERNEL_C8_BRIEF.md`](FINANCIAL_KERNEL_C8_BRIEF.md) — decisions, `sql/v251_ledger_posting_engine.sql`
+> drafted and proven (48 PGlite checks), scope, invariants, the two TypeScript specs, and the handoff fields.
+> C8 ships no account, no series set, no rule and no flag; C9 needs the named consultant first.
+> The C6 brief below is kept as the record of what #73 implemented.
+
+### Previous package — C6 shadow payment mode (S1 for one pilot business), briefed 2026-09-14
 
 > Goal: the first flag flip becomes a *phase* that is explicit, dated, auditable and reversible with a
 > reason, and every day the kernel's view of each pilot invoice is compared with Fortnox at Level 1 and
@@ -910,6 +918,13 @@ become callers in C5s. Golden path 20 is the acceptance replay.
 `OPEN_SOURCE_ACCOUNTING_LANDSCAPE.md` §5: it names the reference data (Odoo core `l10n_se`,
 LGPL), the official schemas (HUS v6, camt.053/054, SIE 4/5) and the licence rules (AGPL and
 GPL code is read, never copied).
+
+**Artiklar/ROT (utanför kärnan, rör fakturans ROT-bas).** Briefed 2026-09-16 in
+[`ARTIKLAR_MALLAR_ROT_BRIEF.md`](ARTIKLAR_MALLAR_ROT_BRIEF.md): mandatory labour/material/travel split per line,
+ROT base = Σ labour only, `rot_work_cost` written on every invoice path (the kernel's customer/tax_authority
+split in v238 reads it), Fortnox HouseWork rows split for mixed lines. **Done 2026-09-16:** PR #86 merged
+(`71c10ea9`) after two review rounds, v252 applied to production and verified (brief §8). Not a kernel package;
+listed here because C9's ROT posting rule and the SKV file depend on the corrected base, which now exists.
 
 **C1b — rounding policy.** Cannot start until a named accounting consultant confirms the
 rounding account (parent §5 proposes 3740; that is a proposal). Add the person's name to §1 of

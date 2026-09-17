@@ -6,6 +6,7 @@ import { rotRutDeductionInclVat } from '@/lib/rot-rut'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { rotRutLaborBasis, splitTimeEntryLine } from '@/lib/rot-rut-basis'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,7 +57,7 @@ export async function GET(request: NextRequest) {
   // Hämta ofakturerade tidposter
   const { data: timeEntries, error: timeError } = await supabase
     .from('time_entry')
-    .select('time_entry_id, description, work_date, duration_minutes, hourly_rate, is_billable, business_user_id, invoiced')
+    .select('time_entry_id, description, work_date, duration_minutes, hourly_rate, is_billable, business_user_id, work_category, invoiced')
     .eq('business_id', business.business_id)
     .eq('project_id', projectId)
     .or('invoiced.is.null,invoiced.eq.false')
@@ -98,6 +99,9 @@ export async function GET(request: NextRequest) {
         `Timpris saknas för "${te.description || `Arbete ${te.work_date}`}" — sätt pris manuellt innan fakturan skickas.`,
       )
     }
+    const total = rate ? Math.round(hours * rate) : 0
+    const category = te.work_category || 'work'
+    const split = splitTimeEntryLine(total, category)
     return {
       source: 'time_entry' as const,
       source_id: te.time_entry_id,
@@ -105,9 +109,10 @@ export async function GET(request: NextRequest) {
       quantity: Math.round(hours * 100) / 100,
       unit: 'tim',
       unit_price: rate || 0,
-      total: rate ? Math.round(hours * rate) : 0,
-      is_rot_eligible: true,
-      is_rut_eligible: false,
+      total,
+      work_category: category,
+      category_slug: category === 'travel' ? 'resa' : category === 'work' ? 'arbete_tid' : 'ovrigt',
+      ...split,
       date: te.work_date,
       price_missing: !rate,
     }
@@ -134,6 +139,9 @@ export async function GET(request: NextRequest) {
     total: m.total_sell || Math.round((m.quantity || 1) * (m.sell_price || m.purchase_price || 0)),
     is_rot_eligible: false,
     is_rut_eligible: false,
+    labor_amount: 0,
+    material_amount: m.total_sell || Math.round((m.quantity || 1) * (m.sell_price || m.purchase_price || 0)),
+    travel_amount: 0,
   }))
 
   const laborTotal = laborLines.reduce((s: number, l: any) => s + l.total, 0)
@@ -246,17 +254,13 @@ export async function POST(request: NextRequest) {
   // Kapa mot kundens ÅRSUTRYMME (ej bara engångstaket) — annars kan avdraget
   // bli för högt om kunden redan använt sitt ROT/RUT och Skatteverket nekar.
   if (rot_rut_type === 'rot') {
-    rotWorkCost = items
-      .filter((i: any) => i.is_rot_eligible)
-      .reduce((s: number, i: any) => s + (i.total || 0), 0)
+    rotWorkCost = rotRutLaborBasis(items, 'rot')
     rotDeduction = customer_id && rotWorkCost > 0
       ? (await calculateCappedDeduction(customer_id, business.business_id, 'rot', rotWorkCost, { vatRate: vat_rate, discountFactor })).deduction
       : Math.round(rotRutDeductionInclVat('rot', rotWorkCost, { vatRate: vat_rate, discountFactor }))
     customerPays = total - rotDeduction
   } else if (rot_rut_type === 'rut') {
-    rutWorkCost = items
-      .filter((i: any) => i.is_rut_eligible)
-      .reduce((s: number, i: any) => s + (i.total || 0), 0)
+    rutWorkCost = rotRutLaborBasis(items, 'rut')
     rutDeduction = customer_id && rutWorkCost > 0
       ? (await calculateCappedDeduction(customer_id, business.business_id, 'rut', rutWorkCost, { vatRate: vat_rate, discountFactor })).deduction
       : Math.round(rotRutDeductionInclVat('rut', rutWorkCost, { vatRate: vat_rate, discountFactor }))

@@ -1,16 +1,14 @@
 import { QuoteItem, PaymentPlanEntry, QuoteTotals, RotRutType } from '@/lib/types/quote'
-import { estimateHours, splitAmount, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
+import { estimateHours, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import { rotRutDeductionInclVat, gronTeknikDeductionInclVat } from '@/lib/rot-rut'
+import { getBasisRotRutType, rotRutLaborBasis, splitLine } from '@/lib/rot-rut-basis'
 
 /**
  * Get the effective ROT/RUT type for an item.
  * Prefers rot_rut_type dropdown value, falls back to boolean flags.
  */
 export function getItemRotRutType(item: QuoteItem): RotRutType {
-  if (item.rot_rut_type !== undefined) return item.rot_rut_type
-  if (item.is_rot_eligible) return 'rot'
-  if (item.is_rut_eligible) return 'rut'
-  return null
+  return getBasisRotRutType(item)
 }
 
 /**
@@ -189,24 +187,25 @@ export function calculateQuoteTotals(
   // Sum by ROT/RUT eligibility
   let laborTotal = 0
   let materialTotal = 0
+  let travelTotal = 0
   let serviceTotal = 0
-  let rotWorkCost = 0
-  let rutWorkCost = 0
+  const basisItems = regularItems.map(item => item.item_type === 'option' ? { ...item, item_type: 'item' } : item)
+  const rotWorkCost = rotRutLaborBasis(basisItems, 'rot')
+  const rutWorkCost = rotRutLaborBasis(basisItems, 'rut')
   let gronBase = 0
   let gronDeductionRaw = 0
 
   for (const item of regularItems) {
     const lineTotal = item.quantity * item.unit_price
     const rotRut = getItemRotRutType(item)
-    // ROT/RUT-basen per rad: labor_amount (produktbankens arbetsandel, v67)
-    // när den finns — `??`, ALDRIG `||`: 0 är GILTIGT (ren material → bas 0).
-    // Rader utan labor_amount → hela radens total, exakt som tidigare.
-    if (rotRut === 'rot') {
+    const hasSplit = item.labor_amount != null && item.material_amount != null && item.travel_amount != null
+    if (hasSplit) {
+      laborTotal += Number(item.labor_amount)
+      materialTotal += Number(item.material_amount)
+      travelTotal += Number(item.travel_amount)
+    } else if (rotRut === 'rot' || rotRut === 'rut') {
+      // Legacy utan komplett tredelning: berättigad rad var historiskt arbete.
       laborTotal += lineTotal
-      rotWorkCost += item.labor_amount ?? lineTotal
-    } else if (rotRut === 'rut') {
-      laborTotal += lineTotal
-      rutWorkCost += item.labor_amount ?? lineTotal
     } else if (rotRut === 'gron_solceller' || rotRut === 'gron_lagring' || rotRut === 'gron_laddpunkt') {
       // Grön teknik-basen är HELA radtotalen (arbete + material) — inte
       // labor_amount. Raden flödar ändå in i labor/material-summan precis
@@ -216,8 +215,6 @@ export function calculateQuoteTotals(
       } else {
         materialTotal += lineTotal
       }
-      gronBase += lineTotal
-      gronDeductionRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
     } else if (item.labor_amount != null && Number.isFinite(Number(item.labor_amount))) {
       // Utan avdragstyp avgör arbetsandelen (v67), inte enheten: en arbetsrad
       // med enheten "st" visade "Arbete 0 kr" så fort ROT var av (driftfynd
@@ -231,12 +228,16 @@ export function calculateQuoteTotals(
     } else {
       materialTotal += lineTotal
     }
+    if (rotRut === 'gron_solceller' || rotRut === 'gron_lagring' || rotRut === 'gron_laddpunkt') {
+      gronBase += lineTotal
+      gronDeductionRaw += lineTotal * GRON_TEKNIK_RATES[rotRut]
+    }
   }
 
   // Discount rows (negative amounts)
   const discountFromRows = discountItems.reduce((sum, item) => sum + Math.abs(item.total), 0)
 
-  const subtotal = laborTotal + materialTotal + serviceTotal
+  const subtotal = laborTotal + materialTotal + travelTotal + serviceTotal
   const discountAmount = subtotal * (discountPercent / 100) + discountFromRows
   const afterDiscount = subtotal - discountAmount
   const vat = afterDiscount * (vatRate / 100)
@@ -265,6 +266,7 @@ export function calculateQuoteTotals(
   return {
     laborTotal,
     materialTotal,
+    travelTotal,
     serviceTotal,
     subtotal,
     discountAmount,
@@ -306,6 +308,7 @@ export interface PublicStructuredItem {
   /** Produktbank (v67): arbetsandel i kr — 0 giltigt, null = legacy (hela totalen). */
   labor_amount?: number | null
   material_amount?: number | null
+  travel_amount?: number | null
 }
 
 /**
@@ -337,6 +340,7 @@ export function calculatePublicQuoteTotals(
     // ?? (inte ||): labor_amount 0 = ren material och skall ge ROT-bas 0.
     labor_amount: it.labor_amount ?? null,
     material_amount: it.material_amount ?? null,
+    travel_amount: it.travel_amount ?? null,
     sort_order: it.sort_order ?? 0,
     option_selected:
       it.item_type === 'option' ? selectedOptionIds.has(it.id) : it.option_selected === true,
@@ -370,6 +374,7 @@ export function calculatePublicQuoteTotalsFromBase(
 ): QuoteTotals {
   let laborTotal = base.laborTotal
   let materialTotal = base.materialTotal
+  let travelTotal = base.travelTotal
   const serviceTotal = base.serviceTotal
   let rotWorkCost = base.rotWorkCost
   let rutWorkCost = base.rutWorkCost
@@ -386,7 +391,13 @@ export function calculatePublicQuoteTotalsFromBase(
     if (o.item_type !== 'option' || !selectedOptionIds.has(o.id)) continue
     const lineTotal = (o.quantity ?? 0) * (o.unit_price ?? 0)
     const rotRut = (o.rot_rut_type ?? undefined) || (o.is_rot_eligible ? 'rot' : o.is_rut_eligible ? 'rut' : null)
-    if (rotRut === 'rot') {
+    if (o.labor_amount != null && o.material_amount != null && o.travel_amount != null) {
+      laborTotal += Number(o.labor_amount)
+      materialTotal += Number(o.material_amount)
+      travelTotal += Number(o.travel_amount)
+      if (rotRut === 'rot') rotWorkCost += Number(o.labor_amount)
+      else if (rotRut === 'rut') rutWorkCost += Number(o.labor_amount)
+    } else if (rotRut === 'rot') {
       laborTotal += lineTotal
       rotWorkCost += o.labor_amount ?? lineTotal
     } else if (rotRut === 'rut') {
@@ -407,7 +418,7 @@ export function calculatePublicQuoteTotalsFromBase(
     }
   }
 
-  const subtotal = laborTotal + materialTotal + serviceTotal
+  const subtotal = laborTotal + materialTotal + travelTotal + serviceTotal
   // base.discountAmount inkluderar redan ev. rabattraders belopp + procentrabatt
   // på bas-subtotalen. Räkna om procentdelen på den kombinerade subtotalen och
   // behåll bas-rabattradernas fasta del (base.discountAmount − procentdel på bas).
@@ -439,7 +450,7 @@ export function calculatePublicQuoteTotalsFromBase(
   const customerPaysAfterDeductions = total - totalDeduction
 
   return {
-    laborTotal, materialTotal, serviceTotal, subtotal, discountAmount, afterDiscount,
+    laborTotal, materialTotal, travelTotal, serviceTotal, subtotal, discountAmount, afterDiscount,
     vat, total, rotWorkCost, rotDeduction, rotCustomerPays, rutWorkCost, rutDeduction, rutCustomerPays,
     gronBase, gronDeduction, gronCustomerPays, totalDeduction, customerPaysAfterDeductions,
   }
@@ -511,6 +522,9 @@ export function createDefaultItem(type: QuoteItem['item_type'], sortOrder: numbe
     category_slug: undefined,
     is_rot_eligible: false,
     is_rut_eligible: false,
+    labor_amount: type === 'item' ? 0 : null,
+    material_amount: type === 'item' ? 0 : null,
+    travel_amount: type === 'item' ? 0 : null,
     sort_order: sortOrder,
   }
 
@@ -545,17 +559,26 @@ export function recalculateItems(items: QuoteItem[]): QuoteItem[] {
     // Option-rader beräknas som item (spread behåller option_selected/option_default)
     if (item.item_type === 'item' || item.item_type === 'option') {
       const total = item.quantity * item.unit_price
+      // Paketjämförelsen måste kunna klassificera en ofullständig/prislös rad
+      // som ogiltig utan att delningshjälparen kastar innan valideringen körs.
+      if (!Number.isFinite(total)) return { ...item, total }
       const laborShare = item.component_snapshot?.labor_share
       if (laborShare !== null && laborShare !== undefined) {
-        const { labor_amount, material_amount } = splitAmount(total, laborShare)
+        const travelShare = item.component_snapshot?.travel_share ?? 0
+        const { labor_amount, material_amount, travel_amount } = splitLine(total, laborShare, travelShare)
         const components: SnapshotComponent[] = item.component_snapshot?.components ?? []
         return {
           ...item,
           total,
           labor_amount,
           material_amount,
+          travel_amount,
           estimated_hours: estimateHours(components, item.quantity),
         }
+      }
+      if (item.item_type === 'item') {
+        const laborShare = item.is_rot_eligible || item.is_rut_eligible ? 1 : 0
+        return { ...item, total, ...splitLine(total, laborShare, 0) }
       }
       return { ...item, total }
     }

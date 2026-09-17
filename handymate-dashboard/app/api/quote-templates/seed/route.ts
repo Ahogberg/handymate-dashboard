@@ -3,6 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
 import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
+import { ensureOnboardingJobTypes } from '@/lib/job-types'
 
 function genId() {
   return 'qtpl_' + Math.random().toString(36).substr(2, 9)
@@ -49,6 +50,11 @@ export async function POST(request: NextRequest) {
     if (defaultTemplates.length === 0) {
       return NextResponse.json({ templates: [], count: 0, alreadySeeded: true })
     }
+    await ensureOnboardingJobTypes(
+      supabase,
+      businessId,
+      Array.from(new Set(defaultTemplates.map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
+    )
 
     // Get default texts for this branch
     const defaultTexts = getDefaultStandardTexts(branch)
@@ -64,6 +70,7 @@ export async function POST(request: NextRequest) {
       name: t.name,
       description: t.description,
       category: t.category,
+      job_type_slug: t.job_type_slug,
       // Inlednings-/avslutningstext seedas INTE längre (pilot-beslut 2026-07)
       // — redundanta mot quotes.description. getDefaultStandardTexts()
       // returnerar inte längre dessa typer.

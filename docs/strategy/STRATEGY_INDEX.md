@@ -16,9 +16,12 @@
 - [`FINANCIAL_KERNEL_CALL_SITE_MAP.md`](FINANCIAL_KERNEL_CALL_SITE_MAP.md) — Claude track B (2026-09-13): every path that reads or writes payment and invoice truth today, the bypasses around `applyInvoicePayment` by severity, what C4/C5 must cover, and four bugs to fix before the kernel.
 - [`FINANCIAL_KERNEL_SE_LEDGER_REVIEW.md`](FINANCIAL_KERNEL_SE_LEDGER_REVIEW.md) — Claude track D (2026-09-13): Swedish ledger proposals (BAS subset, reverse charge both sides, cash basis, ROT/RUT, credits, periods, rounding, SIE, receivables lifecycle) and the 23 questions for the accounting consultant. Nothing in it is confirmed.
 - [`FINANCIAL_KERNEL_PACKAGE_LOG.md`](FINANCIAL_KERNEL_PACKAGE_LOG.md) — live package board, handoff blocks and the brief for the next implementation package.
+- [`FINANCIAL_KERNEL_C8_BRIEF.md`](FINANCIAL_KERNEL_C8_BRIEF.md) — C8 Ledger schema + posting engine (2026-09-15): country-neutral core (accounts, fiscal years, periods, journals, entries, gapless numbering, reversal, period lock), drafted `v251` with 48 PGlite checks, and the TypeScript posting engine as an empty-registry kernel consumer. No account, series, rule or flag decided.
 - [`CUSTOMER_VALUE_PACKAGE_LOG.md`](CUSTOMER_VALUE_PACKAGE_LOG.md) — customer-value packages after the 2026-09-14 ROI/WOW audit: V0 (estimated time never shown as confirmed money, done), V1 value event log, V2 money stages from kernel events, V3 Handymate Impact; owner boundary against the Financial Kernel. The canonical event catalogue, envelope rules, feature flags and module ownership live in `handymate-dashboard/ARCHITECTURE.md` §FK.0–FK.6 and are enforced by `tests/financial-kernel-event-contract.spec.ts`.
 - [`EXTERNA_PARTER_BOKFORING.md`](EXTERNA_PARTER_BOKFORING.md) — pedagogisk lista (2026-09-14, ägare Christoffer) över de fem externa parter bokföringen kräver: redovisningskonsult, pilotbolag, Skatteverkets partner-API, bankdata, betalleverantör; vad varje part låser upp, ledtid, och besluten D1/D3/D4 som styr ordningen.
 - [`TRYGG_OVERLAMNING_BRIEF.md`](TRYGG_OVERLAMNING_BRIEF.md) — Codex brief (2026-09-14) for "Handymate tog det vidare": H1 never a silent expiry, H2 autonomy on from day one under a daily digest, H3 channel pre-flight and durable outbound promises, H4 a morning report that delivers or says why; grounded in the 60-day production shapes (expiry ≈ approval, 0 autonomous actions, failures are configuration).
+- [Artiklar, offertmallar och ROT på arbetsdelen](ARTIKLAR_MALLAR_ROT_BRIEF.md) — brief 2026-09-16: obligatorisk delning arbete/material/resa i varje offert- och fakturarad, ROT bara på arbetsdelen via en delad bas, sex felställen med fil:rad, jobbtypsmallen som standardstart, `v252` utkastad med 27 PGlite-kontroller, Christoffers ägargrindar.
+- [H3b — Durable outbound promises](H3B_OUTBOUND_INTENTS_BRIEF.md) — `outbound_intents`, the kernel's intent pattern applied to SMS, e-mail and push. Drafted migration v249 and its PGlite acceptance.
 
 ### Business / platform strategy
 
@@ -31,6 +34,11 @@
 
 ### Execution roadmaps
 
+- [`../roadmap/FORTNOX_REPLACEMENT_2027.md`](../roadmap/FORTNOX_REPLACEMENT_2027.md) — Andreas mål om Fortnox-ersättning från 1 januari 2027; föreslagen september–decemberplan, beslutspunkt 30 november, konsultgranskat historiskt facit och avgränsad livepilot. Gemensam tidsplan för Codex och Claude; ändrar inga aktiveringsgrindar.
+- [`../roadmap/FORTNOX_CAPABILITY_MATRIX.md`](../roadmap/FORTNOX_CAPABILITY_MATRIX.md) — förmågematrisen för Fortnox-ersättningen: femton förmågor lästa ur koden, tio saknade paket, fyra ägargrindar, och var designen hör hemma.
+- [`../design/BOKFORING_UI_DESIGNPROMPT.md`](../design/BOKFORING_UI_DESIGNPROMPT.md) — designprompt till Claude Design för bokföringens åtta ytor, med Handymates varumärkestokens.
+- [`../design/BOKFORING_UI_DESIGNPROMPT_V2.md`](../design/BOKFORING_UI_DESIGNPROMPT_V2.md) — version 2: Karin bokför inom konsultens regelbok, förtroendetrappan, byråns egen ingång, elva ytor.
+- [`../design/BOKFORING_UI_CANVAS_2026-09-15.dc.html`](../design/BOKFORING_UI_CANVAS_2026-09-15.dc.html) — den godkända canvasen, elva artboards. Öppnas i Claude Design.
 - [`../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md`](../roadmap/POST_REALITY_LAUNCH_VALUE_WAVE.md)
 - [`../roadmap/BRAIN_VISIBILITY_WEEKEND.md`](../roadmap/BRAIN_VISIBILITY_WEEKEND.md)
 

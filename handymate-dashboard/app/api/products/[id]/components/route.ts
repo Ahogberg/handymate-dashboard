@@ -66,8 +66,7 @@ export async function GET(
 /**
  * PUT /api/products/[id]/components — ersätt HELA komponentlistan
  * body: { components: [{ component_type, description, quantity_per_unit, unit, unit_cost }] }
- * Validering sker FÖRE någon skrivning: component_type 'arbete'|'material',
- * quantity_per_unit > 0, unit_cost >= 0, description icke-tom.
+ * Validering sker FÖRE någon skrivning: typ, priser, mängd och ROT-flagga.
  */
 export async function PUT(
   request: NextRequest,
@@ -94,9 +93,9 @@ export async function PUT(
 
     // Validera ALLA rader innan någon skrivning sker
     for (const c of components) {
-      if (c.component_type !== 'arbete' && c.component_type !== 'material') {
+      if (!['arbete', 'material', 'resa'].includes(c.component_type)) {
         return NextResponse.json(
-          { error: "Komponenttyp måste vara 'arbete' eller 'material'" },
+          { error: "Komponenttyp måste vara 'arbete', 'material' eller 'resa'" },
           { status: 400 }
         )
       }
@@ -108,6 +107,12 @@ export async function PUT(
       }
       if (typeof c.unit_cost !== 'number' || Number.isNaN(c.unit_cost) || c.unit_cost < 0) {
         return NextResponse.json({ error: 'Kostnad kan inte vara negativ' }, { status: 400 })
+      }
+      if (typeof c.unit_price !== 'number' || Number.isNaN(c.unit_price) || c.unit_price < 0) {
+        return NextResponse.json({ error: 'À-pris kan inte vara negativt' }, { status: 400 })
+      }
+      if (c.component_type !== 'arbete' && c.is_rot_eligible) {
+        return NextResponse.json({ error: 'ROT-flaggan kan bara sättas på arbete' }, { status: 400 })
       }
     }
 
@@ -133,6 +138,10 @@ export async function PUT(
       quantity_per_unit: c.quantity_per_unit,
       unit: c.unit || 'st',
       unit_cost: c.unit_cost,
+      article_number: c.article_number || null,
+      unit_price: c.unit_price,
+      is_rot_eligible: c.component_type === 'arbete' && c.is_rot_eligible !== false,
+      linked_product_id: c.linked_product_id || null,
       sort_order: idx,
     }))
 
