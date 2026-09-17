@@ -1,0 +1,735 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Offertflödet rensat — skisser 2026-09-17</title>
+<!--
+  Skisser på offertflödet efter rivningen (Andreas 2026-09-17: "gå igenom plattformen
+  och bara strippa bort saker som inte tillför"). Underlag för sittningen med
+  Christoffer, hör ihop med docs/offert/offertflodet-inventering-2026-09-17.md.
+  Statisk fil — inga beroenden utom Google Fonts. Öppna direkt i webbläsaren.
+-->
+<style>html,body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+:root{
+  --bg:#e9eeed; --canvas:#dfe6e4; --panel:#ffffff; --ink:#15211f; --muted:#5d6f6b; --line:#cbd8d4;
+  --accent:#0f766e; --accent-soft:#e3f2ee; --gone:#a8322a; --gone-soft:#f8e6e4; --kept:#0f766e;
+  /* Produktens egna färger — samma i båda teman, appen har inget mörkt läge */
+  --p-teal:#0f766e; --p-teal-dark:#115e57; --p-teal-50:#eefaf7; --p-teal-100:#d6f0ea;
+  --p-slate-900:#0f172a; --p-slate-700:#334155; --p-slate-500:#64748b; --p-slate-400:#94a3b8;
+  --p-slate-200:#e2e8f0; --p-slate-100:#f1f5f9; --p-slate-50:#f8fafc; --p-white:#fff;
+  --p-amber:#b45309; --p-amber-bg:#fef3c7; --p-red:#dc2626;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0d1413; --canvas:#111b19; --panel:#17211f; --ink:#e7efec; --muted:#93a8a3; --line:#2a3937;
+  --accent:#5fd3c3; --accent-soft:#14312c; --gone:#ff9b91; --gone-soft:#3a1714;
+}}
+:root[data-theme="dark"]{
+  --bg:#0d1413; --canvas:#111b19; --panel:#17211f; --ink:#e7efec; --muted:#93a8a3; --line:#2a3937;
+  --accent:#5fd3c3; --accent-soft:#14312c; --gone:#ff9b91; --gone-soft:#3a1714;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:"Source Sans 3",system-ui,sans-serif;font-size:16px;line-height:1.55;margin:0;padding-inline:16px;padding-block:28px 72px}
+main{max-width:1180px;margin:0 auto}
+h1{font-family:Archivo,system-ui,sans-serif;font-weight:700;font-size:clamp(30px,5vw,46px);line-height:1.04;letter-spacing:-.02em;margin:6px 0 10px;text-wrap:balance}
+h2{font-family:Archivo,system-ui,sans-serif;font-weight:700;font-size:clamp(20px,2.6vw,26px);letter-spacing:-.01em;margin:0 0 4px;text-wrap:balance}
+h3{font-family:Archivo,system-ui,sans-serif;font-weight:600;font-size:16px;margin:0 0 6px}
+p{max-width:68ch;margin:8px 0}
+.eyebrow{font-size:11.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:var(--accent)}
+.lede{font-size:18px;color:var(--muted);max-width:66ch}
+a{color:var(--accent)}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+
+/* ── Sektionsram ───────────────────────────────────────────── */
+.step{margin:56px 0 0;padding-top:20px;border-top:1px solid var(--line)}
+.step-head{display:flex;gap:14px;align-items:flex-start;margin-bottom:18px}
+.step-num{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--bg);
+  display:grid;place-items:center;font-family:Archivo;font-weight:700;font-size:17px}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) .step-num{color:#08100f}}
+:root[data-theme="dark"] .step-num{color:#08100f}
+
+/* ── Artboard + annoteringar ───────────────────────────────── */
+.board{display:grid;grid-template-columns:minmax(0,375px) minmax(0,1fr);gap:22px;align-items:start}
+@media (max-width:760px){.board{grid-template-columns:1fr}}
+.board.wide{grid-template-columns:minmax(0,1fr);}
+.canvas{background:var(--canvas);border:1px solid var(--line);border-radius:18px;padding:18px;
+  background-image:radial-gradient(var(--line) 1px,transparent 1px);background-size:14px 14px}
+.canvas.scroll{overflow-x:auto}
+.notes{display:flex;flex-direction:column;gap:12px}
+.note{background:var(--panel);border:1px solid var(--line);border-radius:13px;padding:13px 15px}
+.note h3{color:var(--ink)}
+.note p{font-size:14.5px;margin:4px 0;color:var(--muted);max-width:none}
+.note.gone{border-left:4px solid var(--gone)}
+.note.kept{border-left:4px solid var(--kept)}
+ul.tight{margin:6px 0 0;padding-left:18px}
+ul.tight li{font-size:14.5px;margin:3px 0;color:var(--muted)}
+ul.tight li s{color:var(--gone);text-decoration-thickness:1.5px}
+ul.tight li b{color:var(--ink);font-weight:600}
+.stat{display:flex;gap:18px;flex-wrap:wrap;margin-top:8px}
+.stat div{font-size:13px;color:var(--muted)}
+.stat b{display:block;font-family:Archivo;font-weight:700;font-size:22px;color:var(--ink);font-variant-numeric:tabular-nums}
+
+/* ══ PRODUKTYTAN — telefonram ══════════════════════════════ */
+.phone{width:min(375px,100%);margin:0 auto;background:var(--p-white);border-radius:26px;
+  box-shadow:0 14px 40px rgba(10,30,28,.22);overflow:hidden;font-family:system-ui,-apple-system,sans-serif;
+  color:var(--p-slate-900);font-size:14px;line-height:1.45;border:1px solid rgba(0,0,0,.06)}
+.status{display:flex;justify-content:space-between;align-items:center;padding:8px 18px 2px;
+  font-size:11.5px;font-weight:600;color:var(--p-slate-900)}
+.status .dots{letter-spacing:1px;color:var(--p-slate-500)}
+.ph-body{padding:10px 16px 18px;background:var(--p-slate-50)}
+.ph-body.plain{background:var(--p-white)}
+
+/* appens byggstenar */
+.nav{display:flex;justify-content:space-between;align-items:center;padding:4px 0 14px}
+.nav a{font-size:13.5px;color:var(--p-slate-500);text-decoration:none;font-weight:500;display:inline-flex;gap:5px;align-items:center}
+.nav a.right{color:var(--p-teal);font-weight:600}
+.h-xl{font-size:23px;font-weight:700;letter-spacing:-.02em;line-height:1.15;margin:0 0 5px;color:var(--p-slate-900)}
+.sub{font-size:13.5px;color:var(--p-slate-500);margin:0 0 15px}
+.label{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--p-slate-400);margin:0 0 7px}
+.card{background:var(--p-white);border:1px solid var(--p-slate-200);border-radius:15px;padding:13px;margin-bottom:11px}
+.strip{background:var(--p-white);border:1px solid var(--p-slate-200);border-radius:14px;padding:8px;margin-bottom:12px;
+  display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.chip{border:1px solid var(--p-slate-200);background:var(--p-white);color:var(--p-slate-700);
+  border-radius:10px;padding:7px 11px;font-size:12.5px;font-weight:600;white-space:nowrap}
+.chip.on{background:var(--p-teal);border-color:var(--p-teal);color:#fff}
+.chip.soft{background:var(--p-teal-50);border-color:rgba(15,118,110,.25);color:var(--p-teal-dark)}
+.chip.soft small{display:block;font-weight:500;color:var(--p-slate-400);font-size:10.5px}
+.ta{border:2px solid var(--p-slate-200);border-radius:14px;padding:11px 12px;font-size:13.5px;color:var(--p-slate-400);
+  background:var(--p-white);position:relative;min-height:74px}
+.mic{position:absolute;right:9px;bottom:9px;width:38px;height:38px;border-radius:50%;background:var(--p-teal-50);
+  color:var(--p-teal);display:grid;place-items:center;font-size:15px}
+.ex{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;align-items:center}
+.ex span.t{font-size:11px;color:var(--p-slate-400)}
+.ex span.p{border:1px solid var(--p-slate-200);background:var(--p-slate-50);border-radius:999px;
+  padding:5px 10px;font-size:11px;font-weight:500;color:var(--p-slate-500)}
+.row{display:flex;align-items:center;gap:9px}
+.row .grow{flex:1;min-width:0}
+.sel{border:1px solid var(--p-slate-200);border-radius:11px;padding:10px 12px;font-size:13.5px;
+  color:var(--p-slate-500);background:var(--p-white);display:flex;justify-content:space-between;align-items:center}
+.btn{border-radius:13px;padding:13px 16px;font-size:15px;font-weight:600;text-align:center;display:block}
+.btn.pri{background:var(--p-teal);color:#fff}
+.btn.sec{background:var(--p-white);border:1px solid var(--p-slate-200);color:var(--p-slate-700)}
+.q{background:var(--p-white);border:1px solid var(--p-slate-200);border-radius:15px;padding:12px 13px;margin-bottom:9px}
+.q .qt{font-size:13.5px;font-weight:600;margin-bottom:8px;color:var(--p-slate-900)}
+.q .qt i{color:var(--p-slate-400);font-style:normal;margin-right:5px}
+.inp{border:2px solid var(--p-slate-200);border-radius:11px;padding:9px 11px;font-size:14px;background:var(--p-white);
+  color:var(--p-slate-900);font-weight:600}
+.inp.ghost{color:var(--p-slate-400);font-weight:400}
+.unit{font-size:13px;font-weight:600;color:var(--p-slate-500)}
+.yn{display:flex;gap:7px}
+.yn>div{flex:1;text-align:center;border:2px solid var(--p-slate-200);border-radius:11px;padding:9px;
+  font-size:13.5px;font-weight:600;color:var(--p-slate-700)}
+.yn>div.on{background:var(--p-teal);border-color:var(--p-teal);color:#fff}
+.foot{position:relative;margin:13px -16px -18px;padding:11px 16px calc(14px + env(safe-area-inset-bottom,0px));
+  background:rgba(248,250,252,.96);border-top:1px solid var(--p-slate-200);
+  display:flex;justify-content:space-between;align-items:center;gap:10px}
+.foot .cnt{font-size:11.5px;color:var(--p-slate-500)}
+.foot .btn{padding:12px 16px;font-size:14.5px}
+
+/* A4-dokument i miniatyr */
+.doc{background:#fff;border:1px solid var(--p-slate-200);border-radius:8px;padding:14px 13px;font-size:11px;
+  color:var(--p-slate-700);box-shadow:0 2px 10px rgba(15,23,42,.06)}
+.doc .dh{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid var(--p-slate-200);
+  padding-bottom:9px;margin-bottom:9px}
+.doc .dh b{font-size:13px;color:var(--p-slate-900);display:block}
+.doc .dh span{font-size:10px;color:var(--p-slate-400)}
+.doc .dt{font-size:10px;color:var(--p-slate-400);text-align:right}
+.doc h4{font-size:14px;margin:0 0 3px;color:var(--p-slate-900);font-weight:700}
+.doc .desc{font-size:10.5px;color:var(--p-slate-500);margin:0 0 10px}
+.doc .lr{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-bottom:1px solid var(--p-slate-100)}
+.doc .lr .n{color:var(--p-slate-900);font-weight:500}
+.doc .lr .q{border:0;padding:0;margin:0;background:none;color:var(--p-slate-400);font-size:10px;display:block;font-weight:400}
+.doc .lr .a{white-space:nowrap;font-variant-numeric:tabular-nums}
+.doc .lr.opt .n{color:var(--p-teal-dark)}
+.doc .sum{display:flex;justify-content:space-between;padding:5px 0;font-size:10.5px}
+.doc .sum.big{border-top:1px solid var(--p-slate-200);margin-top:6px;padding-top:9px;font-size:13px;font-weight:700;color:var(--p-slate-900)}
+.doc .pay{background:var(--p-teal-50);border-radius:8px;padding:9px 11px;margin-top:9px;
+  display:flex;justify-content:space-between;align-items:center}
+.doc .pay b{font-size:15px;color:var(--p-teal-dark);font-variant-numeric:tabular-nums}
+.doc .pay span{font-size:10px;color:var(--p-slate-500)}
+.matte{display:flex;gap:9px;align-items:flex-start;background:var(--p-white);border:1px solid var(--p-slate-200);
+  border-radius:13px;padding:10px 12px;margin-bottom:11px}
+.matte .av{flex:0 0 auto;width:26px;height:26px;border-radius:9px;background:var(--p-teal-100);color:var(--p-teal-dark);
+  display:grid;place-items:center;font-size:12px;font-weight:700}
+.matte p{margin:0;font-size:12.5px;color:var(--p-slate-700)}
+.matte a{font-size:12px;color:var(--p-teal);font-weight:600;text-decoration:none}
+.merbar{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap}
+.merbar .m{border:1px solid var(--p-slate-200);background:var(--p-white);border-radius:11px;padding:8px 11px;
+  font-size:12px;font-weight:600;color:var(--p-slate-700);display:flex;align-items:center;gap:6px}
+.merbar .m .dot{width:6px;height:6px;border-radius:50%;background:var(--p-teal)}
+.merbar .m .dot.off{background:var(--p-slate-200)}
+.bottombar{margin:13px -16px -18px;padding:11px 16px calc(14px + env(safe-area-inset-bottom,0px));
+  background:#fff;border-top:1px solid var(--p-slate-200);display:flex;gap:9px}
+.bottombar .btn{flex:1;padding:13px 8px;font-size:13.5px;white-space:nowrap}
+
+/* desktop-skärm */
+.desktop{min-width:940px;background:var(--p-slate-50);border-radius:14px;overflow:hidden;
+  box-shadow:0 14px 40px rgba(10,30,28,.2);font-family:system-ui,sans-serif;color:var(--p-slate-900);border:1px solid rgba(0,0,0,.06)}
+.dtop{background:#fff;border-bottom:1px solid var(--p-slate-200);padding:11px 18px;display:flex;
+  justify-content:space-between;align-items:center;gap:14px}
+.dtop .left{display:flex;align-items:center;gap:13px;min-width:0}
+.dtop .ttl{font-size:15px;font-weight:700}
+.dtop .back{font-size:13px;color:var(--p-slate-500)}
+.dtop .acts{display:flex;gap:8px;align-items:center}
+.dtop .b{border-radius:10px;padding:9px 14px;font-size:13.5px;font-weight:600}
+.dtop .b.g{background:#fff;border:1px solid var(--p-slate-200);color:var(--p-slate-700)}
+.dtop .b.t{background:var(--p-teal);color:#fff}
+.dgrid{display:grid;grid-template-columns:330px 1fr;gap:16px;padding:16px 18px 20px;align-items:start}
+.dcol .card{margin-bottom:12px}
+.ded{display:flex;gap:6px}
+.ded>div{flex:1;text-align:center;border:1px solid var(--p-slate-200);border-radius:9px;padding:7px 4px;
+  font-size:11.5px;font-weight:600;color:var(--p-slate-700);background:#fff}
+.ded>div.on{background:var(--p-teal);border-color:var(--p-teal);color:#fff}
+.kv{display:flex;justify-content:space-between;font-size:12px;padding:3px 0;color:var(--p-slate-500)}
+.kv b{color:var(--p-slate-900);font-variant-numeric:tabular-nums}
+.doc.big{padding:26px 24px;font-size:12px}
+.doc.big h4{font-size:19px}
+.doc.big .lr{padding:8px 0}
+.addrow{border:1.5px dashed var(--p-slate-200);border-radius:11px;padding:11px;text-align:center;
+  font-size:13px;font-weight:600;color:var(--p-teal);background:#fff;margin-top:11px}
+.capt{font-size:12px;color:var(--muted);text-align:center;margin-top:10px}
+
+/* flödeskarta */
+.flow{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media (max-width:760px){.flow{grid-template-columns:1fr}}
+.fbox{background:var(--panel);border:1px solid var(--line);border-radius:15px;padding:16px}
+.fbox h3{display:flex;align-items:center;gap:8px}
+.fbox h3 em{font-style:normal;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;
+  padding:2px 8px;border-radius:999px}
+.fbox.before h3 em{background:var(--gone-soft);color:var(--gone)}
+.fbox.after h3 em{background:var(--accent-soft);color:var(--accent)}
+.path{display:flex;align-items:center;gap:7px;flex-wrap:wrap;font-size:13px;padding:7px 0;
+  border-bottom:1px solid var(--line);color:var(--muted)}
+.path:last-child{border-bottom:0}
+.path b{color:var(--ink);font-weight:600}
+.path .ar{color:var(--accent);font-weight:700}
+.fbox.before .path{color:var(--muted)}
+.fbox.before .path s{color:var(--gone)}
+
+.tw{overflow-x:auto;background:var(--panel);border:1px solid var(--line);border-radius:14px;margin:16px 0}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th{text-align:left;font-size:11px;letter-spacing:.05em;text-transform:uppercase;color:var(--muted);
+  padding:11px 14px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{padding:11px 14px;border-bottom:1px solid var(--line);vertical-align:top}
+tr:last-child td{border-bottom:0}
+td.num{font-variant-numeric:tabular-nums;white-space:nowrap;font-weight:600}
+td.down{color:var(--accent);font-weight:700;font-variant-numeric:tabular-nums;white-space:nowrap}
+.foot-note{background:var(--panel);border-left:4px solid var(--accent);border-radius:0 12px 12px 0;
+  padding:14px 17px;margin:18px 0;max-width:68ch}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body>
+
+
+<main>
+  <div class="eyebrow">Handymate · skisser · 2026-09-17</div>
+  <h1>Offertflödet rensat</h1>
+  <p class="lede">Så här ser flödet och offertskaparen ut om rivningsförslagen genomförs.
+  Skärmarna är ritade i appens egna färger och på telefonbredd, eftersom hantverkaren står
+  hemma hos kunden. Vid varje skärm står vad som försvunnit därifrån.</p>
+
+  <div class="stat">
+    <div><b>6</b>vägar in i editorn (från 16)</div>
+    <div><b>15</b>kontroller på tom offert (från ~40)</div>
+    <div><b>3</b>paneler bakom Mer (från 6)</div>
+    <div><b>1</b>ställe per fält (från 2)</div>
+  </div>
+
+  <!-- ══════════════ FLÖDESKARTAN ══════════════ -->
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">0</div>
+      <div>
+        <h2>Flödet, före och efter</h2>
+        <p>Varje rad är en väg fram till en offert med rader i. Före-listan är inte påhittad,
+        den är räknad ur koden.</p>
+      </div>
+    </div>
+    <div class="flow">
+      <div class="fbox before">
+        <h3>I dag <em>16 vägar</em></h3>
+        <div class="path"><b>Fritext</b><span class="ar">→</span>AI<span class="ar">→</span>editorn</div>
+        <div class="path"><s>Bygg själv</s><span class="ar">→</span><s>mellanskärm med titel</s><span class="ar">→</span>editorn</div>
+        <div class="path"><s>Använd en mall</s><span class="ar">→</span><s>mallistan</s><span class="ar">→</span>editorn</div>
+        <div class="path"><s>Mallistan igen, ovanpå editorn</s></div>
+        <div class="path"><b>Jobbtyp</b><span class="ar">→</span>upplägg<span class="ar">→</span>editorn</div>
+        <div class="path"><b>Jobbtyp</b><span class="ar">→</span>frågor<span class="ar">→</span>editorn</div>
+        <div class="path">Onboarding<span class="ar">→</span>automatiskt upplägg</div>
+        <div class="path"><s>Öppna editorn direkt</s><span class="ar">→</span>tom editor</div>
+        <div class="path"><s>Sparad vana: börja i editorn</s></div>
+        <div class="path"><s>Sparad vana: börja med mall</s></div>
+        <div class="path">Länk med kund, affär eller lead<span class="ar">→</span>editorn</div>
+        <div class="path"><s>Arbetsprovet från onboardingen</s></div>
+        <div class="path"><s>Kundunderlagets panel</s></div>
+        <div class="path">Återställning av påbörjad offert</div>
+        <div class="path">Avlastningens överlämning</div>
+        <div class="path"><s>AI-hjälpen inne i editorn</s></div>
+      </div>
+      <div class="fbox after">
+        <h3>Efter <em>6 vägar</em></h3>
+        <div class="path"><b>Jobbtyp</b><span class="ar">→</span><b>frågor</b><span class="ar">→</span>prissatt offert</div>
+        <div class="path"><b>Fritext eller foto</b><span class="ar">→</span>AI<span class="ar">→</span>offert</div>
+        <div class="path"><b>Bygg själv</b><span class="ar">→</span>tomt dokument</div>
+        <div class="path">Länk med kund, affär eller lead<span class="ar">→</span>offert</div>
+        <div class="path">Återställning av påbörjad offert</div>
+        <div class="path">Matte eller avlastningen<span class="ar">→</span>utkast</div>
+        <p style="font-size:13.5px;color:var(--muted);margin-top:12px">
+        De tio som försvinner är antingen dubbletter av en kvarvarande väg, eller inställningar
+        som gör att appen ser olika ut för olika personer. Ingen funktion går förlorad: mallarna
+        blir jobbtypens upplägg, arbetsprovet kommer in via onboardingens överlämning, och
+        kundunderlaget fyller fritextrutan direkt i stället för att bo i en egen panel.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SKÄRM 1 ══════════════ -->
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">1</div>
+      <div>
+        <h2>Ny offert — en skärm</h2>
+        <p>Jobbtypen ligger först, eftersom den är det snabbaste sättet till en prissatt offert.
+        Under den ligger fritexten för den som hellre berättar. Två vägar ut, båda synliga.</p>
+      </div>
+    </div>
+    <div class="board">
+      <div class="canvas">
+        <div class="phone">
+          <div class="status"><span>9:41</span><span class="dots">▮▮▮ ▲ ▰</span></div>
+          <div class="ph-body">
+            <div class="nav">
+              <a href="#1" onclick="return false">← Tillbaka</a>
+              <a href="#1" onclick="return false" class="right">Bygg själv →</a>
+            </div>
+            <div class="h-xl">Berätta om jobbet</div>
+            <p class="sub">Välj jobbtyp för en prissatt offert direkt — eller skriv och prata in.</p>
+
+            <div class="strip">
+              <span class="label" style="margin:0 4px 0 2px">Jobbtyp</span>
+              <span class="chip on">Badrum</span>
+              <span class="chip">Måleri</span>
+              <span class="chip">El</span>
+              <span class="chip">Fönster</span>
+            </div>
+            <div class="strip" style="border-color:rgba(15,118,110,.25);background:var(--p-teal-50)">
+              <span class="chip soft" style="flex:1;text-align:left">Badrum · komplett
+                <small>12 rader · dina priser · 5 frågor</small></span>
+              <span style="color:var(--p-teal);font-weight:700">→</span>
+            </div>
+
+            <div class="ta">Vad ska göras, var, och vad kunden önskat sig …
+              <div class="mic">🎤</div>
+            </div>
+            <div class="ex">
+              <span class="t">T.ex.</span>
+              <span class="p">Helrenovera badrum, ca 6 m²</span>
+              <span class="p">Byta 12 fönster</span>
+            </div>
+
+            <div class="row" style="margin-top:13px">
+              <div class="sel grow">📷 Lägg till foto</div>
+            </div>
+            <div class="row" style="margin-top:9px">
+              <div class="sel grow">Kund (frivillig) <span>▾</span></div>
+            </div>
+
+            <div class="foot">
+              <span class="cnt">Du granskar allt innan något skickas</span>
+              <span class="btn pri" style="flex:0 0 auto">Bygg utkast</span>
+            </div>
+          </div>
+        </div>
+        <p class="capt">375 px — samma skärm på desktop, centrerad</p>
+      </div>
+      <div class="notes">
+        <div class="note gone">
+          <h3>Borta från den här skärmen</h3>
+          <ul class="tight">
+            <li><s>"Använd en mall"</s> och mallistan. Mallen <b>är</b> jobbtypens upplägg.</li>
+            <li><s>"Öppna editorn direkt"</s> i headern. Samma sak som "Bygg själv", som nu står där.</li>
+            <li><s>Mellanskärmen</s> som bara frågade efter en titel. Titeln skrivs i dokumentet.</li>
+            <li><s>"Fortsätt med jobbet du visade oss"</s> från onboardingen.</li>
+            <li><s>"Använd granskat kundunderlag"</s> som panel. Texten hamnar direkt i rutan när man kommer via länken.</li>
+            <li><s>Bannern "Vill du alltid börja så här?"</s> och de tre sparade startlägena.</li>
+          </ul>
+        </div>
+        <div class="note kept">
+          <h3>Kvar, oförändrat</h3>
+          <ul class="tight">
+            <li>Rösten i rutan, med transkript man kan rätta.</li>
+            <li>Foton som räcker ensamma för att bygga ett utkast.</li>
+            <li>Kunden är frivillig. Hantverkaren står hemma hos någon som inte finns i registret än.</li>
+            <li>Exempelchipsen mot tomma-sidan-paralysen.</li>
+          </ul>
+        </div>
+        <div class="note">
+          <h3>Det här är den enda ändringen i logik</h3>
+          <p>Jobbtypsremsan flyttar från toppen av sidan in i skärmens eget flöde, och upplägget
+          får en tydlig rad med antal frågor. Allt annat är borttagning.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SKÄRM 2 ══════════════ -->
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">2</div>
+      <div>
+        <h2>Frågorna på plats</h2>
+        <p>Byggt i dag. Skissen visar hur den ser ut när "planerade besök" flyttat in hit
+        som en vanlig fråga i stället för en egen editor längre fram i flödet.</p>
+      </div>
+    </div>
+    <div class="board">
+      <div class="canvas">
+        <div class="phone">
+          <div class="status"><span>9:43</span><span class="dots">▮▮▮ ▲ ▰</span></div>
+          <div class="ph-body">
+            <div class="nav">
+              <a href="#2" onclick="return false">← Tillbaka</a>
+              <a href="#2" onclick="return false" class="right">Hoppa över frågorna →</a>
+            </div>
+            <p class="label" style="color:var(--p-teal)">Badrum</p>
+            <div class="h-xl">Några frågor om jobbet</div>
+            <p class="sub">Svaren sätter mängderna. Hoppa över det du inte vet.</p>
+
+            <div class="q">
+              <div class="qt"><i>1.</i>Hur stor yta gäller det?</div>
+              <div class="row"><span class="inp grow">6,5</span><span class="unit">m²</span></div>
+            </div>
+            <div class="q">
+              <div class="qt"><i>2.</i>Ska det vara golvvärme?</div>
+              <div class="yn"><div class="on">Ja</div><div>Nej</div></div>
+            </div>
+            <div class="q">
+              <div class="qt"><i>3.</i>Vilket ytskikt?</div>
+              <div class="row" style="flex-wrap:wrap;gap:6px">
+                <span class="chip on">Kakel</span><span class="chip">Klinker</span><span class="chip">Våtrumsmatta</span>
+              </div>
+            </div>
+            <div class="q">
+              <div class="qt"><i>4.</i>Hur många besök räknar du med?</div>
+              <div class="row"><span class="inp grow">3</span><span class="unit">besök</span></div>
+            </div>
+            <div class="q">
+              <div class="qt"><i>5.</i>Något som påverkar tiden?</div>
+              <div class="ta" style="min-height:52px;border-width:2px">Trång trappa, fjärde våningen utan hiss
+                <div class="mic" style="width:32px;height:32px;font-size:13px">🎤</div>
+              </div>
+            </div>
+
+            <div class="foot">
+              <span class="cnt">5 av 5 besvarade</span>
+              <span class="btn pri" style="flex:0 0 auto">Skapa offerten →</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <div class="note kept">
+          <h3>Vad svaren gör</h3>
+          <ul class="tight">
+            <li><b>6,5 m²</b> sätter mängden på varje rad som mäts i m²: tätskikt, kakel, klinker.</li>
+            <li><b>Golvvärme: Ja</b> kryssar i tillvalsraden.</li>
+            <li><b>3 besök</b> skriver "Planerade besök: 3." i beskrivningen.</li>
+            <li>Ytskikt och fritext går till Matte som underlag, aldrig som gissad mängd.</li>
+          </ul>
+        </div>
+        <div class="note gone">
+          <h3>Borta längre fram i flödet</h3>
+          <ul class="tight">
+            <li><s>"Så jobbar vi · planerade besök"</s> med egen förhandsvisning, egen API-rutt och en rad i kunskapstabellen. Blir fråga 4 här.</li>
+          </ul>
+        </div>
+        <div class="note">
+          <h3>Fortfarande ingen grind</h3>
+          <p>Varje fråga går att hoppa över, och "Hoppa över frågorna" ger upplägget orört.
+          Ett hoppat svar rör ingen rad.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SKÄRM 3 ══════════════ -->
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">3</div>
+      <div>
+        <h2>Offerten på telefonen</h2>
+        <p>Den skärm hantverkaren står med i kundens hall. Dokumentet är hela ytan.
+        Ingen listvy, ingen granskningsremsa, inga chips som räknar upp vad som saknas.</p>
+      </div>
+    </div>
+    <div class="board">
+      <div class="canvas">
+        <div class="phone">
+          <div class="status"><span>9:47</span><span class="dots">▮▮▮ ▲ ▰</span></div>
+          <div class="ph-body">
+            <div class="nav" style="padding-bottom:10px">
+              <a href="#3" onclick="return false">← Offerter</a>
+              <span style="font-size:12px;color:var(--p-slate-400)">Utkast · sparas automatiskt</span>
+            </div>
+
+            <div class="sel" style="margin-bottom:11px"><span style="color:var(--p-slate-900);font-weight:600">Anna Svensson</span><span>▾</span></div>
+
+            <div class="matte">
+              <span class="av">M</span>
+              <div>
+                <p>Liknande badrum tog 12 % längre tid än offererat. Tre jobb bakom siffran.</p>
+                <a href="#3" onclick="return false">Visa varför →</a>
+              </div>
+            </div>
+
+            <div class="merbar">
+              <span class="m"><span class="dot off"></span>Betalplan</span>
+              <span class="m"><span class="dot"></span>Visning</span>
+              <span class="m"><span class="dot off"></span>Bilagor</span>
+            </div>
+
+            <div class="doc">
+              <div class="dh">
+                <div><b>Nilssons Bygg AB</b><span>Offert 2026-114</span></div>
+                <div class="dt">17 sep 2026<br>Giltig t.o.m. 17 okt</div>
+              </div>
+              <h4>Badrumsrenovering</h4>
+              <p class="desc">Helrenovering av badrum om 6,5 m² med kakel på vägg och klinker på golv.
+              Planerade besök: 3.</p>
+              <div class="lr"><span class="n">Rivning och bortforsling<span class="q">14 tim</span></span><span class="a">10 500 kr</span></div>
+              <div class="lr"><span class="n">Tätskikt<span class="q">6,5 m²</span></span><span class="a">9 750 kr</span></div>
+              <div class="lr"><span class="n">Kakel vägg<span class="q">6,5 m²</span></span><span class="a">13 000 kr</span></div>
+              <div class="lr"><span class="n">Klinker golv<span class="q">6,5 m²</span></span><span class="a">8 450 kr</span></div>
+              <div class="lr"><span class="n">VVS och montage<span class="q">18 tim</span></span><span class="a">13 500 kr</span></div>
+              <div class="lr opt"><span class="n">✓ Golvvärme, elektrisk<span class="q">6,5 m² · tillval</span></span><span class="a">12 200 kr</span></div>
+              <div class="sum"><span>Summa exkl. moms</span><span>67 400 kr</span></div>
+              <div class="sum"><span>Moms 25 %</span><span>16 850 kr</span></div>
+              <div class="sum big"><span>Totalt</span><span>84 250 kr</span></div>
+              <div class="pay">
+                <div><span>Att betala efter ROT</span></div>
+                <b>68 150 kr</b>
+              </div>
+            </div>
+            <div class="addrow">+ Lägg till rad</div>
+
+            <div class="bottombar">
+              <span class="btn sec">Spara utkast</span>
+              <span class="btn pri">Granska och skicka</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="notes">
+        <div class="note gone">
+          <h3>Borta från editorn</h3>
+          <ul class="tight">
+            <li><s>Listvyn</s> och växeln Dokument/Listvy. Rader läggs till, ändras och flyttas i dokumentet.</li>
+            <li><s>Granskningsremsan</s> "nästa sak att kontrollera" och chip-raden i bottenfältet.</li>
+            <li><s>AI-hjälpen</s> inne i editorn. AI-vägen är startskärmen.</li>
+            <li><s>Paketjämförelsen</s> Bas/Rekommenderat/Utökat. Kommer åter som varianter per jobbtyp.</li>
+            <li><s>Efterkalkylbannern, prisvarningarna, Daniels buffertkort och Daniels bedömning</s> som fyra separata ytor. Blir en rad: <b>Matte säger</b>.</li>
+            <li><s>Kundkortets titel och beskrivning.</s> De står i dokumentet.</li>
+            <li><s>Summeringskortet.</s> Summorna står i dokumentet.</li>
+          </ul>
+        </div>
+        <div class="note kept">
+          <h3>Mer blev tre paneler</h3>
+          <p>Betalplan, Visning och Bilagor. Stil flyttar till inställningar,
+          Villkor och texter redigeras i dokumentet, ROT-uppgifterna fyller kunden i vid signering.
+          Statusprickarna är kvar så man ser vad som är ifyllt utan att öppna.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SKÄRM 4 ══════════════ -->
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">4</div>
+      <div>
+        <h2>Offertskaparen på desktop</h2>
+        <p>Samma innehåll, bredare. Vänsterkolumnen är kund, Matte och avdrag.
+        Höger är dokumentet. Det är hela editorn.</p>
+      </div>
+    </div>
+    <div class="canvas scroll">
+      <div class="desktop">
+        <div class="dtop">
+          <div class="left">
+            <span class="back">← Offerter</span>
+            <span class="ttl">Badrumsrenovering</span>
+            <span style="font-size:11.5px;color:var(--p-slate-400)">Utkast · sparad 9:47</span>
+          </div>
+          <div class="acts">
+            <span class="b g">Spara som upplägg</span>
+            <span class="b g">Spara utkast</span>
+            <span class="b t">Granska och skicka</span>
+          </div>
+        </div>
+        <div class="dgrid">
+          <div class="dcol">
+            <div class="card">
+              <p class="label">Kund</p>
+              <div class="sel" style="margin-bottom:8px"><span style="color:var(--p-slate-900);font-weight:600">Anna Svensson</span><span>▾</span></div>
+              <div style="font-size:12px;color:var(--p-teal);font-weight:600">+ Skapa ny kund</div>
+            </div>
+            <div class="matte" style="margin-bottom:12px">
+              <span class="av">M</span>
+              <div>
+                <p>Liknande badrum tog 12 % längre tid än offererat. Tre jobb bakom siffran.</p>
+                <a href="#4" onclick="return false">Visa varför →</a>
+              </div>
+            </div>
+            <div class="card">
+              <p class="label">Avdrag</p>
+              <div class="ded"><div>Inget</div><div class="on">ROT</div><div>RUT</div></div>
+            </div>
+            <div class="card">
+              <p class="label">Din marginal</p>
+              <div class="kv"><span>Täckningsbidrag</span><b>31 400 kr</b></div>
+              <div class="kv"><span>Marginal</span><b>46 %</b></div>
+              <div class="kv"><span>Rader utan inköpspris</span><b>2</b></div>
+            </div>
+            <div class="card">
+              <p class="label">Fyll på från jobbtyp</p>
+              <div class="row" style="flex-wrap:wrap;gap:6px">
+                <span class="chip">El</span><span class="chip">Måleri</span><span class="chip">Golv</span>
+              </div>
+            </div>
+          </div>
+          <div class="dcol">
+            <div class="merbar">
+              <span class="m"><span class="dot off"></span>Betalplan</span>
+              <span class="m"><span class="dot"></span>Visning</span>
+              <span class="m"><span class="dot off"></span>Bilagor</span>
+            </div>
+            <div class="doc big">
+              <div class="dh">
+                <div><b>Nilssons Bygg AB</b><span>Offert 2026-114 · Org.nr 556123-4567</span></div>
+                <div class="dt">17 september 2026<br>Giltig t.o.m. 17 oktober 2026</div>
+              </div>
+              <h4>Badrumsrenovering</h4>
+              <p class="desc">Helrenovering av badrum om 6,5 m² med kakel på vägg och klinker på golv.
+              Planerade besök: 3.</p>
+              <div class="lr"><span class="n">Rivning och bortforsling<span class="q">14 tim × 750 kr</span></span><span class="a">10 500 kr</span></div>
+              <div class="lr"><span class="n">Tätskikt<span class="q">6,5 m² × 1 500 kr</span></span><span class="a">9 750 kr</span></div>
+              <div class="lr"><span class="n">Kakel vägg<span class="q">6,5 m² × 2 000 kr</span></span><span class="a">13 000 kr</span></div>
+              <div class="lr"><span class="n">Klinker golv<span class="q">6,5 m² × 1 300 kr</span></span><span class="a">8 450 kr</span></div>
+              <div class="lr"><span class="n">VVS och montage<span class="q">18 tim × 750 kr</span></span><span class="a">13 500 kr</span></div>
+              <div class="lr opt"><span class="n">✓ Golvvärme, elektrisk<span class="q">6,5 m² · tillval, valt av kunden</span></span><span class="a">12 200 kr</span></div>
+              <div class="sum"><span>Summa exkl. moms</span><span>67 400 kr</span></div>
+              <div class="sum"><span>Moms 25 %</span><span>16 850 kr</span></div>
+              <div class="sum big"><span>Totalt inkl. moms</span><span>84 250 kr</span></div>
+              <div class="pay"><div><span>Att betala efter ROT-avdrag</span></div><b>68 150 kr</b></div>
+              <div style="margin-top:14px;padding-top:11px;border-top:1px solid var(--p-slate-200);font-size:11px;color:var(--p-slate-500)">
+                <b style="color:var(--p-slate-700);display:block;margin-bottom:3px">Förbehåll</b>
+                Priset förutsätter befintliga avlopp i nuvarande läge. Dolda skador i bjälklag tillkommer efter överenskommelse.
+              </div>
+              <div style="margin-top:11px;font-size:11px;color:var(--p-slate-500)">
+                <b style="color:var(--p-slate-700);display:block;margin-bottom:3px">Ingår inte</b>
+                Målning av tak. Vitvaror. Bygglov.
+              </div>
+            </div>
+            <div class="addrow">+ Lägg till rad</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="notes" style="margin-top:18px;display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:12px">
+      <div class="note gone">
+        <h3>Ett ställe per fält</h3>
+        <ul class="tight">
+          <li><b>Titel och beskrivning:</b> bara i dokumentet.</li>
+          <li><b>Rabatt:</b> bara i dokumentet.</li>
+          <li><b>Villkor, ÄTA, betalningsvillkor, ingår inte:</b> bara i dokumentet, med standardtextväljaren där.</li>
+          <li><b>ROT:</b> en växel, i vänsterkolumnen. Personnummer fyller kunden i vid signering.</li>
+          <li><b>Summering:</b> bara i dokumentet.</li>
+        </ul>
+      </div>
+      <div class="note kept">
+        <h3>Kvar i vänsterkolumnen</h3>
+        <ul class="tight">
+          <li>Kund, med "skapa ny" inline.</li>
+          <li>Matte-raden, som visar det som finns att säga och annars ingenting.</li>
+          <li>Avdragsväxeln.</li>
+          <li>Marginalen, som syns först när någon rad har ett inköpspris.</li>
+          <li>Fyll på från jobbtyp, som i dag.</li>
+        </ul>
+      </div>
+      <div class="note">
+        <h3>Prisminnet och förbehållen</h3>
+        <p>Båda är kvar och båda är självgardande: de syns bara när de har något att säga.
+        Förbehållen föreslås i dokumentets egen sektion, som i dag.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════════ SIFFROR ══════════════ -->
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">5</div>
+      <div>
+        <h2>Vad det kostar och ger</h2>
+        <p>Radantalen är uppskattade ur filstorlekar, inte ett löfte. Testkolumnen är exakt:
+        det är de facit som måste skrivas om i samma commit som borttagningen.</p>
+      </div>
+    </div>
+    <div class="tw">
+      <table>
+        <thead><tr><th>Paket</th><th>Vad som rivs</th><th>Rader</th><th>Facit som måste ändras</th></tr></thead>
+        <tbody>
+          <tr><td><b>A · Starten</b></td>
+            <td>Mellanskärmen, mallvägen, startvanan, arbetsprovet, kundunderlagspanelen, onboardingguiden, återställningsfrågan</td>
+            <td class="down">−700</td>
+            <td>quick-preferences (bort), snabboffert-startvagar (skrivs om)</td></tr>
+          <tr><td><b>B · Dubbletterna</b></td>
+            <td>Titel, beskrivning, rabatt, villkor, ROT och summering får ett ställe. Mer 6 → 3 paneler</td>
+            <td class="down">−900</td>
+            <td>quotes-mer-i-flodet, quote-document-empty-state, rot-instruktion</td></tr>
+          <tr><td><b>C · Verktygen</b></td>
+            <td>Listvyn, AI-hjälpen, paketjämförelsen, besöksregeln, granskningsremsan, grossistsöket</td>
+            <td class="down">−1 500</td>
+            <td>golden-path (kräver Listvy-knappen), quote-completeness, single-cta-surface</td></tr>
+          <tr><td><b>D · Runtomkring</b></td>
+            <td>Mallsidan in i jobbtyperna, två uppföljningsmotorer blir en, dubbla API-rutter, KPI-korten</td>
+            <td class="down">−1 500</td>
+            <td>handoff-runtime, durable-followup, quote-template-job-type-default</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="foot-note">
+      <p style="margin:0"><b>Den ärliga varningen.</b> Flera av de här borttagningarna kostar ett facit
+      som i dag säger "ändra inte". Det är precis därför de aldrig tagits bort. Ett facit skyddar mot
+      buggar, men det försvarar också en funktion som ingen aktivt valt att behålla. Sittningen är
+      platsen där ni väljer aktivt.</p>
+    </div>
+  </section>
+
+  <section class="step">
+    <div class="step-head">
+      <div class="step-num">6</div>
+      <div>
+        <h2>Vad som inte ändras</h2>
+        <p>Så att det syns svart på vitt vad rivningen inte rör.</p>
+      </div>
+    </div>
+    <ul class="tight" style="columns:2;column-gap:28px;max-width:900px">
+      <li><b>createQuote</b> — en väg in i offerter och rader.</li>
+      <li>Tredelningen arbete, material och resa per rad.</li>
+      <li>ROT- och RUT-motorn och årstaket.</li>
+      <li>Offertnummer, signeringslänk och signering.</li>
+      <li>Hela kundvyn: tillval, avböjskäl, starttider, referensfoton, kundens fråga.</li>
+      <li>Jobbtyper, upplägg per jobbtyp och prisupplösningen mot firmans artiklar.</li>
+      <li>Frågeflödet som byggdes i dag.</li>
+      <li>Skicka-modalen med kanal, mottagare och verklighetskontroll.</li>
+      <li>Öppningsspårningen och uppföljningens kvittenser.</li>
+      <li>Godkännandegränsen för allt kunden får se.</li>
+    </ul>
+  </section>
+</main>
+
+</body>
+</html>
