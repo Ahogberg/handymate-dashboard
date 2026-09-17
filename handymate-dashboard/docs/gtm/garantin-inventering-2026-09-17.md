@@ -212,11 +212,11 @@ publiceras, inte bara grundarna. Bytet får inte ske före §10 i heroutkastet.
 
 **Kvar:**
 
-- Andreas eget konto (**Andreas Bygg**, aktiv Stripe-prenumeration,
-  `is_demo_tenant = false`) räknas av `isFoundersOfferAvailable()` som
-  plats 1 av 20. Märk det som demokonto eller undanta det — annars går en
-  verklig grundarplats till spillo. Inte gjort här: `is_demo_tenant` styr
-  också demoåterställningen (v99), så det är ett medvetet val.
+- ~~Andreas eget konto räknas som plats 1 av 20.~~ **Gjort** (beslut
+  Andreas samma dag, `sql/v240_andreas_bygg_demo_tenant.sql`): `Andreas
+  Bygg` är `is_demo_tenant = true`. Grinden räknar nu 0 av 20 tagna.
+  Flaggan var säker att sätta — demoåterställningen är grindad på
+  `DEMO_BUSINESS_ID`, inte på flaggan.
 - Bytet till `'usage'`: §10-villkoren, särskilt punkt 7 (juridisk
   genomläsning). När det är gjort är bytet en rad i `feature-gates.ts` plus
   landningssidan.
