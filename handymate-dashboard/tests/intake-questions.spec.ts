@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
 import {
-  applyIntakeAnswers, buildIntakeAnswerSet, equivalentUnit, intakeAnswersText, intakeUnitsFromRows, readIntakeAnswerSet,
+  applyIntakeAnswers, buildIntakeAnswerSet, equivalentUnit, intakeAnswersText, intakeRowTakesQuantity, intakeUnitsFromRows, readIntakeAnswerSet,
   readIntakeQuestions, seedIntakeQuestions, validateIntakeQuestions, type IntakeQuestion,
 } from '../lib/quotes/intake-questions'
 import { fetchIntakeQuestions } from '../lib/quotes/intake-flow'
@@ -29,12 +29,24 @@ const fragor: IntakeQuestion[] = [
 
 const rader = () => [
   { item_type: 'heading', description: 'Badrum', unit: '', quantity: 1 },
-  { item_type: 'item', description: 'Tätskikt', unit: 'm2', quantity: 1 },
-  { item_type: 'item', description: 'Kakel vägg', unit: 'M²', quantity: 1 },
-  { item_type: 'item', description: 'Rivning', unit: 'tim', quantity: 8 },
-  { item_type: 'item', description: 'Blandare', unit: 'st', quantity: 1 },
+  { item_type: 'item', description: 'Tätskikt', unit: 'm2', quantity: 1, linked_product_id: 'prod_tatskikt' },
+  { item_type: 'item', description: 'Kakel vägg', unit: 'M²', quantity: 1, linked_product_id: 'prod_kakel' },
+  { item_type: 'item', description: 'Rivning', unit: 'tim', quantity: 8, linked_product_id: 'prod_arbete' },
+  { item_type: 'item', description: 'Blandare', unit: 'st', quantity: 1, linked_product_id: 'prod_blandare' },
+  // Fri rad utan artikelkoppling: enheten stämmer men mängden får inte röras.
+  { item_type: 'item', description: 'Egen rad', unit: 'm2', quantity: 3 },
   { item_type: 'option', description: 'Golvvärme elektrisk', unit: 'm²', quantity: 1, option_selected: false, option_default: false },
   { item_type: 'option', description: 'Handdukstork', unit: 'st', quantity: 1, option_selected: true, option_default: true },
+]
+
+/** Bee Services faktiska badrumsmall i produktion (2026-09-17): mallen används
+    som miniräknare — beloppet ligger i antalet, á-priset är 1, allt är "st",
+    ingen rad är kopplad till en artikel. Frågeflödet får aldrig röra den. */
+const miniraknarmall = () => [
+  { item_type: 'heading', description: 'Rivning till tätskigt', unit: 'st', quantity: 0 },
+  { item_type: 'item', description: 'Arbete', unit: 'st', quantity: 160 },
+  { item_type: 'item', description: 'Material> färdigt Tätskigt', unit: 'st', quantity: 25348 },
+  { item_type: 'item', description: 'Standard paketet Kakel/ klinker & möbler', unit: 'st', quantity: 55211 },
 ]
 
 test.describe('formen — validateIntakeQuestions / readIntakeQuestions', () => {
@@ -92,15 +104,25 @@ test.describe('seedningen — bransch + jobbtypens namn + enheterna i standardra
   test('seedade frågor är giltiga enligt formen', () => {
     expect(() => validateIntakeQuestions(seedIntakeQuestions('plumber', 'Avlopp', ['m', 'st', 'tim', 'm3', 'kg']))).not.toThrow()
   })
+  test('okopplade rader ger inga enheter — en mängdfråga som inte kan sätta något föreslås aldrig', () => {
+    expect(intakeUnitsFromRows(miniraknarmall())).toEqual([])
+    expect(intakeUnitsFromRows([{ item_type: 'item', unit: 'm2' }])).toEqual([])
+    expect(intakeUnitsFromRows([{ item_type: 'item', unit: 'm2', linked_product_id: 'p1' }])).toEqual(['m2'])
+    // Utan kopplade rader blir det bara branschfrågor och den öppna frågan.
+    const seeded = seedIntakeQuestions('construction', 'Badrum', intakeUnitsFromRows(miniraknarmall()))
+    expect(seeded.every(q => q.kind !== 'number')).toBe(true)
+    expect(seeded.some(q => q.id === 'paverkar_tiden')).toBe(true)
+  })
 })
 
 test.describe('svar → rader — applyIntakeAnswers', () => {
-  test('mått sätter mängd på artikelrader med samma enhet (även stavningsvariant), aldrig på tillval eller andra enheter', () => {
+  test('mått sätter mängd på KOPPLADE artikelrader med samma enhet (även stavningsvariant), aldrig på tillval, andra enheter eller fria rader', () => {
     const before = rader()
     const after = applyIntakeAnswers(before, fragor, { yta_m2: '6,5', antal_st: 3 })
-    expect(after.map(r => r.quantity)).toEqual([1, 6.5, 6.5, 8, 3, 1, 1])
+    //                                heading  m2   M²  tim  st  fri m2  option  option
+    expect(after.map(r => r.quantity)).toEqual([1, 6.5, 6.5, 8, 3, 3, 1, 1])
     // Orörda rader är samma objekt — inget kopieras i onödan.
-    expect(after[0]).toBe(before[0]); expect(after[3]).toBe(before[3]); expect(after[5]).toBe(before[5])
+    expect(after[0]).toBe(before[0]); expect(after[3]).toBe(before[3]); expect(after[5]).toBe(before[5]); expect(after[6]).toBe(before[6])
     expect(after[1]).not.toBe(before[1])
   })
   test('tomt, noll eller hoppat svar rör ingen rad', () => {
@@ -110,14 +132,32 @@ test.describe('svar → rader — applyIntakeAnswers', () => {
   })
   test('ja/nej med kopplat tillval kryssar matchande tillvalsrader — nej kryssar ur, utan koppling händer inget', () => {
     const ja = applyIntakeAnswers(rader(), fragor, { golvvarme: true })
-    expect(ja[5].option_selected).toBe(true); expect(ja[5].option_default).toBe(true); expect(ja[6].option_selected).toBe(true)
+    expect(ja[6].option_selected).toBe(true); expect(ja[6].option_default).toBe(true); expect(ja[7].option_selected).toBe(true)
     const nej = applyIntakeAnswers(rader(), fragor, { golvvarme: false })
-    expect(nej[5].option_selected).toBe(false); expect(nej[6].option_selected).toBe(true)
+    expect(nej[6].option_selected).toBe(false); expect(nej[7].option_selected).toBe(true)
     const utan = applyIntakeAnswers(rader(), [{ id: 'q', label: 'x', kind: 'yesno' }], { q: true })
     expect(utan).toEqual(rader())
   })
   test('val och fritext rör aldrig rader', () => {
     expect(applyIntakeAnswers(rader(), fragor, { ytskikt: 'Kakel', ovrigt: '12 m² extra' })).toEqual(rader())
+  })
+  test('miniräknarmallen (belopp i antalet, allt "st", inga artiklar) lämnas helt orörd', () => {
+    const before = miniraknarmall()
+    const alla = { yta_m2: 6.5, antal_st: 3, golvvarme: true, ytskikt: 'Kakel', ovrigt: 'x' }
+    const after = applyIntakeAnswers(before, fragor, alla)
+    expect(after).toEqual(before)
+    after.forEach((row, index) => expect(row).toBe(before[index]))
+    // Regressionen som regeln finns för: utan kopplingskravet hade 25 348 blivit 3.
+    expect(after[2].quantity).toBe(25348)
+  })
+  test('intakeRowTakesQuantity kräver artikelrad OCH koppling', () => {
+    expect(intakeRowTakesQuantity({ item_type: 'item', linked_product_id: 'p1' })).toBe(true)
+    expect(intakeRowTakesQuantity({ linked_product_id: 'p1' })).toBe(true)
+    expect(intakeRowTakesQuantity({ item_type: 'item' })).toBe(false)
+    expect(intakeRowTakesQuantity({ item_type: 'item', linked_product_id: '' })).toBe(false)
+    expect(intakeRowTakesQuantity({ item_type: 'item', linked_product_id: null })).toBe(false)
+    expect(intakeRowTakesQuantity({ item_type: 'option', linked_product_id: 'p1' })).toBe(false)
+    expect(intakeRowTakesQuantity({ item_type: 'heading', linked_product_id: 'p1' })).toBe(false)
   })
 })
 
@@ -184,6 +224,17 @@ test.describe('kopplingen i koden — källskanning', () => {
     expect(route).toContain("hasPermission(user, 'see_financials')")
     expect(route).toContain('isOwnerOrAdmin(user)) return NextResponse.json')
     expect(route).toContain("'Cache-Control': 'no-store'")
+  })
+  test('kopplingskravet står i koden, inte bara i facit', () => {
+    const lib = utanKommentarer(read('lib/quotes/intake-questions.ts'))
+    expect(lib).toContain('export function intakeRowTakesQuantity')
+    expect(lib).toContain("typeof row.linked_product_id === 'string' && row.linked_product_id.length > 0")
+    // Mängdsättningen går genom vakten, aldrig direkt på item_type.
+    expect(lib).toContain('intakeRowTakesQuantity(row) && equivalentUnit(String(row.unit ?? \'\'), q.unit!)')
+    expect(lib).not.toMatch(/\(row\.item_type \?\? 'item'\) === 'item' && equivalentUnit/)
+    // Editorn förklarar varför en mängdfråga inte gör något utan koppling.
+    expect(utanKommentarer(read('components/onboarding/JobTypeQuestionsEditor.tsx')))
+      .toContain('Inga rader är kopplade till en artikel ännu')
   })
   test('servern: frågor utan sparad lista seedas, skrivning validerar och null återställer', () => {
     const server = utanKommentarer(read('lib/quotes/intake-questions-server.ts'))

@@ -104,7 +104,8 @@ export function JobTypeQuestionsEditor({ jobTypeSlug, jobTypeName, canManage, bu
   const disabled = busy || saving || loading || !canManage
   return <section className="job-standard-editor" aria-label={`Frågor på plats för ${jobTypeName}`} aria-busy={loading || saving}>
     <h4>Frågor på plats</h4>
-    <p className="job-setup-caption">Ställs när en offert startas från {jobTypeName}. Mått och antal sätter mängden på standardrader med samma enhet{units.length ? ` (${units.join(', ')})` : ''}; ja/nej kan kryssa ett tillval; resten går som underlag till Matte.</p>
+    <p className="job-setup-caption">Ställs när en offert startas från {jobTypeName}. Mått och antal sätter mängden på rader som är kopplade till en artikel med samma enhet{units.length ? ` (${units.join(', ')})` : ''}; ja/nej kan kryssa ett tillval; resten går som underlag till Matte.</p>
+    {!loading && !units.length && <p className="job-setup-note">Inga rader är kopplade till en artikel ännu, så en fråga om mått eller antal ändrar ingen mängd. Koppla raderna under &quot;Vad brukar ingå?&quot; så börjar svaren räkna. Ja/nej-frågor och fritext fungerar ändå.</p>}
     {loading && <p className="job-setup-loading" role="status"><Loader2 size={16} className="animate-spin" /> Hämtar frågorna…</p>}
     {error && <p role="alert" className="job-setup-error">{error}</p>}
     {saved && <p role="status" className="job-setup-caption">{saved}</p>}

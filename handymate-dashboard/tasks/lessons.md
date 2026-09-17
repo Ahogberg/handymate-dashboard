@@ -700,3 +700,18 @@ Spara gärna pågående kontroll för samtidiga anrop, men kasta cacheposten vid
 ## 2026-09-16 — En "delad" funktion måste bevisas på varje väg, inte en
 Codex fixade de sex namngivna ROT-ställena men fyra fakturavägar och kreditvägen låg kvar på gamla logiken, och specen "all paths" körde en väg. Briefen ska räkna upp alla anropare (grep `.from('invoices')`/`createInvoice(`) och acceptansen ska köra tal genom varje, inte textskanna källfiler.
 
+
+## 2026-09-17 — Enheten ensam bevisar inte att antalet är ett antal
+Frågeflödets mängdregel matchade på enhet: svar med enheten "st" satte `quantity`
+på varje st-rad. Andreas kollade produktionen: Bee Services badrumsmall används som
+miniräknare — BELOPPET ligger i antalskolumnen (25 348 st × 1 kr), enheten är "st"
+även för timmar, och ingen rad är kopplad till en artikel. Svaret "3" hade tagit
+offerten från 170 000 kr till knappt 2 000, tyst framför kunden. I hela databasen
+bär 4 av 221 mallrader en artikelkoppling, och 2 075 av 2 076 artiklar är seedade
+och aldrig kopplade till något.
+Regler: (1) en regel som SKRIVER mängder eller belopp får bara röra rader vars form
+är garanterad — artikelkopplingen garanterar att enhet och á-pris kommer ur
+registret, enhetssträngen garanterar ingenting. (2) Innan en sådan regel släpps:
+läs verklig produktionsdata och lägg in den formen som testfall, inte en påhittad
+mall. (3) Seeda aldrig ett förslag som inte kan få effekt — en mängdfråga utan
+kopplade rader är ett löfte flödet inte kan hålla, så seedningen läser samma vakt.

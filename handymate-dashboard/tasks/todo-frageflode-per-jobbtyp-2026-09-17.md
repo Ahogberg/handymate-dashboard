@@ -56,5 +56,13 @@ docs/offert/offertflodet-kontext-2026-09-17.md.
   dem till en fråga men radmatchningen var exakt, så M²-rader hade missats. Löst med
   `equivalentUnit` (stavningsvarianter, aldrig omräkning) i seedning, enhetslista och
   svar→rader.
+- EFTERSLÄNG 2026-09-17 (Andreas fynd i produktion): mängdregeln matchade bara på
+  enhet. Bee Services badrumsmall bär beloppet i antalskolumnen med enheten "st"
+  och ingen artikelkoppling — ett st-svar hade skrivit över 25 348 med 3. Ny vakt
+  `intakeRowTakesQuantity`: en mängdfråga rör bara artikelrader som är kopplade till
+  registret. Seedningen läser samma vakt, så en jobbtyp utan kopplade rader får inga
+  mängdfrågor, och editorn förklarar varför. 5 nya mutationer fångade (vakten borta,
+  tom sträng som koppling, tillval genom vakten, seedning utan vakt, editorns
+  förklaring borta). Contracts 2 769 passed.
 - Inte klickprovat i webbläsare (ingen inloggning i miljön). Preview-bygget på Vercel
   är byggkontrollen; flödet bör provas på telefon: tryck upplägg → frågor → offert.

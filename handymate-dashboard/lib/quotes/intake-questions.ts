@@ -181,12 +181,46 @@ export function seedIntakeQuestions(trade: string | null | undefined, jobTypeNam
   return questions.slice(0, 8)
 }
 
-/** Enheterna i en jobbtyps standardrader, i radordning, utan dubbletter. */
-export function intakeUnitsFromRows(rows: ReadonlyArray<{ unit?: string | null; item_type?: string | null; itemType?: string | null }>): string[] {
+/**
+ * Sant när en mängdfråga får röra raden: en artikelrad kopplad till en artikel
+ * i företagets register.
+ *
+ * ═══ VARFÖR KOPPLINGEN ÄR ETT KRAV (2026-09-17) ═══
+ *
+ * Bee Services badrumsmall i produktion ser ut så här:
+ *
+ *   Arbete                             160 st × 570 kr
+ *   Material> färdigt Tätskigt      25 348 st ×   1 kr
+ *   Standard paketet Kakel/klinker  55 211 st ×   1 kr
+ *
+ * Mallen används som miniräknare: BELOPPET ligger i antalskolumnen, á-priset är
+ * 1, och enheten är "st" även för timmar. En fråga med enheten "st" hade skrivit
+ * över både 160 och 25 348 och tagit offerten från 170 000 kr till knappt 2 000 —
+ * tyst, mitt framför kunden.
+ *
+ * Enheten ensam är alltså ingen garanti för att antalet ÄR ett antal. Det är
+ * artikelkopplingen som är det: en kopplad rad har sin enhet och sitt á-pris
+ * från artikelregistret, så mängden är per definition en mängd. I hela
+ * produktionsdatabasen bär 4 av 221 mallrader en koppling — regeln gör alltså
+ * ingenting på dagens mallar, och det är avsikten. Kopplingen är det som låser
+ * upp frågeflödet, inte tvärtom.
+ *
+ * Tillval (ja/nej → option_selected) rör aldrig belopp och omfattas inte.
+ */
+export function intakeRowTakesQuantity(row: { item_type?: string | null; itemType?: string | null; linked_product_id?: string | null }): boolean {
+  const type = row.item_type ?? row.itemType ?? 'item'
+  return type === 'item' && typeof row.linked_product_id === 'string' && row.linked_product_id.length > 0
+}
+
+/**
+ * Enheterna som en mängdfråga faktiskt kan sätta, i radordning, utan dubbletter.
+ * Bara kopplade artikelrader räknas — en fråga om en enhet som ingen kopplad rad
+ * bär vore ett löfte flödet inte kan hålla.
+ */
+export function intakeUnitsFromRows(rows: ReadonlyArray<{ unit?: string | null; item_type?: string | null; itemType?: string | null; linked_product_id?: string | null }>): string[] {
   const units: string[] = []
   for (const row of rows) {
-    const type = row.item_type ?? row.itemType ?? 'item'
-    if (type !== 'item') continue
+    if (!intakeRowTakesQuantity(row)) continue
     const unit = typeof row.unit === 'string' ? row.unit.trim() : ''
     if (unit && !units.some(u => equivalentUnit(u, unit))) units.push(unit)
   }
@@ -256,16 +290,18 @@ interface IntakeRow {
   description?: string | null
   unit?: string | null
   quantity?: number | null
+  linked_product_id?: string | null
   option_selected?: boolean | null
   option_default?: boolean | null
 }
 
 /**
  * Svar → rader. Returnerar en NY lista; rader utan träff är samma objekt som
- * förut. Mängder ändras bara på artikelrader (`item`) med samma enhet som
- * frågan (exakt eller känd stavningsvariant, aldrig omräkning), tillval bara
- * på tillvalsrader vars beskrivning innehåller det kopplade ordet. Anroparen
- * kör recalculateItems/prisresolvern efteråt.
+ * förut. Mängder ändras bara på rader som klarar `intakeRowTakesQuantity`
+ * (artikelrad kopplad till registret) OCH har samma enhet som frågan (exakt
+ * eller känd stavningsvariant, aldrig omräkning). Tillval kryssas bara på
+ * tillvalsrader vars beskrivning innehåller det kopplade ordet. Anroparen kör
+ * recalculateItems/prisresolvern efteråt.
  */
 export function applyIntakeAnswers<T extends IntakeRow>(rows: readonly T[], questions: readonly IntakeQuestion[], answers: IntakeAnswers): T[] {
   let result = rows.slice()
@@ -273,7 +309,7 @@ export function applyIntakeAnswers<T extends IntakeRow>(rows: readonly T[], ques
     const value = normalizeIntakeAnswer(q, answers[q.id])
     if (!isAnswered(value)) continue
     if (q.kind === 'number' && q.unit && typeof value === 'number' && value > 0) {
-      result = result.map(row => (row.item_type ?? 'item') === 'item' && equivalentUnit(String(row.unit ?? ''), q.unit!) ? { ...row, quantity: value } : row)
+      result = result.map(row => intakeRowTakesQuantity(row) && equivalentUnit(String(row.unit ?? ''), q.unit!) ? { ...row, quantity: value } : row)
     } else if (q.kind === 'yesno' && q.optionMatch && typeof value === 'boolean') {
       const needle = q.optionMatch.toLocaleLowerCase('sv')
       result = result.map(row => row.item_type === 'option' && String(row.description ?? '').toLocaleLowerCase('sv').includes(needle)
