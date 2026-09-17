@@ -1694,3 +1694,14 @@ Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är
 Granskning: se briefens §9 "Review". Driftläge: briefens §8. C9 är nästa paket (väntar på namngiven konsult, P0, C1b).
 
 ---
+
+## Bolagsverket-uppslaget svarade aldrig — 2026-09-17
+
+- [x] Spåra "Kunde inte nå Bolagsverket just nu" till enda källan: onboardingens steg 2 (partnerdashboarden har inget uppslag alls).
+- [x] Körloggen: `token-hämtning misslyckades: 404` — fel värd, inte fel nyckel.
+- [x] Token-URL till portal-värden; uppslaget ligger kvar på gateway-värden; båda env-överstyrbara för acceptansmiljön.
+- [x] `identitetsbeteckning` byggs tolvsiffrigt (`orgNumberIdentity`) i stället för tio.
+- [x] `not_authorized` skiljd från `request_failed`; status och URL i varje loggrad.
+- [x] Fyra miljövariabler dokumenterade i `.env.local.example`; facit i karin-org-number (26) och bolagsverket-onboarding (29).
+- [ ] Skarpt prov: fyll i ett org.nr i onboardingens steg 2 och bekräfta att namn/adress fylls i. Går inte att prova härifrån — utgående trafik mot bolagsverket.se är blockerad och nycklarna finns bara i Vercel.
+

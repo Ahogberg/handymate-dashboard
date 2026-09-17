@@ -16,15 +16,36 @@
  * innan produktionsanvändning — särskilt `/organisationer`-svarets
  * exakta fältnamn.
  *
+ * RÄTTAT 2026-09-17 efter skarpt fel i onboardingen ("Kunde inte nå
+ * Bolagsverket just nu", körloggen: `token-hämtning misslyckades: 404`):
+ *   1. Tokens mintas på PORTAL-värden, inte på gateway-värden. Uppslaget
+ *      går mot `gw.api.bolagsverket.se`, men `/oauth2/token` finns bara på
+ *      `portal.api.bolagsverket.se`. Den gamla gateway-URL:en gav 404.
+ *   2. `identitetsbeteckning` är TOLV siffror (PeOrgNr), inte tio — se
+ *      orgNumberIdentity i lib/karin/org-number.ts.
+ * Båda värdarna är env-överstyrbara: Bolagsverket delar ut nycklar till
+ * acceptansmiljön först (`portal-accept2`/`gw-accept2`), och en miljöbyte
+ * ska inte kräva en deploy.
+ *
  * Fail-soft genomgående, samma disciplin som app/api/onboarding/
  * scrape-website/route.ts: saknade credentials, nätverksfel och
  * oväntade svar ger alla ett typat `{ok:false, reason}` — aldrig ett
- * kastat fel som stoppar onboarding.
+ * kastat fel som stoppar onboarding. Varje misslyckande loggar status OCH
+ * URL: utan URL:en i loggen tog 404:an ovan en felsökningsrunda extra.
  */
+import { orgNumberIdentity } from '@/lib/karin/org-number'
 
-const TOKEN_URL = 'https://gw.api.bolagsverket.se/oauth2/token'
-const API_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1'
+const DEFAULT_TOKEN_URL = 'https://portal.api.bolagsverket.se/oauth2/token'
+const DEFAULT_API_BASE_URL = 'https://gw.api.bolagsverket.se/vardefulla-datamangder/v1'
 const SCOPE = 'vardefulla-datamangder:read'
+
+/** Läses per anrop, inte vid modulladdning — annars fryses värdet in i bygget. */
+function tokenUrl(): string {
+  return process.env.BOLAGSVERKET_TOKEN_URL || DEFAULT_TOKEN_URL
+}
+function apiBaseUrl(): string {
+  return process.env.BOLAGSVERKET_API_BASE_URL || DEFAULT_API_BASE_URL
+}
 
 export interface BolagsverketAddress {
   street: string | null
@@ -44,8 +65,15 @@ export type BolagsverketLookupResult =
   | { ok: true; data: BolagsverketCompany }
   | {
       ok: false
-      reason: 'not_configured' | 'not_found' | 'invalid_response' | 'request_failed' | 'rate_limited'
+      /**
+       * `not_authorized` skiljer "nycklarna/miljön är fel" från "tjänsten
+       * svarade inte" (`request_failed`). Innan den skillnaden fanns såg alla
+       * tre felfallen likadana ut för både användaren och oss.
+       */
+      reason: 'not_configured' | 'not_authorized' | 'not_found' | 'invalid_response' | 'request_failed' | 'rate_limited'
     }
+
+type TokenResult = { ok: true; accessToken: string } | { ok: false; reason: 'not_authorized' | 'request_failed' }
 
 interface CachedToken {
   accessToken: string
@@ -64,11 +92,12 @@ export function isTokenValid(token: CachedToken | null, nowMs: number): boolean 
   return token.expiresAtMs - 60_000 > nowMs
 }
 
-async function fetchAccessToken(clientId: string, clientSecret: string): Promise<string | null> {
-  if (isTokenValid(cachedToken, Date.now())) return (cachedToken as CachedToken).accessToken
+async function fetchAccessToken(clientId: string, clientSecret: string): Promise<TokenResult> {
+  if (isTokenValid(cachedToken, Date.now())) return { ok: true, accessToken: (cachedToken as CachedToken).accessToken }
 
+  const url = tokenUrl()
   try {
-    const res = await fetch(TOKEN_URL, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
@@ -79,17 +108,22 @@ async function fetchAccessToken(clientId: string, clientSecret: string): Promise
       }),
     })
     if (!res.ok) {
-      console.error('[bolagsverket] token-hämtning misslyckades:', res.status)
-      return null
+      // URL:en med i loggen: en 404 här betyder fel VÄRD, inte fel nyckel.
+      console.error('[bolagsverket] token-hämtning misslyckades:', res.status, url)
+      // 400 invalid_client och 401/403 = nycklarna eller miljön; allt annat = tjänsten.
+      return { ok: false, reason: [400, 401, 403].includes(res.status) ? 'not_authorized' : 'request_failed' }
     }
     const json: any = await res.json()
-    if (typeof json.access_token !== 'string') return null
+    if (typeof json.access_token !== 'string') {
+      console.error('[bolagsverket] token-svaret saknade access_token:', url)
+      return { ok: false, reason: 'request_failed' }
+    }
     const expiresInSec = typeof json.expires_in === 'number' ? json.expires_in : 300
     cachedToken = { accessToken: json.access_token, expiresAtMs: Date.now() + expiresInSec * 1000 }
-    return cachedToken.accessToken
+    return { ok: true, accessToken: cachedToken.accessToken }
   } catch (err) {
-    console.error('[bolagsverket] token-hämtning kastade:', err instanceof Error ? err.message : err)
-    return null
+    console.error('[bolagsverket] token-hämtning kastade:', url, err instanceof Error ? err.message : err)
+    return { ok: false, reason: 'request_failed' }
   }
 }
 
@@ -147,23 +181,32 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
   const clientSecret = process.env.BOLAGSVERKET_CLIENT_SECRET
   if (!clientId || !clientSecret) return { ok: false, reason: 'not_configured' }
 
-  const token = await fetchAccessToken(clientId, clientSecret)
-  if (!token) return { ok: false, reason: 'request_failed' }
+  // Tolv siffror (PeOrgNr), inte tio — Bolagsverket avvisar det tiosiffriga.
+  const identitetsbeteckning = orgNumberIdentity(orgNumber)
+  if (!identitetsbeteckning) return { ok: false, reason: 'not_found' }
 
+  const token = await fetchAccessToken(clientId, clientSecret)
+  if (!token.ok) return { ok: false, reason: token.reason }
+
+  const url = `${apiBaseUrl()}/organisationer`
   try {
-    const res = await fetch(`${API_BASE_URL}/organisationer`, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
+        Authorization: `Bearer ${token.accessToken}`,
       },
-      body: JSON.stringify({ identitetsbeteckning: orgNumber.replace(/[^0-9]/g, '') }),
+      body: JSON.stringify({ identitetsbeteckning }),
     })
 
     if (res.status === 429) return { ok: false, reason: 'rate_limited' }
     if (res.status === 404) return { ok: false, reason: 'not_found' }
+    if (res.status === 401 || res.status === 403) {
+      console.error('[bolagsverket] uppslag nekades:', res.status, url)
+      return { ok: false, reason: 'not_authorized' }
+    }
     if (!res.ok) {
-      console.error('[bolagsverket] uppslag misslyckades:', res.status)
+      console.error('[bolagsverket] uppslag misslyckades:', res.status, url)
       return { ok: false, reason: 'request_failed' }
     }
 
@@ -172,7 +215,7 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
     if (!parsed) return { ok: false, reason: 'invalid_response' }
     return { ok: true, data: parsed }
   } catch (err) {
-    console.error('[bolagsverket] uppslag kastade:', err instanceof Error ? err.message : err)
+    console.error('[bolagsverket] uppslag kastade:', url, err instanceof Error ? err.message : err)
     return { ok: false, reason: 'request_failed' }
   }
 }

@@ -70,6 +70,61 @@ test.describe('lib/bolagsverket/client.ts — fail-soft, aldrig ett kastat fel u
   })
 })
 
+test.describe('regressionen 2026-09-17 — "Kunde inte nå Bolagsverket just nu" i skarp onboarding', () => {
+  // Körloggen sa `token-hämtning misslyckades: 404`. Tokens mintas på
+  // PORTAL-värden; uppslaget går mot gateway-värden. Att peka token mot
+  // gatewayen ger 404 och ser ut som ett nätverksfel.
+  test('token hämtas från portal-värden, aldrig från gateway-värden', () => {
+    const tokenDefault = client.match(/const DEFAULT_TOKEN_URL = '([^']+)'/)
+    expect(tokenDefault, 'DEFAULT_TOKEN_URL saknas').not.toBeNull()
+    expect(tokenDefault![1]).toContain('portal')
+    expect(tokenDefault![1]).not.toContain('gw.api')
+  })
+
+  test('uppslaget går fortfarande mot gateway-värden', () => {
+    const apiDefault = client.match(/const DEFAULT_API_BASE_URL = '([^']+)'/)
+    expect(apiDefault).not.toBeNull()
+    expect(apiDefault![1]).toContain('gw.api')
+  })
+
+  test('båda värdarna är env-överstyrbara — acceptansmiljön kräver ingen deploy', () => {
+    expect(client).toContain('process.env.BOLAGSVERKET_TOKEN_URL')
+    expect(client).toContain('process.env.BOLAGSVERKET_API_BASE_URL')
+    // Läses per anrop; ett modulkonstant-värde fryses in i bygget.
+    expect(client).toMatch(/function tokenUrl\(\)/)
+    expect(client).toMatch(/function apiBaseUrl\(\)/)
+  })
+
+  test('de fyra variablerna är dokumenterade i .env.local.example', () => {
+    const env = read('.env.local.example')
+    for (const namn of ['BOLAGSVERKET_CLIENT_ID', 'BOLAGSVERKET_CLIENT_SECRET', 'BOLAGSVERKET_TOKEN_URL', 'BOLAGSVERKET_API_BASE_URL']) {
+      expect(env, `${namn} odokumenterad`).toContain(namn)
+    }
+  })
+
+  test('identitetsbeteckning byggs som tolv siffror, inte en rå siffersträng', () => {
+    expect(client).toContain("import { orgNumberIdentity } from '@/lib/karin/org-number'")
+    expect(client).toContain('orgNumberIdentity(orgNumber)')
+    // Den gamla tiosiffriga strippningen får inte finnas kvar.
+    expect(client).not.toContain("orgNumber.replace(/[^0-9]/g, '')")
+  })
+
+  test('varje misslyckande loggar URL:en, inte bara statuskoden', () => {
+    // Utan URL:en gick det inte att se att 404:an var fel VÄRD och inte fel nyckel.
+    const fel = Array.from(client.matchAll(/console\.error\('\[bolagsverket\][^']*'([^)]*)\)/g))
+    expect(fel.length).toBeGreaterThan(2)
+    for (const m of fel) expect(m[1], `saknar url: ${m[0]}`).toContain('url')
+  })
+
+  test('nekad behörighet skiljs från otillgänglig tjänst, hela vägen ut till texten', () => {
+    expect(client).toContain("'not_authorized'")
+    expect(route).toContain('not_authorized:')
+    // Fortfarande fail-soft: ingen ny status, bara en ärligare text.
+    const statusCalls = Array.from(route.matchAll(/NextResponse\.json\([^)]*\{[\s\S]*?\},\s*\{\s*status:\s*(\d+)/g))
+    expect(statusCalls.map(m => m[1]).every(s => s === '429')).toBe(true)
+  })
+})
+
 test.describe('Step2Business.tsx — org.nr flyttat till start, före hemsides-frågan', () => {
   test("'orgnr' är startfasen, inte 'question'", () => {
     expect(step2).toContain("() => (data.hasWebsite !== undefined ? 'form' : 'orgnr')")

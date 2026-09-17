@@ -63,8 +63,12 @@ export async function POST(request: NextRequest) {
 
     const result = await lookupCompany(rawOrgNumber)
     if (!result.ok) {
+      // `not_authorized` och `request_failed` såg likadana ut för användaren
+      // fram till 2026-09-17, och båda betydde i praktiken "något är fel hos
+      // OSS". Nu säger texten vilket — och körloggen bär status + URL.
       const REASON_TEXT: Record<string, string> = {
         not_configured: 'Uppslag mot Bolagsverket är inte aktiverat än',
+        not_authorized: 'Vår koppling till Bolagsverket är inte färdigkopplad — fyll i uppgifterna manuellt så länge',
         not_found: 'Hittade inget företag med det organisationsnumret',
         invalid_response: 'Kunde inte tolka svaret från Bolagsverket',
         request_failed: 'Kunde inte nå Bolagsverket just nu',

@@ -93,6 +93,30 @@ export function orgNumberCompanyForm(input: string | null | undefined): string |
   }
 }
 
+/**
+ * Bolagsverkets `identitetsbeteckning` (PeOrgNr) — TOLV siffror, inte tio.
+ *
+ * Juridiska personer: sekelprefixet `16` + de tio siffrorna. En enskild firma
+ * har inget eget organisationsnummer utan använder innehavarens personnummer,
+ * och då är prefixet födelseseklet (`19`/`20`).
+ *
+ * Sekelgissningen: en näringsidkare är vuxen, så `19` gäller utom när det
+ * skulle göra personen över hundra år — då är det `20`. Ett nummer som redan
+ * kommer in tolvsiffrigt returneras oförändrat; ett prefix som står där ska
+ * aldrig gissas om.
+ *
+ * `null` när numret inte är ett giltigt org.nr — hellre inget uppslag alls än
+ * ett uppslag på ett påhittat nummer.
+ */
+export function orgNumberIdentity(input: string | null | undefined, now: Date = new Date()): string | null {
+  const d = normalizeOrgNumber(input)
+  if (!isValidOrgNumber(d)) return null
+  if (d.length === 12) return d
+  if (orgNumberCompanyForm(d) !== 'ef') return `16${d}`
+  const nittonhundra = 1900 + Number(d.slice(0, 2))
+  return `${now.getFullYear() - nittonhundra > 100 ? '20' : '19'}${d}`
+}
+
 export interface OrgNumberCheck {
   valid: boolean
   formatted: string

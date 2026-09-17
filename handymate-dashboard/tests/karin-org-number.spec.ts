@@ -17,6 +17,7 @@ import {
   formatOrgNumber,
   isValidOrgNumber,
   orgNumberCompanyForm,
+  orgNumberIdentity,
   checkOrgNumber,
 } from '../lib/karin/org-number'
 
@@ -158,5 +159,36 @@ test.describe('svaret till användaren', () => {
       if (!e) continue
       expect(/\b(luhn|mod|checksum|invalid|error)\b/i.test(e), e).toBe(false)
     }
+  })
+})
+
+test.describe('identitetsbeteckning — tolv siffror, det Bolagsverket faktiskt vill ha', () => {
+  // Skarpt fel 2026-09-17: klienten skickade de tio siffrorna rakt av.
+  // Bolagsverkets PeOrgNr är tolv: sekelprefix + numret.
+  const EF = medKontrollsiffra('850101123') // personnummer: tredje siffran < 2
+
+  test('juridisk person får prefixet 16', () => {
+    expect(orgNumberIdentity(GILTIGT_AB)).toBe(`16${GILTIGT_AB}`)
+    expect(orgNumberIdentity(formatOrgNumber(GILTIGT_AB))).toBe(`16${GILTIGT_AB}`)
+  })
+
+  test('enskild firma får födelseseklet, inte 16', () => {
+    expect(orgNumberCompanyForm(EF)).toBe('ef')
+    expect(orgNumberIdentity(EF, new Date('2026-09-17'))).toBe(`19${EF}`)
+  })
+
+  test('ett sekel tillbaka i tiden blir 20, inte en hundraåring', () => {
+    const ungEf = medKontrollsiffra('050101123')
+    expect(orgNumberIdentity(ungEf, new Date('2026-09-17'))).toBe(`20${ungEf}`)
+  })
+
+  test('ett redan tolvsiffrigt nummer gissas aldrig om', () => {
+    expect(orgNumberIdentity(`16${GILTIGT_AB}`)).toBe(`16${GILTIGT_AB}`)
+  })
+
+  test('ogiltigt nummer ger null — inget uppslag på ett påhittat org.nr', () => {
+    expect(orgNumberIdentity('5566778890')).toBeNull()
+    expect(orgNumberIdentity('12345')).toBeNull()
+    expect(orgNumberIdentity('')).toBeNull()
   })
 })

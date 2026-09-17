@@ -700,3 +700,9 @@ Spara gärna pågående kontroll för samtidiga anrop, men kasta cacheposten vid
 ## 2026-09-16 — En "delad" funktion måste bevisas på varje väg, inte en
 Codex fixade de sex namngivna ROT-ställena men fyra fakturavägar och kreditvägen låg kvar på gamla logiken, och specen "all paths" körde en väg. Briefen ska räkna upp alla anropare (grep `.from('invoices')`/`createInvoice(`) och acceptansen ska köra tal genom varje, inte textskanna källfiler.
 
+## 2026-09-17 — En gissad API-endpoint gick hela vägen till produktion
+`lib/bolagsverket/client.ts` skrev själv i sin header att endpointen var "en välgrundad gissning" och att den skulle VERIFIERAS mot dokumentationen som följer med API-nycklarna. Den verifieringen gjordes aldrig, och token-URL:en pekade på gateway-värden i stället för portal-värden: 404 på varje uppslag, i månader, dolt bakom ett snällt "Kunde inte nå Bolagsverket just nu". Två regler: en integration som är byggd på gissningar får inte markeras klar utan ett skarpt anrop mot leverantören, och ett fail-soft-fel måste logga status OCH URL — utan URL:en gick 404:an inte att skilja från fel nyckel.
+
+## 2026-09-17 — Fail-soft får inte betyda att alla fel ser likadana ut
+`request_failed` täckte tre helt olika saker: nekad behörighet, fel URL och nätverksfel. Användaren och vi såg samma text för alla tre. Degradera snällt, men behåll skillnaden mellan "fel hos oss" och "tjänsten svarar inte" ända ut i texten och i loggen.
+
