@@ -107,3 +107,12 @@
   .job-questions-row > label:first-child { grid-column: 1 / -1; }
   .job-questions-row .job-setup-inline { grid-column: 1 / -1; }
 }
+
+/* Bindningen fråga → rader (2026-09-17): "Sätter mängden på" / "Kryssar tillvalet". */
+.job-questions-targets { grid-column: 1 / -1; border: 1px solid #dceae5; border-radius: 10px; padding: 8px 12px 10px; margin: 0; min-width: 0; }
+.job-questions-targets legend { font-size: 12px; font-weight: 600; color: #0f766e; padding: 0 4px; }
+.job-questions-target { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 2px 0; font-size: 14px; }
+.job-questions-target input { width: 20px; height: 20px; accent-color: #0f766e; flex-shrink: 0; }
+.job-questions-target > span:first-of-type { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.job-questions-target.is-muted { color: #8a9590; }
+.job-questions-unit { font-size: 12px; color: #5b6763; flex-shrink: 0; }

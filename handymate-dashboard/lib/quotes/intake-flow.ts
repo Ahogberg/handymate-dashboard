@@ -1,10 +1,10 @@
-import type { IntakeQuestion } from './intake-questions'
+import type { IntakeQuestion, IntakeTarget } from './intake-questions'
 
 export interface IntakeQuestionsResponse {
   jobType: { slug: string; name: string }
   questions: IntakeQuestion[]
   seeded: boolean
-  units: string[]
+  targets: IntakeTarget[]
   canManage: boolean
 }
 

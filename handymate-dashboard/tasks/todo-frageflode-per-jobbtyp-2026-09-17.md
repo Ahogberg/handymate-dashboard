@@ -103,3 +103,40 @@ docs/offert/offertflodet-kontext-2026-09-17.md.
   läsa grenen.
 - Inte klickprovat i webbläsare. Prova på telefon: tryck rad → koppla artikel →
   mängd, och "+ Lägg till rad" → Tillval.
+
+## Bindningar i stället för enhetsmatchning (2026-09-17, efter granskning)
+
+Granskningen utifrån träffade rätt: "hur stor yta?" satte golvytan på både
+golv- och väggraden (samma enhet, olika betydelse), och ja/nej kryssade tillval
+via delsträng i beskrivningen. Facit låste fast felet (`[1, 6.5, 6.5, …]`).
+
+Beslut: en fråga pekar på RADER via mallradens `id` (stabilt: överlever
+redigering och omsortering, 217 av 221 rader bar det redan). Ingen ny kolumn.
+0 sparade frågor och 0 svar i produktion → enhetsmatchning och `optionMatch`
+borttagna helt, ingen bakåtkompatibilitet.
+
+- [x] sql/v254_template_row_ids.sql — backfyll id på 4 rader, körd via MCP:
+      0 utan id, 221 rader, 0 dubbletter inom mall
+- [x] lib/quotes/job-standard-server.ts — `productRows` sätter id på nya rader
+      (det var vägen som skapade kopplade rader utan id)
+- [x] lib/quotes/intake-questions.ts — `targets` på number/yesno, `IntakeTarget`,
+      `intakeTargetsFromRows`, `bindIntakeQuestions` (finns, rätt slag, samma
+      enhet), `missingIntakeTargets`; seedning EN fråga per kopplad rad och per
+      tillval (tak 12); `applyIntakeAnswers` rör bara pekade rader, vakten
+      `intakeRowTakesQuantity` gäller fortfarande; svaret på offerten bär `targets`
+- [x] lib/quotes/intake-questions-server.ts — `targets` i vyn, sparning binder
+      mot upplägget
+- [x] components/onboarding/JobTypeQuestionsEditor.tsx — "Sätter mängden på" /
+      "Kryssar tillvalet" med kryssruta per rad; annan enhet = avstängd; saknad
+      rad = notis + "Glöm de raderna"
+- [x] components/quotes/IntakeQuestionFlow.tsx — "Sätter: …" / "Kryssar: …" under
+      frågan; QuoteBuilder skickar `targets`
+- [x] tests/intake-questions.spec.ts — omskrivet: golvfrågan sätter golvraden och
+      BARA den; två rader under en fråga är hantverkarens val; okopplad/borta/fel
+      slag ändrar inget; ja/nej på id inte text; bindningsfel 400; seedning per rad
+- [x] Mutationstest 6/6 röda: enhetsmatchning igen, textmatchning igen, vakten
+      bort, id bort i productRows, blandade enheter tillåtna, "Sätter:" bort
+- [x] tsc, contracts, build
+
+Medvetet inte nu: skydd av manuella ändringar (svaren tillämpas en gång, före
+redigering), upprepning per rum. Står i målbilden.

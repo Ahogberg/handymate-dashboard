@@ -7,15 +7,23 @@
  * över — ett tomt svar rör ingen rad. "Hoppa över frågorna" ger upplägget
  * orört; "Tillbaka" lämnar allt som det var. Röst per fritextfråga via samma
  * hook och transkriberingsrutt som Snabbofferten; texten landar redigerbar.
+ *
+ * Under varje fråga som pekar på rader står vad svaret ändrar ("Sätter:
+ * Kakel golv, Tätskikt" / "Kryssar: Golvvärme"). Hantverkaren ska aldrig
+ * behöva gissa vilken rad ett tal hamnar på — det är hela skillnaden mot
+ * enhetsmatchning. Raderna finns redan i minnet (upplägget är hämtat), så
+ * det kostar inget.
  */
 import { useEffect, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Loader2, Mic, Square } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
-import { normalizeIntakeAnswer, type IntakeAnswers, type IntakeQuestion } from '@/lib/quotes/intake-questions'
+import { normalizeIntakeAnswer, type IntakeAnswers, type IntakeQuestion, type IntakeTarget } from '@/lib/quotes/intake-questions'
 
 interface Props {
   jobTypeName: string
   questions: IntakeQuestion[]
+  /** Upplägget rader frågorna kan peka på — för "Sätter: …" under frågan. */
+  targets?: IntakeTarget[]
   initialAnswers?: IntakeAnswers
   busy: boolean
   error?: string | null
@@ -24,7 +32,8 @@ interface Props {
   onBack: () => void
 }
 
-export function IntakeQuestionFlow({ jobTypeName, questions, initialAnswers, busy, error, onSubmit, onSkip, onBack }: Props) {
+export function IntakeQuestionFlow({ jobTypeName, questions, targets = [], initialAnswers, busy, error, onSubmit, onSkip, onBack }: Props) {
+  const affects = (q: IntakeQuestion) => (q.targets ?? []).map(id => targets.find(t => t.id === id)?.description).filter((d): d is string => !!d)
   const [answers, setAnswers] = useState<IntakeAnswers>(initialAnswers ?? {})
   const [voiceTarget, setVoiceTarget] = useState<string | null>(null)
   const [transcribing, setTranscribing] = useState(false)
@@ -96,6 +105,9 @@ export function IntakeQuestionFlow({ jobTypeName, questions, initialAnswers, bus
               <label htmlFor={`intake-${q.id}`} className="block text-sm font-semibold text-slate-900 mb-2">
                 <span className="text-slate-400 mr-1.5">{index + 1}.</span>{q.label}
               </label>
+              {(q.kind === 'number' || q.kind === 'yesno') && affects(q).length > 0 && <p className="text-xs text-slate-500 -mt-1 mb-2">
+                <span className="font-semibold text-primary-700">{q.kind === 'number' ? 'Sätter:' : 'Kryssar:'}</span> {affects(q).join(', ')}
+              </p>}
               {q.kind === 'number' && <div className="flex items-center gap-2">
                 <input id={`intake-${q.id}`} inputMode="decimal" className={field} disabled={busy} placeholder="0"
                   value={typeof value === 'number' || typeof value === 'string' ? String(value) : ''} onChange={e => set(q.id, e.target.value)} />

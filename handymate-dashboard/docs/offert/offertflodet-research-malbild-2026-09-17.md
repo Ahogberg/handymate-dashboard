@@ -25,7 +25,7 @@ siffror nedan är påhittade, men leverantörernas egna siffror är just det.
 2. **Kit finns överallt, men som fasta rader utan drivare.** Tradify Kits, Fergus
    Favourites, simPRO Pre-builds, ServiceM8 Bundles, Fortnox paketartiklar: en samling
    material och timmar med fasta mängder. Skalning sker bara genom kit-antalet. Er
-   koppling svar → enhet → mängd är steget ingen tagit.
+   koppling svar → rad → mängd är steget ingen tagit.
 3. **Kundens val på offertsidan är det som bevisat höjer snittet.** Jobbers tillval
    med live-summa, Bolsters "upgrades, options, selections" (leverantörens siffra:
    15 % större jobb, 20 % högre avslut), ServiceTitans bra/bättre/bäst ur
@@ -169,8 +169,10 @@ Fortnox med husarbete). Men femton luckor hittades. De som rör målbilden:
 ### Väg B. Frågeflödet (hantverkaren hos kunden, telefon)
 1. **Jobbtyp** väljs, upplägget visas som en rad: "Badrum · 12 rader · dina priser · 5 frågor".
 2. **Frågorna** i en skärm. Tre typer av svar, varav den tredje är ny:
-   - Mått och antal sätter mängd på rader med samma enhet. Finns.
-   - Ja/nej kryssar tillval. Finns.
+   - Mått och antal sätter mängd på DE RADER frågan pekar på. Finns (bindning på
+     mallradens id sedan 2026-09-17 — inte på enhet: golv och vägg är två frågor).
+     Under frågan står "Sätter: Klinker golv" så hantverkaren ser vad talet ändrar.
+   - Ja/nej kryssar DE TILLVAL frågan pekar på. Finns (på id, inte på text).
    - **Artikelval**: frågan "Vilket kakel?" visar artiklar ur registret med pris per
      enhet, valet byter ut artikeln på raden. Det är ServiceTitans configurable
      service, fast som en fråga. Kräver en ny frågetyp `article` med artikel-id:n och
@@ -180,6 +182,16 @@ Fortnox med husarbete). Men femton luckor hittades. De som rör målbilden:
    svaren appliceras på alla varianter, så kunden får tre prissatta alternativ ur ett
    besök. Nytt: visa varianterna för kunden.
 4. **Offerten** öppnas prissatt. Hantverkaren granskar i dokumentet. Samma editor.
+
+Två saker som medvetet INTE är byggda i bindningen än, i den ordning de blir
+aktuella:
+- **Manuella ändringar skyddas inte.** Behövs inte så länge svaren tillämpas en
+  gång, före första redigeringen. Den dag svar kan ändras i efterhand ska rader
+  hantverkaren rört för hand låsas och en ändring visa vad den påverkar innan den
+  tillämpas.
+- **Upprepning (två badrum).** Kräver en egen modell där en fråga multiplicerar en
+  radgrupp per rum. Byggs efter att hela första-jobb-resan (offert → signatur →
+  jobb → faktura) är bevisad för ett nytt företag utan artikelarbete.
 
 ### Kundsidan (samma för båda vägarna)
 - Varianterna sida vid sida, kunden väljer en. Under den bockar kunden tillval, summan

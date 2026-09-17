@@ -27,7 +27,7 @@ import { canApplyJobTypeStart, loadJobTypeStart, type JobTypeStart, type QuoteSt
 import { byggPafyllnadsrader } from '@/lib/quotes/job-type-append'
 import { IntakeQuestionFlow } from '@/components/quotes/IntakeQuestionFlow'
 import { fetchIntakeQuestions } from '@/lib/quotes/intake-flow'
-import { applyIntakeAnswers, buildIntakeAnswerSet, intakeAnswersText, type IntakeAnswerSet, type IntakeAnswers, type IntakeQuestion } from '@/lib/quotes/intake-questions'
+import { applyIntakeAnswers, buildIntakeAnswerSet, intakeAnswersText, intakeTargetsFromRows, type IntakeAnswerSet, type IntakeAnswers, type IntakeQuestion } from '@/lib/quotes/intake-questions'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 import { compressImageFile } from '@/lib/images/compress-photo'
@@ -2402,6 +2402,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       <IntakeQuestionFlow
         jobTypeName={pendingIntake.start.jobTypeName}
         questions={pendingIntake.questions}
+        targets={intakeTargetsFromRows(pendingIntake.start.template.default_items ?? [])}
         busy={false}
         onSubmit={answers => applyVerifiedJobTypeStart(pendingIntake.start, { questions: pendingIntake.questions, answers })}
         onSkip={() => applyVerifiedJobTypeStart(pendingIntake.start, null)}
