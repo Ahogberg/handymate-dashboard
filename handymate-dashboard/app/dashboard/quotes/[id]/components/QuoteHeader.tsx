@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   ArrowLeft,
   Bookmark,
+  CheckCircle,
   ChevronDown,
   Copy,
   Download,
@@ -40,6 +41,11 @@ interface QuoteHeaderProps {
   onCreateInvoice: () => void
   onDuplicate: () => void
   onSaveTemplate: () => void
+  /** RIVNING PAKET D (2026-09-17, rad 3.3): flyttad hit från listans
+   *  radknapp ("Acceptera", app/dashboard/quotes/page.tsx). Samma
+   *  /api/quotes/accept-anrop som förut — bara UI:t är flyttat. */
+  onMarkAccepted: () => void
+  markingAccepted: boolean
   /** Öppnar page.tsx:s namn-modal — ETAPP 4, punkt 4: ingen window.prompt(). */
   onRequestNewVersion: () => void
   /** Öppnar page.tsx:s bekräftelsemodal — ETAPP 4, punkt 4: ingen window.confirm(). */
@@ -98,6 +104,8 @@ export function QuoteHeader({
   onSaveTemplate,
   onRequestNewVersion,
   onRequestDelete,
+  onMarkAccepted,
+  markingAccepted,
 }: QuoteHeaderProps) {
   const router = useRouter()
   const [docMenuOpen, setDocMenuOpen] = useState(false)
@@ -190,6 +198,16 @@ export function QuoteHeader({
           <button onClick={onOpenSendModal} className={PRIMARY_BTN}>
             <RefreshCw className="w-4 h-4" />
             Skicka påminnelse
+          </button>
+        )}
+        {/* RIVNING PAKET D (2026-09-17, rad 3.3): "Acceptera" per rad i
+            listan flyttad hit — enda stället en offert med vunnen/förlorad-
+            beslut kan markeras manuellt fanns i listan, inte på detaljsidan
+            om den faktiska offerten. */}
+        {['sent', 'opened'].includes(quote.status) && (
+          <button onClick={onMarkAccepted} disabled={markingAccepted} className={GHOST_BTN}>
+            <CheckCircle className="w-4 h-4" />
+            {markingAccepted ? 'Markerar…' : 'Markera som accepterad'}
           </button>
         )}
         {quote.status === 'accepted' && quote.linked_project && (

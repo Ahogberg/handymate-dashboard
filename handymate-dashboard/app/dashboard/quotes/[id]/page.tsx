@@ -64,6 +64,7 @@ export default function QuoteDetailPage() {
   })
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
+  const [markingAccepted, setMarkingAccepted] = useState(false)
   const [generatingSignLink, setGeneratingSignLink] = useState(false)
   const [portalUrl, setPortalUrl] = useState<string | null>(null)
   const [extraEmails, setExtraEmails] = useState('')
@@ -344,6 +345,35 @@ export default function QuoteDetailPage() {
     }
   }
 
+  // RIVNING PAKET D (2026-09-17, rad 3.3): flyttad hit från listans
+  // "Acceptera"-radknapp (app/dashboard/quotes/page.tsx). Samma
+  // /api/quotes/accept-anrop som förut, oförändrat — se rapportens fynd
+  // om varför rutten INTE skrevs om att anropa finalizeAcceptedQuote:
+  // den är en egen, tungt kontraktstestad väg (concurrency, RBAC,
+  // tenant-isolering — tests/first-job-acceptance.spec.ts), inte en
+  // övergiven dubblett. Ingen status skrivs direkt från klienten här.
+  const markAccepted = async () => {
+    if (!quote) return
+    setMarkingAccepted(true)
+    try {
+      const response = await fetch('/api/quotes/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId: quote.quote_id }),
+      })
+      if (response.ok) {
+        showToast('Offerten är markerad som accepterad!', 'success')
+        fetchQuote()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast(err.error || 'Kunde inte markera offerten som accepterad', 'error')
+      }
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+    setMarkingAccepted(false)
+  }
+
   const createProjectFromQuote = async () => {
     if (!quote) return
     setCreatingProject(true)
@@ -486,6 +516,8 @@ export default function QuoteDetailPage() {
           onSaveTemplate={onSaveTemplateClick}
           onRequestNewVersion={requestNewVersion}
           onRequestDelete={requestDelete}
+          onMarkAccepted={markAccepted}
+          markingAccepted={markingAccepted}
         />
 
         {/* Daniels agentrad (docs/design/skisser-2026-09-06/agentnarvaro-

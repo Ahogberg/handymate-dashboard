@@ -3,10 +3,16 @@
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { CheckCircle, Clock, Eye, FileText, Loader2, Plus, Search, Send, XCircle } from 'lucide-react'
+// RIVNING PAKET D (2026-09-17, rad 3.3): "Acceptera" per rad flyttad till
+// detaljsidan ([id]/page.tsx, "Markera som accepterad") — samma endpoint,
+// bara UI:t flyttat. Se rapportens fynd om varför /api/quotes/accept INTE
+// skrevs om att anropa finalizeAcceptedQuote: rutten är en egen, tungt
+// kontraktstestad väg (tests/first-job-acceptance.spec.ts), inte övergiven
+// dubblettkod — att slå ihop den kräver ett beslut, inte en UI-flytt.
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import QuotePerformanceCard from '@/components/dashboard/QuotePerformanceCard'
-import { quoteListHref, readQuoteListFilter, type QuoteListFilter } from '@/lib/quotes/list-filter'
+import { quoteListHref, readQuoteListFilter, sortQuotesByRecency, type QuoteListFilter } from '@/lib/quotes/list-filter'
 
 interface Quote {
   quote_id: string
@@ -17,6 +23,7 @@ interface Quote {
   rot_rut_type: string | null
   valid_until: string
   created_at: string
+  updated_at?: string | null
   view_count?: number
   last_viewed_at?: string
   customer?: {
@@ -88,23 +95,6 @@ export default function QuotesPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<QuoteListFilter>(() => readQuoteListFilter(searchParams))
   const [searchQuery, setSearchQuery] = useState('')
-  const [acceptingId, setAcceptingId] = useState<string | null>(null)
-
-  async function handleAcceptQuote(e: React.MouseEvent, quoteId: string) {
-    e.preventDefault()
-    e.stopPropagation()
-    if (!confirm('Vill du markera denna offert som accepterad?')) return
-    setAcceptingId(quoteId)
-    try {
-      const res = await fetch('/api/quotes/accept', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ quoteId }),
-      })
-      if (res.ok) fetchQuotes()
-    } catch { /* ignore */ }
-    setAcceptingId(null)
-  }
 
   useEffect(() => {
     fetchQuotes()
@@ -135,7 +125,9 @@ export default function QuotesPage() {
     setLoading(false)
   }
 
-  const filteredQuotes = quotes.filter(q => {
+  // Rad 3.4: senast ändrad (updated_at, fallback created_at) överst —
+  // sorteringen görs efter filter/sök så flikarna och sökfältet är opåverkade.
+  const filteredQuotes = sortQuotesByRecency(quotes.filter(q => {
     if (filter === 'draft' && q.status !== 'draft') return false
     if (filter === 'sent' && !['sent', 'opened'].includes(q.status)) return false
     if (filter === 'accepted' && q.status !== 'accepted') return false
@@ -146,13 +138,17 @@ export default function QuotesPage() {
       if (!matchTitle && !matchCustomer) return false
     }
     return true
-  })
+  }))
 
   const stats = {
     total: quotes.length,
     draft: quotes.filter(q => q.status === 'draft').length,
     sent: quotes.filter(q => ['sent', 'opened'].includes(q.status)).length,
     accepted: quotes.filter(q => q.status === 'accepted').length,
+    // Rad 3.1: "summa" — den enda av de tre siffrorna som inte redan syntes
+    // någonstans (antal fanns i undertexten, acceptgrad i KPI-kortet OCH
+    // undertexten). Samma belopp som raderna visar (efter ROT/RUT om satt).
+    sumTotal: quotes.reduce((sum, q) => sum + (q.rot_rut_type ? q.customer_pays : q.total || 0), 0),
     acceptRate:
       quotes.filter(q => ['accepted', 'declined'].includes(q.status)).length > 0
         ? Math.round(
@@ -182,16 +178,14 @@ export default function QuotesPage() {
     <div className="min-h-screen bg-slate-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-10">
         {/* ── Header ──────────────────────────────────────── */}
-        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
+        <header className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
           <div>
             <h1 className="font-heading text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
               Offerter
             </h1>
-            <p className="text-sm text-slate-500 mt-1">
-              {stats.total === 0
-                ? 'Inga offerter ännu'
-                : `${stats.total} ${stats.total === 1 ? 'offert' : 'offerter'} · ${stats.acceptRate}% acceptrate`}
-            </p>
+            {stats.total === 0 && (
+              <p className="text-sm text-slate-500 mt-1">Inga offerter ännu</p>
+            )}
           </div>
           <Link
             href="/dashboard/quotes/new"
@@ -202,27 +196,32 @@ export default function QuotesPage() {
           </Link>
         </header>
 
-        <QuotePerformanceCard />
-
-        {/* ── KPI cards ──────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-8">
-          {[
-            { label: 'Utkast', value: stats.draft },
-            { label: 'Skickade', value: stats.sent },
-            { label: 'Accepterade', value: stats.accepted },
-            { label: 'Acceptrate', value: `${stats.acceptRate}%` },
-          ].map(kpi => (
-            <div
-              key={kpi.label}
-              className="bg-white border border-slate-200 rounded-2xl px-4 py-4 sm:px-5 sm:py-5"
-            >
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider">{kpi.label}</p>
-              <p className="font-heading text-2xl sm:text-3xl font-bold text-slate-900 mt-1 tracking-tight">
-                {kpi.value}
-              </p>
+        {/* RIVNING PAKET D (2026-09-17, rad 3.1): undertexten (antal +
+            acceptrate) och de fyra KPI-korten (Utkast/Skickade/Accepterade/
+            Acceptrate) sa samma sak tre gånger. En rad kvar, med "summa"
+            tillagd — den enda av de tre talen (antal, summa, acceptgrad) som
+            inte redan syntes någon annanstans. Grid, inte flex-wrap, så
+            raden garanterat ryms utan sidscroll på 375 px.
+            QuotePerformanceCard rörs INTE — den bär funnel/tidsavvikelse/
+            nej-orsaker per detaljnivå, ett djup ingen annan yta här har. */}
+        {stats.total > 0 && (
+          <div className="grid grid-cols-3 gap-3 sm:gap-4 mb-6 bg-white border border-slate-200 rounded-2xl px-3 py-4 sm:px-5 sm:py-5">
+            <div className="text-center sm:text-left">
+              <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">Offerter</p>
+              <p className="font-heading text-lg sm:text-2xl font-bold text-slate-900 mt-1 tracking-tight">{stats.total}</p>
             </div>
-          ))}
-        </div>
+            <div className="text-center sm:text-left">
+              <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">Summa</p>
+              <p className="font-heading text-lg sm:text-2xl font-bold text-slate-900 mt-1 tracking-tight truncate">{formatCurrency(stats.sumTotal)}</p>
+            </div>
+            <div className="text-center sm:text-left">
+              <p className="text-[10px] sm:text-xs font-medium text-slate-500 uppercase tracking-wider">Acceptgrad</p>
+              <p className="font-heading text-lg sm:text-2xl font-bold text-slate-900 mt-1 tracking-tight">{stats.acceptRate}%</p>
+            </div>
+          </div>
+        )}
+
+        <QuotePerformanceCard />
 
         {/* ── Search + Filter tabs ───────────────────────── */}
         <div className="flex flex-col gap-4 mb-6">
@@ -271,12 +270,7 @@ export default function QuotesPage() {
         ) : (
           <div className="space-y-2">
             {filteredQuotes.map(quote => (
-              <QuoteRow
-                key={quote.quote_id}
-                quote={quote}
-                accepting={acceptingId === quote.quote_id}
-                onAccept={e => handleAcceptQuote(e, quote.quote_id)}
-              />
+              <QuoteRow key={quote.quote_id} quote={quote} />
             ))}
           </div>
         )}
@@ -287,21 +281,8 @@ export default function QuotesPage() {
 
 // ─── QuoteRow ────────────────────────────────────────────────────────
 
-function QuoteRow({
-  quote,
-  accepting,
-  onAccept,
-}: {
-  quote: Quote
-  accepting: boolean
-  onAccept: (e: React.MouseEvent) => void
-}) {
+function QuoteRow({ quote }: { quote: Quote }) {
   const badge = getStatusBadge(quote.status)
-  const showAccept = ['sent', 'opened'].includes(quote.status)
-  const showNudge =
-    quote.view_count != null &&
-    quote.view_count >= 3 &&
-    ['sent', 'opened'].includes(quote.status)
   const displayAmount = quote.rot_rut_type ? quote.customer_pays : quote.total
 
   return (
@@ -331,17 +312,16 @@ function QuoteRow({
                 </>
               )}
             </p>
+            {/* RIVNING PAKET D (2026-09-17, rad 3.2): "Föreslå nudge"-
+                badgen (>= 3 visningar) borttagen — den hade ingen knapp
+                eller åtgärd kopplad. unopened-quote-nudge-logiken i lib/
+                är en annan, oberoende modul och är orörd. */}
             {(quote.view_count != null && quote.view_count > 0) && (
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <span className="text-[11px] text-slate-500 inline-flex items-center gap-1">
                   <Eye className="w-3 h-3" />
                   Öppnad {quote.view_count}x
                 </span>
-                {showNudge && (
-                  <span className="inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full bg-amber-50 text-amber-700 uppercase tracking-wider">
-                    Föreslå nudge
-                  </span>
-                )}
               </div>
             )}
           </div>
@@ -361,21 +341,6 @@ function QuoteRow({
             >
               {badge.label}
             </span>
-            {showAccept && (
-              <button
-                type="button"
-                onClick={onAccept}
-                disabled={accepting}
-                className="mt-1 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-primary-700 border border-primary-200 bg-white hover:bg-primary-50 hover:border-primary-300 rounded-lg transition-colors disabled:opacity-50"
-              >
-                {accepting ? (
-                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                ) : (
-                  <CheckCircle className="w-3.5 h-3.5" />
-                )}
-                Acceptera
-              </button>
-            )}
           </div>
         </div>
       </div>
