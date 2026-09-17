@@ -227,5 +227,10 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // 2026-09-15: admin/revenue/partner-leads (requireRevenue + manager)
   // och partners/leads (verifierad partner-token + aktuellt avtal) → 169.
   // H3b: one endpoint with GET/POST, verified superadmin actor → 170.
-  expect(utanStandard.length).toBeLessThanOrEqual(170)
+  // 2026-09-17 (demoknappen i partnerportalen): partners/demo-entry —
+  // verifierad partner-token + aktivt konto + gällande avtal, exakt samma tre
+  // grindar som partners/leads. Ingen tenant-kontext finns: målet är det
+  // DELADE demokontot, valt ur DEMO_BUSINESS_ID och grindat på
+  // is_demo_tenant, aldrig den anropande partnerns eget konto → 171.
+  expect(utanStandard.length).toBeLessThanOrEqual(171)
 })
