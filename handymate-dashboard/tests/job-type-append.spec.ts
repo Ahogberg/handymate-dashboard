@@ -139,10 +139,13 @@ test.describe('ett begrepp i offertflödet: jobbtyp (2026-09-17)', () => {
     expect(intake).not.toContain('Använd en mall')
   })
 
-  test('ett upplägg = ett tryck; flera = varianter', () => {
-    expect(remsa).toMatch(/if \(kandidater\.length === 1\) void apply\(\{ jobTypeSlug: slug, templateId: kandidater\[0\]\.id \}\)/)
-    // Chipet går genom valjJobbtyp, inte en egen onClick.
+  test('två nivåer: jobbtypschipet är standardupplägget, varianterna egna chips', () => {
+    expect(remsa).toMatch(/const standard = standardForVal\(slug\)\s*if \(standard\) void apply\(\{ jobTypeSlug: slug, templateId: standard\.id \}\)/)
     expect(remsa).toContain('onClick={() => valjJobbtyp(job.slug)}')
+    expect(remsa).toMatch(/varianterFor\(data\.templates, job\.slug\)\.map\(v => <button/)
+    expect(remsa).toContain('onClick={() => valjVariant(job.slug, v.id)}')
+    // I ärvt läge finns inga chips — standardknappen får inte gömmas där.
+    expect(remsa).toContain('(!harStandard || visaSomArvd) && matching.map')
   })
 
   test('sparade upplägg utan jobbtyp göms inte — "Övriga upplägg" finns så länge de finns', () => {
@@ -181,5 +184,86 @@ test.describe('ett begrepp i offertflödet: jobbtyp (2026-09-17)', () => {
     expect(sida).toContain('const kanKoppla = Boolean(setup?.canManage)')
     expect(sida).toMatch(/\{kanKoppla && \(\s*<select/)
     expect(sida).toContain("fetch('/api/job-types/quote-setup'")
+  })
+})
+
+import { standardFor, varianterFor, toSetupTemplate } from '../lib/quotes/job-type-setup'
+import { getDefaultQuoteTemplates, JOBBTYP_FOR_MALL, ALLMANT_ARBETE } from '../lib/quote-template-defaults'
+import { ADDITIONAL_JOB_TYPES_BY_TRADE } from '../lib/job-type-catalog'
+
+test.describe('två nivåer — standard och varianter (v254)', () => {
+  const mall = (id: string, over: Record<string, unknown> = {}) =>
+    toSetupTemplate({ id, name: id, job_type_slug: 'badrum', default_items: [{ description: 'Arbete', unit: 'tim' }], ...over })
+
+  test('flaggad standard vinner; utan flagga är det enda upplägget standard; flera utan flagga = ingen', () => {
+    expect(standardFor([mall('a'), mall('b', { is_default: true })], 'badrum')?.id).toBe('b')
+    expect(standardFor([mall('a')], 'badrum')?.id).toBe('a')
+    expect(standardFor([mall('a'), mall('b')], 'badrum')).toBeNull()
+    // ett tomt upplägg räknas inte — det går inte att starta en offert från
+    expect(standardFor([mall('tom', { default_items: [] })], 'badrum')).toBeNull()
+  })
+
+  test('varianterna är allt utom standarden — och tomma utan standard', () => {
+    expect(varianterFor([mall('a'), mall('b', { is_default: true }), mall('c')], 'badrum').map(t => t.id)).toEqual(['a', 'c'])
+    expect(varianterFor([mall('a'), mall('b')], 'badrum')).toEqual([])
+    expect(varianterFor([mall('a'), mall('x', { job_type_slug: 'kok' })], 'badrum')).toEqual([])
+  })
+
+  test('is_default läses bara som exakt true', () => {
+    expect(toSetupTemplate({ id: 't', name: 't', is_default: 'true' }).isDefault).toBe(false)
+    expect(toSetupTemplate({ id: 't', name: 't' }).isDefault).toBe(false)
+  })
+
+  test('seeden: specifik branschmall = egen jobbtyp ur onboardingens katalog; formatmallar under Allmänt arbete', () => {
+    const katalog = new Set(Object.values(ADDITIONAL_JOB_TYPES_BY_TRADE).flat())
+    for (const branch of ['construction', 'electrician', 'plumber', 'painter', 'other']) {
+      const standarder = new Map<string, string[]>()
+      for (const t of getDefaultQuoteTemplates(branch)) {
+        const namn = t.job_type_name!
+        expect(JOBBTYP_FOR_MALL[t.name], `${t.name} saknas i tabellen`).toBe(namn)
+        // Namnet är onboardingens eget (samma chip som kundens val), eller
+        // mallens egen identitet när katalogen saknar den, eller samlingen.
+        expect(katalog.has(namn) || namn === t.name || namn === ALLMANT_ARBETE, `${branch}/${t.name} → ${namn}`).toBe(true)
+        if (t.is_default) standarder.set(namn, [...(standarder.get(namn) || []), t.name])
+      }
+      // exakt EN standard per jobbtyp i seeden — indexet hade annars fällt insert
+      for (const [namn, mallar] of Array.from(standarder)) expect(mallar, `${branch}: ${namn} har flera standarder`).toHaveLength(1)
+      expect(standarder.get(ALLMANT_ARBETE)).toEqual(['Enkel offert'])
+    }
+    // Inga breda buckets kvar.
+    for (const t of getDefaultQuoteTemplates('electrician')) expect(t.job_type_name).not.toBe('Elarbete')
+  })
+
+  test('en mall utanför tabellen kastar — ingen tyst mall utan jobbtyp', () => {
+    expect(() => getDefaultQuoteTemplates('electrician')).not.toThrow()
+    expect(Object.keys(JOBBTYP_FOR_MALL).length).toBeGreaterThanOrEqual(17)
+  })
+
+  test('seedern kopplar om befintliga seedade rader och delar koden med seed-rutten', () => {
+    const seed = utanKommentarer(read('lib/seed-defaults.ts'))
+    expect(seed).toContain('export async function seedQuoteTemplates')
+    expect(seed).toContain('job_type_slug: jobTypesReady ? t.job_type_slug : null')
+    expect(seed).toMatch(/const attKoppla = defaults\.filter\(t => \{ const r = befintliga\.get\(t\.name\); return !!r && !r\.job_type_slug \}\)/)
+    expect(seed).toContain('is_default: taStandard(t)')
+    // företagets befintliga standard vinner
+    expect(seed).toMatch(/harStandard = new Set\(\(existingRows \|\| \[\]\)\.filter\(r => r\.is_default && r\.job_type_slug\)/)
+    const rutt = utanKommentarer(read('app/api/quote-templates/seed/route.ts'))
+    expect(rutt).toContain('await seedQuoteTemplates(supabase, businessId, branch)')
+    expect(rutt).not.toContain("from('quote_templates')")
+  })
+
+  test('första upplägget för en jobbtyp blir standard vid "Spara som upplägg"; Förbered standardrader är alltid standard', () => {
+    const rutt = utanKommentarer(read('app/api/quote-templates/route.ts'))
+    expect(rutt).toMatch(/isDefault = \(count \?\? 0\) === 0/)
+    expect(rutt).toContain('is_default: isDefault,')
+    expect(utanKommentarer(read('lib/quotes/job-standard-server.ts'))).toContain('is_default: true, default_items: []')
+  })
+
+  test('Inställningar: Gör till standard, och badgen', () => {
+    const setup = utanKommentarer(read('components/onboarding/JobTypeQuoteSetup.tsx'))
+    expect(setup).toContain('isDefault: true })}>Gör till standard för {job.name}')
+    expect(setup).toContain('Standardupplägg.')
+    const sida = utanKommentarer(read('app/dashboard/settings/quote-templates/page.tsx'))
+    expect(sida).toMatch(/template\.is_default && template\.job_type_slug && \(/)
   })
 })

@@ -128,6 +128,24 @@ test('flera upplägg under samma jobbtyp visas som varianter — chipet väljer 
   expect(got).toEqual({ jobTypeSlug: 'service', templateId: 't2' })
 })
 
+test('två nivåer: jobbtypschipet lägger in standarden med ett tryck, varianten är ett eget chip', async () => {
+  const standard = { id: 'std', name: 'Service', job_type_slug: 'service', is_default: true, default_items: [{ description: 'Arbete', unit: 'tim' }] }
+  const variant = { id: 'tot', name: 'Totalservice', job_type_slug: 'service', default_items: [{ description: 'Arbete', unit: 'tim' }] }
+  global.fetch = (async () => Response.json({ ...setup, templates: [toSetupTemplate(standard), toSetupTemplate(variant)] })) as typeof fetch
+  const got: unknown[] = []
+  await render(QuoteJobTypeStart, { ...base, inherited: false, jobType: null, automatic: false, onApply: async (sel: unknown) => { got.push(sel) } })
+  await act(async () => {})
+  // varianten syns som chip redan innan något valts
+  expect(button('Totalservice')).toBeTruthy()
+  await click('Service')
+  expect(got).toEqual([{ jobTypeSlug: 'service', templateId: 'std' }])
+  await act(async () => root.unmount()); root = createRoot(host)
+  await render(QuoteJobTypeStart, { ...base, inherited: false, jobType: null, automatic: false, onApply: async (sel: unknown) => { got.push(sel) } })
+  await act(async () => {})
+  await click('Totalservice')
+  expect(got[1]).toEqual({ jobTypeSlug: 'service', templateId: 'tot' })
+})
+
 test('Övriga upplägg: visas bara när okopplade upplägg finns, och går via onApplyOvrig', async () => {
   // Utan okopplade: inget chip.
   await render(QuoteJobTypeStart, { ...base, inherited: false, jobType: null, automatic: false, onApplyOvrig: async () => {} })

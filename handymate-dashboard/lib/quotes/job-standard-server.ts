@@ -59,7 +59,9 @@ export async function writeJobStandard(db: SupabaseClient, businessId: string, i
       // systemnamn som läckte ett begrepp hantverkaren aldrig valt; med ett
       // upplägg per jobbtyp visas det aldrig, och med flera är det en variant
       // bland andra ("Badrum", "Totalrenovering"). v253 döpte om befintliga.
-      name: job.name, job_type_slug: job.slug, default_items: [], updated_at: new Date().toISOString() }).select('*').single()
+      // Firmans egna standardrader är jobbtypens standard (v254). Den här
+      // vägen nås bara när jobbtypen saknar upplägg helt, så ingen krock.
+      name: job.name, job_type_slug: job.slug, is_default: true, default_items: [], updated_at: new Date().toISOString() }).select('*').single()
     if (createError?.code === '23505') {
       const { data: existing, error: retryError } = await db.from('quote_templates').select('*').eq('business_id', businessId).eq('id', id).maybeSingle()
       if (!retryError && existing?.job_type_slug === job.slug) return toSetupTemplate(existing)

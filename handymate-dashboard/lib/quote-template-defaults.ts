@@ -137,7 +137,44 @@ export interface DefaultQuoteTemplate {
       branschbyggarna konstruerar innehållet före kopplingen. */
   job_type_slug?: string
   job_type_name?: string
+  /** Mallen är jobbtypens standardupplägg (v254). Seedern sätter den bara om
+      jobbtypen inte redan har en standard hos företaget. */
+  is_default?: boolean
 }
+
+/**
+ * Två nivåer (2026-09-17, Andreas): en specifik branschmall ÄR en jobbtyp —
+ * "Byte av elcentral" är det man gör, inte en variant av "Elarbete". Namnen
+ * hämtas ur onboardingens egen katalog (lib/job-type-catalog.ts) så att det
+ * kunden valde där och mallen från banken landar i SAMMA chip. Bara
+ * formatmallarna (enkel/detaljerad/löpande) och den ospecifika reparationen
+ * är inte ett jobb; de ligger under "Allmänt arbete" med "Enkel offert" som
+ * standard.
+ *
+ * Explicit tabell, ingen namngissning: en mall som saknas här kastar vid
+ * seedning, i stället för att tyst hamna utan jobbtyp.
+ */
+export const ALLMANT_ARBETE = 'Allmänt arbete'
+export const JOBBTYP_FOR_MALL: Record<string, string> = {
+  'Enkel offert': ALLMANT_ARBETE,
+  'Detaljerad offert med grupper': ALLMANT_ARBETE,
+  'Löpande räkning': ALLMANT_ARBETE,
+  'Enkel reparation': ALLMANT_ARBETE,
+  'Badrumsrenovering': 'Renovera badrum',
+  'Köksrenovering': 'Renovera kök',
+  'Altanbygge': 'Bygga altan',
+  'Byte av elcentral': 'Byta elcentral',
+  'Belysningsinstallation': 'Installera belysning',
+  'Laddbox för elbil': 'Installera laddbox',
+  'Elbesiktning': 'Elbesiktning',
+  'Badrum — VVS-installation': 'Dra rör vid badrumsrenovering',
+  'Byte av blandare/WC': 'Byta blandare',
+  'Akutjobb VVS': 'Åtgärda vattenläcka',
+  'Värmepumpsinstallation (luft/vatten)': 'Installera värmepump',
+  'Målning inomhus': 'Måla väggar och tak',
+  'Fasadmålning': 'Måla fasad',
+}
+const STANDARD_FOR_ALLMANT = 'Enkel offert'
 
 // ─── Branschnyckel-normalisering ────────────────────────────────────────
 // Branschförståelse steg 1 (2026-09-02): alias-tabellen bor i lib/branch —
@@ -493,20 +530,25 @@ function maleriTemplates(): DefaultQuoteTemplate[] {
  */
 export function getDefaultQuoteTemplates(branch?: string | null): DefaultQuoteTemplate[] {
   const normalized = normalizeTemplateBranch(branch)
-  const link = (templates: Omit<DefaultQuoteTemplate, 'job_type_slug' | 'job_type_name'>[], jobTypeName: string): DefaultQuoteTemplate[] =>
-    templates.map(template => ({ ...template, job_type_slug: slugifyJobType(jobTypeName), job_type_name: jobTypeName }))
-  const allround = link(allroundTemplates(), 'Allmänt arbete')
+  const link = (templates: Omit<DefaultQuoteTemplate, 'job_type_slug' | 'job_type_name' | 'is_default'>[]): DefaultQuoteTemplate[] =>
+    templates.map(template => {
+      const jobTypeName = JOBBTYP_FOR_MALL[template.name]
+      if (!jobTypeName) throw new Error(`Mallen "${template.name}" saknar jobbtyp i JOBBTYP_FOR_MALL.`)
+      return { ...template, job_type_slug: slugifyJobType(jobTypeName), job_type_name: jobTypeName,
+        is_default: jobTypeName === ALLMANT_ARBETE ? template.name === STANDARD_FOR_ALLMANT : true }
+    })
+  const allround = link(allroundTemplates())
 
   switch (normalized) {
     case 'construction':
     case 'carpenter':
-      return [...allround, ...link(byggTemplates(), 'Byggarbete')]
+      return [...allround, ...link(byggTemplates())]
     case 'electrician':
-      return [...allround, ...link(elTemplates(), 'Elarbete')]
+      return [...allround, ...link(elTemplates())]
     case 'plumber':
-      return [...allround, ...link(vvsTemplates(), 'VVS-arbete')]
+      return [...allround, ...link(vvsTemplates())]
     case 'painter':
-      return [...allround, ...link([...maleriTemplates(), enkelReparationTemplate()], 'Måleriarbete')]
+      return [...allround, ...link([...maleriTemplates(), enkelReparationTemplate()])]
     default:
       return allround
   }

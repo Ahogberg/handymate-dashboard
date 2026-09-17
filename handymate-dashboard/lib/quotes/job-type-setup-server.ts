@@ -51,8 +51,9 @@ export async function loadQuoteSetup(db: SupabaseClient, businessId: string): Pr
 export async function linkTemplateToJobType(db: SupabaseClient, businessId: string, input: unknown) {
   if (!input || typeof input !== 'object' || Array.isArray(input)) throw new QuoteSetupError(400, 'Ogiltigt val.')
   const body = input as Record<string, unknown>
-  if (Object.keys(body).some(k => !['templateId', 'jobTypeSlug', 'updatedAt'].includes(k)) ||
+  if (Object.keys(body).some(k => !['templateId', 'jobTypeSlug', 'updatedAt', 'isDefault'].includes(k)) ||
       typeof body.templateId !== 'string' || body.templateId.length > 200 ||
+      !(body.isDefault === undefined || typeof body.isDefault === 'boolean') ||
       !(body.jobTypeSlug === null || (typeof body.jobTypeSlug === 'string' && body.jobTypeSlug.length > 0 && body.jobTypeSlug.length <= 100)) ||
       !(body.updatedAt === null || typeof body.updatedAt === 'string')) throw new QuoteSetupError(400, 'Ogiltigt val.')
 
@@ -70,7 +71,20 @@ export async function linkTemplateToJobType(db: SupabaseClient, businessId: stri
     if (!job) throw new QuoteSetupError(404, 'Jobbtypen finns inte eller är arkiverad.')
   }
   if ((template.updated_at ?? null) !== body.updatedAt) throw new QuoteSetupError(409, 'Mallen har ändrats. Läs in den igen.')
-  let q = db.from('quote_templates').update({ job_type_slug: body.jobTypeSlug, updated_at: nextTemplateVersion(template.updated_at) })
+  // Standard (v254): "gör till standard" flyttar flaggan inom jobbtypen —
+  // syskonen släpper först, sedan tar den här. Den partiella unika indexen
+  // gör två standarder omöjliga även om något går fel mitt i. En mall som
+  // kopplas LOSS kan inte vara standard.
+  const blirStandard = body.isDefault === true && body.jobTypeSlug !== null
+  if (blirStandard) {
+    const { error: syskonError } = await db.from('quote_templates').update({ is_default: false })
+      .eq('business_id', businessId).eq('job_type_slug', body.jobTypeSlug).neq('id', body.templateId).eq('is_default', true)
+    if (syskonError) throw new QuoteSetupError(503, 'Standarden kunde inte flyttas. Försök igen.')
+  }
+  const andring: Record<string, unknown> = { job_type_slug: body.jobTypeSlug, updated_at: nextTemplateVersion(template.updated_at) }
+  if (blirStandard) andring.is_default = true
+  if (body.jobTypeSlug === null) andring.is_default = false
+  let q = db.from('quote_templates').update(andring)
     .eq('business_id', businessId).eq('id', body.templateId)
   q = body.updatedAt === null ? q.is('updated_at', null) : q.eq('updated_at', body.updatedAt)
   const { data, error } = await q.select('*').maybeSingle()

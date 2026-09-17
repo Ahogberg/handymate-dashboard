@@ -75,10 +75,18 @@ export async function POST(request: NextRequest) {
     // upplägget är fortfarande värt att spara, det hamnar bara under
     // "Övriga upplägg" tills det kopplas.
     let jobTypeSlug: string | null = null
+    let isDefault = false
     if (typeof body.job_type_slug === 'string' && body.job_type_slug) {
       const { data: job } = await supabase.from('job_types').select('slug')
         .eq('business_id', business.business_id).eq('slug', body.job_type_slug).eq('is_active', true).maybeSingle()
       jobTypeSlug = job?.slug ?? null
+      // Första upplägget för en jobbtyp blir dess standard (ett tryck i
+      // offertflödet). Finns redan ett blir det här en variant.
+      if (jobTypeSlug) {
+        const { count } = await supabase.from('quote_templates').select('id', { count: 'exact', head: true })
+          .eq('business_id', business.business_id).eq('job_type_slug', jobTypeSlug)
+        isDefault = (count ?? 0) === 0
+      }
     }
 
     const insertPayload: Record<string, any> = {
@@ -89,6 +97,7 @@ export async function POST(request: NextRequest) {
       branch: body.branch || null,
       category: body.category || null,
       job_type_slug: jobTypeSlug,
+      is_default: isDefault,
       introduction_text: body.introduction_text || null,
       conclusion_text: body.conclusion_text || null,
       not_included: body.not_included || null,

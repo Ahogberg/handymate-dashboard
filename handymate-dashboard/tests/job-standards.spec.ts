@@ -4,10 +4,12 @@ import { ensureOnboardingJobTypes } from '../lib/job-types'
 import { JOB_TYPES_BY_TRADE } from '../lib/job-type-catalog'
 import { writeJobStandard, validateStandardRows } from '../lib/quotes/job-standard-server'
 import { hydrateStandardProducts } from '../lib/quotes/hydrate-standard-products'
-import { loadQuoteSetup } from '../lib/quotes/job-type-setup-server'
+import { linkTemplateToJobType, loadQuoteSetup } from '../lib/quotes/job-type-setup-server'
+import { seedQuoteTemplates } from '../lib/seed-defaults'
 import { loadJobTypeStart } from '../lib/quotes/job-type-start'
 import { resolveTemplateItemPrices } from '../lib/quotes/resolve-template-item-prices'
 import { buildJobTypeQuotePreview } from '../lib/quotes/job-type-preview'
+import { getDefaultQuoteTemplates } from '../lib/quote-template-defaults'
 
 // One PostgreSQL instance, reset data between tests; no production access.
 test.describe.configure({ mode: 'serial' })
@@ -125,4 +127,55 @@ test('främmande jobbtyp och mall kan inte ändras via manipulerade id:n', async
   await expect(writeJobStandard(f.db,'a',{operation:'append',jobTypeSlug:'annat_jobb',templateId:foreign.id,updatedAt:foreign.updatedAt,rows:[{productId:'p',quantity:1}]})).rejects.toMatchObject({status:404})
   await expect(writeJobStandard(f.db,'a',{operation:'append',jobTypeSlug:'installera_laddbox',templateId:foreign.id,updatedAt:foreign.updatedAt,rows:[{productId:'p',quantity:1}]})).rejects.toMatchObject({status:404})
   expect((await loadQuoteSetup(f.db,'a')).templates.find(t=>t.id===own.id)?.items).toHaveLength(0)
+})
+
+test('v254: Förbered standardrader är standard; Gör till standard flyttar flaggan; loss-koppling släpper den', async () => {
+  const t = await setup()
+  expect(t.isDefault).toBe(true)
+  await f.pg.exec(`INSERT INTO quote_templates(id,business_id,name,job_type_slug,default_items) VALUES ('variant','a','Totalrenovering','installera_laddbox','[]')`)
+  const variant = (await loadQuoteSetup(f.db, 'a')).templates.find(x => x.id === 'variant')!
+  expect(variant.isDefault).toBe(false)
+  const flyttad = await linkTemplateToJobType(f.db, 'a', { templateId: 'variant', jobTypeSlug: 'installera_laddbox', updatedAt: variant.updatedAt, isDefault: true })
+  expect(flyttad.isDefault).toBe(true)
+  const rader = (await f.pg.query(`SELECT id, is_default FROM quote_templates ORDER BY id`)).rows as { id: string; is_default: boolean }[]
+  expect(rader.filter(r => r.is_default).map(r => r.id)).toEqual(['variant'])
+  // Två standarder är omöjliga även utan koden: indexet säger nej.
+  await expect(f.pg.exec(`UPDATE quote_templates SET is_default = true WHERE id = '${t.id}'`)).rejects.toThrow()
+  // Kopplas loss → inte längre standard.
+  const loss = await linkTemplateToJobType(f.db, 'a', { templateId: 'variant', jobTypeSlug: null, updatedAt: flyttad.updatedAt })
+  expect(loss.isDefault).toBe(false)
+  expect(loss.jobTypeSlug).toBeNull()
+})
+
+test('v254: seedern kopplar om gamla seedade rader efter seed-identitet, sätter standard, och firmans egen standard vinner', async () => {
+  // Ett konto seedat före kopplingen: två branschmallar utan jobbtyp, en egen mall.
+  await f.pg.exec(`INSERT INTO quote_templates(id,business_id,name,job_type_slug,default_items) VALUES
+    ('gammal1','a','Laddbox för elbil',NULL,'[{"item_type":"item","description":"x","quantity":1,"unit":"st","unit_price":0,"total":0}]'),
+    ('gammal2','a','Enkel offert',NULL,'[]'),
+    ('egen','a','Min egen mall',NULL,'[]')`)
+  // Firman har redan förberett egna standardrader för Installera laddbox.
+  await ensureOnboardingJobTypes(f.db, 'a', ['Installera laddbox'])
+  const egna = await writeJobStandard(f.db, 'a', { operation: 'create', jobTypeSlug: 'installera_laddbox' })
+  expect(egna.isDefault).toBe(true)
+
+  const forsta = await seedQuoteTemplates(f.db, 'a', 'electrician')
+  expect(forsta.relinked).toBe(2)
+  const rader = (await f.pg.query(`SELECT id, name, job_type_slug, is_default FROM quote_templates ORDER BY id`)).rows as any[]
+  const by = (id: string) => rader.find(r => r.id === id)
+  // seed-identitet: kopplad till onboardingens namn, inte "Elarbete"
+  expect(by('gammal1').job_type_slug).toBe('installera_laddbox')
+  expect(by('gammal1').is_default).toBe(false)          // firmans egna vann
+  expect(by(egna.id).is_default).toBe(true)
+  expect(by('gammal2').job_type_slug).toBe('allmant_arbete')
+  expect(by('gammal2').is_default).toBe(true)           // Enkel offert är Allmänt arbetes standard
+  // hantverkarens egen mall rörs aldrig
+  expect(by('egen').job_type_slug).toBeNull()
+  // och de mallar som saknades seedades med sina jobbtyper
+  expect(by(`qtpl_a_${getDefaultQuoteTemplates('electrician').findIndex(t => t.name === 'Elbesiktning')}`).job_type_slug).toBe('elbesiktning')
+  const jobb = (await f.pg.query(`SELECT slug FROM job_types WHERE business_id='a' ORDER BY slug`)).rows.map((r: any) => r.slug)
+  expect(jobb).toEqual(expect.arrayContaining(['installera_laddbox', 'byta_elcentral', 'installera_belysning', 'elbesiktning', 'allmant_arbete']))
+  expect(jobb).not.toContain('elarbete')
+  // Idempotent: andra körningen gör ingenting.
+  const andra = await seedQuoteTemplates(f.db, 'a', 'electrician')
+  expect(andra).toEqual({ inserted: [], relinked: 0 })
 })

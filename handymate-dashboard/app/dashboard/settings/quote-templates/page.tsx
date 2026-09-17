@@ -41,6 +41,7 @@ interface QuoteTemplate {
   introduction_text?: string
   conclusion_text?: string
   job_type_slug?: string | null
+  is_default?: boolean
   updated_at?: string | null
 }
 
@@ -547,7 +548,12 @@ export default function QuoteTemplatesPage() {
                 )}
 
                 {/* Name & description */}
-                <h3 className="text-sm font-semibold text-slate-900 mb-0.5 pr-6">{template.name}</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-0.5 pr-6">
+                  {template.name}
+                  {template.is_default && template.job_type_slug && (
+                    <span className="ml-2 align-middle text-[9px] font-medium px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded">Standard</span>
+                  )}
+                </h3>
                 {template.description && (
                   <p className="text-xs text-slate-400 line-clamp-1 mb-0">{template.description}</p>
                 )}

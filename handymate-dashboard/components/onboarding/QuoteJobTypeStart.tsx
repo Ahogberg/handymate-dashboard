@@ -30,7 +30,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Loader2 } from 'lucide-react'
-import { templatesForJobType, type FirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
+import { standardFor, templatesForJobType, varianterFor, type FirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
 import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
 
 interface Props {
@@ -116,16 +116,27 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
   const matching = data && aktivJobbtyp
     ? (aktivJobbtyp === OVRIGA ? ovriga : templatesForJobType(data.templates, aktivJobbtyp).filter(t => t.items.length > 0))
     : []
-  // Ett upplägg = ett tryck (2026-09-17). Chipet lägger in raderna direkt när
-  // jobbtypen har exakt ett upplägg; bara flera upplägg (varianter) kräver
-  // ett val till. Tidigare gällde det bara ärvda affärer.
+  // Två nivåer (2026-09-17, Andreas): jobbtypschipet ÄR standardupplägget —
+  // ett tryck lägger in det. Varianterna ligger som egna chips efter, också
+  // ett tryck var. Bara en jobbtyp med flera upplägg och ingen standard
+  // kräver ett val till (den listar sina upplägg efter trycket).
+  function standardForVal(slug: string) {
+    if (!data?.linkingAvailable) return null
+    if (slug === OVRIGA) return ovriga.length === 1 ? ovriga[0] : null
+    return standardFor(data.templates, slug)
+  }
   function valjJobbtyp(slug: string) {
     lastSelection.current = null; setError('')
     if (pafyllnad) setLokaltVal(slug); else onSelectJobType(slug)
-    if (!data?.linkingAvailable) return
-    const kandidater = slug === OVRIGA ? ovriga : templatesForJobType(data.templates, slug).filter(t => t.items.length > 0)
-    if (kandidater.length === 1) void apply({ jobTypeSlug: slug, templateId: kandidater[0].id })
+    const standard = standardForVal(slug)
+    if (standard) void apply({ jobTypeSlug: slug, templateId: standard.id })
   }
+  function valjVariant(slug: string, templateId: string) {
+    lastSelection.current = null; setError('')
+    if (pafyllnad) setLokaltVal(slug); else onSelectJobType(slug)
+    void apply({ jobTypeSlug: slug, templateId })
+  }
+  const harStandard = aktivJobbtyp ? !!standardForVal(aktivJobbtyp) : false
   // Chipstil = Fas E:s Mer-chips, så remsan läses som en i verktygsstacken.
   // MEN med 44px träffyta under sm: remsan är hantverkarens FÖRSTA tryck vid
   // offertstart på telefon (CLAUDE.md: mobiloptimerat, telefon på bygget) —
@@ -148,14 +159,20 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
     </span>}
     {data && !loading && <>
       {visaSomArvd ? <span className="px-1 text-[12.5px] font-semibold text-slate-700">{data.jobTypes.find(j => j.slug === jobType)?.name || jobType}</span> :
-        data.jobTypes.map(job => <button key={job.id} type="button" disabled={busy} aria-pressed={aktivJobbtyp === job.slug}
-          className={`${chip} ${aktivJobbtyp === job.slug ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
-          onClick={() => valjJobbtyp(job.slug)}>{job.name}</button>)}
+        data.jobTypes.map(job => <span key={job.id} className="contents">
+          <button type="button" disabled={busy} aria-pressed={aktivJobbtyp === job.slug}
+            className={`${chip} ${aktivJobbtyp === job.slug ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
+            onClick={() => valjJobbtyp(job.slug)}>{job.name}</button>
+          {data.linkingAvailable && varianterFor(data.templates, job.slug).map(v => <button key={v.id} type="button" disabled={busy}
+            aria-label={`${job.name}: ${v.name}`}
+            className={`${chip} bg-primary-50 text-primary-800 hover:bg-primary-100 border-primary-700/30`}
+            onClick={() => valjVariant(job.slug, v.id)}>↳ {v.name}</button>)}
+        </span>)}
       {!visaSomArvd && ovriga.length > 0 && <button type="button" disabled={busy} aria-pressed={aktivJobbtyp === OVRIGA}
         className={`${chip} ${aktivJobbtyp === OVRIGA ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-500 hover:bg-slate-50 border-dashed border-slate-300'}`}
         onClick={() => valjJobbtyp(OVRIGA)}>Övriga upplägg</button>}
       {!data.linkingAvailable && <span className="text-[12.5px] text-slate-500">Mallkopplingen är inte aktiverad ännu — beskriv jobbet eller välj en mall som vanligt.</span>}
-      {data.linkingAvailable && matching.map(t => <button type="button" key={t.id} disabled={busy}
+      {data.linkingAvailable && (!harStandard || visaSomArvd) && matching.map(t => <button type="button" key={t.id} disabled={busy}
         className={`px-3 py-1.5 rounded-[10px] border border-primary-700/30 bg-primary-50 hover:bg-primary-100 transition-colors inline-flex items-center gap-2 text-left disabled:opacity-60 ${touch}`}
         onClick={() => void apply({ jobTypeSlug: aktivJobbtyp!, templateId: t.id })}>
         <span className="text-[12.5px] font-semibold text-primary-800">{t.name}</span>

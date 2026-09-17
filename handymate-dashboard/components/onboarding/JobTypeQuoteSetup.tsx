@@ -175,7 +175,7 @@ export function JobTypeQuoteSetup({ trade, syncOnboarding = false, initialJobTyp
         <label className="job-setup-label" htmlFor="quote-setup-template">Offertupplägg</label>
         <select id="quote-setup-template" value={chosen?.id || ''} disabled={busy || priceSaving || loading} onChange={e => { setTemplateId(e.target.value); setShowAll(false) }}>
           <option value="">Välj en mall</option>
-          <optgroup label="Kopplade till jobbtypen">{linked.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
+          <optgroup label="Kopplade till jobbtypen">{linked.map(t => <option key={t.id} value={t.id}>{t.name}{t.isDefault ? ' · standard' : ''}</option>)}</optgroup>
           <optgroup label="Mallar att koppla">{data.templates.filter(t => !t.jobTypeSlug).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}</optgroup>
         </select>
         {!data.templates.length && <div className="job-setup-note"><p>Det finns inga offertmallar ännu.</p>
@@ -190,6 +190,12 @@ export function JobTypeQuoteSetup({ trade, syncOnboarding = false, initialJobTyp
             {data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => void mutate('/api/job-types/quote-setup', 'PUT',
               { templateId: chosen.id, jobTypeSlug: job.slug, updatedAt: chosen.updatedAt })}>Koppla till {job.name} <ArrowRight size={16} /></button>}
           </div>}
+          {chosen.jobTypeSlug === job.slug && (chosen.isDefault
+            ? <p className="job-setup-note"><strong>Standardupplägg.</strong> Ett tryck på {job.name} i offerten lägger in de här raderna. Övriga upplägg under jobbtypen visas som varianter bredvid.</p>
+            : <div className="job-setup-note"><p>Det här är en variant under {job.name}. Standardupplägget är det som läggs in med ett tryck.</p>
+              {data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => void mutate('/api/job-types/quote-setup', 'PUT',
+                { templateId: chosen.id, jobTypeSlug: job.slug, updatedAt: chosen.updatedAt, isDefault: true })}>Gör till standard för {job.name} <ArrowRight size={16} /></button>}
+            </div>)}
           {chosen.jobTypeSlug === job.slug && data.canManage && <JobStandardRowsEditor starterPackage={starterPackage} template={chosen} products={data.products} busy={busy || priceSaving || loading}
             onWrite={body => mutate('/api/job-types/quote-setup', 'POST', body)} onRefresh={load} onBusyChange={setPriceSaving} />}
           <p className="job-setup-summary" role="status">{setupSummary(rows)}</p>

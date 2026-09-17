@@ -404,31 +404,41 @@ async function seedReservations(supabase: SupabaseClient, businessId: string, br
 // haft en rad. Läsarna går nu mot products (lib/products/price-list-view.ts).
 
 /**
- * Seedar mallbanken (quote_templates) — delar lib/quote-template-defaults.ts
- * med app/api/quote-templates/seed/route.ts (den manuella "Hämta färdiga
+ * Seedar mallbanken (quote_templates) — delad med
+ * app/api/quote-templates/seed/route.ts (den manuella "Hämta färdiga
  * mallar"-CTA:n). Idempotent per mallnamn (inte bara "finns någon mall") så
  * att en business som redan sparat en egen mall ändå får branschmallarna.
+ *
+ * Två nivåer (2026-09-17): varje seedad mall hör till en jobbtyp ur
+ * JOBBTYP_FOR_MALL, jobbtyperna säkras först, och mallen blir jobbtypens
+ * standard om företaget inte redan har en (firmans egna standardrader
+ * vinner alltid). Befintliga seedade rader UTAN jobbtyp — seedade före
+ * kopplingen fanns — kopplas om efter sin seed-identitet (namnet i
+ * mallbanken), aldrig efter namngissning på hantverkarens egna mallar.
  */
-async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, branch: string) {
+export async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, branch: string): Promise<{ inserted: Record<string, unknown>[]; relinked: number }> {
   const normalizedBranch = normalizeTemplateBranch(branch)
 
   const { data: existingRows, error: readError } = await supabase
     .from('quote_templates')
-    .select('name')
+    .select('id, name, job_type_slug, is_default')
     .eq('business_id', businessId)
 
   if (readError) throw readError
-  const existingNames = new Set((existingRows || []).map((r: { name: string }) => r.name))
-  const defaultTemplates = getDefaultQuoteTemplates(normalizedBranch).map((t, index) => ({ ...t, seedIndex: index })).filter(t => !existingNames.has(t.name))
+  const befintliga = new Map<string, { id: string; name: string; job_type_slug: string | null; is_default: boolean }>()
+  for (const r of existingRows || []) if (!befintliga.has(r.name)) befintliga.set(r.name, r)
+  const defaults = getDefaultQuoteTemplates(normalizedBranch).map((t, index) => ({ ...t, seedIndex: index }))
+  const nya = defaults.filter(t => !befintliga.has(t.name))
+  const attKoppla = defaults.filter(t => { const r = befintliga.get(t.name); return !!r && !r.job_type_slug })
 
-  if (defaultTemplates.length === 0) return
+  if (nya.length === 0 && attKoppla.length === 0) return { inserted: [], relinked: 0 }
 
   let jobTypesReady = true
   try {
     await ensureOnboardingJobTypes(
       supabase,
       businessId,
-      Array.from(new Set(defaultTemplates.map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
+      Array.from(new Set([...nya, ...attKoppla].map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
     )
   } catch (error) {
     // En äldre/arkiverad jobbtyp kan krocka på namn. Mallarna är fortfarande
@@ -437,12 +447,34 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
     jobTypesReady = false
   }
 
+  // Standard per jobbtyp: företagets befintliga vinner, sedan första i seeden.
+  const harStandard = new Set((existingRows || []).filter(r => r.is_default && r.job_type_slug).map(r => r.job_type_slug as string))
+  const taStandard = (t: { is_default?: boolean; job_type_slug?: string }): boolean => {
+    if (!jobTypesReady || !t.is_default || !t.job_type_slug || harStandard.has(t.job_type_slug)) return false
+    harStandard.add(t.job_type_slug)
+    return true
+  }
+
+  let relinked = 0
+  if (jobTypesReady) {
+    for (const t of attKoppla) {
+      const rad = befintliga.get(t.name)!
+      const { error } = await supabase.from('quote_templates')
+        .update({ job_type_slug: t.job_type_slug, is_default: taStandard(t), updated_at: new Date().toISOString() })
+        .eq('business_id', businessId).eq('id', rad.id)
+      if (error) throw error
+      relinked++
+    }
+  }
+
+  if (nya.length === 0) return { inserted: [], relinked }
+
   const defaultTexts = getDefaultStandardTexts(normalizedBranch)
   const texts: Record<string, string> = {}
   for (const t of defaultTexts) texts[t.text_type] = t.content
 
-  const { error: writeError } = await supabase.from('quote_templates').insert(
-    defaultTemplates.map((t, i) => ({
+  const { data: inserted, error: writeError } = await supabase.from('quote_templates').insert(
+    nya.map(t => ({
       id: `qtpl_${businessId}_${t.seedIndex}`,
       business_id: businessId,
       branch: normalizedBranch,
@@ -450,6 +482,7 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       description: t.description,
       category: t.category,
       job_type_slug: jobTypesReady ? t.job_type_slug : null,
+      is_default: taStandard(t),
       // Inlednings-/avslutningstext seedas INTE längre (pilot-beslut 2026-07)
       // — redundanta mot quotes.description. getDefaultStandardTexts()
       // returnerar inte längre dessa typer, se lib/quote-standard-text-defaults.ts.
@@ -461,8 +494,9 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
       rot_enabled: t.rot_enabled,
       rut_enabled: t.rut_enabled,
     }))
-  )
+  ).select()
   if (writeError) throw writeError
+  return { inserted: inserted || [], relinked }
 }
 
 /**

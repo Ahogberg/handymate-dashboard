@@ -2,12 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getDefaultStandardTexts } from '@/lib/quote-standard-text-defaults'
-import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-template-defaults'
-import { ensureOnboardingJobTypes } from '@/lib/job-types'
-
-function genId() {
-  return 'qtpl_' + Math.random().toString(36).substr(2, 9)
-}
+import { normalizeTemplateBranch } from '@/lib/quote-template-defaults'
+import { seedQuoteTemplates } from '@/lib/seed-defaults'
 
 /**
  * POST - Hämta färdiga branschmallar ("Hämta färdiga mallar för din bransch")
@@ -37,58 +33,14 @@ export async function POST(request: NextRequest) {
 
     const branch = normalizeTemplateBranch(config?.branch)
 
-    // Idempotens: hämta befintliga mallnamn för businessen och seeda bara
-    // mallar vars namn INTE redan finns.
-    const { data: existingRows } = await supabase
-      .from('quote_templates')
-      .select('name')
-      .eq('business_id', businessId)
-
-    const existingNames = new Set((existingRows || []).map(r => r.name))
-    const defaultTemplates = getDefaultQuoteTemplates(branch).filter(t => !existingNames.has(t.name))
-
-    if (defaultTemplates.length === 0) {
-      return NextResponse.json({ templates: [], count: 0, alreadySeeded: true })
+    // Delad seeder (2026-09-17): samma idempotens, jobbtypssäkring,
+    // standardflagga och omkoppling som vid onboardingens finalize —
+    // rutten är bara den manuella knappen till samma sak.
+    const { inserted, relinked } = await seedQuoteTemplates(supabase, businessId, branch)
+    if (inserted.length === 0 && relinked === 0) {
+      return NextResponse.json({ templates: [], count: 0, relinked: 0, alreadySeeded: true })
     }
-    await ensureOnboardingJobTypes(
-      supabase,
-      businessId,
-      Array.from(new Set(defaultTemplates.map(template => template.job_type_name).filter((name): name is string => Boolean(name)))),
-    )
-
-    // Get default texts for this branch
     const defaultTexts = getDefaultStandardTexts(branch)
-    const texts: Record<string, string> = {}
-    for (const t of defaultTexts) {
-      texts[t.text_type] = t.content
-    }
-
-    const inserts = defaultTemplates.map(t => ({
-      id: genId(),
-      business_id: businessId,
-      branch,
-      name: t.name,
-      description: t.description,
-      category: t.category,
-      job_type_slug: t.job_type_slug,
-      // Inlednings-/avslutningstext seedas INTE längre (pilot-beslut 2026-07)
-      // — redundanta mot quotes.description. getDefaultStandardTexts()
-      // returnerar inte längre dessa typer.
-      not_included: texts.not_included || null,
-      ata_terms: texts.ata_terms || null,
-      payment_terms_text: texts.payment_terms || null,
-      default_items: t.default_items,
-      default_payment_plan: t.default_payment_plan,
-      rot_enabled: t.rot_enabled,
-      rut_enabled: t.rut_enabled,
-    }))
-
-    const { data, error } = await supabase
-      .from('quote_templates')
-      .insert(inserts)
-      .select()
-
-    if (error) throw error
 
     // Also seed standard texts if none exist
     const { count } = await supabase
@@ -109,7 +61,7 @@ export async function POST(request: NextRequest) {
       await supabase.from('quote_standard_texts').insert(textInserts)
     }
 
-    return NextResponse.json({ templates: data || [], count: inserts.length })
+    return NextResponse.json({ templates: inserted, count: inserted.length, relinked })
   } catch (error: any) {
     console.error('Seed templates error:', error)
     return NextResponse.json({ error: error.message }, { status: 500 })

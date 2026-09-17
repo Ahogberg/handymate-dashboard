@@ -20,6 +20,7 @@ export async function standardDatabase() {
   await pg.exec(readFileSync('sql/v_job_types.sql', 'utf8'))
   await pg.exec(create('sql/quote_overhaul.sql', 'quote_templates'))
   await pg.exec(readFileSync('sql/v187_quote_template_job_type.sql', 'utf8'))
+  await pg.exec(readFileSync('sql/v254_upplagg_standard_per_jobbtyp.sql', 'utf8'))
   await pg.exec(create('sql/v12_products.sql', 'products'))
   await pg.exec('ALTER TABLE products ADD COLUMN default_labor_share numeric;')
   await pg.exec(create('sql/v67_produktbank.sql', 'product_components'))
@@ -32,6 +33,7 @@ export async function standardDatabase() {
     const query: any = {
       select(value = '*') { columns = value; return query },
       eq(column: string, value: any) { filters.push({ column, op: '=', value }); return query },
+      neq(column: string, value: any) { filters.push({ column, op: '<>', value }); return query },
       is(column: string, value: any) { filters.push({ column, op: 'IS', value }); return query },
       in(column: string, value: any[]) { filters.push({ column, op: 'IN', value }); return query },
       order(column: string, options?: { ascending?: boolean }) { orders.push(`${identifier(column)} ${options?.ascending === false ? 'DESC' : 'ASC'}`); return query },
@@ -50,6 +52,7 @@ export async function standardDatabase() {
       const fields = columns === '*' ? '*' : columns.split(',').map(v => identifier(v.trim())).join(',')
       const where = () => filters.length ? ' WHERE ' + filters.map(f => f.op === 'IS' ? `${identifier(f.column)} IS NULL`
         : f.op === 'IN' ? `${identifier(f.column)} IN (${f.value.map(param).join(',')})`
+        : f.op === '<>' ? `${identifier(f.column)} <> ${param(f.value)}`
         : `${identifier(f.column)} = ${param(f.value)}`).join(' AND ') : ''
       let sql: string
       if (action === 'read') sql = `SELECT ${fields} FROM ${identifier(table)}${where()}${orders.length ? ' ORDER BY ' + orders.join(',') : ''}${limit !== undefined ? ` LIMIT ${limit}` : ''} OFFSET ${start}`
