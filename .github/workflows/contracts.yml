@@ -275,6 +275,7 @@ jobs:
           tests/salj-case-overlamning.spec.ts
           tests/partner-demo-ingang.spec.ts
           tests/partner-genomgangar.spec.ts
+          tests/revenue-bulk.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

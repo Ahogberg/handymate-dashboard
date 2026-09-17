@@ -17,6 +17,7 @@ type Overview = {
   won: number
   manager: boolean
   email: string
+  partners: Array<{ id: string; name: string; company: string | null }>
   source_runs: Array<{
     id: string
     source: string
@@ -40,6 +41,16 @@ export default function RevenueOSPage() {
     [revision, setRevision] = useState(0)
   const [showCreate, setShowCreate] = useState(false),
     [showSource, setShowSource] = useState(false)
+  // Bulkurval. Listan från revenue_v2_overview är sorterad på total_score
+  // desc, 50 per sida — en sida ÄR därför ett sammanhängande poängspann, och
+  // "markera alla" gäller sidan du ser. Aldrig ett urval du inte har framför
+  // dig: en knapp som tar bort företag du inte sett är inte en knapp.
+  const [valda, setValda] = useState<Set<string>>(new Set())
+  const [poangMin, setPoangMin] = useState('')
+  const [bulkPartner, setBulkPartner] = useState('')
+  const [bulkSvar, setBulkSvar] = useState<
+    { rubrik: string; rader: Array<{ foretag: string; text: string }> } | null
+  >(null)
   const sequence = useRef(0)
   const reload = useCallback(async () => {
     const n = ++sequence.current
@@ -62,6 +73,12 @@ export default function RevenueOSPage() {
         )
       }
     }
+  }, [q, offset])
+  // Byter sida eller sökning ⇒ töm urvalet. Ett urval som lever kvar över en
+  // sidbyte tar bort företag som inte längre står på skärmen.
+  useEffect(() => {
+    setValda(new Set())
+    setBulkSvar(null)
   }, [q, offset])
   useEffect(() => {
     const timer = setTimeout(reload, 200)
@@ -86,6 +103,78 @@ export default function RevenueOSPage() {
       setBusy(false)
     }
   }
+  const HINDER: Record<string, string> = {
+    partnerlead: 'har en partnerlead — den är partnerns historik',
+    kontaktsparr: 'har en kontaktspärr som måste bevaras',
+    historik: 'har aktiviteter — stäng som förlorad i stället',
+    kontaktperson: 'har en sparad kontaktperson med källa',
+    ingen_kontakt: 'saknar kontaktperson med e-post eller telefon',
+    ingen_research: 'saknar underlag — kör Förbered först',
+    redan_tilldelad: 'är redan tilldelad en partner',
+    sparrad: 'är spärrad för kontakt',
+    ej_oppen: 'är inte öppet för kontakt',
+    saknas: 'finns inte längre',
+  }
+  function hinderText(rad: { hinder: string; skal?: string }) {
+    return rad.hinder === 'nekades'
+      ? rad.skal || 'nekades av tilldelningsregeln'
+      : HINDER[rad.hinder] || rad.hinder
+  }
+
+  async function taBortValda() {
+    const antal = valda.size
+    if (!antal) return
+    if (!window.confirm(
+      `Ta bort ${antal} företag ur katalogen? Företag med partnerlead, ` +
+      'kontaktspärr, aktiviteter eller sparad kontaktperson lämnas kvar.',
+    )) return
+    setBusy(true)
+    setError('')
+    setBulkSvar(null)
+    try {
+      const r = await sendRevenue('discard', { ids: Array.from(valda) })
+      setBulkSvar({
+        rubrik: `${r.borttagna} företag togs bort.`,
+        rader: (r.behallna || []).map((b: { foretag: string; hinder: string }) => ({
+          foretag: b.foretag,
+          text: `lämnades kvar — ${hinderText(b)}`,
+        })),
+      })
+      setValda(new Set())
+      setRevision((v) => v + 1)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function tilldelaValda() {
+    if (!valda.size || !bulkPartner) return
+    setBusy(true)
+    setError('')
+    setBulkSvar(null)
+    try {
+      const r = await sendRevenue('assign_bulk', {
+        partner_id: bulkPartner,
+        ids: Array.from(valda),
+      })
+      setBulkSvar({
+        rubrik: `${r.antal} leads tilldelade. Underlaget kommer ur varje företags egen research.`,
+        rader: (r.hoppade || []).map((h: { foretag: string; hinder: string; skal?: string }) => ({
+          foretag: h.foretag,
+          text: `hoppades över — ${hinderText(h)}`,
+        })),
+      })
+      setValda(new Set())
+      setRevision((v) => v + 1)
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function exportCrm() {
     setBusy(true)
     setError('')
@@ -322,23 +411,140 @@ export default function RevenueOSPage() {
                     placeholder="Namn eller organisationsnummer"
                   />
                 </label>
+                {data.manager && (() => {
+                  // Poängfiltret gäller sidan du ser — listan är sorterad på
+                  // poäng, så sidan är ett sammanhängande spann.
+                  const grans = poangMin === '' ? null : Number(poangMin)
+                  const synliga = data.accounts.filter(
+                    (a) => grans === null || (a.total_score ?? 0) >= grans,
+                  )
+                  const allaValda =
+                    synliga.length > 0 && synliga.every((a) => valda.has(a.id))
+                  return (
+                    <div className="flex flex-wrap items-center gap-3 rounded-2xl border bg-white p-4">
+                      <label className="text-sm">
+                        Poäng minst
+                        <input
+                          type="number"
+                          min={0}
+                          max={100}
+                          value={poangMin}
+                          onChange={(e) => setPoangMin(e.target.value)}
+                          placeholder="alla"
+                          className="ml-2 w-20 rounded-lg border p-1.5"
+                        />
+                      </label>
+                      <button
+                        className="rounded-xl border px-3 py-1.5 text-sm"
+                        onClick={() =>
+                          setValda(
+                            allaValda
+                              ? new Set()
+                              : new Set(synliga.map((a) => a.id)),
+                          )
+                        }
+                      >
+                        {allaValda
+                          ? 'Avmarkera sidan'
+                          : `Markera sidan (${synliga.length})`}
+                      </button>
+                      <span className="text-sm text-slate-500">
+                        {valda.size} valda
+                      </span>
+                      <div className="ml-auto flex flex-wrap items-center gap-2">
+                        <select
+                          aria-label="Partner att tilldela"
+                          value={bulkPartner}
+                          onChange={(e) => setBulkPartner(e.target.value)}
+                          className="rounded-lg border p-1.5 text-sm"
+                        >
+                          <option value="">Välj partner…</option>
+                          {data.partners.map((pt) => (
+                            <option key={pt.id} value={pt.id}>
+                              {pt.company || pt.name}
+                            </option>
+                          ))}
+                        </select>
+                        <button
+                          disabled={busy || !valda.size || !bulkPartner}
+                          onClick={tilldelaValda}
+                          className="rounded-xl bg-teal-700 px-3 py-1.5 text-sm font-semibold text-white disabled:opacity-40"
+                        >
+                          Tilldela valda
+                        </button>
+                        <button
+                          disabled={busy || !valda.size}
+                          onClick={taBortValda}
+                          className="rounded-xl border border-red-300 px-3 py-1.5 text-sm text-red-700 disabled:opacity-40"
+                        >
+                          Ta bort valda
+                        </button>
+                      </div>
+                      {data.partners.length === 0 && (
+                        <p className="w-full text-sm text-slate-500">
+                          Ingen aktiv partner med godkänt gällande avtal finns
+                          att tilldela ännu.
+                        </p>
+                      )}
+                    </div>
+                  )
+                })()}
+                {bulkSvar && (
+                  <div role="status" className="rounded-2xl border bg-white p-4">
+                    <p className="font-medium">{bulkSvar.rubrik}</p>
+                    {bulkSvar.rader.length > 0 && (
+                      <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                        {bulkSvar.rader.map((r, i) => (
+                          <li key={i}>
+                            <strong className="font-medium">{r.foretag}</strong>{' '}
+                            {r.text}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
                 <div className="divide-y rounded-2xl border bg-white">
-                  {data.accounts.map((a) => (
-                    <button
-                      className="flex w-full items-center justify-between gap-3 p-5 text-left hover:bg-teal-50"
-                      key={a.id}
-                      onClick={() => setSelected(a.id)}
-                    >
-                      <span>
-                        <strong>{a.company_name}</strong>
-                        <span className="mt-1 block text-sm text-slate-500">
-                          {[a.city, a.industry].filter(Boolean).join(' · ')}
+                  {data.accounts
+                    .filter(
+                      (a) =>
+                        !data.manager ||
+                        poangMin === '' ||
+                        (a.total_score ?? 0) >= Number(poangMin),
+                    )
+                    .map((a) => (
+                    <div className="flex items-center gap-3 p-5" key={a.id}>
+                      {data.manager && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Välj ${a.company_name}`}
+                          checked={valda.has(a.id)}
+                          onChange={(e) =>
+                            setValda((f) => {
+                              const n = new Set(f)
+                              if (e.target.checked) n.add(a.id)
+                              else n.delete(a.id)
+                              return n
+                            })
+                          }
+                          className="h-5 w-5 flex-none"
+                        />
+                      )}
+                      <button
+                        className="flex flex-1 items-center justify-between gap-3 text-left hover:text-teal-800"
+                        onClick={() => setSelected(a.id)}
+                      >
+                        <span>
+                          <strong>{a.company_name}</strong>
+                          <span className="mt-1 block text-sm text-slate-500">
+                            {[a.city, a.industry].filter(Boolean).join(' · ')}
+                          </span>
                         </span>
-                      </span>
-                      <span className="text-sm text-teal-800">
-                        {STAGES[a.status]}
-                      </span>
-                    </button>
+                        <span className="flex-none text-sm text-teal-800">
+                          {a.total_score}/100 · {STAGES[a.status]}
+                        </span>
+                      </button>
+                    </div>
                   ))}
                   {!data.accounts.length && (
                     <p className="p-5 text-slate-500">
