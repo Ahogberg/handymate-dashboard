@@ -1,9 +1,11 @@
 /**
  * Facit-tester för Mer-radens statusprickar (etapp A3, 2026-08-06).
  *
- * Bakgrund: pilotkunden Christoffer sa "man får inte med allt". Sju av fjorton
- * offertfält bor bakom Mer-raden, och knapparna såg likadana ut oavsett om
- * panelen var ifylld, tom eller behövde åtgärdas.
+ * Rivning paket B (2026-09-17, rad 2.3–2.6, 2.10): "Villkor & texter", "Stil"
+ * och "ROT-detaljer" är inte längre egna Mer-paneler (se panel-status.ts:s
+ * egen kommentar för var de flyttade) — deras tester tas bort härifrån i
+ * stället för att peka på fält som inte längre finns i PanelStatusInput.
+ * Kvar: de tre paneler som fortfarande är egna ytor.
  *
  * Det viktigaste löftet som testas: 'attention' används SPARSAMT. Att färga
  * allt tomt som en varning hade gjort raden till en vägg av amber och lärt
@@ -25,21 +27,6 @@ test.describe('tom offert — inget skriker', () => {
   })
 })
 
-test.describe('villkor & texter', () => {
-  test('ett ifyllt fält räcker för att panelen ska räknas som ifylld', () => {
-    expect(panelStatus({ notIncluded: 'Bygglov ingår ej' }).villkor.state).toBe('filled')
-  })
-
-  test('antalet ifyllda fält visas som hint', () => {
-    const status = panelStatus({ notIncluded: 'x', ataTerms: 'y', referencePerson: 'z' })
-    expect(status.villkor.hint).toBe('3')
-  })
-
-  test('blanksteg räknas inte som ifyllt', () => {
-    expect(panelStatus({ notIncluded: '   ', termsText: '' }).villkor.state).toBe('empty')
-  })
-})
-
 test.describe('betalplan — det enda tillståndet som kan vara fel', () => {
   test('ingen plan är helt okej', () => {
     expect(panelStatus({ paymentPlanCount: 0 }).betalplan.state).toBe('empty')
@@ -58,31 +45,7 @@ test.describe('betalplan — det enda tillståndet som kan vara fel', () => {
   })
 })
 
-test.describe('ROT — personnumret är det som faktiskt behövs', () => {
-  test('ROT valt utan personnummer kräver åtgärd', () => {
-    const status = panelStatus({ hasRotItems: true })
-    expect(status.rot.state).toBe('attention')
-    expect(status.rot.hint).toContain('personnummer')
-  })
-
-  test('ROT med personnummer är ifyllt', () => {
-    expect(panelStatus({ hasRotItems: true, personnummer: '19800101-1234' }).rot.state).toBe('filled')
-  })
-
-  test('RUT kräver inte personnummer på samma sätt', () => {
-    expect(panelStatus({ hasRutItems: true }).rot.state).toBe('filled')
-  })
-
-  test('inget avdrag alls kräver ingenting', () => {
-    expect(panelStatus({ hasRotItems: false, hasRutItems: false }).rot.state).toBe('empty')
-  })
-
-  test('ifyllda uppgifter utan avdrag räknas som ifyllt, inte som fel', () => {
-    expect(panelStatus({ personnummer: '19800101-1234' }).rot.state).toBe('filled')
-  })
-})
-
-test.describe('visning och stil — bara avvikelser markeras', () => {
+test.describe('visning — bara avvikelser markeras', () => {
   test('standardvisning (full detalj) markeras inte', () => {
     expect(panelStatus({ detailLevel: 'detailed', showUnitPrices: true, showQuantities: true }).visning.state).toBe('empty')
   })
@@ -93,15 +56,6 @@ test.describe('visning och stil — bara avvikelser markeras', () => {
 
   test('dolda à-priser markeras', () => {
     expect(panelStatus({ showUnitPrices: false }).visning.state).toBe('filled')
-  })
-
-  test('vald stil visas med svenskt namn', () => {
-    expect(panelStatus({ templateStyle: 'friendly' }).stil.hint).toBe('Personlig')
-    expect(panelStatus({ templateStyle: 'modern' }).stil.hint).toBe('Modern')
-  })
-
-  test('okänd stil visas som den är i stället för att döljas', () => {
-    expect(panelStatus({ templateStyle: 'nyskapad' }).stil.hint).toBe('nyskapad')
   })
 })
 
@@ -116,24 +70,19 @@ test.describe('bilagor', () => {
 test.describe('attentionCount — sparsamhet är hela poängen', () => {
   test('en fullt ifylld offert utan fel ger noll varningar', () => {
     const status = panelStatus({
-      notIncluded: 'Bygglov ingår ej',
       paymentPlanCount: 3,
       paymentPlanValid: true,
       attachmentCount: 1,
-      templateStyle: 'modern',
-      hasRotItems: true,
-      personnummer: '19800101-1234',
     })
     expect(attentionCount(status)).toBe(0)
   })
 
   test('bara verkliga fel räknas', () => {
     const status = panelStatus({
-      hasRotItems: true,
       paymentPlanCount: 2,
       paymentPlanValid: false,
     })
-    expect(attentionCount(status)).toBe(2)
+    expect(attentionCount(status)).toBe(1)
   })
 
   test('en helt tom offert ger inga varningar — tomt är inte fel', () => {

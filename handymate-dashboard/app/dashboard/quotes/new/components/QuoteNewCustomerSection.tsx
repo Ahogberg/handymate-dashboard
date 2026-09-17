@@ -2,8 +2,9 @@
 
 import { useState } from 'react'
 import { formatKronor } from '@/lib/format-price'
-import { AlertTriangle, ClipboardList, User } from 'lucide-react'
+import { ClipboardList, User } from 'lucide-react'
 import { createDefaultItem } from '@/lib/quote-calculations'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 import type { QuoteItem } from '@/lib/types/quote'
 
 interface Customer {
@@ -31,18 +32,17 @@ interface QuoteNewCustomerSectionProps {
   selectedCustomer: string
   onCustomerCreated?: (customer: Customer) => void
   setSelectedCustomer: (id: string) => void
-  /** @deprecated Giltighetstiden sätts i dokumentet ("Giltig till"-datumet).
-      Propparna finns kvar för anropskompatibilitet men används inte längre. */
-  validDays?: number
-  setValidDays?: (n: number) => void
-  title: string
-  setTitle: (s: string) => void
-  description: string
-  setDescription: (s: string) => void
   customerPriceListInfo: CustomerPriceListInfo | null
   items: QuoteItem[]
   setItems: React.Dispatch<React.SetStateAction<QuoteItem[]>>
-  hasItems: boolean
+  /** Rivning paket B (2026-09-17, rad 2.3): flyttade hit från den
+      borttagna "Mer → Villkor & texter"-panelen — hör hemma vid kundvalet. */
+  referencePerson: string
+  setReferencePerson: (v: string) => void
+  customerReference: string
+  setCustomerReference: (v: string) => void
+  projectAddress: string
+  setProjectAddress: (v: string) => void
 }
 
 const INPUT_CLS =
@@ -52,20 +52,28 @@ const INPUT_CLS =
  * Kund-sektion för new-vyn. Skiljer sig från edit genom att den visar en
  * banner under kundvalet med kundens kopplade prislista (timpris,
  * materialpåslag, snabbknapp för att importera prislisteposter).
+ *
+ * RIVNING PAKET B (2026-09-17, rad 2.1): titel och beskrivning bort ur
+ * kortet — båda är redan redigerbara fält i dokumentet
+ * (QuoteDocument.tsx), och att ha dem på två ställen var precis den sortens
+ * dubblett rivningen skulle bort med. `validDays`-propparna (redan döda
+ * sedan DUBBLETT-kommentaren nedanför borttogs 2026-08-06) är helt borta —
+ * inget läste dem längre.
  */
 export function QuoteNewCustomerSection({
   customers,
   selectedCustomer,
   onCustomerCreated,
   setSelectedCustomer,
-  title,
-  setTitle,
-  description,
-  setDescription,
   customerPriceListInfo,
   items,
   setItems,
-  hasItems,
+  referencePerson,
+  setReferencePerson,
+  customerReference,
+  setCustomerReference,
+  projectAddress,
+  setProjectAddress,
 }: QuoteNewCustomerSectionProps) {
   const [creatingCustomer, setCreatingCustomer] = useState(false)
   const [customerName, setCustomerName] = useState('')
@@ -188,34 +196,40 @@ export function QuoteNewCustomerSection({
               faktiska datumet i stället för ett antal dagar. */}
         </div>
 
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Titel</label>
-          <input
-            type="text"
-            value={title}
-            onChange={e => setTitle(e.target.value)}
-            placeholder="T.ex. Elinstallation kök"
-            className={INPUT_CLS}
-          />
-        </div>
-
-        <div>
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">
-            Beskrivning <span className="normal-case font-medium text-slate-400">(rekommenderas)</span>
-          </label>
-          <textarea
-            value={description}
-            onChange={e => setDescription(e.target.value)}
-            placeholder="Kort beskrivning av jobbet…"
-            rows={2}
-            className={`${INPUT_CLS} resize-y leading-relaxed`}
-          />
-          {!description.trim() && hasItems && (
-            <p className="mt-1.5 flex items-start gap-1.5 text-xs text-amber-700">
-              <AlertTriangle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
-              Beskriv vad offerten avser — det är det första kunden läser.
-            </p>
-          )}
+        {/* Rivning paket B (2026-09-17, rad 2.3): referens/adress, flyttade
+            hit från den borttagna "Mer → Villkor & texter"-panelen. Titel
+            och beskrivning (rad 2.1) redigeras numera bara i dokumentet. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Er referens</label>
+            <input
+              type="text"
+              value={referencePerson}
+              onChange={e => setReferencePerson(e.target.value)}
+              placeholder="Namn"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Kundens referens</label>
+            <input
+              type="text"
+              value={customerReference}
+              onChange={e => setCustomerReference(e.target.value)}
+              placeholder="Referensnummer"
+              className={INPUT_CLS}
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Arbetsplatsadress</label>
+            <AddressAutocomplete
+              value={projectAddress}
+              onChange={setProjectAddress}
+              onSelect={r => setProjectAddress(r.full_address)}
+              placeholder="Sök adress…"
+              className={INPUT_CLS}
+            />
+          </div>
         </div>
       </div>
     </div>

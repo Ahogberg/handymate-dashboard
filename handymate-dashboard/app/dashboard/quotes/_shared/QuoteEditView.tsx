@@ -13,7 +13,6 @@ import type {
   QuoteStandardText,
 } from '@/lib/types/quote'
 import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
-import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 import type { CustomCategory } from '@/lib/constants/categories'
 
@@ -23,17 +22,18 @@ import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
-import { QuoteRotSection } from './QuoteRotSection'
-import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
+// RIVNING PAKET B (2026-09-17): QuoteStylePicker monteras inte längre här
+// (komponenten lever kvar, InvoiceEditor.tsx använder den fortfarande för
+// fakturans egen stil). QuoteRotSection och QuoteStandardTextsSection är
+// raderade filer — se lib/quotes/panel-status.ts:s docblock för var de tre
+// ytorna flyttade. QuoteTotalsSection är också raderad.
 import { QuotePaymentPlanSection } from './QuotePaymentPlanSection'
 import { QuoteDisplaySettingsSection } from './QuoteDisplaySettingsSection'
-import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
 import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditCustomerSection } from './QuoteEditCustomerSection'
 import type { ProductWithComponents } from './applyProductToItem'
-import type { useQuoteCalculations } from './useQuoteCalculations'
 import { QuoteNewAttachmentsCard } from '../new/components/QuoteNewAttachmentsCard'
 
 interface Customer {
@@ -54,12 +54,12 @@ interface Customer {
  * modell som create-lägets state.
  *
  * VARFÖR EN EGEN FIL (inte inline i QuoteBuilder.tsx):
- * `tests/quotes-mer-i-flodet.spec.ts` låser att de sex delade
- * "Mer"-panelerna (QuoteStylePicker/QuoteStandardTextsSection/
- * QuotePaymentPlanSection/QuoteDisplaySettingsSection/
- * QuoteNewAttachmentsCard/QuoteRotSection) monteras EXAKT EN GÅNG i
- * `QuoteBuilder.tsx` — de monteras redan där för create-lägets "Mer"-rad.
- * Om edit-lägets JSX (som VISAR alla sex permanent, ingen "Mer"-rad) låg
+ * `tests/quotes-mer-i-flodet.spec.ts` låser att de delade Mer-panelerna
+ * (efter rivning paket B, 2026-09-17: QuotePaymentPlanSection/
+ * QuoteDisplaySettingsSection/QuoteNewAttachmentsCard — Stil/Villkor &
+ * texter/ROT-detaljer är borta, se panel-status.ts) monteras EXAKT EN GÅNG
+ * i `QuoteBuilder.tsx` — de monteras redan där för create-lägets "Mer"-rad.
+ * Om edit-lägets JSX (som VISAR dem permanent, ingen "Mer"-rad) låg
  * inline i samma fil hade mount-räkningen blivit två för varje panel.
  * Edit-läget har dessutom en helt annan layout (klassisk tvåkolumn, ingen
  * Snabboffert/canvas-first "Mer"-rad) — att tvinga in det i samma
@@ -83,10 +83,6 @@ export interface QuoteEditViewProps {
   onSaveDraft: () => void
   onSaveTemplate: () => void
   hasItems: boolean
-
-  businessDefaultStyle: 'modern' | 'premium' | 'friendly'
-  templateStyle: 'modern' | 'premium' | 'friendly' | null
-  setTemplateStyle: (s: 'modern' | 'premium' | 'friendly' | null) => void
 
   reservations: ReturnType<typeof useReservationSuggestions>
 
@@ -116,15 +112,15 @@ export interface QuoteEditViewProps {
   addBlankRowWithDescription: (description: string) => void
   setProductModalRow: (row: QuoteItem | null) => void
 
-  hasRotItems: boolean
-  hasRutItems: boolean
-  personnummer: string
-  setPersonnummer: (v: string) => void
-  fastighetsbeteckning: string
-  setFastighetsbeteckning: (v: string) => void
+  /** Rivning paket B (2026-09-17, rad 2.5/2.6): vilket avdrag som är valt —
+      ersätter hasRotItems/hasRutItems, som bara behövdes av den borttagna
+      QuoteRotSection/QuoteTotalsSection. Vidarebefordras rakt till
+      QuoteDocumentSurface. */
+  activeDeductionType: 'rot' | 'rut' | null
 
-  showStandardTexts: boolean
-  setShowStandardTexts: (b: boolean) => void
+  /** Rivning paket B (2026-09-17, rad 2.3): standardtexterna, vidare-
+      befordrade till dokumentets egna textfält i stället för den
+      borttagna QuoteStandardTextsSection. */
   textsByType: Record<string, QuoteStandardText[]>
   referencePerson: string
   setReferencePerson: (v: string) => void
@@ -132,14 +128,6 @@ export interface QuoteEditViewProps {
   setCustomerReference: (v: string) => void
   projectAddress: string
   setProjectAddress: (v: string) => void
-  notIncluded: string
-  setNotIncluded: (v: string) => void
-  ataTerms: string
-  setAtaTerms: (v: string) => void
-  paymentTermsText: string
-  setPaymentTermsText: (v: string) => void
-  termsText: string
-  setTermsText: (v: string) => void
 
   showPaymentPlan: boolean
   setShowPaymentPlan: (b: boolean) => void
@@ -165,10 +153,8 @@ export interface QuoteEditViewProps {
   showQuantities: boolean
   setShowQuantities: (b: boolean) => void
 
-  totals: ReturnType<typeof useQuoteCalculations>['totals']
   vatRate: number
   discountPercent: number
-  setDiscountPercent: (n: number) => void
 
   liveAvailable: boolean
   quoteTemplateData: QuoteTemplateData
@@ -199,21 +185,18 @@ export function QuoteEditView(props: QuoteEditViewProps) {
   const {
     quoteId, quoteNumber, completenessSummaries, onSelectSection,
     autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
-    businessDefaultStyle, templateStyle, setTemplateStyle,
     reservations, recalculated,
     customers, selectedCustomer, setSelectedCustomer, validDays, setValidDays, title, setTitle, description, setDescription,
     items, setItems, allCategories, products, onSaveAsStandard, addItem, updateItem, removeItem, moveItemById, addFromProduct, applyProductToExistingRow,
     addBlankRowWithDescription, setProductModalRow,
-    hasRotItems, hasRutItems, personnummer, setPersonnummer, fastighetsbeteckning, setFastighetsbeteckning,
-    showStandardTexts, setShowStandardTexts, textsByType, referencePerson, setReferencePerson,
-    customerReference, setCustomerReference, projectAddress, setProjectAddress, notIncluded, setNotIncluded,
-    ataTerms, setAtaTerms, paymentTermsText, setPaymentTermsText, termsText, setTermsText,
+    activeDeductionType, textsByType, referencePerson, setReferencePerson,
+    customerReference, setCustomerReference, projectAddress, setProjectAddress,
     showPaymentPlan, setShowPaymentPlan, paymentPlan, calculatedPaymentPlan, paymentPlanValid,
     addPaymentPlanEntry, updatePaymentPlanEntry, removePaymentPlanEntry, formatCurrency,
     attachments, setAttachments, uploadingFile, onFileUpload,
     showDisplaySettings, setShowDisplaySettings, detailLevel, setDetailLevel, showUnitPrices, setShowUnitPrices,
     showQuantities, setShowQuantities,
-    totals, vatRate, discountPercent, setDiscountPercent,
+    vatRate, discountPercent,
     liveAvailable, quoteTemplateData,
     liveHandlers, setSheetItemId, addRowSheetOpen, setAddRowSheetOpen, templatePreviewPayload, sheetItem,
     businessId, productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
@@ -260,12 +243,9 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
           {/* ── Left Column — Form ─────────────────────────────────── */}
           <div className="flex flex-col gap-4">
-            <QuoteStylePicker
-              quoteId={quoteId}
-              value={templateStyle}
-              onChange={setTemplateStyle}
-              businessDefaultStyle={businessDefaultStyle}
-            />
+            {/* RIVNING PAKET B (2026-09-17, rad 2.4/3.12): QuoteStylePicker
+                monteras inte längre här — firmadefaulten i inställningar
+                räcker, ingen per-offert-stilväljare kvar. */}
 
             {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
                 fristående "N reservationer matchar"-bannern som satt här
@@ -295,40 +275,22 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               setTitle={setTitle}
               description={description}
               setDescription={setDescription}
-            />
-
-            {props.visitRuleEditor}
-            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
-
-            <QuoteRotSection
-              items={items}
-              setItems={setItems}
-              hasRotItems={hasRotItems}
-              personnummer={personnummer}
-              setPersonnummer={setPersonnummer}
-              fastighetsbeteckning={fastighetsbeteckning}
-              setFastighetsbeteckning={setFastighetsbeteckning}
-            />
-
-            <QuoteStandardTextsSection
-              open={showStandardTexts}
-              setOpen={setShowStandardTexts}
-              textsByType={textsByType}
               referencePerson={referencePerson}
               setReferencePerson={setReferencePerson}
               customerReference={customerReference}
               setCustomerReference={setCustomerReference}
               projectAddress={projectAddress}
               setProjectAddress={setProjectAddress}
-              notIncluded={notIncluded}
-              setNotIncluded={setNotIncluded}
-              ataTerms={ataTerms}
-              setAtaTerms={setAtaTerms}
-              paymentTermsText={paymentTermsText}
-              setPaymentTermsText={setPaymentTermsText}
-              termsText={termsText}
-              setTermsText={setTermsText}
             />
+
+            {props.visitRuleEditor}
+            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
+
+            {/* RIVNING PAKET B (2026-09-17, rad 2.3/2.5/2.6): QuoteRotSection,
+                QuoteStandardTextsSection och QuoteTotalsSection borttagna —
+                avdragsväxeln och texterna sitter nu i dokumentets egen
+                summering/villkorsstycke (se activeDeductionType/textsByType
+                på QuoteDocumentSurface nedan). */}
 
             <QuotePaymentPlanSection
               open={showPaymentPlan}
@@ -360,18 +322,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               showQuantities={showQuantities}
               setShowQuantities={setShowQuantities}
             />
-
-            <QuoteTotalsSection
-              totals={totals}
-              vatRate={vatRate}
-              discountPercent={discountPercent}
-              setDiscountPercent={setDiscountPercent}
-              hasRotItems={hasRotItems}
-              hasRutItems={hasRutItems}
-              formatCurrency={formatCurrency}
-              items={items}
-              setItems={setItems}
-            />
           </div>
 
           {/* ── Höger kolumn — dokumentytan, fyller viewport ─────── */}
@@ -385,6 +335,8 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               templatePreviewPayload={templatePreviewPayload}
               reservationSuggestions={reservations.suggestions}
               onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
+              activeDeductionType={activeDeductionType}
+              standardTexts={textsByType}
               // onOpenAiHelp intentionally omitted: edit-läget har ingen
               // AI-utkasts-flöde (showAiHelper/QuoteNewAIHelper finns bara i
               // create-läget i QuoteBuilder.tsx) — utan proppen visar

@@ -114,6 +114,13 @@ export interface QuoteDocumentHandlers {
   onDueDateChange?: (v: string) => void
   onOurReferenceChange?: (v: string) => void
   onYourReferenceChange?: (v: string) => void
+  /** Rivning paket B (2026-09-17, rad 2.5/2.6): avdragsväxeln (Inget
+      avdrag/ROT/RUT) satt tidigare bara i den fristående QuoteTotalsSection
+      och skrev direkt på radlistan via applyGlobalDeductionType — flyttad
+      hit så den sitter vid dokumentets summering i stället för i en
+      duplicerad sidopanel. Utelämnad → växeln renderas inte (fakturans
+      canvas skickar den aldrig). */
+  onDeductionTypeChange?: (type: 'rot' | 'rut' | null) => void
 }
 
 /**

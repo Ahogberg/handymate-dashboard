@@ -15,7 +15,7 @@ import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDo
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import {
-  generateItemId, recalculateItems, getItemRotRutType,
+  generateItemId, recalculateItems, getItemRotRutType, applyGlobalDeductionType,
 } from '@/lib/quote-calculations'
 import { generatedQuoteToQuoteItems, rotRutEfterArtikelkoppling } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
@@ -55,11 +55,11 @@ import { ProductModal, type ProductInitialValues, type ProductSavePayload } from
 
 // Delade sektionskomponenter (flyttade+döpta om från [id]/edit/components/ i
 // Fas 1, offert-omtaget 2026-08-31 — edit/page.tsx importerar samma filer).
-import { QuoteRotSection } from './QuoteRotSection'
-import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
+// RIVNING PAKET B (2026-09-17): QuoteRotSection, QuoteStandardTextsSection
+// och QuoteTotalsSection är borttagna — se panel-status.ts:s docblock för
+// var de tre ytorna flyttade.
 import { QuotePaymentPlanSection } from './QuotePaymentPlanSection'
 import { QuoteDisplaySettingsSection } from './QuoteDisplaySettingsSection'
-import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
@@ -73,7 +73,11 @@ import { QuoteEditView } from './QuoteEditView'
 import { fetchQuoteForEdit } from './loadEditQuote'
 import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
 
-import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
+// RIVNING PAKET B (2026-09-17, rad 2.4/3.12): QuoteStylePicker monteras inte
+// längre här — firmadefaulten i inställningar (businessDefaultStyle) räcker,
+// ingen per-offert-stilväljare kvar i editorn. Komponenten själv lever kvar
+// (components/quotes/QuoteStylePicker.tsx) — InvoiceEditor.tsx använder den
+// fortfarande för fakturans EGEN per-faktura-stil, utanför uppdragets scope.
 import { panelStatus } from '@/lib/quotes/panel-status'
 
 // Komponenter unika för create-flödet (bor kvar i new/components/ — bara
@@ -526,38 +530,24 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const hasRotItems = items.some(i => i.is_rot_eligible)
   const hasRutItems = items.some(i => i.is_rut_eligible)
 
-  // Statusprickar för Mer-raden — sju offertfält bor bara bakom den, och utan
-  // markering måste hantverkaren öppna varje panel för att veta vad som är
-  // ifyllt. Det var halva "man får inte med allt".
+  // Statusprickar för Mer-raden. Rivning paket B (2026-09-17, rad 2.3–2.6,
+  // 2.10): Stil/Villkor & texter/ROT-detaljer är inte längre egna paneler
+  // (se panel-status.ts) — kvar är bara de tre fälten de tre återstående
+  // panelerna faktiskt behöver.
   const merPanelStatus = useMemo(
     () =>
       panelStatus({
-        notIncluded,
-        termsText,
-        ataTerms,
-        paymentTermsText,
-        referencePerson,
-        customerReference,
-        projectAddress,
         paymentPlanCount: paymentPlan.length,
         paymentPlanValid,
         detailLevel,
         showUnitPrices,
         showQuantities,
         attachmentCount: attachments.length,
-        templateStyle,
-        hasRotItems,
-        hasRutItems,
-        personnummer,
-        fastighetsbeteckning,
       }),
     [
-      notIncluded, termsText, ataTerms, paymentTermsText,
-      referencePerson, customerReference, projectAddress,
       paymentPlan.length, paymentPlanValid,
       detailLevel, showUnitPrices, showQuantities,
-      attachments.length, templateStyle,
-      hasRotItems, hasRutItems, personnummer, fastighetsbeteckning,
+      attachments.length,
     ],
   )
 
@@ -892,13 +882,21 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       },
       onItemMove: moveItemById,
       onReservationRemove: reservations.removeReservation,
+      // Rivning paket B (2026-09-17, rad 2.5/2.6): avdragsväxeln flyttad
+      // från den borttagna QuoteTotalsSection — samma anrop, ny plats.
+      onDeductionTypeChange: type => setItems(prev => applyGlobalDeductionType(prev, type)),
     }),
     [
       setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
       setNotIncluded, setAtaTerms, updateItem, addItem, removeItem, items, moveItemById,
-      reservations.removeReservation,
+      reservations.removeReservation, setItems,
     ],
   )
+
+  // Rivning paket B (2026-09-17, rad 2.5/2.6): samma prioritetsordning som
+  // QuoteTotalsSection tidigare använde (ROT går före RUT om båda skulle
+  // förekomma via radvis cykling) — dokumentets avdragsväxel visar detta.
+  const activeDeductionType: 'rot' | 'rut' | null = hasRotItems ? 'rot' : hasRutItems ? 'rut' : null
 
   // ═══════════════════════════════════════════════════════════════════
   // Data fetching
@@ -2250,9 +2248,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
           setShowSaveTemplateModal(true)
         }}
         hasItems={items.length > 0}
-        businessDefaultStyle={businessDefaultStyle}
-        templateStyle={templateStyle}
-        setTemplateStyle={setTemplateStyle}
         reservations={reservations}
         recalculated={recalculated}
         customers={customers}
@@ -2277,14 +2272,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         applyProductToExistingRow={applyProductToExistingRow}
         addBlankRowWithDescription={addBlankRowWithDescription}
         setProductModalRow={setProductModalRow}
-        hasRotItems={hasRotItems}
-        hasRutItems={hasRutItems}
-        personnummer={personnummer}
-        setPersonnummer={setPersonnummer}
-        fastighetsbeteckning={fastighetsbeteckning}
-        setFastighetsbeteckning={setFastighetsbeteckning}
-        showStandardTexts={showStandardTexts}
-        setShowStandardTexts={setShowStandardTexts}
+        activeDeductionType={activeDeductionType}
         textsByType={textsByType}
         referencePerson={referencePerson}
         setReferencePerson={setReferencePerson}
@@ -2292,14 +2280,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         setCustomerReference={setCustomerReference}
         projectAddress={projectAddress}
         setProjectAddress={setProjectAddress}
-        notIncluded={notIncluded}
-        setNotIncluded={setNotIncluded}
-        ataTerms={ataTerms}
-        setAtaTerms={setAtaTerms}
-        paymentTermsText={paymentTermsText}
-        setPaymentTermsText={setPaymentTermsText}
-        termsText={termsText}
-        setTermsText={setTermsText}
         showPaymentPlan={showPaymentPlan}
         setShowPaymentPlan={setShowPaymentPlan}
         paymentPlan={paymentPlan}
@@ -2321,10 +2301,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         setShowUnitPrices={setShowUnitPrices}
         showQuantities={showQuantities}
         setShowQuantities={setShowQuantities}
-        totals={totals}
         vatRate={vatRate}
         discountPercent={discountPercent}
-        setDiscountPercent={setDiscountPercent}
         liveAvailable={liveAvailable}
         quoteTemplateData={quoteTemplateData}
         liveHandlers={liveHandlers}
@@ -2575,16 +2553,15 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
               onCustomerCreated={customer => setCustomers(previous => [...previous.filter(c => c.customer_id !== customer.customer_id), customer])}
               selectedCustomer={selectedCustomer}
               setSelectedCustomer={setSelectedCustomer}
-              validDays={validDays}
-              setValidDays={setValidDays}
-              title={title}
-              setTitle={setTitle}
-              description={description}
-              setDescription={setDescription}
               customerPriceListInfo={customerPriceListInfo}
               items={items}
               setItems={setItems}
-              hasItems={items.length > 0}
+              referencePerson={referencePerson}
+              setReferencePerson={setReferencePerson}
+              customerReference={customerReference}
+              setCustomerReference={setCustomerReference}
+              projectAddress={projectAddress}
+              setProjectAddress={setProjectAddress}
             />
             </div>
           </div>
@@ -2609,17 +2586,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
               onGenerateFromText={() => generateFromText()}
             />
 
-            <QuoteTotalsSection
-              totals={totals}
-              vatRate={vatRate}
-              discountPercent={discountPercent}
-              setDiscountPercent={setDiscountPercent}
-              hasRotItems={hasRotItems}
-              hasRutItems={hasRutItems}
-              formatCurrency={formatCurrency}
-              items={items}
-              setItems={setItems}
-            />
+            {/* RIVNING PAKET B (2026-09-17, rad 2.2/2.5/2.6): QuoteTotalsSection
+                är borttagen — summorna, rabatten och avdragsväxeln stod redan
+                en gång till i dokumentets summering (QuoteDocument.tsx), och
+                den här sidopanelen var dubbletten. Avdragsväxeln flyttade dit
+                (se onDeductionTypeChange/activeDeductionType nedan). */}
 
             {/* DUBBLETT BORTTAGEN (2026-08-06): Skicka fanns både här och i
                 den sticky headern. Headern vinner — den är alltid synlig,
@@ -2632,19 +2603,19 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             {/* Jobbtypsremsan flyttades HÄRIFRÅN 2026-09-02 till direkt under
                 headern (se kommentaren där) — mobilordningen gjorde att den
                 hamnade en hel skärm ner, bakom hela assistentkolumn del 1. */}
-            {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
-                ROT nås härifrån, en panel synlig i taget (inte modal —
-                dokumentet syns hela tiden nedanför). */}
+            {/* "Mer"-verktygsrad. RIVNING PAKET B (2026-09-17, rad 2.10):
+                sex knappar → tre. Stil flyttade till inställningarnas
+                firmadefault (2.4), Villkor & texter till dokumentets egna
+                textfält (2.3), ROT-detaljer till avdragsväxeln vid
+                dokumentets summering (2.5) — kvar är de tre paneler som
+                fortfarande är egna ytor. */}
             <div className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
               <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Mer</span>
               {(
                 [
-                  { key: 'stil', label: 'Stil' },
-                  { key: 'villkor', label: 'Villkor & texter' },
                   { key: 'betalplan', label: 'Betalplan' },
                   { key: 'visning', label: 'Visning' },
                   { key: 'bilagor', label: 'Bilagor' },
-                  { key: 'rot', label: 'ROT-detaljer' },
                 ] as const
               ).map(p => {
                 // Statusprick: sju av offertens fält bor bara här, och utan
@@ -2687,40 +2658,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
               })}
             </div>
 
-            {activePanel === 'stil' && (
-              <div className="relative">
-                <MerPanelClose onClose={() => setActivePanel(null)} />
-                <QuoteStylePicker
-                  value={templateStyle}
-                  onChange={setTemplateStyle}
-                  businessDefaultStyle={businessDefaultStyle}
-                  accentColor={businessConfig?.accent_color}
-                />
-              </div>
-            )}
-
-            {activePanel === 'villkor' && (
-              <QuoteStandardTextsSection
-                open={true}
-                setOpen={b => setActivePanel(b ? 'villkor' : null)}
-                textsByType={textsByType}
-                referencePerson={referencePerson}
-                setReferencePerson={setReferencePerson}
-                customerReference={customerReference}
-                setCustomerReference={setCustomerReference}
-                projectAddress={projectAddress}
-                setProjectAddress={setProjectAddress}
-                notIncluded={notIncluded}
-                setNotIncluded={setNotIncluded}
-                ataTerms={ataTerms}
-                setAtaTerms={setAtaTerms}
-                paymentTermsText={paymentTermsText}
-                setPaymentTermsText={setPaymentTermsText}
-                termsText={termsText}
-                setTermsText={setTermsText}
-              />
-            )}
-
             {activePanel === 'betalplan' && (
               <QuotePaymentPlanSection
                 open={true}
@@ -2756,21 +2693,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                   setAttachments={setAttachments}
                   uploadingFile={uploadingFile}
                   onFileUpload={handleFileUpload}
-                />
-              </div>
-            )}
-
-            {activePanel === 'rot' && (
-              <div className="relative">
-                <MerPanelClose onClose={() => setActivePanel(null)} />
-                <QuoteRotSection
-                  items={items}
-                  setItems={setItems}
-                  hasRotItems={hasRotItems}
-                  personnummer={personnummer}
-                  setPersonnummer={setPersonnummer}
-                  fastighetsbeteckning={fastighetsbeteckning}
-                  setFastighetsbeteckning={setFastighetsbeteckning}
                 />
               </div>
             )}
@@ -2811,6 +2733,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                 templatePreviewPayload={templatePreviewPayload}
                 reservationSuggestions={reservations.suggestions}
                 onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
+                activeDeductionType={activeDeductionType}
+                standardTexts={textsByType}
               />
             </div>
 

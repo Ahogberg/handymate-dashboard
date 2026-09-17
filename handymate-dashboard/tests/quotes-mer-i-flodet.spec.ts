@@ -46,8 +46,8 @@ const QUOTE_COMPLETENESS = fs.readFileSync(
   path.join(__dirname, '..', 'lib', 'quotes', 'quote-completeness.ts'),
   'utf8',
 )
-const STANDARD_TEXTS_SECTION = fs.readFileSync(
-  path.join(QUOTES_DIR, '_shared', 'QuoteStandardTextsSection.tsx'),
+const NEW_CUSTOMER_SECTION = fs.readFileSync(
+  path.join(QUOTES_DIR, 'new', 'components', 'QuoteNewCustomerSection.tsx'),
   'utf8',
 )
 const BUILDER_HEADER = fs.readFileSync(
@@ -93,15 +93,16 @@ test.describe('QuickReceipt och QuoteNewMoreAboutProject är raderade filer', ()
   })
 })
 
-test.describe('"Mer"-raden är den ENDA vägen till de sex panelerna', () => {
-  test('alla sex paneler monteras i QuoteBuilder.tsx, en gång var', () => {
+test.describe('"Mer"-raden är den ENDA vägen till de tre kvarvarande panelerna', () => {
+  // Rivning paket B (2026-09-17, rad 2.3–2.6, 2.10): Stil/Villkor &
+  // texter/ROT-detaljer är inte längre Mer-paneler. Stil flyttade till
+  // firmadefaulten i inställningar, Villkor & texter till dokumentets egna
+  // textfält, ROT-detaljer till avdragsväxeln vid dokumentets summering.
+  test('de tre kvarvarande panelerna monteras i QuoteBuilder.tsx, en gång var', () => {
     const panels = [
-      'QuoteStylePicker',
-      'QuoteStandardTextsSection',
       'QuotePaymentPlanSection',
       'QuoteDisplaySettingsSection',
       'QuoteNewAttachmentsCard',
-      'QuoteRotSection',
     ]
     for (const panel of panels) {
       const mounts = BUILDER.match(new RegExp(`<${panel}[\\s/>]`, 'g')) || []
@@ -109,20 +110,33 @@ test.describe('"Mer"-raden är den ENDA vägen till de sex panelerna', () => {
     }
   })
 
-  test('referens-/adressfälten binder till samma state i "Mer → Villkor & texter" som förr i QuoteNewMoreAboutProject', () => {
-    // Fälten fanns tidigare på TVÅ ställen (Mer-panelen OCH den borttagna
-    // QuoteNewMoreAboutProject). Nu finns bara ett — men det stället ska
-    // fortfarande binda till EXAKT samma state (referencePerson/
-    // customerReference/projectAddress) som innan.
-    expect(STANDARD_TEXTS_SECTION).toContain('referencePerson')
-    expect(STANDARD_TEXTS_SECTION).toContain('setReferencePerson')
-    expect(STANDARD_TEXTS_SECTION).toContain('customerReference')
-    expect(STANDARD_TEXTS_SECTION).toContain('setCustomerReference')
-    expect(STANDARD_TEXTS_SECTION).toContain('projectAddress')
-    expect(STANDARD_TEXTS_SECTION).toContain('setProjectAddress')
+  test('de tre borttagna panelerna monteras INTE längre i QuoteBuilder.tsx eller QuoteEditView.tsx', () => {
+    const EDIT_VIEW = fs.readFileSync(path.join(QUOTES_DIR, '_shared', 'QuoteEditView.tsx'), 'utf8')
+    for (const panel of ['QuoteStylePicker', 'QuoteStandardTextsSection', 'QuoteRotSection', 'QuoteTotalsSection']) {
+      expect(BUILDER, `${panel} monteras fortfarande i QuoteBuilder.tsx`).not.toMatch(new RegExp(`<${panel}[\\s/>]`))
+      expect(EDIT_VIEW, `${panel} monteras fortfarande i QuoteEditView.tsx`).not.toMatch(new RegExp(`<${panel}[\\s/>]`))
+    }
+  })
 
-    const mountIdx = BUILDER.indexOf('<QuoteStandardTextsSection')
-    expect(mountIdx, 'QuoteStandardTextsSection monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
+  test('QuoteRotSection.tsx, QuoteStandardTextsSection.tsx och QuoteTotalsSection.tsx är raderade filer', () => {
+    for (const name of ['QuoteRotSection.tsx', 'QuoteStandardTextsSection.tsx', 'QuoteTotalsSection.tsx']) {
+      expect(fs.existsSync(path.join(QUOTES_DIR, '_shared', name)), `${name} finns fortfarande`).toBe(false)
+    }
+  })
+
+  test('referens-/adressfälten binder till samma state i kundkortet (flyttade dit från Mer → Villkor & texter)', () => {
+    // Fälten satt tidigare i den borttagna QuoteStandardTextsSection. Nu
+    // binder de i stället i QuoteNewCustomerSection — kundkortet — men mot
+    // EXAKT samma state (referencePerson/customerReference/projectAddress).
+    expect(NEW_CUSTOMER_SECTION).toContain('referencePerson')
+    expect(NEW_CUSTOMER_SECTION).toContain('setReferencePerson')
+    expect(NEW_CUSTOMER_SECTION).toContain('customerReference')
+    expect(NEW_CUSTOMER_SECTION).toContain('setCustomerReference')
+    expect(NEW_CUSTOMER_SECTION).toContain('projectAddress')
+    expect(NEW_CUSTOMER_SECTION).toContain('setProjectAddress')
+
+    const mountIdx = BUILDER.indexOf('<QuoteNewCustomerSection')
+    expect(mountIdx, 'QuoteNewCustomerSection monteras inte i QuoteBuilder.tsx').toBeGreaterThan(-1)
     const propsBlock = BUILDER.slice(mountIdx, BUILDER.indexOf('/>', mountIdx))
     expect(propsBlock).toContain('referencePerson={referencePerson}')
     expect(propsBlock).toContain('setReferencePerson={setReferencePerson}')
@@ -130,6 +144,12 @@ test.describe('"Mer"-raden är den ENDA vägen till de sex panelerna', () => {
     expect(propsBlock).toContain('setCustomerReference={setCustomerReference}')
     expect(propsBlock).toContain('projectAddress={projectAddress}')
     expect(propsBlock).toContain('setProjectAddress={setProjectAddress}')
+  })
+
+  test('avdragsväxeln flyttade till dokumentets summering (QuoteDocument.tsx), inte en egen panel', () => {
+    expect(DOCUMENT_TYPES).toContain('onDeductionTypeChange')
+    expect(QUOTE_DOCUMENT).toContain('onDeductionTypeChange')
+    expect(BUILDER).toContain('onDeductionTypeChange: type => setItems(prev => applyGlobalDeductionType(prev, type))')
   })
 })
 
