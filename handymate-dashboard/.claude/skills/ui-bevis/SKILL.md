@@ -49,6 +49,32 @@ Postgres bakom.
    scroll i 375 px är ett fel, inte en smaksak. Lägger du till en ny yta ska
    den ha provet.
 
+## Vad harnessen INTE visar — läs det här innan du kallar något fult
+
+Skisserna är byggda för att pröva **beteende**, inte utseende. Tre skillnader
+mot produktionen är stora nog att göra en fin yta ful, och de har redan lurat
+mig till två felaktiga fynd (2026-09-17):
+
+| I appen | I skissen |
+|---|---|
+| Space Grotesk (rubriker), DM Sans (löptext), JetBrains Mono (belopp), self-hostade via `next/font` | **Arial**, hårdkodat i varje preview-helper |
+| `app/globals.css`: `--foreground-rgb`, `h1–h6 → font-heading`, `anim-fade/rise/pop` | laddas inte — rubriker får löptextfont, animationer uteblir |
+| `AgentAvatar` visar porträtt ur Supabase storage | bilder blockeras (`route.abort()`), så initial-fallbacken syns: "M L H" |
+| Alla ytor har Tailwind | sex preview-helpers kompilerar Tailwind, men **onboardingturens harness har ingen Tailwind alls** — bara `onboarding.css` och komponenternas egna CSS-filer |
+
+Följden: i turen renderas `className="min-h-[44px] underline"` som en naken
+grå systemknapp. Det är inte produkten, det är en saknad stilmall.
+
+**Slutsatser du FÅR dra ur en skiss:** informationsarkitektur (vad som står
+och i vilken ordning), antal beslut och knappar, motsägande siffror, text på
+engelska eller med interna namn, horisontell scroll, och att komponenten
+monterar utan att krascha.
+
+**Slutsatser du INTE får dra:** typografi, färgsättning, rundningar,
+spacing, rörelse, och krockar mellan komponenter som appens riktiga layout
+placerar på skilda ställen. Ska något av det bedömas krävs produktionen —
+en Vercel-preview på en branch.
+
 ## Regler
 
 - **PNG:er committas aldrig.** `test-results/` är gitignorerad. Beviset hör i
