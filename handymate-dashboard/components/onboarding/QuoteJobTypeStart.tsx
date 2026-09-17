@@ -18,6 +18,15 @@
 //    onSelectJobType/onApply)
 // All apply-/automatik-logik nedan är OFÖRÄNDRAD från stora boxen — Del 2
 // är enbart visuell.
+//
+// PÅFYLLNING (2026-09-17, Andreas: "olika jobbtypers standardrader som
+// fyller på"): samma remsa kan monteras en gång till när offerten redan
+// har rader, med `pafyllnad`. Då är valet LOKALT — det rör aldrig offertens
+// jobbtyp (badrummet förblir ett badrumsjobb när elen läggs till), ingen
+// automatik startar, och `inherited` ignoreras eftersom en affärs jobbtyp
+// inte hindrar att man lägger till rader från en annan. onApply får samma
+// urval som förut; föräldern avgör att det betyder "lägg till", inte
+// "ersätt". Testlåst i tests/job-type-start-ui.spec.ts.
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Loader2 } from 'lucide-react'
@@ -32,10 +41,18 @@ interface Props {
   automatic?: boolean
   onSelectJobType: (slug: string) => void
   onApply: (selection: FirstQuoteSelection, signal: AbortSignal) => Promise<void>
+  /** Offerten har redan rader: valet lägger till, rör inte offertens jobbtyp och startar aldrig automatiskt. */
+  pafyllnad?: boolean
 }
 
-export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic = true, onSelectJobType, onApply }: Props) {
+export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic = true, onSelectJobType, onApply, pafyllnad = false }: Props) {
   const [data, setData] = useState<QuoteSetupData | null>(null)
+  // Påfyllningens eget val. Startar tomt — man fyller på med något ANNAT
+  // än det som redan ligger där, och ett förvalt chip hade sett ut som ett
+  // beslut ingen fattat.
+  const [lokaltVal, setLokaltVal] = useState<string | null>(null)
+  const aktivJobbtyp = pafyllnad ? lokaltVal : jobType
+  const visaSomArvd = inherited && !pafyllnad
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(false)
@@ -73,7 +90,7 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
   // Bara en automatisk start: onboardingens EXPLICITA val, eller affärens
   // redan valda jobbtyp med exakt en mall. Flera mallar kräver alltid ett val.
   useEffect(() => {
-    if (!data || attempted.current || !automatic || !data.linkingAvailable) return
+    if (pafyllnad || !data || attempted.current || !automatic || !data.linkingAvailable) return
     attempted.current = true
     if (initialIntent) { void apply(initialIntent); return }
     if (!inherited || !jobType) return
@@ -82,7 +99,7 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
-  const matching = data && jobType ? templatesForJobType(data.templates, jobType).filter(t => t.items.length > 0) : []
+  const matching = data && aktivJobbtyp ? templatesForJobType(data.templates, aktivJobbtyp).filter(t => t.items.length > 0) : []
   // Chipstil = Fas E:s Mer-chips, så remsan läses som en i verktygsstacken.
   // MEN med 44px träffyta under sm: remsan är hantverkarens FÖRSTA tryck vid
   // offertstart på telefon (CLAUDE.md: mobiloptimerat, telefon på bygget) —
@@ -93,7 +110,7 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
   return <section aria-label="Jobbtyp och offertunderlag" aria-busy={loading || busy}
     className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
     <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-      {inherited ? 'Ditt underlag för jobbet' : 'Jobbtyp'}
+      {pafyllnad ? 'Fyll på från jobbtyp' : inherited ? 'Ditt underlag för jobbet' : 'Jobbtyp'}
     </span>
     {loading && <span role="status" className="text-[12.5px] text-slate-500">Hämtar ditt upplägg…</span>}
     {error && <span role="alert" className="text-[12.5px] text-red-700">
@@ -104,19 +121,19 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
       }}>Försök igen</button>
     </span>}
     {data && !loading && <>
-      {inherited ? <span className="px-1 text-[12.5px] font-semibold text-slate-700">{data.jobTypes.find(j => j.slug === jobType)?.name || jobType}</span> :
-        data.jobTypes.map(job => <button key={job.id} type="button" disabled={busy} aria-pressed={jobType === job.slug}
-          className={`${chip} ${jobType === job.slug ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
-          onClick={() => { lastSelection.current = null; onSelectJobType(job.slug); setError('') }}>{job.name}</button>)}
+      {visaSomArvd ? <span className="px-1 text-[12.5px] font-semibold text-slate-700">{data.jobTypes.find(j => j.slug === jobType)?.name || jobType}</span> :
+        data.jobTypes.map(job => <button key={job.id} type="button" disabled={busy} aria-pressed={aktivJobbtyp === job.slug}
+          className={`${chip} ${aktivJobbtyp === job.slug ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
+          onClick={() => { lastSelection.current = null; setError(''); if (pafyllnad) setLokaltVal(job.slug); else onSelectJobType(job.slug) }}>{job.name}</button>)}
       {!data.linkingAvailable && <span className="text-[12.5px] text-slate-500">Mallkopplingen är inte aktiverad ännu — beskriv jobbet eller välj en mall som vanligt.</span>}
       {data.linkingAvailable && matching.map(t => <button type="button" key={t.id} disabled={busy}
         className={`px-3 py-1.5 rounded-[10px] border border-primary-700/30 bg-primary-50 hover:bg-primary-100 transition-colors inline-flex items-center gap-2 text-left disabled:opacity-60 ${touch}`}
-        onClick={() => void apply({ jobTypeSlug: jobType!, templateId: t.id })}>
+        onClick={() => void apply({ jobTypeSlug: aktivJobbtyp!, templateId: t.id })}>
         <span className="text-[12.5px] font-semibold text-primary-800">{t.name}</span>
-        <span className="text-[11px] text-slate-400">{t.items.length} rader · dina priser</span>
+        <span className="text-[11px] text-slate-400">{t.items.length} rader · {pafyllnad ? 'läggs till' : 'dina priser'}</span>
         {busy ? <Loader2 size={14} className="animate-spin motion-reduce:animate-none shrink-0" /> : <ArrowRight size={14} className="shrink-0 text-primary-700" />}
       </button>)}
-      {data.linkingAvailable && ((jobType && matching.length === 0) || data.jobTypes.length === 0) &&
+      {data.linkingAvailable && ((aktivJobbtyp && matching.length === 0) || data.jobTypes.length === 0) &&
         <span className="text-[12.5px] text-slate-500">Inget kopplat underlag ännu — fortsätt fritt. <a href="/dashboard/settings/job-types" className="underline text-primary-700">Anpassa dina jobbtyper</a></span>}
     </>}
     {busy && <span role="status" className="text-[12.5px] text-slate-500">Kontrollerar mall och aktuella artikelpriser…</span>}

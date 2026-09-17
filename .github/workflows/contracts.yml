@@ -213,6 +213,7 @@ jobs:
           tests/onboarding-wow.spec.ts
           tests/first-quote-reality-harness.spec.ts
           tests/job-type-start.spec.ts
+          tests/job-type-append.spec.ts
           tests/first-job-acceptance.spec.ts
           tests/job-standards.spec.ts
           tests/job-type-setup.spec.ts

@@ -25,6 +25,7 @@ import { useQuoteSectionNavigation } from './useQuoteSectionNavigation'
 import { FirstQuoteGuide } from '@/components/onboarding/FirstQuoteGuide'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
 import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
+import { byggPafyllnadsrader } from '@/lib/quotes/job-type-append'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 import { compressImageFile } from '@/lib/images/compress-photo'
@@ -1763,6 +1764,24 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     finishQuickStart()
   }
 
+  // Fyll på från jobbtyp (2026-09-17): offerten har redan rader, nu ska en
+  // annan jobbtyps standardrader in UNDER dem. Samma verifiering och samma
+  // prisresolver som starten — men ingen ersättning: funktionell setItems
+  // lägger till sist på det som ligger där när svaret kommer, så ingen
+  // ögonblicksbild behövs. Rör ALDRIG offertens jobbtyp, titel, beskrivning,
+  // betalplan, villkor eller template_id — de tillhör det första upplägget.
+  async function applyJobTypeAppend(selection: FirstQuoteSelection, signal: AbortSignal) {
+    const start = await loadJobTypeStart(selection, signal)
+    if (signal.aborted) return
+    // Antalet räknas UTANFÖR uppdateraren: React får köra den lat och mer än
+    // en gång, så en variabel satt därinne är inte läsbar här.
+    const antal = Array.isArray(start.template.default_items) ? start.template.default_items.length : 0
+    if (antal === 0) throw new Error(`Upplägget för ${start.jobTypeName} har inga rader att lägga till.`)
+    setItems(prev => recalculateItems([...prev,
+      ...byggPafyllnadsrader(start.template, start.jobTypeName, start.products, pricingSettings?.hourly_rate, prev.length, generateItemId)]))
+    toast.success(`${antal} rader från ${start.jobTypeName} tillagda`)
+  }
+
   function handleTemplateSelect(template: any) {
     if (template.default_items && Array.isArray(template.default_items) && template.default_items.length > 0) {
       handleNewTemplateSelect(template as QuoteTemplate)
@@ -2391,6 +2410,14 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart} />
   ) : null
 
+  // Påfyllning: samma remsa, monteras först när det finns något att fylla på.
+  // Även i redigeringsläge — ett sparat badrumsjobb kan få elen tillagd i
+  // efterhand, det är ingen "start".
+  const jobTypeFyllPa = items.length > 0 && !templatePickerOpen ? (
+    <QuoteJobTypeStart pafyllnad jobType={quoteJobType} inherited={false} initialIntent={null} automatic={false}
+      onSelectJobType={() => {}} onApply={applyJobTypeAppend} />
+  ) : null
+
   const preparationInput = !isEditMode && selectedCustomer ? <QuotePreparationInput
     key={selectedCustomer} customerId={selectedCustomer} preparationId={searchParams?.get('preparation_id')}
     onApply={text => {
@@ -2542,6 +2569,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             orört. */}
         {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
         {jobTypeStart}
+        {jobTypeFyllPa}
         {preparationInput}
         {!isEditMode && <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
           onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}

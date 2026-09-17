@@ -6,6 +6,8 @@ export interface JobTypeStart {
   selection: FirstQuoteSelection
   template: QuoteTemplate
   products: TemplatePricingProduct[]
+  /** Jobbtypens namn som kunden ser det — rubriken vid påfyllning. Aldrig mallnamnet ("Standardrader · …"). */
+  jobTypeName: string
 }
 
 export async function fetchQuoteSetup(signal?: AbortSignal, fetcher: typeof fetch = fetch): Promise<QuoteSetupData> {
@@ -33,7 +35,7 @@ export async function loadJobTypeStart(selection: FirstQuoteSelection, signal?: 
   }
   return { selection: verified, template, products: setup.products.map(p => ({
     id: p.id, name: p.name, unit: p.unit, sales_price: p.salesPrice,
-  })) }
+  })), jobTypeName: setup.jobTypes.find(j => j.slug === verified.jobTypeSlug)?.name || verified.jobTypeSlug }
 }
 
 export interface QuoteStartSnapshot {

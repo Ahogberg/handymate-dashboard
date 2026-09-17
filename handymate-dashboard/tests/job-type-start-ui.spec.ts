@@ -78,6 +78,29 @@ test('ärvd jobbtyp + en mall tillämpas en gång, aldrig igen vid rerender', as
   expect(host.textContent).toContain('Ditt underlag för jobbet')
 })
 
+test('påfyllning: ärvd jobbtyp + en mall startar ALDRIG automatiskt', async () => {
+  let applied = 0
+  await render(QuoteJobTypeStart, { ...base, pafyllnad: true, automatic: true, onApply: async () => { applied++ } })
+  await act(async () => {})
+  expect(applied).toBe(0)
+  expect(host.textContent).toContain('Fyll på från jobbtyp')
+  // ärvd jobbtyp visas inte som låst text — chipsen finns
+  expect(button('Service').getAttribute('aria-pressed')).toBe('false')
+})
+
+test('påfyllning: chipvalet är lokalt och rör aldrig offertens jobbtyp; mallknappen lämnar urvalet', async () => {
+  let selectedByParent = 0
+  let got: unknown = null
+  await render(QuoteJobTypeStart, { ...base, pafyllnad: true, onSelectJobType: () => { selectedByParent++ }, onApply: async (sel: unknown) => { got = sel } })
+  await act(async () => {})
+  await click('Service')
+  expect(selectedByParent).toBe(0)
+  expect(button('Service').getAttribute('aria-pressed')).toBe('true')
+  expect(host.textContent).toContain('läggs till')
+  await click('Serviceupplägg')
+  expect(got).toEqual({ jobTypeSlug: 'service', templateId: 't1' })
+})
+
 test('flera mallar kräver ett verkligt knappval', async () => {
   global.fetch = (async () => Response.json({ ...setup, templates: [setup.templates[0], { ...setup.templates[0], id: 't2', name: 'Alternativ' }] })) as typeof fetch
   let calls = 0
