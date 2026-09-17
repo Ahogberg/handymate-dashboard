@@ -21,6 +21,7 @@
  *   npx playwright test tests/launch-visibility.spec.ts --no-deps
  */
 import { test, expect } from '@playwright/test'
+import { intakeNextStep } from '../lib/onboarding/customer-intake'
 import fs from 'fs'
 import path from 'path'
 import {
@@ -118,6 +119,34 @@ test.describe('grossistens ingångar utanför menyn', () => {
   test('projektvyns grossistmodal är grindad', () => {
     const f = läs('app/dashboard/projects/[id]/page.tsx')
     expect(f).toContain("isLaunchHidden('wholesaler')")
+  })
+})
+
+test.describe('webbwidgetens ingångar utanför menyn', () => {
+  // Samma fel som grossistens, hittat 2026-09-17: integrationssidan renderade
+  // kortet "Hemsida-widget" utan grind — med statusbadge från /api/widget/status
+  // — medan settings-hubben hade den. Klicket tog kunden till en route som
+  // middleware redirectar till /dashboard. En återvändsgränd med statusetikett
+  // är sämre än ingen länk alls.
+  test('integrationssidans widgetkort är grindat', () => {
+    const f = läs('app/dashboard/settings/integrations/page.tsx')
+    expect(f).toContain("isLaunchHidden('website_widget')")
+  })
+
+  test('inställningshubbens widgetkort är grindat', () => {
+    const f = läs('app/dashboard/settings/page.tsx')
+    expect(f).toContain("isLaunchHidden('website_widget')")
+  })
+
+  test('onboardingens kanalråd pekar aldrig på en grindad funktion', () => {
+    // intakeNextStep('website') bad tidigare kunden "konfigurera webbwidgeten i
+    // Inställningar efter onboardingen" — omöjligt att följa så länge widgeten
+    // är dold. Rådet prövas på utdata, inte på källtexten: ett prov som läser
+    // filen spricker på sin egen förklarande kommentar och vaktar då prosa
+    // i stället för beteende.
+    const rad = intakeNextStep('website')
+    expect(rad).not.toMatch(/widget/i)
+    expect(rad).toContain('rätt kundärende')
   })
 })
 

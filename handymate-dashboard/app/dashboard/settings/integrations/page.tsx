@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { ArrowLeft, Globe, Calendar, Mail, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw, Download } from 'lucide-react'
 import { useState, useEffect, useCallback } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { isLaunchHidden } from '@/lib/launch-visibility'
 
 interface FortnoxStatus {
   connected: boolean
@@ -254,7 +255,14 @@ export default function IntegrationsPage() {
 
         {/* Integration cards */}
         <div className="space-y-3 mb-8">
-          {/* Hemsida-widget */}
+          {/* Hemsida-widget. Grinden är inte kosmetik: website_widget är
+              'hidden' i lib/launch-visibility.ts och middleware redirectar
+              /dashboard/settings/website-widget till /dashboard. Utan den här
+              kontrollen renderades kortet ändå — med statusbadge — och klicket
+              tog kunden till en återvändsgränd. Exakt vad filhuvudet i
+              launch-visibility.ts varnar för: "En dold meny med kvarvarande
+              knapp är sämre än att inte dölja alls." */}
+          {!isLaunchHidden('website_widget') && (
           <Link
             href="/dashboard/settings/website-widget"
             className="flex items-center gap-4 p-4 bg-white rounded-xl border border-[#E2E8F0] hover:border-primary-300 hover:shadow-sm transition-all"
@@ -283,6 +291,7 @@ export default function IntegrationsPage() {
             </div>
             <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
           </Link>
+          )}
 
           {/* Google Calendar. ?tab= krävs (buggfix 2026-08-11): utan den
               landade klicket på inställnings-hubben utan vald flik och
