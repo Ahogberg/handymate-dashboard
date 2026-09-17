@@ -97,3 +97,13 @@
   .job-standard-row > strong { grid-column: 1 / -1; }
   .job-standard-price { min-width: 0; }
 }
+/* Frågor på plats (2026-09-17): en fråga per rad — text, typ, ev. enhet/alternativ/tillval, knappar. */
+.job-questions-row { display: grid; grid-template-columns: minmax(160px, 2fr) minmax(140px, 1fr) minmax(120px, 1fr) auto; align-items: end; gap: 10px; padding: 12px 0; border-bottom: 1px solid #dceae5; }
+.job-questions-row label { display: block; min-width: 0; }
+.job-questions-row .job-setup-inline { margin: 0; }
+.job-questions-row .job-setup-inline button { padding: 8px 10px; }
+@media (max-width: 640px) {
+  .job-questions-row { grid-template-columns: 1fr 1fr; }
+  .job-questions-row > label:first-child { grid-column: 1 / -1; }
+  .job-questions-row .job-setup-inline { grid-column: 1 / -1; }
+}

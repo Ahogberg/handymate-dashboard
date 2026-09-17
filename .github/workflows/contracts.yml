@@ -271,6 +271,7 @@ jobs:
           tests/demo-seedning-tackning.spec.ts
           tests/demo-undantaget.spec.ts
           tests/salj-case-overlamning.spec.ts
+          tests/intake-questions.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

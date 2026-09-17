@@ -6,6 +6,7 @@ import type {
   QuoteItem,
 } from '@/lib/types/quote'
 import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
+import type { IntakeAnswerSet } from '@/lib/quotes/intake-questions'
 
 /**
  * Alla fält som `POST /api/quotes` (create-läget) behöver, UTOM `items` —
@@ -55,6 +56,8 @@ export interface QuotePayloadContext {
   sourceTranscript?: string | null
   templateId?: string | undefined
   quoteJobType?: string | null
+  /** Svaren från frågeflödet (2026-09-17) — create-läge, null utan frågor. */
+  intakeAnswers?: IntakeAnswerSet | null
   dealId?: string | null
   leadId?: string | null
   templateStyle: 'modern' | 'premium' | 'friendly' | null
@@ -141,6 +144,7 @@ export function buildQuotePayload(input: BuildQuotePayloadInput) {
       source_transcript: input.sourceTranscript || null,
       template_id: input.templateId || null,
       job_type: input.quoteJobType,
+      intake_answers: input.intakeAnswers ?? null,
       deal_id: input.dealId,
       lead_id: input.leadId,
     }

@@ -24,8 +24,11 @@ import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-
 import { useQuoteSectionNavigation } from './useQuoteSectionNavigation'
 import { FirstQuoteGuide } from '@/components/onboarding/FirstQuoteGuide'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
-import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
+import { canApplyJobTypeStart, loadJobTypeStart, type JobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
 import { byggPafyllnadsrader } from '@/lib/quotes/job-type-append'
+import { IntakeQuestionFlow } from '@/components/quotes/IntakeQuestionFlow'
+import { fetchIntakeQuestions } from '@/lib/quotes/intake-flow'
+import { applyIntakeAnswers, buildIntakeAnswerSet, intakeAnswersText, type IntakeAnswerSet, type IntakeAnswers, type IntakeQuestion } from '@/lib/quotes/intake-questions'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 import { compressImageFile } from '@/lib/images/compress-photo'
@@ -447,7 +450,14 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // canvas-editorn (quickMode = null) via finishQuickStart() nedan — se
   // completenessSummaries/QuoteCompletenessStrip för vad som ersatte
   // kvittots granskningskrav: en alltid synlig, icke-blockerande chip-rad.
-  const [quickMode, setQuickMode] = useState<'intake' | 'blank' | 'building' | null>(null)
+  const [quickMode, setQuickMode] = useState<'intake' | 'blank' | 'building' | 'fragor' | null>(null)
+  // Frågeflödet per jobbtyp (2026-09-17): upplägget är hämtat och verifierat
+  // men INTE inlagt förrän frågorna är besvarade eller hoppade över. Sätts
+  // och töms alltid tillsammans med quickMode 'fragor'; returläget är det
+  // hantverkaren stod i när upplägget trycktes (intaget eller editorn).
+  const [pendingIntake, setPendingIntake] = useState<{ start: JobTypeStart; questions: IntakeQuestion[] } | null>(null)
+  const intakeReturnMode = useRef<'intake' | 'blank' | 'building' | null>(null)
+  const [intakeAnswers, setIntakeAnswers] = useState<IntakeAnswerSet | null>(null)
   /** Snabbofferten öppnas automatiskt EN gång vid kallstart. Utan den här
       vakten hade "Öppna fullständiga editorn" (som sätter quickMode = null)
       studsat tillbaka in i intaget direkt. */
@@ -1756,12 +1766,48 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     if (!canApplyJobTypeStart(before, jobStartSnapshot.current)) {
       throw new Error('Du har börjat ändra offerten. Dina ändringar behålls; inget underlag har lagts in.')
     }
-    // Samma mallhandler, prisresolver och reservationshook som alla andra
-    // mallstarter. Rör INTE kund, affär, titel/beskrivning som redan finns.
+    // Frågeflödet (2026-09-17): har jobbtypen frågor öppnas de INNAN upplägget
+    // läggs in, så svaren kan sätta mängderna i samma klon. Ett läsfel är ett
+    // fel (remsan visar "Försök igen"), aldrig ett tyst hopp förbi frågorna.
+    const intake = await fetchIntakeQuestions(start.selection.jobTypeSlug, signal)
+    if (signal.aborted) return
+    if (intake.questions.length > 0) {
+      intakeReturnMode.current = quickMode === 'fragor' ? null : quickMode
+      setPendingIntake({ start, questions: intake.questions })
+      setQuickMode('fragor')
+      return
+    }
+    applyVerifiedJobTypeStart(start, null)
+  }
+
+  /**
+   * Samma mallhandler, prisresolver och reservationshook som alla andra
+   * mallstarter. Rör INTE kund, affär, titel/beskrivning som redan finns.
+   * Med svar: mängder och tillval sätts i klonen FÖRE prisresolvern, så
+   * radernas totaler räknas på de riktiga mängderna. Svaren sparas
+   * strukturerat på offerten och som text till Matte (source_transcript);
+   * kundens beskrivning rörs inte.
+   */
+  function applyVerifiedJobTypeStart(verified: JobTypeStart, answered: { questions: IntakeQuestion[]; answers: IntakeAnswers } | null) {
+    const set = answered ? buildIntakeAnswerSet(verified.selection.jobTypeSlug, answered.questions, answered.answers) : null
+    const start: JobTypeStart = set && answered
+      ? { ...verified, template: { ...verified.template, default_items: applyIntakeAnswers(verified.template.default_items ?? [], answered.questions, answered.answers) } }
+      : verified
     setQuoteJobType(start.selection.jobTypeSlug)
     handleNewTemplateSelect(start.template, start.products)
+    setIntakeAnswers(set)
+    if (set) {
+      const text = intakeAnswersText(set)
+      setSourceTranscript(prev => prev && prev.trim() ? `${prev.trim()}\n\n${text}` : text)
+    }
     setJobStartApplied(true)
+    setPendingIntake(null)
     finishQuickStart()
+  }
+
+  function leaveIntakeFlow() {
+    setPendingIntake(null)
+    setQuickMode(intakeReturnMode.current)
   }
 
   // Fyll på från jobbtyp (2026-09-17): offerten har redan rader, nu ska en
@@ -2060,6 +2106,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             sourceTranscript,
             templateId,
             quoteJobType,
+            intakeAnswers,
             dealId: dealIdFromQuery,
             leadId: leadIdFromQuery,
           }),
@@ -2085,7 +2132,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       setPersonnummer(c.personnummer); setFastighetsbeteckning(c.fastighetsbeteckning); setValidDays(c.validDays)
       setTemplateStyle(c.templateStyle); setAttachments(c.attachments); setTemplateId(c.templateId)
       setAiGenerated(!!c.aiGenerated); setAiConfidence(c.aiConfidence ?? null); setSourceTranscript(c.sourceTranscript ?? null)
-      setQuoteJobType(c.quoteJobType ?? null); setQuickInput(saved.quickInput); setPhotos(saved.photos)
+      setQuoteJobType(c.quoteJobType ?? null); setIntakeAnswers(c.intakeAnswers ?? null); setQuickInput(saved.quickInput); setPhotos(saved.photos)
       setAiTextInput(saved.aiTextInput); setAiBedomning(saved.aiBedomning)
       setQuickMode(saved.items.length ? null : 'intake')
     },
@@ -2427,6 +2474,22 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       if (items.length === 0) setQuickMode('intake')
       else setShowAiHelper(true)
     }} /> : null
+
+  // ═══ FRÅGEFLÖDET: fullskärm mellan upplägg-trycket och offerten ═══════
+  // "Hoppa över" ger upplägget orört (samma resultat som före 2026-09-17),
+  // "Tillbaka" lämnar allt som det var och landar där hantverkaren stod.
+  if (quickMode === 'fragor' && pendingIntake) {
+    return (
+      <IntakeQuestionFlow
+        jobTypeName={pendingIntake.start.jobTypeName}
+        questions={pendingIntake.questions}
+        busy={false}
+        onSubmit={answers => applyVerifiedJobTypeStart(pendingIntake.start, { questions: pendingIntake.questions, answers })}
+        onSkip={() => applyVerifiedJobTypeStart(pendingIntake.start, null)}
+        onBack={leaveIntakeFlow}
+      />
+    )
+  }
 
   // ═══ SNABBOFFERTEN: intag och byggkänsla är fullskärmslägen ══════════
   if (quickMode === 'intake') {
