@@ -715,3 +715,20 @@ registret, enhetssträngen garanterar ingenting. (2) Innan en sådan regel släp
 läs verklig produktionsdata och lägg in den formen som testfall, inte en påhittad
 mall. (3) Seeda aldrig ett förslag som inte kan få effekt — en mängdfråga utan
 kopplade rader är ett löfte flödet inte kan hålla, så seedningen läser samma vakt.
+
+## 2026-09-17 — Påstå inte "ingen gör det" när den egna researchen säger annat
+
+Sammanfattningen i `docs/offert/offertflodet-research-malbild-2026-09-17.md`
+skrev "Ingen gör det ni håller på att bygga" medan brödtexten i samma dokument
+beskrev Housecall Pros Pricing Forms (mått → kvadratmeter → pris). Detaljen var
+korrekt researchad, rubriken överdrev den. **Regel: en sammanfattning får aldrig
+vara starkare än den svagaste detaljen den sammanfattar.** Läs om den egna
+brödtexten innan en punktsats skrivs som absolut.
+
+Samma dokument påstod "dolda rader filtreras inte" till faktura som en lucka.
+Det var fel: `is_hidden` betyder "syns inte i kundens dokument men PRISET INGÅR I
+SUMMAN" (beslut Andreas 2026-08-05, `lib/types/quote.ts`). Att fakturan tar med
+raden är alltså rätt, inte en bugg. **Regel: innan något kallas lucka — läs
+typens egen kommentar och alla konsumenter, inte bara den ena.**
+"Dold för kunden", "inte vald" och "ska inte faktureras" är tre olika saker och
+bara den första finns i dag.

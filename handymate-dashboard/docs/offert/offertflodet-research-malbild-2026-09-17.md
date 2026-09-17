@@ -14,9 +14,11 @@ siffror nedan är påhittade, men leverantörernas egna siffror är just det.
 
 ## Huvudfynd i fem punkter
 
-1. **Ingen gör det ni håller på att bygga.** Frågestyrd offertering per jobbtyp, där
-   svaren sätter mängder på artikelrader, finns inte hos någon av de 25 produkter vi
-   tittade på. Närmast är Housecall Pros mätformulär (ett radpris ur längd × bredd),
+1. **Ingen gör hela kedjan, men delar av den finns.** Frågestyrd offertering per
+   jobbtyp, där svaren sätter mängder på FLERA artikelrader i samma offert, hittades
+   inte hos någon av de 25 produkter vi tittade på. Att kalla det "ingen gör det ni
+   bygger" är dock för starkt (rättat 2026-09-17): måttstyrd prissättning är etablerad.
+   Närmast är Housecall Pros mätformulär (ett radpris ur längd × bredd),
    ServiceTitans "configurable services" (välj variant, priset följer) och Bolsters
    assemblies (formler mot dimensioner, desktop, byggentreprenad). Det är en lucka i
    marknaden, inte ett bevisat mönster. Det betyder både chans och risk.
@@ -135,7 +137,7 @@ siffror nedan är påhittade, men leverantörernas egna siffror är just det.
 | ÄTA för småföretag | Fergus, simPRO | ÄTA-livscykel | Kunden godkänner delta på samma sida |
 | Full mobilparitet | Tradify, Fergus Go | Editor på mobil | Efter rivningen: en editor, inte två |
 | Seedade upplägg per bransch med egna priser | ServiceTitan Smart Start | Mallbank + jobbtyper | Kopplingen mall ↔ jobbtyp för alla seedade |
-| Rader som följer med hela vägen | Ingen | Rader → faktura med tredelning | Betalplan → delfakturor, dolda rader filtreras inte |
+| Rader som följer med hela vägen | Ingen | Rader → faktura med tredelning | Betalplan → delfakturor; skillnaden dold-för-kund / ej-vald / ska-ej-faktureras |
 
 ## Var ni står: från offert till faktura i dag
 
