@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Heading1, Loader2, Minus, Plus, Search, Star, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, Equal, Heading1, ListPlus, Loader2, Minus, Percent, Plus, Search, Star, Type, X } from 'lucide-react'
 import type { ProductWithComponents } from '@/app/dashboard/quotes/_shared/applyProductToItem'
 import { useAllProducts, useProductSearch } from '@/app/dashboard/quotes/_shared/useProductSearch'
 import { priceLabel, priceState } from '@/lib/products/pricing-state'
@@ -12,8 +12,17 @@ interface AddRowSheetProps {
   onSelectProduct: (product: ProductWithComponents, quantity: number) => void
   /** Tom rad, eventuellt med beskrivningen som skrivits. */
   onAddBlankRow: (description: string) => void
-  /** Rubrikrad — grupperar offerten. */
-  onAddHeading: () => void
+  /**
+   * De radtyper som inte är artiklar. Rubrik grupperar, tillval låter kunden
+   * välja till, fritext förklarar, delsumma summerar ovanstående och rabatt
+   * drar av.
+   *
+   * RIVNINGEN PAKET A (2026-09-17): de fyra sista fanns BARA i listvyns
+   * "Fler alternativ" — alltså bara på desktop, i en vy som nu är borta.
+   * Tillval är dessutom det kunden ska kunna välja på sin offertsida, så
+   * det måste gå att skapa med telefonen hemma hos kunden.
+   */
+  onAddRowType: (type: 'heading' | 'option' | 'text' | 'subtotal' | 'discount') => void
   onClose: () => void
   /**
    * Hur många förbehåll artikeln drar med sig (spår C2). Utelämnad → inget
@@ -21,6 +30,15 @@ interface AddRowSheetProps {
    */
   reservationCount?: (product: ProductWithComponents) => number
 }
+
+/** Radtyper som inte är artiklar, i den ordning de faktiskt används. */
+const ANDRA_RADTYPER = [
+  { type: 'heading' as const, label: 'Rubrik', Ikon: Heading1 },
+  { type: 'option' as const, label: 'Tillval', Ikon: ListPlus },
+  { type: 'text' as const, label: 'Fritext', Ikon: Type },
+  { type: 'subtotal' as const, label: 'Delsumma', Ikon: Equal },
+  { type: 'discount' as const, label: 'Rabatt', Ikon: Percent },
+]
 
 /** Kategorierna i den ordning hantverkaren tänker på dem. */
 const KATEGORI_ORDNING = ['arbete', 'material', 'hyra', 'övrigt']
@@ -70,7 +88,7 @@ export function AddRowSheet({
   open,
   onSelectProduct,
   onAddBlankRow,
-  onAddHeading,
+  onAddRowType,
   onClose,
   reservationCount,
 }: AddRowSheetProps) {
@@ -149,8 +167,8 @@ export function AddRowSheet({
     onClose()
   }
 
-  const addHeading = () => {
-    onAddHeading()
+  const addRowType = (type: 'heading' | 'option' | 'text' | 'subtotal' | 'discount') => {
+    onAddRowType(type)
     onClose()
   }
 
@@ -387,14 +405,26 @@ export function AddRowSheet({
             <Plus className="w-4 h-4" />
             {trimmed ? `Lägg till «${trimmed}»` : 'Lägg till tom rad'}
           </button>
-          <button
-            type="button"
-            onClick={addHeading}
-            className="w-full min-h-[44px] flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-slate-200 text-slate-700 text-[15px] font-medium rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors"
-          >
-            <Heading1 className="w-4 h-4" />
-            Lägg till rubrik
-          </button>
+          {/* Radtyper som inte är artiklar. Två per rad så träffytan håller
+              44px även på 375px skärm. */}
+          <div>
+            <span className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+              Annan rad
+            </span>
+            <div className="grid grid-cols-2 gap-2">
+              {ANDRA_RADTYPER.map(({ type, label, Ikon }) => (
+                <button
+                  key={type}
+                  type="button"
+                  onClick={() => addRowType(type)}
+                  className="min-h-[44px] flex items-center justify-center gap-1.5 px-3 py-2 bg-white border border-slate-200 text-slate-700 text-[13.5px] font-medium rounded-xl hover:bg-slate-50 active:bg-slate-100 transition-colors"
+                >
+                  <Ikon className="w-3.5 h-3.5 shrink-0 text-slate-400" />
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     </div>

@@ -1,7 +1,6 @@
 'use client'
 
 import type { Dispatch, SetStateAction, ReactNode } from 'react'
-import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
@@ -24,7 +23,6 @@ import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
-import { QuoteItemsSection } from './QuoteItemsSection'
 import { QuoteRotSection } from './QuoteRotSection'
 import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
 import { QuotePaymentPlanSection } from './QuotePaymentPlanSection'
@@ -107,25 +105,15 @@ export interface QuoteEditViewProps {
   items: QuoteItem[]
   setItems: Dispatch<SetStateAction<QuoteItem[]>>
   allCategories: { slug: string; label: string; rot: boolean; rut: boolean }[]
-  localCustomCategories: CustomCategory[]
   products: ProductWithComponents[]
   onSaveAsStandard: (productId: string, price: number) => void
-  dndSensors: any
-  handleDragEnd: (event: any) => void
   addItem: (type: QuoteItem['item_type']) => void
   updateItem: (id: string, field: keyof QuoteItem, value: any) => void
   removeItem: (id: string) => void
-  moveItem: (index: number, direction: 'up' | 'down') => void
   moveItemById: (id: string, direction: 'up' | 'down') => void
   addFromProduct: (product: ProductWithComponents, quantity?: number) => void
   applyProductToExistingRow: (itemId: string, product: ProductWithComponents) => void
   addBlankRowWithDescription: (description: string) => void
-  setShowGrossistSearch: (b: boolean) => void
-  createCustomCategory: (label: string, itemId: string) => void
-  showNewCategoryInput: string | null
-  setShowNewCategoryInput: (v: string | null) => void
-  newCategoryLabel: string
-  setNewCategoryLabel: (v: string) => void
   setProductModalRow: (row: QuoteItem | null) => void
 
   hasRotItems: boolean
@@ -192,9 +180,7 @@ export interface QuoteEditViewProps {
 
   sheetItem: QuoteItem | null
 
-  showGrossistSearch: boolean
   businessId: string
-  addFromGrossist: (p: any) => void
 
   productModalRow: QuoteItem | null
   savingProduct: boolean
@@ -216,10 +202,8 @@ export function QuoteEditView(props: QuoteEditViewProps) {
     businessDefaultStyle, templateStyle, setTemplateStyle,
     reservations, recalculated,
     customers, selectedCustomer, setSelectedCustomer, validDays, setValidDays, title, setTitle, description, setDescription,
-    items, setItems, allCategories, localCustomCategories, products, onSaveAsStandard, dndSensors, handleDragEnd,
-    addItem, updateItem, removeItem, moveItem, moveItemById, addFromProduct, applyProductToExistingRow,
-    addBlankRowWithDescription, setShowGrossistSearch, createCustomCategory, showNewCategoryInput,
-    setShowNewCategoryInput, newCategoryLabel, setNewCategoryLabel, setProductModalRow,
+    items, setItems, allCategories, products, onSaveAsStandard, addItem, updateItem, removeItem, moveItemById, addFromProduct, applyProductToExistingRow,
+    addBlankRowWithDescription, setProductModalRow,
     hasRotItems, hasRutItems, personnummer, setPersonnummer, fastighetsbeteckning, setFastighetsbeteckning,
     showStandardTexts, setShowStandardTexts, textsByType, referencePerson, setReferencePerson,
     customerReference, setCustomerReference, projectAddress, setProjectAddress, notIncluded, setNotIncluded,
@@ -232,8 +216,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
     totals, vatRate, discountPercent, setDiscountPercent,
     liveAvailable, quoteTemplateData,
     liveHandlers, setSheetItemId, addRowSheetOpen, setAddRowSheetOpen, templatePreviewPayload, sheetItem,
-    showGrossistSearch, businessId, addFromGrossist,
-    productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
+    businessId, productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
     showSaveTemplateModal, setShowSaveTemplateModal, templateName, setTemplateName, savingTemplate, saveAsTemplate,
   } = props
 
@@ -316,30 +299,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
 
             {props.visitRuleEditor}
             <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
-            <QuoteItemsSection
-              items={items}
-              recalculated={recalculated}
-              allCategories={allCategories}
-              customCategories={localCustomCategories}
-              products={products}
-              onSaveAsStandard={onSaveAsStandard}
-              dndSensors={dndSensors}
-              onDragEnd={handleDragEnd}
-              onAddItem={addItem}
-              onUpdateItem={updateItem}
-              onRemoveItem={removeItem}
-              onMoveItem={moveItem}
-              onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
-              onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-              onAddBlankRow={addBlankRowWithDescription}
-              onOpenGrossistSearch={() => setShowGrossistSearch(true)}
-              onCreateCategory={createCustomCategory}
-              showNewCategoryInput={showNewCategoryInput}
-              setShowNewCategoryInput={setShowNewCategoryInput}
-              newCategoryLabel={newCategoryLabel}
-              setNewCategoryLabel={setNewCategoryLabel}
-              onSaveToProducts={row => setProductModalRow(row)}
-            />
 
             <QuoteRotSection
               items={items}
@@ -467,6 +426,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         }
         onSaveAsStandard={(productId, price) => { void onSaveAsStandard(productId, price) }}
         onSaveToBank={row => setProductModalRow(row)}
+        onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
       />
 
       <AddRowSheet
@@ -474,7 +434,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         reservationCount={product => reservations.countForProduct(product)}
         onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
         onAddBlankRow={addBlankRowWithDescription}
-        onAddHeading={() => addItem('heading')}
+        onAddRowType={addItem}
         onClose={() => setAddRowSheetOpen(false)}
       />
 
@@ -486,15 +446,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         onClose={() => reservations.setReviewOpen(false)}
       />
 
-      <ProductSearchModal
-        isOpen={showGrossistSearch}
-        onClose={() => setShowGrossistSearch(false)}
-        onSelect={p => {
-          addFromGrossist(p)
-          setShowGrossistSearch(false)
-        }}
-        businessId={businessId}
-      />
 
       {productModalRow && (
         <ProductModal

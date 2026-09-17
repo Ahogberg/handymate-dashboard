@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { ArrowDown, ArrowUp, Bookmark, Check, Plus, Trash2, X } from 'lucide-react'
 import type { QuoteItem, QuoteItemType } from '@/lib/types/quote'
-import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
+import { UNIT_OPTIONS } from '@/lib/quotes/item-format'
 import { standardPriceOffer } from '@/lib/products/pricing-state'
+import { QuoteRowProductCombo } from '@/app/dashboard/quotes/_shared/QuoteRowProductCombo'
+import type { ProductWithComponents } from '@/app/dashboard/quotes/_shared/applyProductToItem'
 
 interface RowEditSheetProps {
   /** null → sheeten är stängd (inget att redigera). */
@@ -39,6 +41,11 @@ interface RowEditSheetProps {
    * Utelämnad → knappen renderas inte.
    */
   onSaveToBank?: (item: QuoteItem) => void
+  /**
+   * Koppla den HÄR raden till en artikel ur registret. Utelämnad → vanligt
+   * fritextfält, så anropare utan artikelbank påverkas inte.
+   */
+  onSelectProductForRow?: (itemId: string, product: ProductWithComponents) => void
 }
 
 const TYPE_LABEL: Record<QuoteItemType, string> = {
@@ -60,16 +67,20 @@ const FIELD_CLS =
  * kartläggningen) för små för touch, så raden blir tappbar och alla värden
  * redigeras här istället.
  *
- * Tar RAW QuoteItem (inte QuoteTemplateItem) + samma onUpdate/onRemove som
- * ItemRow.tsx (listvyn) — dokumentmotorns QuoteItemPatch/QuoteDocumentHandlers
- * saknar kategori helt (QuoteTemplateItem har inget categorySlug-fält, se
- * lib/quote-templates/types.ts — kategorin är intern bokföringsdata, aldrig
- * kundfacing, och hör därför inte hemma i dokumentdatan). Sidan (new/edit)
- * äger `items`/`allCategories`/`updateItem`/`removeItem` redan — samma
- * enda källa som QuoteItemsSection — så sheeten återanvänder dem rakt av
- * istället för att uppfinna en egen datavåg.
+ * Tar RAW QuoteItem (inte QuoteTemplateItem) — dokumentmotorns
+ * QuoteItemPatch/QuoteDocumentHandlers saknar kategori helt (QuoteTemplateItem
+ * har inget categorySlug-fält, se lib/quote-templates/types.ts — kategorin är
+ * intern bokföringsdata, aldrig kundfacing, och hör därför inte hemma i
+ * dokumentdatan). Sidan (new/edit) äger `items`/`allCategories`/`updateItem`/
+ * `removeItem` redan, så sheeten återanvänder dem rakt av i stället för att
+ * uppfinna en egen datavåg.
+ *
+ * RIVNINGEN PAKET A (2026-09-17): listvyn (QuoteItemsSection + ItemRow) är
+ * borttagen — den här sheeten är nu ENDA stället en befintlig rad redigeras,
+ * på alla skärmbredder. Därför flyttade artikelkopplingen hit; se
+ * beskrivningsfältet nedan.
  */
-export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose, linkedProductPrice, onSaveAsStandard, onSaveToBank }: RowEditSheetProps) {
+export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, onClose, linkedProductPrice, onSaveAsStandard, onSaveToBank, onSelectProductForRow }: RowEditSheetProps) {
   const [shareLaborPct, setShareLaborPct] = useState(0)
   const [shareTravelPct, setShareTravelPct] = useState(0)
   const [confirmingShare, setConfirmingShare] = useState(false)
@@ -222,16 +233,40 @@ export function RowEditSheet({ item, allCategories, onUpdate, onRemove, onMove, 
         <div className="px-5 py-4 space-y-4 overflow-y-auto flex-1">
           <div>
             <label className="block text-xs font-medium text-slate-500 mb-1.5">Beskrivning</label>
-            <input
-              type="text"
-              autoFocus
-              value={item.description}
-              onChange={e => onUpdate(item.id, 'description', e.target.value)}
-              placeholder={
-                item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext…' : 'Beskrivning'
-              }
-              className={FIELD_CLS}
-            />
+            {/* ARTIKELKOPPLING (rivningen paket A, 2026-09-17): samma combo som
+                listvyns ItemRow hade. Den var enda vägen att koppla en BEFINTLIG
+                rad till en artikel, och listvyn är borta — utan den här hade
+                kopplingen bara gått att göra på nya rader via AddRowSheet.
+                Den väger tyngre än en bekvämlighet: intakeRowTakesQuantity gör
+                artikelkopplingen till det som låser upp frågeflödets mängdregel,
+                så en okopplad rad tar aldrig emot ett svar. Fritext är kvar som
+                förstahandsväg — varje tangenttryck skriver direkt till raden,
+                dropdownen är ett erbjudande. */}
+            {isEditable && onSelectProductForRow ? (
+              <QuoteRowProductCombo
+                value={item.description}
+                onChangeText={text => onUpdate(item.id, 'description', text)}
+                onSelectProduct={product => onSelectProductForRow(item.id, product)}
+                placeholder="Sök artikel eller skriv beskrivning…"
+                inputClassName={FIELD_CLS}
+              />
+            ) : (
+              <input
+                type="text"
+                autoFocus
+                value={item.description}
+                onChange={e => onUpdate(item.id, 'description', e.target.value)}
+                placeholder={
+                  item.item_type === 'heading' ? 'Rubriktext' : item.item_type === 'text' ? 'Fritext…' : 'Beskrivning'
+                }
+                className={FIELD_CLS}
+              />
+            )}
+            {isEditable && item.linked_product_id && (
+              <p className="mt-1.5 text-[11px] text-primary-700">
+                Kopplad till din artikel — enhet och pris kommer ur registret.
+              </p>
+            )}
           </div>
 
           {isEditable && (

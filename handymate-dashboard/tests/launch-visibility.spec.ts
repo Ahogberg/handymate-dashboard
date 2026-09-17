@@ -109,10 +109,17 @@ test.describe('döljandet är inte kosmetiskt', () => {
 })
 
 test.describe('grossistens ingångar utanför menyn', () => {
-  test('offertskaparens "Sök grossist" är grindad', () => {
+  test('offertflödet har ingen grossistingång alls', () => {
     // Codex poäng: en dold meny med kvarvarande knapp är sämre än att inte dölja alls.
-    const f = läs('app/dashboard/quotes/_shared/QuoteItemsSection.tsx')
-    expect(f).toContain("isLaunchHidden('wholesaler')")
+    // RIVNINGEN PAKET A (2026-09-17): knappen låg i listvyns "Fler alternativ".
+    // Listvyn är borttagen, och med den hela ingången — starkare än en grind.
+    const fs = require('fs') as typeof import('fs')
+    const path = require('path') as typeof import('path')
+    expect(fs.existsSync(path.join(__dirname, '..', 'app/dashboard/quotes/_shared/QuoteItemsSection.tsx'))).toBe(false)
+    for (const fil of ['app/dashboard/quotes/_shared/QuoteBuilder.tsx',
+                       'app/dashboard/quotes/_shared/QuoteEditView.tsx']) {
+      expect(läs(fil), `${fil} ska inte öppna grossistsöket`).not.toContain('ProductSearchModal')
+    }
   })
 
   test('projektvyns grossistmodal är grindad', () => {

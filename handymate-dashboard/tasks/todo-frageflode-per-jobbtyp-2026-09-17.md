@@ -66,3 +66,40 @@ docs/offert/offertflodet-kontext-2026-09-17.md.
   förklaring borta). Contracts 2 769 passed.
 - Inte klickprovat i webbläsare (ingen inloggning i miljön). Preview-bygget på Vercel
   är byggkontrollen; flödet bör provas på telefon: tryck upplägg → frågor → offert.
+
+## Rivningen paket A (2026-09-17, efter beslut av Andreas)
+
+- **A1 — startvanan bort** (`df82272f`): quick-preferences, banderollen "Vill du
+  alltid börja så här?", fem localStorage-nycklar, tre sparade startlägen.
+  Kallstart öppnar alltid intaget. 350 rader netto bort.
+- **A2 — listvyn bort**: dokumentet är enda radeditorn på alla skärmbredder.
+  - FÖRE rivningen flyttades fyra radtyper in i `AddRowSheet` (tillval, fritext,
+    delsumma, rabatt). De fanns bara i listvyns "Fler alternativ", alltså bara på
+    desktop. Tillval krävs dessutom av nästa steg: kundens val på offertsidan.
+  - BLOCKERARE som hittades under kartläggningen: `QuoteRowProductCombo`
+    (koppla en BEFINTLIG rad till en artikel) monterades bara i `ItemRow`.
+    Utan åtgärd hade rivningen tagit bort enda vägen att koppla en rad till
+    registret — samma koppling som `intakeRowTakesQuantity` gör till
+    förutsättning för frågeflödets mängdregel. Löst: combon flyttad in i
+    `RowEditSheet`s beskrivningsfält, ny prop `onSelectProductForRow`.
+  - `UNIT_OPTIONS`/`formatCurrency` flyttade ur `ItemRow` till
+    `lib/quotes/item-format.ts` — enheterna måste vara identiska på alla ytor,
+    annars matchar varken `sameUnit` eller mängdregeln. Värdena diffade före flytt.
+  - Raderat: `QuoteItemsSection`, `QuoteAddRowCombo`, `QuoteProductSearchModal`,
+    `ItemRow`. Dött städat: `mainView`, vy-växeln, dnd-sensorerna, `handleDragEnd`,
+    `moveItem` (index), grossistingången i offertflödet.
+  - MEDVETET TAPP: skapa offertkategori inline mitt i radredigeringen. Fanns bara
+    i listvyn. Kategorier skapas i Inställningar → Offertkategorier; radbladet
+    väljer bland befintliga. Läggs till i sheeten om någon saknar det.
+  - Behållet: `components/ProductSearchModal.tsx` (projektvyn använder den) och
+    `@dnd-kit` som beroende (projektvyn sorterar med det).
+
+### Granskning A2
+- tsc rent, contracts 2 780 passed, next build ren.
+- 5 mutationer fångade: artikelkombon bakom `false ?`, `onSelectProductForRow`
+  bortkopplad, tillval borta ur radtyperna, raderad fil återskapad,
+  Listvy-knappen återinförd. Mutation 1 slank först igenom — provet kollade att
+  komponenten fanns, inte att villkoret kopplade in den. Provet skärptes till att
+  läsa grenen.
+- Inte klickprovat i webbläsare. Prova på telefon: tryck rad → koppla artikel →
+  mängd, och "+ Lägg till rad" → Tillval.

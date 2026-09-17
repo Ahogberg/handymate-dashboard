@@ -1,18 +1,9 @@
 'use client'
 
 import { useCallback } from 'react'
-import {
-  KeyboardSensor,
-  PointerSensor,
-  TouchSensor,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from '@dnd-kit/core'
 import { createDefaultItem, generateItemId } from '@/lib/quote-calculations'
 import { getCategoryRotRut, type CustomCategory } from '@/lib/constants/categories'
 import type { QuoteItem, RotRutType } from '@/lib/types/quote'
-import type { SelectedProduct } from '@/lib/suppliers/types'
 import { splitLine } from '@/lib/rot-rut-basis'
 import { componentSaleTotal, resolveLineShares, type SnapshotComponent } from '@/lib/products/build-item-snapshot'
 import {
@@ -167,55 +158,6 @@ export function useQuoteItems(
     [setItems],
   )
 
-  const dndSensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
-    useSensor(KeyboardSensor),
-  )
-
-  const handleDragEnd = useCallback(
-    (event: DragEndEvent) => {
-      const { active, over } = event
-      if (!over || active.id === over.id) return
-      setItems(prev => {
-        const oldIndex = prev.findIndex(i => i.id === active.id)
-        const newIndex = prev.findIndex(i => i.id === over.id)
-        if (oldIndex === -1 || newIndex === -1) return prev
-        const newArr = [...prev]
-        const [moved] = newArr.splice(oldIndex, 1)
-        newArr.splice(newIndex, 0, moved)
-        return newArr.map((item, i) => ({ ...item, sort_order: i }))
-      })
-    },
-    [setItems],
-  )
-
-  const addFromGrossist = useCallback(
-    (product: SelectedProduct) => {
-      const newItem: QuoteItem = {
-        id: generateItemId(),
-        item_type: 'item',
-        description: product.name,
-        article_number: product.sku,
-        quantity: 1,
-        unit: normalizeUnit(product.unit),
-        unit_price: product.sell_price,
-        cost_price: product.purchase_price,
-        total: product.sell_price,
-        is_rot_eligible: false,
-        is_rut_eligible: false,
-        labor_amount: 0,
-        material_amount: product.sell_price,
-        travel_amount: 0,
-        sort_order: 0,
-      }
-      setItems(prev => {
-        newItem.sort_order = prev.length
-        return [...prev, newItem]
-      })
-    },
-    [setItems],
-  )
 
   /**
    * Produktbank: förfyll en BEFINTLIG rad från vald produkt (inline-combon i
@@ -280,9 +222,6 @@ export function useQuoteItems(
     removeItem,
     moveItem,
     moveItemById,
-    dndSensors,
-    handleDragEnd,
-    addFromGrossist,
     addFromPriceList,
     applyProductToRow,
     addFromProductBank,

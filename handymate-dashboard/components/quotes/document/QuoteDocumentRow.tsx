@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import { EditableText, EditableNumber, EditableSelect } from '@/components/quotes/editable/EditableFields'
-import { UNIT_OPTIONS } from '@/components/quotes/ItemRow'
+import { UNIT_OPTIONS } from '@/lib/quotes/item-format'
 import { formatCurrency } from '@/lib/document-html'
 import { priceState, priceLabel } from '@/lib/products/pricing-state'
 import type { QuoteTemplateItem } from '@/lib/quote-templates/types'

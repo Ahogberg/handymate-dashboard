@@ -9,7 +9,6 @@ import { supabase } from '@/lib/supabase'
 import { loadQuoteReliefHandoff } from '@/lib/relief/intake'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
-import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
@@ -46,7 +45,6 @@ import { useQuoteItems } from './useQuoteItems'
 import { usePriceListLookup } from './usePriceListLookup'
 import { ensureProductComponents, applyProductToItem, type ProductWithComponents } from './applyProductToItem'
 import { QuoteQuickstartCard, type QuickstartRow } from './QuoteQuickstartCard'
-import { QuoteItemsSection } from './QuoteItemsSection'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
@@ -370,7 +368,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
 
   // Modals & search
-  const [showGrossistSearch, setShowGrossistSearch] = useState(false)
   // Spara-i-prislistan modal — vilken offertrad som ska sparas
   const [productModalRow, setProductModalRow] = useState<QuoteItem | null>(null)
   const [savingProduct, setSavingProduct] = useState(false)
@@ -388,8 +385,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [showDisplaySettings, setShowDisplaySettings] = useState(false)
 
   // Custom categories — inline create
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null)
-  const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
   // Attachments — `url` är en KORTLIVAD signerad länk bara för visning i det
   // här passet; `path` är storage-pathen som faktiskt ska sparas
@@ -419,15 +414,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   // ETAPP 2b (offert-masterplan.md): canvas-first-layouten. `activePanel`
   // styr "Mer"-verktygsraden ovanför dokumentet — en sektion synlig i taget,
-  // inte modal (hantverkaren ska se dokumentet samtidigt). `mainView` växlar
-  // huvudytan mellan dokument-canvasen och radeditorn ("Listvy") — canvas
-  // är default när live-läget finns, annars listvy (satt en gång när datan
-  // laddat klart, se effekten nedan).
+  // inte modal (hantverkaren ska se dokumentet samtidigt).
+  //
+  // RIVNINGEN PAKET A (2026-09-17): `mainView` och växeln Dokument/Listvy är
+  // borta. Dokumentet är alltid huvudytan.
   const [activePanel, setActivePanel] = useState<
     null | 'stil' | 'villkor' | 'betalplan' | 'visning' | 'bilagor' | 'rot'
   >(null)
-  const [mainView, setMainView] = useState<'document' | 'list'>('document')
-  const mainViewInitialized = useRef(false)
   // ETAPP 1f: inline-bekräftelse för "beskrivning saknas" (ersätter den
   // gamla descriptionWarningShownRef-vägen — se useQuoteBuilderSave/QuoteBuilderHeader).
   const [sendConfirmPending, setSendConfirmPending] = useState(false)
@@ -510,11 +503,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     addItem,
     updateItem,
     removeItem,
-    moveItem,
     moveItemById,
-    dndSensors,
-    handleDragEnd,
-    addFromGrossist,
     applyProductToRow,
     addFromProductBank,
   } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
@@ -633,42 +622,20 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
    * sektion OAVSETT fokus (se QuoteDocument.tsx) — samma hake som den
    * borttagna granskningssekvensens auto-scroll använde, nu utlöst
    * on-demand av ett klick i stället för av ett kontinuerligt useEffect på
-   * `quickSection`. Byter till dokumentvyn först om listvyn är aktiv,
-   * eftersom `data-section` bara finns i canvas-renderingen.
+   * `quickSection`.
+   *
+   * RIVNINGEN PAKET A (2026-09-17): växlade tidigare till dokumentvyn först,
+   * eftersom `data-section` bara fanns i canvas-renderingen och listvyn kunde
+   * vara aktiv. Listvyn är borta — dokumentet är alltid ytan, så det finns
+   * inget att växla till.
    */
-  const showDocument = useCallback(() => setMainView('document'), [])
-  const scrollToSection = useQuoteSectionNavigation(showDocument)
+  const scrollToSection = useQuoteSectionNavigation()
 
   const selectedCustomerObj = useMemo(
     () => customers.find(c => c.customer_id === selectedCustomer) || null,
     [customers, selectedCustomer],
   )
 
-  // ─── Custom category creation (new-vyn unique) ────────────────────
-  async function createCustomCategory(label: string, itemId: string) {
-    const slug =
-      'custom_' + label.toLowerCase().replace(/[^a-zåäö0-9]/g, '_').replace(/_+/g, '_')
-    const { data, error } = await supabase
-      .from('custom_quote_categories')
-      .insert({
-        business_id: business.business_id,
-        slug,
-        label,
-        rot_eligible: false,
-        rut_eligible: false,
-      })
-      .select('*')
-      .single()
-    if (error) {
-      toast.error('Kunde inte skapa kategori')
-      return
-    }
-    const newCat = data as CustomCategory
-    setLocalCustomCategories(prev => [...prev, newCat])
-    updateItem(itemId, 'category_slug', newCat.slug)
-    setShowNewCategoryInput(null)
-    setNewCategoryLabel('')
-  }
 
   // ─── EN preview-pipeline (ETAPP 1a, offert-masterplan.md) ─────────
   // quoteTemplateData (→ ModernCanvas) och templatePreviewPayload (→
@@ -873,14 +840,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
-  // ETAPP 2b: mainView-defaulten sätts EN gång när data laddat klart —
-  // canvas när live-läget finns, annars listvy (se komponentens state ovan).
-  useEffect(() => {
-    if (!loading && !mainViewInitialized.current) {
-      mainViewInitialized.current = true
-      setMainView(liveAvailable ? 'document' : 'list')
-    }
-  }, [loading, liveAvailable])
 
   // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
   // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
@@ -2330,25 +2289,15 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         items={items}
         setItems={setItems}
         allCategories={allCategories}
-        localCustomCategories={localCustomCategories}
         products={products}
         onSaveAsStandard={saveStandardPrice}
-        dndSensors={dndSensors}
-        handleDragEnd={handleDragEnd}
         addItem={addItem}
         updateItem={updateItem}
         removeItem={removeItem}
-        moveItem={moveItem}
         moveItemById={moveItemById}
         addFromProduct={addFromProduct}
         applyProductToExistingRow={applyProductToExistingRow}
         addBlankRowWithDescription={addBlankRowWithDescription}
-        setShowGrossistSearch={setShowGrossistSearch}
-        createCustomCategory={createCustomCategory}
-        showNewCategoryInput={showNewCategoryInput}
-        setShowNewCategoryInput={setShowNewCategoryInput}
-        newCategoryLabel={newCategoryLabel}
-        setNewCategoryLabel={setNewCategoryLabel}
         setProductModalRow={setProductModalRow}
         hasRotItems={hasRotItems}
         hasRutItems={hasRutItems}
@@ -2406,9 +2355,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         setAddRowSheetOpen={setAddRowSheetOpen}
         templatePreviewPayload={templatePreviewPayload}
         sheetItem={sheetItem}
-        showGrossistSearch={showGrossistSearch}
         businessId={business.business_id}
-        addFromGrossist={addFromGrossist}
         productModalRow={productModalRow}
         savingProduct={savingProduct}
         saveItemToProducts={saveItemToProducts}
@@ -2766,8 +2713,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                 hamnade en hel skärm ner, bakom hela assistentkolumn del 1. */}
             {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
                 ROT nås härifrån, en panel synlig i taget (inte modal —
-                dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
-                huvudytans innehåll. */}
+                dokumentet syns hela tiden nedanför). */}
             <div className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
               <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Mer</span>
               {(
@@ -2818,26 +2764,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                   </button>
                 )
               })}
-              <div className="ml-auto flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                <button
-                  type="button"
-                  onClick={() => setMainView('document')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    mainView === 'document' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Dokument
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMainView('list')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    mainView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Listvy
-                </button>
-              </div>
             </div>
 
             {activePanel === 'stil' && (
@@ -2930,65 +2856,43 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
             <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
 
-            {/* Huvudyta: dokument-canvas (default) eller listvy (radeditor) */}
-            {mainView === 'list' ? (
-              <QuoteItemsSection
-                items={items}
-                recalculated={recalculated}
-                allCategories={allCategories}
-                customCategories={localCustomCategories}
-                products={products}
-                onSaveAsStandard={saveStandardPrice}
-                dndSensors={dndSensors}
-                onDragEnd={handleDragEnd}
-                onAddItem={addItem}
-                onUpdateItem={updateItem}
-                onRemoveItem={removeItem}
-                onMoveItem={moveItem}
-                onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
-                onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-                onAddBlankRow={addBlankRowWithDescription}
-                onOpenGrossistSearch={() => setShowGrossistSearch(true)}
-                onCreateCategory={createCustomCategory}
-                showNewCategoryInput={showNewCategoryInput}
-                setShowNewCategoryInput={setShowNewCategoryInput}
-                newCategoryLabel={newCategoryLabel}
-                setNewCategoryLabel={setNewCategoryLabel}
-                onSaveToProducts={row => setProductModalRow(row)}
+            {/* Huvudytan: dokumentet. RIVNINGEN PAKET A (2026-09-17, Andreas):
+                listvyn och växeln Dokument/Listvy är borta — offerten ÄR ytan,
+                och två radeditorer betydde att varje ny radtyp måste byggas
+                två gånger eller glida isär. Rader läggs till via AddRowSheet,
+                ändras och flyttas via RowEditSheet. */}
+            <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
+              <QuoteDocumentSurface
+                liveEnabled={liveAvailable}
+                liveTemplateData={quoteTemplateData}
+                // ETAPP C3: i granskningsläget skickas bara den fokuserade
+                // sektionens handlers in — dokumentmotorn renderar då resten
+                // som ren text. focusSection sköter dimningen. Två oberoende
+                // spakar: dimning utan handler-gating hade sett låst ut men
+                liveHandlers={liveHandlers}
+                // FAS 1 (offert-omtaget, 2026-08-31): focusSection/dimning
+                // hörde till den borttagna granskningssekvensen — chip-
+                // raden scrollar via data-section (scrollToSection) i
+                // stället, ALDRIG via denna prop, så dimningen den
+                // driver aldrig triggas av ett chip-klick.
+                focusSection={null}
+                quickReveal={quickMode !== null}
+                onRowTap={setSheetItemId}
+                onAddRowTap={() => setAddRowSheetOpen(true)}
+                // FAS E (offertskaparen-design-polish, 2026-09-01): tomt-
+                // läges-rutans "beskriv jobbet"/"Fota eller beskriv
+                // jobbet" — återanvänder AI-hjälpens BEFINTLIGA state
+                // (showAiHelper), ingen ny state uppfunnen. Create-läget
+                // ENDA anropare som skickar denna: QuoteEditView.tsx har
+                // ingen QuoteNewAIHelper/showAiHelper alls, se
+                // QuoteDocument.tsx:s onOpenAiHelp-docblock.
+                onOpenAiHelp={() => setShowAiHelper(true)}
+                templatePreviewPayload={templatePreviewPayload}
+                reservationSuggestions={reservations.suggestions}
+                onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
               />
-            ) : (
-              <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
-                <QuoteDocumentSurface
-                  liveEnabled={liveAvailable}
-                  liveTemplateData={quoteTemplateData}
-                  // ETAPP C3: i granskningsläget skickas bara den fokuserade
-                  // sektionens handlers in — dokumentmotorn renderar då resten
-                  // som ren text. focusSection sköter dimningen. Två oberoende
-                  // spakar: dimning utan handler-gating hade sett låst ut men
-                  liveHandlers={liveHandlers}
-                  // FAS 1 (offert-omtaget, 2026-08-31): focusSection/dimning
-                  // hörde till den borttagna granskningssekvensen — chip-
-                  // raden scrollar via data-section (scrollToSection) i
-                  // stället, ALDRIG via denna prop, så dimningen den
-                  // driver aldrig triggas av ett chip-klick.
-                  focusSection={null}
-                  quickReveal={quickMode !== null}
-                  onRowTap={setSheetItemId}
-                  onAddRowTap={() => setAddRowSheetOpen(true)}
-                  // FAS E (offertskaparen-design-polish, 2026-09-01): tomt-
-                  // läges-rutans "beskriv jobbet"/"Fota eller beskriv
-                  // jobbet" — återanvänder AI-hjälpens BEFINTLIGA state
-                  // (showAiHelper), ingen ny state uppfunnen. Create-läget
-                  // ENDA anropare som skickar denna: QuoteEditView.tsx har
-                  // ingen QuoteNewAIHelper/showAiHelper alls, se
-                  // QuoteDocument.tsx:s onOpenAiHelp-docblock.
-                  onOpenAiHelp={() => setShowAiHelper(true)}
-                  templatePreviewPayload={templatePreviewPayload}
-                  reservationSuggestions={reservations.suggestions}
-                  onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
-                />
-              </div>
-            )}
+            </div>
+
           </div>
         </div>
       </div>
@@ -3031,6 +2935,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         }
         onSaveAsStandard={(productId, price) => { void saveStandardPrice(productId, price) }}
         onSaveToBank={row => setProductModalRow(row)}
+        onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
       />
 
       {/* Mobilens "lägg till rad" — söker i artikelbanken i stället för att
@@ -3041,7 +2946,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         reservationCount={product => reservations.countForProduct(product)}
         onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
         onAddBlankRow={addBlankRowWithDescription}
-        onAddHeading={() => addItem('heading')}
+        onAddRowType={addItem}
         onClose={() => setAddRowSheetOpen(false)}
       />
 
@@ -3063,16 +2968,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         onClose={() => reservations.setReviewOpen(false)}
       />
 
-      {/* Grossist search modal */}
-      <ProductSearchModal
-        isOpen={showGrossistSearch}
-        onClose={() => setShowGrossistSearch(false)}
-        onSelect={p => {
-          addFromGrossist(p)
-          setShowGrossistSearch(false)
-        }}
-        businessId={business.business_id}
-      />
 
       {productModalRow && (
         <ProductModal
