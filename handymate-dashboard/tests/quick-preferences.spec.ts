@@ -50,7 +50,7 @@ test.describe('frågan om standardväg ställs EN gång', () => {
 })
 
 test.describe('vägarna ut ur Snabbofferten', () => {
-  const routes: EscapeRoute[] = ['editor', 'template']
+  const routes: EscapeRoute[] = ['editor']
 
   test('varje väg har en svensk etikett som går att sätta in i en mening', () => {
     // Frågan lyder "Vill du alltid börja <etikett>?" — etiketten måste alltså
@@ -62,9 +62,9 @@ test.describe('vägarna ut ur Snabbofferten', () => {
     }
   })
 
-  test('räknarna är oberoende — tre mallval frågar inte om editorn', () => {
-    // Trösklarna är per väg. Skulle de dela räknare hade tre mallval plus noll
-    // editorbesök triggat frågan om editorn, vilket vore obegripligt.
+  test('räknaren är per väg — tre av något annat frågar inte om editorn', () => {
+    // Trösklarna är per väg. En delad räknare hade triggat frågan om editorn
+    // av något som inte var editorbesök, vilket vore obegripligt.
     expect(shouldAskPreferred(ASK_PREFERRED_AFTER, false)).toBe(true)
     expect(shouldAskPreferred(0, false)).toBe(false)
   })
@@ -92,10 +92,17 @@ test.describe('vägvalet är förstklassigt — inte en hjälte och två fotnote
     expect(editorLank, 'editorlänken har flyttat under textrutan igen').toBeLessThan(textruta)
   })
 
-  test('mallen är en riktig knapp bredvid Bygg utkast', () => {
-    expect(intake).toContain('Använd en mall')
-    // Fortfarande skyddad av hasContent — en mall efter AI-bygge raderar arbete.
+  test('mallknappen är BORTA — jobbtypsremsan är valet av upplägg (2026-09-17)', () => {
+    // Andreas: "blir det inte dubbelt?" Två dörrar till samma upplägg var en
+    // dörr för mycket. Remsan ligger redan ovanför textrutan.
+    expect(intake).not.toContain('Använd en mall')
+    expect(intake).not.toContain('onUseTemplate')
+    // Bygg själv är fortfarande skyddad av hasContent.
     expect(intake).toContain('{!hasContent && (')
+    // Och 'template' är inte längre en väg ut.
+    const prefs = fs.readFileSync(path.resolve(__dirname, '..', 'lib/quotes/quick-preferences.ts'), 'utf8')
+    expect(prefs).toContain("export type StartMode = 'quick' | 'editor'")
+    expect(prefs).not.toMatch(/template: 'med en mall'/)
   })
 
   test('exempelchips fyller rutan och försvinner när något står där', () => {

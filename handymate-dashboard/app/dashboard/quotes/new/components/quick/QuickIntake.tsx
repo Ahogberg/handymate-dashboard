@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Camera, FileText, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Camera, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
 /** Bara det intaget faktiskt behöver. Strukturell typ i stället för en import
     av sidans Customer: det finns tre olika Customer-typer i kodbasen, och den
@@ -70,16 +70,13 @@ interface QuickIntakeProps {
   onOpenFullEditor: () => void
   building: boolean
   /**
-   * "Använd en mall i stället". Sedan startväljaren togs bort (2026-08-06) är
-   * mallvalet en av två utgångar härifrån, inte ett eget startval.
-   */
-  onUseTemplate: () => void
-  /**
-   * true när offerten redan har rader. Mallänken DÖLJS då: handleTemplateSelect
-   * skriver över titel, beskrivning och rader, så en mall vald efter att AI
-   * byggt ett utkast hade raderat arbetet utan förvarning. Att dölja länken
-   * gör krocken omöjlig i stället för att varna om den — ett beslut mindre i
-   * ett flöde vi försöker tömma på beslut.
+   * true när offerten redan har rader. "Bygg själv" DÖLJS då: en blankstart
+   * efter att AI byggt ett utkast hade raderat arbetet utan förvarning.
+   *
+   * En tredje knapp mot en separat mallista fanns här t.o.m. 2026-09-17. Borttagen (Andreas: "blir det inte dubbelt?"): jobb-
+   * typsremsan ovanför textrutan ÄR valet av upplägg — ett tryck på jobbtypen
+   * lägger in firmans rader. Två dörrar till samma upplägg var en dörr för
+   * mycket.
    */
   hasContent: boolean
   /**
@@ -107,7 +104,6 @@ export function QuickIntake({
   onClose,
   onOpenFullEditor,
   building,
-  onUseTemplate,
   hasContent,
   onSkipDescription,
 }: QuickIntakeProps) {
@@ -372,16 +368,6 @@ export function QuickIntake({
               >
                 <PenLine className="w-4 h-4" />
                 Bygg själv
-              </button>
-            )}
-            {!hasContent && (
-              <button
-                type="button"
-                onClick={onUseTemplate}
-                className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                Använd en mall
               </button>
             )}
           </div>

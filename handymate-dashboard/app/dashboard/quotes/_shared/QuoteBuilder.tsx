@@ -84,7 +84,6 @@ import { workSampleDraft } from '@/lib/onboarding/work-sample'
 import { QuoteNewAIHelper } from '../new/components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from '../new/components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from '../new/components/QuoteNewAttachmentsCard'
-import { QuoteNewStartChooser } from '../new/components/QuoteNewStartChooser'
 import { QuickIntake } from '../new/components/quick/QuickIntake'
 import { QuickBlankStart } from '../new/components/quick/QuickBlankStart'
 import { QuickBuilding } from '../new/components/quick/QuickBuilding'
@@ -101,6 +100,7 @@ import {
   hasBeenAskedPreferred,
   markAskedPreferred,
   type EscapeRoute,
+  type StartMode,
 } from '@/lib/quotes/quick-preferences'
 import { QuickStartPreferenceBanner } from '../new/components/quick/QuickStartPreferenceBanner'
 import { QuoteNewPriceWarningsBanner } from '../new/components/QuoteNewPriceWarningsBanner'
@@ -400,11 +400,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [efterkalkylInsight, setEfterkalkylInsight] = useState<EfterkalkylInsight | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
 
-  // Startsteg (Etapp 3): "Börja tomt / Använd mall / Beskriv med AI" —
-  // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
-  /** Mallväljaren, öppnad från Snabboffertens intag. Ersätter startväljaren
-      som helhet — se kommentaren vid showTemplatePicker nedan. */
-  const [templatePickerOpen, setTemplatePickerOpen] = useState(false)
+  // Den separata mallistan (öppnad från intaget) togs bort 2026-09-17:
+  // jobbtypsremsan är det enda valet av upplägg, i intaget och i editorn.
+  // Sparade upplägg utan jobbtyp nås via remsans "Övriga upplägg".
 
   // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet (bottom-
   // sheet-radeditorn) är öppen — satt av QuoteDocumentSurfaces onRowTap när
@@ -455,7 +453,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [quickInput, setQuickInput] = useState('')
   const jobStartSnapshot = useRef<QuoteStartSnapshot>({ items, jobType: quoteJobType, input: quickInput, mode: quickMode, busy: false })
   jobStartSnapshot.current = { items, jobType: quoteJobType, input: quickInput,
-    mode: `${quickMode}:${templatePickerOpen}`, busy: generating || quickMode === 'building',
+    mode: `${quickMode}`, busy: generating || quickMode === 'building',
     formSignature: JSON.stringify([selectedCustomer, title, description, notIncluded, ataTerms, paymentTermsText,
       termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities, pricingSettings?.hourly_rate, templateId]),
   }
@@ -1782,6 +1780,26 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     toast.success(`${antal} rader från ${start.jobTypeName} tillagda`)
   }
 
+  // Sparade upplägg utan jobbtyp (seedade före 2026-09-17, eller sparade
+  // innan "Spara som upplägg" började bära jobbtypen). De ska inte gömmas
+  // bara för att mallistan är borta — remsan visar dem under "Övriga
+  // upplägg" tills de kopplats i Inställningar → Offertmallar. Start:
+  // samma mallhandler som förut. Påfyllning: rubriken blir uppläggets namn.
+  async function applyOvrigtUpplagg(templateId: string, pafyllnad: boolean, signal: AbortSignal) {
+    const res = await fetch('/api/quote-templates', { cache: 'no-store', signal })
+    if (!res.ok) throw new Error('Kunde inte läsa upplägget. Försök igen.')
+    const { templates } = await res.json()
+    const template = (templates as QuoteTemplate[]).find(t => t.id === templateId)
+    if (signal.aborted) return
+    if (!template) throw new Error('Upplägget finns inte längre. Läs in listan igen.')
+    if (!pafyllnad) { handleTemplateSelect(template); finishQuickStart(); return }
+    const antal = Array.isArray(template.default_items) ? template.default_items.length : 0
+    if (antal === 0) throw new Error(`${template.name} har inga rader att lägga till.`)
+    setItems(prev => recalculateItems([...prev,
+      ...byggPafyllnadsrader(template, template.name, products, pricingSettings?.hourly_rate, prev.length, generateItemId)]))
+    toast.success(`${antal} rader från ${template.name} tillagda`)
+  }
+
   function handleTemplateSelect(template: any) {
     if (template.default_items && Array.isArray(template.default_items) && template.default_items.length > 0) {
       handleNewTemplateSelect(template as QuoteTemplate)
@@ -2131,6 +2149,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         body: JSON.stringify({
           name: templateName,
           description,
+          // Upplägget hör till offertens jobbtyp — annars hamnar det under
+          // "Övriga upplägg" och ingen hittar det nästa gång.
+          job_type_slug: quoteJobType || null,
           default_items: recalculateItems(items),
           default_payment_plan: paymentPlan,
           not_included: notIncluded || null,
@@ -2205,7 +2226,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     // svarat ja på "vill du alltid börja så här?" slipper mellansteget.
     const preferred = getPreferredStart()
     if (preferred === 'editor') return          // stanna i offertskaparen
-    if (preferred === 'template') { setTemplatePickerOpen(true); return }
     setQuickMode('intake')
   }, [loading, coldStart, quickMode])
 
@@ -2225,7 +2245,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
    * svarat "börja alltid i offertskaparen" hade annars ingen väg dit igen —
    * och banderollen lovar uttryckligen att man kan ändra sig.
    */
-  const [preferredStart, setPreferredStartState] = useState<'quick' | 'editor' | 'template'>('quick')
+  const [preferredStart, setPreferredStartState] = useState<StartMode>('quick')
   useEffect(() => { setPreferredStartState(getPreferredStart()) }, [])
 
   /**
@@ -2404,18 +2424,19 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     )
   }
 
-  const jobTypeStart = !isEditMode && items.length === 0 && !jobStartApplied && dealContextReady && !templatePickerOpen ? (
+  const jobTypeStart = !isEditMode && items.length === 0 && !jobStartApplied && dealContextReady ? (
     <QuoteJobTypeStart jobType={quoteJobType} inherited={!!inheritedJobType}
       initialIntent={firstQuoteIntent} automatic={!jobStartAttempted.current}
-      onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart} />
+      onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart}
+      onApplyOvrig={applyOvrigtUpplagg} />
   ) : null
 
   // Påfyllning: samma remsa, monteras först när det finns något att fylla på.
   // Även i redigeringsläge — ett sparat badrumsjobb kan få elen tillagd i
   // efterhand, det är ingen "start".
-  const jobTypeFyllPa = items.length > 0 && !templatePickerOpen ? (
+  const jobTypeFyllPa = items.length > 0 ? (
     <QuoteJobTypeStart pafyllnad jobType={quoteJobType} inherited={false} initialIntent={null} automatic={false}
-      onSelectJobType={() => {}} onApply={applyJobTypeAppend} />
+      onSelectJobType={() => {}} onApply={applyJobTypeAppend} onApplyOvrig={applyOvrigtUpplagg} />
   ) : null
 
   const preparationInput = !isEditMode && selectedCustomer ? <QuotePreparationInput
@@ -2432,15 +2453,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   if (quickMode === 'intake') {
     return (
       <>
-      {/* Mallistan ligger ÖVER intaget, som blir kvar monterat under. Stänger
-          man den utan att välja något är man tillbaka där man var — annars
-          hade ett ångrat mallval landat i den fullständiga editorn, alltså
-          precis den yta man försökte undvika. */}
-      <QuoteNewStartChooser
-        show={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
-      />
       <QuickIntake
         jobTypeStart={<>{reliefError && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{reliefError} <a href="/dashboard/avlastning" className="underline">Till mitt underlag</a></p>}{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
           <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
@@ -2464,9 +2476,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         onClose={() => router.push('/dashboard/quotes')}
         onOpenFullEditor={() => { leaveQuickMode('editor', true); setQuickMode(null) }}
         building={false}
-        // Ingen carryText här: mallen sätter sin egen titel och beskrivning,
-        // så texten hade skrivits över i nästa andetag ändå.
-        onUseTemplate={() => { leaveQuickMode('template', false); setTemplatePickerOpen(true) }}
         hasContent={items.length > 0}
         onSkipDescription={() => setQuickMode('blank')}
       />
@@ -2509,14 +2518,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   return (
     <div className={`min-h-screen bg-slate-50${jobStartApplied ? ' first-quote-arrival' : ''}`}>
-      {/* Mallväljaren. Öppnas bara från Snabboffertens intag — den är inte
-          längre ett startval utan en av två utgångar därifrån. */}
-      <QuoteNewStartChooser
-        show={templatePickerOpen}
-        onClose={() => setTemplatePickerOpen(false)}
-        onSelectTemplate={t => { handleTemplateSelect(t); finishQuickStart() }}
-      />
-
       {/* FAS 1 (offert-omtaget, 2026-08-31): den tvingade steg-för-steg-
           granskningen ("quickMode === 'review' || 'overview'") är BORTA.
           AI-utkast, blankt och mall landar alla direkt här — samma canvas-

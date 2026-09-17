@@ -34,10 +34,13 @@
  * facit-testas utan webbläsare. Bara läs/skriv rör localStorage.
  */
 
-/** Var kallstart ska landa. 'quick' är standard och behöver aldrig lagras. */
-export type StartMode = 'quick' | 'editor' | 'template'
+/** Var kallstart ska landa. 'quick' är standard och behöver aldrig lagras.
+    'template' fanns t.o.m. 2026-09-17 (mallväljaren som egen väg ut) och
+    läses nu som 'quick': jobbtypsremsan ligger redan i intaget, så det finns
+    ingen separat mallskärm att landa i. */
+export type StartMode = 'quick' | 'editor'
 
-/** De två vägar man kan ta SIG UT ur Snabbofferten. 'quick' räknas inte —
+/** Den väg man kan ta SIG UT ur Snabbofferten. 'quick' räknas inte —
     den är default och kräver inget val av användaren. */
 export type EscapeRoute = Exclude<StartMode, 'quick'>
 
@@ -102,7 +105,9 @@ function write(key: string, value: string): void {
  */
 export function getPreferredStart(): StartMode {
   const raw = readString(PREFERRED_KEY)
-  return raw === 'editor' || raw === 'template' ? raw : 'quick'
+  // Ett sparat 'template' från före 2026-09-17 blir 'quick' — inte ett fel,
+  // bara en vana vars skärm inte finns längre.
+  return raw === 'editor' ? raw : 'quick'
 }
 
 export function setPreferredStart(mode: StartMode): void {
@@ -133,5 +138,4 @@ export function markAskedPreferred(mode: EscapeRoute): void {
 /** Svensk etikett för vägen, till frågan i gränssnittet. */
 export const ESCAPE_LABELS: Record<EscapeRoute, string> = {
   editor: 'i offertskaparen',
-  template: 'med en mall',
 }

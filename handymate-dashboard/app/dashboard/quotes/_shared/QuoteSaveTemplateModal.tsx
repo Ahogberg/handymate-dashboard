@@ -35,9 +35,9 @@ export function QuoteSaveTemplateModal({
         className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-xl max-h-[90dvh] overflow-y-auto"
         onClick={e => e.stopPropagation()}
       >
-        <h3 className="font-heading text-lg font-bold text-slate-900 mb-4 tracking-tight">Spara som mall</h3>
+        <h3 className="font-heading text-lg font-bold text-slate-900 mb-4 tracking-tight">Spara som upplägg</h3>
         <div className="mb-5">
-          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Mallnamn</label>
+          <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Namn</label>
           <input
             type="text"
             value={templateName}

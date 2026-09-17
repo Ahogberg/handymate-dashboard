@@ -70,6 +70,17 @@ export async function POST(request: NextRequest) {
 
     const id = 'qtpl_' + Math.random().toString(36).substr(2, 9)
 
+    // Jobbtypen valideras mot företagets egna aktiva jobbtyper — aldrig
+    // tagen rakt ur bodyn. Okänd eller arkiverad jobbtyp ger null, inte fel:
+    // upplägget är fortfarande värt att spara, det hamnar bara under
+    // "Övriga upplägg" tills det kopplas.
+    let jobTypeSlug: string | null = null
+    if (typeof body.job_type_slug === 'string' && body.job_type_slug) {
+      const { data: job } = await supabase.from('job_types').select('slug')
+        .eq('business_id', business.business_id).eq('slug', body.job_type_slug).eq('is_active', true).maybeSingle()
+      jobTypeSlug = job?.slug ?? null
+    }
+
     const insertPayload: Record<string, any> = {
       id,
       business_id: business.business_id,
@@ -77,6 +88,7 @@ export async function POST(request: NextRequest) {
       description: body.description || null,
       branch: body.branch || null,
       category: body.category || null,
+      job_type_slug: jobTypeSlug,
       introduction_text: body.introduction_text || null,
       conclusion_text: body.conclusion_text || null,
       not_included: body.not_included || null,

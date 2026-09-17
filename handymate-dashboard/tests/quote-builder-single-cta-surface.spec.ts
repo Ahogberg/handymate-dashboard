@@ -79,14 +79,14 @@ test.describe('Headerns knappgrupp (desktop) är hidden lg:flex', () => {
     expect(sendQuoteIdx).toBeLessThan(wrapperEnd)
   })
 
-  test('"Spara som mall" ligger UTANFÖR hidden lg:flex-paret (egen hidden sm:inline-flex, se docblock)', () => {
+  test('"Spara som upplägg" ligger UTANFÖR hidden lg:flex-paret (egen hidden sm:inline-flex, se docblock)', () => {
     // Medveten skillnad, dokumenterad i QuoteBuilderHeader.tsx: "Spara som
     // mall" saknar en bottenfälts-motsvarighet och ska därför INTE gates på
     // lg — bara Spara utkast/Skicka-paret ska. Ett nollbevis mot att någon
     // av misstag sveper in den i samma lg-gate.
     const templateIdx = HEADER.indexOf('onClick={onSaveTemplate}')
     const draftWrapperStart = HEADER.lastIndexOf('<div className="hidden lg:flex', HEADER.indexOf('onClick={onSaveDraft}'))
-    expect(templateIdx, 'Spara som mall-knappen hittades inte').toBeGreaterThan(-1)
+    expect(templateIdx, 'Spara som upplägg-knappen hittades inte').toBeGreaterThan(-1)
     expect(templateIdx).toBeLessThan(draftWrapperStart)
   })
 })

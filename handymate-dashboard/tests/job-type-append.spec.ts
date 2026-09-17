@@ -95,7 +95,7 @@ test.describe('kopplingen i byggaren', () => {
   })
 
   test('remsan monteras i påfyllningsläge först när offerten har rader', () => {
-    expect(builder).toMatch(/const jobTypeFyllPa = items\.length > 0 && !templatePickerOpen \? \(\s*<QuoteJobTypeStart pafyllnad/)
+    expect(builder).toMatch(/const jobTypeFyllPa = items\.length > 0 \? \(\s*<QuoteJobTypeStart pafyllnad/)
     expect(builder).toMatch(/onApply=\{applyJobTypeAppend\}/)
     // och renderas bredvid startremsan, inte bara deklareras
     expect(builder).toMatch(/\{jobTypeStart\}\s*\{jobTypeFyllPa\}/)
@@ -113,7 +113,7 @@ test.describe('remsan i påfyllningsläge', () => {
 
   test('automatiken är avstängd och valet är lokalt — offertens jobbtyp rörs inte', () => {
     expect(remsa).toMatch(/if \(pafyllnad \|\| !data \|\| attempted\.current/)
-    expect(remsa).toContain('if (pafyllnad) setLokaltVal(job.slug); else onSelectJobType(job.slug)')
+    expect(remsa).toContain('if (pafyllnad) setLokaltVal(slug); else onSelectJobType(slug)')
     expect(remsa).toContain("pafyllnad ? 'Fyll på från jobbtyp'")
   })
 
@@ -122,25 +122,64 @@ test.describe('remsan i påfyllningsläge', () => {
   })
 })
 
-test.describe('mallväljaren grupperar på jobbtyp', () => {
-  const valjare = utanKommentarer(read('components/quotes/TemplateSelector.tsx'))
+test.describe('ett begrepp i offertflödet: jobbtyp (2026-09-17)', () => {
+  // Andreas: "blir det inte dubbelt med både mallsektioner för jobbtyper och
+  // hela mallar?" Jo. Datan behåller två tabeller (jobbtypen används på ~30
+  // ställen utanför offerten; ett upplägg bär betalplan och villkor), men
+  // flödet har ETT begrepp: jobbtyp, med varianter när det finns flera.
+  const remsa = utanKommentarer(read('components/onboarding/QuoteJobTypeStart.tsx'))
+  const builder = utanKommentarer(read('app/dashboard/quotes/_shared/QuoteBuilder.tsx'))
+  const intake = utanKommentarer(read('app/dashboard/quotes/new/components/quick/QuickIntake.tsx'))
 
-  test('sektioner i jobbtypernas ordning, övriga sist, tomma sektioner bort', () => {
-    expect(valjare).toContain("fetch('/api/job-types/quote-setup'")
-    expect(valjare).toMatch(/jobbtyper\.map\(j => \(\{ slug: j\.slug[^}]*mallar: sortedTemplates\.filter\(t => t\.job_type_slug === j\.slug\)/)
-    expect(valjare).toContain("namn: 'Övriga mallar'")
-    expect(valjare).toMatch(/\.filter\(sek => sek\.mallar\.length > 0\)/)
+  test('mallistan finns inte längre — varken fil, import eller tillstånd', () => {
+    expect(fs.existsSync(path.join(ROOT, 'app/dashboard/quotes/new/components/QuoteNewStartChooser.tsx'))).toBe(false)
+    expect(fs.existsSync(path.join(ROOT, 'components/quotes/TemplateSelector.tsx'))).toBe(false)
+    expect(builder).not.toContain('templatePickerOpen')
+    expect(builder).not.toContain('QuoteNewStartChooser')
+    expect(intake).not.toContain('Använd en mall')
   })
 
-  test('utan jobbtypsdata: platt lista, exakt som förut', () => {
-    expect(valjare).toMatch(/: \[\{ slug: null, namn: '', mallar: sortedTemplates \}\]/)
-    expect(valjare).toContain('if (!res.ok) return')
+  test('ett upplägg = ett tryck; flera = varianter', () => {
+    expect(remsa).toMatch(/if \(kandidater\.length === 1\) void apply\(\{ jobTypeSlug: slug, templateId: kandidater\[0\]\.id \}\)/)
+    // Chipet går genom valjJobbtyp, inte en egen onClick.
+    expect(remsa).toContain('onClick={() => valjJobbtyp(job.slug)}')
   })
 
-  test('"Lägg under …" använder samma PUT som inställningarna, med mallens version som villkor', () => {
-    expect(valjare).toMatch(/method: 'PUT'[\s\S]{0,200}templateId: mall\.id, jobTypeSlug, updatedAt: mall\.updated_at \?\? null/)
-    // bara för den som får koppla
-    expect(valjare).toContain('const kanKoppla = Boolean(setup?.canManage)')
-    expect(valjare).toMatch(/\{kanKoppla && \(\s*<select/)
+  test('sparade upplägg utan jobbtyp göms inte — "Övriga upplägg" finns så länge de finns', () => {
+    expect(remsa).toContain("export const OVRIGA = '__ovriga'")
+    expect(remsa).toMatch(/const ovriga = data && onApplyOvrig \? data\.templates\.filter\(t => !t\.jobTypeSlug && t\.items\.length > 0\)/)
+    expect(remsa).toMatch(/ovriga\.length > 0 && <button/)
+    expect(remsa).toContain('Övriga upplägg')
+    // Båda monteringarna i byggaren erbjuder dem.
+    expect((builder.match(/onApplyOvrig=\{applyOvrigtUpplagg\}/g) || []).length).toBe(2)
+  })
+
+  test('"Spara som upplägg" bär offertens jobbtyp, och servern validerar den', () => {
+    expect(builder).toMatch(/job_type_slug: quoteJobType \|\| null,/)
+    const rutt = utanKommentarer(read('app/api/quote-templates/route.ts'))
+    expect(rutt).toMatch(/from\('job_types'\)\.select\('slug'\)[\s\S]{0,200}\.eq\('slug', body\.job_type_slug\)\.eq\('is_active', true\)/)
+    expect(rutt).toContain('job_type_slug: jobTypeSlug,')
+    expect(rutt).not.toMatch(/job_type_slug: body\.job_type_slug/)
+    // Ordet "mall" är borta ur knapp och dialog.
+    expect(read('app/dashboard/quotes/_shared/QuoteBuilderHeader.tsx')).toContain('Spara som upplägg')
+    expect(read('app/dashboard/quotes/_shared/QuoteSaveTemplateModal.tsx')).not.toContain('Spara som mall')
+  })
+
+  test('upplägget heter som jobbet — inget systemnamn', () => {
+    const server = utanKommentarer(read('lib/quotes/job-standard-server.ts'))
+    expect(server).toContain('name: job.name, job_type_slug: job.slug')
+    expect(server).not.toContain('Standardrader ·')
+    // och databasen är i samma läge (v253)
+    const sql = read('sql/v253_upplagg_utan_systemnamn.sql')
+    expect(sql).toContain("WHERE name LIKE 'Standardrader · %'")
+    expect(sql).toContain('AND job_type_slug IS NOT NULL')
+  })
+
+  test('kopplingen mall → jobbtyp bor i Inställningar, med mallens version som villkor', () => {
+    const sida = utanKommentarer(read('app/dashboard/settings/quote-templates/page.tsx'))
+    expect(sida).toMatch(/method: 'PUT'[\s\S]{0,200}templateId: mall\.id, jobTypeSlug, updatedAt: mall\.updated_at \?\? null/)
+    expect(sida).toContain('const kanKoppla = Boolean(setup?.canManage)')
+    expect(sida).toMatch(/\{kanKoppla && \(\s*<select/)
+    expect(sida).toContain("fetch('/api/job-types/quote-setup'")
   })
 })

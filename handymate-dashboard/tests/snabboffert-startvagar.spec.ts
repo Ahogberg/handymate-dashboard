@@ -53,13 +53,17 @@ test.describe('alla tre starterna landar i samma fulla editor', () => {
     expect(body).not.toContain('setQuickMode(null)')
   })
 
-  test('mallvägen: VARJE onSelectTemplate-hanterare kör finishQuickStart', () => {
-    // Båda monteringsställena av QuoteNewStartChooser — ett mallval får
-    // aldrig landa i editorn via en egen, parallell genväg.
-    const handlers = PAGE.match(/onSelectTemplate=\{[^}]*\}\}/g) || []
-    expect(handlers.length, 'minst ett monteringsställe för mallväljaren').toBeGreaterThanOrEqual(1)
-    for (const h of handlers) {
-      expect(h, `mallval utan den delade avslutningen: ${h}`).toContain('finishQuickStart()')
+  test('upplägg-vägen: jobbtypsstarten och Övriga upplägg slutar i finishQuickStart', () => {
+    // Mallistan (QuoteNewStartChooser) togs bort 2026-09-17. Vägen till ett
+    // upplägg är jobbtypsremsan, och den får aldrig landa i editorn via en
+    // egen, parallell genväg.
+    expect(PAGE).not.toContain('QuoteNewStartChooser')
+    expect(PAGE).not.toContain('onSelectTemplate=')
+    for (const namn of ['async function applyJobTypeStart', 'async function applyOvrigtUpplagg']) {
+      const fn = PAGE.slice(PAGE.indexOf(namn))
+      const body = fn.slice(0, fn.indexOf('\n  }'))
+      expect(body, `${namn} ska landa i editorn via den delade funktionen`).toContain('finishQuickStart()')
+      expect(body).not.toContain('setQuickMode(null)')
     }
   })
 
@@ -87,10 +91,10 @@ test.describe('intaget — tre riktiga knappar, inte en hjälte och två fotnote
     expect(around).toContain('Bygg själv')
   })
 
-  test('alla tre startetiketter finns i intaget', () => {
+  test('två startknappar i intaget — mallknappen är borta (2026-09-17)', () => {
     expect(INTAKE).toContain('Bygg utkast')
     expect(INTAKE).toContain('Bygg själv')
-    expect(INTAKE).toContain('Använd en mall')
+    expect(INTAKE).not.toContain('Använd en mall')
   })
 })
 
