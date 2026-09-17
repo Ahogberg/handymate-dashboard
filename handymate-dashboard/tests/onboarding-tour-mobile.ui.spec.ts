@@ -54,6 +54,10 @@ for(const width of [375,1280])test(`alla fem tipskort inom viewport och toast fr
     if(width===375)await page.evaluate(()=>window.scrollTo(0,300))
     const card=page.getByText(`${index} av 5`,{exact:true}).locator('../..')
     await expect(card).toBeVisible()
+    // ui-bevis (2026-09-17): turen var den enda ui-specen utan sparad bild,
+    // och den är första ytan en ny kund ser. Kort 1 och 5 räcker — hela
+    // serien blir fem bilder per bredd utan att visa mer.
+    if(index===1||index===5)await page.screenshot({path:`test-results/onboarding-tour-${index}-${width}.png`,fullPage:true})
     const box=await card.boundingBox()
     expect(box!.y).toBeGreaterThanOrEqual(0);expect(box!.y+box!.height).toBeLessThanOrEqual(height)
     await page.getByRole('button',{name:index===5?'Klart':'Nästa',exact:true}).click()

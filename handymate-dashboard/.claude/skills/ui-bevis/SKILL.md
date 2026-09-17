@@ -58,6 +58,10 @@ Postgres bakom.
   och `scrollWidth`-provet är vad som går; påstå inte mer.
 - **En bild är inget korrekthetsbevis.** Den visar att ytan syns. Logiken
   bevisas fortfarande av facit med mutationstest (se `facit`).
+- **Varje ui-spec sparar en bild.** Alla sjutton gör det sedan 2026-09-17
+  (onboardingturen var den sista). Letar du efter anropet: det heter inte
+  alltid `page.screenshot` — specar med två flikar använder
+  `second.screenshot`. Grep på `.screenshot(`.
 - **Ändrar du en `.ui.spec.ts`-yta måste specen köras om** — den är också
   grinden som fångar att din nya rendering inte kraschar (`pageerror` samlas
   och ska vara tom).
