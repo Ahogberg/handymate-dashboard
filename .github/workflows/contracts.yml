@@ -193,6 +193,7 @@ jobs:
           tests/lars-preparation-review.spec.ts
           tests/feature-test-parity.spec.ts
           tests/arbetsordningen.spec.ts
+          tests/kundens-team-antal.spec.ts
           tests/facit-ai-kostnad-sanning.spec.ts
           tests/bransle-matare.spec.ts
           tests/quote-edit-autosave.spec.ts

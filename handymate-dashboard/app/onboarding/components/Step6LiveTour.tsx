@@ -20,7 +20,7 @@
 import AutonomyConsentCard from '@/components/dashboard/AutonomyConsentCard'
 import { useEffect, useState } from 'react'
 import { ListChecks, Target, Crown, TrendingUp, Compass } from 'lucide-react'
-import { TEAM, getAgentById } from '@/lib/agents/team'
+import { AI_KOLLEGOR, TEAM, getAgentById } from '@/lib/agents/team'
 import { TourTarget, SpotlightOverlay, type TourStepBase } from '@/components/tour/TourPrimitives'
 import { KOM_IGANG_DEFAULT_LABELS, KOM_IGANG_HEADING } from '@/lib/onboarding/kom-igang-tasks'
 import type { OnboardingFormData } from '../types-redesign'
@@ -277,7 +277,11 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
   const customerCount = instant?.customer_count ?? 0
   const openDealsCount = instant?.open_deals_count ?? 0
 
-  const teamRow = TEAM.filter(a => a.id !== 'matte').map(a => ({
+  // Kundens specialister: AI_KOLLEGOR utan Matte, som hälsar separat ovanför.
+  // TEAM användes tidigare här och tog med Handymate Support — vår kundtjänst
+  // stod som en av hantverkarens teammedlemmar (fynd 2, UI-genomgången
+  // 2026-09-17).
+  const teamRow = AI_KOLLEGOR.filter(a => a.id !== 'matte').map(a => ({
     id: a.id,
     name: a.name,
     avatar: a.avatar || '',
@@ -394,19 +398,12 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
               }}
             >
               <strong style={{ fontSize: 13, color: 'var(--ob-ink)' }}>Ditt AI-team idag</strong>
-              <span
-                style={{
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  gap: 5,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  color: 'var(--ob-green-600)',
-                }}
-              >
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'var(--ob-green-600)' }} />
-                {teamRow.length} på plats
-              </span>
+              {/* "N på plats" med grön prick låg här t.o.m. 2026-09-17 och var
+                  två fel i ett: ett andra tal för teamets storlek tjugo pixlar
+                  från rutan som säger samma sak, och ett ogrindat påstående om
+                  att alla är i arbete på ett konto där ingen kanal är kopplad
+                  ännu (samma lögn som sann agentstatus stängde 2026-09-13).
+                  Rutan nedan bär numret; den här raden är bara en rubrik. */}
             </div>
             <div style={{ display: 'flex', gap: 6 }}>
               {teamRow.map(a => (
@@ -462,7 +459,7 @@ function MockDashboard({ highlight, firstName, companyName, instant }: MockDashb
             ['Kunder', nf(customerCount), 'importerade', false],
             ['Obetalda', nf(unpaidCount), 'fakturor', false],
             ['Öppna affärer', nf(openDealsCount), 'att följa upp', false],
-            ['AI-kollegor', String(TEAM.length), 'i ditt team', true],
+            ['AI-kollegor', String(AI_KOLLEGOR.length), 'i ditt team', true],
           ].map((s, i) => {
             const hero = s[3] as boolean
             return (
