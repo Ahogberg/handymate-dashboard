@@ -21,11 +21,17 @@ import path from 'path'
 
 const ROOT = path.resolve(__dirname, '..')
 const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+/** Strippar kommentarer — provet vaktar vad kunden ser, inte förklaringar i koden. */
+const utanKommentarer = (src: string) =>
+  src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'`])\/\/.*$/gm, '$1')
 
 const HELPER = 'lib/billing/founders-offer.ts'
 const BANNER_TITLE = 'Lanseringserbjudande — Grundarkunderna'
-const BANNER_BODY =
-  'Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får {FOUNDERS_GUARANTEE_DAYS} dagars'
+// Bannerns brödtext bor sedan 2026-09-17 i getFoundersBannerBody() (lib/feature-
+// gates.ts) så den aldrig kan säga något annat än getGuaranteeFacts(true).
+// Ytorna ska anropa den — inte bära texten. Facit för själva orden:
+// tests/guarantee-truth.spec.ts.
+const BANNER_BODY = '{getFoundersBannerBody()}'
 
 test.describe('isFoundersOfferAvailable — frågan mot riktiga prenumerationsfält', () => {
   test('räknar på stripe_subscription_id + subscription_status = active', () => {
@@ -98,12 +104,15 @@ test.describe('Step5Activate — bannern', () => {
     expect(s.indexOf(BANNER_TITLE, titleIdx + 1)).toBe(-1)
   })
 
-  test('garantin hämtas från samma kanoniska grund-/grundarkundskonstanter', () => {
-    const s = read(FILE)
-    expect(s).toContain('STANDARD_GUARANTEE_DAYS')
-    expect(s).toContain('FOUNDERS_GUARANTEE_DAYS')
-    expect(s).toContain('{guaranteeDays} dagars resultatgaranti')
-    expect(s).toContain('pengarna tillbaka')
+  test('garantin läses från den enda källan, aldrig ur egna konstanter', () => {
+    // Låste tidigare ordet "resultatgaranti" här medan fakturasidan sa
+    // "pengarna-tillbaka-garanti. Inga frågor." — ett facit som garanterade
+    // att två ytor sa olika saker. Nu: båda läser getGuaranteeFacts().
+    const s = utanKommentarer(read(FILE))
+    expect(s).toContain('getGuaranteeFacts(')
+    expect(s).not.toContain('resultatgaranti')
+    expect(s).not.toContain('FOUNDERS_GUARANTEE_DAYS')
+    expect(s).not.toContain('STANDARD_GUARANTEE_DAYS')
   })
 })
 

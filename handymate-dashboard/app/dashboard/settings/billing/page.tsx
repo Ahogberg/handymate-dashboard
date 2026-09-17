@@ -21,8 +21,8 @@ import {
 } from 'lucide-react'
 import { FuelBillingCard } from '@/components/fuel/FuelBillingCard'
 import {
-  FOUNDERS_GUARANTEE_DAYS,
-  STANDARD_GUARANTEE_DAYS,
+  getFoundersBannerBody,
+  getGuaranteeFacts,
   getPlanCommercialFacts,
   YEARLY_MONTHS_FREE,
   type PlanType,
@@ -196,9 +196,9 @@ export default function BillingPage() {
   // Årsavtal (Andreas-beslut 2026-08-31, ersätter 2026-08-19): default Årsvis
   // vid plan-byte — matchar sajtens frontade årspris.
   const [billingInterval, setBillingInterval] = useState<'monthly' | 'yearly'>('yearly')
-  const guaranteeDays = billing?.founders_available
-    ? FOUNDERS_GUARANTEE_DAYS
-    : STANDARD_GUARANTEE_DAYS
+  // Garantin läses från EN källa (getGuaranteeFacts) — facit i
+  // tests/guarantee-truth.spec.ts.
+  const guarantee = getGuaranteeFacts(Boolean(billing?.founders_available))
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -446,7 +446,7 @@ export default function BillingPage() {
                     Lanseringserbjudande — Grundarkunderna
                   </strong>
                   <p className="text-sm text-gray-600 leading-relaxed">
-                    Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får {FOUNDERS_GUARANTEE_DAYS} dagars pengarna-tillbaka-garanti och en direktlinje till grundaren under hela första året.
+                    {getFoundersBannerBody()}
                   </p>
                 </div>
               )}
@@ -478,7 +478,7 @@ export default function BillingPage() {
 
               {billingInterval === 'yearly' && (
                 <p className="text-xs text-primary-700 font-medium mb-4">
-                  {guaranteeDays} dagars pengarna-tillbaka-garanti. Inga frågor. Gäller även årsavtal.
+                  {guarantee.headline}. {guarantee.body}
                 </p>
               )}
 

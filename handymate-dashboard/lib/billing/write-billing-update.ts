@@ -1,4 +1,5 @@
 import type Stripe from 'stripe'
+import { getPlanPrice, getPlanYearlyPrice, type PlanType } from '@/lib/feature-gates'
 
 /**
  * Den delade skrivningen av prenumerationsstatus (2026-09-02, Etapp B2).
@@ -40,11 +41,25 @@ export interface BillingPeriod {
   end?: string | null
 }
 
+/**
+ * Grundarstämpeln (sql/v239, beslutsfilen §4). Byggs bara när checkout-
+ * sessionen bar metadata.founders = 'true' — erbjudandet var tillgängligt i
+ * det ögonblick kunden sa ja. Priset är LISTPRISET vid köpet i hela kronor
+ * exkl. moms, inte vad Stripe drog.
+ */
+export interface FoundingStamp {
+  founding_at: string
+  founding_plan: string
+  founding_interval: 'monthly' | 'yearly'
+  founding_price_sek: number | null
+}
+
 export async function writeBillingUpdate(
   supabase: any,
   businessId: string,
   critical: Record<string, any>,
   period?: BillingPeriod,
+  founding?: FoundingStamp,
 ) {
   const { error } = await supabase
     .from('business_config')
@@ -67,6 +82,21 @@ export async function writeBillingUpdate(
       console.warn('[Billing] billing_period_* ej skrivet (kolumn saknas innan v69?) — icke-blockerande:', perr.message)
     }
   }
+
+  // Grundarstämpeln: egen, icke-blockerande skrivning av samma skäl som
+  // perioden — en saknad kolumn (v239) får aldrig stoppa aktiveringen. Och
+  // EN gång: filtret på founding_at IS NULL gör att en senare checkout
+  // (uppgradering, omteckning) aldrig skriver över den ursprungliga stämpeln.
+  if (founding) {
+    const { error: ferr } = await supabase
+      .from('business_config')
+      .update(founding)
+      .eq('business_id', businessId)
+      .is('founding_at', null)
+    if (ferr) {
+      console.warn('[Billing] grundarstämpeln ej skriven (kolumn saknas innan v239?) — icke-blockerande:', ferr.message)
+    }
+  }
 }
 
 /**
@@ -78,7 +108,7 @@ export async function writeBillingUpdate(
 export async function byggAbonnemangsfalt(
   stripe: Stripe,
   session: Stripe.Checkout.Session,
-): Promise<{ critical: Record<string, any>; period?: BillingPeriod }> {
+): Promise<{ critical: Record<string, any>; period?: BillingPeriod; founding?: FoundingStamp }> {
   const critical: Record<string, any> = {
     stripe_customer_id: session.customer as string,
     subscription_plan: session.metadata?.plan_id || 'starter',
@@ -107,5 +137,28 @@ export async function byggAbonnemangsfalt(
     }
   }
 
-  return { critical, period }
+  return { critical, period, founding: byggGrundarstampel(session.metadata) }
+}
+
+/**
+ * Grundarstämpeln ur metadata. Checkout-skaparna sätter `founders` i BÅDA
+ * metadata-blocken — sessionens och prenumerationens — så samma hjälpare
+ * fungerar för verify-vägen (session) och webhookens
+ * customer.subscription.* (subscription). Det är webhooken som faktiskt
+ * skriver kontots status efter en checkout; verify-vägen är onboardingens
+ * egen väg. Båda ska ge samma stämpel.
+ */
+export function byggGrundarstampel(
+  metadata: Stripe.Metadata | null | undefined,
+): FoundingStamp | undefined {
+  if (metadata?.founders !== 'true') return undefined
+  const plan = (metadata.plan_id || 'starter') as PlanType
+  const interval = metadata.billing_interval === 'yearly' ? 'yearly' : 'monthly'
+  const price = interval === 'yearly' ? getPlanYearlyPrice(plan) : getPlanPrice(plan)
+  return {
+    founding_at: new Date().toISOString(),
+    founding_plan: plan,
+    founding_interval: interval,
+    founding_price_sek: typeof price === 'number' ? price : null,
+  }
 }

@@ -51,11 +51,14 @@ test.describe('en kanonisk prissanning', () => {
     'app/onboarding/components/Step5Activate.tsx',
     'app/dashboard/settings/billing/page.tsx',
   ]) {
-    test(`${file} läser planfakta och garantitid centralt`, () => {
+    test(`${file} läser planfakta och garanti centralt`, () => {
       const s = read(file)
       expect(s).toContain('getPlanCommercialFacts')
-      expect(s).toContain('STANDARD_GUARANTEE_DAYS')
-      expect(s).toContain('FOUNDERS_GUARANTEE_DAYS')
+      // Garantin: en källa, eget facit (tests/guarantee-truth.spec.ts).
+      // Dagarna får inte längre interpoleras av ytan själv.
+      expect(s).toContain('getGuaranteeFacts(')
+      expect(s).not.toContain('STANDARD_GUARANTEE_DAYS')
+      expect(s).not.toContain('FOUNDERS_GUARANTEE_DAYS')
       expect(s).not.toContain('users: 10')
     })
   }

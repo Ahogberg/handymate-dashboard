@@ -71,8 +71,8 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const { critical, period } = await byggAbonnemangsfalt(stripe, session)
-    await writeBillingUpdate(supabase, business.business_id, critical, period)
+    const { critical, period, founding } = await byggAbonnemangsfalt(stripe, session)
+    await writeBillingUpdate(supabase, business.business_id, critical, period, founding)
 
     return NextResponse.json({ paid: critical.subscription_status === 'active' })
   } catch (error: unknown) {

@@ -7,7 +7,7 @@ import { classifyStripeInvoiceForPartner } from '@/lib/partners/stripe-revenue'
 // Skrivningen av prenumerationsstatus är delad med betalverifieringen i
 // onboardingen (POST /api/billing/onboarding-checkout/verify) — se
 // lib/billing/write-billing-update.ts. Två vägar, exakt en sanning.
-import { writeBillingUpdate, byggAbonnemangsfalt, toIsoOrNull, STRIPE_STATUS_MAP } from '@/lib/billing/write-billing-update'
+import { writeBillingUpdate, byggAbonnemangsfalt, byggGrundarstampel, toIsoOrNull, STRIPE_STATUS_MAP } from '@/lib/billing/write-billing-update'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -358,7 +358,10 @@ async function updateSubscriptionData(
     end: toIsoOrNull((subscription as any).current_period_end),
   }
 
-  await writeBillingUpdate(supabase, businessId, critical, period)
+  // Grundarstämpeln (sql/v239): checkout-skaparen la `founders` i
+  // subscription_data.metadata, så den följer med hit. Skrivs en gång —
+  // writeBillingUpdate filtrerar på founding_at IS NULL.
+  await writeBillingUpdate(supabase, businessId, critical, period, byggGrundarstampel(subscription.metadata))
 
   // Logga händelse
   await supabase

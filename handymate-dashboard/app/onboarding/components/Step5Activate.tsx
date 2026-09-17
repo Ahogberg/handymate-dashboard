@@ -7,8 +7,8 @@ import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import {
-  FOUNDERS_GUARANTEE_DAYS,
-  STANDARD_GUARANTEE_DAYS,
+  getFoundersBannerBody,
+  getGuaranteeFacts,
   getPlanCommercialFacts,
   YEARLY_MONTHS_FREE,
 } from '@/lib/feature-gates'
@@ -91,7 +91,8 @@ interface Step5Props {
 /**
  * Betalning sker numera på Stripes hostade Checkout-sida (redirect), inte via
  * inbäddat CardElement. Detta skapar en RIKTIG prenumeration som debiteras
- * DIREKT (ingen provperiod — modellen är betala direkt + resultatgaranti). De
+ * DIREKT (ingen provperiod — modellen är betala direkt + garanti, se
+ * getGuaranteeFacts i lib/feature-gates.ts). De
  * gamla /api/billing/setup-intent + /api/billing/confirm är ERSATTA (satte bara
  * subscription_status:'trialing' utan att skapa någon Stripe-prenumeration →
  * kunden debiterades aldrig). Routes finns kvar orörda men anropas inte längre.
@@ -187,9 +188,10 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
   }
 
   const selectedPlan = PLANS.find(p => p.id === plan) || PLANS[0]
-  const guaranteeDays = data.foundersAvailable
-    ? FOUNDERS_GUARANTEE_DAYS
-    : STANDARD_GUARANTEE_DAYS
+  // Garantin läses från EN källa (lib/feature-gates.ts getGuaranteeFacts) —
+  // den här ytan visar texten, formulerar inte om den. Facit:
+  // tests/guarantee-truth.spec.ts.
+  const guarantee = getGuaranteeFacts(Boolean(data.foundersAvailable))
 
   return (
     <div className="ob-screen">
@@ -279,7 +281,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
               Lanseringserbjudande — Grundarkunderna
             </strong>
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
-              Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får {FOUNDERS_GUARANTEE_DAYS} dagars resultatgaranti och en direktlinje till grundaren under hela första året.
+              {getFoundersBannerBody()}
             </p>
           </div>
         )}
@@ -330,19 +332,12 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
                   letterSpacing: '-0.01em',
                 }}
               >
-                {guaranteeDays} dagars resultatgaranti
+                {guarantee.headline}
               </strong>
             </div>
             <p style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
-              Hanterar inte AI-teamet minst <strong>5 kundkontakter</strong> åt dig — eller är
-              du av någon anledning inte nöjd — får du{' '}
-              <strong>pengarna tillbaka</strong>. Inga frågor.
+              {guarantee.body}
             </p>
-            {billingInterval === 'yearly' && (
-              <p style={{ fontSize: 12, color: 'var(--ob-primary-700)', fontWeight: 600, marginTop: 6 }}>
-                Gäller även årsavtal.
-              </p>
-            )}
           </div>
         </div>
 
@@ -456,7 +451,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
           <Shield size={18} style={{ color: 'var(--ob-primary-700)', flexShrink: 0 }} />
           <span style={{ fontSize: 13, color: 'var(--ob-ink-2)', lineHeight: 1.45 }}>
             Du anger kortuppgifterna säkert hos Stripe i nästa steg. Prenumerationen
-            startar direkt — täckt av vår {guaranteeDays}-dagars resultatgaranti.
+            startar direkt — täckt av garantin ovan.
           </span>
         </div>
 
@@ -496,7 +491,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
             Vad händer nu?
           </div>
           {[
-            'Pengarna tillbaka om garantin inte infrias',
+            guarantee.short,
             'Välj första uppdraget och kontrollera dina anslutningar',
             'Avsluta när som helst',
           ].map((t, i) => (

@@ -41,6 +41,19 @@ och `FOUNDERS_GUARANTEE_DAYS`.
 
 Först därefter är spårningen nedan meningsfull.
 
+**Uppföljning 2026-09-17, senare samma dag:** gjort. `getGuaranteeFacts()`
+i `lib/feature-gates.ts` är nu den enda källan, alla fyra ytorna läser
+därifrån, och `tests/guarantee-truth.spec.ts` fäller varje yta som bär egen
+text. Beslut Andreas: användningsgarantin gäller alla kunder när den
+publiceras. Bytet väntar på §10 i heroutkastet. Se
+`docs/gtm/garantin-inventering-2026-09-17.md` §7.
+
+Och en följd för avsnitt 2 nedan: de åtta ytorna mäter **användning**, inte
+koppling — `lib/admin/adoption.ts` säger uttryckligen "Setup är inte
+användning". Kopplade kanaler är alltså inte ett garantivillkor, och behöver
+inte bli det: "Lisa tog ett samtal" kräver redan en fungerande telefonkanal.
+Bevisloggens värde är att fånga kunden dag sju, inte att avslå dag åttiofem.
+
 ---
 
 ## 1. Varför `channel-health` inte kan bära garantin som den är

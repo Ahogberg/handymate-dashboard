@@ -8,6 +8,7 @@
 import { Loader2 } from 'lucide-react'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { usePartnerMe } from '../usePartnerMe'
+import { getGuaranteeFacts } from '@/lib/feature-gates'
 
 const AGENTER: Array<{ key: string; namn: string; roll: string }> = [
   { key: 'matte', namn: 'Matte', roll: 'Går igenom firman varje morgon' },
@@ -329,7 +330,7 @@ export default function PartnerdeckPage() {
               <span className="text-xl text-white/60">/mån</span>
             </div>
             <p className="text-[15px] text-white/65 leading-relaxed mt-3">
-              Firman: 5 995 kr/mån exkl. moms vid månadsbetalning, utan bindningstid. 30 dagars pengarna-tillbaka-garanti. Storfirman: 11 995 kr/mån exkl. moms för större volym. Bränsle ingår upp till planens gräns; extra påfyllning köps separat.
+              Firman: 5 995 kr/mån exkl. moms vid månadsbetalning, utan bindningstid. {getGuaranteeFacts(false).headline}. Storfirman: 11 995 kr/mån exkl. moms för större volym. Bränsle ingår upp till planens gräns; extra påfyllning köps separat.
             </p>
             <p className="text-xl font-semibold leading-snug mt-6">
               Utgå från <span className="text-teal-300">vad det kan göra för din firma</span>.

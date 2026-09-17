@@ -156,8 +156,9 @@ finns av bakåtkompatibilitet men marknadsförs inte publikt.
 
 Lanseringserbjudandet **Grundarkunderna** gäller de första 20 riktiga
 betalande företagen: låst pris, direktlinje till grundaren under första året
-och den ordinarie 30-dagars pengarna-tillbaka-garantin. Vi visar aldrig en
-påhittad platsräknare.
+och grundarnivån av garantin (vad garantin lovar bor i `getGuaranteeFacts()`,
+`lib/feature-gates.ts`, och upprepas inte här). Vi visar aldrig en påhittad
+platsräknare.
 
 Priset presenteras efter att prospektets problem och relevant arbetskedja har
 visats. Handymate jämförs med kostnaden för kvarvarande administration,

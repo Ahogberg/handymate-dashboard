@@ -2,9 +2,10 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Lanseringserbjudandet "Grundarkunderna" (Andreas-beslut 2026-08-19): de
- * första 20 RIKTIGA betalande företagen låser sitt pris för alltid, får 90
- * dagars pengarna-tillbaka-garanti i stället för 30, och direktlinje till
- * grundaren första året.
+ * första 20 RIKTIGA betalande företagen låser sitt pris för alltid, får
+ * grundarnivån av garantin (getGuaranteeFacts(true) i lib/feature-gates.ts —
+ * den enda källan för vad garantin lovar), och direktlinje till grundaren
+ * första året.
  *
  * "Riktig betalande" (aldrig en påhittad räknare):
  *   - stripe_subscription_id IS NOT NULL — en verklig Stripe-prenumeration

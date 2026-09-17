@@ -169,3 +169,54 @@ skrivet att just det företaget har livstidspris.
 Ett löfte om *livstid* som inte är nedskrivet per kund är det svagaste stället
 i hela konstruktionen, och det blir svårare att rätta för varje kund som
 tillkommer.
+
+---
+
+## 7. Utfört 2026-09-17 (samma dag, efter beslutet)
+
+**Beslut Andreas:** användningsgarantin gäller **alla kunder** när den
+publiceras, inte bara grundarna. Bytet får inte ske före §10 i heroutkastet.
+
+**Byggt:**
+
+- `getGuaranteeFacts()` + `getFoundersBannerBody()` i `lib/feature-gates.ts`,
+  med brytaren `GUARANTEE_MODEL` (`'money_back'` i dag, `'usage'` när §10 är
+  uppfyllt). Användningsgarantins siffror läses ur `lib/admin/adoption.ts` —
+  samma tal kunden ser i `/dashboard/min-garanti`.
+- Alla kundytor i det här repot läser därifrån: `Step5Activate` (tre
+  ställen, inkl. den femte formuleringen "minst 5 kundkontakter" som är
+  borta), fakturasidan, partnerdeck, demo-manus. `min-garanti` räknar
+  beslutsfönstret från samma konstant.
+- `tests/guarantee-truth.spec.ts` (16 prov): en källa, varje yta anropar
+  den, ingen yta bär egen garantitext. `founders-offer.spec.ts` och
+  `pricing-truth.spec.ts` justerade — de låste tidigare fast motsättningen.
+- `sql/v239_founding_customer.sql`: `founding_at`, `founding_plan`,
+  `founding_interval`, `founding_price_sek` på `business_config`. **Körd i
+  prod och verifierad.** Stämplas en gång av det delade betalflödet när
+  checkout-sessionen bar `metadata.founders = 'true'` — avgjort i
+  checkout-skaparen i det ögonblick erbjudandet visades, inte i webhooken
+  efteråt. Fyndet på vägen: `handleCheckoutCompleted` skriver aldrig
+  kontots status själv; det gör `updateSubscriptionData` via
+  `customer.subscription.*`, som bara har prenumerationens metadata. Därför
+  `founders` i båda metadata-blocken och samma hjälpare på båda vägarna.
+
+**Inte rört, med skäl:**
+
+- `handymate-landing/index.html` — statisk HTML, kan inte anropa
+  `getGuaranteeFacts()`. Under `money_back` säger den redan det kanoniska
+  ("30 dagars pengarna-tillbaka-garanti. Inga frågor."), så ingen ändring
+  behövs nu. **Den blir en manuell spegel** och ska ändras i samma pass som
+  brytaren. Noterat i heroutkastets §11.
+- `docs/gtm/grundarerbjudandet-hero-v1.md` — det är källan till
+  `'usage'`-texten, inte en kundyta.
+
+**Kvar:**
+
+- Andreas eget konto (**Andreas Bygg**, aktiv Stripe-prenumeration,
+  `is_demo_tenant = false`) räknas av `isFoundersOfferAvailable()` som
+  plats 1 av 20. Märk det som demokonto eller undanta det — annars går en
+  verklig grundarplats till spillo. Inte gjort här: `is_demo_tenant` styr
+  också demoåterställningen (v99), så det är ett medvetet val.
+- Bytet till `'usage'`: §10-villkoren, särskilt punkt 7 (juridisk
+  genomläsning). När det är gjort är bytet en rad i `feature-gates.ts` plus
+  landningssidan.

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import Stripe from 'stripe'
+import { isFoundersOfferAvailable } from '@/lib/billing/founders-offer'
 
 export const dynamic = 'force-dynamic'
 
@@ -116,6 +117,12 @@ export async function POST(request: NextRequest) {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://app.handymate.se'
 
     // Skapa Stripe Checkout-session — INGEN provperiod, debiteras direkt.
+    // Grundarstämpeln (sql/v239): avgörs HÄR, i det ögonblick erbjudandet
+    // visades och kunden sa ja — inte i webhooken efteråt, när platsen
+    // kan ha hunnit tas av någon annan. Metadata följer sessionen till
+    // byggAbonnemangsfalt(), som stämplar kontot en gång.
+    const foundersAtCheckout = await isFoundersOfferAvailable(supabase)
+
     const session = await stripe.checkout.sessions.create({
       customer: stripeCustomerId,
       mode: 'subscription',
@@ -137,6 +144,7 @@ export async function POST(request: NextRequest) {
       metadata: {
         business_id: business.business_id,
         plan_id: planId,
+        founders: foundersAtCheckout ? 'true' : 'false',
         onboarding: 'true',
         billing_interval: interval,
       },
@@ -144,6 +152,7 @@ export async function POST(request: NextRequest) {
         metadata: {
           business_id: business.business_id,
           plan_id: planId,
+          founders: foundersAtCheckout ? 'true' : 'false',
           onboarding: 'true',
           billing_interval: interval,
         },

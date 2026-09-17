@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { USAGE_GUARANTEE_DECISION_DAYS } from '@/lib/feature-gates'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, isOwnerOrAdmin } from '@/lib/permissions'
 import { getServerSupabase } from '@/lib/supabase'
@@ -45,8 +46,9 @@ export const dynamic = 'force-dynamic'
  * arbetsyta — en montör ska inte se företagets garantistatus.
  */
 
-/** Dagen beslutet senast ska fattas, räknat från onboardingens slut. */
-const BESLUTSFONSTER_DAGAR = 90
+/** Dagen beslutet senast ska fattas, räknat från onboardingens slut — samma
+    tal som garantitexten citerar (lib/feature-gates.ts), aldrig ett eget. */
+const BESLUTSFONSTER_DAGAR = USAGE_GUARANTEE_DECISION_DAYS
 
 export async function GET(request: NextRequest) {
   try {

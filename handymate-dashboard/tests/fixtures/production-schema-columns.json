@@ -1,6 +1,6 @@
 {
   "verified_at": "2026-09-07",
-  "source": "Supabase PostgREST OpenAPI, service_role, read-only. business_config uppdaterad 2026-09-04 efter migration v211 (deleted_at, deleted_by) och 2026-09-07 efter v222 (booking_visit_free).",
+  "source": "Supabase PostgREST OpenAPI, service_role, read-only. business_config uppdaterad 2026-09-04 efter migration v211 (deleted_at, deleted_by) och 2026-09-07 efter v222 (booking_visit_free) och 2026-09-17 efter v239 (founding_at, founding_plan, founding_interval, founding_price_sek).",
   "tables": {
     "business_config": [
       "accent_color",
@@ -76,6 +76,10 @@
       "fortnox_last_synced_at",
       "forward_phone_number",
       "forwarding_confirmed",
+      "founding_at",
+      "founding_interval",
+      "founding_plan",
+      "founding_price_sek",
       "four_eyes_enabled",
       "four_eyes_threshold_sek",
       "google_calendar_id",

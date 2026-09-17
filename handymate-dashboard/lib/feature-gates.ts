@@ -1,3 +1,5 @@
+import { ADOPTION_FONSTER_DAGAR, ADOPTION_TROSKEL, YTA_NYCKLAR } from '@/lib/admin/adoption'
+
 // Andreas-beslut 2026-07-31: 'starter' är borttagen ur det publika köpflödet
 // (onboarding + uppgraderingssidan) fr.o.m. 2026-07-31 — den bryter
 // kategorilöftet "hela teamet" som publikt utbud nu är Professional (ingång)
@@ -87,6 +89,97 @@ export function getCallLimit(plan: PlanType): number | null {
 /** En garanti, två nivåer. Grundarkundserbjudandet är uttryckligen 90 dagar. */
 export const STANDARD_GUARANTEE_DAYS = 30
 export const FOUNDERS_GUARANTEE_DAYS = 90
+
+// ---------------------------------------------------------------------------
+// Garantin — EN sanning för vad den lovar (2026-09-17)
+//
+// Dagarna ovan var redan kanoniska. Vad garantin LOVAR var det inte: elva ytor
+// över två repon sa fem olika saker (docs/gtm/garantin-inventering-2026-09-17.md)
+// — "pengarna tillbaka, inga frågor", "resultatgaranti", "minst 5 kundkontakter",
+// "om garantin inte infrias" och heroutkastets användningsgaranti. Ett facit
+// låste dessutom fast motsättningen.
+//
+// Samma mönster som getPlanCommercialFacts(): kundytorna får formulera nyttan
+// olika men aldrig bära egen garantitext. tests/guarantee-truth.spec.ts fäller
+// varje yta som gör det.
+//
+// ═══ TVÅ MODELLER, EN BRYTARE ═══
+//
+// 'money_back' är det som är publicerat i dag: villkorslöst, "inga frågor".
+// 'usage' är den villkorade användningsgarantin ur
+// docs/gtm/grundarerbjudandet-hero-v1.md §3 — beslut Andreas 2026-09-17 att den
+// gäller ALLA kunder, inte bara grundarna. Den får INTE slås på förrän §10 i
+// samma dokument är uppfyllt (bl.a. juridisk genomläsning: texterna blir
+// avtalsvillkor i samma stund de publiceras). Bytet är den här raden, inte elva.
+//
+// Villkorets siffror kommer från lib/admin/adoption.ts — samma tal kunden ser i
+// /dashboard/min-garanti och admin ser i sin vy. Ett villkor får aldrig
+// hänvisa till ett mått som räknas annorlunda än det annonseras.
+// ---------------------------------------------------------------------------
+
+export type GuaranteeModel = 'money_back' | 'usage'
+
+/** Brytaren. Se blocket ovan innan den ändras. */
+export const GUARANTEE_MODEL: GuaranteeModel = 'money_back'
+
+/** Beslutsfönstret för användningsgarantin: kunden ska ha sagt till före den här dagen. */
+export const USAGE_GUARANTEE_DECISION_DAYS = 90
+
+export interface GuaranteeFacts {
+  model: GuaranteeModel
+  /** Dagar kunden har på sig — återbetalningsfönster (money_back) eller beslutsfönster (usage). */
+  days: number
+  /** Vad som betalas tillbaka: den betalda perioden, eller hela året. */
+  refund: 'period' | 'year'
+  /** Villkoret kunden mäts mot, eller null när garantin är villkorslös. */
+  condition: { surfaces: number; of: number; windowDays: number } | null
+  /** Rubriken, t.ex. "30 dagars pengarna-tillbaka-garanti". */
+  headline: string
+  /** Den exakta meningen. Kundytorna visar den, formulerar inte om den. */
+  body: string
+  /** Kortformen för punktlistor och kvitton. */
+  short: string
+}
+
+export function getGuaranteeFacts(foundersAvailable: boolean): GuaranteeFacts {
+  if (GUARANTEE_MODEL === 'usage') {
+    const surfaces = ADOPTION_TROSKEL
+    const of = YTA_NYCKLAR.length
+    const windowDays = ADOPTION_FONSTER_DAGAR
+    return {
+      model: 'usage',
+      days: USAGE_GUARANTEE_DECISION_DAYS,
+      refund: 'year',
+      condition: { surfaces, of, windowDays },
+      headline: 'Använd det. Annars kostar det inget.',
+      body:
+        `Använd Handymate på ${surfaces} av ${of} ytor under dina första ${windowDays} dagar. ` +
+        `Gör du det och ändå inte tycker att det är värt pengarna, säg till före dag ${USAGE_GUARANTEE_DECISION_DAYS} ` +
+        `så får du hela året tillbaka. Du behåller all data, och vi hjälper dig exportera den.`,
+      short: 'Använd det. Annars kostar det inget.',
+    }
+  }
+  const days = foundersAvailable ? FOUNDERS_GUARANTEE_DAYS : STANDARD_GUARANTEE_DAYS
+  return {
+    model: 'money_back',
+    days,
+    refund: 'period',
+    condition: null,
+    headline: `${days} dagars pengarna-tillbaka-garanti`,
+    body: 'Är du inte nöjd får du pengarna tillbaka. Inga frågor. Gäller även årsavtal.',
+    short: 'Pengarna tillbaka om du inte är nöjd. Inga frågor.',
+  }
+}
+
+/**
+ * Grundarbannerns text. Bor här av samma skäl: den citerar garantin, och ska
+ * aldrig kunna säga något annat än getGuaranteeFacts(true).
+ */
+export function getFoundersBannerBody(): string {
+  const g = getGuaranteeFacts(true)
+  const garanti = g.model === 'usage' ? 'användningsgarantin "Använd det. Annars kostar det inget."' : g.headline
+  return `Just nu finns grundarkundsplatser kvar: ditt pris låses för alltid, du får ${garanti} och en direktlinje till grundaren under hela första året.`
+}
 
 // ---------------------------------------------------------------------------
 // Team-agenter per plan (Bas = bara Matte)
