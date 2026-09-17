@@ -140,3 +140,54 @@ borttagna helt, ingen bakåtkompatibilitet.
 
 Medvetet inte nu: skydd av manuella ändringar (svaren tillämpas en gång, före
 redigering), upprepning per rum. Står i målbilden.
+
+## Första jobbresan — bevisad, och de tre listorna kopplade (2026-09-17)
+
+Granskningens omprioritering: bevisa en hel första jobbresa innan mer byggs.
+Andreas valde "bevisa resan först, laga bara det som blockerar".
+
+**Mätningen som ändrade planen.** Handymate hade TRE listor som aldrig mött
+varandra, och det var en orsak, inte tre symptom:
+
+| Lista | Innehåll | Överlapp |
+|---|---|---|
+| Onboardingens jobbtyper | 15–17 per bransch, kundens språk | 0 av 15–17 mot mallarnas |
+| Mallbanken | 3–7 mallar, två grova jobbtyper | 0 av 22–35 rader mot artiklarna |
+| Artikelregistret | 4 prislösa startartiklar | — |
+
+I produktionen: 11 av 14 jobbtyper utan upplägg, 4 av 221 mallrader kopplade.
+Frågeflödet kunde alltså aldrig sätta en mängd för en ny firma.
+
+Två idéer föll på mätning innan de byggdes: namnmatchning vid seedning (0
+träffar) och återbruk av prisupplösningens fuzzy-matchare (också 0 träffar).
+
+- [x] lib/onboarding/template-articles.ts — artiklar härledda ur mallraderna,
+      ALLTID prislösa; tre rader härleds medvetet inte (tim, avsiktlig nollrad,
+      redan kopplad). `jobTypeStarters` ger varje jobbtyp utan upplägg
+      branschens generella rader
+- [x] lib/seed-defaults.ts — härleder, upsertar med stabila id:n och kopplar
+      raderna; `sales_price: 0` (NOT NULL, 0 = "pris saknas")
+- [x] lib/quotes/lifecycle.ts — `intake_answers` låst efter accept
+- [x] lib/quotes/lifecycle.ts — `travel_total` låst. Hittades av
+      tests/quote-content-lock.spec.ts som stod OGATAD utanför test:contracts
+      och gått röd obemärkt. Facit är nu i grinden
+- [x] app/api/projects/route.ts — jobbtypen från OFFERTEN före affären, så
+      knappen och create-from-quote ger samma projekt
+- [x] lib/invoices/quote-to-invoice-items.ts + fakturamallarna — dolda rader
+      faktureras (priset ingår i summan) men behåller sin doldhet
+- [x] sql/v255_invoice_job_type.sql + lib/invoices/create-invoice.ts —
+      jobbtypen på fakturan, härledd i KÄRNAN så alla åtta vägar får den
+- [x] tests/forsta-jobbresan.spec.ts — hela kedjan med riktiga funktioner
+- [x] Mutationstest 8/8 röda
+
+**Rättelse:** "Dolda rader faktureras" stod som lucka i inventeringen. Fel —
+att de faktureras är rätt (priset ingår i offertens summa, beslut 2026-08-05).
+Felet var att de tappade sin doldhet och blev synliga för kunden.
+
+### Kvar, medvetet
+- Betalplan → delfakturor (eget paket, blockerar inte resan)
+- Frågeflödet kan inte fråga efter TIMMAR: timrader kopplas aldrig, eftersom en
+  explicit koppling prövas före timregeln och hade tagit arbetsraden från
+  firmans timpris till 0 kr
+- Klickprovet registrering → första offert (golden path station 2 är
+  uttryckligen "assertion, ej ny registrering")

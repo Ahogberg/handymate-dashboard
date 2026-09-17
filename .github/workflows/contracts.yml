@@ -272,6 +272,8 @@ jobs:
           tests/demo-undantaget.spec.ts
           tests/salj-case-overlamning.spec.ts
           tests/intake-questions.spec.ts
+          tests/forsta-jobbresan.spec.ts
+          tests/quote-content-lock.spec.ts
           tests/offertens-radtyper.spec.ts
           --no-deps
           --project=chromium

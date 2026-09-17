@@ -6,6 +6,9 @@ import { getDefaultQuoteTemplates, normalizeTemplateBranch } from '@/lib/quote-t
 import { getDefaultAgreementTypes } from '@/lib/agreement-type-defaults'
 import { ensureDefaultStages } from '@/lib/pipeline'
 import { ensureOnboardingJobTypes } from '@/lib/job-types'
+import {
+  deriveTemplateArticles, jobTypeStarters, linkTemplateRowsToArticles, templateArticleId, templateArticleKey,
+} from '@/lib/onboarding/template-articles'
 
 type SupabaseClient = ReturnType<typeof getServerSupabase>
 
@@ -414,14 +417,13 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
 
   const { data: existingRows, error: readError } = await supabase
     .from('quote_templates')
-    .select('name')
+    .select('name, job_type_slug')
     .eq('business_id', businessId)
 
   if (readError) throw readError
   const existingNames = new Set((existingRows || []).map((r: { name: string }) => r.name))
-  const defaultTemplates = getDefaultQuoteTemplates(normalizedBranch).map((t, index) => ({ ...t, seedIndex: index })).filter(t => !existingNames.has(t.name))
-
-  if (defaultTemplates.length === 0) return
+  const branschmallar = getDefaultQuoteTemplates(normalizedBranch)
+  const defaultTemplates = branschmallar.map((t, index) => ({ ...t, seedIndex: index })).filter(t => !existingNames.has(t.name))
 
   let jobTypesReady = true
   try {
@@ -437,13 +439,84 @@ async function seedQuoteTemplates(supabase: SupabaseClient, businessId: string, 
     jobTypesReady = false
   }
 
+  // ── Jobbtyperna utan upplägg (2026-09-17, beslut Andreas) ───────────────
+  // Onboardingens jobbtyper ("Renovera badrum", "Installera laddbox") möter
+  // aldrig mallarnas grova ("Allmänt arbete", "Byggarbete"): överlappet är 0
+  // av 15–17 i alla fyra branscher, och i produktionen saknar 11 av 14
+  // jobbtyper upplägg. Var och en får därför branschens generella rader som
+  // start — hantverkaren byter ut dem, men börjar aldrig från tomt.
+  const { data: jobTypeRows } = await supabase.from('job_types')
+    .select('slug, name').eq('business_id', businessId).eq('is_active', true)
+  const slugsMedUpplagg = new Set([
+    ...(existingRows || []).map((r: { job_type_slug: string | null }) => r.job_type_slug).filter((s): s is string => Boolean(s)),
+    ...defaultTemplates.map(t => t.job_type_slug).filter((s): s is string => Boolean(s)),
+  ])
+  const startare = jobTypesReady
+    ? jobTypeStarters(branschmallar, (jobTypeRows || []) as { slug: string; name: string }[], slugsMedUpplagg)
+        .filter(t => !existingNames.has(t.name))
+    : []
+
+  const allaMallar = [...defaultTemplates, ...startare]
+  if (allaMallar.length === 0) return
+
+  // ── Artiklarna ur mallraderna ──────────────────────────────────────────
+  // Mätt 2026-09-17: noll av mallraderna matchade startbankens fyra artiklar,
+  // så ingen rad bar linked_product_id och frågeflödet var dött för varje ny
+  // firma. Varje distinkt rad blir därför en PRISLÖS artikel med radens namn
+  // och enhet; mallens gissade kronor följer aldrig med. Se
+  // lib/onboarding/template-articles.ts för de tre rader som inte härleds.
+  const { data: produktrader } = await supabase.from('products')
+    .select('id, name, unit').eq('business_id', businessId)
+  const befintliga = [
+    ...getStarterProducts(normalizedBranch),
+    ...((produktrader || []) as { name: string; unit: string }[]),
+  ] as { name: string; unit: string }[]
+  const harledda = deriveTemplateArticles(allaMallar, befintliga as never)
+
+  const idPerNyckel = new Map<string, string>()
+  for (const rad of (produktrader || []) as { id: string; name: string; unit: string }[]) {
+    if (rad.name && rad.unit) idPerNyckel.set(templateArticleKey(rad.name, rad.unit), rad.id)
+  }
+  if (harledda.length > 0) {
+    const { error: artikelFel } = await supabase.from('products').upsert(
+      harledda.map(a => ({
+        id: templateArticleId(businessId, templateArticleKey(a.name, a.unit)),
+        business_id: businessId,
+        name: a.name,
+        sku: a.sku,
+        unit: a.unit,
+        category: a.category,
+        // Priset är firmans att sätta — aldrig mallens gissning. Noll är
+        // kodbasens representation för "pris saknas" (sales_price är NOT NULL,
+        // se lib/products/pricing-state.ts) och ger "Sätt pris" i väljaren.
+        sales_price: 0,
+        purchase_price: null,
+        default_labor_share: a.labor_share,
+        default_travel_share: 0,
+        share_source: 'seed',
+        rot_eligible: false,
+        rut_eligible: false,
+        is_active: true,
+      })),
+      { onConflict: 'id', ignoreDuplicates: true },
+    )
+    // Artiklarna är värdefulla men inte livsviktiga: utan dem saknar mallraderna
+    // koppling, precis som före 2026-09-17. Mallarna ska seedas ändå.
+    if (artikelFel) console.warn('[seedQuoteTemplates] Kunde inte seeda mallartiklarna:', artikelFel.message)
+    else for (const a of harledda) idPerNyckel.set(templateArticleKey(a.name, a.unit), templateArticleId(businessId, templateArticleKey(a.name, a.unit)))
+  }
+
+  const kopplade = linkTemplateRowsToArticles(allaMallar, idPerNyckel)
+
   const defaultTexts = getDefaultStandardTexts(normalizedBranch)
   const texts: Record<string, string> = {}
   for (const t of defaultTexts) texts[t.text_type] = t.content
 
   const { error: writeError } = await supabase.from('quote_templates').insert(
-    defaultTemplates.map((t, i) => ({
-      id: `qtpl_${businessId}_${t.seedIndex}`,
+    kopplade.map((t) => ({
+      id: 'seedIndex' in t && typeof t.seedIndex === 'number'
+        ? `qtpl_${businessId}_${t.seedIndex}`
+        : `qtpl_${businessId}_jt_${t.job_type_slug}`,
       business_id: businessId,
       branch: normalizedBranch,
       name: t.name,

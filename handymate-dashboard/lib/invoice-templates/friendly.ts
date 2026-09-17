@@ -21,7 +21,7 @@ export const renderFriendly: InvoiceTemplateRenderFn = (data: InvoiceTemplateDat
   // heading/text/subtotal/discount-rader, denna sträng-mall grenar därför
   // radtypen själv istället för att anta att alla rader är 'item'.
   let itemNum = 0
-  const itemsHtml = data.invoice.items.map(item => {
+  const itemsHtml = data.invoice.items.filter(item => !item.isHidden).map(item => {
     const itemType = item.itemType || 'item'
     if (itemType === 'heading') {
       return `<div style="font-weight:700;font-size:14px;color:var(--ink);padding:10px 4px 2px;">${escapeHtml(item.name)}</div>`

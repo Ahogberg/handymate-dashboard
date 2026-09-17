@@ -17,7 +17,7 @@ export const renderPremium: InvoiceTemplateRenderFn = (data: InvoiceTemplateData
   // mall (kvar som sträng, inte migrerad till dokumentmotorn i 6a) måste
   // därför gren-hantera radtyperna själv, samma mönster som
   // lib/quote-templates/premium.ts redan gjorde för offertens rader.
-  const itemsHtml = data.invoice.items.map(item => {
+  const itemsHtml = data.invoice.items.filter(item => !item.isHidden).map(item => {
     const itemType = item.itemType || 'item'
     if (itemType === 'heading') {
       return `<div class="item-heading" style="font-family:'Syne',sans-serif;font-weight:700;font-size:13px;color:var(--dark);padding:10px 16px 4px;">${escapeHtml(item.name)}</div>`

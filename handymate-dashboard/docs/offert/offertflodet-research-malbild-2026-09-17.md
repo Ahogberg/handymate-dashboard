@@ -151,7 +151,7 @@ Fortnox med husarbete). Men femton luckor hittades. De som rör målbilden:
 | Jobbtyp når inte projektet via "Skapa projekt"-knappen | `POST /api/projects` tar bara jobbtyp från affären, aldrig från offerten | Projekt utan jobbtyp får inga lärdomar och ingen efterkalkyl per jobbtyp |
 | Jobbtyp når aldrig fakturan | 0 träffar på `job_type` i fakturakoden | Ingen lönsamhet per jobbtyp på fakturanivå |
 | Svaren från frågeflödet dör med offerten | `intake_answers` har ingen läsare i projekt eller faktura | Projektet vet inte att kunden sa "6,5 m² och golvvärme" |
-| Dolda rader faktureras | Mapparen filtrerar tillval men läser aldrig `is_hidden` | Offert och faktura kan visa olika radlistor |
+| Dolda rader tappar sin doldhet | Mapparen filtrerade tillval men läste aldrig `is_hidden` | Raden SKA faktureras (priset ingår i summan) men blev synlig för kunden på fakturan. Rättat 2026-09-17 |
 | ÄTA-rader tappar tredelningen | ÄTA-rader byggs utan `labor_amount` | ROT-basen för ÄTA räknas på hela beloppet |
 | Två projektskapare divergerar | Knappen ärver affär, auto-vägen ärver lead, en tredje i AI-motorn | Samma offert ger olika projekt beroende på väg |
 | Fortnox-offertsynken är död kod | `@deprecated` men anropas fortfarande | Risk för tomma rader om någon slår på den |
@@ -220,7 +220,7 @@ Sedan fyra byggpaket, vart och ett med kontraktstest och mutationstest som i dag
 | R | Rivningen enligt inventeringen, paket A–D | | Databas, scheman, jobbtyper |
 | B1 Artiklar i frågan | Frågetyp `article`: artikel-id:n + styrd rad. Editorn för frågor får ett artikelval. Svar byter artikel och pris på raden | v253, prisupplösningen | Artikelregistret |
 | B2 Varianter | Flera upplägg per jobbtyp visas som bas/rekommenderat/utökat. Svaren appliceras på alla. Kundsidan visar dem sida vid sida med tillval och live-summa | `quote_templates.job_type_slug`, tillvalsmotorn | Signeringen |
-| B3 Vägen ut | Betalplan → delfakturor. Jobbtyp och svar → projekt via båda skaparna. Dolda rader filtreras. ÄTA-rader får tredelning. Snapshot vid signering | `InvoiceType 'partial'`, referensmodellen | Fortnox-synken av fakturor |
+| B3 Vägen ut | ~~Jobbtyp → projekt via båda skaparna~~, ~~dolda rader behåller sin doldhet~~, ~~jobbtyp på fakturan~~, ~~svaren låsta vid accept~~ (alla gjorda 2026-09-17). Kvar: betalplan → delfakturor, ÄTA-rader får tredelning | `InvoiceType 'partial'` | Fortnox-synken av fakturor |
 | B4 Matte som utkast | Foto eller röst hos kunden → Matte fyller i frågeflödets svar, hantverkaren ser dem förifyllda. Aldrig ett pris som inte är firmans | Frågeflödet, transkriberingen | Godkännandegränsen |
 | Senare | Kundsvar före besöket (portal → lead → förifyllda frågor). Mockup ur före-bild | B1, B4 | |
 

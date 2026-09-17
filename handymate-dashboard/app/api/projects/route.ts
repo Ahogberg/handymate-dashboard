@@ -525,6 +525,17 @@ export async function POST(request: NextRequest) {
       projectData.quote_id = quote.quote_id
       projectData.customer_id = quote.customer_id
 
+      // Jobbtypen kommer i FÖRSTA hand från offerten (2026-09-17). Den här
+      // rutten läste bara affärens jobbtyp, medan den andra projektskaparen
+      // — lib/projects/create-from-quote.ts, den som accepterade offerter
+      // går igenom — alltid tagit offertens. Samma offert gav alltså olika
+      // projekt beroende på om kunden signerade eller hantverkaren tryckte
+      // "Skapa projekt", och knappens projekt fick varken lärdomar eller
+      // efterkalkyl per jobbtyp. Affären står kvar som fallback nedan.
+      if (!projectData.job_type && quote.job_type) {
+        projectData.job_type = quote.job_type
+      }
+
       // Hämta dealen som offerten tillhör (via quotes.deal_id) — så projektet
       // ärver samma ärende-nummer och kan falla tillbaka på deal-titeln.
       if (quote.deal_id) {

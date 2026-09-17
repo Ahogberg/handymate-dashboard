@@ -110,3 +110,61 @@ test.describe('rotRutLaborBasis', () => {
     expect(rotRutLaborBasis([], 'rot')).toBe(0)
   })
 })
+
+/**
+ * Dolda rader (2026-09-17). `is_hidden` betyder "kunden ser inte raden, men
+ * priset ingår i summan oförändrat" (lib/types/quote.ts, beslut Andreas
+ * 2026-08-05). Raden SKA alltså faktureras — men den ska inte plötsligt bli
+ * synlig för kunden på fakturan. Mapparen tappade flaggan helt, så en rad
+ * hantverkaren dolt i offerten dök upp som en vanlig rad på fakturan.
+ */
+test.describe('dolda rader behåller sin doldhet hela vägen', () => {
+  const rader = () => [
+    { item_type: 'item', description: 'Kakel', quantity: 10, unit_price: 400 },
+    { item_type: 'item', description: 'Marginal', quantity: 1, unit_price: 5000, is_hidden: true },
+  ]
+
+  test('raden följer med till fakturan — den ska betalas', () => {
+    const faktura = mapQuoteItemsToInvoiceItems(rader())
+    expect(faktura.map(r => r.description), 'båda raderna faktureras').toEqual(['Kakel', 'Marginal'])
+    expect(faktura.reduce((s, r) => s + r.total, 0), 'summan är oförändrad').toBe(9000)
+  })
+
+  test('men den bär sin doldhet, så kundens fakturadokument kan utelämna den', () => {
+    const faktura = mapQuoteItemsToInvoiceItems(rader())
+    expect(faktura[0].is_hidden).toBe(false)
+    expect(faktura[1].is_hidden).toBe(true)
+  })
+
+  test('mallarna filtrerar på flaggan, precis som offertmallarna gör', () => {
+    const fs = require('fs'), path = require('path')
+    const ROOT = path.resolve(__dirname, '..')
+    for (const fil of ['lib/invoice-templates/friendly.ts', 'lib/invoice-templates/premium.ts']) {
+      expect(fs.readFileSync(path.join(ROOT, fil), 'utf8'), `${fil} ska utelämna dolda rader`)
+        .toContain('data.invoice.items.filter(item => !item.isHidden)')
+    }
+    expect(fs.readFileSync(path.join(ROOT, 'lib/invoice-templates/data-builder.ts'), 'utf8'))
+      .toContain('isHidden: i.is_hidden === true,')
+  })
+})
+
+/**
+ * Jobbtypen på fakturan (2026-09-17, sql/v255). Härledningen bor i kärnan,
+ * inte i de åtta vägar som skapar fakturor — åtta kopior driftar isär.
+ */
+test.describe('jobbtypen når fakturan', () => {
+  test('kärnan härleder den ur offerten först, projektet sedan', () => {
+    const fs = require('fs'), path = require('path')
+    const kod = fs.readFileSync(path.resolve(__dirname, '..', 'lib/invoices/create-invoice.ts'), 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(kod).toContain('async function resolveJobType')
+    expect(kod).toContain('job_type: jobType,')
+    const kropp = kod.slice(kod.indexOf('async function resolveJobType'), kod.indexOf('export interface CreateInvoiceInput'))
+    expect(kropp.indexOf("from('quotes')"), 'offerten läses').toBeGreaterThan(-1)
+    expect(kropp.indexOf("from('project')"), 'projektet läses efter offerten').toBeGreaterThan(kropp.indexOf("from('quotes')"))
+    // Uppföljning får aldrig fälla en faktura.
+    expect(kropp).toContain('catch (error)')
+    expect(fs.readFileSync(path.resolve(__dirname, '..', 'sql/v255_invoice_job_type.sql'), 'utf8'))
+      .toContain('ADD COLUMN IF NOT EXISTS job_type TEXT')
+  })
+})
