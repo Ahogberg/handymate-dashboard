@@ -199,6 +199,15 @@ Nothing to activate. After review and merge, v251 is applied like v235–v240 (s
 until C9 registers a rule and the owner flips its flag). Verify after apply: seven tables, eight RPCs callable
 by service_role, `ledger_post` callable by none, zero rows.
 
+**Driftläge 2026-09-17 (Claude):** #89 mergad (`5a27d986`), v251 körd i produktion via Supabase MCP och verifierad
+med SELECT: sju `ledger_*`-tabeller med RLS på och 0 rader; `service_role` SELECT på alla sju, `authenticated`
+SELECT + policy `<tabell>_tenant_read` på sex (inte counters), `anon` inget, ingen INSERT för någon roll; de åtta
+RPC:erna EXECUTE för `service_role` och inte för `anon`/`authenticated`; `ledger_post`, `ledger_entry_json`,
+`ledger_period_for`, `ledger_lines_normalized`, `ledger_request_hash` EXECUTE för ingen; triggrarna
+`ledger_entries_reverse_only`, `ledger_entry_lines_no_update_delete`, `ledger_entry_lines_balanced` (DEFERRABLE
+INITIALLY DEFERRED) finns. Security advisor: ett nytt INFO, `ledger_voucher_counters` har RLS utan policy — avsett
+(bara RPC:n skriver, ingen roll läser), samma klass som `financial_event_consumers`. Inget bokförs förrän C9.
+
 ## 9. Handoff
 
 **Claude 2026-09-16 — built by Claude (Codex usage exhausted; owner decision the same day), branch `claude/jolly-hopper-t1d1jn`.**
