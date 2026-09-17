@@ -71,7 +71,7 @@ const MENU_ITEM_DANGER =
  *  - SEKUNDÄR: Redigera + en "Dokument"-dropdown (Visa i ny flik/Visa
  *    kundvy/Ladda ner PDF — tre knappar med samma Eye/Download-ikoner slås
  *    ihop till en meny).
- *  - "…"-OVERFLOW: Duplicera, Ny version, Spara mall, Skapa faktura (bara
+ *  - "…"-OVERFLOW: Duplicera, Ny version, Spara som upplägg, Skapa faktura (bara
  *    accepted — flyttad hit eftersom planen bara namnger EN primärknapp för
  *    accepted-status), Ta bort (bara draft).
  *  - Signeringslänken finns INTE här längre (punkt 6): QuoteSignatureCard
@@ -279,7 +279,7 @@ export function QuoteHeader({
               </button>
               <button onClick={() => { setMoreMenuOpen(false); onSaveTemplate() }} className={MENU_ITEM}>
                 <Bookmark className="w-4 h-4 text-slate-400" />
-                Spara mall
+                Spara som upplägg
               </button>
               {quote.status === 'accepted' && (
                 <button onClick={() => { setMoreMenuOpen(false); onCreateInvoice() }} disabled={creatingInvoice} className={MENU_ITEM}>

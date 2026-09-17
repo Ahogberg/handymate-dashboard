@@ -165,10 +165,10 @@ export interface QuoteEditViewProps {
 
   showSaveTemplateModal: boolean
   setShowSaveTemplateModal: (b: boolean) => void
-  templateName: string
-  setTemplateName: (s: string) => void
-  savingTemplate: boolean
-  saveAsTemplate: () => void
+  /** RIVNING PAKET C (2026-09-17, rad 2.20): "Spara som upplägg för
+      jobbtypen" behöver veta offertens jobbtyp — läst av loadEditQuote.ts
+      (quotes.job_type) precis som create-läget redan läser den. */
+  quoteJobType: string | null
 }
 
 export function QuoteEditView(props: QuoteEditViewProps) {
@@ -190,7 +190,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
     liveAvailable, quoteTemplateData,
     liveHandlers, setSheetItemId, addRowSheetOpen, setAddRowSheetOpen, templatePreviewPayload, sheetItem,
     businessId, productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
-    showSaveTemplateModal, setShowSaveTemplateModal, templateName, setTemplateName, savingTemplate, saveAsTemplate,
+    showSaveTemplateModal, setShowSaveTemplateModal, quoteJobType,
   } = props
 
   // Fas B-granskningsfix (offertskaparen-design-polish, 2026-08-31): lyft ur
@@ -393,12 +393,10 @@ export function QuoteEditView(props: QuoteEditViewProps) {
       )}
 
       <QuoteSaveTemplateModal
+        jobType={quoteJobType}
+        items={items}
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
-        templateName={templateName}
-        setTemplateName={setTemplateName}
-        saving={savingTemplate}
-        onSave={saveAsTemplate}
       />
     </div>
   )

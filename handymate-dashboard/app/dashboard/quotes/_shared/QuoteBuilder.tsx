@@ -348,10 +348,10 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [showUnitPrices, setShowUnitPrices] = useState(true)
   const [showQuantities, setShowQuantities] = useState(true)
 
-  // Template save modal
+  // Template save modal. RIVNING PAKET C (2026-09-17, rad 2.20):
+  // templateName/savingTemplate (det fria mallnamnet + dess egen sparning)
+  // är borta — se QuoteSaveTemplateModal.tsx:s docblock.
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
-  const [templateName, setTemplateName] = useState('')
-  const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateId, setTemplateId] = useState<string | undefined>(undefined)
   // Explicit jobbtyp från kopplad deal. Sparas på offerten så samma
   // Outcome Quality Gate-nyckel finns kvar vid kontrollen före utskick.
@@ -1145,6 +1145,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       setFastighetsbeteckning(loaded.fastighetsbeteckning)
       setDiscountPercent(loaded.discountPercent)
       setValidDays(loaded.validDays)
+      // RIVNING PAKET C (2026-09-17, rad 2.20): quoteJobType (redan
+      // create-lägets state) återanvänds i edit-läge för "Spara som
+      // upplägg för jobbtypen" — samma kolumn (quotes.job_type), bara en
+      // ny läsare (loadEditQuote.ts).
+      setQuoteJobType(loaded.jobType)
 
       setLoading(false)
       // Samma 500ms-marginal som gamla edit-sidan: låter alla setState-
@@ -1999,42 +2004,12 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     templateStyle, attachments,
   ])
 
-  async function saveAsTemplate() {
-    if (!templateName.trim()) return
-    setSavingTemplate(true)
-    try {
-      const response = await fetch('/api/quote-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: templateName,
-          description,
-          default_items: recalculateItems(items),
-          default_payment_plan: paymentPlan,
-          not_included: notIncluded || null,
-          ata_terms: ataTerms || null,
-          payment_terms_text: paymentTermsText || null,
-          terms_text: termsText || null,
-          detail_level: detailLevel,
-          show_unit_prices: showUnitPrices,
-          show_quantities: showQuantities,
-          rot_enabled: hasRotItems,
-          rut_enabled: hasRutItems,
-        }),
-      })
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        throw new Error(result.error || 'Kunde inte spara mallen')
-      }
-      toast.success('Mall sparad!')
-      setShowSaveTemplateModal(false)
-      setTemplateName('')
-    } catch (err) {
-      console.error('Failed to save template:', err)
-      toast.error(err instanceof Error ? err.message : 'Kunde inte spara mallen')
-    }
-    setSavingTemplate(false)
-  }
+  // RIVNING PAKET C (2026-09-17, rad 2.20): saveAsTemplate (POST till det
+  // fria, jobbtyp-lösa /api/quote-templates) är borttagen — "Spara som
+  // mall" är nu "Spara som upplägg för jobbtypen" och sparar via
+  // SaveJobStandardFromQuote inne i QuoteSaveTemplateModal (se dess
+  // docblock). /api/quote-templates-routen själv och mallistan i
+  // Inställningar rörs inte (rad 3.10, kräver Andreas).
 
   // ═══════════════════════════════════════════════════════════════════
   // Render
@@ -2117,10 +2092,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         saving={saving}
         onSendQuote={() => saveQuote(true)}
         onSaveDraft={() => saveQuote(false)}
-        onSaveTemplate={() => {
-          setTemplateName(title)
-          setShowSaveTemplateModal(true)
-        }}
+        onSaveTemplate={() => setShowSaveTemplateModal(true)}
         hasItems={items.length > 0}
         reservations={reservations}
         recalculated={recalculated}
@@ -2192,10 +2164,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         buildProductInitialValues={buildProductInitialValues}
         showSaveTemplateModal={showSaveTemplateModal}
         setShowSaveTemplateModal={setShowSaveTemplateModal}
-        templateName={templateName}
-        setTemplateName={setTemplateName}
-        savingTemplate={savingTemplate}
-        saveAsTemplate={saveAsTemplate}
+        quoteJobType={quoteJobType}
       />
     )
   }
@@ -2315,10 +2284,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
           hasItems={items.length > 0}
           onSendQuote={() => saveQuote(true)}
           onSaveDraft={() => saveQuote(false)}
-          onSaveTemplate={() => {
-            setTemplateName(title)
-            setShowSaveTemplateModal(true)
-          }}
+          onSaveTemplate={() => setShowSaveTemplateModal(true)}
         />
         {/* Jobbtypsremsan (Del 2, offertytan, 2026-09-01 — flyttad hit
             2026-09-02): låg tidigare i dokumentkolumnen ovanför "Mer"-raden,
@@ -2684,10 +2650,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         items={items}
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
-        templateName={templateName}
-        setTemplateName={setTemplateName}
-        saving={savingTemplate}
-        onSave={saveAsTemplate}
       />
     </div>
   )

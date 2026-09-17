@@ -278,6 +278,7 @@ jobs:
           tests/snabboffert-startvagar.spec.ts
           tests/offertstarten-en-skarm.spec.ts
           tests/rivning-c-verktygen.spec.ts
+          tests/rivning-2-20-mall-upplagg.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

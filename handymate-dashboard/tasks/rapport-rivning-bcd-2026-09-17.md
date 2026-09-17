@@ -5,11 +5,11 @@ Andreas (han sover). Uppdateras löpande, ett paket per commit.
 
 ## Status i korthet
 
-- **Paket B: KLART, grönt, pushat.** Rad 2.1–2.6, 2.10 gjorda. Rad 2.20
-  **hoppad över** (se motivering nedan — rättad i nästa commit, se
-  Paket C-avsnittet).
-- **Paket C: KLART, grönt.** Rad 2.12–2.17 gjorda, egen commit. Rad 2.20
-  görs som en EGEN commit direkt efter, med samma grind.
+- **Paket B: KLART, grönt, pushat.** Rad 2.1–2.6, 2.10 gjorda.
+- **Paket C: KLART, grönt, pushat.** Rad 2.12–2.17 gjorda, egen commit.
+- **Rad 2.20: KLART, grönt, egen commit efter paket C.** Ursprungligen
+  hoppad över i paket B av en felaktig motivering — rättad, se
+  "Rättelse"-avsnittet mellan paket C och paket D.
 - **Paket D: EJ PÅBÖRJAT.**
 - Fynd om 3.5/3.7/3.10/3.13 (görs inte i natt) är listade längst ner, hämtade
   ur inventeringsdokumentet — ingen ny kod skriven för dem.
@@ -392,6 +392,127 @@ contracts`, sist i listan efter `offertstarten-en-skarm.spec.ts`, och
   inga läckta 2.20-ändringar (se nästa avsnitt för varför det kontrollerades
   separat).
 
+## Rättelse till egen tidigare rapport — 2.20 hoppades över av fel skäl
+
+Föregående version av den här rapporten (skriven i paket B-avsnittet ovan)
+sa att 2.20 hoppades över för att `quotes` saknar kolumnen `job_type`.
+**Det var fel**, verifierat av Andreas: kolumnen finns
+(`sql/v7_pricing.sql:44`, `ALTER TABLE quotes ADD COLUMN IF NOT EXISTS
+job_type TEXT`), skrivs redan vid create (`buildQuotePayload.ts:146`,
+`job_type: input.quoteJobType`) och läses redan av
+`create-from-quote.ts:121`. Det som verkligen saknades var att
+`app/dashboard/quotes/[id]/types.ts`s lokala `Quote`-typ inte deklarerade
+fältet — en TypeScript-typlucka, inte en schemalucka. 2.20 är gjord nedan,
+som en egen commit efter paket C, med samma grind.
+
+## Rad 2.20 — "Spara som mall" blir "Spara som upplägg för jobbtypen"
+
+Två-tre implementationer av samma sak slogs ihop till en:
+
+1. **Headerns "Spara som mall"** (`QuoteBuilder.tsx` → `QuoteSaveTemplateModal.
+   tsx`) hade REDAN båda mekanismerna sida vid sida: ett fritt mallnamn +
+   `POST /api/quote-templates`, OCH (monterad separat i samma modal, från ett
+   tidigare, parallellt pass) `SaveJobStandardFromQuote` →
+   `/api/job-types/quote-setup` → `lib/quotes/job-standard-server.ts`
+   (`writeJobStandard`, operation `replace`/`append`) — redan byggd och delad
+   med onboardingen.
+2. **Detaljsidans egen inline-modal** (`app/dashboard/quotes/[id]/page.tsx`)
+   var en tredje, handkopierad variant: samma fria mallnamn +
+   `POST /api/quote-templates`, men UTAN `SaveJobStandardFromQuote` alls —
+   ingen jobbtypskoppling överhuvudtaget.
+
+**Gjort:** `QuoteSaveTemplateModal.tsx` skrivet om till EN väg. Mallnamn-
+fältet och `onSave`/`saving`-propparna borttagna helt. Kvar: titeln "Spara
+som upplägg för jobbtypen", och `SaveJobStandardFromQuote` monterad direkt
+om offerten har en jobbtyp. Saknas jobbtyp visas texten "Välj jobbtyp
+först" i stället för att spara utan koppling (ingen ny mekanism uppfunnen
+— `SaveJobStandardFromQuote` kräver ändå `jobType` för att veta vilket
+upplägg raderna ska bindas till).
+
+`saveAsTemplate`/`templateName`/`savingTemplate` (den fria mallsparningen)
+och dess `/api/quote-templates`-POST är borttagna ur ALLA TRE anropare:
+`QuoteBuilder.tsx` (create), `QuoteEditView.tsx` (edit) och `[id]/page.tsx`
+(detaljsidan, som nu monterar samma delade `QuoteSaveTemplateModal` i
+stället för sin egen handkopierade JSX). `/api/quote-templates`-routen
+SJÄLV (kontrollerat: filen finns kvar) och mallistan i Inställningar
+(rad 3.10, kräver Andreas) rörs INTE — bara de tre UI-anroparnas skrivväg
+för den fria sparningen. `QuoteBuilder.tsx`s ANDRA, orelaterade anrop till
+samma rutt (`PATCH … increment_usage` när en BEFINTLIG mall VÄLJS i
+`handleNewTemplateSelect`) är orört — upptäckt och medvetet undantaget i
+facit efter att en första version av testet råkade fånga det också.
+
+**Jobbtypen trådas nu även till redigeringsläget och detaljsidan**, som
+tidigare saknade den helt för det här syftet:
+
+- `app/dashboard/quotes/_shared/loadEditQuote.ts` (`LoadedEditQuote`) läser
+  nu `quote.job_type` — samma kolumn, en ny läsare. `QuoteBuilder.tsx`
+  sätter `quoteJobType`-state (redan create-lägets state) från den vid
+  `fetchQuote()`, och trådar den in i `QuoteEditView`.
+- `app/dashboard/quotes/[id]/types.ts`s `Quote`-typ fick fältet
+  `job_type?: string | null` — ren TypeScript-typ, ingen SQL, ingen
+  schemaändring (kolumnen fanns redan, API-svaret är redan `select('*')`
+  i `app/api/quotes/route.ts`).
+
+Knapptext ändrad "Spara som mall" → "Spara som upplägg" i
+`QuoteBuilderHeader.tsx` och detaljsidans "…"-meny (`[id]/components/
+QuoteHeader.tsx`).
+
+### Nytt facit: tests/rivning-2-20-mall-upplagg.spec.ts
+
+10 tester, källskanning utan browser/session. Bekräftar: det fria
+mallnamnet och `/api/quote-templates`-POST:en är borta ur alla tre
+anropare (men att routen själv och mallistan i Inställningar lever kvar,
+och att `handleNewTemplateSelect`s orelaterade PATCH-anrop till samma rutt
+inte räknas som en kvarleva); att `QuoteSaveTemplateModal` monteras av
+alla tre; att "Välj jobbtyp först" visas när jobbtyp saknas; att både
+detaljsidan och redigeraren nu läser `job_type`; att `sql/v7_pricing.sql`
+faktiskt lägger kolumnen (beviset för att detta aldrig var en
+schemaändring). Registrerad i `package.json` `test:contracts` och
+`.github/workflows/contracts.yml`, direkt efter `rivning-c-verktygen.spec.
+ts`.
+
+### Rader bort/ändrade (mätt med `wc -l`, HEAD `6a01781a` = paket C-committen, mot arbetsträdet)
+
+| Fil | Före (paket C) | Efter (+ 2.20) |
+|---|---:|---:|
+| `QuoteSaveTemplateModal.tsx` | 72 | 62 (−10, mallnamn-fältet + knappar bort) |
+| `QuoteBuilder.tsx` | 2694 | 2656 (−38) |
+| `QuoteEditView.tsx` | 405 | 403 (−2) |
+| `[id]/page.tsx` | 628 | 568 (−60, egen inline-modal + saveAsTemplate bort) |
+| `[id]/types.ts` | 132 | 138 (+6, `job_type`-fältet) |
+| `loadEditQuote.ts` | 188 | 195 (+7, `jobType`-fältet + läsning) |
+| **Summa** | **4119** | **3922** (netto **−97**) |
+
+### Mutationer (fyra, alla röda innan återställning)
+
+1. Bytte texten "Välj jobbtyp först…" mot "Mallnamn" i
+   `QuoteSaveTemplateModal.tsx` → `rivning-2-20-mall-upplagg.spec.ts` rött
+   på "modalen har bara jobbtyp-vägen kvar" (1 failed, 9 passed).
+   Återställt.
+2. Bytte `job_type?: string | null` mot `job_type_XX?: string | null` i
+   `[id]/types.ts` → rött på "detaljsidans Quote-typ … bär redan job_type"
+   (1 failed, 9 passed). Återställt.
+3. Bytte `jobType: quote.job_type || null` mot `jobType: null` i
+   `loadEditQuote.ts` → rött på "redigeraren läser jobbtypen …" (1 failed,
+   9 passed). Återställt.
+4. Bytte "Spara som upplägg" mot "Spara som mall" i
+   `QuoteBuilderHeader.tsx` → rött på "knapptexten byter namn med
+   mekaniken" (1 failed, 9 passed). Återställt, `diff` mot backup identisk
+   efteråt.
+
+### Verifiering
+
+- `./node_modules/.bin/tsc --noEmit` → 0 fel.
+- `npm run test:contracts` → **2872 passed, 1 skipped** av 2873 (2862 +
+  10 nya i `rivning-2-20-mall-upplagg.spec.ts`; samma pre-existerande skip
+  som paket C, orört).
+- `npx next build` → `✓ Compiled successfully`, samma kända brus.
+- `git status --short` kontrollerad — matchar exakt 2.20:s filomfång (sex
+  filer: `QuoteSaveTemplateModal.tsx`, `QuoteBuilder.tsx`,
+  `QuoteEditView.tsx`, `[id]/page.tsx`, `[id]/types.ts`,
+  `loadEditQuote.ts`) plus de två nya raderna i grindarna och det nya
+  facitet.
+
 ## Paket D — runtomkring
 
 **Inte påbörjat.**
@@ -424,34 +545,49 @@ ny kod skriven eller kod läst utöver dokumentet för dessa fyra rader:
   kunder, inte bara UI. Kräver ett uttryckligt beslut av Andreas, inte en
   agent som river på egen hand klockan natt.
 
-## Sammanfattning (efter paket C, innan rad 2.20)
+## Sammanfattning
 
-**Pushat/klart hittills:**
+**Pushat/klart:**
 
-- **Paket B** (rad 2.1–2.6, 2.10) — dokumentet är nu den enda platsen för
-  titel, beskrivning, rabatt, ROT/RUT-avdragsväxeln och de fyra
-  standardtexterna (med "Välj standardtext" flyttad dit); referens- och
-  adressfält bor i kundkortet; stilväljaren och "Mer"-radens tre borttagna
-  paneler är borta ur offertflödet (komponenten själv lever kvar åt
-  fakturan). Rad 2.20 hoppades ursprungligen över av en felaktig motivering
-  — rättas i nästa commit.
-- **Paket C** (rad 2.12–2.17) — AI-hjälpen inne i editorn, paketjämförelsen,
-  besöksregel-editorn (ersatt av en seedad fråga), en dödkod-komponent,
-  hela completeness-chipraden och fyra separata Matte/Daniel-ytor (slagna
-  ihop till "Matte säger") är borta. Nytt facit `tests/rivning-c-
-  verktygen.spec.ts` (16 test, registrerat i båda grindarna).
+- **Paket B** (rad 2.1–2.6, 2.10, pushat tidigare, commit `82ee1fd9`) —
+  dokumentet är nu den enda platsen för titel, beskrivning, rabatt,
+  ROT/RUT-avdragsväxeln och de fyra standardtexterna (med "Välj
+  standardtext" flyttad dit); referens- och adressfält bor i kundkortet;
+  stilväljaren och "Mer"-radens tre borttagna paneler är borta ur
+  offertflödet (komponenten själv lever kvar åt fakturan).
+- **Paket C** (rad 2.12–2.17, commit `6a01781a`, pushat) — AI-hjälpen inne
+  i editorn, paketjämförelsen, besöksregel-editorn (ersatt av en seedad
+  fråga), en dödkod-komponent, hela completeness-chipraden och fyra
+  separata Matte/Daniel-ytor (slagna ihop till "Matte säger") är borta.
+  Nytt facit `tests/rivning-c-verktygen.spec.ts` (16 test).
+- **Rad 2.20** (egen commit efter paket C) — "Spara som mall" i headern
+  och detaljsidans egen handkopierade variant slås ihop till EN väg,
+  "Spara som upplägg för jobbtypen" (`SaveJobStandardFromQuote` →
+  `writeJobStandard`), med "Välj jobbtyp först" när kopplingen saknas.
+  Jobbtypen trådas nu även till redigeringsläget och detaljsidan, som
+  tidigare saknade den. Nytt facit `tests/rivning-2-20-mall-upplagg.
+  spec.ts` (10 test).
 
-Grönt för paket C: tsc 0 fel, 2862/2863 kontraktstest passed (1
-pre-existerande skip, verifierat orört), ren build, fyra mutationer
-bekräftat röda och återställda.
+Grönt genomgående: tsc 0 fel, `npm run test:contracts` **2872 passed, 1
+skipped** av 2873 (baslinjen 2846 + 16 + 10 nya test; det enda skippet är
+`tests/send-invoice-core.spec.ts`s hårdkodade, pre-existerande
+`test.skip(...)`, verifierat orört av båda rivningarna), ren `next build`,
+och för varje paket minst fyra mutationer bekräftat röda och återställda
+mot respektive nya facit.
 
-**Kvar:** Rad 2.20 (görs i nästa commit — se rättelsen ovan), hela paket D.
+**Kvar:** hela paket D (inte påbörjat).
 
-**Viktigaste fyndet i paket C:** samma mönster som paket B — en yta som ser
-ut som ren dödkod kan dölja en riktig, oberoende läsare någon annanstans.
-`lib/quotes/visit-rule.ts` (2.14) såg ut att höra ihop med den borttagna
-editorn och rutten, men `lib/ai-quote-generator.ts` läser TIDIGARE sparade
-regler direkt ur databasen, helt oberoende — modulen fick leva kvar även om
-den enda UI-vägen till att SKRIVA nya regler ersattes av en seedad fråga.
-Att bara grep:a efter komponentnamnet (`VisitRuleEditor`) hade missat detta;
-grep på hela modulnamnet (`visit-rule`) hittade den andra läsaren.
+**Viktigaste fyndet:** samma mönster i båda passen — en yta som ser ut som
+ren dödkod, eller ett fritt val mellan flera implementationer, kan dölja en
+riktig, oberoende läsare eller en redan byggd men outnyttjad bättre väg.
+I paket C: `lib/quotes/visit-rule.ts` såg ut att höra ihop med den
+borttagna editorn och rutten (2.14), men `lib/ai-quote-generator.ts` läser
+TIDIGARE sparade regler direkt ur databasen, helt oberoende — modulen fick
+leva kvar även om den enda UI-vägen till att SKRIVA nya regler ersattes av
+en seedad fråga. I rad 2.20: den "riktiga" jobbtyp-kopplade sparningen
+(`SaveJobStandardFromQuote`) fanns redan byggd och monterad i headerns
+modal, bredvid den gamla — den behövde bara bli den ENDA vägen, inte
+uppfinnas. Att bara grep:a efter komponentnamnet (`VisitRuleEditor`) eller
+lita på en tidigare agents "kolumnen saknas"-slutsats hade missat båda; att
+grep:a hela modulnamnet (`visit-rule`) och att faktiskt läsa SQL-filen
+(`sql/v7_pricing.sql`) innan man drog en schema-slutsats hittade dem.
