@@ -2,6 +2,14 @@
 
 Detta dokument läses automatiskt av Claude Code vid sessionsstart. Följ alltid dessa regler.
 
+> **Arbetsordningen står i `AGENTS.md`** (repotets rot): i vilken ordning
+> arbetet görs och vad som räknas som bevisat. Detaljerna ligger som skills i
+> `.claude/skills/` — `facit` (mutationstesta varje test), `databasen-ar-facit`
+> (slå upp, gissa aldrig, en nolla är inget svar), `starta-ratt` (parallellt
+> arbete och premisser före bygge), `ui-bevis` (rendera i 375 px och titta).
+> Claude Code laddar dem automatiskt när uppgiften matchar. Den här filen är
+> produktreglerna; AGENTS.md är arbetssättet.
+
 ## Workflow Orchestration
 
 ### 1. Plan Node Default
