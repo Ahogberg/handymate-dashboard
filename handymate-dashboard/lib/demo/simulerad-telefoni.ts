@@ -67,6 +67,43 @@ export function arSimuleratDemonummer(nummer: string | null | undefined): boolea
 }
 
 /**
+ * Demokundernas simulerade nummer (2026-09-17).
+ *
+ * TIDIGARE fick alla sex demokunder ägarens egna `personal_phone`, med
+ * avsikten att man skulle kunna ringa demon från sin egen telefon. Två
+ * problem:
+ *
+ *  1. `unique_phone_per_business` är ett unikt index på
+ *     (business_id, phone_number). Kund nummer TVÅ kraschade alltid.
+ *     Det är därför återställningen inte gått igenom sedan indexet kom:
+ *     "customer_insert_failed: duplicate key value violates unique
+ *     constraint" på Mikael, varje gång.
+ *  2. Sex kunder med samma nummer gör inkommande samtal omöjliga att
+ *     tillskriva — matchningen hittar sex kunder och kan inte välja.
+ *
+ * Och framför allt: ett riktigt nummer i demodata betyder att ett utskick
+ * som slinker igenom når en verklig person. Demon ska vara simulerad hela
+ * vägen (Andreas 2026-09-17).
+ *
+ * Samma block som kontots nummer, men ALDRIG samma nummer —
+ * `arSimuleratDemonummer` måste förbli en exakt match mot ...0000, annars
+ * slutar nattsvepet kontrollera riktiga företags nummer.
+ */
+export const DEMO_KUNDNUMMER: Record<string, string> = {
+  anna: '+46701740001',
+  mikael: '+46701740002',
+  brf: '+46701740003',
+  fastighets: '+46701740004',
+  kristina: '+46701740005',
+  johan: '+46701740006',
+}
+
+/** Exakt matchning mot demokundernas nummer. Samma hållning som ovan: aldrig prefix. */
+export function arSimuleratDemokundnummer(nummer: string | null | undefined): boolean {
+  return typeof nummer === 'string' && Object.values(DEMO_KUNDNUMMER).includes(nummer)
+}
+
+/**
  * De simulerade samtalen. Två fångade, ett besvarat — samma blandning en
  * riktig vecka har.
  *

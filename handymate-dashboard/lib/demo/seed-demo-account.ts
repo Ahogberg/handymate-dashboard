@@ -8,6 +8,7 @@ import { ensureDefaultStages, getStageBySlug } from '@/lib/pipeline'
 import { seedAllDefaults } from '@/lib/seed-defaults'
 import type { QuoteItem } from '@/lib/types/quote'
 import { buildDemoManifest, type DemoManifest } from '@/lib/demo/manifest'
+import { DEMO_KUNDNUMMER } from '@/lib/demo/simulerad-telefoni'
 import { captureExpectedMarginSnapshot } from '@/lib/quotes/margin-snapshot'
 import { freezeProjectOutcome } from '@/lib/efterkalkyl/freeze-outcome'
 import { getProjectOutcome } from '@/lib/efterkalkyl/get-project-outcome'
@@ -30,7 +31,7 @@ import type { ExperimentMeasureKey } from '@/lib/experiment/types'
  * (app/api/admin/demo-reset/route.ts) redan har verifierat är exakt
  * process.env.DEMO_BUSINESS_ID. Funktionen gör ingen egen gate — den litar
  * på route-lagret. Rör ALDRIG business_config/business_users/auth: läser
- * bara personal_phone/business_name/contact_name (read-only).
+ * bara business_name/contact_name/branch (read-only).
  *
  * Radera→infoga är idempotent: kör man reset igen raderas gårdagens
  * demo-rader (matchade på business_id) innan nya skapas.
@@ -133,20 +134,19 @@ export async function resetDemoAccount(
     .from('business_config')
     // branch tillkom 2026-09-10 för seedAllDefaults nedan. Fortfarande
     // enbart LÄSNING av business_config — se filhuvudet.
-    .select('personal_phone, business_name, contact_name, branch')
+    .select('business_name, contact_name, branch')
     .eq('business_id', businessId)
     .single()
 
   if (bizErr || !biz) {
     return { error: 'Kunde inte läsa demokontots företagsinställningar.' }
   }
-  const ownerPhone = (biz.personal_phone as string | null) || null
-  if (!ownerPhone) {
-    return {
-      error:
-        'Inget mobilnummer sparat på demokontot. Gå till Inställningar → Telefoni och spara "Ditt privata mobilnummer" innan du återställer demon.',
-    }
-  }
+  // INGET RIKTIGT MOBILNUMMER BEHÖVS (2026-09-17). Demokunderna får
+  // simulerade nummer ur lib/demo/simulerad-telefoni.ts, och seedade SMS
+  // pekar på kundens eget nummer — ingenting i demon är någons riktiga
+  // telefon. Kravet var dessutom en onödig spärr: det andra demokontot
+  // (biz_demo_ekstrom) saknar eget mobilnummer och kunde därför aldrig
+  // återställas alls.
   const businessName = (biz.business_name as string) || 'Företaget'
   const contactName = (biz.contact_name as string) || ''
 
@@ -269,7 +269,7 @@ export async function resetDemoAccount(
   }
 
   // ══════════════════════════════════════════════════════════
-  // 3. KUNDER (6 st) — alla telefonnummer = ägarens personal_phone
+  // 3. KUNDER (6 st) — simulerade nummer ur DEMO_KUNDNUMMER
   // ══════════════════════════════════════════════════════════
   type SeedCustomer = {
     key: string
@@ -283,7 +283,7 @@ export async function resetDemoAccount(
         customer_id: genId('cust'),
         business_id: businessId,
         name: 'Anna Lindqvist',
-        phone_number: ownerPhone,
+        phone_number: DEMO_KUNDNUMMER.anna,
         email: 'demo+1@handymate.se',
         address_line: 'Björkvägen 14, 122 33 Enskede',
         customer_type: 'private',
@@ -297,7 +297,7 @@ export async function resetDemoAccount(
         customer_id: genId('cust'),
         business_id: businessId,
         name: 'Mikael Svensson',
-        phone_number: ownerPhone,
+        phone_number: DEMO_KUNDNUMMER.mikael,
         email: 'demo+2@handymate.se',
         address_line: 'Furuvägen 8, 141 45 Huddinge',
         customer_type: 'private',
@@ -309,7 +309,7 @@ export async function resetDemoAccount(
         customer_id: genId('cust'),
         business_id: businessId,
         name: 'BRF Lönnen',
-        phone_number: ownerPhone,
+        phone_number: DEMO_KUNDNUMMER.brf,
         email: 'demo+3@handymate.se',
         address_line: 'Lönngatan 5, 118 27 Stockholm',
         customer_type: 'brf',
@@ -324,7 +324,7 @@ export async function resetDemoAccount(
         customer_id: genId('cust'),
         business_id: businessId,
         name: 'Fastighets AB Storgatan',
-        phone_number: ownerPhone,
+        phone_number: DEMO_KUNDNUMMER.fastighets,
         email: 'demo+4@handymate.se',
         address_line: 'Storgatan 22, 111 51 Stockholm',
         customer_type: 'company',
@@ -338,7 +338,7 @@ export async function resetDemoAccount(
         customer_id: genId('cust'),
         business_id: businessId,
         name: 'Kristina Bergström',
-        phone_number: ownerPhone,
+        phone_number: DEMO_KUNDNUMMER.kristina,
         email: 'demo+5@handymate.se',
         address_line: 'Ekbacken 3, 168 36 Bromma',
         customer_type: 'private',
@@ -351,7 +351,7 @@ export async function resetDemoAccount(
         customer_id: genId('cust'),
         business_id: businessId,
         name: 'Johan Ek',
-        phone_number: ownerPhone,
+        phone_number: DEMO_KUNDNUMMER.johan,
         email: 'demo+6@handymate.se',
         address_line: 'Sjövägen 19, 131 40 Nacka',
         customer_type: 'private',
@@ -382,12 +382,17 @@ export async function resetDemoAccount(
   // i pipen — var osynlig.
   //
   // Varför INTE createLeadAndDeal, som vore den ärligaste vägen: dess
-  // kunddedupe matchar på telefon, och ALLA sex demokunder delar avsiktligt
-  // ägarens personal_phone (så demons SMS går till presentatörens egen
-  // telefon). Sex starka träffar är per definition tvetydigt, och funktionen
-  // vägrar då med rätta. Raderna nedan speglar därför dess insert kolumn för
-  // kolumn i stället: samma fält, samma 'new_lead'-fallback på
-  // pipeline_stage_key, samma lead_number ur samma räknare.
+  // kunddedupe matchade på telefon, och ALLA sex demokunder delade tidigare
+  // ägarens egna mobilnummer. Sex starka träffar är per definition tvetydigt,
+  // och funktionen vägrade då med rätta. Raderna nedan speglar därför dess
+  // insert kolumn för kolumn i stället: samma fält, samma
+  // 'new_lead'-fallback på pipeline_stage_key, samma lead_number ur samma
+  // räknare.
+  //
+  // SKÄLET ÄR BORTA SEDAN 2026-09-17: demokunderna har nu sex olika
+  // simulerade nummer, så dedupen är entydig och den här vägen KAN gå via
+  // createLeadAndDeal. Det är ett eget pass — en omskrivning här utan facit
+  // per rad är precis hur demodatan skulle glida isär från Golden Path.
   //
   // Två av dem hör till de webbkällade affärerna och länkas via deal.lead_id
   // nedan — det är formen en konverterad lead faktiskt har. Den tredje står
@@ -1230,7 +1235,7 @@ export async function resetDemoAccount(
       payload: {
         agent_id: 'daniel',
         quote_id: quotes.mikael_quote.quote_id,
-        to: ownerPhone,
+        to: customers.mikael.phone_number,
         // R1/R2 (kundröst-sveep 2026-08-12): förnamn, ingen intern offert-titel
         // — speglar den fixade formen i lib/autopilot/quote-nudge.ts.
         message: `${halsning(customers.mikael.name)} Jag såg att du tittade på offerten. Har du några frågor? Hör gärna av dig! //${contactName}`,
@@ -1253,7 +1258,7 @@ export async function resetDemoAccount(
       risk_level: 'low',
       payload: {
         agent_id: 'lisa',
-        to: ownerPhone,
+        to: customers.brf.phone_number,
         message: `Hej! Vi missade tyvärr ditt samtal till ${businessName}. Svara på detta SMS med vad du behöver hjälp med, så återkommer vi direkt — eller ringer upp så snart vi kan.`,
         customer_id: customers.brf.customer_id,
         customer_name: customers.brf.name,
@@ -1282,7 +1287,7 @@ export async function resetDemoAccount(
           businessId,
           customerId: customers.kristina.customer_id,
           businessName,
-          customerPhone: ownerPhone,
+          customerPhone: customers.kristina.phone_number,
           customerEmail: customers.kristina.email,
           emailToo: false,
           messages: {
@@ -1479,7 +1484,7 @@ export async function resetDemoAccount(
         agent_id: 'daniel',
         quote_id: quotes.anna_quote.quote_id,
         customer_id: customers.anna.customer_id,
-        to: ownerPhone,
+        to: customers.anna.phone_number,
         message: `${halsning(customers.anna.name)} Hörde av mig för att höra hur ni tänkte kring offerten — säg gärna till om något är oklart! //${contactName}`,
         customer_name: customers.anna.name,
         view_count: 2,
@@ -1499,7 +1504,7 @@ export async function resetDemoAccount(
       risk_level: 'low',
       payload: {
         agent_id: 'lisa',
-        to: ownerPhone,
+        to: customers.fastighets.phone_number,
         message: 'Hej! Bekräftar bara att fakturan för elinstallationen är på väg — hör av dig om något är oklart.',
         customer_id: customers.fastighets.customer_id,
         customer_name: customers.fastighets.name,
@@ -1519,7 +1524,7 @@ export async function resetDemoAccount(
       risk_level: 'low',
       payload: {
         agent_id: 'lisa',
-        to: ownerPhone,
+        to: customers.johan.phone_number,
         message: 'Hej! Bekräftar fakturan för gästtoaletten — hör av dig om något är oklart.',
         customer_id: customers.johan.customer_id,
         customer_name: customers.johan.name,
