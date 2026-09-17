@@ -1689,8 +1689,8 @@ Slutresultat: 53 PGlite-kontroller och 29 runtime-/integrationsprov för H3b är
 - [x] `tests/ledger-golden-path-vouchers.spec.ts`: 39 verifikat i 18 golden paths bokförs, läses rad för rad, numreras utan luckor, replay idempotent (6/6).
 - [x] Registrering i `contracts.yml` och `test:contracts`; handoff i briefens §9; paketloggens C8-rad.
 - [x] Adversariell granskning med två oberoende läsare (2 blockers + 8 should-fix rättade, se brief §9), `tsc`, `test:six-outcomes`, `next build` gröna.
-- [ ] Commit, push, PR, CI grön, squash-merge; därefter v251 i produktion med §8-verifieringen.
+- [x] PR #89 mergad efter grön CI; v251 körd i produktion 2026-09-17 och verifierad enligt §8.
 
-Granskning: se briefens §9 "Review". Kvar: PR, CI, merge, v251 i produktion.
+Granskning: se briefens §9 "Review". Driftläge: briefens §8. C9 är nästa paket (väntar på namngiven konsult, P0, C1b).
 
 ---

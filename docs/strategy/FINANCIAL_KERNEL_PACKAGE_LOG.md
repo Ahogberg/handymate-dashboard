@@ -39,11 +39,11 @@ Rules that keep this file honest:
 | C5b | Consumer bridge, shared sweep and human recovery | Codex | **done 2026-09-14** (PR #71 merged; review §5, 3 LOW carried to C6; see [C5b handoff](FINANCIAL_KERNEL_C5B_HANDOFF.md)) | — |
 | C6 | Shadow payment mode (S1 per business, Level 1 comparison, kill switch) | Codex | **done 2026-09-14** (PR #73 merged after base merge `8400f720`; review §5: no BLOCKER, 3 LOW; [C6 handoff](FINANCIAL_KERNEL_C6_HANDOFF.md)) | flip itself: v239 → v240 → v242 applied, crons live, PMF gate (orchestration §2) + owner pilot decision |
 | C7 | Pay provider adapter | Codex | not started | provider contract (Sprint −1), C3 |
-| C8 | Ledger schema + posting engine | Claude (Codex usage exhausted 2026-09-16) | **built 2026-09-16** ([C8 brief](FINANCIAL_KERNEL_C8_BRIEF.md) §9 handoff; 48 SQL + 39 golden-path vouchers + 7 engine checks green; PR pending review/merge, then v251 applied) | — |
-| C9 | SE posting rules | Codex | not started | P0, C1b, named accountant, C8 |
-| C10 | Read-only Ledger projections + SIE export | Codex | not started | C8 |
+| C8 | Ledger schema + posting engine | Claude (Codex usage exhausted 2026-09-16) | **done 2026-09-17** (PR #89 merged after two adversarial reviews; v251 applied to production and verified, [C8 brief](FINANCIAL_KERNEL_C8_BRIEF.md) §8/§9) | — |
+| C9 | SE posting rules | Codex | not started | P0, C1b, named accountant (C8 done) |
+| C10 | Read-only Ledger projections + SIE export | Codex | not started | — (C8 done) |
 | C11 | Bank/reconciliation | Codex | not started | C4, bank access (Sprint −1) |
-| C12 | Fortnox shadow verifier | Codex | not started | C6, C8 |
+| C12 | Fortnox shadow verifier | Codex | not started | C6 (C8 done) |
 | C13 | VAT return primitives | Codex | not started | C9, D3 (file vs produce) |
 | C14 | Receivables lifecycle | Codex | not started | C4, C9 |
 | R0 | Manual rulebook track: a handful of pilot companies' running bookkeeping done by hand, SIE4 of a closed year collected (roadmap §21.2, §13.1) | Owner + accounting consultant | **not started — condition, not option** | named accounting consultant |
