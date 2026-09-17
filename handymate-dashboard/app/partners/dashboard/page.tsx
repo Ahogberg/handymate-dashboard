@@ -26,6 +26,7 @@ import {
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
 import AssignedLeads from './components/AssignedLeads'
+import MinaGenomgangar from './components/MinaGenomgangar'
 import AgreementGate from '../components/AgreementGate'
 import PortalPreview from './components/PortalPreview'
 import StatementSection from './components/StatementSection'
@@ -606,6 +607,9 @@ export default function PartnerDashboardPage() {
             ))}
           </div>
         </section>
+
+        {/* ─── Dina genomgångar (utfallet av säljmaterialet ovan) ─── */}
+        <MinaGenomgangar />
 
         {/* ─── Så ser portalen ut när du har kunder (bara i tomma läget) ─── */}
         {tomtLage && (

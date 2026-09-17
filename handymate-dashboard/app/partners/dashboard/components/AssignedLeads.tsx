@@ -3,6 +3,17 @@ import { useCallback, useEffect, useState } from 'react'
 import { PARTNER_LEAD_STATUS, sendPartnerLead, type PartnerLead } from '@/lib/revenue/partner-leads'
 const field = 'mt-1 w-full rounded-lg border border-slate-300 p-2 text-sm'
 const button = 'rounded-lg bg-teal-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50'
+// Leaden → säljgenomgången. Orgnummer och kontakt följer med i adressen så
+// partnern inte skriver om det som redan står i leaden; genomgången slår upp
+// företaget mot Bolagsverket precis som när numret skrivs för hand.
+function genomgangsLank(snapshot: PartnerLead['snapshot']) {
+  const q = new URLSearchParams()
+  if (snapshot.org_number) q.set('org', snapshot.org_number)
+  if (snapshot.contact_name) q.set('kontakt', snapshot.contact_name)
+  if (snapshot.contact_email) q.set('epost', snapshot.contact_email)
+  const fraga = q.toString()
+  return '/partners/material/genomgang' + (fraga ? '?' + fraga : '')
+}
 function local(value: string | null) {
   if (!value) return ''
   const d = new Date(value)
@@ -37,6 +48,7 @@ export default function AssignedLeads() {
         {l.snapshot.contact_email && <a className="block break-all text-teal-700 underline" href={`mailto:${l.snapshot.contact_email}`}>{l.snapshot.contact_email}</a>}
         {l.snapshot.contact_phone && <a className="block text-teal-700 underline" href={`tel:${l.snapshot.contact_phone}`}>{l.snapshot.contact_phone}</a>}
       </div>
+      {!['won','lost','declined','revoked'].includes(l.status) && <a href={genomgangsLank(l.snapshot)} className="inline-flex min-h-[44px] items-center gap-1.5 rounded-full border border-slate-200 px-3.5 text-sm text-slate-700 hover:border-teal-400 hover:text-teal-800">Kör säljgenomgången för {l.snapshot.company_name}</a>}
       {!['won','lost','declined','revoked'].includes(l.status) && <form className="space-y-3" onSubmit={e => {
         e.preventDefault()
         const f = new FormData(e.currentTarget)

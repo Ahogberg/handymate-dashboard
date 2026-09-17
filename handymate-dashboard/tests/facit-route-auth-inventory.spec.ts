@@ -232,5 +232,9 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // grindar som partners/leads. Ingen tenant-kontext finns: målet är det
   // DELADE demokontot, valt ur DEMO_BUSINESS_ID och grindat på
   // is_demo_tenant, aldrig den anropande partnerns eget konto → 171.
-  expect(utanStandard.length).toBeLessThanOrEqual(171)
+  // 2026-09-17 (partnerns egna genomgångar): partners/sales-cases —
+  // partner-token + gällande avtal, samma grind som partners/leads. Läser
+  // bara rader där created_by_partner_id är partnern själv; ingen
+  // tenant-kontext finns, caset tillhör partnern och prospektet → 172.
+  expect(utanStandard.length).toBeLessThanOrEqual(172)
 })
