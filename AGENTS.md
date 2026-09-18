@@ -9,6 +9,11 @@ Detaljerna ligger som skills i `handymate-dashboard/.claude/skills/`. Claude
 Code laddar dem automatiskt när uppgiften matchar; läs dem som vanliga
 markdown-filer om du är en annan agent.
 
+**Obligatorisk quality gate:** alla icke-triviala produktändringar följer
+`handymate-dashboard/docs/DEVELOPMENT_QUALITY_GATE.md`. Byggaren får inte vara
+enda granskare av sitt eget arbete. Claude och Codex korsgranskar varandra,
+och en ändring är inte klar förrän kundutfallet är **OUTCOME PROVEN**.
+
 ## Fyra steg
 
 **1. Starta rätt** → `starta-ratt`
@@ -38,6 +43,9 @@ Före push, alltid: `npx tsc --noEmit` · `npm run test:contracts` ·
 `npx next build` · `git status --short`.
 
 **4. Skeppa**
+
+Före merge krävs oberoende review enligt quality gaten, med `QUALITY GATE: PASS`
+bundet till aktuell head-SHA. En ny commit gör tidigare PASS ogiltigt.
 
 Commitmeddelandet ska säga **varför**, vilket verkligt fel som stängdes,
 vilka mutationer som testades, och vad som medvetet lämnades ogjort. Svenska.
