@@ -1,3 +1,59 @@
+## Spår 1 — Samtalet blir ett jobb, 2026-09-18
+
+Fångst-SMS:et lovar kunden "Svara på detta SMS med vad du behöver hjälp med".
+Svaret kom fram och sparades i `sms_conversation` — och stannade där. Ingen
+kund, inget kort, ingen affär. Hantverkaren fick ringa upp och fråga om samma
+sak en gång till. Det är den halvan som stängs här.
+
+- [x] Normaliserad identitet: tenantfallbacken i `sms/incoming` frågar på
+      `phoneCandidates()` i stället för råsträngen, kunden/leaden löses på
+      huvudvägen, och `sms/send` matchar via `findCustomerByPhone`.
+- [x] Svaret kopplas till det missade samtalet: `lib/sms/relatera-missat-samtal.ts`
+      läser fångst-SMS:et (`sms_log`, `message_type='automation_rule'`) och
+      `call_recording` inom 24 h; `related_call_id` följer med in i kortet och
+      i Matte-kontexten.
+- [x] Okänd avsändare blir kund via golden path med **`notify: false`** — annars
+      fyras `lead_received` och den seedade regeln "Snabbsvar på ny lead"
+      skickar ett andra "tack för din förfrågan" ovanpå fångst-SMS:et.
+- [x] ETT kort: `lib/sms/svar-blir-jobb.ts` klassar på `runIntentAgent`s
+      `intent`/`confidence` (inget andra modellanrop), sparar kundfakta med
+      ordagrant citat via den delade extraktorn, och skapar ett `lead_review`-kort.
+      Matte-exekveraren hoppar de action-typer kortet täcker.
+- [x] Obegripligt svar ⇒ kortet säger att vi inte förstod. Ingen jobbtyp, ingen
+      beskrivning, inga kundfakta. Förfrågan tappas aldrig, men gissas aldrig.
+- [x] `sql/v260_sms_conversation_identitet.sql` körd mot prod och verifierad:
+      `customer_id` + `lead_id` finns, två index skapade, 19 rader orörda.
+- [x] `tests/sms-svar-blir-kund.spec.ts` (21 prov), registrerad sist i både
+      `test:contracts` och `contracts.yml`. 13 mutationer testade, alla dödade.
+- [x] `npx tsc --noEmit` exit 0 · `npx next build` ren · `test:contracts`
+      2875 → 2896 pass, 0 röda, 1 skip (oförändrad).
+
+**Medvetna avvikelser, med skäl:**
+
+- Dedup-hålet i `lib/leads/golden-path.ts` (lead-intake-granskningen
+  §"Dedup-hålet") var **redan stängt** — dedupen går genom
+  `findCustomerDuplicates` med `normalizeSwedishPhone` + e-postfallback.
+  Ingen kodändring; ett låsande facit i stället så det inte återöppnas.
+- `app/api/voice/incoming/route.ts` **orörd**. `createLeadAndDeal` ligger inuti
+  testfönstret med flit — raderna 196–204 bär beslutet "ett telefonnummer som
+  börjar ringa är INTE ett kvalificerat lead". En utlyftning vore en
+  beteendeändring, inte en flytt.
+- SMS-fångade kundfakta skrivs med `confirmed_at: null` — ingen människa har
+  godkänt dem. `lib/matte/resolver.ts` och `lib/ai-quote-generator.ts` filtrerar
+  därför nu på `confirmed_at`, eftersom deras prompter ordagrant kallar listan
+  "godkända av hantverkaren". `/api/customers/[id]/facts` gjorde det redan.
+- `sms_conversation.customer_id` fanns i prod men saknade fil i `sql/`.
+  Deklarerad i v260 (no-op mot prod) så kolumnkontraktet har en sanning att läsa.
+
+**Kvar, inte rört i detta pass:** `app/api/sms/incoming/route.ts` triggar
+`incoming_sms`-agenten (`lib/agent/agents/lead-agent.ts`: "svara med SMS",
+`send_sms` i verktygen) **samtidigt** som Matte-grenen kan svara kunden
+(`action-executor.ts` → `sendCustomerReply`, grindad av
+`matte_customer_reply_enabled`). Är den flaggan på kan kunden få två svar på
+samma SMS. Beteendet är oförändrat här och behöver ett eget beslut.
+
+---
+
 ## Artiklar, mallar och ROT — 2026-09-16
 
 - [x] Fas 1: 30/30 v252-kontroller i isolerad PGlite; ingen extern migration körd.

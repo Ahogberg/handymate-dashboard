@@ -16,6 +16,11 @@ export interface IncomingSignal {
   body: string
   subject?: string
   receivedAt: string
+  /** Spår 1 (2026-09-18): call_recording-id när SMS:et svarar på ett missat
+      samtal inom 24 h. Sätts av app/api/sms/incoming. */
+  relatedCallId?: string | null
+  /** Sant när ett fångst-SMS eller missat samtal finns i fönstret. */
+  svarPaMissatSamtal?: boolean
 }
 
 export interface MatteAction {
@@ -202,7 +207,7 @@ function buildContext(
     : '\nKALENDER: Inga lediga tider pre-hämtade — skapa approval utan specifika tider.'
 
   return `INKOMMANDE ${signal.channel.toUpperCase()} FRÅN: ${entity.customerName ?? 'Okänd avsändare'}
-Telefon/mail: ${signal.from}
+Telefon/mail: ${signal.from}${signal.svarPaMissatSamtal ? '\nSAMMANHANG: Detta är kundens SVAR på ett missat samtal — vi bad dem själva skriva vad de behöver hjälp med.' : ''}
 ${signal.subject ? `Ämne: ${signal.subject}\n` : ''}Meddelande: "${signal.body}"
 Tidpunkt: ${signal.receivedAt}
 

@@ -278,6 +278,7 @@ jobs:
           tests/revenue-bulk.spec.ts
           tests/revisorsplats.spec.ts
           tests/pengar-pa-bordet.spec.ts
+          tests/sms-svar-blir-kund.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

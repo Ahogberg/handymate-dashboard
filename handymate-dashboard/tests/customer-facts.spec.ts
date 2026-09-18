@@ -354,12 +354,18 @@ test.describe('"ta bort"-vägen — självrefererande superseded_by', () => {
 })
 
 test.describe('konsumenterna läser fail-safe', () => {
-  test('resolvern filtrerar på superseded_by och begränsar till 10', () => {
+  test('resolvern filtrerar på superseded_by + confirmed_at och begränsar till 10', () => {
     const s = read('lib/matte/resolver.ts')
     const i = s.indexOf("from('customer_fact')")
     expect(i, 'resolvern läser inte customer_fact').toBeGreaterThan(-1)
-    const gren = s.slice(i, i + 400)
+    const gren = s.slice(i, i + 900)
     expect(gren).toContain('superseded_by')
+    // Spår 1 (2026-09-18): SMS-svaret på ett missat samtal skriver fångade
+    // kundfakta med confirmed_at NULL — de är förslag, inte beslut. Prompten
+    // som listan hamnar i heter "BEKRÄFTADE KUNDFAKTA (godkända av
+    // hantverkaren)", så utan det här filtret ljuger vi för modellen.
+    expect(gren, 'obekräftade fakta når prompten som "godkända av hantverkaren"')
+      .toContain(".not('confirmed_at', 'is', null)")
     expect(gren).toContain('.limit(10)')
     expect(s).toContain('confirmedFacts')
   })

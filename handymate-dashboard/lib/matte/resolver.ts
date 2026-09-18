@@ -234,6 +234,10 @@ export async function resolveEntity(
           .eq('business_id', businessId)
           .eq('customer_id', customerId)
           .is('superseded_by', null)
+          // Spår 1 (2026-09-18): SMS-vägen skriver fångade kundfakta med
+          // confirmed_at NULL — de är förslag, inte beslut. Prompten nedan
+          // kallar listan "godkända av hantverkaren", och det ska vara sant.
+          .not('confirmed_at', 'is', null)
           .order('created_at', { ascending: false })
           .limit(10)
       : Promise.resolve({ data: [] as any[] }),
