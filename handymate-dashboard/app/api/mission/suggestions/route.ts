@@ -74,7 +74,7 @@ async function loadPengarSignal(
         .lt('due_date', idag),
       supabase
         .from('pending_approvals')
-        .select('payload')
+        .select('id, payload')
         .eq('business_id', businessId)
         .eq('approval_type', 'profitability_warning')
         .eq('status', 'pending'),
@@ -88,12 +88,17 @@ async function loadPengarSignal(
       return typeof v === 'number' ? v : 0
     }
 
+    // Den här rutten använder bara summan och antalet, men bygger genom samma
+    // rena modul — så siffrorna här kan inte avvika från Pengar på bordet.
     const summary = buildPengarSummary({
       staleQuotes: [],
       missedRevenue: [],
       overdueInvoices: riktigaForfallna as OverdueInvoice[],
-      marginOverruns: (marginRes.data ?? []).map(r => overrun(r.payload)),
-      ataEstimates: [],
+      marginRisker: (marginRes.data ?? []).map(r => ({
+        id: String(r.id),
+        overrunKr: overrun(r.payload),
+      })),
+      ataForslag: [],
     })
 
     const forfallet = summary.kategorier.find(k => k.key === 'forfallet')

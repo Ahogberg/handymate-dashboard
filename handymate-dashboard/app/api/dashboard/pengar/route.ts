@@ -50,7 +50,9 @@ export async function GET(request: NextRequest) {
         .from('quotes')
         // `title` läses ENBART för testdata-filtret nedan — e2e-offerten
         // heter "E2E Test — …" och skulle annars räknas som riktiga pengar.
-        .select('total, sent_at, title')
+        // quote_id/quote_number läses för att posten ska gå att peka ut —
+        // en siffra utan rad går inte att kontrollera.
+        .select('quote_id, quote_number, total, sent_at, title')
         .eq('business_id', businessId)
         .in('status', [...OPEN_QUOTE_STATUSES])
         .lt('sent_at', staleGrans),
@@ -81,19 +83,19 @@ export async function GET(request: NextRequest) {
         .from('invoice')
         // `invoice_id` läses ENBART för testdata-filtret — e2e-fakturor
         // prefixas 'e2e_inv_' och ska inte synas som förfallna fordringar.
-        .select('invoice_id, total, customer_pays, rot_rut_type')
+        .select('invoice_id, invoice_number, total, customer_pays, rot_rut_type, due_date')
         .eq('business_id', businessId)
         .in('status', ['sent', 'overdue'])
         .lt('due_date', idag),
       supabase
         .from('pending_approvals')
-        .select('payload')
+        .select('id, payload')
         .eq('business_id', businessId)
         .eq('approval_type', 'profitability_warning')
         .eq('status', 'pending'),
       supabase
         .from('pending_approvals')
-        .select('payload')
+        .select('id, payload')
         .eq('business_id', businessId)
         .eq('approval_type', 'create_ata_draft')
         .eq('status', 'pending'),
@@ -131,13 +133,13 @@ export async function GET(request: NextRequest) {
       now: nu,
     })
 
-    const overrun = (p: unknown): number => {
-      const v = (p as Record<string, unknown> | null)?.projected_overrun
+    const tal = (p: unknown, nyckel: string): number => {
+      const v = (p as Record<string, unknown> | null)?.[nyckel]
       return typeof v === 'number' ? v : 0
     }
-    const estimate = (p: unknown): number => {
-      const v = (p as Record<string, unknown> | null)?.amount_estimate
-      return typeof v === 'number' ? v : 0
+    const projektnamn = (p: unknown): string | null => {
+      const v = (p as Record<string, unknown> | null)?.project_name
+      return typeof v === 'string' && v ? v : null
     }
 
     return NextResponse.json(
@@ -145,8 +147,16 @@ export async function GET(request: NextRequest) {
         staleQuotes: riktigaOfferter as StaleQuote[],
         missedRevenue,
         overdueInvoices: riktigaForfallna as OverdueInvoice[],
-        marginOverruns: (marginRes.data ?? []).map(r => overrun(r.payload)),
-        ataEstimates: (ataDraftRes.data ?? []).map(r => estimate(r.payload)),
+        marginRisker: (marginRes.data ?? []).map(r => ({
+          id: String(r.id),
+          overrunKr: tal(r.payload, 'projected_overrun'),
+          projectName: projektnamn(r.payload),
+        })),
+        ataForslag: (ataDraftRes.data ?? []).map(r => ({
+          id: String(r.id),
+          estimateKr: tal(r.payload, 'amount_estimate'),
+          projectName: projektnamn(r.payload),
+        })),
       }),
     )
   } catch (error) {

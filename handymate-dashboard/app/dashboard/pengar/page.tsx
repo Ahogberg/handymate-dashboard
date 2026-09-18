@@ -14,6 +14,7 @@ import { LedgerHistorik, type LedgerHistorikRad } from '@/components/value/Ledge
 import RevenueWorkQueue from '@/components/pengar/RevenueWorkQueue'
 import WeeklyValueDigest from '@/components/dashboard/WeeklyValueDigest'
 import { useBusiness } from '@/lib/BusinessContext'
+import { PengarPoster } from '@/components/value/PengarPoster'
 
 /**
  * /dashboard/pengar — Value Ledger + "Pengar på bordet".
@@ -189,37 +190,46 @@ function PengarSession() {
                     <span className="text-xs text-slate-400 hidden sm:inline">{grupp.beskrivning}</span>
                   </div>
                   <div className="flex flex-col gap-3">
+                    {/* Kortet är ett <div> och inte ett <Link>: raderna bakom
+                        siffran ligger i en <details> inuti, och ett
+                        expanderbart avsnitt får inte bo i en länk. */}
                     {grupp.kategorier.map(k => (
-                      <Link
+                      <div
                         key={k.key}
-                        href={k.href}
-                        className="flex items-center gap-4 bg-white border border-slate-200 rounded-card p-4 sm:p-5 hover:border-primary-300 transition-colors"
+                        id={k.key}
+                        className="bg-white border border-slate-200 rounded-card p-4 sm:p-5 scroll-mt-20"
                       >
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline gap-2 flex-wrap">
-                            <span className="font-heading text-xl font-bold tabular-nums text-slate-900">
-                              {k.summaKr > 0 ? formatKr(k.summaKr) : `${k.antal} st`}
-                            </span>
-                            <span className="text-sm font-semibold text-slate-700">{k.titel}</span>
-                          </div>
-                          <p className="m-0 mt-0.5 text-[13px] text-slate-500 leading-relaxed">
-                            {k.beskrivning}
-                            {k.antalUtanBelopp ? (
-                              <span className="text-slate-400">
-                                {' '}+ {k.antalUtanBelopp} utan känt belopp
+                        <Link
+                          href={k.href}
+                          className="flex items-center gap-4 hover:text-primary-800 transition-colors"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-baseline gap-2 flex-wrap">
+                              <span className="font-heading text-xl font-bold tabular-nums text-slate-900">
+                                {k.summaKr > 0 ? formatKr(k.summaKr) : `${k.antal} st`}
                               </span>
-                            ) : null}
-                          </p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
-                      </Link>
+                              <span className="text-sm font-semibold text-slate-700">{k.titel}</span>
+                            </div>
+                            <p className="m-0 mt-0.5 text-[13px] text-slate-500 leading-relaxed">
+                              {k.beskrivning}
+                              {k.antalUtanBelopp ? (
+                                <span className="text-slate-400">
+                                  {' '}+ {k.antalUtanBelopp} utan känt belopp
+                                </span>
+                              ) : null}
+                            </p>
+                          </div>
+                          <ArrowRight className="w-4 h-4 text-slate-300 shrink-0" />
+                        </Link>
+                        <PengarPoster poster={k.poster} />
+                      </div>
                     ))}
                   </div>
                 </div>
               ))}
 
               <p className="m-0 text-xs text-slate-400 text-center">
-                Summorna kommer från källrader i offerter, projekt och fakturor. De är potential tills de har granskats.
+                Varje summa räknas ur raderna under den. De är potential tills de har granskats.
               </p>
             </>
           )
