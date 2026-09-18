@@ -18,7 +18,13 @@ export async function executeMatteActions(
   signal: IncomingSignal,
   businessId: string,
   supabase: SupabaseClient,
-  availableSlots?: TimeSlot[]
+  availableSlots?: TimeSlot[],
+  /** Spår 1 (2026-09-18): action-typer som lead_review-kortet redan täckt.
+      Utan den här grinden får hantverkaren två kort för samma SMS — och
+      den autonoma create_lead hade dessutom kört golden path en andra gång
+      med notify:true, alltså ett andra "tack för din förfrågan"-SMS till en
+      kund som just svarat på fångst-SMS:et. Samma princip som ataHandled. */
+  redanHanterat?: Set<string>
 ): Promise<void> {
   // Våg 2b (tasks/value-chain-plan.md) — ÄTA-kedjan: en tilläggsbeställning
   // (intent 'quote_addition') på ett REDAN identifierat projekt är en ÄTA,
@@ -53,6 +59,10 @@ export async function executeMatteActions(
     // två kort (ett 'create_ata_draft' + ett generiskt 'quote_addition')
     // för samma kundförfrågan.
     if (ataHandled && action.type === 'quote_addition') continue
+    if (redanHanterat?.has(action.type)) {
+      console.info(`[Matte] ${action.type} hoppas — lead_review-kortet täcker den redan`)
+      continue
+    }
     try {
       if (action.autonomous) {
         await executeDirectAction(action, entity, signal, businessId, supabase)

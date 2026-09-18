@@ -3,11 +3,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { getUserLimit, type PlanType } from '@/lib/feature-gates'
-import { Resend } from 'resend'
-
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY)
-}
+import { sendEmail } from '@/lib/email'
 
 const TEAM_COLORS = ['#3B82F6', '#8B5CF6', '#EC4899', '#F59E0B', '#10B981', '#06B6D4', '#EF4444', '#6366F1']
 function randomColor() {
@@ -204,13 +200,14 @@ async function sendInviteEmail(
   toName: string,
   token: string
 ) {
-  const resend = getResend()
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const inviteUrl = `${appUrl}/invite/${token}`
   const domain = process.env.RESEND_DOMAIN || 'handymate.se'
 
-  await resend.emails.send({
-    from: `${business.business_name} via Handymate <noreply@${domain}>`,
+  // Strypunkten (lib/email.ts). Avsändarnamn och adress oförändrade.
+  const utfall = await sendEmail({
+    fromName: `${business.business_name} via Handymate`,
+    fromAddress: `noreply@${domain}`,
     to: toEmail,
     subject: `${inviterName} bjuder in dig till ${business.business_name}`,
     html: `
@@ -239,4 +236,5 @@ async function sendInviteEmail(
       </div>
     `
   })
+  if (!utfall.success) throw new Error(utfall.error || 'Inbjudningsmejlet kunde inte skickas')
 }

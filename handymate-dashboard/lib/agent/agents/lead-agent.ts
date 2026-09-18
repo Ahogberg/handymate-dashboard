@@ -76,7 +76,10 @@ Från: ${triggerData?.phone_number || 'Okänt'}
 Meddelande: ${triggerData?.message || '(Tomt)'}
 Historik: ${triggerData?.conversation_history || '(Ingen)'}
 
-**Uppgift:** Kvalificera som lead, sök befintlig kund, svara med SMS.`
+**Uppgift:** Kvalificera som lead och sök befintlig kund.
+**Svaret till kunden skickas INTE av dig.** Matte-vägen äger kundsvaret på
+inkommande SMS (lib/agent/kundsvar-agare.ts) — send_sms är bortfiltrerat i den
+här kontexten. Skriv inget svar "som om" det gick iväg.`
   } else if (triggerType === 'phone_call') {
     triggerBlock = `## Samtal avslutat
 Telefon: ${triggerData?.phone_number || 'Okänt'}

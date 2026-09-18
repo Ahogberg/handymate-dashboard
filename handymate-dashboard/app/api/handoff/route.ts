@@ -56,7 +56,7 @@ export async function GET(request: NextRequest) {
     ].filter(Boolean)))
     if (sourceIds.length) {
       const receipts = await db.from('outbound_intents')
-        .select('source_id,kind,status,defer_reason,finished_at,cancel_requested_at')
+        .select('source_id,kind,status,defer_reason,finished_at,cancel_requested_at,delivery_status,delivered_at')
         .eq('business_id', business.business_id).eq('source', 'approval').in('source_id', sourceIds)
       if (receipts.error) return NextResponse.json({ error: 'Leveranskvittensen kunde inte hämtas. Försök igen.' }, { status: 503 })
       outbound = receipts.data || []

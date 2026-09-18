@@ -361,6 +361,10 @@ async function prepareApprovalReviewInternal(db: SupabaseClient, businessId: str
         detail('Valt beslut', p.decision === 'made_standard' ? 'Gör till företagets standard' : 'Fortsätt testa')
         return complete(p.decision === 'made_standard' ? 'Sparar arbetssättet i företagskunskapen och kopplar det till försöket.' : 'Registrerar beslutet att fortsätta testa och tar fram ett nytt separat förslag.', 'Bekräfta beslutet')
       }
+      case 'booking_offer_confirm': {
+        const { prepareBookingOfferReview } = await import('./booking-offer-review')
+        return await prepareBookingOfferReview(db, businessId, p)
+      }
       case 'lead_review': {
         const { prepareLeadActivationReview } = await import('./lead-review')
         return await prepareLeadActivationReview(db, businessId, p, body.action_overrides)

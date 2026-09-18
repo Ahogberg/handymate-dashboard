@@ -18,6 +18,7 @@ import { extractFirstName } from '@/lib/customers/namn'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { loadMandateResolutionCache, resolveMandateForAction, type MandateResolutionCache } from '@/lib/mandates/resolve'
+import { skaparEventLoop, type EventName } from '@/lib/events/names'
 
 // ── Types ───────────────────────────────────────────────
 
@@ -1450,7 +1451,7 @@ async function queryThresholdEntities(
  */
 export async function fireEvent(
   supabase: SupabaseClient,
-  eventName: string,
+  eventName: EventName,
   businessId: string,
   payload: ExecutionContext = {}
 ): Promise<{ matched: number; pending_approval: number; executed: number; skipped: number; failed: number }> {
@@ -1468,10 +1469,24 @@ export async function fireEvent(
     if (!rules || rules.length === 0) return summary
 
     // Filter by event_name in trigger_config
-    const matchingRules = (rules as AutomationRule[]).filter(r => {
+    const traffade = (rules as AutomationRule[]).filter(r => {
       const configEvent = r.trigger_config?.event_name
       return configEvent === eventName
     })
+
+    // Loopspärren (Spår 4): en regel som svarar på sitt eget event med samma
+    // åtgärd matar sig själv. `sms_sent` + `send_sms` är det skarpa fallet —
+    // strypunkten avfyrar `sms_sent` efter VARJE lyckat utskick, så en sådan
+    // regel skickar SMS till kunden tills kvoten tar slut. Spärren sitter här,
+    // i motorn, och inte bara i seeden: regler skapas också av användare och
+    // agenter. Den spärrade regeln räknas som skipped, inte matched — den
+    // kördes aldrig, och siffran ska inte ljuga om det.
+    const matchingRules = traffade.filter(r => !skaparEventLoop(eventName, r.action_type))
+    const sparrade = traffade.length - matchingRules.length
+    if (sparrade > 0) {
+      summary.skipped += sparrade
+      console.warn(`[automation-engine] loopspärr: ${sparrade} regel(er) på '${eventName}' hoppades över (skulle mata sig själv)`)
+    }
     summary.matched = matchingRules.length
 
     // Execute matching rules

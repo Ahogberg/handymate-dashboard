@@ -81,6 +81,12 @@ export const ACTION_CONTRACT: Record<string, ActionClass> = {
   propose_site_visit: 'EXECUTABLE_ACTION',
   reschedule_request: 'EXECUTABLE_ACTION',
   new_booking_request: 'EXECUTABLE_ACTION',
+  // Bokning på svar (spår 3, 2026-09-18): kunden har valt en av de tider vi
+  // SMS:ade, tiden är kontrollerad som ledig, och kortet bär själva valet.
+  // Ett godkännande skapar bokningen och skickar kundbekräftelsen — alltså
+  // samma klass som create_booking. Autonomt blir det aldrig
+  // (tasks/earned-autonomy-spec.md: create_booking är inte en allowlist-nyckel).
+  booking_offer_confirm: 'EXECUTABLE_ACTION',
   dispatch_suggestion: 'EXECUTABLE_ACTION',
   publish_microsite: 'EXECUTABLE_ACTION',
   invoice_reminder: 'EXECUTABLE_ACTION',

@@ -2,11 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
-import { Resend } from 'resend'
-
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY)
-}
+import { sendEmail } from '@/lib/email'
 
 /**
  * POST /api/team/[id]/resend-invite - Skicka ny inbjudan
@@ -67,11 +63,11 @@ export async function POST(
       if (!process.env.RESEND_API_KEY) {
         console.warn('[RESEND-INVITE] RESEND_API_KEY saknas')
       } else {
-        const resend = getResend()
         const domain = process.env.RESEND_DOMAIN || 'handymate.se'
 
-        await resend.emails.send({
-          from: `${business.business_name} via Handymate <noreply@${domain}>`,
+        const utfall = await sendEmail({
+          fromName: `${business.business_name} via Handymate`,
+          fromAddress: `noreply@${domain}`,
           to: member.email,
           subject: `Påminnelse: ${currentUser.name} bjuder in dig till ${business.business_name}`,
           html: `
@@ -96,6 +92,7 @@ export async function POST(
             </div>
           `
         })
+        if (!utfall.success) throw new Error(utfall.error || 'Inbjudningsmejlet kunde inte skickas')
         emailSent = true
       }
     } catch (emailErr) {

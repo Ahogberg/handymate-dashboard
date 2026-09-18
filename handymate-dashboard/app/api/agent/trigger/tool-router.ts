@@ -55,6 +55,7 @@ import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation
 import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mission-summary'
 import { resolveGoalType } from '@/lib/mission/goal-type'
 import { isToolAllowedForActor, EXTERNAL_TOOL_DENIED_MESSAGE, type ActorType } from '@/lib/agent/external-actor'
+import { agsVerktygetAvMatte, KUNDSVAR_AGS_AV_MATTE_MEDDELANDE } from '@/lib/agent/kundsvar-agare'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { loadWorkReportContext, prepareWorkReportAction, isWorkReportTool, type WorkReportScope } from '@/lib/matte/work-report'
 import type { BusinessUser } from '@/lib/permissions'
@@ -118,6 +119,14 @@ interface ToolContext {
    */
   actorType?: ActorType
   /**
+   * Vilken trigger som startade körningen ('incoming_sms', 'phone_call',
+   * 'cron', 'manual', …). Sätts av app/api/agent/trigger/route.ts och
+   * lib/agent/orchestrator.ts. Styr EN sak i dag: vakten nedan som låter
+   * Matte-vägen äga kundsvaret på ett inkommande SMS (lib/agent/
+   * kundsvar-agare.ts). Odefinierad = ingen trigger-beroende gräns.
+   */
+  triggerType?: string
+  /**
    * Support-agenten (escalate_to_handymate_team, se docs/superpowers/specs/
    * 2026-08-21-handymate-support-agent-design.md): den agent_threads.id som
    * konversationen tillhör, satt av app/api/matte/chat/route.ts efter att
@@ -158,6 +167,18 @@ export async function executeTool(
   // case. Neutral text — avslöjar aldrig vilka verktyg som finns.
   if (!isToolAllowedForActor(name, context.actorType)) {
     return { success: false, error: EXTERNAL_TOOL_DENIED_MESSAGE }
+  }
+  // ═══ ETT SVAR PER KUND-SMS — ANDRA HALVAN AV GRINDEN (2026-09-18) ═══
+  // Matte-vägen äger kundsvaret på ett inkommande SMS; den har
+  // entitetsupplösning, lediga tider, kundfakta och flaggan
+  // matte_customer_reply_enabled. Agenten kvalificerar vidare, men får inte
+  // skicka sitt EGET svar på samma meddelande: två modeller som svarar samma
+  // kund utan att veta om varandra är inte redundans, det är två svar.
+  // route.ts filtrerar redan bort verktyget ur listan — men listan till
+  // modellen är UX, inte gränsen. Skälet och mätningen: lib/agent/
+  // kundsvar-agare.ts. Smal med flit: bara incoming_sms, bara send_sms.
+  if (agsVerktygetAvMatte(name, context.triggerType)) {
+    return { success: false, error: KUNDSVAR_AGS_AV_MATTE_MEDDELANDE }
   }
   try {
     if (context.workReport) {
@@ -1389,12 +1410,39 @@ async function createBooking(
   const { error } = await supabase.from('booking').insert({
     booking_id: bookingId, business_id: businessId, customer_id: params.customer_id,
     scheduled_start: params.scheduled_start,
-    scheduled_end: params.scheduled_end, status: 'pending',
+    scheduled_end: params.scheduled_end,
+    // ═══ AGENTENS create_booking HAR ALDRIG KUNNAT LYCKAS (fynd 2026-09-18) ═══
+    //
+    // Raden skickade `status: 'pending'`. I prod är `booking.status` enumet
+    // booking_status (confirmed|cancelled|completed|no_show) — 'pending' finns
+    // inte, och kolumnen `source` finns inte alls på tabellen. Varje insert
+    // föll på ett databasfel och returnerades som { success: false }, precis
+    // som lib/approve-actions.ts createBooking gjorde före spår 3 (a5d6253).
+    //
+    // 'confirmed' är rätt värde här: koden kommer bara hit när grinden ovanför
+    // har sagt att bokningen INTE kräver godkännande (annars går den via
+    // queueAgentActionForApproval och POST /api/bookings). Är raden skriven är
+    // tiden bokad.
+    status: 'confirmed',
     notes: [params.service_type, params.notes].filter(Boolean).join(' — ') || null,
     created_at: new Date().toISOString(),
   })
 
   if (error) return { success: false, error: error.message }
+
+  // Eventkontraktet (spår 4): EN gång per faktiskt skapad bokning. Den här
+  // vägen (agentens create_booking-verktyg) saknade avfyrningen helt, så
+  // Lars regler och kundtidslinjen aldrig fick veta att bokningen fanns.
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(supabase, 'booking_created', businessId, {
+      booking_id: bookingId,
+      customer_id: (params.customer_id as string) ?? null,
+      date: params.scheduled_start as string,
+    })
+  } catch (eventFel) {
+    console.error('[tool-router] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+  }
 
   // Sync to Google Calendar if connected
   let googleEventId: string | null = null
@@ -2225,24 +2273,27 @@ async function sendEmail(
   }
 
   // Fallback: Resend API
-  const resendKey = process.env.RESEND_API_KEY!
   const from = context.contactEmail
     ? `${context.businessName} <${context.contactEmail}>`
     : `${context.businessName} <noreply@handymate.se>`
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from, to: params.to, subject: params.subject, text: params.body,
-    }),
+  // Strypunkten (lib/email.ts, Spår 2). Agenten byggde tidigare sitt eget
+  // rå-anrop mot api.resend.com — utanför kanalkontroll och leveranskvitto.
+  // from delas upp i namn och adress; texten skickas fortfarande som text.
+  const namnDel = from.slice(0, from.indexOf(' <')).trim() || context.businessName
+  const adressDel = from.slice(from.indexOf('<') + 1, from.lastIndexOf('>')).trim()
+  const { sendEmail } = await import('@/lib/email')
+  const utfall = await sendEmail({
+    businessId,
+    customerId: (params.customer_id as string) || null,
+    fromName: namnDel,
+    fromAddress: adressDel,
+    to: params.to as string,
+    subject: params.subject as string,
+    html: '',
+    text: params.body as string,
   })
-
-  const result = await response.json()
-  if (!response.ok) return { success: false, error: `E-postfel: ${result.message}` }
+  if (!utfall.success) return { success: false, error: `E-postfel: ${utfall.error}` }
 
   // Kontextrevisionen 2026-08-16: samma loggning på Resend-vägen.
   const { logOutboundEmail } = await import('@/lib/comm/log-outbound-email')
@@ -2256,7 +2307,7 @@ async function sendEmail(
   })
   try { const { markCustomerContacted } = await import('@/lib/pipeline/contacted'); await markCustomerContacted(supabase, businessId, (params.customer_id as string) || null, 'mejl') } catch { /* best-effort */ }
 
-  return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: result.id, sent_via: 'resend' } }
+  return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: utfall.messageId, sent_via: 'resend' } }
 }
 
 // ── Gmail ────────────────────────────────────────────────

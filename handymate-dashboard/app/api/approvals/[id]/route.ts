@@ -1322,6 +1322,65 @@ async function executeApprovalPayload(
         return { action: 'create_booking', ...r }
       }
 
+      case 'booking_offer_confirm': {
+        // ═══ KUNDEN HAR VALT TIDEN, HANTVERKAREN TRYCKER ═══ (spår 3)
+        //
+        // Allt underlag kommer ur den signerade granskningen
+        // (lib/approvals/booking-offer-review.ts), som läser erbjudandet ur
+        // booking_offer och kontrollerar att tiden fortfarande är ledig.
+        // Payloaden på kortet pekar bara ut vilket erbjudande det gäller.
+        const reviewed = reviewedPayload as any
+        if (!reviewed?.offerId || !reviewed?.start || !reviewed?.end || !reviewed?.phone || !reviewed?.message) {
+          return { action: 'booking_offer_confirm', ok: false, error: 'Det granskade tidsvalet saknas.' }
+        }
+        const supabaseBO = (await import('@/lib/supabase')).getServerSupabase()
+
+        // Idempotenskrav FÖRE bokningen: erbjudandet får ge exakt en bokning.
+        const { data: erbjudande } = await supabaseBO.from('booking_offer')
+          .select('resulting_booking_id')
+          .eq('business_id', businessId).eq('id', reviewed.offerId).maybeSingle()
+        if (erbjudande?.resulting_booking_id) {
+          return { action: 'booking_offer_confirm', ok: true, booking_id: erbjudande.resulting_booking_id, idempotent: true, sms_sent: true }
+        }
+
+        // Befintlig bokningsväg (lib/approve-actions.ts createBooking): den
+        // äger konfliktkollen, kunddedupen och avfyrar booking_created.
+        const { executeApproveAction } = await import('@/lib/approve-actions')
+        const r = await executeApproveAction(
+          supabaseBO,
+          { suggestion_type: 'booking', business_id: businessId, customer_id: reviewed.customerId || null, source_text: '' },
+          {
+            customer_name: reviewed.customerName,
+            phone_number: reviewed.phone,
+            scheduled_start: reviewed.start,
+            scheduled_end: reviewed.end,
+            duration_minutes: reviewed.durationMinutes,
+            service: 'Tid som kunden valt i SMS',
+          },
+        )
+        if (!r.success || !r.booking_id) {
+          return { action: 'booking_offer_confirm', ok: false, error: r.error || 'Bokningen kunde inte skapas.' }
+        }
+
+        const { error: kopplingsFel } = await supabaseBO.from('booking_offer')
+          .update({ resulting_booking_id: r.booking_id })
+          .eq('business_id', businessId).eq('id', reviewed.offerId).is('resulting_booking_id', null)
+        if (kopplingsFel) console.error('[approvals/booking_offer_confirm] erbjudandet kunde inte kopplas till bokningen:', kopplingsFel.message)
+
+        // Bekräftelsen är BÄSTA FÖRSÖK efter en redan skapad bokning — samma
+        // regel som new_booking_request/quote_signing: ett uteblivet SMS får
+        // inte visa kortet som misslyckat, kunden är bokad.
+        const smsBO = await sendSms({
+          to: reviewed.phone, message: reviewed.message, customerId: reviewed.customerId || null,
+          relatedId: r.booking_id, messageType: 'booking_confirmation', purpose: 'transactional',
+        })
+        const resultatBO: Record<string, unknown> = {
+          action: 'booking_offer_confirm', ok: true, booking_id: r.booking_id, sms_sent: smsBO.sms_sent,
+        }
+        if (!smsBO.sms_sent) resultatBO.sms_reason = smsBO.error || 'Bekräftelsen kunde inte skickas'
+        return resultatBO
+      }
+
       case 'autonomy_offer': {
         // Beviljar förtjänad autonomi för en åtgärdstyp. Ingen extern effekt —
         // endast settings-skrivning (låg risk). Kräver att sql/v65 är körd.
@@ -1835,6 +1894,30 @@ async function executeApprovalPayload(
           messageType: approval_type,
           purpose: 'conversational',
         })
+        // ═══ ERBJUDANDET BLIR DATA (spår 3, 2026-09-18) ═══
+        //
+        // Tiderna fanns tidigare bara i den här payloaden. Kundens svar kom
+        // från ett telefonnummer och kunde aldrig hitta tillbaka hit — det
+        // blev ett kort med texten "2". Nu skrivs de erbjudna tiderna som en
+        // rad i booking_offer (48 h), som svaret matchas mot i
+        // lib/bookings/svar-pa-erbjudande.ts. Skrivs bara när SMS:et faktiskt
+        // gick iväg: ett erbjudande kunden aldrig fick ska inte kunna
+        // besvaras.
+        if (r.sms_sent) {
+          const { skapaErbjudande } = await import('@/lib/bookings/erbjudande')
+          await skapaErbjudande((await import('@/lib/supabase')).getServerSupabase(), {
+            businessId,
+            sourceApprovalId: approvalId,
+            phone: reviewed.to,
+            slots: reviewed.slots,
+            customerId: reviewed.customerId || null,
+            leadId: reviewed.leadId || null,
+            // Andra rundan ärver sitt ursprung, så "max ett nytt förslag"
+            // är kod och inte en förhoppning.
+            parentOfferId: typeof pl.parent_offer_id === 'string' ? pl.parent_offer_id : null,
+          })
+        }
+
         return {
           action: approval_type,
           sms_sent: r.sms_sent,

@@ -11,6 +11,9 @@ export async function applyAnnualCap(
   vatRate: number,
   totals: { rotWorkCost: number; rutWorkCost: number; subtotal: number; afterDiscount: number; total: number },
   current: { rotDeduction: number; rotCustomerPays: number; rutDeduction: number; rutCustomerPays: number },
+  /** Bästa kända datum för offerten (default idag) — styr sats och tak,
+   *  se lib/rot/regler.ts. */
+  datum?: Date | string,
 ): Promise<{ rotDeduction: number; rotCustomerPays: number; rutDeduction: number; rutCustomerPays: number; capped: boolean; warning?: string }> {
   if (!customerId) return { ...current, capped: false }
 
@@ -20,7 +23,7 @@ export async function applyAnnualCap(
   let warning: string | undefined
 
   if (totals.rotWorkCost > 0) {
-    const cap = await calculateCappedDeduction(customerId, businessId, 'rot', totals.rotWorkCost, { vatRate, discountFactor })
+    const cap = await calculateCappedDeduction(customerId, businessId, 'rot', totals.rotWorkCost, { vatRate, discountFactor, datum })
     if (cap.capped) {
       capped = true
       warning = cap.warning
@@ -29,7 +32,7 @@ export async function applyAnnualCap(
     }
   }
   if (totals.rutWorkCost > 0) {
-    const cap = await calculateCappedDeduction(customerId, businessId, 'rut', totals.rutWorkCost, { vatRate, discountFactor })
+    const cap = await calculateCappedDeduction(customerId, businessId, 'rut', totals.rutWorkCost, { vatRate, discountFactor, datum })
     if (cap.capped) {
       capped = true
       warning = warning ? `${warning} ${cap.warning}` : cap.warning

@@ -51,6 +51,8 @@ export const TYPE_LABEL: Record<string, string> = {
   send_quote: 'Offert',
   send_invoice: 'Faktura',
   create_booking: 'Bokning',
+  // Bokning på svar (spår 3): kunden har valt en av tiderna vi SMS:ade.
+  booking_offer_confirm: 'Vald tid',
   lead_review: 'Ny lead',
   quote_nudge: 'Offertuppföljning',
   review_request: 'Recension',

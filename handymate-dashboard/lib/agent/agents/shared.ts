@@ -85,6 +85,12 @@ export interface ToolContext {
    */
   actorType?: ActorType
   /**
+   * Vilken trigger som startade körningen. Speglar samma fält i tool-router.ts
+   * ToolContext och läses av vakten där (lib/agent/kundsvar-agare.ts): på ett
+   * inkommande kund-SMS äger Matte-vägen kundsvaret.
+   */
+  triggerType?: string
+  /**
    * Support-agenten (escalate_to_handymate_team, se docs/superpowers/specs/
    * 2026-08-21-handymate-support-agent-design.md): den agent_threads.id som
    * konversationen tillhör. Satt av matte/chat/route.ts från redan hämtad/

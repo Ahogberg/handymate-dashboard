@@ -11,9 +11,7 @@ import { validatePersonnummer } from '@/lib/rot-rut'
 import { isCustomerSettled } from '@/lib/invoices/status'
 import { getCustomerShare } from '@/lib/invoices/customer-share'
 import { getCategory, type RotRutType } from './categories'
-
-const ROT_MAX_PER_YEAR = 50000
-const RUT_MAX_PER_YEAR = 75000
+import { regelFor } from '@/lib/rot/regler'
 
 export interface SkvInvoiceLike {
   invoice_id: string
@@ -153,8 +151,11 @@ export function validateInvoiceForSkv(input: SkvValidationInput): ValidationResu
   if (deduction <= 0) errors.push('Begärt avdrag saknas eller är noll.')
   if (deduction >= workCost) errors.push('Begärt avdrag kan inte vara större än eller lika med arbetskostnaden.')
 
-  // 9. Årstak per person (inkl. tidigare begärt detta år)
-  const max = type === 'rut' ? RUT_MAX_PER_YEAR : ROT_MAX_PER_YEAR
+  // 9. Årstak per person (inkl. tidigare begärt detta år). Skatteverket knyter
+  // regeln till BETALNINGSDATUMET — här finns det (paid_at), så det används
+  // rakt av; saknas det gäller skatteårets sista dag (lib/rot/regler.ts).
+  const regel = regelFor(paidAt && !isNaN(paidAt.getTime()) ? paidAt : `${taxYear}-12-31`)
+  const max = type === 'rut' ? regel.rut_tak : regel.rot_tak
   const already = Math.round(input.alreadyRequestedThisYearKr || 0)
   if (deduction + already > max) {
     errors.push(`Begärt avdrag (${deduction} kr) + redan begärt (${already} kr) överskrider årstaket ${max} kr.`)

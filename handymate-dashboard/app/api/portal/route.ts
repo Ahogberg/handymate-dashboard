@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
       // bekräftelse) fyrades av en gång till på samma offert.
       const { data: updatedRows, error } = await supabase
         .from('quotes')
-        .update({ status: 'accepted', accepted_at: new Date().toISOString() })
+        .update({ status: 'accepted', accepted_at: new Date().toISOString(), accepted_via: 'kundportal' })
         .eq('quote_id', quote_id)
         .eq('customer_id', customer.customer_id)
         .eq('business_id', customer.business_id)
@@ -153,65 +153,11 @@ export async function POST(request: NextRequest) {
 
       const acceptedQuote = updatedRows[0]
 
-      // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
-      try {
-        const { captureExpectedMarginSnapshot } = await import('@/lib/quotes/margin-snapshot')
-        await captureExpectedMarginSnapshot(supabase, customer.business_id, quote_id, 'portal_accept')
-      } catch (err) {
-        console.error('[portal] captureExpectedMarginSnapshot failed (non-blocking):', quote_id, err)
-      }
-
-      // Log activity
-      await supabase.from('customer_activity').insert({
-        customer_id: customer.customer_id,
-        business_id: customer.business_id,
-        activity_type: 'quote_accepted',
-        title: 'Offert accepterad via kundportal',
-        description: `Kund accepterade offert ${quote_id}`,
-        created_by: 'portal',
-      })
-
-      // V3 Automation Engine: fire quote_signed + quote_accepted events
-      try {
-        const { fireEvent } = await import('@/lib/automation-engine')
-        await fireEvent(supabase, 'quote_signed', customer.business_id, {
-          quote_id,
-          customer_id: customer.customer_id,
-        })
-      } catch { /* non-blocking */ }
-
-      // Smart communication: notifiera hantverkare
-      try {
-        const { triggerEventCommunication } = await import('@/lib/smart-communication')
-        await triggerEventCommunication({
-          businessId: customer.business_id,
-          event: 'quote_signed',
-          customerId: customer.customer_id,
-          context: { quoteId: quote_id },
-        })
-      } catch { /* non-blocking */ }
-
-      // Push-notis
-      try {
-        const { notifyQuoteSigned } = await import('@/lib/notifications')
-        const { data: q } = await supabase.from('quotes').select('total').eq('quote_id', quote_id).single()
-        await notifyQuoteSigned({
-          businessId: customer.business_id,
-          customerName: customer.name || 'Kund',
-          quoteId: quote_id,
-          total: q?.total || 0,
-        })
-      } catch { /* non-blocking */ }
-
-      // Autopilot
-      try {
-        const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
-        await triggerAutopilot(customer.business_id, quote_id)
-      } catch { /* non-blocking */ }
-
-      // Samma avslutskedja som kundens signering: bekräftelse, projekt och
-      // deal→vunnen. Låg tidigare bara i signeringsvägen, vilket gjorde
-      // portal-accept till en halv accept — vunnen offert utan jobb.
+      // EXAKT samma eftersteg som kundens signering och hantverkarens interna
+      // accept — marginal, projekt, deal→vunnen, projekt-AI, kommunikation,
+      // notis, automationsevent, autopilot och bekräftelse. Tidigare låg de
+      // inklistrade här i en egen uppsättning, och portalen saknade helt
+      // projekt-AI:ns händelse. Journalfört steg för steg i finalizern.
       const { finalizeAcceptedQuote } = await import('@/lib/quotes/finalize-accepted')
       await finalizeAcceptedQuote(supabase, {
         businessId: customer.business_id,

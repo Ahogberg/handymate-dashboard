@@ -16,6 +16,22 @@ import type { PlanType } from './feature-gates'
 import { checkFuelGate, type FuelGateReason } from './costs/fuel'
 import { elksFelKlarsprak, klassaElksFel, ELKS_FEL_VAR_SAK } from './sms/klarsprak'
 import { rapporteraTystFel } from './observability/driftlarm'
+import { medElksHemlighet } from './elks-webhook-auth'
+
+// Samma källa som voice/incoming använder för sina whenhangup-adresser.
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
+
+/**
+ * Adressen 46elks postar leveransrapporten till (Spår 2, 2026-09-18).
+ *
+ * Utan `whendelivered` betyder sms_log.status='sent' bara att 46elks svarade
+ * HTTP 200 — inte att telefonen tog emot något. Adressen bär samma hemlighet
+ * i frågesträngen som alla andra 46elks-callbacks (lib/elks-webhook-auth.ts),
+ * annars 401:ar rapporten och kvittot går förlorat.
+ */
+export function smsLeveransCallbackUrl(): string {
+  return medElksHemlighet(`${APP_URL}/api/sms/delivered`)
+}
 
 const ELKS_API_USER = process.env.ELKS_API_USER
 const ELKS_API_PASSWORD = process.env.ELKS_API_PASSWORD
@@ -399,6 +415,7 @@ async function sendSmsWithoutAutonomyWrapper(args: SendSmsArgs): Promise<SendSms
           from: fromName,
           to: phone,
           message,
+          whendelivered: smsLeveransCallbackUrl(),
         }),
       })
 
@@ -514,6 +531,34 @@ async function sendSmsWithoutAutonomyWrapper(args: SendSmsArgs): Promise<SendSms
     }
   } catch (logErr) {
     console.error('[sendSmsViaElks] sms_log insert exception:', logErr)
+  }
+
+  // ═══ EVENTKONTRAKTET: sms_sent (Spår 4) ═══
+  //
+  // `sms_sent` stod i ARCHITECTURE.md §4 men avfyrades aldrig. Strypunkten är
+  // rätt ställe: alla ~20 utgående vägar passerar här, och eventet betyder
+  // exakt det sms_log-raden betyder — 46elks tog emot utskicket.
+  //
+  // LOOPRISKEN är verklig: en regel på `sms_sent` med åtgärden `send_sms`
+  // skulle skicka ett SMS som avfyrar `sms_sent` som skickar ett SMS ... mot
+  // en riktig kund, på riktiga pengar. Spärren ligger i fireEvent()
+  // (lib/events/names.ts: skaparEventLoop) så att den gäller ALLA regler, inte
+  // bara de seedade. Bara lyckade utskick — ett avvisat eller failat SMS är
+  // ingen sändning.
+  if (success) {
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'sms_sent', businessId, {
+        to: phone,
+        customer_id: resolvedCustomerId ?? null,
+        message_type: messageType || null,
+        elks_id: elksId || null,
+        sms_id: smsId,
+        recipient,
+      })
+    } catch (eventFel) {
+      console.error('[sendSmsViaElks] fireEvent sms_sent misslyckades (icke-blockerande):', eventFel)
+    }
   }
 
   // ═══ SPEGLA TILL KONVERSATIONSHISTORIKEN (kontextrevisionen 2026-08-16) ═══

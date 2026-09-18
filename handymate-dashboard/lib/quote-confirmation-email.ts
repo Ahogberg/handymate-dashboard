@@ -1,5 +1,6 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { sendEmail } from '@/lib/email'
+import type { AcceptanceSource } from '@/lib/quotes/finalize-accepted'
 import { loadBranding, type Branding } from '@/lib/branding/get-branding'
 import { escapeHtml } from '@/lib/document-html'
 import {
@@ -7,15 +8,48 @@ import {
 } from '@/lib/email-templates'
 
 /**
- * Skicka bekräftelsemail efter att offert signerats.
- * Inkluderar ROT-uppgifter om offerten har ROT-avdrag.
+ * Bekräftelsen till kunden när en offert blivit accepterad — ETT utskick per
+ * accept: mejl när kunden har adress, annars SMS.
+ *
+ * KÄLLMEDVETEN TEXT (2026-09-18): bekräftelsen påstår aldrig en signatur som
+ * inte finns. Bara `signering` har en. Portalens knapp och hantverkarens egen
+ * registrering får text om godkännande respektive registrerad beställning.
+ * Den interna vägens gamla SMS ("Vi har mottagit din signatur på offerten")
+ * gick ut till kunder som aldrig signerat något.
  *
  * Varumärkeslagret 2026-09-07: renderas genom emailLayout() med företagets
  * logotyp/accent/stämpel (tidigare hårdkodad teal utan stämpel).
  */
+const BEKRAFTELSENS_ORD: Record<AcceptanceSource, {
+  band: string
+  rubrik: (fornamn: string) => string
+  ingress: string
+  sms: (fornamn: string) => string
+}> = {
+  signering: {
+    band: 'Offerten är signerad',
+    rubrik: f => (f ? `Tack ${f}, offerten är signerad` : 'Tack, offerten är signerad'),
+    ingress: 'Vi har tagit emot din signatur. Här är vad som gäller och vad som händer nu.',
+    sms: f => `Tack ${f}! Vi har tagit emot din signatur på offerten.`,
+  },
+  kundportal: {
+    band: 'Offerten är godkänd',
+    rubrik: f => (f ? `Tack ${f}, offerten är godkänd` : 'Tack, offerten är godkänd'),
+    ingress: 'Vi har tagit emot ditt godkännande. Här är vad som gäller och vad som händer nu.',
+    sms: f => `Tack ${f}! Vi har tagit emot ditt godkännande av offerten.`,
+  },
+  internt: {
+    band: 'Beställningen är registrerad',
+    rubrik: f => (f ? `Tack ${f}, beställningen är registrerad` : 'Tack, beställningen är registrerad'),
+    ingress: 'Vi har registrerat din beställning. Här är vad som gäller och vad som händer nu.',
+    sms: f => `Tack ${f}! Vi har registrerat din beställning.`,
+  },
+}
+
 export async function sendQuoteSignedConfirmation(
   businessId: string,
-  quoteId: string
+  quoteId: string,
+  source: AcceptanceSource = 'signering',
 ): Promise<{ success: boolean; skipped?: boolean; error?: string }> {
   const supabase = getServerSupabase()
 
@@ -53,8 +87,37 @@ export async function sendQuoteSignedConfirmation(
     .eq('business_id', businessId)
     .single()
 
+  const ord = BEKRAFTELSENS_ORD[source] || BEKRAFTELSENS_ORD.signering
+
+  // Kunden utan e-postadress får bekräftelsen som SMS i stället — tidigare
+  // returnerade den här vägen bara "Customer has no email" och kunden fick
+  // ingenting alls från portal- och signeringsvägen.
   if (!customer?.email) {
-    return { success: false, error: 'Customer has no email' }
+    if (!customer?.phone_number) return { success: true, skipped: true }
+    const { data: config } = await supabase
+      .from('business_config')
+      .select('business_name, contact_name')
+      .eq('business_id', businessId)
+      .single()
+    const bizName = config?.business_name || 'Vi'
+    const contactName = config?.contact_name || ''
+    const first = (customer.name || '').split(' ')[0]
+    const text = `${ord.sms(first).replace(' !', '!')} Vi återkommer inom kort med en tid för att påbörja arbetet. // ${contactName}, ${bizName}`
+    // Strypunkten (spår 2): leveranskvitto och utskickslöfte ligger där.
+    const { sendSmsViaElks } = await import('@/lib/sms-send')
+    const r = await sendSmsViaElks({
+      supabase,
+      businessId,
+      businessName: bizName,
+      to: customer.phone_number,
+      message: text,
+      customerId: quote.customer_id ?? null,
+      relatedId: quoteId,
+      messageType: 'quote_accepted_confirmation',
+      recipient: 'customer',
+      purpose: 'transactional',
+    })
+    return r.success ? { success: true } : { success: false, error: r.error || 'SMS saknar leverantörskvittens' }
   }
 
   // Varumärke + stämpel (kastar aldrig; neutralt fallback vid fel).
@@ -69,8 +132,8 @@ export async function sendQuoteSignedConfirmation(
 
   const rotSaknas = hasRot && (!personnummer || !fastighet)
   const subject = rotSaknas
-    ? `Offerten är godkänd — vi behöver dina ROT-uppgifter`
-    : `Offerten är godkänd — tack ${firstName}!`
+    ? `${ord.band} — vi behöver dina ROT-uppgifter`
+    : `${ord.band} — tack ${firstName}!`
 
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
   const portalUrl = customer.portal_token && customer.portal_enabled
@@ -79,6 +142,9 @@ export async function sendQuoteSignedConfirmation(
 
   const html = buildConfirmationHtml({
     branding,
+    band: ord.band,
+    rubrik: ord.rubrik(firstName),
+    ingress: ord.ingress,
     firstName,
     quoteNumber,
     quoteTitle: quote.title || '',
@@ -146,6 +212,10 @@ export async function sendQuoteSignedConfirmation(
  */
 export function buildConfirmationHtml(opts: {
   branding: Branding
+  /** Källmedveten text. Utelämnad = signeringens formulering (bakåtkompat). */
+  band?: string
+  rubrik?: string
+  ingress?: string
   firstName: string
   quoteNumber: string
   quoteTitle: string
@@ -208,10 +278,10 @@ export function buildConfirmationHtml(opts: {
   }
 
   const content = `
-    ${statusBand('Offerten är godkänd', 'success')}
+    ${statusBand(escapeHtml(opts.band || 'Offerten är godkänd'), 'success')}
     ${emailHeading(
-      first ? `Tack ${first}, offerten är godkänd` : 'Tack, offerten är godkänd',
-      'Vi har tagit emot ditt godkännande. Här är vad som gäller och vad som händer nu.',
+      escapeHtml(opts.rubrik || (opts.firstName ? `Tack ${opts.firstName}, offerten är godkänd` : 'Tack, offerten är godkänd')),
+      escapeHtml(opts.ingress || 'Vi har tagit emot ditt godkännande. Här är vad som gäller och vad som händer nu.'),
     )}
     ${summering}
     ${vadHanderNu}

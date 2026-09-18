@@ -278,6 +278,16 @@ jobs:
           tests/revenue-bulk.spec.ts
           tests/revisorsplats.spec.ts
           tests/pengar-pa-bordet.spec.ts
+          tests/sms-svar-blir-kund.spec.ts
+          tests/event-kontrakt.spec.ts
+          tests/sms-leverans.spec.ts
+          tests/email-leverans.spec.ts
+          tests/email-chokepoint.spec.ts
+          tests/outbound-status.spec.ts
+          tests/bokning-pa-svar.spec.ts
+          tests/rot-regler.spec.ts
+          tests/identitetslasare.spec.ts
+          tests/accept-en-sanning.spec.ts
           tests/bulk-med-bekraftelse.spec.ts
           --no-deps
           --project=chromium

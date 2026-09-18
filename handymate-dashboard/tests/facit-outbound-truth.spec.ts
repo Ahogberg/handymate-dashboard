@@ -62,7 +62,13 @@ test.describe('8.1 — inga sessionslösa serveranrop till /api/sms/send', () =>
       'lib/projects/create-from-quote.ts',
       'app/api/invoices/[id]/status/route.ts',
       'app/api/projects/[id]/milestones/route.ts',
-      'app/api/quotes/accept/route.ts',
+      // Flyttad 2026-09-18: bekräftelsen till kunden ägs inte längre av
+      // accept-rutten utan av finalizerns bekräftelsesteg, som är gemensamt
+      // för signering, kundportal och intern accept. Kravet är oförändrat —
+      // SMS:et går genom strypunkten och resultatet läses — men det bevisas
+      // nu där SMS:et faktiskt skickas. Att lämna kvar den gamla raden hade
+      // krävt en död sendSmsViaElks-kopia i rutten bara för att blidka facit.
+      'lib/quote-confirmation-email.ts',
     ]) {
       const s = read(f)
       expect(s, `${f} går inte genom sendSmsViaElks`).toContain('sendSmsViaElks({')

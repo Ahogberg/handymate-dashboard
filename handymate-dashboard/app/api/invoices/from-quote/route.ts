@@ -133,7 +133,9 @@ export async function POST(request: NextRequest) {
           business_id,
           quote.rot_rut_type as 'rot' | 'rut',
           laborCost,
-          { vatRate },
+          // Fakturadatumet är bästa kända datum för vilken ROT-sats som
+          // gäller (Skatteverket: betalningsdatumet styr) — lib/rot/regler.ts.
+          { vatRate, datum: invoiceDate },
         )
         rotRutDeduction = capped.deduction
         customerPays = total - rotRutDeduction

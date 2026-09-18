@@ -9,7 +9,6 @@ import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { fetchQuoteCreator } from '@/lib/quotes/fetch-quote-creator'
 import { quoteRecipients, validateQuoteDeliveryData, buildQuoteDeliveryEnvelope, quoteSendReceipt } from '@/lib/quotes/delivery-envelope'
 
-const RESEND_API_KEY = process.env.RESEND_API_KEY
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
 
 /**
@@ -52,53 +51,38 @@ async function sendSMS(
 /**
  * Skicka email via Resend
  */
-async function sendEmail(
+/**
+ * Offertmejlet genom strypunkten (Spår 2, 2026-09-18).
+ *
+ * Rutten byggde tidigare sitt eget rå-fetch mot api.resend.com. Följden var
+ * att offertmejlet var osynligt för leveranskvittot, för kanalkontrollen och
+ * för kostnadsmätningen. Bara omslaget är nytt — avsändare (offert@), reply-to,
+ * bcc och boolean-returen är exakt som förut.
+ */
+async function sendQuoteEmail(
   to: string | string[],
   subject: string,
   htmlContent: string,
   fromName: string,
+  businessId: string,
+  customerId: string | null,
   replyTo?: string,
   bcc?: string[]
 ): Promise<boolean> {
-  if (!RESEND_API_KEY) {
-    console.log('Resend API key not configured, skipping email')
-    return false
-  }
-
-  try {
-    const toList = Array.isArray(to) ? to : [to]
-    const payload: Record<string, any> = {
-      from: `${fromName} <offert@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
-      to: toList,
-      subject: subject,
-      html: htmlContent,
-      reply_to: replyTo,
-    }
-    if (bcc && bcc.length > 0) {
-      payload.bcc = bcc
-    }
-
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    })
-
-    if (!response.ok) {
-      const error = await response.text()
-      console.error('Resend error:', error)
-      return false
-    }
-
-    const result = await response.json()
-    return typeof result?.id === 'string' && result.id.length > 0
-  } catch (error) {
-    console.error('Email send error:', error)
-    return false
-  }
+  const { sendEmail } = await import('@/lib/email')
+  const utfall = await sendEmail({
+    businessId,
+    customerId,
+    to,
+    subject,
+    html: htmlContent,
+    fromName,
+    fromAddress: `offert@${process.env.RESEND_DOMAIN || 'handymate.se'}`,
+    replyTo,
+    bcc: bcc && bcc.length > 0 ? bcc : undefined,
+  })
+  if (!utfall.success) console.error('Email send error:', utfall.error)
+  return utfall.success
 }
 
 export async function POST(request: NextRequest) {
@@ -329,7 +313,7 @@ export async function POST(request: NextRequest) {
           const gmailStatus = await isGmailSendEnabled(business.business_id)
           if (gmailStatus.enabled && gmailStatus.email) {
             gmailAttempted = true
-            emailSent = await sendViaGmail(business.business_id, {
+            const gmailUtfall = await sendViaGmail(business.business_id, {
               to: allRecipients,
               subject: emailSubject,
               html: emailHTML,
@@ -338,6 +322,7 @@ export async function POST(request: NextRequest) {
               replyTo: envelope.email!.replyTo,
               bcc: envelope.email!.bcc.length ? envelope.email!.bcc : undefined,
             })
+            emailSent = gmailUtfall.ok
             if (emailSent) {
               sentVia = gmailStatus.email
             } else {
@@ -352,11 +337,13 @@ export async function POST(request: NextRequest) {
 
         // Fallback: Resend
         if (!emailSent && !gmailAttempted) {
-          emailSent = await sendEmail(
+          emailSent = await sendQuoteEmail(
             allRecipients,
             emailSubject,
             emailHTML,
             business.business_name,
+            business.business_id,
+            quote.customer_id || null,
             envelope.email!.replyTo,
             envelope.email!.bcc.length ? envelope.email!.bcc : undefined,
           )

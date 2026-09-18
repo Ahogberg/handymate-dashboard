@@ -75,12 +75,22 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
     }
 
     const durationMinutes = actionData.duration_minutes || 60
-    const scheduledStart = actionData.date && actionData.time
-      ? `${actionData.date}T${actionData.time}:00`
-      : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
-    const scheduledEnd = new Date(
-      new Date(scheduledStart).getTime() + durationMinutes * 60 * 1000
-    ).toISOString()
+    // ═══ EN EXAKT TID FÅR SKICKAS SOM DEN ÄR (spår 3, 2026-09-18) ═══
+    //
+    // `${date}T${time}:00` saknar tidszon och tolkas därför i SERVERNS
+    // lokaltid (UTC på Vercel) — samma bugklass som lib/dates.ts varnar för.
+    // Kunder som valt en tid ur kalendern (booking_offer) har en färdig
+    // ISO-tid med zon, och den ska inte gå genom den tolkningen.
+    const scheduledStart = actionData.scheduled_start && Number.isFinite(Date.parse(actionData.scheduled_start))
+      ? new Date(actionData.scheduled_start).toISOString()
+      : actionData.date && actionData.time
+        ? `${actionData.date}T${actionData.time}:00`
+        : new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const scheduledEnd = actionData.scheduled_end && Number.isFinite(Date.parse(actionData.scheduled_end))
+      ? new Date(actionData.scheduled_end).toISOString()
+      : new Date(
+          new Date(scheduledStart).getTime() + durationMinutes * 60 * 1000
+        ).toISOString()
 
     // Check for booking collisions
     const { data: conflictingBookings } = await supabase
@@ -172,14 +182,41 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
         customer_id: customerId,
         scheduled_start: scheduledStart,
         scheduled_end: scheduledEnd,
-        status: 'pending',
+        // ═══ INSERTEN HAR ALDRIG KUNNAT LYCKAS (fynd 2026-09-18) ═══
+        //
+        // Raden skickade `status: 'pending'` och `source: 'ai_suggestion'`.
+        // I prod är `booking.status` enumet booking_status
+        // (confirmed|cancelled|completed|no_show) — 'pending' finns inte — och
+        // kolumnen `source` finns inte alls på tabellen. Varje godkänt
+        // bokningsförslag föll alltså på ett databasfel som fångades av
+        // catch-satsen och returnerades som `{ success: false }`.
+        //
+        // 'confirmed' är rätt värde här: raden skapas först när en människa
+        // godkänt förslaget (och i spår 3 dessutom efter att kunden själv valt
+        // tiden). Ursprunget bärs av notes-texten, som förut.
+        status: 'confirmed',
         notes: `${actionData.service || 'Tjänst'} - Skapad från AI-förslag`,
-        source: 'ai_suggestion',
       })
       .select()
       .single()
 
     if (error) throw error
+
+    // Eventkontraktet (Spår 4): EN gång per faktiskt skapad bokning. Ligger
+    // efter konfliktkollen ovan — en avvisad bokning (konflikt) skapar ingen
+    // rad och ska därför inte avfyra något event. Icke-blockerande: kortet är
+    // redan godkänt och bokningen redan skriven.
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'booking_created', businessId, {
+        booking_id: booking?.booking_id ?? null,
+        customer_id: customerId ?? null,
+        date: scheduledStart,
+      })
+    } catch (eventFel) {
+      console.error('[approve-actions] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+    }
+
     return { success: true, booking_id: booking?.booking_id }
   } catch (error: any) {
     return { success: false, error: error.message }

@@ -110,12 +110,13 @@ export async function POST(request: NextRequest) {
 
     // Golden Path: flytta deal till "Kontaktad" om den står i "Ny förfrågan"
     try {
-      const { data: customer } = await supabase
-        .from('customer')
-        .select('customer_id')
-        .eq('business_id', business.business_id)
-        .eq('phone_number', to)
-        .maybeSingle()
+      // Spår 1 (2026-09-18): den gamla exakt-matchningen på phone_number
+      // träffade bara när mottagarsträngen råkade vara exakt den sparade.
+      // Ett SMS till
+      // "+4670…" flyttade därför aldrig dealen för en kund sparad som
+      // "070-123 45 67" — golden path-steget "Kontaktad" hoppades tyst över.
+      const { findCustomerByPhone } = await import('@/lib/voice/find-customer-by-phone')
+      const customer = await findCustomerByPhone(supabase, business.business_id, to)
 
       if (customer) {
         const { data: deal } = await supabase

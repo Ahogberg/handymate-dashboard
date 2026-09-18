@@ -67,11 +67,11 @@ export async function sendAgreementRequestEmail(partner: {
 
   const pending = partner.status === 'pending_approval'
   try {
-    const { Resend } = await import('resend')
-    const resend = new Resend(resendKey)
-    await resend.emails.send({
-      from: 'Handymate <noreply@handymate.se>',
-      to: [partner.email],
+    // Strypunkten (lib/email.ts). Samma avsändare som förut — sendEmail
+    // defaultar till Handymate <noreply@handymate.se>.
+    const { sendEmail } = await import('@/lib/email')
+    const utfall = await sendEmail({
+      to: partner.email,
       subject: `Handymates partneravtal v${AGREEMENT_VERSION} — godkänn för att ${pending ? 'aktivera ditt konto' : 'fortsätta hänvisa'}`,
       html: `
         <h2>Hej ${partner.name}!</h2>
@@ -85,6 +85,7 @@ export async function sendAgreementRequestEmail(partner: {
         <p style="color:#666;font-size:13px">Länken är personlig. Vi loggar version, tidpunkt och IP-adress som bevis på din acceptans.</p>
       `,
     })
+    if (!utfall.success) return { sent: false, error: utfall.error || 'Mejlet kunde inte skickas' }
     return { sent: true, error: null }
   } catch (err) {
     return { sent: false, error: err instanceof Error ? err.message : 'Mejlet kunde inte skickas' }

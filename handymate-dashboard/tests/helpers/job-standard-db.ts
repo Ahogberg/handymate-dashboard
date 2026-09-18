@@ -69,5 +69,18 @@ export async function standardDatabase() {
     }
     return query
   } }
+  // .rpc() mot riktiga plpgsql-funktioner. Journalens claim/finish
+  // (sql/v2_quote_acceptance_completion.sql) ÄR spärren mot dubbla utskick —
+  // den kan bara bevisas genom att faktiskt köra funktionerna.
+  ;(adapter as any).rpc = async (fn: string, args: Record<string, unknown> = {}) => {
+    calls.push({ table: `rpc:${fn}`, action: 'rpc', filters: [] })
+    if (!/^[a-z_]+$/.test(fn)) throw Error('Invalid function name')
+    const names = Object.keys(args)
+    const sql = `SELECT ${identifier(fn)}(${names.map((n, i) => `${identifier(n)} => $${i + 1}`).join(',')}) AS result`
+    try {
+      const out = await pg.query(sql, names.map(n => args[n] as any))
+      return { data: (out.rows[0] as any)?.result ?? null, error: null }
+    } catch (error: any) { return { data: null, error: { code: error.code, message: error.message } } }
+  }
   return { pg, db: adapter as unknown as SupabaseClient, calls, fail: (table: string) => { failTable = table }, close: () => pg.close() }
 }

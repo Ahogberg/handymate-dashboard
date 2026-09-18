@@ -10,6 +10,7 @@ import {
 import { computeBookingDayProgress, fetchProjectBookings } from '@/lib/bookings/day-progress'
 import { notifyBookingAssignment } from '@/lib/notifications/schedule-push'
 import { applyBookingPipelineEffects } from '@/lib/bookings/apply-pipeline-effects'
+import { fireEvent } from '@/lib/automation-engine'
 
 /**
  * GET - Lista bokningar för ett företag
@@ -275,6 +276,19 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (error) throw error
+
+    // Eventkontraktet (Spår 4): EN gång per faktiskt skapad bokning, direkt
+    // efter insertet — före kalendersynk och SMS, som båda är best-effort och
+    // kan misslyckas utan att bokningen slutar vara skapad.
+    try {
+      await fireEvent(supabase, 'booking_created', business.business_id, {
+        booking_id: bookingId,
+        customer_id: customer_id || null,
+        date: scheduled_start,
+      })
+    } catch (eventFel) {
+      console.error('[bookings] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+    }
 
     // Hämta kundnamn för dispatch + calendar (en gång)
     let customerName: string | null = null

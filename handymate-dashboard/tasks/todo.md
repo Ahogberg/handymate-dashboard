@@ -1,3 +1,571 @@
+## Ett svar per kund-SMS, inte två — 2026-09-18
+
+`app/api/sms/incoming/route.ts` startade TVÅ oberoende svarsvägar på samma
+kund-SMS: Matte-intelligensen (resolver → intent-agent → action-executor, som
+kan svara kunden via `sendCustomerReply`, grindad av
+`business_config.matte_customer_reply_enabled`) OCH
+`triggerAgentFireAndForget('incoming_sms', …)`, vars agent har `send_sms` bland
+sina verktyg och en systemprompt som ordagrant sa "svara med SMS". Med flaggan
+på kan kunden få två olika svar, från två modeller som inte vet om varandra.
+
+- [x] **Buggen har aldrig smällt — och stängs ändå nu.** Prod: flaggan är true
+      hos 0 av 29 företag (kolumnens default är false), och inget utgående SMS
+      har någonsin följt på ett inkommande kund-SMS (noll inom 1 minut OCH
+      inom 30 minuter, kontrollerat mot radantalen 14 inkommande kund-SMS och
+      101 utgående i `sms_log`). `send_sms` finns som `message_type` på 11
+      utgående rader — verktyget används alltså, men aldrig som svar på ett
+      inkommande SMS. Inkommande SMS gjorde i praktiken ingenting förrän spår 1
+      landade; spår 1 gör vägen verkligt användbar och därmed går risken från
+      teoretisk till nära förestående. Den stängs före det första riktiga
+      kundsvaret, inte efter ett dubbelsvar.
+- [x] **Beslutet: Matte-vägen äger kundsvaret.** Den har entitetsupplösning,
+      lediga tider, kundfakta och de grindar som redan finns. Agenten
+      fortsätter kvalificera (leads, kundpost, kort) men får `send_sms`
+      bortfiltrerat i `incoming_sms`-kontexten. Skäl och mätning bor i
+      `lib/agent/kundsvar-agare.ts`.
+- [x] **Dubbelgrind, som husets övriga verktygsgränser.** (1)
+      `app/api/agent/trigger/route.ts` filtrerar listan som går till modellen —
+      samma form som `isQuoteFollowupTool`; (2) `tool-router.ts executeTool()`
+      nekar FÖRE switchen, eftersom listan till modellen är UX och inte
+      gränsen. `triggerType` bärs i `ToolContext` (route + orchestrator).
+- [x] **Smal med flit.** Bara triggertypen `incoming_sms`, bara `send_sms`.
+      `send_email` lämnades ORÖRT: det mätta felet är dubbla SMS-svar, och
+      lead-agentens verktygslista innehåller inte ens `send_email` — en
+      vidgning vore en egen beteendeändring utan mätt fel bakom sig. Cron,
+      automationsregler, samtalsvägen och manuella kommandon behåller
+      `send_sms`.
+- [x] **Facit (`tests/sms-inkommande.spec.ts`, +6 prov) räknar FAKTISKA
+      `sendSmsViaElks`-anrop**: flaggan av → 0 utskick + 1 kort; flaggan på →
+      exakt 1; agenten blockerad i `incoming_sms` → 0 och vaktens exakta text,
+      med kontrollen att samma anrop från `phone_call` går fram (1 utskick —
+      annars mäter räknaren ingenting); modellens lista saknar `send_sms` men
+      behåller `send_email` och allt annat; ett svar som spår 3 redan fångat når
+      varken Matte eller agenten. 8 mutationer testade, alla röda:
+      filtret bortkopplat · vakten borta · vidgad till `send_email` · vidgad
+      till `phone_call` · spår 3-grinden borta (agenten) · spår 3-grinden borta
+      (Matte) · flaggan ignorerad i action-executor · `triggerType` inte
+      vidarebefordrad.
+- [x] `npx tsc --noEmit` 0 fel · `npm run test:contracts` 3097 → 3103 passed,
+      0 failed, 1 skipped (baslinjen mätt med `git stash -u`) · `npx next build`
+      ren. Ingen SQL behövdes.
+- [ ] **Oprövat:** ingen skarp körning mot 46elks — bevisen är harness-körda mot
+      den riktiga koden. Orchestrator-vägen (`lib/agent/orchestrator.ts`, som
+      kör lead-agenten) når i dag aldrig triggertypen `incoming_sms`
+      (automationsmotorn kör som `automation_rule`), så där är grinden
+      groundwork. `lib/matte/agent-router.ts` delegerar med samma triggertyp —
+      även den delegerade specialisten har alltså inte längre `send_sms` på ett
+      inkommande SMS, vilket är samma beslut men värt att veta.
+
+## Spår 7 — En sanning för "offert accepterad", 2026-09-18
+
+Tre vägar satte `quotes.status='accepted'` — kundens signering i den publika
+vyn, kundportalens knapp och hantverkarens egen registrering — och var och en
+hade sin EGEN uppsättning eftersteg. Kopiorna hade redan drivit isär:
+`handleProjectEvent` saknades HELT i kundportalen, den interna vägen fyrade
+`quote_accepted` medan de två andra fyrade `quote_signed`, och den interna
+vägens bekräftelse-SMS påstod "Vi har mottagit din signatur på offerten" till
+kunder som aldrig signerat något. Den interna vägen skrev dessutom
+`accepted_manually` — en kolumn som ALDRIG funnits i prod — så varje accept
+föll ned i en reservgren som tappade även `accepted_at`.
+
+- [x] **v263 accept_provenance** (körd mot prod, 2/2 kolumner verifierade):
+      `quotes.accepted_via` (`signering|kundportal|internt`, CHECK-villkor) och
+      `quotes.accepted_by` (bara för `internt`). Ingen backfill — de 8
+      historiska accepterna saknar bevis för sin väg, och ett ärligt NULL är
+      bättre än en gissning. `accepted_manually` återinfördes INTE.
+- [x] **v264 journalen får alla steg** (körd mot prod, 6/6 stegkolumner
+      verifierade, journalen hade 0 rader): sex nya `<steg>_state/_claim/
+      _claimed_at/_error` plus utökade `claim_`/`finish_quote_acceptance_step`.
+      Utgående steg (email/notify/communication/events) återförsöks ALDRIG —
+      en förlorad leverantörskvittens är `uncertain`, inte ogjord. v2:s
+      semantik bevarad: samma `acceptance_journal_missing`, samma
+      SECURITY INVOKER.
+- [x] **Finalizern äger ALLT efter statusflippen.** `finalizeAcceptedQuote`
+      gick från tre steg till nio (margin, project, deal, project_event,
+      communication, notify, events, autopilot, email), vart och ett
+      journalfört. Rutterna gör nu bara auth → statusflipp (CAS) → ett anrop
+      → svar: accept-rutten krympte 227 rader, portalen 66, den publika vyn
+      101. `quote_accepted` fyras på ALLA tre vägar (kanoniskt "affären är
+      vunnen"); `quote_signed` bara där en signatur faktiskt finns.
+- [x] **Återhämtningens omfattning OFÖRÄNDRAD.** `RECOVERY_STEPS` är exakt
+      `['project','deal']` — samma två steg `acceptance-recovery` körde före
+      passet. De sju nya stegen SYNS i journalen men återspelas inte: ett
+      utskick som kanske redan gått ut får aldrig köras om av en
+      knapptryckning. Journalen har aldrig körts skarpt i prod — det var fel
+      tillfälle att vidga den.
+- [x] **Bekräftelsen ljuger inte längre.** `sendQuoteSignedConfirmation` tar
+      källan och väljer ord därefter ("Offerten är signerad" / "Offerten är
+      godkänd" / "Beställningen är registrerad"). ETT utskick per accept: mejl
+      genom `sendEmail` när kunden har adress, annars SMS genom strypunkten
+      `sendSmsViaElks`. Kunden utan e-post fick tidigare INGENTING från
+      portal- och signeringsvägen ("Customer has no email").
+- [x] **Gränssnittet redovisar ursprunget.** `acceptanceOriginLabel`/
+      `acceptanceOriginDate` i `lib/quotes/lifecycle.ts` är enda formuleringen;
+      `QuoteStatusTimeline` och `DealTimeline` läser den. "Offert signerad av
+      kund" om en offert hantverkaren bockat av efter ett telefonsamtal är
+      borta.
+- [x] **Facit:** `tests/accept-en-sanning.spec.ts` (41 prov), registrerad sist
+      i både `test:contracts` och contracts.yml. Finalizern körs på RIKTIGT
+      mot PostgreSQL med journalens verkliga trigger och plpgsql-funktioner
+      (`.rpc()` tillagd i `tests/helpers/job-standard-db.ts`), och
+      bekräftelsemodulen körs på riktigt med räknade utskick.
+      22 mutationer, alla dödade — bl.a. `quote_signed` fyrad på alla vägar,
+      `quote_accepted` borttagen, `project_event`-steget borttaget,
+      `RECOVERY_STEPS` vidgad med `email`, claim-spärren ignorerad,
+      `accepted_by`/`accepted_via` borttagna ur var och en av de tre rutterna,
+      SMS-fallbacken borttagen, både mejl OCH SMS skickade, portaltexten
+      påstår signatur, och den gamla lögnen återinförd i `DealTimeline`.
+      `tests/first-job-acceptance.spec.ts` vändes: reservgrenens facit ersattes
+      av "utan provenance-kolumn accepteras ingenting tyst".
+- [x] **UI-bevis:** båda tidslinjerna renderade i 375 px med alla fyra
+      ursprung (signering, kundportal, internt, gammal accept utan markör) —
+      scratchpad/accept-ursprung-375.png, ingen horisontell scroll
+      (scrollWidth 375 = innerWidth), inga sidfel. Ingen
+      `tests/helpers/*-preview.ts` finns för dessa ytor, så bilden är gjord med
+      samma bundlingsteknik i ett skript i scratchpad — ingen ny registrerad
+      `.ui.spec.ts`.
+
+**Siffror:** `npm run test:contracts` 3031 gröna före passet → 3073 efter,
+noll röda i båda. `npx tsc --noEmit` rent, `npx next build` rent.
+`tests/facit-outbound-truth.spec.ts` (2 röda) och
+`tests/quote-content-lock.spec.ts` (1 röd) var röda FÖRE passet, ligger
+utanför `test:contracts` och tillhör PR #91:s mark — inte tvingade gröna.
+
+**Lämnat ogjort:** ROT-årsutrymmet (`applyAnnualCap`) körs fortfarande bara i
+signeringsvägen — eget pass, medvetet orört här. Signeringsrutten prövas bara
+med källskanning i facit (dess RPC-kedja är inte riggad i minnet).
+Överlapp mot PR #91: `package.json` (`test:contracts`-raden — säker konflikt,
+båda lägger till specar sist), `.github/workflows/contracts.yml`,
+`lib/quotes/lifecycle.ts` och `app/dashboard/quotes/[id]/types.ts` (alla tre
+olika ställen i filen). `app/api/quotes/public/[token]/route.ts` rörs INTE av
+#91.
+
+## Spår 6 — En identitetsläsare (kundminne pass 2), 2026-09-18
+
+Samma person skrev sitt nummer på tre sätt och kanalerna läste identiteten på
+fyra. Två av läsningarna kunde aldrig träffa: Gmail-matcharen gjorde
+`.eq('email', råvärdet)` (en kund sparad som "Anna@Exempel.se" matchades aldrig
+av ett mejl från "anna@exempel.se") och `DealTimeline.tsx:85` sökte kundens
+**ID** som delsträng i ett **telefonnummer** — SMS-grenen i dealtidslinjen har
+varit tom sedan den skrevs. Webbchatten föll ur både kundtidslinjen och
+tvisteunderlaget av samma skäl.
+
+- [x] **En läsning.** Ny `lib/identity/resolve-contact.ts`: `resolveContact`
+      ⇒ `{ customerId?, leadId?, matchedBy: 'phone'|'email'|'none', ambiguous? }`.
+      Telefon genom `findCustomerByPhone`/`phoneCandidates` (alltså
+      `normalizeSwedishPhone` + `findCustomerDuplicates` — ingen tredje
+      normalisering uppfunnen), e-post trimmad och gemenformad exakt som
+      `findCustomerDuplicates` jämför. Kund först, sedan öppen lead (`new`,
+      `contacted`, `qualified` — samma lista Gmail-matcharen alltid använt).
+      FAIL-CLOSED: pekar signalerna åt olika håll (samma adress på två kunder,
+      eller telefonen på en kund och adressen på en annan) returneras
+      `ambiguous: true` UTAN id, samma val som tenant-grinden i
+      `sms/incoming`. Ingen ny tabell, ingen skrivning.
+- [x] **Gmail-matcharen läser genom den.** `matchSender` anropar
+      `resolveContact`; telefon skickas MEDVETET inte in — ett nummer ur
+      brödtexten är avsändarens påstående om sig själv, inte en identitet att
+      matcha någon annan på. Auto-skapandet av kund vid okänd avsändare är
+      oförändrat, men en TVETYDIG avsändare skapar INGEN kund: adressen finns
+      redan på två personer, och en tredje rad hade gjort röran större. Mejlet
+      sparas omatchat och en människa avgör.
+      `lib/launch-desk/normalize.ts` återanvände redan `normalizeSwedishPhone`
+      (verifierat, rad 13) — inget att göra, export-signaturen orörd.
+- [x] **Dealtidslinjens SMS-gren.** Kundens nummer hämtas (minimal fråga) och
+      slås upp med `phoneCandidates` mot både `phone_to` och `phone_from`.
+      `phoneCandidates` är importerbar i en klientkomponent — kedjan
+      find-customer-by-phone → phone-normalize/customer-dedupe har bara
+      typimporter av `@supabase/supabase-js` (prövas av specen). Radnyckeln
+      rättad på vägen: `sms_log` har `sms_id`, inte `id`.
+- [x] **De råa matchningarna som fanns kvar — listade och rättade:**
+      `lib/compliance/communication-trail.ts` webbchatten
+      (`visitor_phone.eq.<rå>` + `visitor_email.eq.<rå>`) och
+      `app/api/customers/[id]/timeline/route.ts` §3g (samma två), plus §9
+      `agent_runs` som jämförde `trigger_data.phone` som delsträng av kundens
+      nummer utan plustecken. E-post-, samtals- och portaldelarna i BÅDA
+      filerna matchar på `customer_id` och var alltså aldrig råa — de rördes
+      inte.
+- [x] **Facit:** `tests/identitetslasare.spec.ts` (18 prov), registrerad sist i
+      både `test:contracts` och contracts.yml. Supabase-stubben FILTRERAR på
+      riktigt (in/eq/ilike över rader i minnet), så provet ser skillnad på
+      "slog upp" och "slog upp rätt". 7 mutationer, alla dödade: tvetydig
+      e-post tillåts ⇒ rött; e-post normaliseras utan gemener ⇒ 5 röda; alla
+      lead-statusar räknas som öppna ⇒ rött; telefonen slås upp rått med
+      `.eq('phone_number')` ⇒ 2 röda; tvetydig avsändare får skapa kund ⇒
+      rött; `phone_to.ilike.%${customerId}%` tillbaka ⇒ 2 röda; rå
+      `visitor_email.eq` i webbchatten ⇒ rött.
+- [x] **UI-bevis:** dealtidslinjen renderad i 375 px med tre SMS ur den
+      RIKTIGA komponenten (scratchpad/dealtimeline-375.png, ingen horisontell
+      scroll, inga sidfel). Det fanns ingen `tests/helpers/*-preview.ts` för
+      DealTimeline, så bilden är gjord med samma bundlingsteknik som
+      `relief-preview.ts` i ett skript i scratchpad — ingen ny registrerad
+      `.ui.spec.ts` lades till.
+
+### A. tsc-felet från spår 2 är stängt
+
+Next.js 14 tillåter bara `POST`/`dynamic` m.fl. ur en route-fil; spår 2:s
+exporterade hjälpare fällde `npx tsc --noEmit` via `.next/types`.
+
+- [x] `verifieraSvixSignatur`, `tolkaEpostHandelse`, `LEVERANSSTATUS`,
+      `HANTERADE_HANDELSER`, `SVIX_TOLERANS_SEKUNDER` → ny `lib/email/svix.ts`.
+      `tolkaLeveransrapport` + `Leveransutfall`/`Leveransrapport` → ny
+      `lib/sms/leveransrapport.ts`. Rutterna exporterar nu bara `POST` och
+      `dynamic`. `tests/email-leverans.spec.ts` och
+      `tests/sms-leverans.spec.ts` importerar från lib.
+- [x] **Bifynd:** `tests/facit-route-auth-inventory.spec.ts` räknade
+      `email/events` som grindad via regexen `createHmac` (grinden hette
+      "hmac_token") — ren tur. När hjälparna flyttade matchade inget alls och
+      rutten föll ur inventeringen. Grinden har nu ett eget namn,
+      `svix_signatur: /verifieraSvixSignatur\(/`. Mutation: grinden bortplockad
+      ur rutten ⇒ rött.
+- [x] **Bevis:** `npx next build` ren, därefter `npx tsc --noEmit` exit 0.
+
+### B. Agentens `create_booking` kunde aldrig lyckas
+
+`tool-router.ts:1389` insertade `status: 'pending'`. Uppslag mot `pg_enum`:
+`booking_status` = `confirmed|cancelled|completed|no_show` — 'pending' finns
+inte, och kolumnen `source` finns inte på `booking` (uppslag mot
+`information_schema`, 35 kolumner). Varje autonom bokning föll på ett
+databasfel som returnerades som `{ success: false }`. Samma bugg som spår 3
+stängde i `lib/approve-actions.ts` (a5d6253) och som den commiten uttryckligen
+lämnade kvar här. Rättat till `'confirmed'` — koden nås bara när grinden
+ovanför sagt att bokningen inte kräver godkännande.
+
+- [x] **Facit:** källskanning i `tests/bokning-pa-svar.spec.ts` (5 nya prov,
+      ett per fil som insertar i `booking`): status måste stå uttryckligen och
+      finnas i enumet, och `source` får inte skrivas. Kommentarer filtreras
+      bort så beskrivningen av den gamla buggen inte läses som kod.
+      Mutationer: `'pending'` tillbaka i tool-router ⇒ rött; `source: 'lars'`
+      i service-bookings ⇒ rött.
+
+**Siffror:** `npm run test:contracts` 3030 → 3031 gröna, 0 röda, 1 skip.
+`npx tsc --noEmit` exit 0 (var 2 fel före passet). `npx next build` ren.
+Ingen SQL kördes — bara läsande uppslag (`pg_enum`, `information_schema`).
+
+**Oprövat:** ingen riktig Gmail-synk och ingen riktig dealtidslinje körd mot
+prod-data; tvetydighetsvägen är bevisad i stub, inte på en riktig dubblett.
+
+## Spår 5 — ROT/RUT som daterad regel, 2026-09-18
+
+Satsen och taket låg som konstanter på fyra ställen utan datum: `ROT_RATE`,
+`RUT_RATE`, `ROT_MAX_PER_YEAR`, `RUT_MAX_PER_YEAR`, `TOTAL_MAX_PER_YEAR` i
+`lib/rot-rut-limits.ts`, samma fyra i `lib/rot-rut.ts`, ett eget par i
+`lib/skv/validate-rot-request.ts` och grön teknik-satserna i
+`lib/quote-calculations.ts`. Skatteverket höjde ROT tillfälligt till 50 % för
+arbete betalt 2025-05-12..2025-12-31 och sänkte tillbaka till 30 % 2026-01-01
+— koden kunde inte uttrycka det. En faktura som betalades i juni 2025 räknades
+med 2026 års sats, och en satsändring krävde fyra redigeringar.
+
+- [x] **En sanning med datum.** Ny `lib/rot/regler.ts`: `RotRegel`,
+      `ROT_REGLER` (tre rader: 2025-01-01..05-11 30 %, 2025-05-12..12-31 50 %,
+      2026-01-01.. 30 %) och `regelFor(datum)`. Den KASTAR ALDRIG — utanför
+      tabellen lånas närmaste regel med `verifierad: false` och en
+      `console.warn`, aldrig en tyst gissning i en pengaberäkning. Datum
+      normaliseras i svensk tid (Europe/Stockholm), så ett `new Date()` strax
+      efter midnatt nyårsnatten inte hamnar i fel år. Grön teknik-satserna
+      (15/50/50, tak 50 000) flyttade hit OFÖRÄNDRADE.
+- [x] **De fyra ställena läser regeln.** `lib/rot-rut.ts` (konstanterna borta,
+      varje funktion tar valfritt `datum`), `lib/rot-rut-limits.ts` (taken ur
+      regeln, `datum` genom hela kedjan), `lib/skv/validate-rot-request.ts`
+      (årstaket ur regeln för BETALNINGSDATUMET — där finns `paid_at`, och det
+      är det datum Skatteverket faktiskt knyter regeln till),
+      `lib/quote-calculations.ts` (ROT/RUT + grön teknik per datum).
+- [x] **Vem skickar datum.** `app/api/invoices/route.ts` POST (klientens
+      `invoice_date`) och PUT (fakturans EGET `invoice_date` — en 2025-faktura
+      som redigeras räknas inte längre om med 2026 års sats),
+      `from-quote`, `from-time-entries` och `lib/quotes/apply-annual-cap.ts`.
+      Övriga vägar (`from-project`, `create-final-invoice`,
+      `project-invoice-draft`, `invoice-visit`, `tool-router`, offertrutterna)
+      faller på default `new Date()` = fakturans/offertens skapandedag, vilket
+      är bästa kända datum där. Kreditvägen proportionerar originalets avdrag
+      och rör aldrig en sats — den ärver därmed originalfakturans regel.
+- [x] **`automation_settings.rot_deduction_rate` fanns aldrig.** Kolumnen finns
+      inte i tabellen (uppslag mot `information_schema`: 30 kolumner, ingen
+      rot-nyckel), den seedas inte i `lib/seed-defaults.ts` och ingen kod läser
+      den — den stod bara i ARCHITECTURE.md §3.2. Avsnittet säger nu att
+      satserna bor i `lib/rot/regler.ts` och att de inte är inställningar.
+      Ingen databasrad rörd.
+- [x] **Facit:** `tests/rot-regler.spec.ts` (29 tester). Gränsdagar, utanför
+      tabellen ⇒ `verifierad:false` + warn, och tal genom VARJE väg med
+      2025-06-01 (50 % ⇒ 6 250 kr) och 2026-03-01 (30 % ⇒ 3 750 kr): de rena
+      funktionerna, årstaksvägen med databasstubbe, skv-valideringen,
+      offertmotorn, tillvalsvägen och sex fakturavägar som KÖRS (from-quote,
+      from-time-entries, invoices POST, from-project, create-final-invoice,
+      invoice-visit) plus projektfakturaunderlaget — under låst systemklocka,
+      efter lärdomen 2026-09-16 om att en delad funktion måste bevisas på varje
+      väg. Plus källskanning: satserna får inte återuppstå som literaler.
+- [x] **Fynd som INTE rördes (utanför uppdraget):** grön teknik-avdraget räknas
+      aldrig i `calculateQuoteTotals` — `getBasisRotRutType` returnerar null för
+      `gron_*`, så `gronBase` blir 0. `tests/gron-teknik.spec.ts` (7 fall) och
+      två fall till var RÖDA redan före passet (verifierat med `git stash`).
+      Samma sak: `npx tsc --noEmit` har två fel i `.next/types` för
+      `app/api/email/events/route.ts` och `app/api/sms/delivered/route.ts`
+      (spår 2 exporterar hjälpfunktioner ur route-filer, vilket Next.js
+      förbjuder) — de var röda före passet och är inte rättade här.
+
+## Spår 3 — Bokning på svar, 2026-09-18
+
+Vi bad själva kunden svara: "Vi kan komma: 1) … 2) … Svara med numret som
+passar bäst". Kunden svarade "2" — och svaret blev ett lead_review-kort med
+texten "2". Ingen bokning, ingen koppling till de tider vi just erbjudit.
+`lib/approvals/booking-times-review.ts` sa det rakt ut: "Kundens svar hanteras
+separat innan kalendern ändras". Det ledet fanns inte. Nu finns det.
+
+- [x] **Erbjudandet blev data.** `sql/v262_booking_offer.sql` körd mot prod:
+      ny tabell `booking_offer` (15 kolumner, 4 index, RLS på, DML bara till
+      service_role — samma rättighetsbild som pending_approvals/booking).
+      Erbjudandets id härleds ur kortet som skickade SMS:et, så ett omkört
+      godkännande ger samma rad. Raden skrivs i
+      `app/api/approvals/[id]/route.ts` FÖRST när SMS:et faktiskt gått iväg —
+      ett erbjudande kunden aldrig fick ska inte gå att besvara.
+      `sms_log` har ingen metadata-kolumn (uppslaget gjort mot
+      information_schema), så SMS-raden märks INTE med offer_id; kopplingen
+      bärs av `source_approval_id` i stället.
+- [x] **Svaret matchas före intent-agenten.** `lib/bookings/svar-pa-erbjudande.ts`
+      slår upp öppet, ej utgånget erbjudande på avsändarens telefonkandidater i
+      samma företag och tolkar svaret i REN KOD: siffra 1–3, eller en veckodag
+      (+ klockslag när flera tider ligger samma dag) som entydigt pekar ut EN
+      tid. Ingen modell. Tvetydigt svar matchar ingenting och går vanliga
+      vägen. Matchar det, hoppas både Matte-vägen (lead_review-kortet) och den
+      fria agenten över — annars hade kunden fått ett svar som lovar något
+      annat än kortet gör.
+- [x] **Ledig tid ⇒ ETT kort.** Status-CAS `open → accepted` + kortet
+      `booking_offer_confirm` ("Anna valde tisdag 22 september kl 13:00–15:00 —
+      Boka", risk `high`, push via skapaKort). Godkännandet går genom den
+      BEFINTLIGA bokningsvägen (`executeApproveAction` → createBooking: kunddedup,
+      konfliktkoll, `booking_created`) och skickar bokningsbekräftelsen via
+      `lib/bookings/confirmation-sms.ts`. Granskningen läser erbjudandet ur
+      tabellen och kontrollerar tiden EN GÅNG TILL — en tid som hunnit bli
+      upptagen blockerar kortet i stället för att dubbelboka.
+- [x] **Upptagen tid ⇒ nya tider, max en gång.** Erbjudandet blir `superseded`
+      och ett nytt `propose_booking_times`-kort förbereds med
+      `parent_offer_id` — SMS:et går genom exakt samma väg och grindar som det
+      första (ingen ny utskickstyp). Andra gången: inget tredje SMS, ärendet
+      går till hantverkaren (`agent_insight`).
+- [x] **Dedupe.** Två svar ⇒ ett kort och en bokning: status-CAS plus
+      deterministiskt kort-id ur erbjudandet, och en idempotenskontroll på
+      `resulting_booking_id` före bokningen. Utgånget erbjudande matchar inte
+      (både i queryn och som JS-bälte) — inget kort från den här modulen.
+- [x] **Fynd som stängdes på vägen:** `createBooking` i `lib/approve-actions.ts`
+      har ALDRIG kunnat lyckas. Den skickade `status: 'pending'` (finns inte i
+      enumet booking_status: confirmed|cancelled|completed|no_show) och
+      `source: 'ai_suggestion'` (kolumnen finns inte på `booking`). Varje
+      godkänt bokningsförslag föll på ett databasfel som fångades och
+      returnerades som `{ success: false }`. Rättat till `status: 'confirmed'`
+      utan `source`. Funktionen tar nu också en exakt ISO-tid
+      (`scheduled_start`), i stället för att sätta ihop `${date}T${time}` utan
+      tidszon och låta servern tolka den som UTC.
+- [x] **Två saknade `booking_created`** (spår 4-fyndet) avfyras nu:
+      `app/api/agent/trigger/tool-router.ts` och
+      `lib/agents/lars/service-bookings.ts`. ARCHITECTURE.md §4 filkolumn
+      uppdaterad; `tests/event-kontrakt.spec.ts` grön.
+- [x] **Kundens kvitto-SMS byggdes INTE.** "Tack, jag återkommer med
+      bekräftelse" är en ny, automatisk, kundvänd utskickstyp utan kort och
+      utan regel — lead-intake-granskningen säger att nya utskickstyper ska gå
+      genom approvals/regler. Kunden får bokningsbekräftelsen när hantverkaren
+      trycker: ETT SMS, inte två. Avvisning skickar heller ingenting; "tiden
+      gick inte att bekräfta" är ett besked bara hantverkaren kan formulera.
+- [x] `tests/bokning-pa-svar.spec.ts` (23 prov) registrerad sist i både
+      `test:contracts` och `contracts.yml`. 14 mutationer testade, alla dödade.
+      Kortet renderat i 375 px (ingen horisontell scroll, rubriken kapas inte).
+
+**Inte gjort:** helautonom bokning på svar (kräver spec-beslut —
+`create_booking` är aldrig autonom i `tasks/earned-autonomy-spec.md`);
+`tool-router`-vägens egen `status: 'pending'`-insert är samma trasiga klass som
+createBooking hade men ligger utanför det här spåret; kundprov med två
+telefoner är inte kört.
+
+## Spår 2 — Skickat blir levererat, 2026-09-18
+
+"Skickat" har betytt att sändtjänsten svarade HTTP 200 på vårt anrop. Ett SMS
+till ett avstängt nummer och ett mejl som studsade såg exakt likadana ut som ett
+som kom fram. `lib/outbound/status.ts` sa det rakt ut: "Leveransbesked saknas".
+Hantverkaren ringde upp och frågade "fick du mitt SMS?" — det är den frågan som
+stängs här. Leverans är ett EGET faktum vid sidan av sändningen; status-maskinen
+`sent|failed|unknown` är orörd.
+
+- [x] **46elks `whendelivered`.** `sendSmsViaElks` skickar
+      `whendelivered=<appUrl>/api/sms/delivered` med webhook-hemligheten i
+      frågesträngen (samma `medElksHemlighet` som `whenhangup`). Ny rutt
+      `app/api/sms/delivered` (force-dynamic, `verifieraElksWebhook`, svarar
+      "OK"): uppdaterar `sms_log` på `elks_id` med `delivery_status` +
+      `delivered_at`. Okänt id ⇒ 200 + logg, aldrig 500 — 46elks retry:ar annars
+      i en kö som aldrig kan tömmas.
+- [x] **Tolerant parser, dokumenterat antagande.** 46elks dokumentation var inte
+      nåbar från byggmiljön (utgående trafik blockerad). Parsern läser id ur
+      `id`/`smsid`/`messageid`, status ur `status`/`delivery_status`, tid ur
+      `delivered`/`delivered_at`/`created`, och tar både form-urlencoded och
+      JSON. Okänt statusvärde skrivs ALDRIG — vi gissar inte ett leveransbesked.
+- [x] **Resend-webhook.** Ny `app/api/email/events` med Svix-signatur
+      (HMAC-SHA256 base64 över `svix-id.svix-timestamp.<rå kropp>`, 5 min
+      toleransfönster, konstant tid, inget nytt beroende — `svix` finns inte i
+      package.json). `email.delivered|bounced|complained|delivery_delayed`
+      skriver på `communication_log.provider_message_id`. Studs/spamanmälan på en
+      kundadress ⇒ `customer_fact` (`contact`, källa `email_bounce`,
+      `confirmed_at: null`) och ALDRIG ett nytt utskick.
+- [x] **Strypunkt för e-post.** Tolv direktanropare flyttade till `sendEmail()`:
+      `lib/invoices/send-invoice.ts`, `app/api/team/invite`,
+      `app/api/team/[id]/resend-invite`, `app/api/orders/send`,
+      `lib/partners/agreement.ts`, `app/api/admin/partners` + `.../[id]/approve`
+      (den tolfte, inte i briefen), `app/api/partners/register`,
+      `app/api/quotes/send`, `tool-router.ts`, `lib/auth/password-reset-email.ts`,
+      `lib/portal/notification-emails.ts`. `sendEmail` utökad med flera
+      mottagare, `bcc`, `text` och Buffer-bilagor i stället för att lämna någon
+      kvar. `lib/gmail-send.ts` returnerar `{ ok, messageId }` — Gmails id
+      kastades förut bort.
+- [x] **Strypunkten loggar Resend-id:t.** Utan en rad som bär id:t har
+      leveranskvittot ingenting att uppdatera. `sendEmail` skriver
+      `communication_log` med deterministiskt id (`cl_mail_<resend-id>`) och
+      upsert, så en anropare som dessutom kallar `logEmail` ger EN rad, inte två.
+- [x] **Visa det.** `outboundStatusText` säger "Levererat 08:14" / "Kom inte
+      fram" / "Försenat hos operatören" när beskedet finns; inkorgen får fälten
+      genom `read_outbound_status` och `/api/handoff`. Kundtidslinjen visar
+      kvittot som en märkning under rubriken (grön/röd). Renderad i 375 px: ingen
+      horisontell scroll, rubriken kapas inte.
+- [x] `sql/v261_leveranskvitto.sql` körd mot prod och verifierad: två kolumner på
+      `sms_log`, tre på `communication_log`, två på `outbound_intents`, tre index
+      (unikt på `sms_log.elks_id` — 57 av 57 var distinkta) och RPC:n
+      `mark_outbound_delivered` (SECURITY DEFINER, EXECUTE bara till
+      service_role, rör aldrig status/finished_at). `read_outbound_status`
+      utökad med leveransfälten. 100 sms_log-rader och 21 communication_log-rader
+      orörda.
+- [x] Fyra nya specar: `sms-leverans` (14), `email-leverans` (19),
+      `email-chokepoint` (7), `outbound-status` (11). Registrerade sist i både
+      `test:contracts` och `contracts.yml`. 12 mutationer testade, alla dödade.
+
+**Driftgrind:** `outbound_intents` FINNS i prod (v249 är körd) men är tom —
+`OUTBOUND_INTENTS_ENABLED` är fortfarande av. Inga env-flaggor rörda i det här
+passet. Leveranskvittot fungerar oberoende av flaggan: `sms_log` och
+`communication_log` uppdateras alltid, H3b-speglingen bara när flaggan är på.
+
+**Medvetna avvikelser, med skäl:**
+
+- `app/api/debug/mail/route.ts` ligger kvar på undantagslistan i
+  `tests/email-chokepoint.spec.ts`: dess hela syfte är att pröva providervägen
+  rå för att skilja Gmail-fel från Resend-fel, och den är redan grindad av
+  `dry_run` (`tests/facit-inga-testmejl.spec.ts`).
+  `lib/channels/preflight.ts` och `lib/launch/preflight.ts` läser bara
+  domänlistan (`api.resend.com/domains`) och skickar ingenting.
+- Tre befintliga facit pekade på `resend.emails.send` i `send-invoice.ts` och
+  gick sönder av flytten. De är uppdaterade till den nya kroken —
+  KRAVET är oförändrat (returvärdet måste läsas, `results.email` sätts bara
+  efter felkontrollen): `invoice-delivery-truth`,
+  `facit-send-invoice-fortnox-first`. `facit-route-auth-inventory` fick taket
+  höjt från 172 till 174 med skäl för de två nya webhookrutterna.
+- `RESEND_WEBHOOK_SECRET` är INTE satt i miljön ännu, och webhooken är inte
+  registrerad hos Resend. Utan hemligheten avvisar rutten allt (fail-closed,
+  aldrig fail-open). Två driftsteg återstår för Andreas: sätt hemligheten och
+  peka Resends webhook på `/api/email/events`.
+- Ingen riktig 46elks-leveransrapport har tagits emot ännu — kvittot är bevisat
+  på parsernivå och ruttnivå, inte med ett skarpt SMS. Kundprovet (ett SMS till
+  verifierad testmottagare, kvittens läst ur `sms_log`) är ogjort.
+
+## Spår 4 — Eventkontraktet blir kod, 2026-09-18
+
+`fireEvent(supabase, eventName: string, ...)` tog en fri sträng. Ett stavfel
+matchade ingen regel och dog tyst — ingen regel körd, inget fel loggat.
+ARCHITECTURE.md §4 hade glidit isär från koden åt båda håll: `invoice_sent`
+stod som ✅ men avfyrades aldrig, tio faktiskt avfyrade event saknades i
+dokumentet, och fyra namn i dokumentet fanns bara i dokumentet. Dokumentets
+egen "KRITISKA REGEL" om att event ska stå i listan FÖRST hade ingen grind.
+
+- [x] `lib/events/names.ts`: `EVENT_NAMES` (27 namn) + `EventName` + `isEventName`
+      + loopspärren `skaparEventLoop`. En svensk kommentar per event: när det
+      avfyras och vad payloaden bär, verifierad mot varje anropsställe.
+- [x] `fireEvent()` tar `EventName`, inte `string`. Alla 36 anropsställen skickar
+      strängliteraler — ingen cast, ingen vakt behövdes i produktionsvägen.
+- [x] Fem tysta event avfyras nu: `quote_expired` (cron, per offert som faktiskt
+      flippades), `booking_created` (tre vägar, en gång per skapad rad),
+      `invoice_sent` (i `triggerPostSendAutomations`, som bara körs när leveransen
+      lyckats), `sms_sent` (SMS-strypunkten, bara vid lyckat utskick),
+      `call_completed` (efter `processCallForPipeline`, inte för möten/utgående).
+- [x] Loopspärr: en regel på `sms_sent` med åtgärden `send_sms` skulle skicka SMS
+      som avfyrar `sms_sent` som skickar SMS. Spärren sitter i `fireEvent()` — inte
+      bara i seeden — så den gäller även regler användare och agenter skapar.
+      Den spärrade regeln räknas som `skipped`, inte `matched`.
+- [x] ARCHITECTURE.md §4 speglar `EVENT_NAMES` exakt, med en fjärde kolumn som
+      pekar ut filen eventet avfyras i. §3.2: `rot_max_per_person_year`
+      75 000 → 50 000, `rut_max_per_person_year` 75 000 tillagd (källa
+      `lib/rot-rut-limits.ts`). §7: Vapi-flödet ersatt av det verkliga
+      46elks-flödet (grep bekräftar: noll Vapi-anrop, bara `vapi_call` som
+      källvärde på leads). Båda kopiorna av ARCHITECTURE.md uppdaterade.
+- [x] `tests/event-kontrakt.spec.ts` (9 prov), registrerad sist i både
+      `test:contracts` och `contracts.yml`. 5 mutationer testade, alla dödade.
+- [x] `npx tsc --noEmit` exit 0 · `npx next build` ren · `test:contracts`
+      2896 → 2905 pass, 0 röda. Ingen SQL behövdes.
+
+**Medvetna avvikelser, med skäl:**
+
+- `quote_created` avfyras INTE. Den enda gemensamma skapandevägen är
+  `lib/quotes/create-quote.ts`, som ägs av öppna PR #91; enda andra insertet är
+  `app/api/debug/e2e-quote`. Namnet är därför borttaget ur §4 i stället för att
+  läggas till i `EVENT_NAMES` — ett kontrakt får inte lova något koden inte gör.
+- `invoice_sent` får INGEN seedad regel. Smart Communication-triggern för
+  `invoice_sent` togs bort 2026-08-27 för att den skickade ett extra faktura-SMS
+  ovanpå en redan levererad faktura. Eventet säger bara att fakturan gick iväg.
+- `booking_created` avfyras på de tre vägar briefen pekade ut. **Två andra
+  bokningsinsert:** `app/api/agent/trigger/tool-router.ts:1389` (agentens
+  `create_booking`) och `lib/agents/lars/service-bookings.ts:161` (serviceavtal)
+  avfyrar inte — utanför uppdraget, men det gör §4 sant bara för tre av fem
+  vägar. Bör stängas i ett eget pass.
+- Tidslinjen `app/api/customers/[id]/timeline/route.ts` orörd: namnen där är
+  visningsetiketter, inte event.
+
+## Spår 1 — Samtalet blir ett jobb, 2026-09-18
+
+Fångst-SMS:et lovar kunden "Svara på detta SMS med vad du behöver hjälp med".
+Svaret kom fram och sparades i `sms_conversation` — och stannade där. Ingen
+kund, inget kort, ingen affär. Hantverkaren fick ringa upp och fråga om samma
+sak en gång till. Det är den halvan som stängs här.
+
+- [x] Normaliserad identitet: tenantfallbacken i `sms/incoming` frågar på
+      `phoneCandidates()` i stället för råsträngen, kunden/leaden löses på
+      huvudvägen, och `sms/send` matchar via `findCustomerByPhone`.
+- [x] Svaret kopplas till det missade samtalet: `lib/sms/relatera-missat-samtal.ts`
+      läser fångst-SMS:et (`sms_log`, `message_type='automation_rule'`) och
+      `call_recording` inom 24 h; `related_call_id` följer med in i kortet och
+      i Matte-kontexten.
+- [x] Okänd avsändare blir kund via golden path med **`notify: false`** — annars
+      fyras `lead_received` och den seedade regeln "Snabbsvar på ny lead"
+      skickar ett andra "tack för din förfrågan" ovanpå fångst-SMS:et.
+- [x] ETT kort: `lib/sms/svar-blir-jobb.ts` klassar på `runIntentAgent`s
+      `intent`/`confidence` (inget andra modellanrop), sparar kundfakta med
+      ordagrant citat via den delade extraktorn, och skapar ett `lead_review`-kort.
+      Matte-exekveraren hoppar de action-typer kortet täcker.
+- [x] Obegripligt svar ⇒ kortet säger att vi inte förstod. Ingen jobbtyp, ingen
+      beskrivning, inga kundfakta. Förfrågan tappas aldrig, men gissas aldrig.
+- [x] `sql/v260_sms_conversation_identitet.sql` körd mot prod och verifierad:
+      `customer_id` + `lead_id` finns, två index skapade, 19 rader orörda.
+- [x] `tests/sms-svar-blir-kund.spec.ts` (21 prov), registrerad sist i både
+      `test:contracts` och `contracts.yml`. 13 mutationer testade, alla dödade.
+- [x] `npx tsc --noEmit` exit 0 · `npx next build` ren · `test:contracts`
+      2875 → 2896 pass, 0 röda, 1 skip (oförändrad).
+
+**Medvetna avvikelser, med skäl:**
+
+- Dedup-hålet i `lib/leads/golden-path.ts` (lead-intake-granskningen
+  §"Dedup-hålet") var **redan stängt** — dedupen går genom
+  `findCustomerDuplicates` med `normalizeSwedishPhone` + e-postfallback.
+  Ingen kodändring; ett låsande facit i stället så det inte återöppnas.
+- `app/api/voice/incoming/route.ts` **orörd**. `createLeadAndDeal` ligger inuti
+  testfönstret med flit — raderna 196–204 bär beslutet "ett telefonnummer som
+  börjar ringa är INTE ett kvalificerat lead". En utlyftning vore en
+  beteendeändring, inte en flytt.
+- SMS-fångade kundfakta skrivs med `confirmed_at: null` — ingen människa har
+  godkänt dem. `lib/matte/resolver.ts` och `lib/ai-quote-generator.ts` filtrerar
+  därför nu på `confirmed_at`, eftersom deras prompter ordagrant kallar listan
+  "godkända av hantverkaren". `/api/customers/[id]/facts` gjorde det redan.
+- `sms_conversation.customer_id` fanns i prod men saknade fil i `sql/`.
+  Deklarerad i v260 (no-op mot prod) så kolumnkontraktet har en sanning att läsa.
+
+**Kvar, inte rört i detta pass:** `app/api/sms/incoming/route.ts` triggar
+`incoming_sms`-agenten (`lib/agent/agents/lead-agent.ts`: "svara med SMS",
+`send_sms` i verktygen) **samtidigt** som Matte-grenen kan svara kunden
+(`action-executor.ts` → `sendCustomerReply`, grindad av
+`matte_customer_reply_enabled`). Är den flaggan på kan kunden få två svar på
+samma SMS. Beteendet är oförändrat här och behöver ett eget beslut.
+
+---
+
 ## Artiklar, mallar och ROT — 2026-09-16
 
 - [x] Fas 1: 30/30 v252-kontroller i isolerad PGlite; ingen extern migration körd.

@@ -51,6 +51,12 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
   // skickar och avvisade all trafik i elva dagar. Ersatt av en delad
   // hemlighet i URL:en, se lib/elks-webhook-auth.ts.
   elks_webhook: /verifieraElksWebhook\(/,
+  // Resends leveranshändelser (spår 2). Grinden hette tidigare "hmac_token"
+  // här, av misstag: regexen matchade `createHmac` som råkade stå i
+  // route-filen. Sedan hjälparna flyttade till lib/email/svix.ts (2026-09-18,
+  // Next.js förbjuder extra exporter ur en route) matchade inget alls, och
+  // rutten föll ur inventeringen. Grinden har ett eget namn nu.
+  svix_signatur: /verifieraSvixSignatur\(/,
   stripe_signatur: /constructEvent\(/,
   postmark_basic_auth: /verifyPostmarkBasicAuth\(/,
   supabase_session: /auth\.getUser\(|auth\.getSession\(|createRouteHandlerClient/,
@@ -236,5 +242,11 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // partner-token + gällande avtal, samma grind som partners/leads. Läser
   // bara rader där created_by_partner_id är partnern själv; ingen
   // tenant-kontext finns, caset tillhör partnern och prospektet → 172.
-  expect(utanStandard.length).toBeLessThanOrEqual(172)
+  // 2026-09-18 (Spår 2, leveranskvitto): sms/delivered (46elks whendelivered,
+  // grindad av verifieraElksWebhook) och email/events (Resends Svix-signatur).
+  // Ingen tenant-kontext finns eller KAN finnas: operatören postar ett
+  // provider-id, och företaget läses ur den rad id:t matchar. Båda svarar
+  // 200 på okänt id — en retry-storm från 46elks är värre än ett tappat
+  // kvitto → 174.
+  expect(utanStandard.length).toBeLessThanOrEqual(174)
 })

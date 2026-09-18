@@ -76,9 +76,19 @@ function buildMimeMessage(opts: {
   return lines.join('\r\n')
 }
 
+/** Utfallet av ett Gmail-utskick. */
+export interface GmailSandResultat {
+  ok: boolean
+  /** Gmails message-id. Kastades tidigare bort — utan det går inget utskick att följa upp. */
+  messageId?: string
+}
+
 /**
  * Skicka mail via Gmail API (OAuth).
- * Returnerar true om det gick, false annars.
+ *
+ * Returnerade tidigare bara `true`/`false` och slängde svarskroppen, alltså
+ * även Gmails `id`. Ett skickat mejl gick därför inte att koppla till vare sig
+ * tråd, kvitto eller kundhistorik. Nu returneras `{ ok, messageId }`.
  */
 export async function sendViaGmail(
   businessId: string,
@@ -91,12 +101,12 @@ export async function sendViaGmail(
     replyTo?: string
     bcc?: string[]
   }
-): Promise<boolean> {
+): Promise<GmailSandResultat> {
   // OAuth-hemligheter hör hemma i integrationslagret. business_config har
   // aldrig haft de gamla google_*/gmail_*-kolumner som denna funktion läste.
   const connection = await getGmailConnection(businessId)
   if (!connection?.refresh_token || !connection.access_token) {
-    return false
+    return { ok: false }
   }
 
   const tokenResult = await ensureValidToken({
@@ -105,12 +115,12 @@ export async function sendViaGmail(
     refresh_token: connection.refresh_token,
     token_expires_at: connection.token_expires_at,
   })
-  if (!tokenResult) return false
+  if (!tokenResult) return { ok: false }
 
   let accessToken = tokenResult.access_token
   if (accessToken !== connection.access_token) {
     const saved = await persistAccessToken(connection.id, accessToken, tokenResult.expiry_date)
-    if (!saved) return false
+    if (!saved) return { ok: false }
   }
 
   const rawMime = buildMimeMessage({
@@ -145,10 +155,10 @@ export async function sendViaGmail(
       refreshed = await refreshGoogleToken(connection.refresh_token)
     } catch (error) {
       console.error('[gmail-send] Google-token kunde inte förnyas efter 401:', error)
-      return false
+      return { ok: false }
     }
     const saved = await persistAccessToken(connection.id, refreshed.access_token, refreshed.expiry_date)
-    if (!saved) return false
+    if (!saved) return { ok: false }
     accessToken = refreshed.access_token
 
     const retryRes = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
@@ -160,10 +170,21 @@ export async function sendViaGmail(
       body: JSON.stringify({ raw: encoded }),
     })
 
-    return retryRes.ok
+    return { ok: retryRes.ok, messageId: await gmailMessageId(retryRes) }
   }
 
-  return res.ok
+  return { ok: res.ok, messageId: await gmailMessageId(res) }
+}
+
+/** Läser Gmails message-id ur svaret. Ett trasigt svar får aldrig fälla ett skickat mejl. */
+async function gmailMessageId(res: Response): Promise<string | undefined> {
+  if (!res.ok) return undefined
+  try {
+    const kropp = await res.json()
+    return typeof kropp?.id === 'string' && kropp.id ? kropp.id : undefined
+  } catch {
+    return undefined
+  }
 }
 
 /**

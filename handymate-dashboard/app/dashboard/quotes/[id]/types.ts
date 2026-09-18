@@ -72,6 +72,10 @@ export interface Quote {
   sent_at: string | null
   opened_at: string | null
   accepted_at: string | null
+  /** v263: vilken väg accepten kom in — signering | kundportal | internt. */
+  accepted_via?: string | null
+  /** v263: bara för accepted_via='internt' — användaren som registrerade den. */
+  accepted_by?: string | null
   declined_at: string | null
   decline_reason: string | null
   pdf_url: string | null

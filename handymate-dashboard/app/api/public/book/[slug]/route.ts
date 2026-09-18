@@ -130,6 +130,19 @@ export async function POST(request: NextRequest, { params }: { params: { slug: s
     return NextResponse.json({ error: 'Kunde inte spara bokningen' }, { status: 500 })
   }
 
+  // Eventkontraktet (Spår 4): EN gång per faktiskt skapad bokning, direkt
+  // efter insertet — kalendersynk och bekräftelse-SMS nedan är best-effort.
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(supabase, 'booking_created', businessId, {
+      booking_id: bookingId,
+      customer_id: customerId ?? null,
+      date: startISO,
+    })
+  } catch (eventFel) {
+    console.error('[public/book] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+  }
+
   // Google Calendar-synk (non-blocking)
   try {
     const result = await syncBookingToCalendar(supabase, businessId, config?.user_id, {

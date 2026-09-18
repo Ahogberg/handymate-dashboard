@@ -104,26 +104,38 @@ export function parseFaktaSvar(text: string): ExtractedFact[] {
   }
 }
 
-function byggPrompt(text: string): string {
-  return `Du analyserar ett inkommande e-postmeddelande som en kund skrev till ett hantverksföretag.
+/**
+ * Kanalens namn i prompten. Spår 1 (2026-09-18) lät SMS-svaret på ett missat
+ * samtal gå genom samma extraktor — och en prompt som kallar ett SMS för ett
+ * mejl beskriver inte texten modellen faktiskt läser. Reglerna nedan är
+ * identiska för båda kanalerna; bara substantivet skiljer.
+ */
+const KANALORD: Record<'email' | 'sms', { rubrik: string; lang: string; best: string }> = {
+  email: { rubrik: 'E-POSTMEDDELANDE', lang: 'ett inkommande e-postmeddelande', best: 'mejlet' },
+  sms: { rubrik: 'SMS', lang: 'ett inkommande SMS', best: 'SMS:et' },
+}
 
-=== E-POSTMEDDELANDE ===
+function byggPrompt(text: string, channel: 'email' | 'sms' = 'email'): string {
+  const k = KANALORD[channel] ?? KANALORD.email
+  return `Du analyserar ${k.lang} som en kund skrev till ett hantverksföretag.
+
+=== ${k.rubrik} ===
 """
 ${text}
 """
 
 === UPPGIFT ===
-Extrahera varaktiga KUNDFAKTA — saker kunden skrev i mejlet som är värda att komma ihåg vid framtida kontakt.
+Extrahera varaktiga KUNDFAKTA — saker kunden skrev i ${k.best} som är värda att komma ihåg vid framtida kontakt.
 
 Regler (strikta):
-- BARA saker som kunden uttryckligen skrev i mejlet — gissa eller tolka ALDRIG in något.
-- Max 5 per mejl.
+- BARA saker som kunden uttryckligen skrev i ${k.best} — gissa eller tolka ALDRIG in något.
+- Max 5 per meddelande.
 - Sätt alltid "fact_type" till ett av: "preference" (önskemål/preferens),
   "constraint" (begränsning, t.ex. tillträdestider, allergier), "commitment"
   (löfte, t.ex. "vi hör av oss senast fredag") eller "contact" (kontaktuppgift,
   t.ex. bästa telefonnummer, föredragen kontaktväg).
-- "evidence_quote" MÅSTE vara ett ordagrant citat ur mejlet — aldrig en omskrivning.
-- ENDAST för "commitment": nämner mejlet EXPLICIT ett datum eller en tidsram
+- "evidence_quote" MÅSTE vara ett ordagrant citat ur ${k.best} — aldrig en omskrivning.
+- ENDAST för "commitment": nämner ${k.best} EXPLICIT ett datum eller en tidsram
   för löftet (t.ex. "senast fredag", "imorgon", "den 20 augusti") — sätt
   "due_date_iso" till det datumet i formatet YYYY-MM-DD.
   Gissa ALDRIG ett datum om det inte uttryckligen sades — sätt då
@@ -138,14 +150,14 @@ Svara ENDAST med JSON i detta format:
     {
       "fact_type": "preference|constraint|commitment|contact",
       "content": "Kort beskrivning av faktumet på svenska",
-      "evidence_quote": "Ordagrant citat ur mejlet",
+      "evidence_quote": "Ordagrant citat ur ${k.best}",
       "confidence": 0.0-1.0,
       "due_date_iso": "YYYY-MM-DD eller null (endast för commitment, ENDAST om datum uttryckligen nämndes)"
     }
   ]
 }
 
-Om mejlet inte innehåller något varaktigt kundfaktum: returnera {"fakta": []}. Svara ENDAST med JSON, ingen annan text.`
+Om ${k.best} inte innehåller något varaktigt kundfaktum: returnera {"fakta": []}. Svara ENDAST med JSON, ingen annan text.`
 }
 
 /**
@@ -158,7 +170,7 @@ Om mejlet inte innehåller något varaktigt kundfaktum: returnera {"fakta": []}.
  */
 export async function extractCustomerFacts(input: {
   text: string
-  channel: 'email'
+  channel: 'email' | 'sms'
   businessId: string
   /** email_conversations-radens id — blir cost_event-refId och kortkälla. */
   refId: string
@@ -176,7 +188,7 @@ export async function extractCustomerFacts(input: {
       // Haiku räcker, samma modellklass som voice/analyze-extraktionen.
       model: EMAIL_FAKTA_MODELL,
       max_tokens: 1000,
-      messages: [{ role: 'user', content: byggPrompt(text) }],
+      messages: [{ role: 'user', content: byggPrompt(text, input.channel) }],
     })
 
     // COGS: mätningen går genom cost-guard (enda tillåtna llm-skrivaren per

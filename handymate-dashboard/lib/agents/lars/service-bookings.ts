@@ -179,6 +179,20 @@ export async function runServiceBookings(supabase: SupabaseClient, businessId: s
       if (usedFallback) result.fallback_used++
       result.bookings_created++
 
+      // Eventkontraktet (spår 4): EN gång per faktiskt skapad bokning.
+      // Serviceavtalens bokningar syntes aldrig som händelse — icke-
+      // blockerande, svepet får aldrig falla på ett eventfel.
+      try {
+        const { fireEvent } = await import('@/lib/automation-engine')
+        await fireEvent(supabase, 'booking_created', businessId, {
+          booking_id: bookingId,
+          customer_id: agreement.customer_id ?? null,
+          date: slot.startISO,
+        })
+      } catch (eventFel) {
+        console.error('[lars/service-bookings] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+      }
+
       // Nästa besök räknas fram från det FÖREGÅENDE next_visit_at (inte det
       // faktiskt bokade slottet) så intervallet aldrig glider vid ombokningar
       // eller kapacitetsplaceringar in i grannveckan.

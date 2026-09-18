@@ -31,7 +31,7 @@
  * kör med servicerollen och har redan verifierat businessId högre upp).
  */
 
-import { Resend } from 'resend'
+import { sendEmail } from '@/lib/email'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { generateOCR } from '@/lib/ocr'
 import { generateInvoicePDF } from '@/lib/pdf-generator'
@@ -50,9 +50,6 @@ import {
   secondaryButton, secondaryLink, linkBlock, escapeEmailText, formatKr, formatDag, type SummaryRow,
 } from '@/lib/email-templates'
 
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY)
-}
 
 export interface SendInvoiceParams {
   businessId: string
@@ -302,16 +299,18 @@ export async function sendInvoice(
       // samma mönster som auto-fakturans 401 — påstådd leverans utan
       // verifierad.
       //
-      // getResend() instansieras HÄR (inte längst upp i funktionen, som i
-      // den gamla rutten) — Resend-konstruktorn kastar synkront om
-      // RESEND_API_KEY saknas. Instansierad tidigt kunde det kasta ETT steg
-      // in i funktionen, INNAN ens fakturan hämtats eller SMS-vägen prövats
-      // — en miljö utan RESEND_API_KEY kunde då aldrig skicka SMS-varningar
-      // heller. Nu fångas felet av try/catchen nedan precis som alla andra
-      // e-postfel, och SMS-försöket (om begärt) påverkas inte alls.
-      const resend = getResend()
-      const emailRes = await resend.emails.send({
-        from: `${businessConfig?.business_name || 'Handymate'} <faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
+      // Strypunkten (lib/email.ts, Spår 2 2026-09-18). Resend-SDK:n låg
+      // tidigare direkt här; nu går fakturamejlet samma väg som alla andra
+      // utskick, så leveranskvittot från Resend kan hitta tillbaka till
+      // raden. sendEmail returnerar ett utfall (kastar inte vid HTTP-fel),
+      // så samma felgrening som förut gäller — bara på ett annat fält.
+      // RESEND_API_KEY som saknas ger { success: false } i stället för ett
+      // synkront kast, vilket aldrig kan blockera SMS-vägen.
+      const emailRes = await sendEmail({
+        businessId: invoice.business_id,
+        customerId: invoice.customer_id || null,
+        fromName: businessConfig?.business_name || 'Handymate',
+        fromAddress: `faktura@${process.env.RESEND_DOMAIN || 'handymate.se'}`,
         to: invoice.customer.email,
         subject: `Faktura ${invoice.invoice_number} från ${businessConfig?.business_name || 'oss'}`,
         html: buildInvoiceEmailHtml({
@@ -342,10 +341,10 @@ export async function sendInvoice(
         ]
       })
 
-      if (emailRes.error) {
+      if (!emailRes.success) {
         console.error('Email send rejected by Resend:', emailRes.error)
-        results.errors.push(`Email: ${emailRes.error.message || 'avvisad av e-posttjänsten'}`)
-      } else if (!emailRes.data?.id) {
+        results.errors.push(`Email: ${emailRes.error || 'avvisad av e-posttjänsten'}`)
+      } else if (!emailRes.messageId) {
         results.errors.push('Email: sändtjänsten gav ingen leveransreferens. Kontrollera leveransen före nytt försök.')
       } else {
         results.email = true
@@ -591,6 +590,28 @@ export interface PostSendAutomationsParams {
  */
 export async function triggerPostSendAutomations(params: PostSendAutomationsParams): Promise<void> {
   const { businessId, invoiceId, invoice } = params
+
+  // Eventkontraktet (Spår 4): `invoice_sent` stod som ✅ i ARCHITECTURE.md §4
+  // men avfyrades aldrig. Här — och bara här — är leveransen bevisad: den här
+  // funktionen anropas enbart när applyInvoiceDeliveryOutcome rapporterade
+  // delivered (e-post, SMS eller e-faktura gick ut).
+  //
+  // OBS: detta återinför INTE den borttagna Smart Communication-triggern
+  // längre ned i filen. Den togs bort för att den skickade ett EXTRA
+  // faktura-SMS ovanpå en redan levererad faktura (dubblett). Eventet skickar
+  // ingenting — det säger bara att fakturan gick iväg. Ingen seedad regel
+  // kopplas till det i detta pass, just för att inte återskapa dubbletten.
+  try {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(getServerSupabase(), 'invoice_sent', businessId, {
+      invoice_id: invoiceId,
+      customer_id: invoice?.customer_id ?? null,
+      amount: invoice?.total ?? null,
+    })
+  } catch (eventFel) {
+    console.error('[invoices/send] fireEvent invoice_sent misslyckades (icke-blockerande):', eventFel)
+  }
 
   // Pipeline: move deal to invoiced
   try {

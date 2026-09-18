@@ -245,28 +245,26 @@ export async function sendPortalNotification(
   // Skicka via Resend
   let emailId: string | undefined
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `${businessName} <portal@${RESEND_DOMAIN}>`,
-        to: [customer.email],
-        subject,
-        html,
-        reply_to: branding.contactEmail || undefined,
-      }),
+    // Strypunkten (lib/email.ts, Spår 2). Avsändare, ämne och reply-to
+    // oförändrade; nu bär utskicket dessutom tenant och kund, så leverans-
+    // kvittot från Resend kan skrivas på rätt rad.
+    const { sendEmail } = await import('@/lib/email')
+    const utfall = await sendEmail({
+      businessId,
+      customerId,
+      fromName: businessName,
+      fromAddress: `portal@${RESEND_DOMAIN}`,
+      to: customer.email,
+      subject,
+      html,
+      replyTo: branding.contactEmail || undefined,
     })
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      return { success: false, error: `Resend: ${errorText}` }
+    if (!utfall.success) {
+      return { success: false, error: `Resend: ${utfall.error || 'utskicket avvisades'}` }
     }
 
-    const data = await response.json().catch(() => ({}))
-    emailId = data?.id
+    emailId = utfall.messageId
   } catch (err: any) {
     return { success: false, error: err.message }
   }

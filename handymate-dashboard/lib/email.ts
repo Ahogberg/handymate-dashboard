@@ -6,17 +6,23 @@
 const RESEND_API_KEY = process.env.RESEND_API_KEY
 
 export interface SendEmailParams {
-  to: string
+  /** En eller flera mottagare. Flera används bara av vägar utan H3b-löfte. */
+  to: string | string[]
   subject: string
   html: string
+  /** Ren text i stället för HTML (agentens send_email skickar text). */
+  text?: string
+  /** Hemlig kopia. Offertvägen skickar kopia till hantverkaren själv. */
+  bcc?: string[]
   fromName?: string
   fromAddress?: string
   replyTo?: string
   /** Kontaktad (2026-08-28): med businessId + customerId flyttas kundens öppna affärer till Kontaktad vid lyckat utskick. */
   businessId?: string | null
   customerId?: string | null
-  /** Immutable reviewed document bytes; never re-render at the provider boundary. */
-  attachments?: Array<{ filename: string; content: string }>
+  /** Immutable reviewed document bytes; never re-render at the provider boundary.
+   *  content: base64-sträng eller Buffer (fakturans PDF kommer som Buffer). */
+  attachments?: Array<{ filename: string; content: string | Buffer }>
   idempotencyKey?: string
   /** Stable source identity for H3b recovery. */
   outbound?: {
@@ -39,6 +45,16 @@ export interface SendEmailResult {
   deliveryState?: 'accepted' | 'rejected' | 'unknown'
 }
 
+/** Alla mottagare som lista, alltid minst ett element för en giltig parameter. */
+export function mottagarlista(to: string | string[]): string[] {
+  return (Array.isArray(to) ? to : [to]).map(t => String(t).trim()).filter(Boolean)
+}
+
+/** Nyckeln H3b-löftet identifieras på. Flera mottagare ⇒ en stabil, sorterad nyckel. */
+function mottagarnyckel(to: string | string[]): string {
+  return mottagarlista(to).map(t => t.toLowerCase()).sort().join(',')
+}
+
 /**
  * Send an email via Resend API
  */
@@ -51,7 +67,7 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       promise: {
         businessId: params.businessId, kind: 'email', source: params.outbound.source,
         sourceId: params.outbound.sourceId, dedupeKey: params.outbound.dedupeKey,
-        recipient: params.to.trim().toLowerCase(), template: params.outbound.template,
+        recipient: mottagarnyckel(params.to), template: params.outbound.template,
         autonomyKey: params.outbound.autonomyKey,
         context: params.fromAddress || params.outbound.auditId ? {
           ...(params.fromAddress ? { fromAddress: params.fromAddress } : {}),
@@ -61,7 +77,13 @@ export async function sendEmail(params: SendEmailParams): Promise<SendEmailResul
       envelope: {
         subject: params.subject, html: params.html, fromName: params.fromName,
         fromAddress: params.fromAddress, replyTo: params.replyTo, customerId: params.customerId,
-        attachments: params.attachments, reconcile: params.outboundReconcile,
+        // Bilagor persisteras som JSON i outbound_messages — en Buffer måste
+        // bli base64 INNAN den lagras, annars går bytesen förlorade vid sweep.
+        attachments: params.attachments?.map(a => ({
+          filename: a.filename,
+          content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content,
+        })),
+        reconcile: params.outboundReconcile,
       },
     }, async (_intent, envelope) => {
       const result = emailProviderOutcome(await sendEmailWithoutOutbound({
@@ -116,15 +138,28 @@ async function sendEmailWithoutOutbound(params: SendEmailParams): Promise<SendEm
     customerId,
   } = params
 
+  const mottagare = mottagarlista(to)
+  if (mottagare.length === 0) {
+    return { success: false, deliveryState: 'rejected', error: 'Ingen mottagare angiven' }
+  }
+
   try {
     const body: Record<string, any> = {
       from: `${fromName} <${fromAddress}>`,
-      to: [to],
+      to: mottagare,
       subject,
-      html,
     }
+    // Agentvägen skickar ren text; allt annat HTML. Resend kräver minst en.
+    if (html) body.html = html
+    if (params.text) body.text = params.text
     if (replyTo) body.reply_to = replyTo
-    if (params.attachments?.length) body.attachments = params.attachments
+    if (params.bcc?.length) body.bcc = params.bcc
+    if (params.attachments?.length) {
+      body.attachments = params.attachments.map(a => ({
+        filename: a.filename,
+        content: Buffer.isBuffer(a.content) ? a.content.toString('base64') : a.content,
+      }))
+    }
 
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
@@ -143,6 +178,17 @@ async function sendEmailWithoutOutbound(params: SendEmailParams): Promise<SendEm
 
     const data = await response.json()
     if (typeof data.id !== 'string' || !data.id) return { success: false, deliveryState: 'unknown', error: 'Mejltjänstens svar saknar leveransreferens' }
+    // Leveranskvittot (Spår 2) behöver en rad som bär Resend-id:t — annars
+    // har `email.delivered`/`email.bounced` ingenting att uppdatera. Raden
+    // skrivs här i strypunkten så att ALLA vägar får ett kvitto, inte bara de
+    // sex som råkade anropa logEmail. Deterministiskt id ⇒ en caller som
+    // dessutom anropar logEmail skriver samma rad, inte en dubblett.
+    if (businessId) {
+      await logEmail({
+        businessId, customerId: customerId || undefined, to: mottagare.join(', '),
+        subject, status: 'sent', messageId: data.id,
+      })
+    }
     if (businessId && customerId) {
       try {
         const { markCustomerContacted } = await import('@/lib/pipeline/contacted')
@@ -171,7 +217,7 @@ export async function logEmail(params: {
   try {
     const { getServerSupabase } = await import('@/lib/supabase')
     const supabase = getServerSupabase()
-    await supabase.from('communication_log').insert({
+    const rad = {
       business_id: params.businessId,
       customer_id: params.customerId || null,
       channel: params.channel || 'email',
@@ -179,8 +225,19 @@ export async function logEmail(params: {
       subject: params.subject,
       message: params.to,
       status: params.status,
+      // v261: leveranskvittot slår upp raden på provider_message_id. Det låg
+      // tidigare bara i metadata-jsonben, som varken är indexerat eller unikt.
+      provider_message_id: params.messageId || null,
       metadata: { message_id: params.messageId },
-    })
+    }
+    if (params.messageId) {
+      // Deterministiskt id + upsert: strypunkten och en caller som ändå
+      // anropar logEmail ger EN rad, inte två.
+      await supabase.from('communication_log')
+        .upsert({ ...rad, id: `cl_mail_${params.messageId}` }, { onConflict: 'id' })
+    } else {
+      await supabase.from('communication_log').insert(rad)
+    }
   } catch {
     // communication_log table may not exist yet
   }

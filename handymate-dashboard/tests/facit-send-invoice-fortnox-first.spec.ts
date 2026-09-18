@@ -14,7 +14,7 @@ test.describe('sendInvoice — Fortnox fore kund', () => {
 
   test('Fortnox-synken anropas FORE email-forsoket', () => {
     const fortnoxIdx = FILE.indexOf('syncInvoiceToFortnox(')
-    const emailIdx = FILE.indexOf('resend.emails.send')
+    const emailIdx = FILE.indexOf('const emailRes = await sendEmail(')
     expect(fortnoxIdx).toBeGreaterThan(-1)
     expect(emailIdx).toBeGreaterThan(-1)
     expect(fortnoxIdx).toBeLessThan(emailIdx)

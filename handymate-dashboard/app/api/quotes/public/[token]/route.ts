@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { sendApprovalPush } from '@/lib/notifications/approval-push'
 import { calculateQuoteTotals } from '@/lib/quote-calculations'
 import { applyAnnualCap } from '@/lib/quotes/apply-annual-cap'
 import { resolveDisplayLevel, groupItemsForSummary } from '@/lib/quotes/display-level'
@@ -643,6 +642,19 @@ export async function POST(
       throw updateError
     }
 
+    // Provenance (v263): vilken väg accepten kom in. Signerings-RPC:n är
+    // atomisk och dess semantik rörs inte — markören skrivs som ett eget,
+    // icke-blockerande steg direkt efteråt. Misslyckas det står signed_at
+    // kvar som bevis, och gränssnittet faller tillbaka på det.
+    {
+      const { error: viaErr } = await supabase
+        .from('quotes')
+        .update({ accepted_via: 'signering' })
+        .eq('quote_id', quote.quote_id)
+        .eq('business_id', quote.business_id)
+      if (viaErr) console.error('[quotes/public] accepted_via kunde inte skrivas (non-blocking):', viaErr.message)
+    }
+
     // ── ROT-uppgifter från kunden (kundvy-omdesignen 2026-09-07) ─────────────
     // Kunden kan fylla i personnummer + fastighetsbeteckning i godkännande-
     // flödet — de uppgifter Skatteverkets ansökan kräver och som hantverkaren
@@ -691,91 +703,16 @@ export async function POST(
       console.error('[quotes/public] ROT-uppgifter kunde inte sparas (non-blocking):', quote.quote_id, err)
     }
 
-    // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
-    try {
-      const { captureExpectedMarginSnapshot } = await import('@/lib/quotes/margin-snapshot')
-      await captureExpectedMarginSnapshot(supabase, quote.business_id, quote.quote_id, 'signed')
-    } catch (err) {
-      console.error('[quotes/public] captureExpectedMarginSnapshot failed (non-blocking):', quote.quote_id, err)
-    }
-
     // Notiser/events nedan skall visa det signerade beloppet — inte det
     // gamla quote.total från före tillvalsomräkningen.
     const finalTotal = recomputed ? recomputed.total : (quote.total || 0)
 
-    // V80: den gamla "flytta till accepted"-flytten här togs bort — den var
-    // vestigial (flyttade dealen till det numera borttagna 'quote_accepted'-
-    // steget, för att sedan alltid bli omedelbart överkörd av "Golden Path:
-    // flytta deal till Vunnen" längre ned i samma handler). Den blocket
-    // längre ned är nu den enda sanningen för denna signeringsväg.
-
-    // Smart communication + notifications (non-blocking)
-    try {
-      const { triggerEventCommunication } = await import('@/lib/smart-communication')
-      await triggerEventCommunication({
-        businessId: quote.business_id,
-        event: 'quote_signed',
-        customerId: quote.customer_id,
-        context: { quoteId: quote.quote_id },
-      })
-
-      try {
-        const { notifyQuoteSigned } = await import('@/lib/notifications')
-        await notifyQuoteSigned({
-          businessId: quote.business_id,
-          customerName: (quote.customer as any)?.name || 'Kund',
-          quoteId: quote.quote_id,
-          total: finalTotal,
-        })
-      } catch { /* non-blocking */ }
-
-      // Push-notis till Christoffer — quote_signed har INGEN pending_approval-rad
-      // (info, inte action — kunden behöver veta att offerten signerats, inte agera).
-      // Anropas med "syntetiskt" approval-objekt så helpern kan återanvända
-      // template-logiken. Fire-and-forget, helpern loggar fel internt.
-      void sendApprovalPush({
-        business_id: quote.business_id,
-        approval_type: 'quote_signed',
-        payload: {
-          customer_name: (quote.customer as any)?.name || 'Kund',
-          quote_id: quote.quote_id,
-          project_id: (quote as any).project_id || null,
-          total: finalTotal,
-        },
-      })
-
-      try {
-        const { handleProjectEvent } = await import('@/lib/project-ai-engine')
-        await handleProjectEvent({
-          type: 'quote_accepted',
-          businessId: quote.business_id,
-          quoteId: quote.quote_id,
-        })
-      } catch { /* non-blocking */ }
-    } catch (commErr) {
-      console.error('Communication trigger error (non-blocking):', commErr)
-    }
-
-    // V3 Automation Engine: fire quote_signed event för pipeline-regler
-    try {
-      const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(supabase, 'quote_signed', quote.business_id, {
-        quote_id: quote.quote_id,
-        customer_id: quote.customer_id,
-        quote_title: quote.title,
-        total: finalTotal,
-      })
-    } catch { /* non-blocking */ }
-
-    // Autopilot: förbered deal-to-delivery-paket
-    try {
-      const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
-      await triggerAutopilot(quote.business_id, quote.quote_id)
-    } catch { /* non-blocking */ }
-
-    // Bekräftelse, projekt och deal→vunnen ligger i lib/quotes/finalize-accepted.ts
-    // så att portalens "Acceptera"-knapp gör EXAKT samma sak. Tidigare låg
-    // kedjan bara här, och portalvägen gav en vunnen offert utan projekt.
+    // ALLA eftersteg ligger i lib/quotes/finalize-accepted.ts så att portalens
+    // "Acceptera"-knapp och hantverkarens interna accept gör EXAKT samma sak.
+    // Tidigare låg marginalen, notisen, kommunikationen, projekt-AI:n,
+    // automationens event och autopiloten inklistrade i var och en av de tre
+    // rutterna — och hade redan drivit isär. Rutten äger auth och statusflipp;
+    // allt efter flippen ägs av finalizern, journalfört steg för steg.
     // Allt är non-blocking — kunden har redan signerat.
     const { finalizeAcceptedQuote } = await import('@/lib/quotes/finalize-accepted')
     await finalizeAcceptedQuote(supabase, {

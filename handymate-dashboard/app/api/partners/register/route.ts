@@ -58,14 +58,12 @@ export async function POST(request: NextRequest) {
 
     // Send admin notification
     try {
-      const { Resend } = await import('resend')
+      const { sendEmail } = await import('@/lib/email')
       const resendKey = process.env.RESEND_API_KEY
       if (resendKey) {
-        const resend = new Resend(resendKey)
         const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://app.handymate.se'
-        await resend.emails.send({
-          from: 'Handymate <noreply@handymate.se>',
-          to: ['andreas@handymate.se'],
+        await sendEmail({
+          to: 'andreas@handymate.se',
           subject: `Ny partneransökan: ${partner.name}`,
           html: `
             <h2>Ny partneransökan</h2>

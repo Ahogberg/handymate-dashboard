@@ -8,6 +8,7 @@ import { toolDefinitions } from './tool-definitions'
 import { buildSystemPrompt } from './system-prompt'
 import { executeTool } from './tool-router'
 import { parseQuoteFollowupRound, isQuoteFollowupTool } from '@/lib/quotes/followup-round'
+import { agsVerktygetAvMatte } from '@/lib/agent/kundsvar-agare'
 import { loadCompanyModel } from '@/lib/company/company-model'
 import { loadTradeContext } from '@/lib/branch/trade-context'
 import { getBusinessPreferences } from '@/lib/business-preferences'
@@ -489,6 +490,10 @@ export async function POST(request: NextRequest) {
       googleConnection,
       agentId,
       triggerSource,
+      // Vilken trigger körningen svarar på — läses av vakten i tool-router.ts
+      // (lib/agent/kundsvar-agare.ts): på ett inkommande kund-SMS äger
+      // Matte-vägen svaret, agenten kvalificerar men skickar inget eget.
+      triggerType: trigger_type,
       handoffChain,
       quoteFollowupRound: trigger_type === 'cron' && trigger_data?.cron_type === 'quote_followup'
         ? parseQuoteFollowupRound(trigger_data.quote_followup_round) : undefined,
@@ -565,7 +570,17 @@ export async function POST(request: NextRequest) {
         max_tokens: 4096,
         system: systemPromptCached,
         tools: (agentAllowedTools === 'all' ? toolDefinitions : toolDefinitions.filter((t: any) => agentAllowedTools.includes(t.name)))
-          .filter((t: any) => !context.quoteFollowupRound || isQuoteFollowupTool(t.name, context.quoteFollowupRound)) as any,
+          .filter((t: any) => !context.quoteFollowupRound || isQuoteFollowupTool(t.name, context.quoteFollowupRound))
+          // ── Ett svar per kund-SMS (2026-09-18) ──────────────────────────
+          // På ett inkommande kund-SMS svarar Matte-vägen kunden (resolver →
+          // intent-agent → action-executor, grindad av
+          // matte_customer_reply_enabled). Då ska agenten inte se send_sms:
+          // två modeller som svarar samma kund utan att veta om varandra är
+          // inte redundans, det är två svar. Agenten kvalificerar vidare med
+          // sina övriga verktyg, och behåller send_sms i ALLA andra
+          // sammanhang (cron, automationsregler, samtal, manuella kommandon).
+          // Motivering och mätning: lib/agent/kundsvar-agare.ts.
+          .filter((t: any) => !agsVerktygetAvMatte(t.name, trigger_type)) as any,
         messages: messagesToSend,
       })
 

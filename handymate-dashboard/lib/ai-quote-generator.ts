@@ -262,6 +262,10 @@ async function fetchCustomerFactsForQuote(
       .eq('customer_id', customerId)
       .in('fact_type', ['preference', 'constraint'])
       .is('superseded_by', null)
+      // Spår 1 (2026-09-18): SMS-vägen skriver fångade kundfakta med
+      // confirmed_at NULL. Offertprompten kallar listan "godkända av
+      // hantverkaren" — ett obekräftat förslag får inte prissätta ett jobb.
+      .not('confirmed_at', 'is', null)
       .order('created_at', { ascending: false })
       .limit(8)
 
