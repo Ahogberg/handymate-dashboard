@@ -28,7 +28,7 @@ test('shared job names use the selected industry and never a guessed industry', 
   expect(getTradeStartPackage('plumber','Eget jobb')).toBeUndefined()
   expect(getTradeStartPackage('plumber','Laddbox')?.labor).toBe('Elektrikerarbete')
 })
-const template:SetupTemplate={id:'t',name:'t',jobTypeSlug:'t',updatedAt:null,category:null,items:[{index:0,itemType:'item',description:'Arbete',unit:'st',linkedProductId:'p'}]}
+const template:SetupTemplate={id:'t',name:'t',jobTypeSlug:'t',isDefault:false,updatedAt:null,category:null,items:[{index:0,itemType:'item',description:'Arbete',unit:'st',linkedProductId:'p'}]}
 test('labor is proven by metadata, not names or an assumed hourly line', () => {
   const product={id:'p',name:'Arbete',unit:'st',salesPrice:1000}
   expect(hasLaborCost(inspectTemplate(template,[product]))).toBe(false)

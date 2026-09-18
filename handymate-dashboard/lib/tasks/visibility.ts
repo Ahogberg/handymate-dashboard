@@ -71,7 +71,12 @@ export function taskPrivacyOrFilter(scope: TaskScope): string {
 export async function resolveTaskScope(
   supabase: SupabaseClient,
   businessId: string,
-  currentUser: { id: string; role: 'owner' | 'admin' | 'employee' } | null,
+  // Rollen är avsiktligt `string` och inte en union: funktionen öppnar bara
+  // för owner och admin och låter ALLA andra roller falla till det snäva
+  // läget. En ny roll (t.ex. revisor, v259) får därmed rätt svar utan att
+  // någon behöver komma ihåg att lägga den i en union — och en felstavad
+  // roll faller stängt i stället för att bli ett typfel på fel ställe.
+  currentUser: { id: string; role: string } | null,
   userId: string | null,
   strict = false,
 ): Promise<TaskScope> {

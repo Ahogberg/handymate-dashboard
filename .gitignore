@@ -35,7 +35,13 @@ yarn-error.log*
 package-lock.json
 
 # Claude
-.claude/
+# .claude/ är personligt (settings.local.json, historik) UTOM skills/, som är
+# arbetsordningen och ska följa med till Codex och varje ny session
+# (2026-09-17). Mönstren måste vara **/-prefixade: ett mönster med snedstreck
+# i sig ankras till den här filens mapp, så `.claude/*` skulle bara matcha
+# roten och inte handymate-dashboard/.claude/.
+**/.claude/*
+!**/.claude/skills/
 .vercel
 
 # git worktrees (isolated workspaces for agentic development)

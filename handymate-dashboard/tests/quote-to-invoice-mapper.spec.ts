@@ -173,6 +173,6 @@ test.describe('jobbtypen når fakturan', () => {
     expect(läs('app/api/projects/[id]/create-final-invoice/route.ts')).toContain('jobType: project.job_type ?? null,')
     // och läser fältet ur databasen.
     expect(läs('app/api/invoices/from-project/route.ts')).toContain("'project_id, quote_id, customer_id, job_type'")
-    expect(läs('sql/v255_invoice_job_type.sql')).toContain('ADD COLUMN IF NOT EXISTS job_type TEXT')
+    expect(läs('sql/v262_invoice_job_type.sql')).toContain('ADD COLUMN IF NOT EXISTS job_type TEXT')
   })
 })

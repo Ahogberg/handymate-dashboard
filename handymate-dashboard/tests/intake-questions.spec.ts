@@ -304,7 +304,7 @@ test.describe('transporten — fetchIntakeQuestions', () => {
 
 test.describe('kopplingen i koden — källskanning', () => {
   test('migrationen deklarerar båda kolumnerna', () => {
-    const sql = read('sql/v253_intake_questions.sql')
+    const sql = read('sql/v260_intake_questions.sql')
     expect(sql).toContain('ALTER TABLE public.job_types ADD COLUMN IF NOT EXISTS intake_questions JSONB')
     expect(sql).toContain('ALTER TABLE public.quotes ADD COLUMN IF NOT EXISTS intake_answers JSONB')
   })
@@ -340,7 +340,7 @@ test.describe('kopplingen i koden — källskanning', () => {
     // Nya kopplade rader får id: annars går de inte att peka på.
     const standard = utanKommentarer(read('lib/quotes/job-standard-server.ts'))
     expect(standard).toContain("return { id: generateItemId(), standard_product: true, item_type: 'item'")
-    expect(fs.existsSync(path.join(ROOT, 'sql/v254_template_row_ids.sql'))).toBe(true)
+    expect(fs.existsSync(path.join(ROOT, 'sql/v261_template_row_ids.sql'))).toBe(true)
     expect(server).toContain('seeded: stored === null')
     expect(server).toContain("body.questions === null ? null")
     expect(server).toContain(".eq('is_active', true)")

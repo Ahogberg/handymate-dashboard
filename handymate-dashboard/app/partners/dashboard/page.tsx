@@ -22,10 +22,11 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   Zap, Copy, Check, Users, LogOut, Loader2, Eye, EyeOff, Settings, X,
-  Mail, MessageCircle, Smartphone, ChevronRight,
+  Mail, MessageCircle, Smartphone, ChevronRight, MonitorPlay,
 } from 'lucide-react'
 import ReferralCard from './components/ReferralCard'
 import AssignedLeads from './components/AssignedLeads'
+import MinaGenomgangar from './components/MinaGenomgangar'
 import AgreementGate from '../components/AgreementGate'
 import PortalPreview from './components/PortalPreview'
 import StatementSection from './components/StatementSection'
@@ -92,10 +93,39 @@ export default function PartnerDashboardPage() {
 
   const [expandedRef, setExpandedRef] = useState<string | null>(null)
 
+  const [demoBusy, setDemoBusy] = useState(false)
+  const [demoError, setDemoError] = useState<string | null>(null)
+
   useEffect(() => {
     fetchDashboard()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Öppnar det delade demokontot i en ny flik. Fliken öppnas FÖRE await:t —
+  // en window.open() efter ett await räknas inte som användarens klick och
+  // blockeras av popup-skyddet i Safari och Chrome.
+  async function oppnaDemo() {
+    if (demoBusy) return
+    setDemoBusy(true)
+    setDemoError(null)
+    const flik = window.open('', '_blank')
+    try {
+      const res = await fetch('/api/partners/demo-entry', { method: 'POST' })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.url) {
+        flik?.close()
+        setDemoError(data?.error || 'Demot kunde inte öppnas. Försök igen.')
+        return
+      }
+      if (flik) flik.location.href = data.url
+      else window.location.href = data.url
+    } catch {
+      flik?.close()
+      setDemoError('Demot kunde inte öppnas. Försök igen.')
+    } finally {
+      setDemoBusy(false)
+    }
+  }
 
   async function fetchDashboard() {
     try {
@@ -517,6 +547,34 @@ export default function PartnerDashboardPage() {
           </div>
         </section>
 
+        {/* ─── Visa Handymate live (delat demokonto) ─── */}
+        <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col gap-3.5">
+          <div>
+            <h2 className="text-[17px] font-semibold text-slate-900">Visa Handymate live</h2>
+            <p className="text-[13px] text-slate-500 mt-0.5">
+              Ett riktigt konto med kunder, offerter och jobb. Du behöver inga inloggningsuppgifter —
+              knappen loggar in dig. Allt som skickas i demot är simulerat, inga samtal eller SMS går
+              till någon riktig person.
+            </p>
+          </div>
+          <button
+            onClick={oppnaDemo}
+            disabled={demoBusy}
+            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-4 rounded-xl bg-primary-700 text-white text-sm font-medium hover:bg-primary-800 disabled:opacity-60 transition-colors self-start"
+          >
+            {demoBusy
+              ? <><Loader2 className="w-4 h-4 animate-spin" /> Öppnar demot…</>
+              : <><MonitorPlay className="w-4 h-4" /> Öppna demot i ny flik</>}
+          </button>
+          {demoError && (
+            <p className="text-[13px] text-red-600">{demoError}</p>
+          )}
+          <p className="text-[13px] text-slate-500">
+            Kontot delas av alla partners. Återställer du det mitt i någon annans möte börjar deras
+            demo om — gör det före mötet, inte under.
+          </p>
+        </section>
+
         {/* ─── Säljmaterial ─── */}
         <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 shadow-sm flex flex-col gap-3.5">
           <div>
@@ -549,6 +607,9 @@ export default function PartnerDashboardPage() {
             ))}
           </div>
         </section>
+
+        {/* ─── Dina genomgångar (utfallet av säljmaterialet ovan) ─── */}
+        <MinaGenomgangar />
 
         {/* ─── Så ser portalen ut när du har kunder (bara i tomma läget) ─── */}
         {tomtLage && (

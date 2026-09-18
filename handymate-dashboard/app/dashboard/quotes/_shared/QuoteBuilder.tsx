@@ -390,10 +390,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [efterkalkylInsight, setEfterkalkylInsight] = useState<EfterkalkylInsight | null>(null)
   const [uploadingFile, setUploadingFile] = useState(false)
 
-  // Startsteg (Etapp 3): "Börja tomt / Använd mall / Beskriv med AI" —
-  // visas bara när ingen styrsignal pekat ut vad offerten redan ska bli.
-  /** Mallväljaren, öppnad från Snabboffertens intag. Ersätter startväljaren
-      som helhet — se kommentaren vid showTemplatePicker nedan. */
+  // Den separata mallistan (öppnad från intaget) togs bort 2026-09-17:
+  // jobbtypsremsan är det enda valet av upplägg, i intaget och i editorn.
+  // Sparade upplägg utan jobbtyp nås via remsans "Övriga upplägg".
 
   // ETAPP 3 (offert-masterplan.md): id på raden vars RowEditSheet (bottom-
   // sheet-radeditorn) är öppen — satt av QuoteDocumentSurfaces onRowTap när
@@ -1677,6 +1676,26 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     toast.success(`${antal} rader från ${start.jobTypeName} tillagda`)
   }
 
+  // Sparade upplägg utan jobbtyp (seedade före 2026-09-17, eller sparade
+  // innan "Spara som upplägg" började bära jobbtypen). De ska inte gömmas
+  // bara för att mallistan är borta — remsan visar dem under "Övriga
+  // upplägg" tills de kopplats i Inställningar → Offertmallar. Start:
+  // samma mallhandler som förut. Påfyllning: rubriken blir uppläggets namn.
+  async function applyOvrigtUpplagg(templateId: string, pafyllnad: boolean, signal: AbortSignal) {
+    const res = await fetch('/api/quote-templates', { cache: 'no-store', signal })
+    if (!res.ok) throw new Error('Kunde inte läsa upplägget. Försök igen.')
+    const { templates } = await res.json()
+    const template = (templates as QuoteTemplate[]).find(t => t.id === templateId)
+    if (signal.aborted) return
+    if (!template) throw new Error('Upplägget finns inte längre. Läs in listan igen.')
+    if (!pafyllnad) { handleTemplateSelect(template); finishQuickStart(); return }
+    const antal = Array.isArray(template.default_items) ? template.default_items.length : 0
+    if (antal === 0) throw new Error(`${template.name} har inga rader att lägga till.`)
+    setItems(prev => recalculateItems([...prev,
+      ...byggPafyllnadsrader(template, template.name, products, pricingSettings?.hourly_rate, prev.length, generateItemId)]))
+    toast.success(`${antal} rader från ${template.name} tillagda`)
+  }
+
   function handleTemplateSelect(template: any) {
     if (template.default_items && Array.isArray(template.default_items) && template.default_items.length > 0) {
       handleNewTemplateSelect(template as QuoteTemplate)
@@ -2172,7 +2191,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const jobTypeStart = !isEditMode && items.length === 0 && !jobStartApplied && dealContextReady ? (
     <QuoteJobTypeStart jobType={quoteJobType} inherited={!!inheritedJobType}
       initialIntent={firstQuoteIntent} automatic={!jobStartAttempted.current}
-      onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart} />
+      onSelectJobType={slug => { jobStartAttempted.current = true; setQuoteJobType(slug) }} onApply={applyJobTypeStart}
+      onApplyOvrig={applyOvrigtUpplagg} />
   ) : null
 
   // Påfyllning: samma remsa, monteras först när det finns något att fylla på.
@@ -2180,7 +2200,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // efterhand, det är ingen "start".
   const jobTypeFyllPa = items.length > 0 ? (
     <QuoteJobTypeStart pafyllnad jobType={quoteJobType} inherited={false} initialIntent={null} automatic={false}
-      onSelectJobType={() => {}} onApply={applyJobTypeAppend} />
+      onSelectJobType={() => {}} onApply={applyJobTypeAppend} onApplyOvrig={applyOvrigtUpplagg} />
   ) : null
 
   // ═══ FRÅGEFLÖDET: fullskärm mellan upplägg-trycket och offerten ═══════

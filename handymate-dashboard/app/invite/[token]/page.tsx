@@ -4,6 +4,7 @@ import { useState, useEffect, FormEvent } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { Loader2, CheckCircle, AlertTriangle, Zap, Eye, EyeOff, Lock, User } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { startsidaForRoll } from '@/lib/auth/lasbehorighet'
 
 interface InviteData {
   valid: boolean
@@ -15,11 +16,19 @@ interface InviteData {
   error?: string
 }
 
+/**
+ * Etiketterna speglar CHECK-villkoret på business_users.role (v259).
+ * Tidigare stod här 'technician' och 'office', som aldrig har funnits i
+ * villkoret — så varje riktig roll utom owner och admin visades som sin
+ * råa nyckel för den som fick inbjudan.
+ */
 const roleLabels: Record<string, string> = {
   owner: 'Ägare',
   admin: 'Admin',
-  technician: 'Tekniker',
-  office: 'Kontor',
+  project_manager: 'Projektledare',
+  kalkylator: 'Kalkylator',
+  employee: 'Medarbetare',
+  revisor: 'Revisor eller redovisningskonsult',
 }
 
 export default function InviteAcceptPage() {
@@ -104,7 +113,9 @@ export default function InviteAcceptPage() {
       }
 
       setSuccess(true)
-      setTimeout(() => router.push('/dashboard'), 1500)
+      // Rollen bestämmer var man landar: en revisor ska inte mötas av en
+      // Översikt byggd för hantverkaren. Samma helper som /dashboard använder.
+      setTimeout(() => router.push(startsidaForRoll(invite?.role)), 1500)
     } catch {
       setError('Något gick fel. Försök igen.')
       setSubmitting(false)

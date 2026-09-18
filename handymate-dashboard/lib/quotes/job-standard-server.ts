@@ -59,7 +59,13 @@ export async function writeJobStandard(db: SupabaseClient, businessId: string, i
     // Same job, same id: concurrent requests cannot create duplicate standards.
     const id = `qstd_${job.id}`
     const { data: created, error: createError } = await db.from('quote_templates').insert({ id, business_id: businessId,
-      name: `Standardrader · ${job.name}`, job_type_slug: job.slug, default_items: [], updated_at: new Date().toISOString() }).select('*').single()
+      // Upplägget heter som jobbet (2026-09-17). "Standardrader · X" var ett
+      // systemnamn som läckte ett begrepp hantverkaren aldrig valt; med ett
+      // upplägg per jobbtyp visas det aldrig, och med flera är det en variant
+      // bland andra ("Badrum", "Totalrenovering"). v253 döpte om befintliga.
+      // Firmans egna standardrader är jobbtypens standard (v254). Den här
+      // vägen nås bara när jobbtypen saknar upplägg helt, så ingen krock.
+      name: job.name, job_type_slug: job.slug, is_default: true, default_items: [], updated_at: new Date().toISOString() }).select('*').single()
     if (createError?.code === '23505') {
       const { data: existing, error: retryError } = await db.from('quote_templates').select('*').eq('business_id', businessId).eq('id', id).maybeSingle()
       if (!retryError && existing?.job_type_slug === job.slug) return toSetupTemplate(existing)

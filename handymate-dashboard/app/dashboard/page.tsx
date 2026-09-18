@@ -1,6 +1,8 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { arLasroll, LASROLLENS_START } from '@/lib/auth/lasbehorighet'
 import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { useBusiness } from '@/lib/BusinessContext'
@@ -41,6 +43,30 @@ interface BookingRow {
 export default function DashboardPage() {
   const business = useBusiness()
   const { user } = useCurrentUser()
+  const router = useRouter()
+
+  /**
+   * En läsroll (revisor, v259) hör inte hit.
+   *
+   * Översikt är hantverkarens yta — kö, kort, agentremsa — och flera av dess
+   * GET:ar svarar 403 för en läsroll, så sidan blir halvtom OCH delvis
+   * trasig. Revisorn skickas till fakturorna, som är det hen kom för.
+   * `replace` och inte `push`: bakåtknappen ska inte leda tillbaka hit.
+   *
+   * Grinden är kosmetisk — servern nekar varje skrivning oavsett var man
+   * står (lib/auth.ts). Den här raden handlar bara om vad man MÖTS av.
+   */
+  useEffect(() => {
+    if (arLasroll(user?.role)) router.replace(LASROLLENS_START)
+  }, [user?.role, router])
+
+  if (arLasroll(user?.role)) {
+    return (
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <Loader2 className="w-5 h-5 text-slate-300 animate-spin" />
+      </div>
+    )
+  }
 
   if (!business?.business_id) {
     return (

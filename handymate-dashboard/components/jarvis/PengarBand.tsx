@@ -55,7 +55,12 @@ export function PengarBand({ summary }: { summary: PengarSummary }) {
               {g.kategorier.map(k => (
                 <Link
                   key={k.key}
-                  href={k.href}
+                  // Till SIFFRAN, inte till en filtrerad lista som visar ett
+                  // annat urval. På Pengar-sidan står talet med sina rader
+                  // under sig; kategorins egen href ligger kvar där som ett
+                  // andra steg. Tidigare gick bandet direkt dit, och ingen av
+                  // de fem listorna matchade talet man just tryckt på.
+                  href={`/dashboard/pengar#${k.key}`}
                   className="flex items-center justify-between gap-2 min-h-[28px] text-[13px] text-slate-600 hover:text-primary-700 transition-colors"
                 >
                   <span className="truncate">{k.titel}{pengarKategoriAntal(k) > 0 ? ` (${pengarKategoriAntal(k)})` : ''}</span>

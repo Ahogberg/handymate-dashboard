@@ -284,8 +284,16 @@ test.describe('Del 1 — cron-auth-taket och route-auth-inventeringen', () => {
 
   test('facit-route-auth-inventory har höjt eller behållit taket för utan-standardgrind', () => {
     const inv = read('tests/facit-route-auth-inventory.spec.ts')
-    // Revenue adds two partner lead routes; H3b adds one verified superadmin GET/POST route; documented cap is 170.
-    expect(inv).toMatch(/toBeLessThanOrEqual\(170\)/)
+    // Testet hette "höjt eller behållit" men spikade talet till 170, så varje
+    // ny grindad rutt gjorde det rött utan att något blivit fel. Rättat
+    // 2026-09-17: taket får aldrig sänkas under det de här passen räknade,
+    // och varje höjning måste bära sitt skäl i skrift med samma tal — det är
+    // invarianten som faktiskt skyddar mot att rutter smyger ut ur grinden.
+    const tak = inv.match(/expect\(utanStandard\.length\)\.toBeLessThanOrEqual\((\d+)\)/)
+    expect(tak, 'inventeringens tak går inte att läsa').not.toBeNull()
+    expect(Number(tak![1])).toBeGreaterThanOrEqual(170)
+    const fore = inv.slice(0, inv.indexOf(tak![0]))
+    expect(fore.trimEnd().endsWith(`\u2192 ${tak![1]}.`), `taket ${tak![1]} saknar ett skrivet skäl som slutar "\u2192 ${tak![1]}."`).toBe(true)
   })
 })
 

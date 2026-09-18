@@ -39,6 +39,7 @@ import { useBusiness } from '@/lib/BusinessContext'
 import { hasFeature, PlanType, getPlanLabel } from '@/lib/feature-gates'
 import { isLaunchHidden, launchGateForPath, isComingSoon, COMING_SOON_LABEL } from '@/lib/launch-visibility'
 import { FuelSidebarBadge } from '@/components/fuel/FuelSidebarBadge'
+import { arLasroll } from '@/lib/auth/lasbehorighet'
 
 interface SidebarProps {
   businessName: string
@@ -647,6 +648,28 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   // ── Role-based filtering ──────────────────────────────────────────
   const isEmployee = currentUser?.role === 'employee'
+
+  /**
+   * Läsroll (revisor, v259) — ALLOWLIST, inte döljlista.
+   *
+   * Filtren för anställda är döljlistor: allt syns om det inte står i dem. För
+   * revisorn är det fel form. Hen är inbjuden för bokföringen, inte för
+   * verksamheten, och en döljlista hade betytt att varje ny meny syns för
+   * revisorn tills någon kommer ihåg att lägga den i listan.
+   *
+   * Här står i stället de fyra ytorna hen ska ha — och skrivgrinden i
+   * lib/auth.ts gör att ingenting går att ändra på någon av dem. Ytor som
+   * ändå svarar 403 för en läsroll (Bolagskalendern, Pengar på bordet — båda
+   * grindade på isOwnerOrAdmin) står medvetet INTE här: en länk som leder
+   * till en stängd dörr är sämre än ingen länk.
+   */
+  const laserBara = arLasroll(currentUser?.role)
+  const LASROLLENS_YTOR = new Set([
+    '/dashboard/invoices',
+    '/dashboard/supplier-invoices',
+    '/dashboard/invoices/rot-payment',
+    '/dashboard/documents',
+  ])
   const HIDDEN_FOR_EMPLOYEE = new Set(['approvals', 'agent', 'settings', 'leads-outbound', 'my_website'])
   // R0 (resurs-masterplan.md): Team flyttade från Settings?tab=team till en
   // egen route (/dashboard/team) med sidebar-länk i Schema-gruppen — samma
@@ -691,6 +714,18 @@ export default function Sidebar({ businessName, businessId, onLogout }: SidebarP
 
   function filterNavForRole(items: NavItem[]): NavItem[] {
     const owa = isOwnerOrAdmin
+    // Läsrollen först: allowlist, och bara barn i grupper — inga toppnivå-
+    // länkar (Godkännanden, Kunder, Inkorg, Mitt team) hör till bokföringen.
+    if (laserBara) {
+      return items
+        .map(item => {
+          if (item.type !== 'group') return null
+          const kvar = item.children.filter(c => LASROLLENS_YTOR.has(c.href))
+          if (kvar.length === 0) return null
+          return { ...item, children: kvar }
+        })
+        .filter(Boolean) as NavItem[]
+    }
     if (!isEmployee && owa) return items
     return items
       .filter(item => !(isEmployee && HIDDEN_FOR_EMPLOYEE.has(item.key)))

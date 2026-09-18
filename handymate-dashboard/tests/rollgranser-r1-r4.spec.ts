@@ -314,7 +314,13 @@ test.describe('Projektlistan — riktiga handlerns identitetsgräns', () => {
 
 // Hela auth-helpern med serverns getUser-svar som gräns. Ger inga konton
 // superadmin i produktion; verifierar hur ett serververifierat svar används.
-function authHelper(serverUser: Record<string, any> | null) {
+function authHelper(
+  serverUser: Record<string, any> | null,
+  // Medlemsraden som business_users ska svara med. Sätts den blir ägarvägen
+  // tom, så helpern faller till medlemsgrenen — den gren där läsrollsgrinden
+  // (v259) sitter.
+  medlem: { business_id: string; role: string } | null = null,
+) {
   const superCode = ts.transpileModule(read('lib/auth/superadmin.ts'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText
@@ -335,7 +341,9 @@ function authHelper(serverUser: Record<string, any> | null) {
         eq: (key: string, value: any) => { filters[key] = value; return q },
         single: async () => ({ data: table === 'business_config'
           ? filters.business_id === 'biz-a' ? { business_id: 'biz-a' }
-            : filters.user_id === 'auth-b' ? { business_id: 'biz-b' } : null
+            : medlem && filters.business_id === medlem.business_id ? { business_id: medlem.business_id }
+            : (!medlem && filters.user_id === 'auth-b') ? { business_id: 'biz-b' } : null
+          : table === 'business_users' ? medlem
           : null, error: null }),
       }
       return q
@@ -349,6 +357,12 @@ function authHelper(serverUser: Record<string, any> | null) {
     '@supabase/supabase-js': { createClient: () => db },
     '@/lib/auth/superadmin': superExports,
     './feature-gates': {},
+    // Den RIKTIGA modulen, inte en attrapp: grinden nedan ska prövas på
+    // riktigt. Relativa importer i lib/auth.ts måste slås upp mot lib/ —
+    // annars letar require i tests/ och modulen kastar. Exakt samma fälla
+    // som superadmin.ts ovan, och det var den som gjorde de fyra
+    // impersoneringsproven röda när grinden lades till (2026-09-18).
+    './auth/lasbehorighet': require(path.join(ROOT, 'lib/auth/lasbehorighet')),
   }
   new Function('require', 'exports', 'setInterval', code)((id: string) => mocks[id] ?? require(id), api, () => 0)
   return api
@@ -374,6 +388,35 @@ test.describe('Impersonering — verklig auth-helper med isolerad Supabase-grän
     const result = await authHelper({ ...baseUser, user_metadata: { is_superadmin: true } }).getAuthenticatedBusiness(request())
     expect(result.business_id).toBe('biz-b')
     expect(result._impersonation).toBeUndefined()
+  })
+
+  test('LÄSROLL: revisor nekas ett POST — körtidsprov av hela helpern', async () => {
+    const skrivning = new NextRequest('https://test/api/quotes', {
+      method: 'POST',
+      headers: { authorization: 'Bearer synthetic-test-token' },
+    })
+    const api = authHelper(baseUser, { business_id: 'biz-c', role: 'revisor' })
+    expect(await api.getAuthenticatedBusiness(skrivning)).toBeNull()
+  })
+
+  test('LÄSROLL: samma revisor släpps in på ett GET', async () => {
+    const lasning = new NextRequest('https://test/api/quotes', {
+      headers: { authorization: 'Bearer synthetic-test-token' },
+    })
+    const api = authHelper(baseUser, { business_id: 'biz-c', role: 'revisor' })
+    const ut = await api.getAuthenticatedBusiness(lasning)
+    expect(ut?.business_id).toBe('biz-c')
+  })
+
+  test('LÄSROLL: en anställd i samma läge får fortfarande skriva', async () => {
+    // Grinden ska träffa läsrollen och ingen annan.
+    const skrivning = new NextRequest('https://test/api/quotes', {
+      method: 'POST',
+      headers: { authorization: 'Bearer synthetic-test-token' },
+    })
+    const api = authHelper(baseUser, { business_id: 'biz-c', role: 'employee' })
+    const ut = await api.getAuthenticatedBusiness(skrivning)
+    expect(ut?.business_id).toBe('biz-c')
   })
 
   test('serververifierad app_metadata krävs för att byta till målföretaget', async () => {

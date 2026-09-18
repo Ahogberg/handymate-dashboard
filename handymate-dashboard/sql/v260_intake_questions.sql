@@ -1,3 +1,7 @@
+-- OMDÖPT VID MERGE 2026-09-18: hette v253_intake_questions.sql och KÖRDES i produktionen
+-- 2026-09-17 under det numret. main hade redan ett v253 med annat
+-- innehåll, så numret krockade. Kör inte om — satserna är idempotenta,
+-- men filen är historik, inte en väntande migration.
 -- v253_intake_questions.sql — frågeflöde per jobbtyp: frågorna på jobbtypen, svaren på offerten.
 -- Claude 2026-09-17, beslut Andreas samma dag ("frågeflöden per jobbtyp byggs först").
 --

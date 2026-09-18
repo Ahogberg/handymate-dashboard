@@ -1,12 +1,13 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
+import { arLasroll, LASROLLENS_RATTIGHETER } from '@/lib/auth/lasbehorighet'
 
 export interface BusinessUser {
   id: string
   business_id: string
   user_id: string | null
-  role: 'owner' | 'admin' | 'project_manager' | 'employee'
+  role: 'owner' | 'admin' | 'project_manager' | 'kalkylator' | 'employee' | 'revisor'
   name: string
   email: string
   phone: string | null
@@ -82,6 +83,17 @@ export function CurrentUserProvider({ children }: { children: ReactNode }) {
 
   const can = useCallback((permission: Permission): boolean => {
     if (!user) return false
+    // LÄSROLL — samma regel som hasPermission() på servern, ur samma modul.
+    //
+    // Den här funktionen är en KOPIA av serverlogiken (den har alltid varit
+    // det: klienten kan inte anropa lib/permissions.ts, som drar in
+    // service-role-klienten). En kopia som saknar en spärr blir en yta som
+    // erbjuder knappar servern nekar — värre än en yta som saknar knappen.
+    // Därför delas just läsrollsregeln som ren modul i stället för att
+    // skrivas av för hand.
+    if (arLasroll(user.role)) {
+      return (LASROLLENS_RATTIGHETER as readonly string[]).includes(permission)
+    }
     if (user.role === 'owner') return true
     if (user.role === 'admin') {
       if (permission === 'manage_settings') return false

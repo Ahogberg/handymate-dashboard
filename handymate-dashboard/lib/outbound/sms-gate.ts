@@ -16,6 +16,7 @@ export type SmsPurpose =
 export type SmsRecipient = 'customer' | 'internal'
 
 export type SmsGateCode =
+  | 'demo_tenant'
   | 'invalid_contract'
   | 'guard_unavailable'
   | 'customer_not_found'
@@ -129,8 +130,50 @@ export async function resolveSmsCustomer(args: {
   }
 }
 
+/**
+ * Är företaget ett demokonto? Läser is_demo_tenant — samma flagga som
+ * lib/demo/demo-quote.ts kräver för att få skriva demodata alls.
+ *
+ * FALLER ÖPPET vid läsfel, med en hög logg. Ett trasigt uppslag får aldrig
+ * tysta ett riktigt företags transaktionella SMS; risken åt andra hållet är
+ * täckt av att demokundernas nummer är simulerade. Tyst är det inte.
+ */
+async function arDemokonto(supabase: SupabaseClient, businessId: string): Promise<boolean> {
+  const { data, error } = await supabase
+    .from('business_config')
+    .select('is_demo_tenant')
+    .eq('business_id', businessId)
+    .maybeSingle()
+  if (error) {
+    console.error('[sms-gate] kunde inte läsa is_demo_tenant, behandlar som riktigt konto:', error.message)
+    return false
+  }
+  return data?.is_demo_tenant === true
+}
+
 export async function gateCustomerSms(input: SmsGateInput): Promise<SmsGateDecision> {
   const { recipient, purpose } = input
+
+  // DEMOT SKICKAR INGENTING (2026-09-17, Andreas: "alla utskick etc bör väl
+  // simuleras i demot? Så det inte går massa samtal eller SMS till mig eller
+  // annan riktig person").
+  //
+  // Grinden ligger FÖRST och gäller både kund och intern mottagare: ett
+  // internt larm på demokontot går till ägarens egen telefon, och det är
+  // också ett riktigt SMS till en riktig person.
+  //
+  // Andra lagret. Första är att demokunderna har simulerade nummer
+  // (lib/demo/simulerad-telefoni.ts) — men ett nummer kan redigeras i UI:t,
+  // och då ska det fortfarande inte gå ut något. Att bara förlita sig på
+  // datan är att förlita sig på att ingen rör den.
+  if (await arDemokonto(input.supabase, input.businessId)) {
+    return {
+      allowed: false,
+      code: 'demo_tenant',
+      error: 'Demokontot simulerar utskick — ingenting skickas till en riktig mottagare.',
+    }
+  }
+
   if ((recipient === 'internal') !== (purpose === 'internal')) {
     return {
       allowed: false,

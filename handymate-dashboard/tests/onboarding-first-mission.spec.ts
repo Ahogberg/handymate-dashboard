@@ -144,10 +144,21 @@ test.describe('components/jarvis/home/Uppdragsrad.tsx — stabilt ankare för tu
 test.describe('Step6LiveTour — inga påhittade tal i mock-dashboarden (2026-08-27)', () => {
   const liveTour = fs.readFileSync(path.join(ROOT, 'app/onboarding/components/Step6LiveTour.tsx'), 'utf8')
 
-  test('teambadgen och statrutan räknas ur TEAM — aldrig ett hårdkodat "5 aktiva"', () => {
+  test('statrutan räknas ur listan — aldrig ett hårdkodat "5 aktiva"', () => {
+    // ÄNDRAD 2026-09-17, medvetet och i samma commit som koden.
+    //
+    // Testet krävde tidigare BÅDE `{teamRow.length} på plats` OCH
+    // `String(TEAM.length), 'i ditt team'`. Kravet var rätt i sin avsikt —
+    // ingen hårdkodad siffra — men det låste fast två olika tal för samma
+    // sak på samma skärm ("6 på plats" bredvid "AI-kollegor 7"), och det
+    // större talet räknade Handymate Support som kundens kollega. Se fynd 2
+    // i docs/ui/genomgang-375px-2026-09-17.md.
+    //
+    // Avsikten står kvar och skärps: talet ska härledas, och det ska finnas
+    // exakt ETT. Antalet vaktas nu av tests/kundens-team-antal.spec.ts.
     expect(liveTour).not.toMatch(/\d+ aktiva/)
-    expect(liveTour).toContain('{teamRow.length} på plats')
-    expect(liveTour).toContain("String(TEAM.length), 'i ditt team'")
+    expect(liveTour).toContain("String(AI_KOLLEGOR.length), 'i ditt team'")
+    expect(liveTour, 'antalsbrickan är tillbaka').not.toMatch(/\{teamRow\.length\}/)
   })
 
   test('setup-rutan är en mock av den riktiga Kom igång-railen — inget påhittat "2/5 klart" eller 40 %-stapel', () => {

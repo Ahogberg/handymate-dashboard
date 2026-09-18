@@ -248,7 +248,10 @@ export const IRRELEVANT: string[] = [
   'business_counters', 'mission', 'mission_mandate', 'monthly_reviews',
   'next_best_action', 'operating_experiment', 'pricing_intelligence',
   'seasonal_campaigns', 'seasonality_insights', 'cost_event', 'usage_record',
-  'demo_reset_audit', 'call_retention_audit', 'raddningsarende',
+  // partner_demo_entry: business_id är alltid det DELADE demokontot, aldrig
+  // en kunds tenant. Raden säger vilken PARTNER som öppnade demot — den hör
+  // till partnerrelationen, inte till något konto som kan raderas här.
+  'demo_reset_audit', 'partner_demo_entry', 'call_retention_audit', 'raddningsarende',
   'lanseringsbevis', 'calendar_watches',
   // Firmans EGEN inkommande e-postadress för leads (t.ex.
   // leads@foretag.handymate.se) — inte en persons adress.

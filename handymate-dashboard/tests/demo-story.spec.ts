@@ -161,8 +161,10 @@ test.describe('recapen blandar aldrig kunskapsnivåerna', () => {
   const pengar: PengarSummary = {
     totalKr: 130_000,
     kategorier: [
-      { key: 'offerter', titel: 'Offerter', beskrivning: 'X', summaKr: 80_000, antal: 1, href: '/dashboard/quotes' },
-      { key: 'marginalrisk', titel: 'Marginal', beskrivning: 'Y', summaKr: 50_000, antal: 1, href: '/dashboard/projects' },
+      { key: 'offerter', titel: 'Offerter', beskrivning: 'X', summaKr: 80_000, antal: 1, href: '/dashboard/quotes',
+        poster: [{ id: 'q1', etikett: 'Offert 1', belopp: 80_000, href: '/dashboard/quotes/q1' }] },
+      { key: 'marginalrisk', titel: 'Marginal', beskrivning: 'Y', summaKr: 50_000, antal: 1, href: '/dashboard/projects',
+        poster: [{ id: 'a1', etikett: 'Projekt', belopp: 50_000, href: '/dashboard/approvals/a1' }] },
     ],
   }
   const weekly: WeeklyValue = {

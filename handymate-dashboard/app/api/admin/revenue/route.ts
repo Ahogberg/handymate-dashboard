@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
+import { AGREEMENT_VERSION } from '@/lib/partners/agreement'
 import { requireRevenue } from '@/lib/revenue/auth'
 import {
   casePayload,
@@ -22,6 +23,18 @@ function id(value: unknown) {
   if (typeof value !== 'string' || !UUID.test(value))
     throw new Error('Ogiltig identifierare.')
   return value
+}
+/**
+ * Flera företag i ett svep. Taket sitter i RPC:n också (200 respektive 50) —
+ * här stoppas orimliga listor innan de blir en databasrunda.
+ */
+function ids(value: unknown, tak: number) {
+  if (!Array.isArray(value) || value.length === 0)
+    throw new Error('Välj minst ett företag.')
+  if (value.length > tak)
+    throw new Error(`Högst ${tak} företag i taget.`)
+  const unika = Array.from(new Set(value.map(v => id(v))))
+  return unika
 }
 function date(value: unknown) {
   if (value == null || value === '') return null
@@ -180,6 +193,21 @@ export async function GET(request: NextRequest) {
     if (runs.error) throw runs.error
     const metrics = await ctx.db.rpc('revenue_sales_metrics', { p_email: ctx.email, p_manager: ctx.manager })
     if (metrics.error) throw metrics.error
+    // Partnerlistan för bulktilldelningen. Bara säljledare fördelar leads, och
+    // bara aktiva partners med GÄLLANDE avtal kan tilldelas — samma urval som
+    // partner-leads-rutten, så listan inte erbjuder en partner som RPC:n
+    // sedan nekar.
+    let partners: Array<{ id: string; name: string; company: string | null }> = []
+    if (ctx.manager) {
+      const rad = await ctx.db
+        .from('partners')
+        .select('id,name,company')
+        .eq('status', 'active')
+        .eq('agreement_version', AGREEMENT_VERSION)
+        .order('name')
+      if (rad.error) throw rad.error
+      partners = rad.data || []
+    }
     return NextResponse.json(
       {
         ...data,
@@ -187,6 +215,7 @@ export async function GET(request: NextRequest) {
         email: ctx.email,
         source_runs: runs.data,
         metrics: metrics.data,
+        partners,
       },
       { headers: { 'Cache-Control': 'private, no-store' } },
     )
@@ -320,6 +349,38 @@ export async function POST(request: NextRequest) {
         return failure(new Error('Företagsnamn krävs.'), 400)
       return NextResponse.json(await command(ctx, requestId, type, input))
     }
+    // ─── Flera företag i ett svep ───────────────────────────────────────
+    // Båda är säljledaråtgärder och båda RPC:erna kräver p_manager själva;
+    // kontrollen här är för felmeddelandets skull, inte för grindens.
+    if (type === 'discard') {
+      if (!ctx.manager)
+        return failure(new Error('Bara säljledare får rensa i katalogen.'), 403)
+      const { data, error } = await ctx.db.rpc('revenue_discard_accounts', {
+        p_actor: ctx.userId,
+        p_email: ctx.email,
+        p_manager: true,
+        p_request: requestId,
+        p_ids: ids(body.ids, 200),
+      })
+      if (error) throw error
+      return NextResponse.json(data)
+    }
+    if (type === 'assign_bulk') {
+      if (!ctx.manager)
+        return failure(new Error('Bara säljledare får fördela partnerleads.'), 403)
+      const { data, error } = await ctx.db.rpc('revenue_assign_partner_bulk', {
+        p_actor: ctx.userId,
+        p_email: ctx.email,
+        p_manager: true,
+        p_request: requestId,
+        p_partner: id(body.partner_id),
+        p_ids: ids(body.ids, 50),
+        p_agreement: AGREEMENT_VERSION,
+      })
+      if (error) throw error
+      return NextResponse.json(data)
+    }
+
     const accountId = id(body.account_id)
     const a = await account(ctx, accountId)
     if (!a)

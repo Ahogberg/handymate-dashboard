@@ -84,11 +84,13 @@ test.describe('varje jobbtyp kunden kan välja får ett upplägg', () => {
   test('startarna rör aldrig ett upplägg som redan finns', () => {
     const mallar = getDefaultQuoteTemplates('construction')
     const egna = new Set(mallar.map(t => t.job_type_slug).filter((s): s is string => Boolean(s)))
-    const jobb = [{ slug: 'byggarbete', name: 'Byggarbete' }, { slug: 'renovera-badrum', name: 'Renovera badrum' }]
+    // "Renovera badrum" HAR ett upplägg sedan mains JOBBTYP_FOR_MALL (2026-09-17);
+    // "Bygga garage" står i onboardingens katalog men har ingen mall.
+    const jobb = [{ slug: 'renovera_badrum', name: 'Renovera badrum' }, { slug: 'bygga_garage', name: 'Bygga garage' }]
     const startare = jobTypeStarters(mallar, jobb, egna)
-    expect(startare.map(t => t.job_type_slug), 'bara jobbtypen utan upplägg får en startare').toEqual(['renovera-badrum'])
+    expect(startare.map(t => t.job_type_slug), 'bara jobbtypen utan upplägg får en startare').toEqual(['bygga_garage'])
     // Idempotent: körs den igen med startaren inräknad blir det ingen till.
-    expect(jobTypeStarters(mallar, jobb, new Set(Array.from(egna).concat(["renovera-badrum"])))).toEqual([])
+    expect(jobTypeStarters(mallar, jobb, new Set(Array.from(egna).concat(["bygga_garage"])))).toEqual([])
   })
 })
 
@@ -193,13 +195,15 @@ test.describe('kopplingen i koden — källskanning', () => {
 
   test('seedningen härleder artiklar, ger jobbtyper utan upplägg en start och kopplar raderna', () => {
     const seed = utanKommentarer(read('lib/seed-defaults.ts'))
-    expect(seed).toContain('deriveTemplateArticles(allaMallar, befintliga as never)')
+    expect(seed).toContain('deriveTemplateArticles(allaNya, kandaArtiklar as never)')
     // Villkoret och användningen, inte bara att anropet står någonstans: en
     // startarlista som byggs men aldrig läggs till är ingen startare.
     expect(seed).toContain('const startare = jobTypesReady')
-    expect(seed).toContain('jobTypeStarters(branschmallar,')
-    expect(seed).toContain('const allaMallar = [...defaultTemplates, ...startare]')
-    expect(seed).toContain('linkTemplateRowsToArticles(allaMallar, idPerNyckel)')
+    expect(seed).toContain('jobTypeStarters(getDefaultQuoteTemplates(normalizedBranch),')
+    expect(seed).toContain('const allaNya = [...nya, ...startare]')
+    // Mains relänkning av gamla seedade rader får inte försvinna i mergen.
+    expect(seed, 'mains relänkning står kvar').toContain('relinked++')
+    expect(seed).toContain('linkTemplateRowsToArticles(allaNya, idPerNyckel)')
     // Priset får ALDRIG följa med mallen in i artikelregistret.
     expect(seed).toContain('sales_price: 0,')
     expect(seed).not.toMatch(/sales_price:\s*a\.unit_price/)

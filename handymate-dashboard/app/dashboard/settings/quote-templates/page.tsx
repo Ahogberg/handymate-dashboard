@@ -40,6 +40,16 @@ interface QuoteTemplate {
   created_at: string
   introduction_text?: string
   conclusion_text?: string
+  job_type_slug?: string | null
+  is_default?: boolean
+  updated_at?: string | null
+}
+
+/** Jobbtyperna i inställningarnas ordning + om den här användaren får koppla. */
+interface JobbtypsSetup {
+  jobTypes: { id: string; slug: string; name: string }[]
+  linkingAvailable: boolean
+  canManage?: boolean
 }
 
 // Branch icons and colors
@@ -140,6 +150,13 @@ export default function QuoteTemplatesPage() {
   const [seeding, setSeeding] = useState(false)
   const [branchFilter, setBranchFilter] = useState<string>('all')
   const [showUpgrade, setShowUpgrade] = useState(false)
+  // Kopplingen mall → jobbtyp bor HÄR sedan 2026-09-17 (mallistan i
+  // offertflödet är borta; jobbtypsremsan visar bara kopplade upplägg, och
+  // okopplade under "Övriga upplägg"). Samma PUT som onboardingen, med
+  // mallens version som villkor.
+  const [setup, setSetup] = useState<JobbtypsSetup | null>(null)
+  const [kopplar, setKopplar] = useState<string | null>(null)
+  const [kopplingsfel, setKopplingsfel] = useState('')
 
   const plan = (business as any)?.subscription_plan || 'starter'
   const hasAccess = hasFeature(plan as PlanType, 'quote_templates')
@@ -147,8 +164,45 @@ export default function QuoteTemplatesPage() {
   const atLimit = templateLimit !== null && templates.length >= templateLimit
 
   useEffect(() => {
-    if (business) fetchTemplates()
+    if (business) { fetchTemplates(); fetchSetup() }
   }, [business])
+
+  async function fetchSetup() {
+    try {
+      const res = await fetch('/api/job-types/quote-setup', { cache: 'no-store' })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data && data.linkingAvailable && Array.isArray(data.jobTypes)) setSetup(data)
+    } catch {
+      /* ingen koppling att erbjuda */
+    }
+  }
+
+  async function kopplaTillJobbtyp(mall: QuoteTemplate, jobTypeSlug: string | null) {
+    setKopplar(mall.id)
+    setKopplingsfel('')
+    try {
+      const res = await fetch('/api/job-types/quote-setup', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ templateId: mall.id, jobTypeSlug, updatedAt: mall.updated_at ?? null }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setKopplingsfel(data.error || 'Kunde inte koppla upplägget.')
+        return
+      }
+      if (data.template) {
+        setTemplates(prev => prev.map(t => (t.id === mall.id ? { ...t, job_type_slug: data.template.job_type_slug ?? null, updated_at: data.template.updated_at ?? null } : t)))
+      }
+    } catch {
+      setKopplingsfel('Kunde inte koppla upplägget. Försök igen.')
+    } finally {
+      setKopplar(null)
+    }
+  }
+  const kanKoppla = Boolean(setup?.canManage) && (setup?.jobTypes.length ?? 0) > 0
+  const jobbtypNamn = (slug?: string | null) => setup?.jobTypes.find(j => j.slug === slug)?.name ?? null
 
   const fetchTemplates = async () => {
     try {
@@ -437,6 +491,10 @@ export default function QuoteTemplatesPage() {
         </div>
       )}
 
+      {kopplingsfel && (
+        <p role="alert" className="mb-3 rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{kopplingsfel}</p>
+      )}
+
       {/* Template grid */}
       {!loading && filteredTemplates.length > 0 && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -472,12 +530,30 @@ export default function QuoteTemplatesPage() {
                     <BranchIcon className={`w-3.5 h-3.5 ${config.color}`} />
                   </div>
                   <span className="text-[10px] tracking-wide uppercase text-slate-400 font-medium">
-                    {template.category || template.branch || 'Mall'}
+                    {jobbtypNamn(template.job_type_slug) || template.category || template.branch || 'Upplägg'}
                   </span>
                 </div>
+                {kanKoppla && (
+                  <select
+                    aria-label={`Lägg ${template.name} under jobbtyp`}
+                    value={template.job_type_slug ?? ''}
+                    disabled={kopplar === template.id}
+                    onChange={e => void kopplaTillJobbtyp(template, e.target.value || null)}
+                    onClick={e => e.stopPropagation()}
+                    className="mb-2 w-full min-h-[44px] sm:min-h-0 rounded-lg border border-slate-200 bg-white px-2 py-1.5 text-xs text-slate-600 disabled:opacity-50"
+                  >
+                    <option value="">Lägg under jobbtyp…</option>
+                    {setup!.jobTypes.map(j => <option key={j.id} value={j.slug}>{j.name}</option>)}
+                  </select>
+                )}
 
                 {/* Name & description */}
-                <h3 className="text-sm font-semibold text-slate-900 mb-0.5 pr-6">{template.name}</h3>
+                <h3 className="text-sm font-semibold text-slate-900 mb-0.5 pr-6">
+                  {template.name}
+                  {template.is_default && template.job_type_slug && (
+                    <span className="ml-2 align-middle text-[9px] font-medium px-1.5 py-0.5 bg-teal-50 text-teal-700 rounded">Standard</span>
+                  )}
+                </h3>
                 {template.description && (
                   <p className="text-xs text-slate-400 line-clamp-1 mb-0">{template.description}</p>
                 )}

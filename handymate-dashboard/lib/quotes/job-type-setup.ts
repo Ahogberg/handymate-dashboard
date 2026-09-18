@@ -23,6 +23,8 @@ export interface SetupTemplate {
   name: string
   category: string | null
   jobTypeSlug: string | null
+  /** Jobbtypens eget standardupplägg (v254). Högst ett per jobbtyp — databasen garanterar det. */
+  isDefault: boolean
   updatedAt: string | null
   items: SetupItem[]
 }
@@ -61,6 +63,24 @@ export function sameUnit(a: string, b: string): boolean {
 
 export function templatesForJobType(templates: SetupTemplate[], slug: string): SetupTemplate[] {
   return templates.filter(t => t.jobTypeSlug === slug)
+}
+
+/**
+ * Två nivåer (2026-09-17, Andreas): jobbtypen ÄR ett färdigt upplägg, och
+ * inuti kan det finnas specifika varianter. Standarden är den flaggade
+ * (is_default) — eller det enda upplägget, om det bara finns ett. Flera utan
+ * flagga har ingen standard: då måste människan välja.
+ */
+export function standardFor(templates: SetupTemplate[], slug: string): SetupTemplate | null {
+  const med = templatesForJobType(templates, slug).filter(t => t.items.length > 0)
+  return med.find(t => t.isDefault) ?? (med.length === 1 ? med[0] : null)
+}
+
+/** Varianterna: allt under jobbtypen utom standarden. Tom när ingen standard finns. */
+export function varianterFor(templates: SetupTemplate[], slug: string): SetupTemplate[] {
+  const standard = standardFor(templates, slug)
+  if (!standard) return []
+  return templatesForJobType(templates, slug).filter(t => t.items.length > 0 && t.id !== standard.id)
 }
 
 export function resolveFirstQuoteSelection(data: QuoteSetupData, value: unknown): FirstQuoteSelection | null {
@@ -127,6 +147,7 @@ export function toSetupTemplate(row: Record<string, unknown>): SetupTemplate {
     id: String(row.id), name: String(row.name),
     category: typeof row.category === 'string' ? row.category : null,
     jobTypeSlug: typeof row.job_type_slug === 'string' ? row.job_type_slug : null,
+    isDefault: row.is_default === true,
     updatedAt: typeof row.updated_at === 'string' ? row.updated_at : null,
     items: rawItems.flatMap((item, index) => {
       if (!item || typeof item !== 'object' || Array.isArray(item)) return []

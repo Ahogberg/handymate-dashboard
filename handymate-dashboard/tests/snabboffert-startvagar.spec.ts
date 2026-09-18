@@ -43,6 +43,26 @@ test.describe('två vägar ut ur intaget, en editor', () => {
     expect(PAGE).not.toContain('startBlankQuickDraft')
   })
 
+  test('upplägg-vägen: jobbtypsstarten och Övriga upplägg slutar i finishQuickStart', () => {
+    // Från main 2026-09-17: mallistan är borta, och vägen till ett upplägg är
+    // jobbtypsremsan. Den får aldrig landa i editorn via en egen genväg.
+    expect(PAGE).not.toContain('QuoteNewStartChooser')
+    expect(PAGE).not.toContain('onSelectTemplate=')
+    // applyJobTypeStart kan inte avsluta själv: frågeflödet lägger sig emellan
+    // (2026-09-17) och avslutningen sker i applyVerifiedJobTypeStart när
+    // frågorna besvarats eller hoppats över. Invarianten är densamma — ingen
+    // väg får ta en egen genväg förbi finishQuickStart.
+    for (const namn of ['function applyVerifiedJobTypeStart', 'async function applyOvrigtUpplagg']) {
+      const fn = PAGE.slice(PAGE.indexOf(namn))
+      const body = fn.slice(0, fn.indexOf('\n  }'))
+      expect(body, `${namn} ska landa i editorn via den delade funktionen`).toContain('finishQuickStart()')
+      expect(body).not.toContain('setQuickMode(null)')
+    }
+    const start = PAGE.slice(PAGE.indexOf('async function applyJobTypeStart'))
+    expect(start.slice(0, start.indexOf('\n  }')), 'starten delegerar, tar ingen genväg')
+      .toContain('applyVerifiedJobTypeStart(start, null)')
+  })
+
   test('finishQuickStart() finns bara en gång och landar i editorn', () => {
     expect((PAGE.match(/function finishQuickStart\(\)/g) || []).length).toBe(1)
     const fn = PAGE.slice(PAGE.indexOf('function finishQuickStart()'))
@@ -73,6 +93,8 @@ test.describe('intaget — två riktiga knappar', () => {
     for (const borta of ['Öppna editorn direkt', 'Använd en mall', 'onOpenFullEditor', 'onUseTemplate', 'onSkipDescription']) {
       expect(INTAKE, `${borta} ska vara borta`).not.toContain(borta)
     }
+    expect(INTAKE).toContain('Bygg utkast')
+    expect(INTAKE).toContain('Bygg själv')
   })
 })
 

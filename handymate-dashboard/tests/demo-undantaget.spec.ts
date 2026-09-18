@@ -130,8 +130,21 @@ test.describe('ägarskapet: seedaren äger datan, resetten äger konfigen', () =
     // business_config (en skrivning där kunde radera presentatörens egen
     // koppling). Simuleringen får inte smyga in en skrivning bakvägen.
     const seedare = read(SEEDARE)
-    expect(seedare, 'seedaren importerar telefonisimuleringen').not.toContain('simulerad-telefoni')
+    // ÄNDRAD 2026-09-17, medvetet och i samma commit som koden.
+    //
+    // Raden förbjöd tidigare varje omnämnande av 'simulerad-telefoni' i
+    // seedaren. Avsikten var rätt — seedaren får inte SKRIVA konfigen — men
+    // regeln var bredare än avsikten: den förbjöd också att importera en
+    // konstant därifrån. Demokundernas simulerade nummer bor i samma modul
+    // just för att hela nummerblocket ska deklareras på ETT ställe; annars
+    // kan ett kundnummer råka bli kontots nummer och nattsvepet slutar
+    // kontrollera riktiga företag.
+    //
+    // Avsikten vaktas nu exakt: ingen skrivning av konfigen, och inget
+    // anrop till simuleringsfunktionen.
     expect(seedare, 'seedaren skriver assigned_phone_number').not.toContain('assigned_phone_number:')
+    expect(seedare, 'seedaren anropar simuleringen').not.toContain('simuleraDemotelefoni')
+    expect(seedare, 'seedaren skriver business_config').not.toMatch(/from\('business_config'\)[\s\S]{0,120}\.(update|insert|upsert)\(/)
   })
 
   test('resetten kör simuleringen EFTER seedningen och fäller inte på fel', () => {
@@ -348,5 +361,83 @@ test.describe('en misslyckad återställning säger VAD som gick fel', () => {
     expect(v233).toMatch(/ADD COLUMN IF NOT EXISTS is_default/)
     const rutt = utanKommentarer(read('app/api/checklists/templates/route.ts'))
     expect(rutt, 'rutten skriver category — då måste v233 finnas kvar').toMatch(/category/)
+  })
+})
+
+test.describe('demon skickar ingenting till en riktig person (2026-09-17)', () => {
+  // Andreas: "alla utskick etc bör väl simuleras i demot? Så det inte går
+  // massa samtal eller SMS till mig eller annan riktig person?"
+  //
+  // Och samma ändring rättar varför Återställ demon har fallit sedan
+  // indexet unique_phone_per_business kom: alla sex demokunder fick ägarens
+  // personal_phone, så kund nummer TVÅ (Mikael) kraschade på
+  // "duplicate key value violates unique constraint" — varje gång. Läst ur
+  // demo_reset_audit 2026-09-17, inte gissat.
+  const modul = read('lib/demo/simulerad-telefoni.ts')
+  const seedare = read('lib/demo/seed-demo-account.ts')
+  const grind = read('lib/outbound/sms-gate.ts')
+
+  test('demokunderna har SEX olika nummer — annars kraschar unique_phone_per_business', () => {
+    const nummer = Array.from(modul.matchAll(/^\s+(anna|mikael|brf|fastighets|kristina|johan): '(\+46\d+)',$/gm))
+    expect(nummer.length, 'alla sex kunder saknar nummer i DEMO_KUNDNUMMER').toBe(6)
+    const varden = nummer.map(m => m[2])
+    expect(new Set(varden).size, 'två demokunder delar nummer').toBe(6)
+  })
+
+  test('inget demokundnummer är kontots nummer — nattsvepets exakta match måste hålla', () => {
+    // Facitet högre upp kräver att arSimuleratDemonummer('+46701740001') är
+    // false. Skulle ett kundnummer råka bli ...0000 slutar svepet kontrollera
+    // riktiga företags nummer.
+    expect(modul).toContain("export const DEMO_SIMULERAT_NUMMER = '+46701740000'")
+    const kundnummer = Array.from(modul.matchAll(/'(\+4670174\d{4})',/g)).map(m => m[1])
+    expect(kundnummer.length).toBeGreaterThanOrEqual(6)
+    expect(kundnummer).not.toContain('+46701740000')
+  })
+
+  test('seedaren rör aldrig ägarens telefon', () => {
+    // Sex kunder OCH de seedade SMS-raderna pekade tidigare på personal_phone.
+    expect(seedare, 'ownerPhone lever kvar i seedaren').not.toContain('ownerPhone')
+    expect(seedare).not.toContain('personal_phone')
+    expect((seedare.match(/phone_number: DEMO_KUNDNUMMER\./g) || []).length).toBe(6)
+    // Seedade SMS pekar på kundens eget nummer, inte ett literalt.
+    expect(seedare).toMatch(/to: customers\.\w+\.phone_number,/)
+    expect(seedare).toContain('customerPhone: customers.kristina.phone_number,')
+  })
+
+  test('numren deklareras på ETT ställe — ingen kopierad literal i seedaren', () => {
+    // Samma regel som kontots nummer redan har. En andra kopia är hur ett
+    // undantag glider isär.
+    expect(seedare).not.toMatch(/\+4670174\d{4}/)
+    expect(seedare).toContain("import { DEMO_KUNDNUMMER } from '@/lib/demo/simulerad-telefoni'")
+  })
+
+  test('SMS-grinden stoppar demokontot FÖRST, för både kund och intern mottagare', () => {
+    expect(grind).toContain("| 'demo_tenant'")
+    const fn = grind.slice(grind.indexOf('export async function gateCustomerSms'))
+    const kropp = fn.slice(0, fn.indexOf('\n  const resolution'))
+    const demoIdx = kropp.indexOf("code: 'demo_tenant'")
+    const kontraktIdx = kropp.indexOf("code: 'invalid_contract'")
+    const internIdx = kropp.indexOf("if (recipient === 'internal') return")
+    expect(demoIdx, 'demospärren saknas i grinden').toBeGreaterThan(-1)
+    // Före kontraktskontrollen och före internt-undantaget: ett internt larm
+    // på demokontot är också ett riktigt SMS till en riktig person.
+    expect(demoIdx).toBeLessThan(kontraktIdx)
+    expect(demoIdx).toBeLessThan(internIdx === -1 ? Number.MAX_SAFE_INTEGER : internIdx)
+  })
+
+  test('läsfel tystar inte ett riktigt företag, och är inte tyst', () => {
+    const fn = grind.slice(grind.indexOf('async function arDemokonto'))
+    const kropp = fn.slice(0, fn.indexOf('\n}'))
+    expect(kropp).toContain("select('is_demo_tenant')")
+    expect(kropp).toContain('.eq(\'business_id\', businessId)')
+    // Faller öppet — men loggar. Ett tyst fall åt något håll är det vi slutar med.
+    expect(kropp).toMatch(/if \(error\) \{[\s\S]*console\.error[\s\S]*return false/)
+    expect(kropp).toContain('is_demo_tenant === true')
+  })
+
+  test('återställningen kräver inte längre ett riktigt mobilnummer', () => {
+    // Kravet blockerade dessutom det andra demokontot (biz_demo_ekstrom),
+    // som har personal_phone NULL och alltså aldrig kunde återställas.
+    expect(seedare).not.toContain('Inget mobilnummer sparat på demokontot')
   })
 })

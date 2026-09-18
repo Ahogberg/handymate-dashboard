@@ -30,7 +30,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { ArrowRight, Loader2 } from 'lucide-react'
-import { templatesForJobType, type FirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
+import { standardFor, templatesForJobType, varianterFor, type FirstQuoteSelection, type QuoteSetupData } from '@/lib/quotes/job-type-setup'
 import { fetchQuoteSetup } from '@/lib/quotes/job-type-start'
 
 interface Props {
@@ -43,9 +43,14 @@ interface Props {
   onApply: (selection: FirstQuoteSelection, signal: AbortSignal) => Promise<void>
   /** Offerten har redan rader: valet lägger till, rör inte offertens jobbtyp och startar aldrig automatiskt. */
   pafyllnad?: boolean
+  /** Sparade upplägg utan jobbtyp ("Övriga upplägg"). Saknas prop:en visas de inte. */
+  onApplyOvrig?: (templateId: string, pafyllnad: boolean, signal: AbortSignal) => Promise<void>
 }
 
-export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic = true, onSelectJobType, onApply, pafyllnad = false }: Props) {
+/** Chipvärdet för upplägg som inte hör till någon jobbtyp. Ingen jobbtyp kan ha den sluggen (slugifyJobType tillåter inte inledande understreck). */
+export const OVRIGA = '__ovriga'
+
+export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic = true, onSelectJobType, onApply, pafyllnad = false, onApplyOvrig }: Props) {
   const [data, setData] = useState<QuoteSetupData | null>(null)
   // Påfyllningens eget val. Startar tomt — man fyller på med något ANNAT
   // än det som redan ligger där, och ett förvalt chip hade sett ut som ett
@@ -79,7 +84,12 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
     applyController.current = controller
     lastSelection.current = selection
     setBusy(true); setError('')
-    try { await callbacks.current.onApply(selection, controller.signal) }
+    try {
+      if (selection.jobTypeSlug === OVRIGA) {
+        if (!onApplyOvrig) throw new Error('Upplägget kan inte användas här.')
+        await onApplyOvrig(selection.templateId, pafyllnad, controller.signal)
+      } else await callbacks.current.onApply(selection, controller.signal)
+    }
     catch (e) { if (!controller.signal.aborted) setError(e instanceof Error ? e.message : 'Kunde inte öppna underlaget.') }
     finally {
       applyController.current = null
@@ -99,7 +109,34 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data])
 
-  const matching = data && aktivJobbtyp ? templatesForJobType(data.templates, aktivJobbtyp).filter(t => t.items.length > 0) : []
+  // Sparade upplägg utan jobbtyp: seedade före 2026-09-17 eller sparade
+  // innan "Spara som upplägg" bar jobbtypen. Chipset finns bara så länge
+  // sådana finns — kopplas de i Inställningar försvinner det av sig självt.
+  const ovriga = data && onApplyOvrig ? data.templates.filter(t => !t.jobTypeSlug && t.items.length > 0) : []
+  const matching = data && aktivJobbtyp
+    ? (aktivJobbtyp === OVRIGA ? ovriga : templatesForJobType(data.templates, aktivJobbtyp).filter(t => t.items.length > 0))
+    : []
+  // Två nivåer (2026-09-17, Andreas): jobbtypschipet ÄR standardupplägget —
+  // ett tryck lägger in det. Varianterna ligger som egna chips efter, också
+  // ett tryck var. Bara en jobbtyp med flera upplägg och ingen standard
+  // kräver ett val till (den listar sina upplägg efter trycket).
+  function standardForVal(slug: string) {
+    if (!data?.linkingAvailable) return null
+    if (slug === OVRIGA) return ovriga.length === 1 ? ovriga[0] : null
+    return standardFor(data.templates, slug)
+  }
+  function valjJobbtyp(slug: string) {
+    lastSelection.current = null; setError('')
+    if (pafyllnad) setLokaltVal(slug); else onSelectJobType(slug)
+    const standard = standardForVal(slug)
+    if (standard) void apply({ jobTypeSlug: slug, templateId: standard.id })
+  }
+  function valjVariant(slug: string, templateId: string) {
+    lastSelection.current = null; setError('')
+    if (pafyllnad) setLokaltVal(slug); else onSelectJobType(slug)
+    void apply({ jobTypeSlug: slug, templateId })
+  }
+  const harStandard = aktivJobbtyp ? !!standardForVal(aktivJobbtyp) : false
   // Chipstil = Fas E:s Mer-chips, så remsan läses som en i verktygsstacken.
   // MEN med 44px träffyta under sm: remsan är hantverkarens FÖRSTA tryck vid
   // offertstart på telefon (CLAUDE.md: mobiloptimerat, telefon på bygget) —
@@ -122,11 +159,20 @@ export function QuoteJobTypeStart({ jobType, inherited, initialIntent, automatic
     </span>}
     {data && !loading && <>
       {visaSomArvd ? <span className="px-1 text-[12.5px] font-semibold text-slate-700">{data.jobTypes.find(j => j.slug === jobType)?.name || jobType}</span> :
-        data.jobTypes.map(job => <button key={job.id} type="button" disabled={busy} aria-pressed={aktivJobbtyp === job.slug}
-          className={`${chip} ${aktivJobbtyp === job.slug ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
-          onClick={() => { lastSelection.current = null; setError(''); if (pafyllnad) setLokaltVal(job.slug); else onSelectJobType(job.slug) }}>{job.name}</button>)}
+        data.jobTypes.map(job => <span key={job.id} className="contents">
+          <button type="button" disabled={busy} aria-pressed={aktivJobbtyp === job.slug}
+            className={`${chip} ${aktivJobbtyp === job.slug ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-600 hover:bg-slate-50 border-slate-200'}`}
+            onClick={() => valjJobbtyp(job.slug)}>{job.name}</button>
+          {data.linkingAvailable && varianterFor(data.templates, job.slug).map(v => <button key={v.id} type="button" disabled={busy}
+            aria-label={`${job.name}: ${v.name}`}
+            className={`${chip} bg-primary-50 text-primary-800 hover:bg-primary-100 border-primary-700/30`}
+            onClick={() => valjVariant(job.slug, v.id)}>↳ {v.name}</button>)}
+        </span>)}
+      {!visaSomArvd && ovriga.length > 0 && <button type="button" disabled={busy} aria-pressed={aktivJobbtyp === OVRIGA}
+        className={`${chip} ${aktivJobbtyp === OVRIGA ? 'bg-primary-700 text-white border-primary-700' : 'bg-white text-slate-500 hover:bg-slate-50 border-dashed border-slate-300'}`}
+        onClick={() => valjJobbtyp(OVRIGA)}>Övriga upplägg</button>}
       {!data.linkingAvailable && <span className="text-[12.5px] text-slate-500">Mallkopplingen är inte aktiverad ännu — beskriv jobbet eller välj en mall som vanligt.</span>}
-      {data.linkingAvailable && matching.map(t => <button type="button" key={t.id} disabled={busy}
+      {data.linkingAvailable && (!harStandard || visaSomArvd) && matching.map(t => <button type="button" key={t.id} disabled={busy}
         className={`px-3 py-1.5 rounded-[10px] border border-primary-700/30 bg-primary-50 hover:bg-primary-100 transition-colors inline-flex items-center gap-2 text-left disabled:opacity-60 ${touch}`}
         onClick={() => void apply({ jobTypeSlug: aktivJobbtyp!, templateId: t.id })}>
         <span className="text-[12.5px] font-semibold text-primary-800">{t.name}</span>

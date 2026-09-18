@@ -512,6 +512,17 @@ class Component extends DCLogic {
           this.setState(Object.assign({}, p.raw, { step: 'handoff' }));
           this._hand = setTimeout(() => this.go('prefilled'), 3400);
         }
+      } else {
+        // Från en lead i partnerportalen: orgnummer och kontakt följer med i
+        // adressen så partnern inte skriver om det som redan står i leaden.
+        // Uppslaget går mot SAMMA Bolagsverket-väg som när numret skrivs för
+        // hand — adressen kan inte mata in ett företag, bara peka ut ett.
+        const q = new URLSearchParams(location.search);
+        const orgFran = (q.get('org') || '').replace(/\D/g, '').slice(0, 12);
+        const namn = (q.get('kontakt') || '').slice(0, 120);
+        const epost = (q.get('epost') || '').slice(0, 200);
+        if (namn || epost) this.setState({ caseName: namn, caseEmail: epost });
+        if (orgFran.length >= 10) this.setState({ org: orgFran }, this.submitLookup);
       }
     } catch (e) {}
   }

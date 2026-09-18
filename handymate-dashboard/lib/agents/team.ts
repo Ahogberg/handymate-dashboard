@@ -34,6 +34,23 @@ export const TEAM: TeamAgent[] = [
   { id: 'lisa',   name: 'Lisa',   role: 'Kundservice & Telefonist', initials: 'Li', color: 'bg-sky-500', dot: '#0ea5e9', softBg: '#E3F3FC', softText: '#0A6E9C',      avatar: `${AVATAR_BASE}/Lisa.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV83N2VjM2Y2OS03NThjLTQ4NDQtYTRkMi01OTUxMjE0YzlmYWYiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJ0ZWFtLWF2YXRhcnMvTGlzYS5wbmciLCJpYXQiOjE3NzQyNTk4MTYsImV4cCI6MTA0MTQyNTk4MTZ9.ZQag6FV2my_vy7rq1tFPBYK2MuwlmhFeDtU16SLA3Ak`, greeting: 'Hej! Hur kan jag hjälpa dig idag?', description: 'Fångar samtalen du missar och hanterar kundförfrågningar', training: true },
   { id: 'support', name: 'Handymate Support', role: 'Kundtjänst', initials: 'HS', color: 'bg-indigo-600', dot: '#4f46e5', softBg: '#E8E7FC', softText: '#3730A3', greeting: 'Jag hjälper dig med ditt Handymate-konto', description: 'Hjälper med konto, fakturering och uppsägning' },
 ]
+/**
+ * Kundens AI-kollegor (2026-09-17). TEAM innehåller även `support`, som är
+ * VÅR kundtjänst — den agenten svarar om konto, fakturering och uppsägning
+ * hos Handymate, och är inte en av hantverkarens anställda. Att räkna den i
+ * "ditt team" blåser upp antalet och grumlar löftet.
+ *
+ * Använd den här listan överallt där antalet eller uppsättningen beskrivs för
+ * KUNDEN. TEAM är kvar oförändrad för agentsidan och support-chatten, som
+ * behöver hela uppsättningen.
+ *
+ * Fynd 2 i docs/ui/genomgang-375px-2026-09-17.md: samma skärm visade
+ * "6 på plats" (TEAM utan matte, MED support) bredvid "AI-kollegor 7"
+ * (hela TEAM). Två tal för samma sak, båda tekniskt sanna, och det ena
+ * räknade vår egen kundtjänst som kundens kollega.
+ */
+export const AI_KOLLEGOR: TeamAgent[] = TEAM.filter(a => a.id !== 'support')
+
 
 export function getAgentById(id: string | null | undefined): TeamAgent | null {
   if (!id) return null

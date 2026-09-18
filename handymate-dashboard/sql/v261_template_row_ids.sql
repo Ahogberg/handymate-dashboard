@@ -1,3 +1,7 @@
+-- OMDÖPT VID MERGE 2026-09-18: hette v254_template_row_ids.sql och KÖRDES i produktionen
+-- 2026-09-17 under det numret. main hade redan ett v254 med annat
+-- innehåll, så numret krockade. Kör inte om — satserna är idempotenta,
+-- men filen är historik, inte en väntande migration.
 -- v254 (2026-09-17): id på varje mallrad i quote_templates.default_items.
 --
 -- Frågeflödet per jobbtyp pekar på RADER (mallradens id) i stället för på en

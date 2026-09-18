@@ -71,7 +71,15 @@ interface QuickIntakeProps {
   /** "Bygg själv" — rakt in i dokumentet, det skrivna följer med. */
   onBuildYourself: () => void
   building: boolean
-  /** true när offerten redan har rader — då göms "Bygg själv", editorn finns redan. */
+  /**
+   * true när offerten redan har rader. "Bygg själv" DÖLJS då: en blankstart
+   * efter att AI byggt ett utkast hade raderat arbetet utan förvarning.
+   *
+   * En tredje knapp mot en separat mallista fanns här t.o.m. 2026-09-17. Borttagen (Andreas: "blir det inte dubbelt?"): jobb-
+   * typsremsan ovanför textrutan ÄR valet av upplägg — ett tryck på jobbtypen
+   * lägger in firmans rader. Två dörrar till samma upplägg var en dörr för
+   * mycket.
+   */
   hasContent: boolean
 }
 

@@ -56,7 +56,10 @@ export function PermissionGate({ permission, children, fallback }: PermissionGat
  * RequireRole - Döljer innehåll om användaren inte har rätt roll.
  */
 export function RequireRole({ roles, children, fallback }: {
-  roles: ('owner' | 'admin' | 'project_manager' | 'employee')[]
+  // Allowlist, och därför `string[]`: en roll som inte står i listan nekas.
+  // Med en union hade varje ny roll (revisor, v259) blivit ett typfel i stället
+  // för ett nej — och nej är rätt svar för en yta som inte räknat med den.
+  roles: readonly string[]
   children: ReactNode
   fallback?: ReactNode
 }) {
