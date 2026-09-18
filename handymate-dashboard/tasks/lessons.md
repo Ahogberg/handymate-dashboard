@@ -766,3 +766,24 @@ Tre fel dolde sig där, alla mina:
 och kör varje `run:`-steg i det jobb som grindar — inte bara `test:contracts`.**
 Samma rot som de tre ogatade facit vi hittade i går: grinden lokalt är smalare
 än grinden i CI, och skillnaden är osynlig tills något faller.
+
+## 2026-09-18 — Ett facit får inte påstå något om maskinen det körs på
+
+Samma dag, nästa lager av samma rot. `tests/arbetsordningen.spec.ts` krävde
+att `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` fanns på disk. Den
+sökvägen finns i utvecklingsburken; CI kör `ubuntu-latest` med
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` och har ingen sådan katalog. Provet var
+alltså omöjligt att klara i CI och höll kontraktsgrinden röd på **main** från
+2026-09-17 — åtta commits utan att någon märkte det, eftersom det var grönt
+på den maskin där det skrevs.
+
+**Regel: skilj på vad som är repots innehåll och vad som är miljöns tillstånd.**
+Att sökvägen STÅR i instruktionen är ett påstående om repot och prövas överallt.
+Att den FINNS är ett påstående om maskinen och hör hemma i ett eget prov med
+`test.skip(...)`, aldrig i ett `if` — ett hoppat prov syns i rapporten, en
+if-sats gör provet tyst tomt.
+
+Följdregel, dyrköpt två gånger nu: **kolla alltid om main själv är grön innan
+du antar att rött är ditt.** Både den här och `sprint/onboarding-seeding.cjs`
+samma morgon var mains fel som grenen ärvde. `actions_list` på
+`contracts.yml` med `branch: main` tar tio sekunder och svarar på frågan.
