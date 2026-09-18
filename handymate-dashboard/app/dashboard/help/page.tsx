@@ -15,6 +15,7 @@
  */
 
 import { useState } from 'react'
+import { getCancellationFacts, getGuaranteeFacts } from '@/lib/feature-gates'
 import Link from 'next/link'
 import {
   HelpCircle,
@@ -174,7 +175,7 @@ const faqItems: FAQItem[] = [
     category: 'Konto, betalning & din data',
     question: 'Hur byter jag abonnemang?',
     answer:
-      'Gå till Inställningar → Fakturering. Där ser du din nuvarande plan och kan byta — ändringen gäller från nästa betalningsperiod. Det finns ingen bindningstid, och funkar inte Handymate för dig får du pengarna tillbaka.',
+      `Gå till Inställningar → Fakturering. Där ser du din nuvarande plan och kan byta — ändringen gäller från nästa betalningsperiod. ${getCancellationFacts().text} ${getGuaranteeFacts(false).short}`,
     icon: <CreditCard className="w-5 h-5" />,
   },
   {

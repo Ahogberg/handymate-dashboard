@@ -186,6 +186,56 @@ export function getGuaranteeFacts(
 }
 
 /**
+ * Uppsägningen — samma sanningsproblem som garantin, och samma lösning.
+ *
+ * "Ingen bindningstid" och "Avsluta när du vill" stod på fem ytor, varav en
+ * (onboardingens punktlista) visades med ÅRSPLANEN förvald. På årsplan är
+ * det missvisande: du kan säga upp, men de tolv betalda månaderna löper
+ * ändå. Landningssidans FAQ var noggrannast av alla — "ingen bindningstid
+ * PÅ MÅNADSPLANEN" — och den formuleringen är den som gäller nu.
+ *
+ * Verifierat i koden 2026-09-18: ingenting sätter `cancel_at_period_end`, så
+ * båda planerna förnyas automatiskt tills de sägs upp. Uppsägningen sker i
+ * betalpartnerns portal via "Hantera prenumeration"
+ * (app/api/billing/portal). Om portalen faktiskt ERBJUDER uppsägning är en
+ * inställning i Stripe-dashboarden, inte något koden bestämmer — ingen
+ * `configuration` skickas med, så kontots standardkonfiguration gäller.
+ */
+export interface CancellationFacts {
+  /** Meningen kundytan visar. */
+  text: string
+  /** Kortformen för punktlistor. */
+  short: string
+  /** Var kunden faktiskt gör det. */
+  where: string
+}
+
+export function getCancellationFacts(
+  interval?: BillingIntervalForGuarantee,
+): CancellationFacts {
+  const where = 'Inställningar → Fakturering → Hantera prenumeration'
+  if (interval === 'monthly') {
+    return {
+      text: `Ingen bindningstid. Du säger upp när du vill under ${where}, och abonnemanget löper ut i slutet av den månad du betalat.`,
+      short: 'Ingen bindningstid — avsluta när du vill',
+      where,
+    }
+  }
+  if (interval === 'yearly') {
+    return {
+      text: `Årsplanen är betald för tolv månader och förnyas tills du säger upp den. Du säger upp när du vill under ${where}; de månader du redan betalat löper ut.`,
+      short: 'Säg upp när du vill — betald tid löper ut',
+      where,
+    }
+  }
+  return {
+    text: `Ingen bindningstid på månadsplanen. Årsplanen betalas för tolv månader i taget. Båda förnyas tills du säger upp dem under ${where}.`,
+    short: 'Ingen bindningstid på månadsplanen',
+    where,
+  }
+}
+
+/**
  * Grundarbannerns text. Bor här av samma skäl: den citerar garantin, och ska
  * aldrig kunna säga något annat än getGuaranteeFacts(true).
  */

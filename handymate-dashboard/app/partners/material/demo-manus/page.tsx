@@ -6,6 +6,7 @@
 // minuter, inte sekunder — vi lovar bara det beviset visar).
 
 import { Loader2, Printer } from 'lucide-react'
+import { getCancellationFacts } from '@/lib/feature-gates'
 import { usePartnerMe } from '../usePartnerMe'
 import { getGuaranteeFacts } from '@/lib/feature-gates'
 
@@ -92,7 +93,7 @@ export default function DemoManusPage() {
           <p className="mt-2"><strong>Säg:</strong> &rdquo;Vi börjar med din firma och ett riktigt arbetsflöde. Har du historik kan vi gå igenom den; börjar du utan historik väljer vi första jobbet tillsammans. Vi kontrollerar vad som fungerar och vad som återstår.&rdquo;</p>
 
           <H2>11 · Nästa steg (1 min)</H2>
-          <p className="mt-2"><strong>Säg:</strong> &rdquo;Firman kostar 5 995 kronor per månad exklusive moms vid månadsbetalning, utan bindningstid. Hela teamet ingår, och garantin är: {getGuaranteeFacts(false).headline}. Bränsle ingår upp till planens gräns; extra påfyllning köps separat. Vi går igenom aktuella villkor tillsammans.&rdquo;</p>
+          <p className="mt-2"><strong>Säg:</strong> &rdquo;Firman kostar 5 995 kronor per månad exklusive moms vid månadsbetalning. {getCancellationFacts('monthly').short}. Hela teamet ingår, och garantin är: {getGuaranteeFacts(false).headline}. Bränsle ingår upp till planens gräns; extra påfyllning köps separat. Vi går igenom aktuella villkor tillsammans.&rdquo;</p>
           <p className="mt-1.5"><strong>Gör:</strong> Kör Företagskollen tillsammans direkt på mobilen. Det tar två minuter och ger dem en egen siffra att gå hem med. Lämna leave-behind-bladet med din kontakt.</p>
 
           <H2>Vanliga invändningar</H2>

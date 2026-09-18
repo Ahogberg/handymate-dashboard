@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { getCancellationFacts, getGuaranteeFacts } from '@/lib/feature-gates'
 import {
   Mail, Send, CheckCircle, Eye, Loader2, Search, Filter,
   MapPin, Calendar, Zap, Home, X, AlertTriangle, ArrowRight,
@@ -613,7 +614,7 @@ function LeadsUpgradePage() {
         {/* Guarantee */}
         <div className="text-center">
           <p className="text-sm text-gray-400">
-            🛡️ 30 dagars pengarna-tillbaka-garanti. Avsluta när du vill.
+            🛡️ {getGuaranteeFacts(false).headline}. {getCancellationFacts().short}.
           </p>
         </div>
       </div>

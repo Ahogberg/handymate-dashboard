@@ -5,6 +5,7 @@
 // förifylls med partnerns namn och riktiga referrallänk.
 
 import { Loader2, Printer } from 'lucide-react'
+import { getCancellationFacts, getGuaranteeFacts } from '@/lib/feature-gates'
 import { AgentAvatar } from '@/components/agents/AgentAvatar'
 import { usePartnerMe } from '../usePartnerMe'
 
@@ -107,7 +108,7 @@ export default function LeaveBehindPage() {
                 <span className="text-[13px] text-white/60"> /mån</span>
               </p>
               <p className="text-[11px] text-white/65 leading-relaxed mt-1.5">
-                Månadsbetalning exkl. moms, utan bindningstid. 30 dagars pengarna-tillbaka.<br />
+                Månadsbetalning exkl. moms. {getCancellationFacts('monthly').short}. {getGuaranteeFacts(false).headline}.<br />
                 Storfirman 11 995 kr/mån exkl. moms för större volym. Bränsle ingår upp till planens gräns; extra påfyllning köps separat.
               </p>
             </div>

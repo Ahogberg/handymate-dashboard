@@ -7,6 +7,7 @@ import { OB_DOTS, OB_DOT_TOTAL } from '../constants'
 import InfoSheet from './InfoSheet'
 import { TEAM } from '@/lib/agents/team'
 import {
+  getCancellationFacts,
   getFoundersBannerBody,
   getGuaranteeFacts,
   getPlanCommercialFacts,
@@ -493,7 +494,7 @@ export default function Step5Activate({ onNext, onBack, data, setData }: Step5Pr
           {[
             guarantee.short,
             'Välj första uppdraget och kontrollera dina anslutningar',
-            'Avsluta när som helst',
+            getCancellationFacts(billingInterval).short,
           ].map((t, i) => (
             <div
               key={i}

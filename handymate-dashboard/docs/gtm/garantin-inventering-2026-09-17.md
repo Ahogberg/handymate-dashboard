@@ -261,8 +261,65 @@ publiceras, inte bara grundarna. Bytet får inte ske före §10 i heroutkastet.
      löper ändå. Landningssidans FAQ är noggrannare: "ingen bindningstid
      **på månadsplanen** … Årsplanen betalas för ett år i taget". Punkten
      bör säga samma sak. Vad den ska säga är ett beslut, därför orörd.
-  2. **Ingen påminnelse före årsförnyelse.** Ett årsabonnemang som förnyas
-     tyst för 59 950 kr är den sortens sak en kund upplever som ett
-     övertramp även när den är avtalsenlig. Ingen kod skickar en sådan
-     påminnelse. Jag skrev medvetet inte in ett löfte om det i villkoren —
-     men det är värt att bygga, och då kan raden läggas till.
+  2. **Ingen påminnelse före årsförnyelse.** Ingen kod skickar en. Se §8.
+
+## 8. Uppsägningen fick samma behandling (2026-09-18)
+
+Beslut Andreas: ytorna ska säga samma sak om avslut, och kunden ska kunna
+avsluta själv.
+
+**`getCancellationFacts(interval?)`** i `lib/feature-gates.ts`, bredvid
+garantin. Månadsplan säger "Ingen bindningstid"; **årsplanen gör det aldrig**
+— du kan säga upp, men de tolv betalda månaderna löper ändå. Utan intervall
+skrivs båda ut, i landningssidans FAQ-formulering, som var noggrannast av
+alla ytor från början.
+
+**Facitet skrevs om från uppräkning till svep.** Första versionen listade
+fyra filer och missade tre som bar hårdkodad garantitext:
+`app/dashboard/help/page.tsx`, `app/dashboard/marketing/leads/page.tsx`,
+`app/partners/material/leave-behind/page.tsx`. Ett facit som räknar upp
+vaktar de filer någon råkade tänka på, inte regeln. Det sveper nu hela
+`app/`. Det hittade de tre direkt, plus ett falsklarm (hjälpsidans "Inga
+frågor **matchade** din sökning") som skärpte mönstret.
+
+Landningssidan: två ovillkorade "Ingen bindningstid" (`index.html:592`,
+`hemsida.html:480`) kvalificerade till "på månadsplanen".
+
+### Kan kunden avsluta själv? Inte verifierbart från koden
+
+Knappen finns — *Hantera prenumeration* i Inställningar → Fakturering,
+ägar-/adminsgrindad, öppnar Stripes kundportal. Men
+`app/api/billing/portal/route.ts` skickar **ingen `configuration`**, så
+kontots standardkonfiguration i Stripe-dashboarden gäller. Om den
+konfigurationen erbjuder uppsägning kan bara Andreas se.
+
+**Att kontrollera:** Stripe → Settings → Billing → Customer portal →
+*Cancellations* påslaget, och inställd på "at end of billing period" (inte
+omedelbart — annars förlorar kunden betald tid, vilket motsäger §9).
+Villkoren säger nu att uppsägning sker där; stämmer inte portalen är det
+villkorstexten som blir osann.
+
+Enda andra uppsägningsvägen i koden är kontoradering
+(`app/api/account/delete/route.ts:120`), som kör
+`stripe.subscriptions.cancel` omedelbart. Den ska inte vara kundens väg att
+säga upp.
+
+### Påminnelse före årsförnyelse — vad den kräver
+
+Förslaget (subtil yta i plattformen + mejl en månad före) är rätt form: det
+som gör tyst förnyelse till ett övertramp är att kunden inte visste, inte
+att den skedde.
+
+**Men förutsättningen saknas.** En påminnelse "en månad före" behöver
+förnyelsedatumet, och `business_config.billing_period_end` är **null** på
+den enda skarpa prenumerationen. Kolumnen finns, `writeBillingUpdate`
+skriver den best-effort, och `byggAbonnemangsfalt` läser
+`(subscription as any).current_period_start/end` — casten är i sig ett spår
+efter ett typfel. I nyare Stripe-API-versioner (kontot kör
+`2026-01-28.clover`) ligger perioden på prenumerationens *items*, inte på
+roten. Är det förklaringen skriver koden aldrig något datum, och då har
+`app/api/billing/usage/route.ts` samma tomma källa.
+
+**Ordning:** verifiera var perioden ligger mot ett riktigt
+prenumerationsobjekt → rätta läsningen → backfyll → sedan påminnelsen. Att
+bygga cronen först ger en påminnelse som aldrig går ut.

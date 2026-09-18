@@ -27,6 +27,7 @@ import {
   GUARANTEE_MODEL,
   STANDARD_GUARANTEE_DAYS,
   USAGE_GUARANTEE_DECISION_DAYS,
+  getCancellationFacts,
   getFoundersBannerBody,
   getGuaranteeFacts,
 } from '../lib/feature-gates'
@@ -96,46 +97,120 @@ test.describe('en kanonisk garantisanning', () => {
 })
 
 test.describe('kundytorna läser garantin, bär den inte', () => {
+  // ═══ VARFÖR SVEP OCH INTE EN LISTA ═══
+  //
+  // Första versionen räknade upp fyra filer. Den missade tre ytor som bar
+  // hårdkodad garantitext: app/dashboard/help/page.tsx (FAQ om abonnemang),
+  // app/dashboard/marketing/leads/page.tsx och
+  // app/partners/material/leave-behind/page.tsx. Ett facit som räknar upp
+  // vaktar de filer någon råkade tänka på — inte regeln. Det här sveper
+  // hela app/ i stället, så en ny yta med egen garantitext faller direkt.
+
+  const forbjudet: Array<[RegExp, string]> = [
+    [/\d+\s*dagars pengarna-tillbaka/i, 'egna dagar + pengarna-tillbaka'],
+    [/\d+\s*dagars pengarna tillbaka/i, 'egna dagar + pengarna tillbaka'],
+    [/\d+-dagars/i, 'egna "N-dagars"'],
+    [/resultatgaranti/i, 'resultatgaranti'],
+    [/kundkontakter/i, 'minst N kundkontakter'],
+    // Punkten är inte kosmetik: garantitexten avslutar meningen ("… pengarna
+    // tillbaka. Inga frågor."), medan hjälpsidans tomtillstånd säger "Inga
+    // frågor matchade din sökning" och är oskyldigt. Utan den blir vakten
+    // ett falsklarm som någon till slut stänger av.
+    [/Inga frågor[.!]/, 'Inga frågor'],
+    [/garantin inte infrias/i, 'om garantin inte infrias'],
+    [/standardgarantin är/i, 'standardgarantin är N dagar'],
+    [/pengarna-tillbaka-garanti/i, 'egen garantirubrik'],
+    [/(?:utan|ingen|inget) bindningstid/i, 'egen uppsägningstext'],
+    [/[Aa]vsluta när (?:som helst|du vill)/, 'egen uppsägningstext'],
+    [/FOUNDERS_GUARANTEE_DAYS\}\s*dagars/, 'egen interpolering av dagarna'],
+    [/STANDARD_GUARANTEE_DAYS\}\s*dagars/, 'egen interpolering av dagarna'],
+  ]
+
+  /** Filer som LEGITIMT nämner orden. Varje undantag har ett skäl. */
+  const undantag = new Set<string>([
+    // Partneravtalet är ett annat avtal, mellan Handymate och partnern —
+    // inte en kundyta som citerar kundens garanti.
+    'app/partners/avtal/page.tsx',
+  ])
+
+  function tsxFiler(dir: string, ut: string[] = []): string[] {
+    for (const post of fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${post.name}`
+      if (post.isDirectory()) tsxFiler(rel, ut)
+      else if (post.name.endsWith('.tsx') || post.name.endsWith('.ts')) ut.push(rel)
+    }
+    return ut
+  }
+
+  test('ingen yta under app/ bär egen garanti- eller uppsägningstext', () => {
+    const traffar: string[] = []
+    for (const fil of tsxFiler('app')) {
+      if (undantag.has(fil)) continue
+      const kalla = utanKommentarer(read(fil))
+      for (const [re, namn] of forbjudet) {
+        if (re.test(kalla)) traffar.push(`${fil}: ${namn}`)
+      }
+    }
+    expect(
+      traffar,
+      'Ytor med egen text — ska läsa getGuaranteeFacts()/getCancellationFacts()',
+    ).toEqual([])
+  })
+
+  // Ytorna som ska ANROPA källan. Svepet ovan fångar avvikelser; den här
+  // fångar motsatsen — att någon tar bort texten helt i stället för att
+  // läsa den.
   const ytorSomVisarGarantin = [
     'app/onboarding/components/Step5Activate.tsx',
     'app/dashboard/settings/billing/page.tsx',
     'app/partners/material/partnerdeck/page.tsx',
     'app/partners/material/demo-manus/page.tsx',
+    'app/partners/material/leave-behind/page.tsx',
+    'app/dashboard/help/page.tsx',
+    'app/dashboard/marketing/leads/page.tsx',
   ]
 
   for (const file of ytorSomVisarGarantin) {
-    test(`${file} anropar getGuaranteeFacts`, () => {
-      expect(utanKommentarer(read(file))).toContain('getGuaranteeFacts(')
+    test(`${file} anropar den kanoniska källan`, () => {
+      const s = utanKommentarer(read(file))
+      expect(s).toMatch(/getGuaranteeFacts\(|getCancellationFacts\(/)
     })
   }
 
   // Ytor som hänvisar till köpflödet i stället för att upprepa garantin —
   // rätt mönster, och de får inte glida tillbaka till egen text.
-  const ytorSomHanvisar = [
-    'app/jamfor/page.tsx',
-    'app/api/onboarding/chat/route.ts',
-  ]
-
-  const egenGarantitext: Array<[RegExp, string]> = [
-    [/\d+\s*dagars pengarna-tillbaka/i, 'egna dagar + pengarna-tillbaka'],
-    [/\d+-dagars/i, 'egna "N-dagars"'],
-    [/resultatgaranti/i, 'resultatgaranti'],
-    [/kundkontakter/i, 'minst N kundkontakter'],
-    [/Inga frågor/, 'Inga frågor'],
-    [/garantin inte infrias/i, 'om garantin inte infrias'],
-    [/standardgarantin är/i, 'standardgarantin är N dagar'],
-    [/FOUNDERS_GUARANTEE_DAYS\}\s*dagars/, 'egen interpolering av dagarna'],
-    [/STANDARD_GUARANTEE_DAYS\}\s*dagars/, 'egen interpolering av dagarna'],
-  ]
-
-  for (const file of [...ytorSomVisarGarantin, ...ytorSomHanvisar]) {
-    test(`${file} bär ingen egen garantitext`, () => {
+  for (const file of ['app/jamfor/page.tsx', 'app/api/onboarding/chat/route.ts']) {
+    test(`${file} hänvisar, upprepar inte`, () => {
       const s = utanKommentarer(read(file))
-      for (const [re, namn] of egenGarantitext) {
-        expect(s, `${file} bär "${namn}" — ska läsa getGuaranteeFacts()`).not.toMatch(re)
+      for (const [re, namn] of forbjudet) {
+        expect(s, `${file} bär "${namn}"`).not.toMatch(re)
       }
     })
   }
+})
+
+test.describe('uppsägningen har också en källa', () => {
+  test('månad, år och obestämt säger olika men aldrig motstridiga saker', () => {
+    const manad = getCancellationFacts('monthly')
+    const ar = getCancellationFacts('yearly')
+    const bada = getCancellationFacts()
+    expect(manad.short).toContain('Ingen bindningstid')
+    // Årsplanen får ALDRIG påstå att bindningstid saknas — du kan säga upp,
+    // men de tolv betalda månaderna löper ändå.
+    expect(ar.short).not.toMatch(/ingen bindningstid/i)
+    expect(ar.text).toContain('tolv månader')
+    expect(bada.text).toContain('Ingen bindningstid på månadsplanen')
+    for (const f of [manad, ar, bada]) {
+      expect(f.where).toBe('Inställningar → Fakturering → Hantera prenumeration')
+      expect(f.text).toContain(f.where)
+    }
+  })
+
+  test('texten speglar att båda planerna förnyas automatiskt', () => {
+    // Verifierat 2026-09-18: ingenting i koden sätter cancel_at_period_end.
+    expect(getCancellationFacts('yearly').text).toContain('förnyas tills du säger upp')
+    expect(getCancellationFacts().text).toContain('förnyas tills du säger upp')
+  })
 })
 
 test.describe('grundarstämpeln — vem som fick livstidspriset skrivs ned', () => {
