@@ -101,10 +101,19 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 | Nyckel | Värde | Beskrivning |
 |--------|-------|-------------|
 | `vat_rate` | `0.25` | Moms 25% — aldrig justerbar |
-| `rot_deduction_rate` | `0.30` | ROT-avdrag 30% på arbetskostnad |
-| `rot_max_per_person_year` | `50000` | Skatteverkets ROT-tak per person och år (kr) — källa: `lib/rot-rut-limits.ts` |
-| `rut_max_per_person_year` | `75000` | Skatteverkets RUT-tak per person och år (kr) — källa: `lib/rot-rut-limits.ts` |
-| `rut_deduction_rate` | `0.50` | RUT-avdrag 50% på arbetskostnad |
+
+**ROT/RUT-satserna och årstaken är INTE inställningar.** Sedan 2026-09-18 bor de
+på exakt ett ställe: `lib/rot/regler.ts` — en DATERAD regeltabell (`ROT_REGLER`,
+`regelFor(datum)`), eftersom ROT-satsen var tillfälligt höjd till 50 % för arbete
+betalt 2025-05-12..2025-12-31 och tillbaka på 30 % från 2026-01-01. RUT 50 %,
+ROT-tak 50 000 kr/person/år, RUT-tak 75 000 kr, gemensamt ROT+RUT-tak 75 000 kr,
+grön teknik 15/50 % med tak 50 000 kr. Skatteverket knyter regeln till
+BETALNINGSDATUMET; vägar som bara känner fakturadatum skickar det som bästa
+kända datum. Nycklarna `rot_deduction_rate`, `rot_max_per_person_year`,
+`rut_max_per_person_year` och `rut_deduction_rate` stod tidigare här men lästes
+aldrig av någon kod och seedades aldrig (`lib/seed-defaults.ts`) — de är
+borttagna ur dokumentet så att ingen tror att satsen går att ställa in per
+företag. Befintliga rader i databasen är orörda.
 
 ---
 

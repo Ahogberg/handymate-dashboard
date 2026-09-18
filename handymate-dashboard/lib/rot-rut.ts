@@ -1,13 +1,13 @@
 /**
- * ROT/RUT-beräkningar och validering
- * ROT: 30% avdrag på arbetskostnad, max 50 000 kr/person/år
- * RUT: 50% avdrag på arbetskostnad, max 75 000 kr/person/år
+ * ROT/RUT-beräkningar och validering.
+ *
+ * Satserna och taken bor i lib/rot/regler.ts som DATERAD regel — den här
+ * filen räknar bara. Varje funktion tar ett valfritt `datum`; utan datum
+ * gäller dagens regel (bästa kända datum, se regler.ts om vilket datum som
+ * egentligen styr: betalningsdatumet).
  */
 
-export const ROT_RATE = 0.30
-export const RUT_RATE = 0.50
-export const ROT_MAX_PER_PERSON = 50000
-export const RUT_MAX_PER_PERSON = 75000
+import { regelFor } from '@/lib/rot/regler'
 
 /**
  * Skatteverkets regel (verifierad 2026-07-30 mot skatteverket.se):
@@ -18,25 +18,25 @@ export const RUT_MAX_PER_PERSON = 75000
 export function rotRutDeductionInclVat(
   type: 'rot' | 'rut',
   workCostExVat: number,
-  opts: { vatRate?: number; discountFactor?: number } = {}
+  opts: { vatRate?: number; discountFactor?: number; datum?: Date | string } = {}
 ): number {
   if (workCostExVat <= 0) return 0
+  const regel = regelFor(opts.datum)
   const vatFactor = 1 + (opts.vatRate ?? 25) / 100
   const factor = Math.max(0, Math.min(1, opts.discountFactor ?? 1))
-  const rate = type === 'rot' ? ROT_RATE : RUT_RATE
-  const cap = type === 'rot' ? ROT_MAX_PER_PERSON : RUT_MAX_PER_PERSON
+  const rate = type === 'rot' ? regel.rot_andel : regel.rut_andel
+  const cap = type === 'rot' ? regel.rot_tak : regel.rut_tak
   return Math.min(workCostExVat * factor * vatFactor * rate, cap)
 }
 
-export const GRON_TEKNIK_MAX = 50_000
 export function gronTeknikDeductionInclVat(
   rawDeductionExVat: number,
-  opts: { vatRate?: number; discountFactor?: number } = {}
+  opts: { vatRate?: number; discountFactor?: number; datum?: Date | string } = {}
 ): number {
   if (rawDeductionExVat <= 0) return 0
   const vatFactor = 1 + (opts.vatRate ?? 25) / 100
   const factor = Math.max(0, Math.min(1, opts.discountFactor ?? 1))
-  return Math.min(rawDeductionExVat * factor * vatFactor, GRON_TEKNIK_MAX)
+  return Math.min(rawDeductionExVat * factor * vatFactor, regelFor(opts.datum).gron_teknik_tak)
 }
 
 export type RotRutType = 'rot' | 'rut' | ''
@@ -61,7 +61,8 @@ export interface QuoteItem {
 export function calculateRotRut(
   items: QuoteItem[],
   type: RotRutType,
-  totalInclVat?: number
+  totalInclVat?: number,
+  datum?: Date | string
 ): RotRutResult {
   const laborTotal = items
     .filter(i => i.type === 'labor')
@@ -78,10 +79,11 @@ export function calculateRotRut(
     }
   }
 
-  const rate = type === 'rot' ? ROT_RATE : RUT_RATE
-  const maxPerPerson = type === 'rot' ? ROT_MAX_PER_PERSON : RUT_MAX_PER_PERSON
+  const regel = regelFor(datum)
+  const rate = type === 'rot' ? regel.rot_andel : regel.rut_andel
+  const maxPerPerson = type === 'rot' ? regel.rot_tak : regel.rut_tak
   const eligible = laborTotal
-  const deduction = rotRutDeductionInclVat(type, eligible)
+  const deduction = rotRutDeductionInclVat(type, eligible, { datum })
   const customerPays = (totalInclVat || 0) - deduction
 
   return {
@@ -150,10 +152,11 @@ export function formatPersonnummer(nr: string): string {
 /**
  * Hämta label för ROT/RUT-typ
  */
-export function getRotRutLabel(type: RotRutType): string {
+export function getRotRutLabel(type: RotRutType, datum?: Date | string): string {
+  const regel = regelFor(datum)
   switch (type) {
-    case 'rot': return 'ROT-avdrag 30%'
-    case 'rut': return 'RUT-avdrag 50%'
+    case 'rot': return `ROT-avdrag ${Math.round(regel.rot_andel * 100)}%`
+    case 'rut': return `RUT-avdrag ${Math.round(regel.rut_andel * 100)}%`
     default: return ''
   }
 }

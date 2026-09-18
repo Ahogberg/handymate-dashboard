@@ -236,7 +236,7 @@ test.describe('Inkoppling', () => {
     expect(aiQuoteGeneratorSrc).not.toContain('is_rut_eligible: true')
   })
 
-  test('lib/skv/* är orört: ingen import av lib/rot i SKV-lagret', () => {
+  test('lib/skv/* är orört: ROT-RÄTTEN (lib/rot/ratt, tabell) når aldrig SKV-lagret', () => {
     const skvDir = path.join(REPO_ROOT, 'lib', 'skv')
     const files = fs.readdirSync(skvDir).filter(f => f.endsWith('.ts'))
     expect(files.length).toBeGreaterThan(0)
@@ -244,7 +244,14 @@ test.describe('Inkoppling', () => {
       const src = fs.readFileSync(path.join(skvDir, f), 'utf8')
       // OBS: matchar "lib/rot/" med trailing slash, inte t.ex. det redan
       // befintliga och orelaterade lib/rot-rut.ts.
-      expect(src, `${f} importerar lib/rot/ — SKV-lagret ska vara orört`).not.toMatch(/from ['"].*lib\/rot\//)
+      // UNDANTAG sedan 2026-09-18 (spår 5): lib/rot/regler.ts är INTE
+      // ROT-rätten utan den daterade SATS-/TAK-regeln — SKV-lagrets årstak
+      // ska komma därifrån, annars lever taket som en literal igen. Allt
+      // annat under lib/rot/ (ratt.ts, tabell.ts) är fortsatt förbjudet här.
+      const forbjudna = Array.from(src.matchAll(/from ['"][^'"]*lib\/rot\/([\w-]+)['"]/g))
+        .map(m => m[1])
+        .filter(namn => namn !== 'regler')
+      expect(forbjudna, `${f} importerar ROT-rätten — SKV-lagret ska vara orört`).toEqual([])
     }
   })
 

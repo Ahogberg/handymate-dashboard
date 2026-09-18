@@ -223,6 +223,10 @@ export async function POST(request: NextRequest) {
     const vatAmount = subtotal * (vat_rate / 100)
     let total = subtotal + vatAmount
 
+    // Fakturadatumet avgör vilken ROT/RUT-regel som gäller (lib/rot/regler.ts)
+    // — härleds FÖRE avdraget, inte efter.
+    const invoiceDateVal = providedInvoiceDate ? new Date(providedInvoiceDate) : new Date()
+
     // ROT/RUT-avdrag med årstaksvalidering
     let rotRutDeduction = 0
     let customerPays = total
@@ -239,7 +243,7 @@ export async function POST(request: NextRequest) {
         business_id,
         rot_rut_type as 'rot' | 'rut',
         laborCost,
-        { vatRate: vat_rate }
+        { vatRate: vat_rate, datum: invoiceDateVal }
       )
 
       rotRutDeduction = cappedResult.deduction
@@ -251,7 +255,7 @@ export async function POST(request: NextRequest) {
       // ska ändå vara rätt (delade kärnan, samma som customer_id-grenen ovan).
       rotRutDeduction =
         Math.round(
-          rotRutDeductionInclVat(rot_rut_type as 'rot' | 'rut', laborCost, { vatRate: vat_rate }) * 100
+          rotRutDeductionInclVat(rot_rut_type as 'rot' | 'rut', laborCost, { vatRate: vat_rate, datum: invoiceDateVal }) * 100
         ) / 100
       customerPays = total - rotRutDeduction
     }
@@ -263,8 +267,6 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       )
     }
-
-    const invoiceDateVal = providedInvoiceDate ? new Date(providedInvoiceDate) : new Date()
 
     // Härd: om client skickade quote_id men inte project_id, försök
     // backlinka via project.quote_id (samma mönster som from-quote/1.3b).
@@ -416,7 +418,7 @@ export async function PUT(request: NextRequest) {
     if (fields.items && Array.isArray(fields.items)) {
       const { data: befintlig } = await supabase
         .from('invoice')
-        .select('customer_id, rot_rut_type, vat_rate, total')
+        .select('customer_id, rot_rut_type, vat_rate, total, invoice_date')
         .eq('invoice_id', invoice_id)
         .eq('business_id', business.business_id)
         .single()
@@ -437,7 +439,9 @@ export async function PUT(request: NextRequest) {
             business.business_id,
             effRotTyp,
             bas,
-            { vatRate: effVat, excludeInvoiceId: invoice_id },
+            // Fakturans EGET datum styr satsen — en faktura från 2025 får
+            // aldrig räknas om med 2026 års regel (lib/rot/regler.ts).
+            { vatRate: effVat, excludeInvoiceId: invoice_id, datum: fields.invoice_date || befintlig?.invoice_date || undefined },
           )
           serverAvdrag = kappat.deduction
         }

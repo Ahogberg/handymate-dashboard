@@ -1,3 +1,61 @@
+## Spår 5 — ROT/RUT som daterad regel, 2026-09-18
+
+Satsen och taket låg som konstanter på fyra ställen utan datum: `ROT_RATE`,
+`RUT_RATE`, `ROT_MAX_PER_YEAR`, `RUT_MAX_PER_YEAR`, `TOTAL_MAX_PER_YEAR` i
+`lib/rot-rut-limits.ts`, samma fyra i `lib/rot-rut.ts`, ett eget par i
+`lib/skv/validate-rot-request.ts` och grön teknik-satserna i
+`lib/quote-calculations.ts`. Skatteverket höjde ROT tillfälligt till 50 % för
+arbete betalt 2025-05-12..2025-12-31 och sänkte tillbaka till 30 % 2026-01-01
+— koden kunde inte uttrycka det. En faktura som betalades i juni 2025 räknades
+med 2026 års sats, och en satsändring krävde fyra redigeringar.
+
+- [x] **En sanning med datum.** Ny `lib/rot/regler.ts`: `RotRegel`,
+      `ROT_REGLER` (tre rader: 2025-01-01..05-11 30 %, 2025-05-12..12-31 50 %,
+      2026-01-01.. 30 %) och `regelFor(datum)`. Den KASTAR ALDRIG — utanför
+      tabellen lånas närmaste regel med `verifierad: false` och en
+      `console.warn`, aldrig en tyst gissning i en pengaberäkning. Datum
+      normaliseras i svensk tid (Europe/Stockholm), så ett `new Date()` strax
+      efter midnatt nyårsnatten inte hamnar i fel år. Grön teknik-satserna
+      (15/50/50, tak 50 000) flyttade hit OFÖRÄNDRADE.
+- [x] **De fyra ställena läser regeln.** `lib/rot-rut.ts` (konstanterna borta,
+      varje funktion tar valfritt `datum`), `lib/rot-rut-limits.ts` (taken ur
+      regeln, `datum` genom hela kedjan), `lib/skv/validate-rot-request.ts`
+      (årstaket ur regeln för BETALNINGSDATUMET — där finns `paid_at`, och det
+      är det datum Skatteverket faktiskt knyter regeln till),
+      `lib/quote-calculations.ts` (ROT/RUT + grön teknik per datum).
+- [x] **Vem skickar datum.** `app/api/invoices/route.ts` POST (klientens
+      `invoice_date`) och PUT (fakturans EGET `invoice_date` — en 2025-faktura
+      som redigeras räknas inte längre om med 2026 års sats),
+      `from-quote`, `from-time-entries` och `lib/quotes/apply-annual-cap.ts`.
+      Övriga vägar (`from-project`, `create-final-invoice`,
+      `project-invoice-draft`, `invoice-visit`, `tool-router`, offertrutterna)
+      faller på default `new Date()` = fakturans/offertens skapandedag, vilket
+      är bästa kända datum där. Kreditvägen proportionerar originalets avdrag
+      och rör aldrig en sats — den ärver därmed originalfakturans regel.
+- [x] **`automation_settings.rot_deduction_rate` fanns aldrig.** Kolumnen finns
+      inte i tabellen (uppslag mot `information_schema`: 30 kolumner, ingen
+      rot-nyckel), den seedas inte i `lib/seed-defaults.ts` och ingen kod läser
+      den — den stod bara i ARCHITECTURE.md §3.2. Avsnittet säger nu att
+      satserna bor i `lib/rot/regler.ts` och att de inte är inställningar.
+      Ingen databasrad rörd.
+- [x] **Facit:** `tests/rot-regler.spec.ts` (29 tester). Gränsdagar, utanför
+      tabellen ⇒ `verifierad:false` + warn, och tal genom VARJE väg med
+      2025-06-01 (50 % ⇒ 6 250 kr) och 2026-03-01 (30 % ⇒ 3 750 kr): de rena
+      funktionerna, årstaksvägen med databasstubbe, skv-valideringen,
+      offertmotorn, tillvalsvägen och sex fakturavägar som KÖRS (from-quote,
+      from-time-entries, invoices POST, from-project, create-final-invoice,
+      invoice-visit) plus projektfakturaunderlaget — under låst systemklocka,
+      efter lärdomen 2026-09-16 om att en delad funktion måste bevisas på varje
+      väg. Plus källskanning: satserna får inte återuppstå som literaler.
+- [x] **Fynd som INTE rördes (utanför uppdraget):** grön teknik-avdraget räknas
+      aldrig i `calculateQuoteTotals` — `getBasisRotRutType` returnerar null för
+      `gron_*`, så `gronBase` blir 0. `tests/gron-teknik.spec.ts` (7 fall) och
+      två fall till var RÖDA redan före passet (verifierat med `git stash`).
+      Samma sak: `npx tsc --noEmit` har två fel i `.next/types` för
+      `app/api/email/events/route.ts` och `app/api/sms/delivered/route.ts`
+      (spår 2 exporterar hjälpfunktioner ur route-filer, vilket Next.js
+      förbjuder) — de var röda före passet och är inte rättade här.
+
 ## Spår 3 — Bokning på svar, 2026-09-18
 
 Vi bad själva kunden svara: "Vi kan komma: 1) … 2) … Svara med numret som

@@ -1,29 +1,20 @@
 import { getServerSupabase } from '@/lib/supabase'
 import { CUSTOMER_SETTLED_STATUSES } from '@/lib/invoices/status'
 import { rotRutDeductionInclVat } from '@/lib/rot-rut'
+import { regelFor, arsFor } from '@/lib/rot/regler'
 
 /**
- * ROT/RUT årstak enligt Skatteverket:
- * ROT: 30% avdrag på arbetskostnad, max 50 000 kr/person/år
- * RUT: 50% avdrag på arbetskostnad, max 75 000 kr/person/år
+ * ROT/RUT årstak enligt Skatteverket. Satserna och taken är INTE konstanter
+ * här längre — de kommer ur den daterade regeln i lib/rot/regler.ts, eftersom
+ * ROT-satsen var tillfälligt 50 % under delar av 2025. Varje funktion tar ett
+ * valfritt `datum` (Skatteverket: betalningsdatumet styr); utan datum gäller
+ * dagens regel, vilket är rätt för en faktura som skapas nu.
  *
- * Totalt ROT+RUT-tak: 75 000 kr/person/år
- */
-
-export const ROT_RATE = 0.30
-export const RUT_RATE = 0.50
-export const ROT_MAX_PER_YEAR = 50_000
-export const RUT_MAX_PER_YEAR = 75_000
-export const TOTAL_MAX_PER_YEAR = 75_000 // Gemensamt tak för ROT+RUT
-
-/**
- * Grön teknik-avdrag: solceller 15%, batteri/laddbox 50%, tak 50 000 kr/år.
- * Separat från ROT/RUT-taket ovan. Fas 1 tillämpar taket per offert i
- * lib/quote-calculations.ts (calculateQuoteTotals). Årsvis tvär-offert-
+ * Grön teknik-taket (separat från ROT/RUT-taket) bor i samma regel och
+ * tillämpas per offert i lib/quote-calculations.ts. Årsvis tvär-offert-
  * spårning (motsvarande getCustomerRotRutUsage för grön teknik) är INTE
  * implementerad än — deferred till Fas 2.
  */
-export const GRON_TEKNIK_MAX_PER_YEAR = 50_000
 
 export interface RotRutUsage {
   rot_used: number
@@ -51,10 +42,15 @@ export async function getCustomerRotRutUsage(
   customerId: string,
   businessId: string,
   year?: number,
-  opts: { excludeInvoiceId?: string } = {}
+  opts: { excludeInvoiceId?: string; datum?: Date | string } = {}
 ): Promise<RotRutUsage> {
   const supabase = getServerSupabase()
-  const currentYear = year || new Date().getFullYear()
+  // Taket hör ihop med ÅRET. Har anroparen ett datum (betal-/fakturadatum)
+  // används det; annars härleds datumet ur året så att taket alltid kommer ur
+  // samma års regel, och ur dagens datum när inget år angetts.
+  const datum = opts.datum ?? (year ? `${year}-12-31` : new Date())
+  const currentYear = year || arsFor(datum)
+  const regel = regelFor(datum)
 
   // excludeInvoiceId (A2, Prisslingan V2): vid OMRÄKNING av en befintlig
   // fakturas avdrag får fakturans EGET redan-lagrade avdrag inte räknas som
@@ -100,9 +96,9 @@ export async function getCustomerRotRutUsage(
     rot_used: Math.round(rotUsed),
     rut_used: Math.round(rutUsed),
     total_used: Math.round(totalUsed),
-    rot_remaining: Math.max(0, Math.round(ROT_MAX_PER_YEAR - rotUsed)),
-    rut_remaining: Math.max(0, Math.round(RUT_MAX_PER_YEAR - rutUsed)),
-    total_remaining: Math.max(0, Math.round(TOTAL_MAX_PER_YEAR - totalUsed)),
+    rot_remaining: Math.max(0, Math.round(regel.rot_tak - rotUsed)),
+    rut_remaining: Math.max(0, Math.round(regel.rut_tak - rutUsed)),
+    total_remaining: Math.max(0, Math.round(regel.totalt_tak - totalUsed)),
     year: currentYear,
   }
 }
@@ -118,7 +114,7 @@ export async function getCustomerRotRutUsage(
 export function calculateRawDeduction(
   type: 'rot' | 'rut',
   laborCost: number,
-  opts: { vatRate?: number; discountFactor?: number } = {}
+  opts: { vatRate?: number; discountFactor?: number; datum?: Date | string } = {}
 ): number {
   return Math.round(rotRutDeductionInclVat(type, laborCost, opts) * 100) / 100
 }
@@ -131,10 +127,13 @@ export function calculateRawDeduction(
 export function buildValidationFromUsage(
   type: 'rot' | 'rut',
   requestedDeduction: number,
-  usage: RotRutUsage
+  usage: RotRutUsage,
+  datum?: Date | string
 ): RotRutValidation {
-  // Bestäm max tillåtet utifrån årstaket
-  const typeMax = type === 'rot' ? ROT_MAX_PER_YEAR : RUT_MAX_PER_YEAR
+  // Bestäm max tillåtet utifrån årstaket. Utan uttryckligt datum gäller
+  // regeln som avslutade det år användningen avser — samma år, samma tak.
+  const regel = regelFor(datum ?? `${usage.year}-12-31`)
+  const typeMax = type === 'rot' ? regel.rot_tak : regel.rut_tak
   const typeUsed = type === 'rot' ? usage.rot_used : usage.rut_used
   const typeRemaining = Math.max(0, typeMax - typeUsed)
 
@@ -173,18 +172,19 @@ export async function validateRotRutDeduction(
   businessId: string,
   type: 'rot' | 'rut',
   laborCost: number,
-  opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string } = {}
+  opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string; datum?: Date | string } = {}
 ): Promise<RotRutValidation> {
   // excludeInvoiceId var tidigare deklarerad men trädde ALDRIG in i
   // usage-frågan (A2-fixen) — parametern var död och exkluderade ingenting.
   const usage = await getCustomerRotRutUsage(customerId, businessId, undefined, {
     excludeInvoiceId: opts.excludeInvoiceId,
+    datum: opts.datum,
   })
 
   // Beräkna begärt avdrag (inkl-moms-korrekt, se lib/rot-rut.ts)
   const requestedDeduction = calculateRawDeduction(type, laborCost, opts)
 
-  return buildValidationFromUsage(type, requestedDeduction, usage)
+  return buildValidationFromUsage(type, requestedDeduction, usage, opts.datum)
 }
 
 /**
@@ -196,7 +196,7 @@ export async function calculateCappedDeduction(
   businessId: string,
   type: 'rot' | 'rut',
   laborCost: number,
-  opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string } = {}
+  opts: { vatRate?: number; discountFactor?: number; excludeInvoiceId?: string; datum?: Date | string } = {}
 ): Promise<{ deduction: number; capped: boolean; warning?: string }> {
   const validation = await validateRotRutDeduction(customerId, businessId, type, laborCost, opts)
 

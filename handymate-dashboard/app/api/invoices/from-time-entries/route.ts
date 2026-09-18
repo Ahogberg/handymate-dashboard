@@ -167,7 +167,8 @@ export async function POST(request: NextRequest) {
     if (rot_rut_type && resolvedCustomerId) {
       const eligibleLabor = rotRutLaborBasis(items, rot_rut_type as 'rot' | 'rut')
       if (eligibleLabor > 0) {
-        const capped = await calculateCappedDeduction(resolvedCustomerId, business_id, rot_rut_type as 'rot' | 'rut', eligibleLabor, { vatRate })
+        // Fakturadatumet = bästa kända datum för satsen (lib/rot/regler.ts).
+        const capped = await calculateCappedDeduction(resolvedCustomerId, business_id, rot_rut_type as 'rot' | 'rut', eligibleLabor, { vatRate, datum: invoiceDate })
         rotRutDeduction = capped.deduction
         customerPays = total - rotRutDeduction
       }
