@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { phoneCandidates } from '@/lib/voice/find-customer-by-phone'
+import { acceptanceOriginDate, acceptanceOriginLabel } from '@/lib/quotes/lifecycle'
 
 interface TimelineEvent {
   id: string
@@ -151,7 +152,7 @@ export function DealTimeline({ dealId, customerId, businessId }: Props) {
       // 4. Quotes linked to this deal
       const { data: quotes } = await supabase
         .from('quotes')
-        .select('quote_id, status, title, total_amount:total, sent_at, accepted_at, created_at')
+        .select('quote_id, status, title, total_amount:total, sent_at, accepted_at, accepted_via, accepted_by, signed_at, signed_by_name, created_at')
         .eq('deal_id', dealId)
 
       quotes?.forEach((q: any) => {
@@ -172,12 +173,16 @@ export function DealTimeline({ dealId, customerId, businessId }: Props) {
             icon: ICONS.quote_sent,
           })
         }
-        if (q.accepted_at) {
+        // Tidslinjen påstod att kunden hade signerat VARJE accepterad
+        // offert — även den hantverkaren själv bockade av efter ett samtal.
+        // Ursprunget kommer nu från lib/quotes/lifecycle (v263).
+        const ursprung = acceptanceOriginLabel(q)
+        if (q.accepted_at && ursprung) {
           allEvents.push({
             id: `q-signed-${q.quote_id}`,
             type: 'quote_signed',
-            timestamp: q.accepted_at,
-            title: 'Offert signerad av kund',
+            timestamp: acceptanceOriginDate(q) || q.accepted_at,
+            title: `${ursprung}: ${q.title || 'Offert'}`,
             icon: ICONS.quote_signed,
           })
         }

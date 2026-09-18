@@ -287,6 +287,7 @@ jobs:
           tests/bokning-pa-svar.spec.ts
           tests/rot-regler.spec.ts
           tests/identitetslasare.spec.ts
+          tests/accept-en-sanning.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

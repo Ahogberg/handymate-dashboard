@@ -153,11 +153,11 @@ företag. Befintliga rader i databasen är orörda.
 | `payment_received` | Betalning registrerad på en faktura | `{ invoice_id, entity_id, customer_id }` | `lib/invoices/apply-payment.ts` |
 | `pipeline_stage_changed` | Affären byter steg i pipelinen | `{ lead_id, from_stage, to_stage, triggered_by }` | `lib/pipeline-stages.ts` |
 | `project_created` | Projekt skapat ur lead, offert eller bokning | `{ project_id, lead_id?, quote_id?, source }` | `lib/projects/create-from-lead.ts`, `lib/projects/create-from-quote.ts`, `lib/projects/maybe-create-from-booking.ts` |
-| `quote_accepted` | Kunden accepterar offerten via acceptlänken | `{ quote_id, customer_id, customer_name, total, title, lead_id }` | `app/api/quotes/accept/route.ts` |
+| `quote_accepted` | Offerten är accepterad — kanoniskt "affären är vunnen". Avfyras på ALLA tre vägar (signering, kundportal, intern accept) | `{ quote_id, customer_id, customer_name, quote_title, title, total, lead_id }` | `lib/quotes/finalize-accepted.ts` |
 | `quote_expired` | Offert passerat `valid_until` utan svar (markeras av cron) | `{ quote_id, lead_id, customer_id, days_sent }` | `app/api/cron/quote-follow-up/route.ts` |
 | `quote_opened` | Kunden öppnar offertlänken första gången | `{ quote_id, customer_id, quote_title }` | `lib/quotes/track-open.ts` |
 | `quote_sent` | Offert skickad till kund | `{ quote_id, customer_id, customer_name, total, title }` | `app/api/quotes/send/route.ts` |
-| `quote_signed` | Kunden signerar offerten digitalt (publik länk eller kundportal) | `{ quote_id, customer_id, quote_title?, total? }` | `app/api/quotes/public/[token]/route.ts`, `app/api/portal/route.ts` |
+| `quote_signed` | Kunden har faktiskt SIGNERAT offerten i den publika länken. Avfyras bara där en signatur finns — aldrig för portal- eller intern accept | `{ quote_id, customer_id, customer_name, quote_title, title, total, lead_id }` | `lib/quotes/finalize-accepted.ts` |
 | `referral_converted` | Värvad kund blev betalande — rabatt utlöst | `{ referred_business_id, amount_sek, referrer_credit_sek }` | `lib/referral/discounts.ts` |
 | `sms_received` | Inkommande SMS från kund | `{ phone, message, customer_name }` | `app/api/sms/incoming/route.ts` |
 | `sms_sent` | Utgående SMS mottaget av 46elks (SMS-strypunkten) | `{ to, customer_id, message_type, elks_id, sms_id, recipient }` | `lib/sms-send.ts` |

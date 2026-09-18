@@ -1,6 +1,7 @@
 'use client'
 
 import { Check } from 'lucide-react'
+import { acceptanceOriginDate, acceptanceOriginLabel } from '@/lib/quotes/lifecycle'
 import { formatDate, formatViewDuration } from '../helpers'
 import type { Quote, QuoteTrackingEvent } from '../types'
 
@@ -97,10 +98,15 @@ export function QuoteStatusTimeline({ quote, trackingEvents }: QuoteStatusTimeli
     })
   }
 
+  // Ursprunget, inte en gissning: en offert som hantverkaren själv markerade
+  // som accepterad stod tidigare som "Signerad" i händelseloggen, med tom
+  // signatär. Etiketten kommer nu från lib/quotes/lifecycle (v263).
+  const ursprung = acceptanceOriginLabel(quote)
+  const ursprungDatum = acceptanceOriginDate(quote)
   steps.push({
-    label: quote.signed_at ? `Signerad av ${quote.signed_by_name}` : 'Signerad',
-    date: quote.signed_at,
-    status: quote.signed_at ? 'done' : quote.status === 'opened' ? 'current' : 'upcoming',
+    label: ursprung || 'Signerad',
+    date: ursprungDatum,
+    status: ursprungDatum ? 'done' : quote.status === 'opened' ? 'current' : 'upcoming',
   })
 
   steps.push({

@@ -1,3 +1,87 @@
+## Spår 7 — En sanning för "offert accepterad", 2026-09-18
+
+Tre vägar satte `quotes.status='accepted'` — kundens signering i den publika
+vyn, kundportalens knapp och hantverkarens egen registrering — och var och en
+hade sin EGEN uppsättning eftersteg. Kopiorna hade redan drivit isär:
+`handleProjectEvent` saknades HELT i kundportalen, den interna vägen fyrade
+`quote_accepted` medan de två andra fyrade `quote_signed`, och den interna
+vägens bekräftelse-SMS påstod "Vi har mottagit din signatur på offerten" till
+kunder som aldrig signerat något. Den interna vägen skrev dessutom
+`accepted_manually` — en kolumn som ALDRIG funnits i prod — så varje accept
+föll ned i en reservgren som tappade även `accepted_at`.
+
+- [x] **v263 accept_provenance** (körd mot prod, 2/2 kolumner verifierade):
+      `quotes.accepted_via` (`signering|kundportal|internt`, CHECK-villkor) och
+      `quotes.accepted_by` (bara för `internt`). Ingen backfill — de 8
+      historiska accepterna saknar bevis för sin väg, och ett ärligt NULL är
+      bättre än en gissning. `accepted_manually` återinfördes INTE.
+- [x] **v264 journalen får alla steg** (körd mot prod, 6/6 stegkolumner
+      verifierade, journalen hade 0 rader): sex nya `<steg>_state/_claim/
+      _claimed_at/_error` plus utökade `claim_`/`finish_quote_acceptance_step`.
+      Utgående steg (email/notify/communication/events) återförsöks ALDRIG —
+      en förlorad leverantörskvittens är `uncertain`, inte ogjord. v2:s
+      semantik bevarad: samma `acceptance_journal_missing`, samma
+      SECURITY INVOKER.
+- [x] **Finalizern äger ALLT efter statusflippen.** `finalizeAcceptedQuote`
+      gick från tre steg till nio (margin, project, deal, project_event,
+      communication, notify, events, autopilot, email), vart och ett
+      journalfört. Rutterna gör nu bara auth → statusflipp (CAS) → ett anrop
+      → svar: accept-rutten krympte 227 rader, portalen 66, den publika vyn
+      101. `quote_accepted` fyras på ALLA tre vägar (kanoniskt "affären är
+      vunnen"); `quote_signed` bara där en signatur faktiskt finns.
+- [x] **Återhämtningens omfattning OFÖRÄNDRAD.** `RECOVERY_STEPS` är exakt
+      `['project','deal']` — samma två steg `acceptance-recovery` körde före
+      passet. De sju nya stegen SYNS i journalen men återspelas inte: ett
+      utskick som kanske redan gått ut får aldrig köras om av en
+      knapptryckning. Journalen har aldrig körts skarpt i prod — det var fel
+      tillfälle att vidga den.
+- [x] **Bekräftelsen ljuger inte längre.** `sendQuoteSignedConfirmation` tar
+      källan och väljer ord därefter ("Offerten är signerad" / "Offerten är
+      godkänd" / "Beställningen är registrerad"). ETT utskick per accept: mejl
+      genom `sendEmail` när kunden har adress, annars SMS genom strypunkten
+      `sendSmsViaElks`. Kunden utan e-post fick tidigare INGENTING från
+      portal- och signeringsvägen ("Customer has no email").
+- [x] **Gränssnittet redovisar ursprunget.** `acceptanceOriginLabel`/
+      `acceptanceOriginDate` i `lib/quotes/lifecycle.ts` är enda formuleringen;
+      `QuoteStatusTimeline` och `DealTimeline` läser den. "Offert signerad av
+      kund" om en offert hantverkaren bockat av efter ett telefonsamtal är
+      borta.
+- [x] **Facit:** `tests/accept-en-sanning.spec.ts` (41 prov), registrerad sist
+      i både `test:contracts` och contracts.yml. Finalizern körs på RIKTIGT
+      mot PostgreSQL med journalens verkliga trigger och plpgsql-funktioner
+      (`.rpc()` tillagd i `tests/helpers/job-standard-db.ts`), och
+      bekräftelsemodulen körs på riktigt med räknade utskick.
+      22 mutationer, alla dödade — bl.a. `quote_signed` fyrad på alla vägar,
+      `quote_accepted` borttagen, `project_event`-steget borttaget,
+      `RECOVERY_STEPS` vidgad med `email`, claim-spärren ignorerad,
+      `accepted_by`/`accepted_via` borttagna ur var och en av de tre rutterna,
+      SMS-fallbacken borttagen, både mejl OCH SMS skickade, portaltexten
+      påstår signatur, och den gamla lögnen återinförd i `DealTimeline`.
+      `tests/first-job-acceptance.spec.ts` vändes: reservgrenens facit ersattes
+      av "utan provenance-kolumn accepteras ingenting tyst".
+- [x] **UI-bevis:** båda tidslinjerna renderade i 375 px med alla fyra
+      ursprung (signering, kundportal, internt, gammal accept utan markör) —
+      scratchpad/accept-ursprung-375.png, ingen horisontell scroll
+      (scrollWidth 375 = innerWidth), inga sidfel. Ingen
+      `tests/helpers/*-preview.ts` finns för dessa ytor, så bilden är gjord med
+      samma bundlingsteknik i ett skript i scratchpad — ingen ny registrerad
+      `.ui.spec.ts`.
+
+**Siffror:** `npm run test:contracts` 3031 gröna före passet → 3073 efter,
+noll röda i båda. `npx tsc --noEmit` rent, `npx next build` rent.
+`tests/facit-outbound-truth.spec.ts` (2 röda) och
+`tests/quote-content-lock.spec.ts` (1 röd) var röda FÖRE passet, ligger
+utanför `test:contracts` och tillhör PR #91:s mark — inte tvingade gröna.
+
+**Lämnat ogjort:** ROT-årsutrymmet (`applyAnnualCap`) körs fortfarande bara i
+signeringsvägen — eget pass, medvetet orört här. Signeringsrutten prövas bara
+med källskanning i facit (dess RPC-kedja är inte riggad i minnet).
+Överlapp mot PR #91: `package.json` (`test:contracts`-raden — säker konflikt,
+båda lägger till specar sist), `.github/workflows/contracts.yml`,
+`lib/quotes/lifecycle.ts` och `app/dashboard/quotes/[id]/types.ts` (alla tre
+olika ställen i filen). `app/api/quotes/public/[token]/route.ts` rörs INTE av
+#91.
+
 ## Spår 6 — En identitetsläsare (kundminne pass 2), 2026-09-18
 
 Samma person skrev sitt nummer på tre sätt och kanalerna läste identiteten på

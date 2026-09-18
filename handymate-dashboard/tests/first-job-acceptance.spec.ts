@@ -10,14 +10,16 @@ import { OPEN_QUOTE_STATUSES, WON_QUOTE_STATUSES } from '../lib/quotes/statuses'
 async function harness(options: { race?: boolean; changedStatus?: string; failRead?: boolean; role?: string } = {}) {
   const database = await standardDatabase()
   await database.pg.exec(`CREATE TABLE quotes (quote_id text PRIMARY KEY, business_id text, status text,
-    customer_id text, title text, total numeric, accepted_at timestamptz, accepted_manually boolean);
+    customer_id text, title text, total numeric, accepted_at timestamptz,
+    accepted_via text, accepted_by text);
     CREATE TABLE customer (customer_id text PRIMARY KEY, business_id text, name text, phone_number text);
     CREATE TABLE customer_activity (activity_id text, business_id text, customer_id text, activity_type text,
       title text, description text, created_by text);
     ALTER TABLE deal ADD COLUMN quote_id text;
-    INSERT INTO quotes VALUES ('q', 'a', 'sent', 'c', 'Servicebesök', 1250, NULL, false);
+    INSERT INTO quotes VALUES ('q', 'a', 'sent', 'c', 'Servicebesök', 1250, NULL, NULL, NULL);
     INSERT INTO customer VALUES ('c', 'a', 'Testkund', NULL);`)
   const effects: string[] = []
+  let finalizeInput: any = null
   let reads = 0, release: () => void = () => {}, changed = false
   const barrier = new Promise<void>(resolve => { release = resolve })
   const db = { from(table: string) {
@@ -46,16 +48,13 @@ async function harness(options: { race?: boolean; changedStatus?: string; failRe
     'next/server': { NextResponse },
     '@/lib/supabase': { getServerSupabase: () => db },
     '@/lib/auth': { getAuthenticatedBusiness: async () => options.role === 'anonymous' ? null : { business_id: 'a' } },
-    '@/lib/permissions': { getCurrentUser: async () => ({ role: options.role || 'owner' }), hasPermission: () => options.role !== 'employee' },
+    '@/lib/permissions': { getCurrentUser: async () => ({ role: options.role || 'owner', name: 'Anna Snickare', email: 'anna@firman.se' }), hasPermission: () => options.role !== 'employee' },
     '@/lib/quotes/statuses': { OPEN_QUOTE_STATUSES, WON_QUOTE_STATUSES },
-    '@/lib/quotes/margin-snapshot': { captureExpectedMarginSnapshot: effect('margin') },
-    '@/lib/smart-communication': { triggerEventCommunication: effect('communication') },
-    '@/lib/notifications': { notifyQuoteSigned: effect('notification') },
-    '@/lib/project-ai-engine': { handleProjectEvent: effect('project-event') },
-    '@/lib/automation-engine': { fireEvent: effect('automation') },
-    '@/lib/projects/create-from-quote': { createProjectFromQuote: effect('project') },
-    '@/lib/autopilot/trigger': { triggerAutopilot: effect('autopilot') },
-    '@/lib/sms-send': { sendSmsViaElks: effect('sms') },
+    // Efterstegen ägs sedan 2026-09-18 av finalizern och bevisas i
+    // tests/accept-en-sanning.spec.ts. Här bevakas ruttens EGET ansvar:
+    // auth, statusflippen med provenance, och att finalizern anropas exakt
+    // en gång — av det anrop som faktiskt ändrade statusen.
+    '@/lib/quotes/finalize-accepted': { finalizeAcceptedQuote: async (_db: unknown, input: any) => { effects.push('finalize'); finalizeInput = input; return {} } },
   }
   const code = ts.transpileModule(readFileSync('app/api/quotes/accept/route.ts', 'utf8'), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -65,7 +64,7 @@ async function harness(options: { race?: boolean; changedStatus?: string; failRe
     if (!(id in mocks)) throw Error(`Unexpected dependency: ${id}`)
     return mocks[id]
   }, api)
-  return { ...database, effects, accept: (quoteId: unknown = 'q') => api.POST(new NextRequest('https://test/api/quotes/accept', {
+  return { ...database, effects, finalize: () => finalizeInput, accept: (quoteId: unknown = 'q') => api.POST(new NextRequest('https://test/api/quotes/accept', {
     method: 'POST', body: JSON.stringify({ quoteId }),
   })) }
 }
@@ -75,9 +74,20 @@ test('two manual accepts run downstream work only once', async () => {
   try {
     const responses = await Promise.all([h.accept(), h.accept()])
     expect(responses.map(r => r.status).sort()).toEqual([200, 409])
-    for (const name of ['margin', 'communication', 'notification', 'project-event', 'automation', 'project', 'autopilot']) {
-      expect(h.effects.filter(e => e === name), name).toHaveLength(1)
-    }
+    expect(h.effects.filter(e => e === 'finalize')).toHaveLength(1)
+  } finally { await h.close() }
+})
+
+test('accepten bär vem som registrerade den — och att det inte var kunden', async () => {
+  const h = await harness()
+  try {
+    expect((await h.accept()).status).toBe(200)
+    const rows = (await h.pg.query('SELECT status, accepted_via, accepted_by, accepted_at FROM quotes')).rows as any[]
+    expect(rows[0].status).toBe('accepted')
+    expect(rows[0].accepted_via).toBe('internt')
+    expect(rows[0].accepted_by).toBe('Anna Snickare')
+    expect(rows[0].accepted_at, 'accepted_at tappades av den borttagna reservgrenen').not.toBeNull()
+    expect(h.finalize()).toMatchObject({ businessId: 'a', quoteId: 'q', source: 'internt' })
   } finally { await h.close() }
 })
 
@@ -118,19 +128,24 @@ test('foreign quote is inaccessible and foreign customer data is not consumed', 
     await h.pg.exec("INSERT INTO quotes (quote_id,business_id,status) VALUES ('foreign','b','sent'); UPDATE customer SET business_id='b';")
     expect((await h.accept('foreign')).status).toBe(404)
     expect((await h.accept()).status).toBe(200)
-    const lookup = h.calls.find(c => c.table === 'customer')
+    const lookup = h.calls.find(c => c.table === 'quotes')
     expect(lookup?.filters).toContainEqual({ column: 'business_id', op: '=', value: 'a' })
-    expect(h.effects).not.toContain('sms')
+    expect(h.effects.filter(e => e === 'finalize')).toHaveLength(1)
   } finally { await h.close() }
 })
 
-test('legacy column fallback retains the same concurrency guard', async () => {
-  const h = await harness({ race: true })
+// Reservgrenen är BORTTAGEN (2026-09-18). Den fanns för `accepted_manually`,
+// en kolumn som aldrig funnits i prod — så den var i praktiken den ENDA vägen,
+// och den tappade `accepted_at`. Efter v263 finns kolumnerna på riktigt.
+// Facit vänds därför: saknas provenance-kolumnen ska accepten FALLA, inte
+// smyga igenom utan markör. Testet låste tidigare reservgrenens CAS.
+test('utan provenance-kolumn accepteras ingenting tyst', async () => {
+  const h = await harness()
   try {
-    await h.pg.exec('ALTER TABLE quotes DROP COLUMN accepted_manually;')
-    const responses = await Promise.all([h.accept(), h.accept()])
-    expect(responses.map(r => r.status).sort()).toEqual([200, 409])
-    expect(h.effects.filter(e => e === 'automation')).toHaveLength(1)
+    await h.pg.exec('ALTER TABLE quotes DROP COLUMN accepted_via;')
+    expect((await h.accept()).status).toBe(500)
+    expect((await h.pg.query('SELECT status FROM quotes')).rows).toEqual([{ status: 'sent' }])
+    expect(h.effects).toEqual([])
   } finally { await h.close() }
 })
 

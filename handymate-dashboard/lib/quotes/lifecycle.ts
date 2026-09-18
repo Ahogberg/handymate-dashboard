@@ -115,3 +115,53 @@ export function lockedChangeMessage(status: string): string {
   const lage = status === 'signed' ? 'signerad av kunden' : 'accepterad av kunden'
   return `Offerten är ${lage} och innehållet är låst. Skapa en ny version om något behöver ändras — då behåller originalet det kunden faktiskt sa ja till.`
 }
+
+/**
+ * Vem registrerade accepten — i klartext.
+ *
+ * Tre vägar leder till `status='accepted'`: kunden signerar, kunden trycker
+ * "Acceptera" i portalen, eller hantverkaren markerar offerten som accepterad
+ * själv. Före v263 fanns ingen maskinläsbar skillnad, och gränssnittet skrev
+ * "Offert signerad av kund" om alla tre — även om den offert hantverkaren
+ * själv bockat av efter ett telefonsamtal. Ett påstått kundgodkännande som
+ * inte finns är värre än inget påstående alls.
+ *
+ * Samma vokabulär som lockedChangeMessage ovan: "signerad av kunden" när det
+ * finns en signatur, "accepterad" annars.
+ */
+export function acceptanceOriginLabel(quote: {
+  signed_at?: string | null
+  signed_by_name?: string | null
+  accepted_at?: string | null
+  accepted_via?: string | null
+  accepted_by?: string | null
+}): string | null {
+  const via = quote.accepted_via
+  if (via === 'internt') {
+    const namn = (quote.accepted_by || '').trim()
+    return namn ? `Registrerad som accepterad av ${namn}` : 'Registrerad som accepterad internt'
+  }
+  if (via === 'kundportal') return 'Accepterad av kunden i kundportalen'
+  if (quote.signed_at) {
+    const namn = (quote.signed_by_name || '').trim()
+    return namn ? `Signerad av kunden (${namn})` : 'Signerad av kunden'
+  }
+  if (via === 'signering') return 'Signerad av kunden'
+  // Ingen markör alls: offerter accepterade före v263. Säg att den är
+  // accepterad, påstå inte VEM — vi vet inte.
+  if (quote.accepted_at) return 'Accepterad'
+  return null
+}
+
+/**
+ * Datumet som hör ihop med etiketten ovan. Signaturen har sitt eget
+ * tidsstämpel; övriga vägar bär bara `accepted_at`.
+ */
+export function acceptanceOriginDate(quote: {
+  signed_at?: string | null
+  accepted_at?: string | null
+  accepted_via?: string | null
+}): string | null {
+  if (quote.accepted_via === 'internt' || quote.accepted_via === 'kundportal') return quote.accepted_at || null
+  return quote.signed_at || quote.accepted_at || null
+}

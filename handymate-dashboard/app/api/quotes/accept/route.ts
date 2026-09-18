@@ -4,6 +4,21 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission } from '@/lib/permissions'
 import { OPEN_QUOTE_STATUSES, WON_QUOTE_STATUSES } from '@/lib/quotes/statuses'
 
+/**
+ * Hantverkarens egen "markera som accepterad".
+ *
+ * Rutten äger auth och statusflippen — inget mer. ALLA eftersteg (marginal,
+ * projekt, deal→vunnen, projekt-AI, kommunikation, notis, automationsevent,
+ * autopilot och bekräftelse till kunden) ligger i finalizeAcceptedQuote, precis
+ * som för signeringen och kundportalen.
+ *
+ * Före 2026-09-18 hade den här rutten egna kopior av projektet, affären och en
+ * egen bekräftelse — som dessutom påstod att kunden hade SIGNERAT ("Vi har
+ * mottagit din signatur på offerten") fast ingen signatur fanns. Den skrev
+ * också `accepted_manually`, en kolumn som aldrig funnits i prod: varje accept
+ * föll därför ned i en reservgren som tappade även `accepted_at`. Kolumnen
+ * `accepted_via` (v263) är markören nu, och reservgrenen är borta.
+ */
 export async function POST(request: NextRequest) {
   try {
     const business = await getAuthenticatedBusiness(request)
@@ -26,7 +41,7 @@ export async function POST(request: NextRequest) {
     // Hämta offert och verifiera ägarskap
     const { data: quote, error: fetchErr } = await supabase
       .from('quotes')
-      .select('*')
+      .select('quote_id, status, customer_id, title, total')
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
       .maybeSingle()
@@ -39,27 +54,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Offert hittades inte' }, { status: 404 })
     }
 
-    // Hämta kund separat — quotes saknar FK till customer i prod, en embed
-    // (`*, customer(*)`) avvisar HELA queryn (PGRST200) och gjorde att
-    // SIGNERINGSFLÖDET 404:ade trots att offerten fanns. Degradera till
-    // customer=null vid fel snarare än att stoppa hela accept-flödet.
-    if (quote.customer_id) {
-      const { data: customerData, error: customerErr } = await supabase
-        .from('customer')
-        .select('*')
-        .eq('customer_id', quote.customer_id)
-        .eq('business_id', business.business_id)
-        .maybeSingle()
-      if (customerErr) {
-        console.error('[quotes/accept] customer fetch error (non-blocking):', customerErr)
-        quote.customer = null
-      } else {
-        quote.customer = customerData
-      }
-    } else {
-      quote.customer = null
-    }
-
     // Ett återförsök kvitterar accepten, men kör inte utskick/automation igen.
     // Detta kvitto intygar statusen, inte att allt efterarbete har lyckats.
     if ((WON_QUOTE_STATUSES as readonly string[]).includes(quote.status)) {
@@ -70,13 +64,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Offerten kan inte accepteras i nuvarande status' }, { status: 400 })
     }
 
-    // Uppdatera offert till accepted
-    let { data: accepted, error: updateErr } = await supabase
+    // Statusflippen, med provenance: det ska gå att se att HANTVERKAREN
+    // registrerade accepten, inte kunden.
+    const { data: accepted, error: updateErr } = await supabase
       .from('quotes')
       .update({
         status: 'accepted',
         accepted_at: new Date().toISOString(),
-        accepted_manually: true,
+        accepted_via: 'internt',
+        accepted_by: currentUser.name || currentUser.email || null,
       })
       .eq('quote_id', quoteId)
       .eq('business_id', business.business_id)
@@ -84,187 +80,26 @@ export async function POST(request: NextRequest) {
       .select('quote_id')
       .maybeSingle()
 
-    // Fallback: om accepted_manually/accepted_at inte finns i DB ännu
-    if (updateErr && ['42703', 'PGRST204'].includes(updateErr.code) &&
-        /accepted_manually|accepted_at/.test(updateErr.message || '')) {
-      const fallback = await supabase
-        .from('quotes')
-        .update({ status: 'accepted' })
-        .eq('quote_id', quoteId)
-        .eq('business_id', business.business_id)
-        .eq('status', quote.status)
-        .select('quote_id')
-        .maybeSingle()
-      accepted = fallback.data
-      updateErr = fallback.error
-    }
-
     if (updateErr) {
       console.error('Quote accept update error:', updateErr)
       return NextResponse.json({ error: `Databasfel: ${updateErr.message}` }, { status: 500 })
     }
 
     // Compare-and-set: endast anropet som faktiskt ändrade status får
-    // skapa projekt, skicka notiser och starta automationer.
+    // köra eftersteg.
     if (!accepted) {
       return NextResponse.json({ error: 'Offerten har ändrats. Läs in den igen innan du fortsätter.' }, { status: 409 })
     }
 
-    // Förväntad marginal vid accept — icke-blockerande (se lib/quotes/margin-snapshot.ts).
-    try {
-      const { captureExpectedMarginSnapshot } = await import('@/lib/quotes/margin-snapshot')
-      await captureExpectedMarginSnapshot(supabase, business.business_id, quoteId, 'manual_accept')
-    } catch (err) {
-      console.error('[quotes/accept] captureExpectedMarginSnapshot failed (non-blocking):', quoteId, err)
-    }
-
-    // V80: den gamla "flytta till accepted"-flytten här togs bort — den var
-    // vestigial (flyttade dealen till det numera borttagna 'quote_accepted'-
-    // steget, för att sedan alltid bli omedelbart överkörd av "Golden Path:
-    // flytta deal till Offert accepterad → Vunnen" längre ned i samma
-    // handler). Det blocket längre ned är nu den enda sanningen för denna väg.
-
-    // Smart communication + notifications
-    try {
-      const { triggerEventCommunication } = await import('@/lib/smart-communication')
-      await triggerEventCommunication({
-        businessId: business.business_id,
-        event: 'quote_signed',
-        customerId: quote.customer_id,
-        context: { quoteId },
-      })
-    } catch (err) {
-      console.error('[quotes/accept] triggerEventCommunication failed (non-blocking):', quoteId, err)
-    }
-
-    try {
-      const { notifyQuoteSigned } = await import('@/lib/notifications')
-      await notifyQuoteSigned({
-        businessId: business.business_id,
-        customerName: quote.customer?.name || 'Kund',
-        quoteId,
-        total: quote.total || 0,
-      })
-    } catch (err) {
-      console.error('[quotes/accept] notifyQuoteSigned failed (non-blocking):', quoteId, err)
-    }
-
-    // Project AI engine: quote_accepted event
-    try {
-      const { handleProjectEvent } = await import('@/lib/project-ai-engine')
-      await handleProjectEvent({
-        type: 'quote_accepted',
-        businessId: business.business_id,
-        quoteId,
-      })
-    } catch (err) {
-      console.error('[quotes/accept] handleProjectEvent (quote_accepted) failed (non-blocking):', quoteId, err)
-    }
-
-    // Automation engine: fire quote_accepted event
-    try {
-      const { fireEvent } = await import('@/lib/automation-engine')
-      await fireEvent(supabase, 'quote_accepted', business.business_id, {
-        quote_id: quoteId,
-        customer_id: quote.customer_id,
-        customer_name: quote.customer?.name,
-        total: quote.total,
-        title: quote.title,
-        lead_id: quote.lead_id,
-      })
-    } catch (err) {
-      console.error('[quotes/accept] fireEvent quote_accepted failed (non-blocking):', quoteId, err)
-    }
-
-    // Golden Path: flytta deal till "Vunnen"
-    try {
-      const { data: linkedDeal } = await supabase
-        .from('deal')
-        .select('id')
-        .eq('business_id', business.business_id)
-        .eq('quote_id', quoteId)
-        .maybeSingle()
-
-      if (linkedDeal) {
-        const { moveDeal } = await import('@/lib/pipeline')
-        await moveDeal({
-          dealId: linkedDeal.id,
-          businessId: business.business_id,
-          toStageSlug: 'won',
-          triggeredBy: 'system',
-          aiReason: 'Offert signerad av kund — deal vunnen',
-        })
-      }
-    } catch (err) {
-      console.error('[quotes/accept] Golden Path moveDeal to won failed (non-blocking):', quoteId, err)
-    }
-
-    // Golden Path: bekräftelse-SMS till kund
-    try {
-      const customerPhone = quote.customer?.phone_number
-      const customerName = quote.customer?.name?.split(' ')[0] || ''
-      if (customerPhone) {
-        const { data: config } = await supabase
-          .from('business_config')
-          .select('business_name, contact_name')
-          .eq('business_id', business.business_id)
-          .single()
-
-        const bizName = config?.business_name || 'Vi'
-        const contactName = config?.contact_name || ''
-        const smsText = `Tack ${customerName}! Vi har mottagit din signatur på offerten. Vi återkommer inom kort med en tid för att påbörja arbetet. // ${contactName}, ${bizName}`
-
-        // Etapp 0 (2026-08-27): strypunkten i stället för den sessions-
-        // grindade /api/sms/send (401 — signaturtacket gick aldrig ut).
-        const { sendSmsViaElks } = await import('@/lib/sms-send')
-        const r = await sendSmsViaElks({
-          supabase,
-          businessId: business.business_id,
-          businessName: bizName,
-          to: customerPhone,
-          message: smsText,
-          customerId: quote.customer_id ?? null,
-          relatedId: quoteId,
-          messageType: 'quote_signed_thanks',
-          recipient: 'customer',
-          purpose: 'transactional',
-        })
-        if (!r.success) console.error('[quotes/accept] bekräftelse-SMS misslyckades (non-blocking):', r.error)
-      }
-    } catch (err) {
-      console.error('[quotes/accept] bekräftelse-SMS failed (non-blocking):', quoteId, err)
-    }
-
-    // Auto-create project from quote (with dedup, milestones, notifications)
-    try {
-      const { createProjectFromQuote } = await import('@/lib/projects/create-from-quote')
-      await createProjectFromQuote(business.business_id, quoteId)
-    } catch (projErr) {
-      console.error('Auto project creation error (non-blocking):', projErr)
-    }
-
-    // Autopilot: förbered deal-to-delivery-paket
-    try {
-      const { triggerAutopilot } = await import('@/lib/autopilot/trigger')
-      await triggerAutopilot(business.business_id, quoteId)
-    } catch (err) {
-      console.error('[quotes/accept] triggerAutopilot failed (non-blocking):', quoteId, err)
-    }
-
-    // Logga aktivitet
-    try {
-      await supabase.from('customer_activity').insert({
-        activity_id: 'act_' + Math.random().toString(36).substr(2, 9),
-        customer_id: quote.customer_id,
-        business_id: business.business_id,
-        activity_type: 'quote_accepted',
-        title: 'Offert manuellt accepterad',
-        description: `Offert "${quote.title}" markerades som accepterad`,
-        created_by: 'user',
-      })
-    } catch (err) {
-      console.error('[quotes/accept] customer_activity log failed (non-blocking):', quoteId, err)
-    }
+    const { finalizeAcceptedQuote } = await import('@/lib/quotes/finalize-accepted')
+    await finalizeAcceptedQuote(supabase, {
+      businessId: business.business_id,
+      quoteId,
+      quoteTitle: quote.title || null,
+      customerId: quote.customer_id,
+      total: quote.total ?? null,
+      source: 'internt',
+    })
 
     return NextResponse.json({ success: true })
   } catch (error: any) {
