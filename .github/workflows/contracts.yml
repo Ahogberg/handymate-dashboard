@@ -279,6 +279,7 @@ jobs:
           tests/revisorsplats.spec.ts
           tests/pengar-pa-bordet.spec.ts
           tests/bulk-med-bekraftelse.spec.ts
+          tests/quality-gate-policy.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
