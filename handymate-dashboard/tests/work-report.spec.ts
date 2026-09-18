@@ -61,6 +61,9 @@ function router() {
   const imports: Record<string, any> = {
     '@/lib/matte/work-report': report,
     '@/lib/agent/external-actor': { isToolAllowedForActor: () => true },
+    // Riktig modul: rapportlägets körningar har ingen trigger-typ, så vakten
+    // för "Matte äger kundsvaret" (2026-09-18) ska släppa igenom dem.
+    '@/lib/agent/kundsvar-agare': require('../lib/agent/kundsvar-agare'),
     '@/lib/time-entry/rate': { resolveTimeEntryHourlyRate },
     '@/lib/agent/recent-duplicate': { hittaNyligDubblett },
     '@/lib/dates': { svDateStr },

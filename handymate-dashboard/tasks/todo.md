@@ -1,3 +1,61 @@
+## Ett svar per kund-SMS, inte två — 2026-09-18
+
+`app/api/sms/incoming/route.ts` startade TVÅ oberoende svarsvägar på samma
+kund-SMS: Matte-intelligensen (resolver → intent-agent → action-executor, som
+kan svara kunden via `sendCustomerReply`, grindad av
+`business_config.matte_customer_reply_enabled`) OCH
+`triggerAgentFireAndForget('incoming_sms', …)`, vars agent har `send_sms` bland
+sina verktyg och en systemprompt som ordagrant sa "svara med SMS". Med flaggan
+på kan kunden få två olika svar, från två modeller som inte vet om varandra.
+
+- [x] **Buggen har aldrig smällt — och stängs ändå nu.** Prod: flaggan är true
+      hos 0 av 29 företag (kolumnens default är false), och inget utgående SMS
+      har någonsin följt på ett inkommande kund-SMS (noll inom 1 minut OCH
+      inom 30 minuter, kontrollerat mot radantalen 14 inkommande kund-SMS och
+      101 utgående i `sms_log`). `send_sms` finns som `message_type` på 11
+      utgående rader — verktyget används alltså, men aldrig som svar på ett
+      inkommande SMS. Inkommande SMS gjorde i praktiken ingenting förrän spår 1
+      landade; spår 1 gör vägen verkligt användbar och därmed går risken från
+      teoretisk till nära förestående. Den stängs före det första riktiga
+      kundsvaret, inte efter ett dubbelsvar.
+- [x] **Beslutet: Matte-vägen äger kundsvaret.** Den har entitetsupplösning,
+      lediga tider, kundfakta och de grindar som redan finns. Agenten
+      fortsätter kvalificera (leads, kundpost, kort) men får `send_sms`
+      bortfiltrerat i `incoming_sms`-kontexten. Skäl och mätning bor i
+      `lib/agent/kundsvar-agare.ts`.
+- [x] **Dubbelgrind, som husets övriga verktygsgränser.** (1)
+      `app/api/agent/trigger/route.ts` filtrerar listan som går till modellen —
+      samma form som `isQuoteFollowupTool`; (2) `tool-router.ts executeTool()`
+      nekar FÖRE switchen, eftersom listan till modellen är UX och inte
+      gränsen. `triggerType` bärs i `ToolContext` (route + orchestrator).
+- [x] **Smal med flit.** Bara triggertypen `incoming_sms`, bara `send_sms`.
+      `send_email` lämnades ORÖRT: det mätta felet är dubbla SMS-svar, och
+      lead-agentens verktygslista innehåller inte ens `send_email` — en
+      vidgning vore en egen beteendeändring utan mätt fel bakom sig. Cron,
+      automationsregler, samtalsvägen och manuella kommandon behåller
+      `send_sms`.
+- [x] **Facit (`tests/sms-inkommande.spec.ts`, +6 prov) räknar FAKTISKA
+      `sendSmsViaElks`-anrop**: flaggan av → 0 utskick + 1 kort; flaggan på →
+      exakt 1; agenten blockerad i `incoming_sms` → 0 och vaktens exakta text,
+      med kontrollen att samma anrop från `phone_call` går fram (1 utskick —
+      annars mäter räknaren ingenting); modellens lista saknar `send_sms` men
+      behåller `send_email` och allt annat; ett svar som spår 3 redan fångat når
+      varken Matte eller agenten. 8 mutationer testade, alla röda:
+      filtret bortkopplat · vakten borta · vidgad till `send_email` · vidgad
+      till `phone_call` · spår 3-grinden borta (agenten) · spår 3-grinden borta
+      (Matte) · flaggan ignorerad i action-executor · `triggerType` inte
+      vidarebefordrad.
+- [x] `npx tsc --noEmit` 0 fel · `npm run test:contracts` 3097 → 3103 passed,
+      0 failed, 1 skipped (baslinjen mätt med `git stash -u`) · `npx next build`
+      ren. Ingen SQL behövdes.
+- [ ] **Oprövat:** ingen skarp körning mot 46elks — bevisen är harness-körda mot
+      den riktiga koden. Orchestrator-vägen (`lib/agent/orchestrator.ts`, som
+      kör lead-agenten) når i dag aldrig triggertypen `incoming_sms`
+      (automationsmotorn kör som `automation_rule`), så där är grinden
+      groundwork. `lib/matte/agent-router.ts` delegerar med samma triggertyp —
+      även den delegerade specialisten har alltså inte längre `send_sms` på ett
+      inkommande SMS, vilket är samma beslut men värt att veta.
+
 ## Spår 7 — En sanning för "offert accepterad", 2026-09-18
 
 Tre vägar satte `quotes.status='accepted'` — kundens signering i den publika

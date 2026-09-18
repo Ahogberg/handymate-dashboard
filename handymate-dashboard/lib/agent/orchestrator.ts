@@ -170,6 +170,10 @@ export async function orchestrate(params: OrchestrateParams): Promise<Orchestrat
     // v3-automationer, crons) — aldrig av en levande chatt-session — så
     // triggerSource är alltid 'system' här.
     const ctx = await fetchBusinessContext(supabase, businessId, 'system')
+    // Samma gräns som /api/agent/trigger: vakten i tool-router.ts behöver veta
+    // vilken trigger körningen svarar på, annars kan lead-agenten skicka sitt
+    // eget SMS-svar på ett inkommande kund-SMS (lib/agent/kundsvar-agare.ts).
+    if (ctx) ctx.toolContext.triggerType = triggerType
     if (!ctx) {
       return {
         success: false,

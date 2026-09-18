@@ -55,6 +55,7 @@ import type { MissionPlanPresentation } from '@/lib/mission/mission-presentation
 import { buildMissionSummaryText, buildMissionHeadline } from '@/lib/mission/mission-summary'
 import { resolveGoalType } from '@/lib/mission/goal-type'
 import { isToolAllowedForActor, EXTERNAL_TOOL_DENIED_MESSAGE, type ActorType } from '@/lib/agent/external-actor'
+import { agsVerktygetAvMatte, KUNDSVAR_AGS_AV_MATTE_MEDDELANDE } from '@/lib/agent/kundsvar-agare'
 import { internalPushHeaders } from '@/lib/notifications/push-internal'
 import { loadWorkReportContext, prepareWorkReportAction, isWorkReportTool, type WorkReportScope } from '@/lib/matte/work-report'
 import type { BusinessUser } from '@/lib/permissions'
@@ -118,6 +119,14 @@ interface ToolContext {
    */
   actorType?: ActorType
   /**
+   * Vilken trigger som startade körningen ('incoming_sms', 'phone_call',
+   * 'cron', 'manual', …). Sätts av app/api/agent/trigger/route.ts och
+   * lib/agent/orchestrator.ts. Styr EN sak i dag: vakten nedan som låter
+   * Matte-vägen äga kundsvaret på ett inkommande SMS (lib/agent/
+   * kundsvar-agare.ts). Odefinierad = ingen trigger-beroende gräns.
+   */
+  triggerType?: string
+  /**
    * Support-agenten (escalate_to_handymate_team, se docs/superpowers/specs/
    * 2026-08-21-handymate-support-agent-design.md): den agent_threads.id som
    * konversationen tillhör, satt av app/api/matte/chat/route.ts efter att
@@ -158,6 +167,18 @@ export async function executeTool(
   // case. Neutral text — avslöjar aldrig vilka verktyg som finns.
   if (!isToolAllowedForActor(name, context.actorType)) {
     return { success: false, error: EXTERNAL_TOOL_DENIED_MESSAGE }
+  }
+  // ═══ ETT SVAR PER KUND-SMS — ANDRA HALVAN AV GRINDEN (2026-09-18) ═══
+  // Matte-vägen äger kundsvaret på ett inkommande SMS; den har
+  // entitetsupplösning, lediga tider, kundfakta och flaggan
+  // matte_customer_reply_enabled. Agenten kvalificerar vidare, men får inte
+  // skicka sitt EGET svar på samma meddelande: två modeller som svarar samma
+  // kund utan att veta om varandra är inte redundans, det är två svar.
+  // route.ts filtrerar redan bort verktyget ur listan — men listan till
+  // modellen är UX, inte gränsen. Skälet och mätningen: lib/agent/
+  // kundsvar-agare.ts. Smal med flit: bara incoming_sms, bara send_sms.
+  if (agsVerktygetAvMatte(name, context.triggerType)) {
+    return { success: false, error: KUNDSVAR_AGS_AV_MATTE_MEDDELANDE }
   }
   try {
     if (context.workReport) {
