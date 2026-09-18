@@ -19,6 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Hämta PR-data och reviewkommentarer
+        id: pr
         uses: actions/github-script@v7
         with:
           script: |
@@ -38,10 +39,11 @@ jobs:
               process.env.RUNNER_TEMP + '/quality-gate-event.json',
               JSON.stringify({ pull_request: pr, __quality_gate_comments: comments }),
             );
+            core.setOutput('head_sha', pr.head.sha);
 
       - uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          ref: ${{ steps.pr.outputs.head_sha }}
 
       - name: Verifiera proof contract och oberoende PASS
         env:
