@@ -16,7 +16,14 @@ async function fixture(failure) {
   '@/lib/reservation-defaults':{getDefaultReservations:()=>[]},
   '@/lib/quote-template-defaults':{normalizeTemplateBranch:v=>v,getDefaultQuoteTemplates:()=>[{name:'First',default_items:[]},{name:'Second',default_items:[]}]},
   '@/lib/agreement-type-defaults':{getDefaultAgreementTypes:()=>[]},
-  '@/lib/job-types':{ensureOnboardingJobTypes:async()=>[]},
+  '@/lib/job-types':{ensureOnboardingJobTypes:async()=>[],slugifyJobType:n=>String(n).toLowerCase().replace(/[^a-z0-9]+/g,'_')},
+  // Artiklar härledda ur mallraderna (2026-09-17). Ren modul utan databas —
+  // stubbad här för att hålla det här testets fokus på seedningens
+  // fel- och återhämtningsvägar, inte på härledningens innehåll (det
+  // låses av tests/forsta-jobbresan.spec.ts).
+  '@/lib/onboarding/template-articles':{deriveTemplateArticles:()=>[],jobTypeStarters:()=>[],
+   linkTemplateRowsToArticles:templates=>templates,templateArticleKey:(n,u)=>`${n}|${u}`,
+   templateArticleId:(b,k)=>`prod_${b}_m${k}`},
  })
  return {state,run:()=>seed.seedAllDefaults(db,'biz_test','electrician',[],950)}
 }

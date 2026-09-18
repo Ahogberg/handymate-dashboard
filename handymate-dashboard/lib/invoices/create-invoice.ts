@@ -34,42 +34,6 @@ export interface CreateInvoiceExtraFields {
   [column: string]: unknown
 }
 
-/**
- * Jobbtypen på fakturan (2026-09-17, sql/v255).
- *
- * Den bars av offerten och av projektet men nådde ALDRIG fakturan — noll
- * träffar på job_type i hela fakturakoden — så efterkalkylen per jobbtyp
- * saknade sitt sista led. Härledningen bor HÄR och inte i de åtta vägar som
- * skapar fakturor, av samma skäl som radmappningen samlades i
- * quote-to-invoice-items: åtta kopior av samma regel driftar isär, och den
- * som glömmer den ser inte fel ut för sig.
- *
- * Offerten före projektet: offerten är det kunden sa ja till. En uttrycklig
- * `jobType` i anropet vinner över båda. Ett läsfel får aldrig stoppa en
- * faktura — jobbtypen är uppföljning, inte pengar.
- */
-async function resolveJobType(
-  supabase: any,
-  input: Pick<CreateInvoiceInput, 'businessId' | 'quoteId' | 'projectId' | 'jobType'>,
-): Promise<string | null> {
-  if (input.jobType !== undefined) return input.jobType
-  try {
-    if (input.quoteId) {
-      const { data } = await supabase.from('quotes').select('job_type')
-        .eq('business_id', input.businessId).eq('quote_id', input.quoteId).maybeSingle()
-      if (data?.job_type) return data.job_type as string
-    }
-    if (input.projectId) {
-      const { data } = await supabase.from('project').select('job_type')
-        .eq('business_id', input.businessId).eq('project_id', input.projectId).maybeSingle()
-      if (data?.job_type) return data.job_type as string
-    }
-  } catch (error) {
-    console.warn('[create-invoice] Kunde inte härleda jobbtypen:', error)
-  }
-  return null
-}
-
 export interface CreateInvoiceInput {
   /** Explicit source ownership is committed with the invoice, never afterwards. */
   sources?: { timeEntryIds?: string[]; materialIds?: string[]; changeIds?: string[] }
@@ -96,7 +60,18 @@ export interface CreateInvoiceInput {
   discountAmount?: number
   projectId?: string | null
   quoteId?: string | null
-  /** Utelämnad → härleds ur offerten, annars projektet. Se resolveJobType. */
+  /**
+   * Jobbtypens slug (sql/v255). Sätts av ANROPAREN, aldrig av kärnan.
+   *
+   * Första försöket (2026-09-17) lät kärnan läsa jobbtypen ur offerten eller
+   * projektet själv, så att alla åtta vägar skulle få den utan att ändras.
+   * Det bröt husregeln som tests/sprint/invoice-acceptance-service.cjs
+   * vaktar: createInvoice får ALDRIG röra databasen utanför sin atomiska
+   * RPC — dess `from()` kastar "unprotected insert" och testet kräver noll
+   * anrop. Regeln är riktig: en läsning före RPC:n ligger utanför
+   * transaktionen. Vägarna som HAR offerten eller projektet läst skickar
+   * därför med jobbtypen; övriga lämnar den tom, precis som förut.
+   */
   jobType?: string | null
   bookingId?: string | null
   invoiceType?: InvoiceType
@@ -240,14 +215,12 @@ export async function createInvoice(
 
   const dueDate = computeDueDate(invoiceDate, input.dueDays ?? 30)
 
-  const jobType = await resolveJobType(supabase, input)
-
   const row: Record<string, unknown> = {
     business_id: input.businessId,
     customer_id: input.customerId ?? null,
     project_id: input.projectId ?? null,
     quote_id: input.quoteId ?? null,
-    job_type: jobType,
+    job_type: input.jobType ?? null,
     invoice_number: invoiceNumber,
     invoice_type: input.invoiceType ?? 'standard',
     status: input.status ?? 'draft',

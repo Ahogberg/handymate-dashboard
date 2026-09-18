@@ -153,18 +153,26 @@ test.describe('dolda rader behåller sin doldhet hela vägen', () => {
  * inte i de åtta vägar som skapar fakturor — åtta kopior driftar isär.
  */
 test.describe('jobbtypen når fakturan', () => {
-  test('kärnan härleder den ur offerten först, projektet sedan', () => {
+  test('kärnan tar emot jobbtypen, den läser ALDRIG databasen själv', () => {
+    // Första försöket lät createInvoice härleda jobbtypen ur offerten eller
+    // projektet, så att alla åtta vägar skulle få den gratis. Det bröt
+    // husregeln i tests/sprint/invoice-acceptance-service.cjs: kärnan får
+    // inte röra databasen utanför sin atomiska RPC — en läsning före RPC:n
+    // ligger utanför transaktionen. Facit låser den riktiga formen.
     const fs = require('fs'), path = require('path')
-    const kod = fs.readFileSync(path.resolve(__dirname, '..', 'lib/invoices/create-invoice.ts'), 'utf8')
-      .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
-    expect(kod).toContain('async function resolveJobType')
-    expect(kod).toContain('job_type: jobType,')
-    const kropp = kod.slice(kod.indexOf('async function resolveJobType'), kod.indexOf('export interface CreateInvoiceInput'))
-    expect(kropp.indexOf("from('quotes')"), 'offerten läses').toBeGreaterThan(-1)
-    expect(kropp.indexOf("from('project')"), 'projektet läses efter offerten').toBeGreaterThan(kropp.indexOf("from('quotes')"))
-    // Uppföljning får aldrig fälla en faktura.
-    expect(kropp).toContain('catch (error)')
-    expect(fs.readFileSync(path.resolve(__dirname, '..', 'sql/v255_invoice_job_type.sql'), 'utf8'))
-      .toContain('ADD COLUMN IF NOT EXISTS job_type TEXT')
+    const ROOT = path.resolve(__dirname, '..')
+    const läs = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+    const kod = läs('lib/invoices/create-invoice.ts').replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    expect(kod).toContain('job_type: input.jobType ?? null,')
+    expect(kod, 'kärnan härleder inte').not.toContain('resolveJobType')
+    expect(kod, 'kärnan läser ingen offert').not.toContain("from('quotes')")
+    expect(kod, 'kärnan läser inget projekt').not.toContain("from('project')")
+    // Vägarna som HAR datan skickar med den.
+    expect(läs('app/api/invoices/from-quote/route.ts')).toContain('jobType: quote.job_type ?? null,')
+    expect(läs('app/api/invoices/from-project/route.ts')).toContain('jobType: projectRow.job_type ?? null,')
+    expect(läs('app/api/projects/[id]/create-final-invoice/route.ts')).toContain('jobType: project.job_type ?? null,')
+    // och läser fältet ur databasen.
+    expect(läs('app/api/invoices/from-project/route.ts')).toContain("'project_id, quote_id, customer_id, job_type'")
+    expect(läs('sql/v255_invoice_job_type.sql')).toContain('ADD COLUMN IF NOT EXISTS job_type TEXT')
   })
 })

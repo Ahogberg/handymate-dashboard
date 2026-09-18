@@ -742,3 +742,27 @@ kördes ändå, så felet dolde sig bland riktiga resultat.
 **Regel: kör alltid `./node_modules/.bin/playwright` och `./node_modules/.bin/tsc`,
 aldrig `npx <verktyg>` för något som finns i node_modules.** Och när ett helt
 block tester faller med SAMMA fel är det miljön, inte koden — leta där först.
+
+## 2026-09-18 — "Grönt lokalt" betydde inte grönt i CI
+
+PR 91 föll på `TypeScript och kontrakt` trots att `test:contracts` (2896),
+tsc och `next build` var gröna. CI-jobbet kör FEM sviter till som inte ligger
+i `test:contracts`: `test:six-outcomes`, `customer-preparation/contract.test.mjs`,
+`sprint/activity-route.cjs`, `sprint/mail-boundaries.cjs`,
+`live-journey/policy.test.cjs` och `test:planning`.
+
+Tre fel dolde sig där, alla mina:
+1. `createInvoice` fick läsa `quotes`/`project` för att härleda jobbtypen.
+   `tests/sprint/invoice-acceptance-service.cjs` slår fast att kärnan ALDRIG
+   rör databasen utanför sin atomiska RPC (dess `from()` kastar och testet
+   kräver noll anrop). Regeln är riktig — en läsning före RPC:n ligger
+   utanför transaktionen. Härledningen flyttades ut till de anropare som
+   redan har offerten eller projektet läst.
+2. + 3. Två sprint-tester har modulladdare som kräver att VARJE `@/`-import
+   stubbas uttryckligen. Nya moduler (`template-articles`, `intake-questions`)
+   fick dem att falla — avsiktligt högljutt.
+
+**Regel: innan något kallas grönt inför en PR, läs `.github/workflows/*.yml`
+och kör varje `run:`-steg i det jobb som grindar — inte bara `test:contracts`.**
+Samma rot som de tre ogatade facit vi hittade i går: grinden lokalt är smalare
+än grinden i CI, och skillnaden är osynlig tills något faller.

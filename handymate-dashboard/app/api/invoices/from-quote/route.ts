@@ -155,6 +155,9 @@ export async function POST(request: NextRequest) {
       customerPays,
       projectId: linkedProjectId,
       quoteId: quote_id,
+      // Jobbtypen följer med till fakturan (sql/v255) — kärnan läser den
+      // aldrig själv, se CreateInvoiceInput.jobType.
+      jobType: quote.job_type ?? null,
       invoiceType: 'standard',
       status: 'draft',
       dueDays,

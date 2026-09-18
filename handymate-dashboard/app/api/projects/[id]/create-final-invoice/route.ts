@@ -55,7 +55,7 @@ export async function POST(
     // ── 1. Project ───────────────────────────────────────────────
     const { data: project, error: projectError } = await supabase
       .from('project')
-      .select('project_id, name, customer_id, business_id, quote_id, status')
+      .select('project_id, name, customer_id, business_id, quote_id, status, job_type')
       .eq('project_id', projectId)
       .eq('business_id', business.business_id)
       .maybeSingle()
@@ -402,6 +402,8 @@ export async function POST(
         businessId: business.business_id,
       sources: { changeIds: signedAtas.map(a => a.change_id) },
         customerId: project.customer_id,
+        // Jobbtypen följer med till fakturan (sql/v255).
+        jobType: project.job_type ?? null,
         items,
         subtotal,
         vatRate,
