@@ -33,6 +33,21 @@ export const LASMETODER = ['GET', 'HEAD', 'OPTIONS'] as const
 /** Vad en läsroll ändå får se. Inget här ändrar något i databasen. */
 export const LASROLLENS_RATTIGHETER = ['see_all_projects', 'see_financials'] as const
 
+/**
+ * Var en läsroll ska landa.
+ *
+ * Översikt är byggd för hantverkaren — kö, kort, agentremsa — och blir
+ * halvtom för en revisor vars GET:ar dessutom nekas på flera av widgetarna.
+ * Fakturorna är det hen kom för. Ett ställe bestämmer det, så inbjudan och
+ * startsidan inte kan hamna på olika svar.
+ */
+export const LASROLLENS_START = '/dashboard/invoices'
+export const NORMAL_START = '/dashboard'
+
+export function startsidaForRoll(role: string | null | undefined): string {
+  return arLasroll(role) ? LASROLLENS_START : NORMAL_START
+}
+
 export function arLasroll(role: string | null | undefined): boolean {
   return typeof role === 'string' && (LASROLLER as readonly string[]).includes(role)
 }

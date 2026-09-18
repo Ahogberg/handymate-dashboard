@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test'
 import fs from 'fs'
 import path from 'path'
-import { arLasroll, farSkriva, LASMETODER, LASROLLER, LASROLLENS_RATTIGHETER } from '../lib/auth/lasbehorighet'
+import { arLasroll, farSkriva, LASMETODER, LASROLLER, LASROLLENS_RATTIGHETER, startsidaForRoll } from '../lib/auth/lasbehorighet'
 import { hasPermission, isOwnerOrAdmin, type BusinessUser, type Permission } from '../lib/permissions'
 
 // Facit för revisorsplatsen (Andreas 2026-09-18: firmans redovisningskonsult
@@ -202,6 +202,64 @@ test.describe('Menyn är en allowlist', () => {
     expect(src).toContain("import { arLasroll } from '@/lib/auth/lasbehorighet'")
     expect(src).toContain('arLasroll(currentUser?.role)')
     expect(src).not.toMatch(/role === 'revisor'/)
+  })
+})
+
+test.describe('Revisorn landar på fakturorna, inte på Översikt', () => {
+  test('startsidan härleds ur rollen på ett ställe', () => {
+    expect(startsidaForRoll('revisor')).toBe('/dashboard/invoices')
+    for (const roll of ['owner', 'admin', 'employee', 'project_manager', 'kalkylator', null, undefined]) {
+      expect(startsidaForRoll(roll), `${roll} ska landa på Översikt`).toBe('/dashboard')
+    }
+  })
+
+  test('Översikt skickar vidare en läsroll med replace, inte push', () => {
+    const src = read('app/dashboard/page.tsx')
+    expect(src).toContain('arLasroll(user?.role)')
+    expect(src).toContain('router.replace(LASROLLENS_START)')
+    // push hade lagt Översikt i historiken, så bakåtknappen loopar tillbaka.
+    expect(src).not.toContain('router.push(LASROLLENS_START)')
+    // Och sidan får inte rendera hantverkarytan under omdirigeringen.
+    const gren = src.slice(src.indexOf('if (arLasroll(user?.role)) {'), src.indexOf('if (!business?.business_id)'))
+    expect(gren).toContain('Loader2')
+    expect(gren).not.toContain('DashboardContent')
+  })
+
+  test('inbjudan landar enligt rollen, inte hårdkodat', () => {
+    const src = read('app/invite/[token]/page.tsx')
+    expect(src).toContain('startsidaForRoll(invite?.role)')
+    expect(src).not.toContain("router.push('/dashboard')")
+  })
+
+  test('inbjudan visar ett läsbart rollnamn för varje verklig roll', () => {
+    const src = read('app/invite/[token]/page.tsx')
+    const labels = src.slice(src.indexOf('const roleLabels'), src.indexOf('}', src.indexOf('const roleLabels')))
+    for (const roll of ['owner', 'admin', 'project_manager', 'kalkylator', 'employee', 'revisor']) {
+      expect(labels, `${roll} saknar etikett`).toContain(`${roll}:`)
+    }
+    // Roller som aldrig funnits i CHECK-villkoret ska inte stå kvar.
+    expect(labels).not.toContain('technician')
+    expect(labels).not.toContain('office')
+  })
+})
+
+test.describe('Klientens kopia av behörighetslogiken har samma spärr', () => {
+  const src = read('lib/CurrentUserContext.tsx')
+
+  test('läsrollen nekas i can(), ur den delade modulen', () => {
+    expect(src).toContain("import { arLasroll, LASROLLENS_RATTIGHETER } from '@/lib/auth/lasbehorighet'")
+    const fn = src.slice(src.indexOf('const can = useCallback'), src.indexOf('}, [user])'))
+    expect(fn).toContain('arLasroll(user.role)')
+    // Före owner-grenen, precis som på servern.
+    expect(fn.indexOf('arLasroll(user.role)')).toBeLessThan(fn.indexOf("user.role === 'owner'"))
+    // Ingen egen ordlista: regeln får inte skrivas av för hand här.
+    expect(fn).not.toContain("'see_financials'")
+  })
+
+  test('RequireRole är en allowlist och nekar en roll den inte känner', () => {
+    const gate = read('components/PermissionGate.tsx')
+    expect(gate).toContain('roles: readonly string[]')
+    expect(gate).toContain('!roles.includes(user.role)')
   })
 })
 
