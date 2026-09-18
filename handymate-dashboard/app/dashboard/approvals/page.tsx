@@ -10,6 +10,7 @@ import { reviewedApprovalFetch } from '@/lib/approvals/review-client'
 
 import { useEffect, useState, useRef } from 'react'
 import Link from 'next/link'
+import BulkBar from '@/components/approvals/BulkBar'
 import {
   Bot,
   CheckCircle,
@@ -863,6 +864,13 @@ export default function ApprovalsPage() {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Gruppvägen — bara i den väntande kön, och bara när det finns
+                något att gruppera. Reglerna för vad som får gå i grupp bor i
+                lib/approvals/bulk.ts; varje kort skickas ändå som sitt eget
+                beslut. */}
+            {activeTab === 'pending' && (
+              <BulkBar approvals={approvals} onDone={() => void fetchApprovals()} />
+            )}
             {approvals.map((approval, idx) => {
               const day = dayLabel(approval.created_at)
               const prevDay = idx > 0 ? dayLabel(approvals[idx - 1].created_at) : null
