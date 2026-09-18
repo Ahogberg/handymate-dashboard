@@ -236,5 +236,11 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // partner-token + gällande avtal, samma grind som partners/leads. Läser
   // bara rader där created_by_partner_id är partnern själv; ingen
   // tenant-kontext finns, caset tillhör partnern och prospektet → 172.
-  expect(utanStandard.length).toBeLessThanOrEqual(172)
+  // 2026-09-18 (kom-ikapp-vägen): admin/kom-ikapp — plattformsadmin via
+  // isAdmin(request). Den kör om seedQuoteTemplates för BEFINTLIGA företag,
+  // alltså med avsikt över ALLA konton i en och samma körning. Just därför
+  // kan den inte bära en tenant-grind: en sådan hade begränsat den till det
+  // inloggade kontot och gjort rutten meningslös. Avgränsningen ligger i
+  // stället i isAdmin + dryRun på som default → 173.
+  expect(utanStandard.length).toBeLessThanOrEqual(173)
 })

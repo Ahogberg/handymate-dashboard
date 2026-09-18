@@ -171,3 +171,28 @@ All read routes are force-dynamic. Inventory ceiling: 166; cron routes: 50.
 ## 2026-09-15 — Revenue partnerleads
 
 Inventeringen omfattar nu 169 rutter utanför getAuthenticatedBusiness. Två nya rutter: admin/revenue/partner-leads kräver requireRevenue och manager; partners/leads härleder partneridentiteten från verifierad partner-token och kräver aktiv partner med aktuellt avtal. Service-role används endast bakom dessa servergrindar. Tilldelning är intern säljdata och partnerns läsning begränsas av serverhärlett partner-id. Korspartneråtkomst, återkallning, avtal, inaktiv partner och kontaktspärrar testas i tests/revenue/partner-leads.cjs.
+
+## 2026-09-18 — Kom-ikapp-vägen
+
+Inventeringen omfattar nu **173** rutter utanför `getAuthenticatedBusiness`.
+En ny: `POST /api/admin/kom-ikapp`.
+
+**Varför den saknar tenant-grind.** Rutten kör om `seedQuoteTemplates` för
+BEFINTLIGA företag, med avsikt över alla konton i en och samma körning. En
+tenant-grind hade begränsat den till det inloggade kontot och därmed gjort
+rutten meningslös — det är just att den ser alla konton som är poängen.
+
+**Vad som avgränsar den i stället.** `isAdmin(request)` (plattformsadmin,
+@handymate.se eller ADMIN_EMAILS) plus `dryRun` på som default: ett anrop
+utan kropp skriver ingenting utan rapporterar bara vilka konton som ligger
+efter. Skrivningen kräver ett uttryckligt `{"dryRun": false}`.
+
+**Vad den skriver.** Ingenting eget. Den anropar samma seedare som
+onboardingens finalize, och den är idempotent: en mall vars namn redan finns
+hoppas över, ett satt `job_type_slug` skrivs aldrig över, ingen jobbtyp döps
+om eller avarkiveras.
+
+**Varför den behövdes.** Mätt 2026-09-18: 26 av 29 företag saknade jobbtyper
+och 17 av 34 jobbtyper hos riktiga kunder hade inget upplägg. Mekanismerna
+fanns — de bodde bara inuti en seedare som bara körs vid onboarding, så varje
+förbättring nådde enbart framtida kunder. Facit: `tests/facit-kom-ikapp.spec.ts`.

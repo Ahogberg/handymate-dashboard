@@ -291,6 +291,7 @@ jobs:
           tests/design-offertflodet-kontrakt.spec.ts
           tests/facit-force-dynamic.spec.ts
           tests/facit-helskarm-over-bubblan.spec.ts
+          tests/facit-kom-ikapp.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
