@@ -1,50 +1,51 @@
 /**
  * Bolagsverket "värdefulla datamängder"-klient (2026-08-15).
  *
- * Endpoints bekräftade mot en verklig, publicerad tredjeparts-klients
- * dokumentation (BolagsverketEx, ett Elixir-bibliotek) — bolagsverket.se:s
- * egna sidor är CAPTCHA-skyddade mot automatiserad läsning, så exakt
- * request-/svarsschema för `POST /organisationer` är en välgrundad
- * gissning byggd på Bolagsverkets dokumenterade fältnamn på andra ställen
- * (t.ex. `identitetsbeteckning` för org.nr). Svarstolkningen
- * (`parseOrganisationResponse`) är MEDVETET defensiv — validerar formen
- * innan den litar på den, ger `null`/`invalid_response` hellre än att
- * gissa fram ett fält eller krascha.
+ * VERIFIERAT 2026-09-18 mot Bolagsverkets officiella OpenAPI-fil
+ * ("VärdefullaDatamängder v1", devportal → Download Swagger). Fram till dess
+ * var både anropets payload och svarets fältnamn en välgrundad gissning, och
+ * gissningen var fel på varje punkt som räknades:
  *
- * VERIFIERAT 2026-09-17 mot Bolagsverkets "Connection establishment guide for
- * Värdefulla Datamängder" v1.01: värdarna, `POST /organisationer`, grant type,
- * `Content-Type`, nycklarna i kroppen (inte Basic auth), `Bearer`-prefixet och
- * `expires_in` i sekunder stämmer alla. KVAR ATT VERIFIERA mot OpenAPI-filen
- * (devportal → "Download Swagger"): `/organisationer`-anropets payload-schema,
- * alltså om `identitetsbeteckning` är tolv siffror, och svarets exakta fältnamn
- * som `parseOrganisationResponse` läser.
+ *   1. `identitetsbeteckning` är TIO siffror för ett organisationsnummer och
+ *      TOLV bara för ett personnummer (enskild näringsidkare). Koden satte
+ *      `16` framför alla tio — se orgNumberIdentity i lib/karin/org-number.ts.
+ *   2. Svaret är `{ organisationer: [ … ] }`, inte ett platt objekt. Tolkningen
+ *      läste varje fält en nivå för högt och hade aldrig hittat ett företag.
+ *   3. Adressen ligger under `postadressOrganisation.postadress`, inte direkt
+ *      under `postadressOrganisation`.
+ *   4. Näringsgrenen heter `naringsgrenOrganisation.sni`, inte
+ *      `naringsgrensindelning`.
+ *   5. En `identitetsbeteckning` kan bära FLERA organisationer — en enskild
+ *      näringsidkare får ett `namnskyddslopnummer` per firma på samma
+ *      personnummer, och Bolagsverkets eget exempel returnerar två.
+ *   6. `organisationsnamnLista` blandar företagsnamn, särskilt företagsnamn och
+ *      namn på främmande språk; `[0]` är inte nödvändigtvis firmanamnet.
+ *
+ * Tidigare verifierat 2026-09-17 mot deras "Connection establishment guide"
+ * v1.01: värdarna, `POST /organisationer`, grant type, `Content-Type`,
+ * nycklarna i kroppen (inte Basic auth), `Bearer`-prefixet och `expires_in`.
  *
  * Testmiljön accept2 tar bara vissa organisationsnummer (anvisningens §6.1).
- * Ett annat nummer ger ett svar som RÄKNAR UPP de tillåtna — inte ett företag.
- * Det svaret passerar inte `parseOrganisationResponse` och landar därför som
- * `invalid_response`; det är väntat i testmiljön, inte en parsningsbugg.
  *
  * RÄTTAT 2026-09-17 efter skarpt fel i onboardingen ("Kunde inte nå
  * Bolagsverket just nu", körloggen: `token-hämtning misslyckades: 404`):
- *   1. Tokens mintas på PORTAL-värden, inte på gateway-värden. Uppslaget
- *      går mot `gw.api.bolagsverket.se`, men `/oauth2/token` finns bara på
- *      `portal.api.bolagsverket.se`. Den gamla gateway-URL:en gav 404.
- *   2. `identitetsbeteckning` är TOLV siffror (PeOrgNr), inte tio — se
- *      orgNumberIdentity i lib/karin/org-number.ts.
+ * tokens mintas på PORTAL-värden, inte på gateway-värden. Uppslaget går mot
+ * `gw.api.bolagsverket.se`, men `/oauth2/token` finns bara på
+ * `portal.api.bolagsverket.se`. Den gamla gateway-URL:en gav 404.
  * Miljön väljs med `BOLAGSVERKET_ENV` (`accept`/`production`), som tar BÅDA
- * värdarna på en gång. Bolagsverket delar ut nycklar till acceptansmiljön
- * först, och en token därifrån avvisas av produktionsgatewayen — värdarna hör
- * ihop parvis och får aldrig sättas var för sig. De två URL-variablerna finns
- * kvar som undantag; sätts de så att värdarna hamnar i olika miljöer stoppas
- * uppslaget av vakten i `endpoints()` i stället för att ge ett obegripligt 401.
+ * värdarna på en gång. En token från acceptansmiljön avvisas av
+ * produktionsgatewayen — värdarna hör ihop parvis och får aldrig sättas var för
+ * sig. De två URL-variablerna finns kvar som undantag; sätts de så att värdarna
+ * hamnar i olika miljöer stoppas uppslaget av vakten i `endpoints()` i stället
+ * för att ge ett obegripligt 401.
  *
  * DIAGNOSTIK 2026-09-18 efter att samma uppslag gav 401 i stället för 404:
- * statusen ensam räcker inte. OAuth-felsvaret bär en `error`-kod — därför
- * loggas token-svarets kropp (truncerad) vid fel, och svarets TOPPNYCKLAR (bara
- * namnen, aldrig värdena) när tolkningen ger upp. Nycklarna trimmas innan de
- * skickas: ett osynligt radbryte i en inklistrad hemlighet ger exakt samma 401
- * som en felaktig nyckel. Token-cachen bär värden den mintades mot, så ett byte
- * av BOLAGSVERKET_ENV inte serverar fel miljös token mot en varm lambda.
+ * statusen ensam räcker inte. OAuth-felsvaret bär en `error`-kod, och
+ * Bolagsverkets eget felsvar följer RFC 7807 med `instance`, `code`, `source`
+ * och `requestId` — allt loggas nu. `title`/`detail` loggas MEDVETET inte: de
+ * är fritext som kan bära tillbaka det vi skickade in, och för en enskild firma
+ * är det ett personnummer. Nycklarna maskas ur token-felet (Bolagsverket ekar
+ * tillbaka client_id i `invalid_client`) och trimmas innan de skickas.
  *
  * Fail-soft genomgående, samma disciplin som app/api/onboarding/
  * scrape-website/route.ts: saknade credentials, nätverksfel och
@@ -52,6 +53,7 @@
  * kastat fel som stoppar onboarding. Varje misslyckande loggar status OCH
  * URL: utan URL:en i loggen tog 404:an ovan en felsökningsrunda extra.
  */
+import { randomUUID } from 'crypto'
 import { orgNumberIdentity } from '@/lib/karin/org-number'
 
 /**
@@ -161,16 +163,63 @@ export function isTokenValid(token: CachedToken | null, nowMs: number, tokenUrl:
 }
 
 /**
- * Felsvarets kropp, truncerad. OAuth-fel bär en maskinläsbar `error`-kod som
- * är hela skillnaden mellan "fel nyckel" och "fel miljö" — utan den står det
- * bara `401` i körloggen och nästa runda blir en gissning till. Kastar aldrig:
- * ett trasigt felsvar får inte bli ett nytt fel ovanpå det vi försöker läsa.
+ * Felsvarets kropp, truncerad och maskad. OAuth-fel bär en maskinläsbar
+ * `error`-kod som är hela skillnaden mellan "fel nyckel" och "fel miljö" —
+ * utan den står det bara `401` i körloggen och nästa runda blir en gissning
+ * till. Kastar aldrig: ett trasigt felsvar får inte bli ett nytt fel ovanpå
+ * det vi försöker läsa.
+ *
+ * MASKNINGEN är inte teoretisk. Bolagsverkets `invalid_client`-svar lyder
+ * ordagrant "A valid OAuth client could not be found for client_id: …" —
+ * nyckeln kommer alltså tillbaka i felet och hade annars hamnat i Vercels
+ * körlogg. Secreten maskas också, för säkerhets skull.
  */
-async function errorBody(res: Response): Promise<string> {
+async function errorBody(res: Response, ...hemligheter: string[]): Promise<string> {
   try {
-    return (await res.text()).slice(0, 300)
+    const text = (await res.text()).slice(0, 300)
+    return hemligheter.filter(Boolean).reduce((t, h) => t.split(h).join('***'), text)
   } catch {
     return '(kunde inte läsa svarskroppen)'
+  }
+}
+
+/**
+ * Bolagsverkets felsvar följer RFC 7807 — samma `ApiError`-kontrakt i hela
+ * deras API-familj (bekräftat i Dokument-API:ts OpenAPI 2026-09-18, och
+ * felkoderna där bär prefixet `urn:hb-kb-api:` som inte är Dokument-specifikt).
+ * Fälten som intresserar oss är rena maskinkoder:
+ *   instance  client.not-found | client.validation | client.not-supported | …
+ *   code      leverantörens egen felkod, t.ex. FM130
+ *   source    vilket FÄLT som var fel, t.ex. identitetsbeteckning
+ *   requestId det Bolagsverkets support frågar efter när man hör av sig
+ * plus `kod` ur valideringsmeddelanden/meddelanden.
+ *
+ * `title` och `detail` läses MEDVETET inte: de är fritext som kan bära
+ * tillbaka det vi skickade in, och för en enskild firma är det ett
+ * personnummer. Koderna räcker för att veta vad som gick fel. Kastar aldrig.
+ */
+export function apiErrorCodes(raw: unknown): string {
+  if (!raw || typeof raw !== 'object') return '(inget läsbart felsvar)'
+  const o = raw as Record<string, any>
+  const koder = [...(o.valideringsmeddelanden || []), ...(o.meddelanden || [])]
+    .map((m: any) => m?.kod)
+    .filter((k: unknown): k is string => typeof k === 'string')
+  const delar = [
+    typeof o.instance === 'string' ? o.instance : null,
+    typeof o.code === 'string' ? `kod=${o.code}` : null,
+    typeof o.source === 'string' ? `fält=${o.source}` : null,
+    koder.length ? `meddelandekoder=${koder.join('/')}` : null,
+    typeof o.requestId === 'string' ? `requestId=${o.requestId}` : null,
+  ].filter(Boolean)
+  return delar.length ? delar.join(' ') : `(inga felkoder, fält: ${topLevelKeys(raw)})`
+}
+
+/** Felsvarets JSON, eller null. Kastar aldrig — ett trasigt felsvar är inte ett nytt fel. */
+async function errorJson(res: Response): Promise<unknown> {
+  try {
+    return JSON.parse((await res.text()).slice(0, 4000))
+  } catch {
+    return null
   }
 }
 
@@ -206,7 +255,7 @@ async function fetchAccessToken(clientId: string, clientSecret: string, url: str
       // från saknat scope i prenumerationen (`invalid_scope`) från fel anrop
       // (`unsupported_grant_type`) — alla tre kommer som 400/401. Hemligheten
       // skickas men ekas aldrig tillbaka; request-kroppen loggas aldrig.
-      console.error('[bolagsverket] token-hämtning misslyckades:', res.status, url, await errorBody(res))
+      console.error('[bolagsverket] token-hämtning misslyckades:', res.status, url, await errorBody(res, clientId, clientSecret))
       // 400 invalid_client och 401/403 = nycklarna eller miljön; allt annat = tjänsten.
       return { ok: false, reason: [400, 401, 403].includes(res.status) ? 'not_authorized' : 'request_failed' }
     }
@@ -224,47 +273,96 @@ async function fetchAccessToken(clientId: string, clientSecret: string, url: str
   }
 }
 
-function extractFirstNamn(namnObj: Record<string, unknown>): string | null {
-  const lista = namnObj.organisationsnamnLista
-  if (!Array.isArray(lista) || lista.length === 0) return null
-  const first = lista[0] as Record<string, unknown>
-  return typeof first?.namn === 'string' ? first.namn : null
+/** Svaret bär epok-millisekunder; vi läser inga datum ut i profilen än. */
+type Block = Record<string, any> | null | undefined
+
+/**
+ * Vilken organisation svaret handlar om.
+ *
+ * En `identitetsbeteckning` kan bära FLERA organisationer: en enskild
+ * näringsidkare får ett `namnskyddslopnummer` per firma på samma personnummer,
+ * och Bolagsverkets eget svarsexempel returnerar två. Vi väljer den som inte är
+ * avregistrerad — en avvecklad firma är sällan den kunden håller på att
+ * registrera hos oss. Finns ingen aktiv tas den första, för att ge något
+ * hellre än inget.
+ *
+ * Ren. Ingen I/O.
+ */
+export function valdOrganisation(organisationer: unknown[]): Record<string, any> | null {
+  const giltiga = organisationer.filter((o): o is Record<string, any> => !!o && typeof o === 'object')
+  if (giltiga.length === 0) return null
+  return giltiga.find(o => !o.avregistreradOrganisation?.avregistreringsdatum) ?? giltiga[0]
 }
 
 /**
- * Ren. Ingen I/O. Tolkar Bolagsverkets organisations-svar defensivt.
- * `null` om svaret inte innehåller NÅGOT vi känner igen — hellre ge upp
- * än att returnera ett objekt av bara `null`-fält som ser ut som ett
- * lyckat, tomt svar.
+ * Företagsnamnet, inte vilket namn som helst.
+ *
+ * `organisationsnamnLista` blandar `FORETAGSNAMN`, `SARSKILT_FORETAGSNAMN` och
+ * `FORETAGSNAMN_PA_FRAMMANDE_SPRAK` — Bolagsverkets exempel returnerar alla tre
+ * för samma bolag, och ordningen är inte garanterad meningsbärande. Att ta
+ * `[0]` kunde alltså fylla onboardingen med "Bicycle expert" i stället för
+ * "Cykelbolaget AB". Vi tar `FORETAGSNAMN` och faller tillbaka på första
+ * posten med ett namn.
+ *
+ * Ren. Ingen I/O.
+ */
+export function foretagsnamn(namnBlock: Block): string | null {
+  const lista = namnBlock?.organisationsnamnLista
+  if (!Array.isArray(lista)) return null
+  const poster = lista.filter((p: any) => p && typeof p.namn === 'string' && p.namn.trim())
+  const primart = poster.find((p: any) => p.organisationsnamntyp?.kod === 'FORETAGSNAMN')
+  return (primart ?? poster[0])?.namn?.trim() ?? null
+}
+
+const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() ? v.trim() : null)
+
+/**
+ * Ren. Ingen I/O. Tolkar Bolagsverkets organisations-svar.
+ *
+ * VERIFIERAT 2026-09-18 mot deras OpenAPI för Värdefulla datamängder
+ * (`OrganisationerSvar`) och båda svarsexemplen — aktiebolag och enskild
+ * näringsidkare. Före det läste den här funktionen fälten på fel nivå rakt
+ * igenom: svaret är `{ organisationer: [ … ] }`, inte ett platt objekt, och
+ * adressen ligger under `postadressOrganisation.postadress`, inte direkt under
+ * `postadressOrganisation`. Näringsgrenen heter `naringsgrenOrganisation.sni`,
+ * inte `naringsgrensindelning`. Inget av det hade gett ett företag.
+ *
+ * Varje block bär ett eget `fel` och en `dataproducent` (Bolagsverket eller
+ * SCB) — när en uppgiftskälla fallerar kommer blocket tomt, och då blir fältet
+ * `null` av sig självt. Ingen särskild hantering behövs, men det är därför
+ * enskilda fält kan saknas i ett i övrigt lyckat svar.
+ *
+ * `null` om svaret inte innehåller NÅGOT vi känner igen — hellre ge upp än att
+ * returnera ett objekt av bara `null`-fält som ser ut som ett lyckat, tomt svar.
  */
 export function parseOrganisationResponse(raw: unknown): BolagsverketCompany | null {
   if (!raw || typeof raw !== 'object') return null
-  const obj = raw as Record<string, unknown>
+  const organisationer = (raw as Record<string, unknown>).organisationer
+  if (!Array.isArray(organisationer)) return null
 
-  const namnObj = obj.organisationsnamn as Record<string, unknown> | undefined
-  const name = namnObj ? extractFirstNamn(namnObj) : null
+  const org = valdOrganisation(organisationer)
+  if (!org) return null
 
-  const formObj = obj.organisationsform as Record<string, unknown> | undefined
-  const companyForm = typeof formObj?.klartext === 'string' ? formObj.klartext : null
+  const name = foretagsnamn(org.organisationsnamn)
+  const companyForm = text(org.organisationsform?.klartext)
 
-  const adresser = obj.postadressOrganisation as Record<string, unknown> | undefined
-  const address: BolagsverketAddress | null = adresser
-    ? {
-        street: typeof adresser.utdelningsadress === 'string' ? adresser.utdelningsadress : null,
-        postalCode: typeof adresser.postnummer === 'string' ? adresser.postnummer : null,
-        city: typeof adresser.postort === 'string' ? adresser.postort : null,
-      }
-    : null
+  const post = org.postadressOrganisation?.postadress
+  const street = text(post?.utdelningsadress)
+  const postalCode = text(post?.postnummer)
+  const city = text(post?.postort)
+  const address: BolagsverketAddress | null =
+    street || postalCode || city ? { street, postalCode, city } : null
 
-  const sniList = obj.naringsgrensindelning as unknown[] | undefined
-  const sniCode =
-    Array.isArray(sniList) && sniList.length > 0 && typeof (sniList[0] as Record<string, unknown>)?.kod === 'string'
-      ? ((sniList[0] as Record<string, unknown>).kod as string)
-      : null
+  const sni = org.naringsgrenOrganisation?.sni
+  const sniCode = Array.isArray(sni) ? text(sni[0]?.kod) : null
+
+  // Verksamhetsbeskrivningen kommer med radbrytningar och inledande blanksteg
+  // i Bolagsverkets eget exempel ("\n       HANDEL MED SKOR.") — trimmas.
+  const description = text(org.verksamhetsbeskrivning?.beskrivning)
 
   if (!name && !companyForm && !address) return null
 
-  return { name, companyForm, address, sniCode, description: null }
+  return { name, companyForm, address, sniCode, description }
 }
 
 /**
@@ -288,7 +386,8 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
     return { ok: false, reason: 'not_configured' }
   }
 
-  // Tolv siffror (PeOrgNr), inte tio — Bolagsverket avvisar det tiosiffriga.
+  // Tio siffror för ett organisationsnummer, tolv för ett personnummer —
+  // Bolagsverkets OpenAPI och båda anropsexemplen säger samma sak.
   const identitetsbeteckning = orgNumberIdentity(orgNumber)
   if (!identitetsbeteckning) return { ok: false, reason: 'not_found' }
 
@@ -296,24 +395,37 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
   if (!token.ok) return { ok: false, reason: token.reason }
 
   const url = `${apiBaseUrl}/organisationer`
+  const requestId = randomUUID()
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token.accessToken}`,
+        // Dokumenterad i deras OpenAPI: klientgenererat id som kommer tillbaka
+        // som `requestId` i felsvaret. Det är det Bolagsverkets support frågar
+        // efter, och utan det kan vi inte peka på ett enskilt anrop.
+        'X-Request-Id': requestId,
       },
       body: JSON.stringify({ identitetsbeteckning }),
     })
 
     if (res.status === 429) return { ok: false, reason: 'rate_limited' }
-    if (res.status === 404) return { ok: false, reason: 'not_found' }
+    if (res.status === 404) {
+      // En 404 kan vara "företaget finns inte" (`client.not-found`) ELLER fel
+      // sökväg — exakt den tvetydighet som kostade en felsökningsrunda i
+      // september. Felkoden skiljer dem åt.
+      console.error('[bolagsverket] inget företag på uppslaget:', url, requestId, apiErrorCodes(await errorJson(res)))
+      return { ok: false, reason: 'not_found' }
+    }
     if (res.status === 401 || res.status === 403) {
-      console.error('[bolagsverket] uppslag nekades:', res.status, url)
+      console.error('[bolagsverket] uppslag nekades:', res.status, url, requestId, apiErrorCodes(await errorJson(res)))
       return { ok: false, reason: 'not_authorized' }
     }
     if (!res.ok) {
-      console.error('[bolagsverket] uppslag misslyckades:', res.status, url)
+      // 400 här betyder `client.validation` med `source` = fältet som var fel.
+      // Det är svaret på om identitetsbeteckning ska vara tio eller tolv siffror.
+      console.error('[bolagsverket] uppslag misslyckades:', res.status, url, requestId, apiErrorCodes(await errorJson(res)))
       return { ok: false, reason: 'request_failed' }
     }
 
@@ -324,7 +436,7 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
       // accept2:s uppräkning av tillåtna testnummer (§6.1) eller ett riktigt
       // företagssvar vars fältnamn vi gissat fel på — och bara namnen, så en
       // enskild firmas uppgifter aldrig hamnar i körloggen.
-      console.error('[bolagsverket] svaret gick inte att tolka:', url, 'fält:', topLevelKeys(json))
+      console.error('[bolagsverket] svaret gick inte att tolka:', url, requestId, 'fält:', topLevelKeys(json))
       return { ok: false, reason: 'invalid_response' }
     }
     return { ok: true, data: parsed }

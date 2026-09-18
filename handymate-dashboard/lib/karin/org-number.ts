@@ -94,16 +94,28 @@ export function orgNumberCompanyForm(input: string | null | undefined): string |
 }
 
 /**
- * Bolagsverkets `identitetsbeteckning` (PeOrgNr) — TOLV siffror, inte tio.
+ * Bolagsverkets `identitetsbeteckning` — TIO siffror för ett organisations-
+ * nummer, TOLV för ett personnummer.
  *
- * Juridiska personer: sekelprefixet `16` + de tio siffrorna. En enskild firma
- * har inget eget organisationsnummer utan använder innehavarens personnummer,
- * och då är prefixet födelseseklet (`19`/`20`).
+ * VERIFIERAT 2026-09-18 mot Bolagsverkets OpenAPI för Värdefulla datamängder
+ * (`Identitetsbeteckning`): "'Organisationsnummer' is represented by 10 digits,
+ * 'personnummer' is represented by 12 digits (YYYYMMDDXXXX)". Anropsexemplen
+ * säger samma sak: aktiebolag `5299999994`, enskild näringsidkare
+ * `194009272719`.
  *
- * Sekelgissningen: en näringsidkare är vuxen, så `19` gäller utom när det
- * skulle göra personen över hundra år — då är det `20`. Ett nummer som redan
- * kommer in tolvsiffrigt returneras oförändrat; ett prefix som står där ska
- * aldrig gissas om.
+ * Det betyder att ett sekelprefix på ett organisationsnummer är FEL. Koden
+ * satte tidigare `16` framför de tio siffrorna — en slutsats dragen ur att
+ * `identitetsbeteckning` heter PeOrgNr på andra ställen hos Bolagsverket, som
+ * aldrig kontrollerades mot det här API:t.
+ *
+ * En enskild firma har inget eget organisationsnummer utan använder
+ * innehavarens personnummer, och där ÄR prefixet rätt — men det är
+ * födelseseklet (`19`/`20`), inte `16`. Sekelvalet: en näringsidkare är vuxen,
+ * så `19` gäller utom när det skulle göra personen över hundra år. Detsamma
+ * gäller samordningsnummer (samma form, födelsedag + 60).
+ *
+ * Ett nummer som redan kommer in tolvsiffrigt returneras oförändrat; ett
+ * prefix som står där ska aldrig gissas om.
  *
  * `null` när numret inte är ett giltigt org.nr — hellre inget uppslag alls än
  * ett uppslag på ett påhittat nummer.
@@ -112,7 +124,7 @@ export function orgNumberIdentity(input: string | null | undefined, now: Date = 
   const d = normalizeOrgNumber(input)
   if (!isValidOrgNumber(d)) return null
   if (d.length === 12) return d
-  if (orgNumberCompanyForm(d) !== 'ef') return `16${d}`
+  if (orgNumberCompanyForm(d) !== 'ef') return d
   const nittonhundra = 1900 + Number(d.slice(0, 2))
   return `${now.getFullYear() - nittonhundra > 100 ? '20' : '19'}${d}`
 }

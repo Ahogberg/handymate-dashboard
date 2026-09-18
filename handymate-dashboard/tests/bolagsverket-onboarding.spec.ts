@@ -180,7 +180,7 @@ test.describe('regressionen 2026-09-18 — 401 i stället för 404: statusen ens
   test('token-felet loggar svarskroppen, inte bara statuskoden', () => {
     // invalid_client = nyckel/miljö, invalid_scope = prenumerationen,
     // unsupported_grant_type = vi — alla tre kommer som 400/401.
-    expect(fetchToken).toContain('errorBody(res)')
+    expect(fetchToken).toContain('errorBody(res, clientId, clientSecret)')
     const felrad = fetchToken.slice(fetchToken.indexOf("token-hämtning misslyckades"))
     expect(felrad.slice(0, felrad.indexOf('\n'))).toContain('errorBody')
   })
@@ -191,10 +191,18 @@ test.describe('regressionen 2026-09-18 — 401 i stället för 404: statusen ens
     expect(fn.slice(0, fn.indexOf('\n}'))).toContain('catch')
   })
 
-  test('hemligheten loggas aldrig — varken request-kroppen eller nycklarna går till körloggen', () => {
+  test('nycklarna når loggen bara genom maskeraren, aldrig som ett eget argument', () => {
+    // Bolagsverket ekar tillbaka client_id i sitt invalid_client-svar — bevisat
+    // skarpt 2026-09-18. errorBody(res, clientId, clientSecret) ersätter dem med
+    // ***; att skicka dem dit är alltså motsatsen till att läcka dem. Men utanför
+    // den maskeraren får de aldrig förekomma på en console-rad.
     for (const rad of client.split('\n').filter(r => r.includes('console.'))) {
-      expect(rad, rad).not.toMatch(/client_secret|clientSecret|clientId|client_id/)
+      const utanMaskerare = rad.replace(/errorBody\([^)]*\)/g, '')
+      expect(utanMaskerare, rad).not.toMatch(/client_secret|clientSecret|clientId|client_id/)
     }
+    // Och maskeraren måste faktiskt maskera.
+    const fn = client.slice(client.indexOf('async function errorBody'))
+    expect(fn.slice(0, fn.indexOf('\n}'))).toContain("'***'")
   })
 
   test('token-cachen bär värden den mintades mot — fel miljös token serveras aldrig', () => {

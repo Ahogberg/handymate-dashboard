@@ -162,33 +162,41 @@ test.describe('svaret till användaren', () => {
   })
 })
 
-test.describe('identitetsbeteckning — tolv siffror, det Bolagsverket faktiskt vill ha', () => {
-  // Skarpt fel 2026-09-17: klienten skickade de tio siffrorna rakt av.
-  // Bolagsverkets PeOrgNr är tolv: sekelprefix + numret.
-  const EF = medKontrollsiffra('850101123') // personnummer: tredje siffran < 2
-
-  test('juridisk person får prefixet 16', () => {
-    expect(orgNumberIdentity(GILTIGT_AB)).toBe(`16${GILTIGT_AB}`)
-    expect(orgNumberIdentity(formatOrgNumber(GILTIGT_AB))).toBe(`16${GILTIGT_AB}`)
+test.describe('identitetsbeteckning — tio siffror för org.nr, tolv för personnummer', () => {
+  // VERIFIERAT mot Bolagsverkets OpenAPI för Värdefulla datamängder och deras
+  // två anropsexempel: aktiebolag "5299999994" (tio), enskild näringsidkare
+  // "194009272719" (tolv). Koden satte tidigare 16 framför alla tio siffror —
+  // en slutsats dragen ur fältnamnet PeOrgNr, aldrig kontrollerad mot API:t.
+  test('juridisk person skickas som tio siffror, utan sekelprefix', () => {
+    expect(orgNumberIdentity('556123-4567')).toBe('5561234567')
+    expect(orgNumberIdentity('5561234567')).toBe('5561234567')
   })
 
-  test('enskild firma får födelseseklet, inte 16', () => {
-    expect(orgNumberCompanyForm(EF)).toBe('ef')
-    expect(orgNumberIdentity(EF, new Date('2026-09-17'))).toBe(`19${EF}`)
+  test('Bolagsverkets eget aktiebolagsexempel går igenom oförändrat', () => {
+    expect(orgNumberIdentity('5299999994')).toBe('5299999994')
+  })
+
+  test('enskild firma får födelseseklet — tolv siffror, som deras EF-exempel', () => {
+    // 400927-2719 är personnumret i Bolagsverkets exempel; med sekel 194009272719.
+    expect(orgNumberIdentity('400927-2719', new Date('2026-01-01'))).toBe('194009272719')
   })
 
   test('ett sekel tillbaka i tiden blir 20, inte en hundraåring', () => {
-    const ungEf = medKontrollsiffra('050101123')
-    expect(orgNumberIdentity(ungEf, new Date('2026-09-17'))).toBe(`20${ungEf}`)
+    // 10 som födelseår: 1910 vore 116 år 2026, alltså 2010.
+    const tio = orgNumberIdentity('101010-1010', new Date('2026-01-01'))
+    expect(tio?.slice(0, 2)).toBe('20')
+    expect(tio).toHaveLength(12)
   })
 
   test('ett redan tolvsiffrigt nummer gissas aldrig om', () => {
-    expect(orgNumberIdentity(`16${GILTIGT_AB}`)).toBe(`16${GILTIGT_AB}`)
+    expect(orgNumberIdentity('194009272719')).toBe('194009272719')
+    expect(orgNumberIdentity('165561234567')).toBe('165561234567')
   })
 
   test('ogiltigt nummer ger null — inget uppslag på ett påhittat org.nr', () => {
-    expect(orgNumberIdentity('5566778890')).toBeNull()
-    expect(orgNumberIdentity('12345')).toBeNull()
+    expect(orgNumberIdentity('5561234568')).toBeNull()
+    expect(orgNumberIdentity('123')).toBeNull()
+    expect(orgNumberIdentity(null)).toBeNull()
     expect(orgNumberIdentity('')).toBeNull()
   })
 })
