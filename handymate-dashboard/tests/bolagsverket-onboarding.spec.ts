@@ -169,6 +169,63 @@ test.describe('regressionen 2026-09-17 — "Kunde inte nå Bolagsverket just nu"
   })
 })
 
+test.describe('regressionen 2026-09-18 — 401 i stället för 404: statusen ensam räcker inte', () => {
+  const fetchToken = client.slice(client.indexOf('async function fetchAccessToken'), client.indexOf('function extractFirstNamn'))
+
+  test('nycklarna trimmas innan de skickas — ett osynligt radbryte ger samma 401 som fel nyckel', () => {
+    expect(client).toContain('process.env.BOLAGSVERKET_CLIENT_ID?.trim()')
+    expect(client).toContain('process.env.BOLAGSVERKET_CLIENT_SECRET?.trim()')
+  })
+
+  test('token-felet loggar svarskroppen, inte bara statuskoden', () => {
+    // invalid_client = nyckel/miljö, invalid_scope = prenumerationen,
+    // unsupported_grant_type = vi — alla tre kommer som 400/401.
+    expect(fetchToken).toContain('errorBody(res)')
+    const felrad = fetchToken.slice(fetchToken.indexOf("token-hämtning misslyckades"))
+    expect(felrad.slice(0, felrad.indexOf('\n'))).toContain('errorBody')
+  })
+
+  test('felkroppen truncerar och kastar aldrig — ett trasigt felsvar får inte bli ett nytt fel', () => {
+    const fn = client.slice(client.indexOf('async function errorBody'))
+    expect(fn.slice(0, fn.indexOf('\n}'))).toMatch(/slice\(0, \d+\)/)
+    expect(fn.slice(0, fn.indexOf('\n}'))).toContain('catch')
+  })
+
+  test('hemligheten loggas aldrig — varken request-kroppen eller nycklarna går till körloggen', () => {
+    for (const rad of client.split('\n').filter(r => r.includes('console.'))) {
+      expect(rad, rad).not.toMatch(/client_secret|clientSecret|clientId|client_id/)
+    }
+  })
+
+  test('token-cachen bär värden den mintades mot — fel miljös token serveras aldrig', () => {
+    expect(client).toMatch(/interface CachedToken \{[\s\S]*?tokenUrl: string/)
+    expect(client).toContain('isTokenValid(cachedToken, Date.now(), url)')
+    expect(client).toContain('tokenUrl: url')
+  })
+
+  test('invalid_response är inte längre blind — svarets fältnamn hamnar i loggen', () => {
+    const lookup = client.slice(client.indexOf('export async function lookupCompany'))
+    const logg = lookup.indexOf('svaret gick inte att tolka')
+    const retur = lookup.indexOf("reason: 'invalid_response'")
+    expect(logg, 'ingen loggrad före invalid_response').toBeGreaterThan(-1)
+    expect(logg, 'loggen måste komma före returen').toBeLessThan(retur)
+  })
+
+  test('bara fältNAMNEN loggas — aldrig värdena, personuppgifter hör inte hemma i körloggen', () => {
+    const fn = client.slice(client.indexOf('export function topLevelKeys'))
+    const body = fn.slice(0, fn.indexOf('\n}'))
+    expect(body).toContain('Object.keys(')
+    expect(body).not.toContain('JSON.stringify')
+    expect(body).not.toContain('Object.entries')
+    expect(body).not.toContain('Object.values')
+  })
+
+  test('.env.local.example säger att nycklarna hör ihop med miljön', () => {
+    const env = read('.env.local.example')
+    expect(env).toMatch(/NYCKLARNA HÖR IHOP MED MILJÖN/)
+  })
+})
+
 test.describe('Step2Business.tsx — org.nr flyttat till start, före hemsides-frågan', () => {
   test("'orgnr' är startfasen, inte 'question'", () => {
     expect(step2).toContain("() => (data.hasWebsite !== undefined ? 'form' : 'orgnr')")

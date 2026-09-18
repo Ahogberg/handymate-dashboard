@@ -38,6 +38,14 @@
  * kvar som undantag; sätts de så att värdarna hamnar i olika miljöer stoppas
  * uppslaget av vakten i `endpoints()` i stället för att ge ett obegripligt 401.
  *
+ * DIAGNOSTIK 2026-09-18 efter att samma uppslag gav 401 i stället för 404:
+ * statusen ensam räcker inte. OAuth-felsvaret bär en `error`-kod — därför
+ * loggas token-svarets kropp (truncerad) vid fel, och svarets TOPPNYCKLAR (bara
+ * namnen, aldrig värdena) när tolkningen ger upp. Nycklarna trimmas innan de
+ * skickas: ett osynligt radbryte i en inklistrad hemlighet ger exakt samma 401
+ * som en felaktig nyckel. Token-cachen bär värden den mintades mot, så ett byte
+ * av BOLAGSVERKET_ENV inte serverar fel miljös token mot en varm lambda.
+ *
  * Fail-soft genomgående, samma disciplin som app/api/onboarding/
  * scrape-website/route.ts: saknade credentials, nätverksfel och
  * oväntade svar ger alla ett typat `{ok:false, reason}` — aldrig ett
@@ -131,6 +139,8 @@ type TokenResult = { ok: true; accessToken: string } | { ok: false; reason: 'not
 interface CachedToken {
   accessToken: string
   expiresAtMs: number
+  /** Värden token mintades mot. En acceptans-token duger inte mot produktion. */
+  tokenUrl: string
 }
 
 let cachedToken: CachedToken | null = null
@@ -139,14 +149,45 @@ let cachedToken: CachedToken | null = null
  * Ren. Ingen I/O. 60s marginal — hellre hämta en ny token en aning för
  * tidigt än att skicka ett uppslag med en token som hinner löpa ut under
  * flykten.
+ *
+ * URL:en är med i jämförelsen: byter BOLAGSVERKET_ENV under en varm lambda
+ * hade den gamla miljöns token annars serverats mot den nya gatewayen, och
+ * svaret blivit ett 401 som inte säger något om varför.
  */
-export function isTokenValid(token: CachedToken | null, nowMs: number): boolean {
+export function isTokenValid(token: CachedToken | null, nowMs: number, tokenUrl: string): boolean {
   if (!token) return false
+  if (token.tokenUrl !== tokenUrl) return false
   return token.expiresAtMs - 60_000 > nowMs
 }
 
+/**
+ * Felsvarets kropp, truncerad. OAuth-fel bär en maskinläsbar `error`-kod som
+ * är hela skillnaden mellan "fel nyckel" och "fel miljö" — utan den står det
+ * bara `401` i körloggen och nästa runda blir en gissning till. Kastar aldrig:
+ * ett trasigt felsvar får inte bli ett nytt fel ovanpå det vi försöker läsa.
+ */
+async function errorBody(res: Response): Promise<string> {
+  try {
+    return (await res.text()).slice(0, 300)
+  } catch {
+    return '(kunde inte läsa svarskroppen)'
+  }
+}
+
+/**
+ * Bara NYCKELNAMNEN ur ett svar vi inte kände igen — aldrig värdena. Det är
+ * exakt vad som behövs för att laga tolkningen eller känna igen accept2:s
+ * avvisningssvar, och det kan aldrig läcka en enskild firmas personuppgifter
+ * till körloggen. Ren, ingen I/O.
+ */
+export function topLevelKeys(raw: unknown): string {
+  if (Array.isArray(raw)) return `array(${raw.length})`
+  if (!raw || typeof raw !== 'object') return raw === null ? 'null' : typeof raw
+  return Object.keys(raw as Record<string, unknown>).join(',') || '(inga fält)'
+}
+
 async function fetchAccessToken(clientId: string, clientSecret: string, url: string): Promise<TokenResult> {
-  if (isTokenValid(cachedToken, Date.now())) return { ok: true, accessToken: (cachedToken as CachedToken).accessToken }
+  if (isTokenValid(cachedToken, Date.now(), url)) return { ok: true, accessToken: (cachedToken as CachedToken).accessToken }
 
   try {
     const res = await fetch(url, {
@@ -161,7 +202,11 @@ async function fetchAccessToken(clientId: string, clientSecret: string, url: str
     })
     if (!res.ok) {
       // URL:en med i loggen: en 404 här betyder fel VÄRD, inte fel nyckel.
-      console.error('[bolagsverket] token-hämtning misslyckades:', res.status, url)
+      // KROPPEN med: statusen ensam skiljer inte fel nyckel (`invalid_client`)
+      // från saknat scope i prenumerationen (`invalid_scope`) från fel anrop
+      // (`unsupported_grant_type`) — alla tre kommer som 400/401. Hemligheten
+      // skickas men ekas aldrig tillbaka; request-kroppen loggas aldrig.
+      console.error('[bolagsverket] token-hämtning misslyckades:', res.status, url, await errorBody(res))
       // 400 invalid_client och 401/403 = nycklarna eller miljön; allt annat = tjänsten.
       return { ok: false, reason: [400, 401, 403].includes(res.status) ? 'not_authorized' : 'request_failed' }
     }
@@ -171,7 +216,7 @@ async function fetchAccessToken(clientId: string, clientSecret: string, url: str
       return { ok: false, reason: 'request_failed' }
     }
     const expiresInSec = typeof json.expires_in === 'number' ? json.expires_in : 300
-    cachedToken = { accessToken: json.access_token, expiresAtMs: Date.now() + expiresInSec * 1000 }
+    cachedToken = { accessToken: json.access_token, expiresAtMs: Date.now() + expiresInSec * 1000, tokenUrl: url }
     return { ok: true, accessToken: cachedToken.accessToken }
   } catch (err) {
     console.error('[bolagsverket] token-hämtning kastade:', url, err instanceof Error ? err.message : err)
@@ -229,8 +274,10 @@ export function parseOrganisationResponse(raw: unknown): BolagsverketCompany | n
  * att Bolagsverket-uppslaget gick fel.
  */
 export async function lookupCompany(orgNumber: string): Promise<BolagsverketLookupResult> {
-  const clientId = process.env.BOLAGSVERKET_CLIENT_ID
-  const clientSecret = process.env.BOLAGSVERKET_CLIENT_SECRET
+  // Trimmade: ett avslutande radbryte i en inklistrad hemlighet ger ett 401
+  // som ser ut som fel nyckel och inte syns någonstans i Vercels gränssnitt.
+  const clientId = process.env.BOLAGSVERKET_CLIENT_ID?.trim()
+  const clientSecret = process.env.BOLAGSVERKET_CLIENT_SECRET?.trim()
   if (!clientId || !clientSecret) return { ok: false, reason: 'not_configured' }
 
   const { tokenUrl, apiBaseUrl, mismatch } = endpoints()
@@ -272,7 +319,14 @@ export async function lookupCompany(orgNumber: string): Promise<BolagsverketLook
 
     const json = await res.json()
     const parsed = parseOrganisationResponse(json)
-    if (!parsed) return { ok: false, reason: 'invalid_response' }
+    if (!parsed) {
+      // Utan det här är `invalid_response` blint. Nyckelnamnen säger om det är
+      // accept2:s uppräkning av tillåtna testnummer (§6.1) eller ett riktigt
+      // företagssvar vars fältnamn vi gissat fel på — och bara namnen, så en
+      // enskild firmas uppgifter aldrig hamnar i körloggen.
+      console.error('[bolagsverket] svaret gick inte att tolka:', url, 'fält:', topLevelKeys(json))
+      return { ok: false, reason: 'invalid_response' }
+    }
     return { ok: true, data: parsed }
   } catch (err) {
     console.error('[bolagsverket] uppslag kastade:', url, err instanceof Error ? err.message : err)

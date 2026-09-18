@@ -6,26 +6,57 @@
  *   npx playwright test tests/bolagsverket-client.spec.ts --no-deps --project=chromium
  */
 import { test, expect } from '@playwright/test'
-import { isTokenValid, parseOrganisationResponse } from '../lib/bolagsverket/client'
+import { isTokenValid, parseOrganisationResponse, topLevelKeys } from '../lib/bolagsverket/client'
+
+const PROD = 'https://portal.api.bolagsverket.se/oauth2/token'
+const ACCEPT = 'https://portal-accept2.api.bolagsverket.se/oauth2/token'
 
 test.describe('isTokenValid — 60s marginal, hellre hämta en ny token för tidigt', () => {
   test('null token är aldrig giltig', () => {
-    expect(isTokenValid(null, Date.now())).toBe(false)
+    expect(isTokenValid(null, Date.now(), PROD)).toBe(false)
   })
 
   test('token med gott om tid kvar är giltig', () => {
     const nu = 1_000_000
-    expect(isTokenValid({ accessToken: 'x', expiresAtMs: nu + 300_000 }, nu)).toBe(true)
+    expect(isTokenValid({ accessToken: 'x', expiresAtMs: nu + 300_000, tokenUrl: PROD }, nu, PROD)).toBe(true)
   })
 
   test('token inom 60s-marginalen räknas som ogiltig', () => {
     const nu = 1_000_000
-    expect(isTokenValid({ accessToken: 'x', expiresAtMs: nu + 30_000 }, nu)).toBe(false)
+    expect(isTokenValid({ accessToken: 'x', expiresAtMs: nu + 30_000, tokenUrl: PROD }, nu, PROD)).toBe(false)
   })
 
   test('redan utgången token är ogiltig', () => {
     const nu = 1_000_000
-    expect(isTokenValid({ accessToken: 'x', expiresAtMs: nu - 1 }, nu)).toBe(false)
+    expect(isTokenValid({ accessToken: 'x', expiresAtMs: nu - 1, tokenUrl: PROD }, nu, PROD)).toBe(false)
+  })
+
+  test('en token från en ANNAN miljö är aldrig giltig, hur färsk den än är', () => {
+    // Byter BOLAGSVERKET_ENV på en varm lambda skulle acceptans-token annars
+    // serverats mot produktionsgatewayen — ett 401 utan förklaring.
+    const nu = 1_000_000
+    const fran_accept = { accessToken: 'x', expiresAtMs: nu + 300_000, tokenUrl: ACCEPT }
+    expect(isTokenValid(fran_accept, nu, ACCEPT)).toBe(true)
+    expect(isTokenValid(fran_accept, nu, PROD)).toBe(false)
+  })
+})
+
+test.describe('topLevelKeys — namnen, aldrig värdena', () => {
+  test('objekt ger fältnamnen, inte innehållet', () => {
+    const keys = topLevelKeys({ organisationsnamn: { namn: 'Bee El AB' }, personnummer: '19850101-1234' })
+    expect(keys).toBe('organisationsnamn,personnummer')
+    expect(keys).not.toContain('Bee El')
+    expect(keys).not.toContain('19850101')
+  })
+
+  test('accept2:s uppräkning av tillåtna testnummer syns som en array, inte som numren', () => {
+    expect(topLevelKeys(['165560000000', '165560000001'])).toBe('array(2)')
+  })
+
+  test('tomt objekt och icke-objekt kastar aldrig', () => {
+    expect(topLevelKeys({})).toBe('(inga fält)')
+    expect(topLevelKeys(null)).toBe('null')
+    expect(topLevelKeys('sträng')).toBe('string')
   })
 })
 

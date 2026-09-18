@@ -706,3 +706,6 @@ Codex fixade de sex namngivna ROT-ställena men fyra fakturavägar och kreditvä
 ## 2026-09-17 — Fail-soft får inte betyda att alla fel ser likadana ut
 `request_failed` täckte tre helt olika saker: nekad behörighet, fel URL och nätverksfel. Användaren och vi såg samma text för alla tre. Degradera snällt, men behåll skillnaden mellan "fel hos oss" och "tjänsten svarar inte" ända ut i texten och i loggen.
 
+
+## 2026-09-18 — En statuskod utan svarskropp är en halv felsökning
+Bolagsverket-uppslaget gick från 404 till 401, och loggen kunde inte säga varför: OAuth-svaret bär en maskinläsbar `error`-kod (`invalid_client` = nyckel/miljö, `invalid_scope` = prenumerationen, `unsupported_grant_type` = vårt anrop) och vi kastade bort den. När ett HTTP-fel har en kropp med en felkod ska koden loggas, inte bara statusen — annars blir varje runda en gissning till. Två följdregler: trimma alltid credentials ur miljövariabler (ett inklistrat radbryte ger samma 401 som fel nyckel och syns ingenstans), och när ett svar inte går att tolka, logga fältNAMNEN men aldrig värdena — det räcker för att laga tolkningen och kan inte läcka personuppgifter till körloggen.
