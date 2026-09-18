@@ -43,7 +43,22 @@ export interface IntakeQuestion {
   /** Bara `number`: enheten svaret anges i — härledd ur målraderna. */
   unit?: string
   /** Bara `choice`: 2–12 alternativ. */
-  choices?: string[]
+  choices?: IntakeChoice[]
+}
+
+/**
+ * Ett alternativ i en valfråga. Med `productId` lägger valet in artikeln som
+ * en rad i offerten; utan går svaret bara vidare som text.
+ *
+ * Varför artikeln och inte en rad: valet är produkten kunden väljer, och den
+ * finns inte som rad i upplägget förrän den valts. Mängdfrågor binder
+ * fortfarande till RADER — klinker golv och klinker vägg kan vara samma
+ * artikel, så en mängd bunden till artikeln skulle träffa båda. Det är exakt
+ * buggen som revs bort när enhetsmatchningen ersattes av radbindning.
+ */
+export interface IntakeChoice {
+  label: string
+  productId?: string
 }
 
 /** En rad i upplägget som en fråga kan peka på. */
@@ -53,6 +68,24 @@ export interface IntakeTarget {
   unit: string
   /** quantity = kopplad artikelrad (mängd), option = tillvalsrad (kryss). */
   kind: 'quantity' | 'option'
+}
+
+/**
+ * Radbyggaren som en valfråga behöver. Anroparen äger den, eftersom bara den
+ * vet radens fulla form och har artikelregistret.
+ */
+export interface IntakeApplyOptions<T> {
+  buildRow?: (input: { question: IntakeQuestion; choice: IntakeChoice; rowId: string }) => T | null
+}
+
+/**
+ * Radens id för en valfrågas svar — härlett ur FRÅGANS id, så att ett omtaget
+ * svar ersätter raden i stället för att lägga till ännu en. Formen håller sig
+ * inom radernas teckenrymd så att raden i sin tur går att peka på med en
+ * mängdfråga.
+ */
+export function intakeChoiceRowId(questionId: string): string {
+  return `qi_val_${questionId}`
 }
 
 export type IntakeAnswerValue = number | boolean | string | null
@@ -96,6 +129,8 @@ export class IntakeQuestionError extends Error {
 const ID_PATTERN = /^[a-z0-9_-]{1,40}$/
 /** Mallradens id (qi_… ur generateItemId, eller äldre seedade former). */
 const TARGET_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
+/** Artikelns id i products — samma teckenrymd som radernas. */
+const PRODUCT_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/
 
 function cleanText(value: unknown, max: number): string | null {
   if (typeof value !== 'string') return null
@@ -151,10 +186,26 @@ export function validateIntakeQuestions(input: unknown): IntakeQuestion[] {
       }
     } else if (q.unit !== undefined) throw new IntakeQuestionError(400, `Bara mått och antal har en enhet ("${label}").`)
     if (kind === 'choice') {
-      const choices = Array.isArray(q.choices) ? q.choices.map(c => cleanText(c, 60)) : null
-      if (!choices || choices.length < 2 || choices.length > 12 || choices.some(c => c === null)) throw new IntakeQuestionError(400, `"${label}" behöver 2–12 alternativ på högst 60 tecken.`)
-      if (new Set(choices).size !== choices.length) throw new IntakeQuestionError(400, `"${label}" har dubbla alternativ.`)
-      question.choices = choices as string[]
+      const raw = Array.isArray(q.choices) ? q.choices : null
+      // En ren sträng tas emot som ett alternativ utan artikel. Formen med
+      // artikel-id kom 2026-09-18; toleransen kostar en rad och gör att en
+      // fråga skriven före den aldrig försvinner tyst genom
+      // readIntakeQuestions catch-gren.
+      const choices = raw?.map(c => {
+        if (typeof c === 'string') { const l = cleanText(c, 60); return l === null ? null : { label: l } }
+        if (!c || typeof c !== 'object' || Array.isArray(c)) return null
+        const o = c as Record<string, unknown>
+        if (Object.keys(o).some(k => !['label', 'productId'].includes(k))) return null
+        const l = cleanText(o.label, 60)
+        if (l === null) return null
+        if (o.productId === undefined || o.productId === null || o.productId === '') return { label: l }
+        const pid = typeof o.productId === 'string' && PRODUCT_ID_PATTERN.test(o.productId) ? o.productId : null
+        return pid ? { label: l, productId: pid } : null
+      }) ?? null
+      if (!choices || choices.length < 2 || choices.length > 12 || choices.some(c => c === null)) throw new IntakeQuestionError(400, `"${label}" behöver 2–12 alternativ på högst 60 tecken, var och en med giltig artikel.`)
+      const labels = (choices as IntakeChoice[]).map(c => c.label)
+      if (new Set(labels).size !== labels.length) throw new IntakeQuestionError(400, `"${label}" har dubbla alternativ.`)
+      question.choices = choices as IntakeChoice[]
     } else if (q.choices !== undefined) throw new IntakeQuestionError(400, `Bara valfrågor har alternativ ("${label}").`)
     return question
   })
@@ -355,7 +406,7 @@ export function normalizeIntakeAnswer(question: IntakeQuestion, value: unknown):
       return Number.isFinite(n) && n >= 0 && value !== '' ? Math.round(n * 100) / 100 : null
     }
     case 'yesno': return typeof value === 'boolean' ? value : null
-    case 'choice': return typeof value === 'string' && question.choices?.includes(value) ? value : null
+    case 'choice': return typeof value === 'string' && question.choices?.some(c => c.label === value) ? value : null
     case 'text': return typeof value === 'string' && value.trim() ? value.trim().slice(0, 1500) : null
   }
 }
@@ -386,7 +437,7 @@ export function readIntakeAnswerSet(value: unknown): IntakeAnswerSet | null {
     const kind = INTAKE_KINDS.includes(a.kind as IntakeQuestionKind) ? (a.kind as IntakeQuestionKind) : null
     if (!id || !label || !kind) return null
     const question: IntakeQuestion = { id, label, kind }
-    if (kind === 'choice' && typeof a.value === 'string') question.choices = [a.value]
+    if (kind === 'choice' && typeof a.value === 'string') question.choices = [{ label: a.value }]
     const unit = a.unit === undefined ? undefined : cleanText(a.unit, 20)
     if (unit === null) return null
     let targets: string[] | undefined
@@ -409,20 +460,64 @@ export function readIntakeAnswerSet(value: unknown): IntakeAnswerSet | null {
  * bara på tillvalsrader. Ingen enhets- eller textmatchning: rader som råkar
  * ha samma enhet eller samma ord rörs aldrig. Anroparen kör
  * recalculateItems/prisresolvern efteråt.
+ *
+ * TVÅ PASS sedan valfrågorna kom (2026-09-18): struktur före mängder. En
+ * valfråga är det ENDA som får skapa en rad, och högst en per fråga — då är
+ * radmängden fortfarande härledbar ur upplägget plus frågorna. Fri påbyggnad
+ * ur artikelregistret hör hemma i dokumentet, som är enda radeditorn.
+ *
+ * Modulen bygger inte raden själv: den kan mappa T till T men inte hitta på
+ * ett T, och den ska förbli fri från pris- och databaskunskap. Anroparen
+ * levererar `buildRow` — och eftersom uppslaget bor där hämtas priset vid
+ * tillämpningen i stället för att sparas när frågan skrevs, så priserna i
+ * frågeflödet kan inte ruttna medan artikelregistret uppdateras.
  */
-export function applyIntakeAnswers<T extends IntakeRow>(rows: readonly T[], questions: readonly IntakeQuestion[], answers: IntakeAnswers): T[] {
+export function applyIntakeAnswers<T extends IntakeRow>(
+  rows: readonly T[],
+  questions: readonly IntakeQuestion[],
+  answers: IntakeAnswers,
+  options?: IntakeApplyOptions<T>
+): T[] {
   let result = rows.slice()
+
+  // ── Pass 1: struktur ──────────────────────────────────────────────────
+  // Vilka rader som FINNS avgörs här: valfrågor lägger in eller tar bort sin
+  // rad, ja/nej kryssar tillval. Måste ske före mängderna, annars kan en
+  // mängdfråga peka på en rad som ännu inte skapats.
   for (const q of questions) {
-    if (!q.targets?.length) continue
     const value = normalizeIntakeAnswer(q, answers[q.id])
-    if (!isAnswered(value)) continue
-    const pointsAt = (row: IntakeRow) => typeof row.id === 'string' && q.targets!.includes(row.id)
-    if (q.kind === 'number' && typeof value === 'number' && value > 0) {
-      result = result.map(row => pointsAt(row) && intakeRowTakesQuantity(row) ? { ...row, quantity: value } : row)
-    } else if (q.kind === 'yesno' && typeof value === 'boolean') {
+
+    if (q.kind === 'choice') {
+      // Radens id härleds ur FRÅGANS id, inte ur alternativet. Därför ersätter
+      // ett omtaget svar raden i stället för att lägga till ännu en.
+      const rowId = intakeChoiceRowId(q.id)
+      const utan = result.filter(row => row.id !== rowId)
+      const valt = isAnswered(value) && typeof value === 'string'
+        ? q.choices?.find(c => c.label === value)
+        : undefined
+      // Inget svar, eller ett alternativ utan artikel: raden ska bort. Ett
+      // omtaget svar får aldrig lämna kvar den förra valda produkten.
+      if (!valt?.productId || !options?.buildRow) { result = utan; continue }
+      const byggd = options.buildRow({ question: q, choice: valt, rowId })
+      result = byggd ? [...utan, byggd] : utan
+      continue
+    }
+
+    if (q.kind === 'yesno' && q.targets?.length && typeof value === 'boolean') {
+      const pointsAt = (row: IntakeRow) => typeof row.id === 'string' && q.targets!.includes(row.id)
       result = result.map(row => pointsAt(row) && row.item_type === 'option' ? { ...row, option_selected: value, option_default: value } : row)
     }
   }
+
+  // ── Pass 2: mängder ───────────────────────────────────────────────────
+  for (const q of questions) {
+    if (q.kind !== 'number' || !q.targets?.length) continue
+    const value = normalizeIntakeAnswer(q, answers[q.id])
+    if (!isAnswered(value) || typeof value !== 'number' || value <= 0) continue
+    const pointsAt = (row: IntakeRow) => typeof row.id === 'string' && q.targets!.includes(row.id)
+    result = result.map(row => pointsAt(row) && intakeRowTakesQuantity(row) ? { ...row, quantity: value } : row)
+  }
+
   return result
 }
 

@@ -55,6 +55,7 @@ for (const [lage, filnamn] of [
       'Hur många kvadratmeter golv?',
       'Hur många kvadratmeter vägg?',
       'Ska golvvärme ingå?',
+      'Vilket ytskikt vill kunden ha?',
       'Något mer vi bör veta?',
     ]) {
       await expect(page.getByText(fraga).first()).toBeVisible()
@@ -68,7 +69,9 @@ for (const [lage, filnamn] of [
     expect(sida).toContain('Sätter: Klinker golv, Tätskikt')
     expect(sida).toContain('Sätter: Kakel vägg')
     expect(sida).toContain('Kryssar: Golvvärme')
-    if (lage === 'ifyllt') expect(sida).toContain('3 av 4 besvarade')
+    // Valfrågan säger vad den GÖR, precis som mängdfrågan säger "Sätter:".
+    expect(sida).toContain('Lägger in')
+    if (lage === 'ifyllt') expect(sida).toContain('4 av 5 besvarade')
 
     // Ingen horisontell scroll i 375 px.
     const bredd = await page.evaluate(() => ({

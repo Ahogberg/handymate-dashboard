@@ -65,6 +65,8 @@ export async function intakeFlowPreview(
     { id: 'q_golv', label: 'Hur många kvadratmeter golv?', kind: 'number', unit: 'm²', targets: ['r_klinker', 'r_tatskikt'] },
     { id: 'q_vagg', label: 'Hur många kvadratmeter vägg?', kind: 'number', unit: 'm²', targets: ['r_kakel'] },
     { id: 'q_golvvarme', label: 'Ska golvvärme ingå?', kind: 'yesno', targets: ['r_golvvarme'] },
+    { id: 'q_ytskikt', label: 'Vilket ytskikt vill kunden ha?', kind: 'choice',
+      choices: [{ label: 'Kakel 20x20', productId: 'p_kakel' }, { label: 'Klinker 30x30', productId: 'p_klinker' }, { label: 'Vet ej än' }] },
     { id: 'q_ovrigt', label: 'Något mer vi bör veta?', kind: 'text', targets: [] },
   ]
   const targets = [
@@ -73,7 +75,7 @@ export async function intakeFlowPreview(
     { id: 'r_kakel', description: 'Kakel vägg', unit: 'm²', kind: 'quantity' },
     { id: 'r_golvvarme', description: 'Golvvärme', unit: 'st', kind: 'option' },
   ]
-  const svar = mode === 'ifyllt' ? { q_golv: 6.5, q_vagg: 21, q_golvvarme: true } : {}
+  const svar = mode === 'ifyllt' ? { q_golv: 6.5, q_vagg: 21, q_golvvarme: true, q_ytskikt: 'Klinker 30x30' } : {}
 
   const script = `
     const cache={

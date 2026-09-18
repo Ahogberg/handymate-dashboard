@@ -119,9 +119,15 @@ export function IntakeQuestionFlow({ jobTypeName, questions, targets = [], initi
                   onClick={() => set(q.id, value === v ? null : (v as boolean))}>{label}</button>)}
               </div>}
               {q.kind === 'choice' && <div className="flex flex-wrap gap-2" role="group" aria-labelledby={`intake-${q.id}`}>
-                {(q.choices ?? []).map(choice => <button key={choice} type="button" disabled={busy} aria-pressed={value === choice}
-                  className={chip(value === choice)} onClick={() => set(q.id, value === choice ? null : choice)}>{choice}</button>)}
+                {(q.choices ?? []).map(choice => <button key={choice.label} type="button" disabled={busy} aria-pressed={value === choice.label}
+                  className={chip(value === choice.label)} onClick={() => set(q.id, value === choice.label ? null : choice.label)}>{choice.label}</button>)}
               </div>}
+              {/* Ett alternativ med artikel lägger in en rad i offerten. Säg det
+                  rakt ut, av samma skäl som "Sätter:" står under mängdfrågan —
+                  den som svarar ska aldrig behöva gissa vad svaret gör. */}
+              {q.kind === 'choice' && (q.choices ?? []).some(c => c.productId) && <p className="text-xs text-slate-500 mt-2">
+                <span className="font-semibold text-primary-700">Lägger in:</span> vald produkt som en rad i offerten
+              </p>}
               {q.kind === 'text' && <div className="relative">
                 <textarea id={`intake-${q.id}`} rows={2} className={`${field} pr-14 resize-none`} disabled={busy}
                   value={typeof value === 'string' ? value : ''} onChange={e => set(q.id, e.target.value)} placeholder="Skriv eller prata in" />

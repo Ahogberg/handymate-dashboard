@@ -26,6 +26,7 @@ import { canApplyJobTypeStart, loadJobTypeStart, type JobTypeStart, type QuoteSt
 import { byggPafyllnadsrader } from '@/lib/quotes/job-type-append'
 import { IntakeQuestionFlow } from '@/components/quotes/IntakeQuestionFlow'
 import { fetchIntakeQuestions } from '@/lib/quotes/intake-flow'
+import type { IntakeChoiceArticle } from '@/lib/quotes/intake-questions-server'
 import { applyIntakeAnswers, buildIntakeAnswerSet, intakeAnswersText, intakeTargetsFromRows, type IntakeAnswerSet, type IntakeAnswers, type IntakeQuestion } from '@/lib/quotes/intake-questions'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
@@ -439,7 +440,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // men INTE inlagt förrän frågorna är besvarade eller hoppade över. Sätts
   // och töms alltid tillsammans med quickMode 'fragor'; returläget är det
   // hantverkaren stod i när upplägget trycktes (intaget eller editorn).
-  const [pendingIntake, setPendingIntake] = useState<{ start: JobTypeStart; questions: IntakeQuestion[] } | null>(null)
+  const [pendingIntake, setPendingIntake] = useState<{ start: JobTypeStart; questions: IntakeQuestion[]; choiceArticles: IntakeChoiceArticle[] } | null>(null)
   const intakeReturnMode = useRef<'intake' | 'building' | null>(null)
   const [intakeAnswers, setIntakeAnswers] = useState<IntakeAnswerSet | null>(null)
   /** Snabbofferten öppnas automatiskt EN gång vid kallstart. Utan den här
@@ -1621,7 +1622,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     if (signal.aborted) return
     if (intake.questions.length > 0) {
       intakeReturnMode.current = quickMode === 'fragor' ? null : quickMode
-      setPendingIntake({ start, questions: intake.questions })
+      setPendingIntake({ start, questions: intake.questions, choiceArticles: intake.choiceArticles ?? [] })
       setQuickMode('fragor')
       return
     }
@@ -1636,10 +1637,35 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
    * strukturerat på offerten och som text till Matte (source_transcript);
    * kundens beskrivning rörs inte.
    */
-  function applyVerifiedJobTypeStart(verified: JobTypeStart, answered: { questions: IntakeQuestion[]; answers: IntakeAnswers } | null) {
+  function applyVerifiedJobTypeStart(
+    verified: JobTypeStart,
+    answered: { questions: IntakeQuestion[]; answers: IntakeAnswers } | null,
+    choiceArticles: IntakeChoiceArticle[] = []
+  ) {
     const set = answered ? buildIntakeAnswerSet(verified.selection.jobTypeSlug, answered.questions, answered.answers) : null
+    /**
+     * Raden ett valt alternativ lägger in. Byggs HÄR och inte i den rena
+     * modulen, som varken känner radens fulla form eller artikelregistret.
+     * Formen är exakt mallradens, så raddelningen arbete/material/resa,
+     * prisresolvern, ROT-basen och dokumentet fungerar oförändrade — det är
+     * hela vinsten med att återanvända radformen i stället för att uppfinna
+     * en egen "artikelrad".
+     */
+    const buildRow = (input: { choice: { productId?: string }; rowId: string }) => {
+      const artikel = choiceArticles.find(a => a.id === input.choice.productId)
+      if (!artikel) return null
+      return {
+        id: input.rowId,
+        item_type: 'item',
+        description: artikel.name,
+        unit: artikel.unit,
+        quantity: 1,
+        unit_price: artikel.salesPrice,
+        linked_product_id: artikel.id,
+      } as (typeof verified.template.default_items extends (infer R)[] | undefined ? R : never)
+    }
     const start: JobTypeStart = set && answered
-      ? { ...verified, template: { ...verified.template, default_items: applyIntakeAnswers(verified.template.default_items ?? [], answered.questions, answered.answers) } }
+      ? { ...verified, template: { ...verified.template, default_items: applyIntakeAnswers(verified.template.default_items ?? [], answered.questions, answered.answers, { buildRow }) } }
       : verified
     setQuoteJobType(start.selection.jobTypeSlug)
     handleNewTemplateSelect(start.template, start.products)
@@ -2213,7 +2239,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         questions={pendingIntake.questions}
         targets={intakeTargetsFromRows(pendingIntake.start.template.default_items ?? [])}
         busy={false}
-        onSubmit={answers => applyVerifiedJobTypeStart(pendingIntake.start, { questions: pendingIntake.questions, answers })}
+        onSubmit={answers => applyVerifiedJobTypeStart(pendingIntake.start, { questions: pendingIntake.questions, answers }, pendingIntake.choiceArticles)}
         onSkip={() => applyVerifiedJobTypeStart(pendingIntake.start, null)}
         onBack={leaveIntakeFlow}
       />

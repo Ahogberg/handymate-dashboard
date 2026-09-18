@@ -9,6 +9,20 @@ export interface IntakeQuestionsView {
   seeded: boolean
   /** Raderna i jobbtypens upplägg som frågor kan peka på (kopplade artikelrader och tillval). */
   targets: IntakeTarget[]
+  /**
+   * Artiklarna som valfrågornas alternativ pekar på, med priset som gäller NU.
+   * Läses här och inte när frågan skrevs — annars skulle priserna i
+   * frågeflödet ruttna medan artikelregistret uppdateras. Bara de artiklar
+   * frågorna faktiskt nämner; registret i sin helhet hör hemma i editorn.
+   */
+  choiceArticles: IntakeChoiceArticle[]
+}
+
+export interface IntakeChoiceArticle {
+  id: string
+  name: string
+  unit: string
+  salesPrice: number
 }
 
 async function readJobType(db: SupabaseClient, businessId: string, slug: unknown) {
@@ -38,14 +52,34 @@ export async function loadIntakeQuestions(db: SupabaseClient, businessId: string
   if (config.error) throw new IntakeQuestionError(503, 'Kunde inte läsa företagets bransch.')
   const stored = readIntakeQuestions(job.intake_questions)
   const trade = normalizeBranch(config.data?.branch ?? null)
+  const questions = stored ?? seedIntakeQuestions(trade, job.name, targets)
   return {
     jobType: { slug: job.slug, name: job.name },
     // En sparad fråga vars rad försvunnit ur upplägget står kvar (redigeraren
     // visar det); bindningen kontrolleras hårt bara vid sparning.
-    questions: stored ?? seedIntakeQuestions(trade, job.name, targets),
+    questions,
     seeded: stored === null,
     targets,
+    choiceArticles: await readChoiceArticles(db, businessId, questions),
   }
+}
+
+/** Artiklarna valfrågorna pekar på. Tom lista när ingen fråga binder till någon. */
+async function readChoiceArticles(db: SupabaseClient, businessId: string, questions: readonly IntakeQuestion[]): Promise<IntakeChoiceArticle[]> {
+  const ids = Array.from(new Set(questions.flatMap(q => (q.choices ?? []).map(c => c.productId).filter((id): id is string => !!id))))
+  if (!ids.length) return []
+  const { data, error } = await db.from('products').select('id, name, unit, sales_price')
+    .eq('business_id', businessId).in('id', ids)
+  // Fail-soft: utan artiklarna går frågeflödet att köra, valen lägger bara
+  // inte in någon rad. Att blockera hela intaget för en produktläsning vore
+  // ett sämre byte.
+  if (error || !data) return []
+  return data.map(p => ({
+    id: String(p.id),
+    name: String(p.name ?? ''),
+    unit: typeof p.unit === 'string' && p.unit ? p.unit : 'st',
+    salesPrice: Number(p.sales_price ?? 0) || 0,
+  })).filter(p => p.id && p.name)
 }
 
 /**

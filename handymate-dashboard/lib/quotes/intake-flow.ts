@@ -1,10 +1,13 @@
 import type { IntakeQuestion, IntakeTarget } from './intake-questions'
+import type { IntakeChoiceArticle } from './intake-questions-server'
 
 export interface IntakeQuestionsResponse {
   jobType: { slug: string; name: string }
   questions: IntakeQuestion[]
   seeded: boolean
   targets: IntakeTarget[]
+  /** Artiklarna valfrågorna pekar på, med priset som gäller nu. */
+  choiceArticles?: IntakeChoiceArticle[]
   canManage: boolean
 }
 

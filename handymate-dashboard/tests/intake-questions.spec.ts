@@ -3,7 +3,7 @@ import fs from 'fs'
 import path from 'path'
 import {
   applyIntakeAnswers, bindIntakeQuestions, buildIntakeAnswerSet, equivalentUnit, intakeAnswersText, intakeRowTakesQuantity, intakeTargetsFromRows,
-  missingIntakeTargets, readIntakeAnswerSet, readIntakeQuestions, seedIntakeQuestions, validateIntakeQuestions, INTAKE_SEED_MAX, type IntakeQuestion,
+  intakeChoiceRowId, missingIntakeTargets, readIntakeAnswerSet, readIntakeQuestions, seedIntakeQuestions, validateIntakeQuestions, INTAKE_SEED_MAX, type IntakeQuestion,
 } from '../lib/quotes/intake-questions'
 import { fetchIntakeQuestions } from '../lib/quotes/intake-flow'
 
@@ -43,7 +43,7 @@ const fragor: IntakeQuestion[] = [
   { id: 'vagg_m2', label: 'Kakel vägg: hur många m²?', kind: 'number', unit: 'M²', targets: ['qi_vagg'] },
   { id: 'antal_st', label: 'Hur många blandare?', kind: 'number', unit: 'st', targets: ['qi_blandare'] },
   { id: 'golvvarme', label: 'Ska det vara golvvärme?', kind: 'yesno', targets: ['qi_golvvarme'] },
-  { id: 'ytskikt', label: 'Vilket ytskikt?', kind: 'choice', choices: ['Kakel', 'Klinker'] },
+  { id: 'ytskikt', label: 'Vilket ytskikt?', kind: 'choice', choices: [{ label: 'Kakel' }, { label: 'Klinker' }] },
   { id: 'ovrigt', label: 'Något som påverkar tiden?', kind: 'text' },
 ]
 
@@ -228,8 +228,68 @@ test.describe('svar → rader — applyIntakeAnswers', () => {
     const utan = applyIntakeAnswers(rader(), [{ id: 'q', label: 'x', kind: 'yesno' }], { q: true })
     expect(utan).toEqual(rader())
   })
-  test('val och fritext rör aldrig rader', () => {
+  test('val och fritext rör aldrig rader utan en radbyggare', () => {
+    // Utan buildRow kan en valfråga inte skapa något — modulen kan mappa T
+    // till T men inte hitta på ett T. Anroparen äger radens form.
     expect(applyIntakeAnswers(rader(), fragor, { ytskikt: 'Kakel', ovrigt: '12 m² extra' })).toEqual(rader())
+  })
+
+  test.describe('valfrågan lägger in artikelns rad', () => {
+    type Rad = ReturnType<typeof rader>[number]
+    const medArtikel: IntakeQuestion[] = [{
+      id: 'ytskikt', label: 'Vilket ytskikt?', kind: 'choice',
+      choices: [{ label: 'Kakel', productId: 'p_kakel' }, { label: 'Klinker', productId: 'p_klinker' }, { label: 'Vet ej' }],
+    }]
+    const priser: Record<string, { name: string; unit: string; price: number }> = {
+      p_kakel: { name: 'Kakel 20x20', unit: 'm²', price: 349 },
+      p_klinker: { name: 'Klinker 30x30', unit: 'm²', price: 429 },
+    }
+    const byggare = ({ choice, rowId }: { choice: { productId?: string }; rowId: string }) => {
+      const a = choice.productId ? priser[choice.productId] : undefined
+      if (!a) return null
+      return { id: rowId, item_type: 'item', description: a.name, unit: a.unit, quantity: 1, unit_price: a.price, linked_product_id: choice.productId } as unknown as Rad
+    }
+
+    test('valt alternativ med artikel ger en ny rad, kopplad till artikeln', () => {
+      const ut = applyIntakeAnswers(rader(), medArtikel, { ytskikt: 'Kakel' }, { buildRow: byggare })
+      expect(ut).toHaveLength(rader().length + 1)
+      const ny = ut[ut.length - 1] as any
+      expect(ny.description).toBe('Kakel 20x20')
+      expect(ny.linked_product_id).toBe('p_kakel')
+      expect(ny.unit_price).toBe(349)
+    })
+
+    test('omtaget svar ERSÄTTER raden — id:t härleds ur frågan, inte ur alternativet', () => {
+      const forst = applyIntakeAnswers(rader(), medArtikel, { ytskikt: 'Kakel' }, { buildRow: byggare })
+      const sedan = applyIntakeAnswers(forst, medArtikel, { ytskikt: 'Klinker' }, { buildRow: byggare })
+      expect(sedan).toHaveLength(rader().length + 1)
+      expect((sedan[sedan.length - 1] as any).description).toBe('Klinker 30x30')
+      expect(sedan.filter(r => r.id === intakeChoiceRowId('ytskikt'))).toHaveLength(1)
+    })
+
+    test('ett alternativ utan artikel tar bort raden ett tidigare val lade in', () => {
+      const forst = applyIntakeAnswers(rader(), medArtikel, { ytskikt: 'Kakel' }, { buildRow: byggare })
+      const sedan = applyIntakeAnswers(forst, medArtikel, { ytskikt: 'Vet ej' }, { buildRow: byggare })
+      expect(sedan).toEqual(rader())
+    })
+
+    test('ett rensat svar tar bort raden — inget spöke från förra svaret blir kvar', () => {
+      const forst = applyIntakeAnswers(rader(), medArtikel, { ytskikt: 'Kakel' }, { buildRow: byggare })
+      expect(applyIntakeAnswers(forst, medArtikel, {}, { buildRow: byggare })).toEqual(rader())
+    })
+
+    test('TVÅ PASS: en mängdfråga kan peka på raden som valfrågan just skapade', () => {
+      // Hela skälet till att strukturen körs före mängderna. Körs de i fel
+      // ordning finns raden ännu inte när mängden ska sättas, och talet tappas.
+      const fragorna: IntakeQuestion[] = [
+        { id: 'ytan', label: 'Hur många m²?', kind: 'number', unit: 'm²', targets: [intakeChoiceRowId('ytskikt')] },
+        ...medArtikel,
+      ]
+      const ut = applyIntakeAnswers(rader(), fragorna, { ytskikt: 'Kakel', ytan: 12 }, { buildRow: byggare })
+      const ny = ut.find(r => r.id === intakeChoiceRowId('ytskikt')) as any
+      expect(ny).toBeTruthy()
+      expect(ny.quantity).toBe(12)
+    })
   })
   test('miniräknarmallen (belopp i antalet, allt "st", inga artiklar) lämnas helt orörd — även om någon pekar på raderna', () => {
     const before = miniraknarmall()
@@ -355,7 +415,14 @@ test.describe('kopplingen i koden — källskanning', () => {
     const apply = block.indexOf('handleNewTemplateSelect(start.template, start.products)')
     expect(verify).toBeGreaterThan(-1); expect(fetch).toBeGreaterThan(verify); expect(open).toBeGreaterThan(fetch); expect(apply).toBeGreaterThan(open)
     expect(block).toContain('if (intake.questions.length > 0) {')
-    expect(block).toContain('applyIntakeAnswers(verified.template.default_items ?? [], answered.questions, answered.answers)')
+    // Radbyggaren måste följa med, annars kan en valfråga inte lägga in sin
+    // artikel — modulen skapar aldrig en rad på egen hand.
+    expect(block).toContain('applyIntakeAnswers(verified.template.default_items ?? [], answered.questions, answered.answers, { buildRow })')
+    // Priset i raden kommer från artikeln som lästes när flödet öppnades,
+    // aldrig ur frågans egen lagring — annars ruttnar priserna.
+    expect(block).toContain('const artikel = choiceArticles.find(a => a.id === input.choice.productId)')
+    expect(block).toContain('unit_price: artikel.salesPrice')
+    expect(block).toContain('linked_product_id: artikel.id')
     expect(block).toContain('setIntakeAnswers(set)')
     expect(block).toContain('intakeAnswersText(set)')
     // Fullskärmsläget: hoppa över = null-svar, tillbaka = lämna flödet.

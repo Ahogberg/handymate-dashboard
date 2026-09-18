@@ -19,7 +19,7 @@ import { ArrowDown, ArrowUp, Loader2, Plus, Trash2 } from 'lucide-react'
 import { fetchIntakeQuestions, saveIntakeQuestions } from '@/lib/quotes/intake-flow'
 import {
   INTAKE_KIND_LABELS, INTAKE_KINDS, INTAKE_MAX_QUESTIONS, equivalentUnit, missingIntakeTargets, validateIntakeQuestions,
-  type IntakeQuestion, type IntakeQuestionKind, type IntakeTarget,
+  type IntakeChoice, type IntakeQuestion, type IntakeQuestionKind, type IntakeTarget,
 } from '@/lib/quotes/intake-questions'
 
 interface Props {
@@ -31,7 +31,10 @@ interface Props {
   refreshKey?: string | number
 }
 
-interface Draft extends IntakeQuestion { choicesText?: string }
+/** Artikelraden i registret som ett alternativ kan peka på. */
+interface Artikel { id: string; name: string; unit: string | null; sales_price: number }
+
+interface Draft extends IntakeQuestion { choiceDrafts?: IntakeChoice[] }
 
 function newId(existing: Draft[]): string {
   let n = existing.length + 1
@@ -39,13 +42,19 @@ function newId(existing: Draft[]): string {
   return `fraga_${n}`
 }
 
-function toDraft(q: IntakeQuestion): Draft { return { ...q, choicesText: q.choices?.join(', ') ?? '' } }
+function toDraft(q: IntakeQuestion): Draft {
+  return { ...q, choiceDrafts: q.choices?.map(c => ({ ...c })) ?? [{ label: '' }, { label: '' }] }
+}
 
 function fromDraft(d: Draft): IntakeQuestion {
   const q: IntakeQuestion = { id: d.id, label: d.label, kind: d.kind }
   if ((d.kind === 'number' || d.kind === 'yesno') && d.targets?.length) q.targets = d.targets.slice()
   if (d.kind === 'number' && d.unit?.trim()) q.unit = d.unit.trim()
-  if (d.kind === 'choice') q.choices = (d.choicesText ?? '').split(',').map(s => s.trim()).filter(Boolean)
+  if (d.kind === 'choice') {
+    q.choices = (d.choiceDrafts ?? [])
+      .map(c => ({ label: c.label.trim(), ...(c.productId ? { productId: c.productId } : {}) }))
+      .filter(c => c.label)
+  }
   return q
 }
 
@@ -53,6 +62,7 @@ export function JobTypeQuestionsEditor({ jobTypeSlug, jobTypeName, canManage, bu
   const [drafts, setDrafts] = useState<Draft[] | null>(null)
   const [seeded, setSeeded] = useState(false)
   const [targets, setTargets] = useState<IntakeTarget[]>([])
+  const [artiklar, setArtiklar] = useState<Artikel[]>([])
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -72,6 +82,38 @@ export function JobTypeQuestionsEditor({ jobTypeSlug, jobTypeName, canManage, bu
       .finally(() => { if (request === revision.current && !controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [jobTypeSlug, refreshKey])
+
+  /**
+   * Artikelregistret för valfrågornas alternativ. Prissatta först: mätt
+   * 2026-09-18 saknar ungefär tre fjärdedelar av artiklarna pris
+   * (Bee Service 139 av 187), så en osorterad lista skulle i praktiken
+   * erbjuda en prislös artikel överst — och en valfråga mot en sådan ger en
+   * 0 kr-rad i kundens offert.
+   */
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch('/api/products', { signal: controller.signal })
+      .then(r => (r.ok ? r.json() : null))
+      .then(data => {
+        const rows: Artikel[] = Array.isArray(data?.products) ? data.products : Array.isArray(data) ? data : []
+        setArtiklar(
+          rows
+            .map(p => ({ id: String(p.id), name: String(p.name ?? ''), unit: p.unit ?? null, sales_price: Number(p.sales_price ?? 0) || 0 }))
+            .filter(p => p.id && p.name)
+            .sort((a, b) => (b.sales_price > 0 ? 1 : 0) - (a.sales_price > 0 ? 1 : 0) || a.name.localeCompare(b.name, 'sv'))
+        )
+      })
+      .catch(() => { /* Utan register går valfrågor att skriva, bara inte binda till en artikel. */ })
+    return () => controller.abort()
+  }, [refreshKey])
+
+  const prislosaVal = (drafts ?? []).flatMap((q, index) =>
+    q.kind === 'choice'
+      ? (q.choiceDrafts ?? [])
+          .filter(c => c.productId && (artiklar.find(a => a.id === c.productId)?.sales_price ?? 0) <= 0)
+          .map(c => `${index + 1}. ${c.label || 'alternativet'}`)
+      : []
+  )
 
   const update = (index: number, patch: Partial<Draft>) => {
     setDrafts(prev => prev ? prev.map((q, i) => i === index ? { ...q, ...patch } : q) : prev); setDirty(true); setSaved('')
@@ -95,7 +137,7 @@ export function JobTypeQuestionsEditor({ jobTypeSlug, jobTypeName, canManage, bu
   }
   const remove = (index: number) => { setDrafts(prev => prev ? prev.filter((_, i) => i !== index) : prev); setDirty(true); setSaved('') }
   const add = () => {
-    setDrafts(prev => { const list = prev ?? []; return [...list, { id: newId(list), label: '', kind: 'number', choicesText: '' }] })
+    setDrafts(prev => { const list = prev ?? []; return [...list, { id: newId(list), label: '', kind: 'number', choiceDrafts: [{ label: '' }, { label: '' }] }] })
     setDirty(true); setSaved('')
   }
 
@@ -112,6 +154,14 @@ export function JobTypeQuestionsEditor({ jobTypeSlug, jobTypeName, canManage, bu
 
   function save() {
     if (!drafts) return
+    // Ett alternativ mot en prislös artikel ger garanterat en 0 kr-rad i
+    // kundens offert. Det är inte en halvfärdig fråga utan en trasig, så den
+    // spärras här i stället för att bara färgas. Måste ligga FÖRE validatorn:
+    // den känner bara frågans form, inte artikelregistrets priser.
+    if (prislosaVal.length) {
+      setError(`Alternativ utan pris: ${prislosaVal.join(', ')}. Sätt ett pris i artikelregistret, eller ta bort artikeln från alternativet.`)
+      return
+    }
     let questions: IntakeQuestion[]
     try { questions = validateIntakeQuestions(drafts.map(fromDraft)) }
     catch (err) { setError(err instanceof Error ? err.message : 'Kontrollera frågorna.'); return }
@@ -167,8 +217,35 @@ export function JobTypeQuestionsEditor({ jobTypeSlug, jobTypeName, canManage, bu
           {INTAKE_KINDS.map(kind => <option key={kind} value={kind}>{INTAKE_KIND_LABELS[kind]}</option>)}
         </select></label>
         {(q.kind === 'number' || q.kind === 'yesno') && targetPicker(index, q)}
-        {q.kind === 'choice' && <label>Alternativ, kommaseparerade<input aria-label={`Alternativ för fråga ${index + 1}`} value={q.choicesText ?? ''} disabled={disabled}
-          onChange={e => update(index, { choicesText: e.target.value })} placeholder="Kakel, Klinker, Våtrumsmatta" /></label>}
+        {q.kind === 'choice' && <fieldset className="job-questions-targets">
+          <legend>Alternativ — och vad de lägger in</legend>
+          {(q.choiceDrafts ?? []).map((choice, ci) => {
+            const artikel = choice.productId ? artiklar.find(a => a.id === choice.productId) : undefined
+            const prislos = !!artikel && artikel.sales_price <= 0
+            const setChoice = (patch: Partial<IntakeChoice>) => update(index, {
+              choiceDrafts: (q.choiceDrafts ?? []).map((c, i) => i === ci ? { ...c, ...patch } : c),
+            })
+            return <div key={ci} className="job-questions-choice">
+              <input aria-label={`Alternativ ${ci + 1} för fråga ${index + 1}`} value={choice.label} disabled={disabled}
+                onChange={e => setChoice({ label: e.target.value })} placeholder="Till exempel: Klinker" />
+              <select aria-label={`Artikel för alternativ ${ci + 1} i fråga ${index + 1}`} value={choice.productId ?? ''} disabled={disabled}
+                onChange={e => setChoice({ productId: e.target.value || undefined })}>
+                <option value="">Lägger inte in någon rad</option>
+                {artiklar.map(a => <option key={a.id} value={a.id}>
+                  {a.name}{a.sales_price > 0 ? ` — ${a.sales_price.toLocaleString('sv-SE')} kr/${a.unit || 'st'}` : ' — pris saknas'}
+                </option>)}
+              </select>
+              {(q.choiceDrafts?.length ?? 0) > 2 && <button type="button" disabled={disabled} aria-label={`Ta bort alternativ ${ci + 1}`}
+                onClick={() => update(index, { choiceDrafts: (q.choiceDrafts ?? []).filter((_, i) => i !== ci) })}><Trash2 size={16} /></button>}
+              {prislos && <p role="alert" className="job-questions-warning">
+                Artikeln saknar pris. Alternativet skulle ge en rad på 0 kr — sätt ett pris i artikelregistret först.
+              </p>}
+            </div>
+          })}
+          {(q.choiceDrafts?.length ?? 0) < 12 && <button type="button" disabled={disabled}
+            onClick={() => update(index, { choiceDrafts: [...(q.choiceDrafts ?? []), { label: '' }] })}>
+            <Plus size={16} /> Lägg till alternativ</button>}
+        </fieldset>}
         {canManage && <div className="job-setup-inline">
           <button type="button" aria-label={`Flytta upp fråga ${index + 1}`} disabled={disabled || index === 0} onClick={() => move(index, -1)}><ArrowUp size={16} /></button>
           <button type="button" aria-label={`Flytta ner fråga ${index + 1}`} disabled={disabled || index === drafts.length - 1} onClick={() => move(index, 1)}><ArrowDown size={16} /></button>
