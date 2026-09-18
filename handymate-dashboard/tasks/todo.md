@@ -1,3 +1,88 @@
+## Spår 2 — Skickat blir levererat, 2026-09-18
+
+"Skickat" har betytt att sändtjänsten svarade HTTP 200 på vårt anrop. Ett SMS
+till ett avstängt nummer och ett mejl som studsade såg exakt likadana ut som ett
+som kom fram. `lib/outbound/status.ts` sa det rakt ut: "Leveransbesked saknas".
+Hantverkaren ringde upp och frågade "fick du mitt SMS?" — det är den frågan som
+stängs här. Leverans är ett EGET faktum vid sidan av sändningen; status-maskinen
+`sent|failed|unknown` är orörd.
+
+- [x] **46elks `whendelivered`.** `sendSmsViaElks` skickar
+      `whendelivered=<appUrl>/api/sms/delivered` med webhook-hemligheten i
+      frågesträngen (samma `medElksHemlighet` som `whenhangup`). Ny rutt
+      `app/api/sms/delivered` (force-dynamic, `verifieraElksWebhook`, svarar
+      "OK"): uppdaterar `sms_log` på `elks_id` med `delivery_status` +
+      `delivered_at`. Okänt id ⇒ 200 + logg, aldrig 500 — 46elks retry:ar annars
+      i en kö som aldrig kan tömmas.
+- [x] **Tolerant parser, dokumenterat antagande.** 46elks dokumentation var inte
+      nåbar från byggmiljön (utgående trafik blockerad). Parsern läser id ur
+      `id`/`smsid`/`messageid`, status ur `status`/`delivery_status`, tid ur
+      `delivered`/`delivered_at`/`created`, och tar både form-urlencoded och
+      JSON. Okänt statusvärde skrivs ALDRIG — vi gissar inte ett leveransbesked.
+- [x] **Resend-webhook.** Ny `app/api/email/events` med Svix-signatur
+      (HMAC-SHA256 base64 över `svix-id.svix-timestamp.<rå kropp>`, 5 min
+      toleransfönster, konstant tid, inget nytt beroende — `svix` finns inte i
+      package.json). `email.delivered|bounced|complained|delivery_delayed`
+      skriver på `communication_log.provider_message_id`. Studs/spamanmälan på en
+      kundadress ⇒ `customer_fact` (`contact`, källa `email_bounce`,
+      `confirmed_at: null`) och ALDRIG ett nytt utskick.
+- [x] **Strypunkt för e-post.** Tolv direktanropare flyttade till `sendEmail()`:
+      `lib/invoices/send-invoice.ts`, `app/api/team/invite`,
+      `app/api/team/[id]/resend-invite`, `app/api/orders/send`,
+      `lib/partners/agreement.ts`, `app/api/admin/partners` + `.../[id]/approve`
+      (den tolfte, inte i briefen), `app/api/partners/register`,
+      `app/api/quotes/send`, `tool-router.ts`, `lib/auth/password-reset-email.ts`,
+      `lib/portal/notification-emails.ts`. `sendEmail` utökad med flera
+      mottagare, `bcc`, `text` och Buffer-bilagor i stället för att lämna någon
+      kvar. `lib/gmail-send.ts` returnerar `{ ok, messageId }` — Gmails id
+      kastades förut bort.
+- [x] **Strypunkten loggar Resend-id:t.** Utan en rad som bär id:t har
+      leveranskvittot ingenting att uppdatera. `sendEmail` skriver
+      `communication_log` med deterministiskt id (`cl_mail_<resend-id>`) och
+      upsert, så en anropare som dessutom kallar `logEmail` ger EN rad, inte två.
+- [x] **Visa det.** `outboundStatusText` säger "Levererat 08:14" / "Kom inte
+      fram" / "Försenat hos operatören" när beskedet finns; inkorgen får fälten
+      genom `read_outbound_status` och `/api/handoff`. Kundtidslinjen visar
+      kvittot som en märkning under rubriken (grön/röd). Renderad i 375 px: ingen
+      horisontell scroll, rubriken kapas inte.
+- [x] `sql/v261_leveranskvitto.sql` körd mot prod och verifierad: två kolumner på
+      `sms_log`, tre på `communication_log`, två på `outbound_intents`, tre index
+      (unikt på `sms_log.elks_id` — 57 av 57 var distinkta) och RPC:n
+      `mark_outbound_delivered` (SECURITY DEFINER, EXECUTE bara till
+      service_role, rör aldrig status/finished_at). `read_outbound_status`
+      utökad med leveransfälten. 100 sms_log-rader och 21 communication_log-rader
+      orörda.
+- [x] Fyra nya specar: `sms-leverans` (14), `email-leverans` (19),
+      `email-chokepoint` (7), `outbound-status` (11). Registrerade sist i både
+      `test:contracts` och `contracts.yml`. 12 mutationer testade, alla dödade.
+
+**Driftgrind:** `outbound_intents` FINNS i prod (v249 är körd) men är tom —
+`OUTBOUND_INTENTS_ENABLED` är fortfarande av. Inga env-flaggor rörda i det här
+passet. Leveranskvittot fungerar oberoende av flaggan: `sms_log` och
+`communication_log` uppdateras alltid, H3b-speglingen bara när flaggan är på.
+
+**Medvetna avvikelser, med skäl:**
+
+- `app/api/debug/mail/route.ts` ligger kvar på undantagslistan i
+  `tests/email-chokepoint.spec.ts`: dess hela syfte är att pröva providervägen
+  rå för att skilja Gmail-fel från Resend-fel, och den är redan grindad av
+  `dry_run` (`tests/facit-inga-testmejl.spec.ts`).
+  `lib/channels/preflight.ts` och `lib/launch/preflight.ts` läser bara
+  domänlistan (`api.resend.com/domains`) och skickar ingenting.
+- Tre befintliga facit pekade på `resend.emails.send` i `send-invoice.ts` och
+  gick sönder av flytten. De är uppdaterade till den nya kroken —
+  KRAVET är oförändrat (returvärdet måste läsas, `results.email` sätts bara
+  efter felkontrollen): `invoice-delivery-truth`,
+  `facit-send-invoice-fortnox-first`. `facit-route-auth-inventory` fick taket
+  höjt från 172 till 174 med skäl för de två nya webhookrutterna.
+- `RESEND_WEBHOOK_SECRET` är INTE satt i miljön ännu, och webhooken är inte
+  registrerad hos Resend. Utan hemligheten avvisar rutten allt (fail-closed,
+  aldrig fail-open). Två driftsteg återstår för Andreas: sätt hemligheten och
+  peka Resends webhook på `/api/email/events`.
+- Ingen riktig 46elks-leveransrapport har tagits emot ännu — kvittot är bevisat
+  på parsernivå och ruttnivå, inte med ett skarpt SMS. Kundprovet (ett SMS till
+  verifierad testmottagare, kvittens läst ur `sms_log`) är ogjort.
+
 ## Spår 4 — Eventkontraktet blir kod, 2026-09-18
 
 `fireEvent(supabase, eventName: string, ...)` tog en fri sträng. Ett stavfel

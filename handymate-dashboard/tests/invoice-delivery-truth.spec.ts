@@ -148,14 +148,18 @@ test.describe('sändkärnan läser Resends svar (fynd av Codex 2026-08-08)', () 
   // lib/invoices/send-invoice.ts — skanningen pekar nu ärligt dit den bor.
   const KARNA = fs.readFileSync(path.join(ROOT, 'lib/invoices/send-invoice.ts'), 'utf8')
 
+  // Spår 2 (2026-09-18): fakturamejlet gick från Resend-SDK:n direkt till
+  // strypunkten lib/email.ts. Facitet pekar på den nya kroken; KRAVET är
+  // oförändrat — returvärdet MÅSTE läsas, och results.email får bara sättas
+  // efter felkontrollen. sendEmail kastar inte heller vid HTTP-fel.
   test('returvärdet fångas och felet grenas', () => {
-    expect(KARNA).toContain('const emailRes = await resend.emails.send')
-    expect(KARNA).toContain('if (emailRes.error)')
+    expect(KARNA).toContain('const emailRes = await sendEmail(')
+    expect(KARNA).toContain('if (!emailRes.success)')
   })
 
   test('email markeras bara skickad när Resend inte avvisat', () => {
     // results.email = true får bara finnas i else-grenen efter felkontrollen.
-    const i = KARNA.indexOf('if (emailRes.error)')
+    const i = KARNA.indexOf('if (!emailRes.success)')
     const j = KARNA.indexOf('results.email = true')
     expect(i).toBeGreaterThan(-1)
     expect(j, 'results.email sätts före felkontrollen').toBeGreaterThan(i)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { phoneCandidates } from '@/lib/voice/find-customer-by-phone'
+import { leveransText } from '@/lib/outbound/status'
 import {
   emptyTimelineProjectContext,
   resolveTimelineProject,
@@ -298,7 +299,7 @@ export async function GET(
   if ((filter === 'all' || filter === 'sms')) {
     const { data: smsLogRows, error: smsLogRowsError } = await supabase
       .from('sms_log')
-      .select('sms_id, message, message_type, related_id, status, sent_at')
+      .select('sms_id, message, message_type, related_id, status, sent_at, delivery_status, delivered_at')
       .eq('business_id', businessId)
       .eq('customer_id', customerId)
       .eq('direction', 'outbound')
@@ -318,6 +319,9 @@ export async function GET(
           message_type: s.message_type,
           related_id: s.related_id,
           source: 'sms_log',
+          // Leveranskvittot (v261). Null tills 46elks har sagt sitt — "Skickat"
+          // och "Levererat" är två olika påståenden och blandas aldrig ihop.
+          delivery_text: leveransText({ delivery_status: s.delivery_status, delivered_at: s.delivered_at }),
           ...smsRelationMetadata(s.message_type, s.related_id),
         },
       })

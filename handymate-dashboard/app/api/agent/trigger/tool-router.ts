@@ -2225,24 +2225,27 @@ async function sendEmail(
   }
 
   // Fallback: Resend API
-  const resendKey = process.env.RESEND_API_KEY!
   const from = context.contactEmail
     ? `${context.businessName} <${context.contactEmail}>`
     : `${context.businessName} <noreply@handymate.se>`
 
-  const response = await fetch('https://api.resend.com/emails', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      from, to: params.to, subject: params.subject, text: params.body,
-    }),
+  // Strypunkten (lib/email.ts, Spår 2). Agenten byggde tidigare sitt eget
+  // rå-anrop mot api.resend.com — utanför kanalkontroll och leveranskvitto.
+  // from delas upp i namn och adress; texten skickas fortfarande som text.
+  const namnDel = from.slice(0, from.indexOf(' <')).trim() || context.businessName
+  const adressDel = from.slice(from.indexOf('<') + 1, from.lastIndexOf('>')).trim()
+  const { sendEmail } = await import('@/lib/email')
+  const utfall = await sendEmail({
+    businessId,
+    customerId: (params.customer_id as string) || null,
+    fromName: namnDel,
+    fromAddress: adressDel,
+    to: params.to as string,
+    subject: params.subject as string,
+    html: '',
+    text: params.body as string,
   })
-
-  const result = await response.json()
-  if (!response.ok) return { success: false, error: `E-postfel: ${result.message}` }
+  if (!utfall.success) return { success: false, error: `E-postfel: ${utfall.error}` }
 
   // Kontextrevisionen 2026-08-16: samma loggning på Resend-vägen.
   const { logOutboundEmail } = await import('@/lib/comm/log-outbound-email')
@@ -2256,7 +2259,7 @@ async function sendEmail(
   })
   try { const { markCustomerContacted } = await import('@/lib/pipeline/contacted'); await markCustomerContacted(supabase, businessId, (params.customer_id as string) || null, 'mejl') } catch { /* best-effort */ }
 
-  return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: result.id, sent_via: 'resend' } }
+  return { success: true, data: { message: `E-post skickad till ${params.to}`, email_id: utfall.messageId, sent_via: 'resend' } }
 }
 
 // ── Gmail ────────────────────────────────────────────────

@@ -69,24 +69,19 @@ export async function sendPasswordResetEmail(email: string): Promise<SendResult>
   const html = buildResetHtml({ firstName, actionLink })
 
   try {
-    const response = await fetch('https://api.resend.com/emails', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${RESEND_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        from: `Handymate <noreply@${RESEND_DOMAIN}>`,
-        to: [email],
-        subject: 'Återställ ditt Handymate-lösenord',
-        html,
-      }),
+    // Strypunkten (lib/email.ts, Spår 2). Avsändare och ämne oförändrade.
+    const { sendEmail } = await import('@/lib/email')
+    const utfall = await sendEmail({
+      fromName: 'Handymate',
+      fromAddress: `noreply@${RESEND_DOMAIN}`,
+      to: email,
+      subject: 'Återställ ditt Handymate-lösenord',
+      html,
     })
 
-    if (!response.ok) {
-      const text = await response.text()
-      console.error('[password-reset] Resend error:', text)
-      return { success: false, error: `Resend: ${text.slice(0, 200)}` }
+    if (!utfall.success) {
+      console.error('[password-reset] Resend error:', utfall.error)
+      return { success: false, error: `Resend: ${(utfall.error || '').slice(0, 200)}` }
     }
 
     return { success: true }

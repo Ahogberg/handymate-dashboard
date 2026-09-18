@@ -85,13 +85,11 @@ export async function GET(
 
   // Send welcome email to partner
   try {
-    const { Resend } = await import('resend')
+    const { sendEmail } = await import('@/lib/email')
     const resendKey = process.env.RESEND_API_KEY
     if (resendKey) {
-      const resend = new Resend(resendKey)
-      await resend.emails.send({
-        from: 'Handymate <noreply@handymate.se>',
-        to: [partner.email],
+      await sendEmail({
+        to: partner.email,
         subject: 'Välkommen som Handymate-partner!',
         html: `
           <h2>Ditt partnerkonto är godkänt!</h2>

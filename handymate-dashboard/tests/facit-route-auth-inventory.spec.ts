@@ -236,5 +236,11 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // partner-token + gällande avtal, samma grind som partners/leads. Läser
   // bara rader där created_by_partner_id är partnern själv; ingen
   // tenant-kontext finns, caset tillhör partnern och prospektet → 172.
-  expect(utanStandard.length).toBeLessThanOrEqual(172)
+  // 2026-09-18 (Spår 2, leveranskvitto): sms/delivered (46elks whendelivered,
+  // grindad av verifieraElksWebhook) och email/events (Resends Svix-signatur).
+  // Ingen tenant-kontext finns eller KAN finnas: operatören postar ett
+  // provider-id, och företaget läses ur den rad id:t matchar. Båda svarar
+  // 200 på okänt id — en retry-storm från 46elks är värre än ett tappat
+  // kvitto → 174.
+  expect(utanStandard.length).toBeLessThanOrEqual(174)
 })

@@ -68,7 +68,7 @@ export async function deliverReviewedDocument(db: SupabaseClient, doc: ReviewedD
         journal: { type: 'reviewed_document' as const, documentId: id, version: doc.version } }
       const promised = await withOutboundSource(db, {
         promise: { businessId: doc.businessId, kind: 'email', source: 'approval', sourceId: doc.approvalId,
-          dedupeKey: `reviewed-document:${id}:${doc.version}`, recipient: doc.email.to, template: 'reviewed-job-report',
+          dedupeKey: `reviewed-document:${id}:${doc.version}`, recipient: Array.isArray(doc.email.to) ? doc.email.to.join(',') : doc.email.to, template: 'reviewed-job-report',
           context: { version: doc.version, ...(doc.email.fromAddress ? { fromAddress: doc.email.fromAddress } : {}) } },
         envelope,
       }, async (_intent, persistedEnvelope) => {

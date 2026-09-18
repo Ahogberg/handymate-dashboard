@@ -280,6 +280,10 @@ jobs:
           tests/pengar-pa-bordet.spec.ts
           tests/sms-svar-blir-kund.spec.ts
           tests/event-kontrakt.spec.ts
+          tests/sms-leverans.spec.ts
+          tests/email-leverans.spec.ts
+          tests/email-chokepoint.spec.ts
+          tests/outbound-status.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

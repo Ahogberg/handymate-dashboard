@@ -1,13 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
-import { Resend } from 'resend'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { checkEmailRateLimitDb } from '@/lib/rate-limit-db'
 import { buildAttribution, attributionEmailHtml } from '@/lib/branding/attribution'
 
-function getResend() {
-  return new Resend(process.env.RESEND_API_KEY)
-}
+import { sendEmail } from '@/lib/email'
 
 interface OrderItem {
   name: string
@@ -36,7 +33,6 @@ export async function POST(request: NextRequest) {
     }
 
     const supabase = getServerSupabase()
-    const resend = getResend()
     const body = await request.json()
     const { order_id } = body
 
@@ -89,8 +85,10 @@ export async function POST(request: NextRequest) {
 
     // Skicka beställning via email
     try {
-      await resend.emails.send({
-        from: `${business?.business_name || 'Handymate'} <bestallning@${process.env.RESEND_DOMAIN || 'handymate.se'}>`,
+      // Strypunkten (lib/email.ts). Avsändarnamn/adress oförändrade.
+      const utfall = await sendEmail({
+        fromName: business?.business_name || 'Handymate',
+        fromAddress: `bestallning@${process.env.RESEND_DOMAIN || 'handymate.se'}`,
         to: order.supplier.contact_email,
         subject: `Materialbeställning från ${business?.business_name || 'oss'}${markning ? ` - Märkning: ${markning}` : ''}${order.supplier.customer_number ? ` - Kundnr: ${order.supplier.customer_number}` : ''}`,
         html: `
@@ -195,6 +193,7 @@ export async function POST(request: NextRequest) {
 </html>
         `
       })
+      if (!utfall.success) throw new Error(utfall.error || 'Beställningsmejlet kunde inte skickas')
 
       // Uppdatera beställningsstatus
       await supabase

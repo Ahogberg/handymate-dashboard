@@ -71,14 +71,16 @@ export async function POST(request: NextRequest) {
 
     if (gmailStatus.enabled && gmailStatus.email) {
       results.gmail.tested = true
-      const sent = await sendViaGmail(business.business_id, {
+      const gmailUtfall = await sendViaGmail(business.business_id, {
         to: [to],
         subject: `Test-mail från ${business.business_name || 'Handymate'}`,
         html: `<p>Detta är ett testmail.</p><p>Om du ser detta fungerar Gmail-utskick korrekt.</p><p>Skickat: ${new Date().toLocaleString('sv-SE')}</p>`,
         fromName: business.business_name || 'Handymate',
         fromEmail: gmailStatus.email,
       })
+      const sent = gmailUtfall.ok
       results.gmail.success = sent
+      results.gmail.message_id = gmailUtfall.messageId || null
       if (!sent) {
         results.gmail.error = 'sendViaGmail returnerade false — token kan ha gått ut'
       }

@@ -527,6 +527,23 @@ export default function CustomerTimeline({ customerId, customerEmail }: Props) {
                         </span>
                       </div>
 
+                      {/* Leveranskvittot (Spår 2): "Skickat" betydde bara att 46elks
+                          svarade 200. Kom det fram står det här — på egen rad, så
+                          rubriken inte kapas i 375 px. */}
+                      {typeof event.metadata.delivery_text === 'string' && (
+                        <p className="mt-1">
+                          <span
+                            className={`inline-block rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                              event.metadata.delivery_text === 'Kom inte fram'
+                                ? 'bg-red-50 text-red-700'
+                                : 'bg-green-50 text-green-700'
+                            }`}
+                          >
+                            {String(event.metadata.delivery_text)}
+                          </span>
+                        </p>
+                      )}
+
                       {/* Compact description */}
                       {event.description && !isExpanded && (
                         <p className="text-sm text-gray-500 mt-1 line-clamp-2">{event.description}</p>
