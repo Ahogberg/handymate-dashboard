@@ -812,6 +812,25 @@ Svara ENDAST med JSON i följande format:
       if (linkError) throw linkError
     }
 
+    // Eventkontraktet (Spår 4): `call_completed` stod i ARCHITECTURE.md §4 men
+    // avfyrades aldrig. Här — efter kvalificeringen — är samtalet färdig-
+    // behandlat: transkribering, analys och ev. kund/lead finns. Möten och
+    // utgående samtal är inte "ett avslutat inkommande samtal" och avfyrar
+    // därför inget. Icke-blockerande, som övriga fireEvent-ställen.
+    if (!arMote && !arUtgaende) {
+      try {
+        const { fireEvent } = await import('@/lib/automation-engine')
+        await fireEvent(supabase, 'call_completed', recording.business_id, {
+          from: recording.phone_number || recording.from_number || null,
+          duration: recording.duration_seconds ?? null,
+          call_recording_id: recording_id,
+          customer_id: customerId ?? null,
+        })
+      } catch (eventFel) {
+        console.error('[voice/analyze] fireEvent call_completed misslyckades (icke-blockerande):', eventFel)
+      }
+    }
+
     // Samtalsefterarbete (2026-09-01): vilket projekt gäller samtalet? Delas
     // av ÄTA-utkastet och dagbokskortet nedan. null = entydigt projekt saknas,
     // då skapas inget projektbundet kort (aldrig gissa).

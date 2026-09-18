@@ -592,6 +592,28 @@ export interface PostSendAutomationsParams {
 export async function triggerPostSendAutomations(params: PostSendAutomationsParams): Promise<void> {
   const { businessId, invoiceId, invoice } = params
 
+  // Eventkontraktet (Spår 4): `invoice_sent` stod som ✅ i ARCHITECTURE.md §4
+  // men avfyrades aldrig. Här — och bara här — är leveransen bevisad: den här
+  // funktionen anropas enbart när applyInvoiceDeliveryOutcome rapporterade
+  // delivered (e-post, SMS eller e-faktura gick ut).
+  //
+  // OBS: detta återinför INTE den borttagna Smart Communication-triggern
+  // längre ned i filen. Den togs bort för att den skickade ett EXTRA
+  // faktura-SMS ovanpå en redan levererad faktura (dubblett). Eventet skickar
+  // ingenting — det säger bara att fakturan gick iväg. Ingen seedad regel
+  // kopplas till det i detta pass, just för att inte återskapa dubbletten.
+  try {
+    const { getServerSupabase } = await import('@/lib/supabase')
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(getServerSupabase(), 'invoice_sent', businessId, {
+      invoice_id: invoiceId,
+      customer_id: invoice?.customer_id ?? null,
+      amount: invoice?.total ?? null,
+    })
+  } catch (eventFel) {
+    console.error('[invoices/send] fireEvent invoice_sent misslyckades (icke-blockerande):', eventFel)
+  }
+
   // Pipeline: move deal to invoiced
   try {
     const { findDealByInvoice, moveDeal, getAutomationSettings } = await import('@/lib/pipeline')

@@ -93,7 +93,8 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 |--------|-------|-------------|
 | `vat_rate` | `0.25` | Moms 25% — aldrig justerbar |
 | `rot_deduction_rate` | `0.30` | ROT-avdrag 30% på arbetskostnad |
-| `rot_max_per_person_year` | `75000` | Skatteverkets maxbelopp per person och år (kr) |
+| `rot_max_per_person_year` | `50000` | Skatteverkets ROT-tak per person och år (kr) — källa: `lib/rot-rut-limits.ts` |
+| `rut_max_per_person_year` | `75000` | Skatteverkets RUT-tak per person och år (kr) — källa: `lib/rot-rut-limits.ts` |
 | `rut_deduction_rate` | `0.50` | RUT-avdrag 50% på arbetskostnad |
 
 ---
@@ -101,32 +102,56 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 ## 4. Eventkontrakt — fullständig lista
 
 > ⚠️ **KRITISK REGEL:** Inga event får uppfinnas lokalt av en terminal.
-> Nya event läggs till i denna lista FÖRST, sedan implementeras de.
-> Namnkonvention: `snake_case`, `verb_substantiv`, alltid på engelska.
+> Nya event läggs till i denna lista FÖRST, sedan i `lib/events/names.ts`, sedan i koden.
+> Namnkonvention: `snake_case`, `substantiv_particip` (`quote_sent`, `payment_received`), alltid på engelska.
+>
+> Listan nedan är **automationsmotorns** event (`fireEvent()` i `lib/automation-engine.ts`).
+> Sedan 2026-09-18 är den kod: `EVENT_NAMES`/`EventName` i `lib/events/names.ts` är unionen
+> `fireEvent()` tar, och `tests/event-kontrakt.spec.ts` kräver att koden, unionen och tabellen
+> nedan säger exakt samma sak — varje namn i tabellen avfyras minst en gång i koden, och varje
+> `fireEvent()`-anrop i `app/` och `lib/` står i tabellen.
+>
+> Financial Kernels durabla ekonomiska event är ett eget kontrakt med egen tabell och
+> egen katalog — se avsnittet *Financial Kernel — kontrakt* längst ned. De två listorna
+> får inte dela namn, och kernel-event får aldrig gå genom `fireEvent()`.
 
-| Event | Triggas när | Primär payload | Finns |
-|-------|-------------|----------------|-------|
-| `lead_created` | Ny lead skapas (samtal, SMS, Gmail, manuellt) | `{ lead_id, source, business_id }` | ✅ |
-| `lead_updated` | Lead-data uppdateras (ej stage) | `{ lead_id, changed_fields }` | ❌ |
-| `contacted` | Utgående SMS eller samtal till lead/kund | `{ lead_id, method: sms\|call }` | ❌ |
-| `call_missed` | Inkommande samtal besvaras ej | `{ from, business_id }` | ✅ |
-| `call_completed` | Inkommande samtal avslutat av agent | `{ from, duration, transcript }` | ❌ |
-| `sms_received` | Inkommande SMS | `{ from, body, business_id }` | ✅ |
-| `sms_sent` | Utgående SMS skickat | `{ to, body, lead_id }` | ❌ |
-| `quote_created` | Offert skapas (ej skickad ännu) | `{ quote_id, lead_id }` | ❌ |
-| `quote_sent` | Offert skickas till kund | `{ quote_id, lead_id, amount }` | ❌ **SAKNAS** |
-| `quote_opened` | Kund öppnar offertlänken | `{ quote_id, lead_id, opened_at }` | ⚠️ Delvis |
-| `quote_signed` | Kund signerar offert digitalt | `{ quote_id, lead_id }` | ✅ |
-| `quote_expired` | Offert går ut utan svar | `{ quote_id, lead_id, days_sent }` | ❌ |
-| `invoice_created` | Ny faktura skapas | `{ invoice_id, lead_id, amount }` | ✅ |
-| `invoice_sent` | Faktura skickas till kund | `{ invoice_id, lead_id }` | ❌ |
-| `invoice_overdue` | Faktura förfallen (körs av cron) | `{ invoice_id, days_overdue }` | ❌ |
-| `payment_received` | Betalning registreras | `{ invoice_id, amount, method }` | ✅ |
-| `booking_created` | Ny bokning skapas | `{ booking_id, lead_id, date }` | ❌ |
-| `booking_reminder` | 24h innan ett jobb | `{ booking_id, lead_id, date }` | ❌ |
-| `job_completed` | Jobb markeras som avslutat | `{ lead_id, invoice_id }` | ❌ |
-| `pipeline_stage_changed` | Lead byter steg i pipeline | `{ lead_id, from_key, to_key }` | ❌ |
-| `customer_reactivation` | 6+ månader sedan senaste jobb | `{ lead_id, months_inactive }` | ❌ |
+| Event | Triggas när | Primär payload | Avfyras i |
+|-------|-------------|----------------|-----------|
+| `ata_sent` | ÄTA skickad till kund (länk eller e-post) | `{ change_id, project_id, ata_number, total, customer_name }` | `app/api/ata/[id]/send/route.ts` |
+| `ata_signed` | Kunden signerar ÄTA i den publika länken | `{ change_id, project_id, ata_number, total, signed_by }` | `app/api/ata/sign/[token]/route.ts` |
+| `booking_created` | Ny bokning skapad — en gång per skapad rad | `{ booking_id, customer_id, date }` | `app/api/bookings/route.ts`, `app/api/public/book/[slug]/route.ts`, `lib/approve-actions.ts` |
+| `call_completed` | Inkommande samtal transkriberat, analyserat och kvalificerat | `{ from, duration, call_recording_id, customer_id }` | `app/api/voice/analyze/route.ts` |
+| `call_missed` | Inkommande samtal besvarades inte — agenten tog meddelande | `{ phone, call_id }` | `app/api/voice/incoming/route.ts`, `app/api/voice/missed/route.ts` |
+| `call_transferred` | Samtalet kopplades vidare till hantverkarens egen telefon | `{ to, from, call_id, mode }` | `app/api/voice/incoming/route.ts` |
+| `contacted` | Utgående SMS från kunddialogen (manuell kontakt) | `{ phone, method }` | `app/api/sms/send/route.ts` |
+| `email_received` | Inkommande e-post läst av Gmail-läsaren | `{ customer_id, lead_id, from_email, subject, gmail_thread_id, matched_by }` | `lib/gmail/processor.ts` |
+| `invoice_created` | Ny faktura skapad | `{ invoice_id, customer_id, total, due_date }` | `app/api/invoices/route.ts` |
+| `invoice_overdue` | Faktura passerat förfallodatum (betalningssynken) | `{ invoice_id }` | `lib/fortnox/sync-payments.ts` |
+| `invoice_sent` | Faktura FAKTISKT levererad till kund (e-post, SMS eller e-faktura) | `{ invoice_id, customer_id, amount }` | `lib/invoices/send-invoice.ts` |
+| `job_completed` | Jobb/projekt markerat som avslutat | `{ project_id, customer_id, project_name }` | `lib/projects/complete-project.ts` |
+| `lead_created` | Lead skapad av agentens verktyg (tool-router) | `{ lead_id, customer_name, phone, job_type, urgency, estimated_value, source }` | `app/api/agent/trigger/tool-router.ts` |
+| `lead_received` | Lead skapad via Golden Path (formulär, samtal, SMS, e-post) | `{ source, lead_id, customer_id, customer_name }` | `lib/leads/golden-path.ts` |
+| `morning_report_sent` | Morgonrapporten skickad till hantverkaren | `{ personal_phone, health }` | `lib/agent/morning-report.ts` |
+| `payment_received` | Betalning registrerad på en faktura | `{ invoice_id, entity_id, customer_id }` | `lib/invoices/apply-payment.ts` |
+| `pipeline_stage_changed` | Affären byter steg i pipelinen | `{ lead_id, from_stage, to_stage, triggered_by }` | `lib/pipeline-stages.ts` |
+| `project_created` | Projekt skapat ur lead, offert eller bokning | `{ project_id, lead_id?, quote_id?, source }` | `lib/projects/create-from-lead.ts`, `lib/projects/create-from-quote.ts`, `lib/projects/maybe-create-from-booking.ts` |
+| `quote_accepted` | Kunden accepterar offerten via acceptlänken | `{ quote_id, customer_id, customer_name, total, title, lead_id }` | `app/api/quotes/accept/route.ts` |
+| `quote_expired` | Offert passerat `valid_until` utan svar (markeras av cron) | `{ quote_id, lead_id, customer_id, days_sent }` | `app/api/cron/quote-follow-up/route.ts` |
+| `quote_opened` | Kunden öppnar offertlänken första gången | `{ quote_id, customer_id, quote_title }` | `lib/quotes/track-open.ts` |
+| `quote_sent` | Offert skickad till kund | `{ quote_id, customer_id, customer_name, total, title }` | `app/api/quotes/send/route.ts` |
+| `quote_signed` | Kunden signerar offerten digitalt (publik länk eller kundportal) | `{ quote_id, customer_id, quote_title?, total? }` | `app/api/quotes/public/[token]/route.ts`, `app/api/portal/route.ts` |
+| `referral_converted` | Värvad kund blev betalande — rabatt utlöst | `{ referred_business_id, amount_sek, referrer_credit_sek }` | `lib/referral/discounts.ts` |
+| `sms_received` | Inkommande SMS från kund | `{ phone, message, customer_name }` | `app/api/sms/incoming/route.ts` |
+| `sms_sent` | Utgående SMS mottaget av 46elks (SMS-strypunkten) | `{ to, customer_id, message_type, elks_id, sms_id, recipient }` | `lib/sms-send.ts` |
+| `work_order_sent` | Arbetsorder skickad till anställd/underentreprenör | `{ work_order_id, project_id, assigned_to, assigned_phone }` | `app/api/work-orders/[id]/send/route.ts` |
+
+**Städat 2026-09-18 (Spår 4):** `deal_flow_advanced`, `proactive_care_triggered`,
+`lead_updated` och `quote_created` stod i listan men avfyrades aldrig — de är borttagna
+tills de faktiskt finns i kod. `customer_reactivation` är en **approval_type**
+(`lib/proactive-care.ts`), inte ett event. `booking_reminder` är ett **cron-jobb** som
+skickar SMS (`lib/booking-reminders.ts`) och en autonominyckel — inte ett event.
+`quote_created` avfyras inte ännu: den enda gemensamma skapandevägen är
+`lib/quotes/create-quote.ts`, som ägs av en öppen PR.
 
 ---
 
@@ -306,16 +331,24 @@ Ta bort tabellen i nästa städ-sprint när V28 är verifierad stabil.
 
 > ⚠️ **Rätt riktning:** Handymates nummer är det publika företagsnumret.
 > Hantverkarens privata nummer är **aldrig** exponerat utåt mot kunder.
+>
+> **Operatör: 46elks, hela vägen.** Vapi används inte och har aldrig varit
+> inkopplat (`vapi_call` lever kvar som ett *källvärde* på leads/deals, inget mer).
+> Ingen kod anropar Vapi; röstflödet är 46elks webhooks + `lib/voice/*`.
 
 ### Rätt flöde
 ```
-Kund ringer Handymates publika nummer (business_config.public_phone)
-  → Vapi-agent svarar alltid
-  → Agenten hanterar ärendet (kvalificerar, bokar, svarar)
-  → Om kunden måste prata med hantverkaren live:
-      agenten säger "ett ögonblick" + connect(personal_phone)
-  → Om hantverkaren inte svarar: agenten tar meddelande, skapar lead
-  → fireEvent("call_completed") eller fireEvent("call_missed")
+Kund ringer Handymates publika nummer (business_config.phone_number)
+  → 46elks POSTar till /api/voice/incoming (signaturverifierad)
+  → business_config.call_handling_mode avgör grenen:
+      agent_always          → agenten svarar, tar meddelande
+      agent_with_transfer   → agenten svarar, kan koppla till personal_phone
+      human_work_hours      → arbetstid: connect(personal_phone) direkt,
+                              utanför: agenten
+  → connect(personal_phone)      ⇒ fireEvent('call_transferred')
+  → inget svar / röstbrevlåda    ⇒ fireEvent('call_missed') + fångst-SMS
+  → inspelning → /api/voice/transcribe → /api/voice/analyze
+      → kvalificering (Golden Path) ⇒ fireEvent('call_completed')
 ```
 
 ### Fel flöde — används inte i Handymate
@@ -323,30 +356,6 @@ Kund ringer Handymates publika nummer (business_config.public_phone)
 **21*+46XXXXXXXXX#  ← vidarekoppling privat → Handymate
 ```
 Detta är INTE Handymates modell. Avaktivera med `##21#`.
-
-### Onboarding steg 3 — Telefon (ska byggas om i V5)
-**Nuvarande:** Visar vidarekopplingskod som primärt flöde. ❌ Fel.
-
-**Ska vara:**
-- Rubrik: "Ditt nya företagsnummer"
-- Visar `public_phone` prominent
-- Text: "Använd detta nummer på visitkort, hemsida och offerter. Kunder ringer hit — agenten svarar alltid."
-- Fält: "Ditt privata mobilnummer" → sparas i `business_config.personal_phone`
-- Sekundärt, kollapsbart: "Har du ett gammalt nummer? Aktivera vidarekoppling" med `**21*`-koden som option
-
-### Transfer-implementation (46elks)
-```typescript
-// I Vapi action handler — vid live-transfer:
-if (agentDecidesTransfer) {
-  await call46elks({
-    action: 'connect',
-    to: businessConfig.personal_phone,
-    timeout: 20, // sekunder innan fallback
-    fallback: 'voicemail'
-  })
-  await fireEvent('call_transferred', businessId, { lead_id, to: personal_phone })
-}
-```
 
 ---
 

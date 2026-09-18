@@ -180,6 +180,22 @@ async function createBooking(supabase: SupabaseClient, suggestion: any, actionDa
       .single()
 
     if (error) throw error
+
+    // Eventkontraktet (Spår 4): EN gång per faktiskt skapad bokning. Ligger
+    // efter konfliktkollen ovan — en avvisad bokning (konflikt) skapar ingen
+    // rad och ska därför inte avfyra något event. Icke-blockerande: kortet är
+    // redan godkänt och bokningen redan skriven.
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'booking_created', businessId, {
+        booking_id: booking?.booking_id ?? null,
+        customer_id: customerId ?? null,
+        date: scheduledStart,
+      })
+    } catch (eventFel) {
+      console.error('[approve-actions] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+    }
+
     return { success: true, booking_id: booking?.booking_id }
   } catch (error: any) {
     return { success: false, error: error.message }

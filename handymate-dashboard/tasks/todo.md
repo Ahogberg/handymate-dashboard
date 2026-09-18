@@ -1,3 +1,54 @@
+## Spår 4 — Eventkontraktet blir kod, 2026-09-18
+
+`fireEvent(supabase, eventName: string, ...)` tog en fri sträng. Ett stavfel
+matchade ingen regel och dog tyst — ingen regel körd, inget fel loggat.
+ARCHITECTURE.md §4 hade glidit isär från koden åt båda håll: `invoice_sent`
+stod som ✅ men avfyrades aldrig, tio faktiskt avfyrade event saknades i
+dokumentet, och fyra namn i dokumentet fanns bara i dokumentet. Dokumentets
+egen "KRITISKA REGEL" om att event ska stå i listan FÖRST hade ingen grind.
+
+- [x] `lib/events/names.ts`: `EVENT_NAMES` (27 namn) + `EventName` + `isEventName`
+      + loopspärren `skaparEventLoop`. En svensk kommentar per event: när det
+      avfyras och vad payloaden bär, verifierad mot varje anropsställe.
+- [x] `fireEvent()` tar `EventName`, inte `string`. Alla 36 anropsställen skickar
+      strängliteraler — ingen cast, ingen vakt behövdes i produktionsvägen.
+- [x] Fem tysta event avfyras nu: `quote_expired` (cron, per offert som faktiskt
+      flippades), `booking_created` (tre vägar, en gång per skapad rad),
+      `invoice_sent` (i `triggerPostSendAutomations`, som bara körs när leveransen
+      lyckats), `sms_sent` (SMS-strypunkten, bara vid lyckat utskick),
+      `call_completed` (efter `processCallForPipeline`, inte för möten/utgående).
+- [x] Loopspärr: en regel på `sms_sent` med åtgärden `send_sms` skulle skicka SMS
+      som avfyrar `sms_sent` som skickar SMS. Spärren sitter i `fireEvent()` — inte
+      bara i seeden — så den gäller även regler användare och agenter skapar.
+      Den spärrade regeln räknas som `skipped`, inte `matched`.
+- [x] ARCHITECTURE.md §4 speglar `EVENT_NAMES` exakt, med en fjärde kolumn som
+      pekar ut filen eventet avfyras i. §3.2: `rot_max_per_person_year`
+      75 000 → 50 000, `rut_max_per_person_year` 75 000 tillagd (källa
+      `lib/rot-rut-limits.ts`). §7: Vapi-flödet ersatt av det verkliga
+      46elks-flödet (grep bekräftar: noll Vapi-anrop, bara `vapi_call` som
+      källvärde på leads). Båda kopiorna av ARCHITECTURE.md uppdaterade.
+- [x] `tests/event-kontrakt.spec.ts` (9 prov), registrerad sist i både
+      `test:contracts` och `contracts.yml`. 5 mutationer testade, alla dödade.
+- [x] `npx tsc --noEmit` exit 0 · `npx next build` ren · `test:contracts`
+      2896 → 2905 pass, 0 röda. Ingen SQL behövdes.
+
+**Medvetna avvikelser, med skäl:**
+
+- `quote_created` avfyras INTE. Den enda gemensamma skapandevägen är
+  `lib/quotes/create-quote.ts`, som ägs av öppna PR #91; enda andra insertet är
+  `app/api/debug/e2e-quote`. Namnet är därför borttaget ur §4 i stället för att
+  läggas till i `EVENT_NAMES` — ett kontrakt får inte lova något koden inte gör.
+- `invoice_sent` får INGEN seedad regel. Smart Communication-triggern för
+  `invoice_sent` togs bort 2026-08-27 för att den skickade ett extra faktura-SMS
+  ovanpå en redan levererad faktura. Eventet säger bara att fakturan gick iväg.
+- `booking_created` avfyras på de tre vägar briefen pekade ut. **Två andra
+  bokningsinsert:** `app/api/agent/trigger/tool-router.ts:1389` (agentens
+  `create_booking`) och `lib/agents/lars/service-bookings.ts:161` (serviceavtal)
+  avfyrar inte — utanför uppdraget, men det gör §4 sant bara för tre av fem
+  vägar. Bör stängas i ett eget pass.
+- Tidslinjen `app/api/customers/[id]/timeline/route.ts` orörd: namnen där är
+  visningsetiketter, inte event.
+
 ## Spår 1 — Samtalet blir ett jobb, 2026-09-18
 
 Fångst-SMS:et lovar kunden "Svara på detta SMS med vad du behöver hjälp med".

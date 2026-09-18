@@ -15,6 +15,7 @@ import { filterOutConflicting, UNOPENED_CONFLICT_WINDOW_HOURS } from '@/lib/agen
 import { arTestId, arTestNamn } from '@/lib/testdata'
 import { registerMandateDeliveryFailure } from '@/lib/mandates/mission-mandate'
 import { loadMandateResolutionCache, resolveMandateForAction, MANDATE_TRUTH_CLASS, type MandateResolutionCache } from '@/lib/mandates/resolve'
+import { fireEvent } from '@/lib/automation-engine'
 
 
 // force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
@@ -53,9 +54,30 @@ export async function GET(request: NextRequest) {
       .update({ status: 'expired' })
       .in('status', [...OPEN_QUOTE_STATUSES]) // 'opened' missades förut → öppnade-men-obesvarade offerter blev aldrig expired
       .lt('valid_until', today)
-      .select('quote_id')
+      .select('quote_id, business_id, lead_id, customer_id, sent_at')
 
     const expiredCount = expiredQuotes?.length || 0
+
+    // Eventkontraktet (Spår 4): offerten som just gick ut är ett event, inte
+    // bara en tyst UPDATE. Avfyras EN gång per offert som faktiskt flippades
+    // här — .select() returnerar bara raderna denna körning ändrade, så en
+    // andra cron-körning samma dag ger noll rader och inget dubbelevent.
+    // Icke-blockerande: uppföljningsloopen nedan får aldrig falla på detta.
+    for (const q of expiredQuotes || []) {
+      try {
+        const daysSent = q.sent_at
+          ? Math.max(0, Math.floor((now.getTime() - new Date(q.sent_at as string).getTime()) / 86_400_000))
+          : null
+        await fireEvent(supabase, 'quote_expired', q.business_id as string, {
+          quote_id: q.quote_id,
+          lead_id: q.lead_id ?? null,
+          customer_id: q.customer_id ?? null,
+          days_sent: daysSent,
+        })
+      } catch (eventFel) {
+        console.error('[quote-follow-up] fireEvent quote_expired misslyckades (icke-blockerande):', eventFel)
+      }
+    }
 
     // 1b. Skicka förfallo-nudge: SMS 3 dagar innan offert går ut
     // Respekterar auto_enabled toggle — skickar INTE om företaget har stängt av auto-SMS

@@ -516,6 +516,34 @@ async function sendSmsWithoutAutonomyWrapper(args: SendSmsArgs): Promise<SendSms
     console.error('[sendSmsViaElks] sms_log insert exception:', logErr)
   }
 
+  // ═══ EVENTKONTRAKTET: sms_sent (Spår 4) ═══
+  //
+  // `sms_sent` stod i ARCHITECTURE.md §4 men avfyrades aldrig. Strypunkten är
+  // rätt ställe: alla ~20 utgående vägar passerar här, och eventet betyder
+  // exakt det sms_log-raden betyder — 46elks tog emot utskicket.
+  //
+  // LOOPRISKEN är verklig: en regel på `sms_sent` med åtgärden `send_sms`
+  // skulle skicka ett SMS som avfyrar `sms_sent` som skickar ett SMS ... mot
+  // en riktig kund, på riktiga pengar. Spärren ligger i fireEvent()
+  // (lib/events/names.ts: skaparEventLoop) så att den gäller ALLA regler, inte
+  // bara de seedade. Bara lyckade utskick — ett avvisat eller failat SMS är
+  // ingen sändning.
+  if (success) {
+    try {
+      const { fireEvent } = await import('@/lib/automation-engine')
+      await fireEvent(supabase, 'sms_sent', businessId, {
+        to: phone,
+        customer_id: resolvedCustomerId ?? null,
+        message_type: messageType || null,
+        elks_id: elksId || null,
+        sms_id: smsId,
+        recipient,
+      })
+    } catch (eventFel) {
+      console.error('[sendSmsViaElks] fireEvent sms_sent misslyckades (icke-blockerande):', eventFel)
+    }
+  }
+
   // ═══ SPEGLA TILL KONVERSATIONSHISTORIKEN (kontextrevisionen 2026-08-16) ═══
   //
   // sms_log är revisionsspåret; sms_conversation är vad ALLA historik-
