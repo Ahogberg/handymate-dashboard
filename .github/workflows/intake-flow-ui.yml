@@ -1,4 +1,4 @@
-name: Frågeflödet i 375 px
+name: Offertflödets ytor i 375 px
 on:
   push:
   pull_request:
@@ -30,7 +30,8 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: fragefloedet-375
+          name: ytor-375
           path: |
             handymate-dashboard/docs/ui/fragefloedet-375-*.png
+            handymate-dashboard/docs/ui/kom-ikapp-375.png
             handymate-dashboard/test-results/

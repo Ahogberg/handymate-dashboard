@@ -44,7 +44,7 @@ Postgres bakom.
 4. **Skicka den till Andreas** med SendUserFile. Han granskar på telefon; en
    bild sparar en deploy-cykel.
 
-5. **Behåll bredd-provet i specen.** 17 av 18 `.ui.spec.ts` kör
+5. **Behåll bredd-provet i specen.** 18 av 19 `.ui.spec.ts` kör
    `expect(document.documentElement.scrollWidth <= innerWidth)` — horisontell
    scroll i 375 px är ett fel, inte en smaksak. Lägger du till en ny yta ska
    den ha provet.
