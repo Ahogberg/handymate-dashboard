@@ -384,10 +384,19 @@ export async function getCommunicationTrail(
   // ── Webbchatten (pre-sale) — ingen customer_id finns, matcha på det
   //    besökaren själv angav. Hela meddelandelistan återges, inte en preview:
   //    AI:ns prisuttalanden före köpet är precis det en tvist handlar om. ─────
-  if (customer.phone_number || customer.email) {
+  //
+  //    Spår 6 (2026-09-18): villkoret var `visitor_phone.eq.<råvärde>` och
+  //    `visitor_email.eq.<råvärde>`. Widgeten sparar det BESÖKAREN skrev
+  //    ("070-123 45 67", "Anna@Exempel.se") medan kundraden kan bära en annan
+  //    form av samma uppgift — chatten föll då ur underlaget helt, tyst. Nu
+  //    läses den genom samma kandidatlista och gemenformade e-post som
+  //    SMS-delen ovan.
+  const widgetKandidater = phoneCandidates(customer.phone_number)
+  const widgetEpost = (customer.email || '').trim().toLowerCase()
+  if (widgetKandidater.length > 0 || widgetEpost) {
     const orVillkor = [
-      customer.phone_number ? `visitor_phone.eq.${customer.phone_number}` : null,
-      customer.email ? `visitor_email.eq.${customer.email}` : null,
+      widgetKandidater.length > 0 ? `visitor_phone.in.(${widgetKandidater.map(n => `"${n}"`).join(',')})` : null,
+      widgetEpost ? `visitor_email.ilike.${widgetEpost}` : null,
     ].filter(Boolean).join(',')
     const rows = await collectSource<{ id: string; messages: unknown; message_count: number | null; created_at: string }>(
       'widget_conversation',

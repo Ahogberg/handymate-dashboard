@@ -55,7 +55,9 @@ test.describe('whendelivered skickas med varje SMS', () => {
 // ── 2. Parsern ───────────────────────────────────────────────────────────
 
 test.describe('tolkaLeveransrapport', () => {
-  const { tolkaLeveransrapport } = require('../app/api/sms/delivered/route')
+  // Flyttad 2026-09-18 ur route-filen till lib/sms/leveransrapport.ts —
+  // Next.js 14 tillåter inga extra exporter ur en route.
+  const { tolkaLeveransrapport } = require('../lib/sms/leveransrapport')
 
   test('46elks form-urlencoded rapport läses rätt', () => {
     const r = tolkaLeveransrapport('id=s1a2b3&status=delivered&delivered=2026-09-18T06%3A14%3A00Z')

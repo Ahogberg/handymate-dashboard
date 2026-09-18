@@ -286,6 +286,7 @@ jobs:
           tests/outbound-status.spec.ts
           tests/bokning-pa-svar.spec.ts
           tests/rot-regler.spec.ts
+          tests/identitetslasare.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

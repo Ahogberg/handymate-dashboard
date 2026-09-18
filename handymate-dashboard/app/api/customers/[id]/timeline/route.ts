@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getServerSupabase } from '@/lib/supabase'
 import { phoneCandidates } from '@/lib/voice/find-customer-by-phone'
+import { normalizeSwedishPhone } from '@/lib/phone-normalize'
 import { leveransText } from '@/lib/outbound/status'
 import {
   emptyTimelineProjectContext,
@@ -365,10 +366,17 @@ export async function GET(
   // Ingen customer_id-länk finns (spekulanten var inte kund än) — matchas
   // via telefon/e-post besökaren själv angav. AI-gjorda prisuttalanden
   // före köpet blir därmed åtkomliga i kundens historik efteråt.
-  if ((filter === 'all' || filter === 'chat') && (customerPhone || customer?.email)) {
+  // Spår 6 (2026-09-18): villkoret var `.eq.<råvärde>` på båda fälten.
+  // Besökaren skrev sitt nummer i widgeten som "070-123 45 67" medan kundraden
+  // bär "+46701234567" (eller tvärtom), och adressen kan ha versaler — chatten
+  // syntes därför inte i kundens historik. Samma kandidatlista och
+  // gemenformade e-post som SMS-delen (3c) och kommunikationsunderlaget.
+  const widgetKandidater = phoneCandidates(customerPhone)
+  const widgetEpost = (customer?.email || '').trim().toLowerCase()
+  if ((filter === 'all' || filter === 'chat') && (widgetKandidater.length > 0 || widgetEpost)) {
     const orVillkor = [
-      customerPhone ? `visitor_phone.eq.${customerPhone}` : null,
-      customer?.email ? `visitor_email.eq.${customer.email}` : null,
+      widgetKandidater.length > 0 ? `visitor_phone.in.(${widgetKandidater.map(n => `"${n}"`).join(',')})` : null,
+      widgetEpost ? `visitor_email.ilike.${widgetEpost}` : null,
     ].filter(Boolean).join(',')
     const { data: widgetConvos, error: widgetConvosError } = await supabase
       .from('widget_conversation')
@@ -640,8 +648,13 @@ export async function GET(
       const relatedCustomerId = triggerData.customer_id as string | undefined
       const relatedPhone = triggerData.phone as string | undefined
 
+      // Spår 6: numret jämfördes som delsträng av råvärdet utan plustecken —
+      // "070…" i trigger_data matchade aldrig en kund sparad som "+4670…".
+      // Samma kandidatlista som resten av kundminnet, jämförd normaliserat.
+      const relateratNormaliserat = relatedPhone ? normalizeSwedishPhone(relatedPhone) : ''
+      const kundNormaliserat = customerPhone ? normalizeSwedishPhone(customerPhone) : ''
       if (relatedCustomerId === customerId ||
-          (customerPhone && relatedPhone && relatedPhone.includes(customerPhone.replace('+', '')))) {
+          (kundNormaliserat && relateratNormaliserat && relateratNormaliserat === kundNormaliserat)) {
         events.push({
           id: `agent_${ar.run_id}`,
           type: 'agent_action',

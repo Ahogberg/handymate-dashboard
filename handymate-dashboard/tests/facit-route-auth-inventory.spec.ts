@@ -51,6 +51,12 @@ const KANDA_GRINDAR: Record<string, RegExp> = {
   // skickar och avvisade all trafik i elva dagar. Ersatt av en delad
   // hemlighet i URL:en, se lib/elks-webhook-auth.ts.
   elks_webhook: /verifieraElksWebhook\(/,
+  // Resends leveranshändelser (spår 2). Grinden hette tidigare "hmac_token"
+  // här, av misstag: regexen matchade `createHmac` som råkade stå i
+  // route-filen. Sedan hjälparna flyttade till lib/email/svix.ts (2026-09-18,
+  // Next.js förbjuder extra exporter ur en route) matchade inget alls, och
+  // rutten föll ur inventeringen. Grinden har ett eget namn nu.
+  svix_signatur: /verifieraSvixSignatur\(/,
   stripe_signatur: /constructEvent\(/,
   postmark_basic_auth: /verifyPostmarkBasicAuth\(/,
   supabase_session: /auth\.getUser\(|auth\.getSession\(|createRouteHandlerClient/,

@@ -10,6 +10,7 @@ import type { GmailMessage } from '@/lib/gmail'
 import { getNextCustomerNumber } from '@/lib/numbering'
 import { hourlyRateField } from '@/lib/company/company-model'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
+import { resolveContact } from '@/lib/identity/resolve-contact'
 
 interface BusinessConfig {
   business_id: string
@@ -21,6 +22,8 @@ interface MatchResult {
   customer_id: string | null
   lead_id: string | null
   matched_by: 'email' | 'name' | 'phone' | 'unmatched'
+  /** Adressen pekade på mer än en person — vi vet inte vem, och gissar inte. */
+  ambiguous?: boolean
 }
 
 /**
@@ -49,6 +52,19 @@ function isFromOwner(message: GmailMessage, ownerEmail: string): boolean {
 
 /**
  * Match an inbound email to an existing customer or lead.
+ *
+ * ═══ EN LÄSNING AV IDENTITETEN (spår 6, 2026-09-18) ═══
+ *
+ * Matcharen gjorde `.eq('email', fromEmail)` mot customer och sedan mot leads,
+ * på råvärdet. En kund sparad som "Anna@Exempel.se" matchades aldrig av ett
+ * mejl från "anna@exempel.se", och telefonnumret som redan låg på lead-raden
+ * användes inte alls. Nu går uppslaget genom lib/identity/resolve-contact.ts,
+ * samma läsning som SMS-vägarna och kundtidslinjen använder: gemenformad
+ * e-post, kund före öppen lead.
+ *
+ * Telefon skickas MEDVETET inte in här: avsändaren har bara en adress, och
+ * ett nummer plockat ur brödtexten är avsändarens påstående om sig själv —
+ * inte en identitet att matcha en annan kund på.
  */
 async function matchSender(
   supabase: SupabaseClient,
@@ -56,33 +72,23 @@ async function matchSender(
   fromEmail: string,
   fromName: string
 ): Promise<MatchResult> {
-  // 1. Match by email
-  const { data: byEmail, error: emailError } = await supabase
-    .from('customer')
-    .select('customer_id')
-    .eq('business_id', businessId)
-    .eq('email', fromEmail)
-    .maybeSingle()
+  // Ett visningsnamn är inte identitetsbevis; olika avsändare delar namn.
+  void fromName
 
-  if (emailError) throw new Error('Kundens e-postadress kunde inte matchas säkert.')
-  if (byEmail) {
-    return { customer_id: byEmail.customer_id, lead_id: null, matched_by: 'email' }
+  const träff = await resolveContact(supabase, businessId, { email: fromEmail })
+
+  if (träff.ambiguous) {
+    // Adressen finns på två kunder/leads. Att välja den ena vore att skriva
+    // kundens mejl i fel journal — hellre omatchad rad som en människa ser.
+    console.warn('[gmail-processor] tvetydig avsändare, ingen matchning gjord:', fromEmail)
+    return { customer_id: null, lead_id: null, matched_by: 'unmatched', ambiguous: true }
   }
 
-  // A display name alone is not proof of identity; different senders may share it.
-
-  // 3. Match against open leads by email
-  const { data: leadByEmail, error: leadError } = await supabase
-    .from('leads')
-    .select('lead_id')
-    .eq('business_id', businessId)
-    .eq('email', fromEmail)
-    .in('status', ['new', 'contacted', 'qualified'])
-    .maybeSingle()
-
-  if (leadError) throw new Error('Förfrågans e-postadress kunde inte matchas säkert.')
-  if (leadByEmail) {
-    return { customer_id: null, lead_id: leadByEmail.lead_id, matched_by: 'email' }
+  if (träff.customerId) {
+    return { customer_id: träff.customerId, lead_id: null, matched_by: träff.matchedBy === 'phone' ? 'phone' : 'email' }
+  }
+  if (träff.leadId) {
+    return { customer_id: null, lead_id: träff.leadId, matched_by: träff.matchedBy === 'phone' ? 'phone' : 'email' }
   }
 
   return { customer_id: null, lead_id: null, matched_by: 'unmatched' }
@@ -201,7 +207,12 @@ export async function processInboundEmail(
   const match = await matchSender(supabase, businessId, fromEmail, fromName)
 
   // 3b. Auto-create customer if unmatched
-  if (match.matched_by === 'unmatched' && fromEmail) {
+  //
+  // TVETYDIG AVSÄNDARE SKAPAR INGEN KUND (spår 6, 2026-09-18): adressen finns
+  // redan på två personer i registret. En tredje rad hade gjort röran större
+  // och dessutom sett ut som en ny kund i statistiken. Mejlet sparas utan
+  // koppling och hantverkaren avgör.
+  if (match.matched_by === 'unmatched' && !match.ambiguous && fromEmail) {
     const phone = extractPhoneFromBody(message.bodyText || '')
     const newCustomerId = await autoCreateCustomer(supabase, businessId, fromEmail, fromName, phone)
     if (newCustomerId) {

@@ -18,9 +18,13 @@ import { test, expect } from '@playwright/test'
 import { createHmac } from 'crypto'
 import { NextRequest } from 'next/server'
 
+// Hjälparna flyttade 2026-09-18 ur route-filen till lib/email/svix.ts —
+// Next.js 14 tillåter inga extra exporter ur en route, och `.next/types`
+// fällde typkontrollen på dem.
 const {
-  verifieraSvixSignatur, tolkaEpostHandelse, LEVERANSSTATUS, SVIX_TOLERANS_SEKUNDER, POST,
-} = require('../app/api/email/events/route')
+  verifieraSvixSignatur, tolkaEpostHandelse, LEVERANSSTATUS, SVIX_TOLERANS_SEKUNDER,
+} = require('../lib/email/svix')
+const { POST } = require('../app/api/email/events/route')
 
 const HEMLIGHET = 'whsec_' + Buffer.from('en-hemlighet-for-testet').toString('base64')
 const SVIX_ID = 'msg_2abc'

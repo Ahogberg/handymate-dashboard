@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { verifieraElksWebhook, larmaAvvisadElksWebhook } from '@/lib/elks-webhook-auth'
+import { tolkaLeveransrapport, type Leveransutfall } from '@/lib/sms/leveransrapport'
 
 /**
  * 46elks leveransrapport (`whendelivered`).
@@ -13,12 +14,10 @@ import { verifieraElksWebhook, larmaAvvisadElksWebhook } from '@/lib/elks-webhoo
  * (`delivery_status`/`delivered_at`) vid sidan av sändningsstatusen. Ett sent
  * kvitto får aldrig skriva om vad vi försökte göra.
  *
- * ANTAGANDE OM FÄLTNAMN (dokumenterat, inte gissat i tysthet): 46elks
- * dokumentation var inte nåbar från byggmiljön (utgående trafik blockerad),
- * så parsern är tolerant. Den läser id ur `id`/`smsid`/`messageid`, status ur
- * `status`/`delivery_status` och tidpunkten ur `delivered`/`delivered_at`/
- * `created`, och tar både form-urlencoded och JSON. Okända statusvärden
- * ignoreras hellre än tolkas fel. Se tests/sms-leverans.spec.ts.
+ * Tolkningen av kroppen bor i lib/sms/leveransrapport.ts (med sitt
+ * dokumenterade antagande om 46elks fältnamn): en route-fil i Next.js 14 får
+ * bara exportera sina HTTP-metoder och segmentinställningar, allt annat
+ * fäller typkontrollen i `.next/types`.
  *
  * ALDRIG 500. 46elks retry:ar på femhundra, och ett okänt `elks_id` (t.ex.
  * ett SMS skickat från en annan miljö) är inget fel hos oss — det loggas och
@@ -26,49 +25,6 @@ import { verifieraElksWebhook, larmaAvvisadElksWebhook } from '@/lib/elks-webhoo
  */
 
 export const dynamic = 'force-dynamic'
-
-/** `delivered` | `failed` — allt annat är okänt och skrivs inte. */
-export type Leveransutfall = 'delivered' | 'failed'
-
-export interface Leveransrapport {
-  elksId: string | null
-  utfall: Leveransutfall | null
-  tidpunkt: string | null
-}
-
-/** Ren funktion, testbar utan HTTP: rå kropp → leveransfakta. */
-export function tolkaLeveransrapport(rawBody: string, contentType?: string | null): Leveransrapport {
-  let falt: Record<string, string> = {}
-  const trimmad = (rawBody || '').trim()
-  const serJsonUt = trimmad.startsWith('{') || (contentType || '').includes('application/json')
-  if (serJsonUt) {
-    try {
-      const parsed = JSON.parse(trimmad)
-      if (parsed && typeof parsed === 'object') {
-        for (const [k, v] of Object.entries(parsed)) {
-          if (v !== null && v !== undefined && typeof v !== 'object') falt[k.toLowerCase()] = String(v)
-        }
-      }
-    } catch { /* faller tillbaka på form-urlencoded nedan */ }
-  }
-  if (Object.keys(falt).length === 0) {
-    new URLSearchParams(trimmad).forEach((v, k) => { falt[k.toLowerCase()] = v })
-  }
-
-  const elksId = falt['id'] || falt['smsid'] || falt['messageid'] || null
-
-  const rått = (falt['status'] || falt['delivery_status'] || '').trim().toLowerCase()
-  const utfall: Leveransutfall | null =
-    rått === 'delivered' ? 'delivered'
-    : rått === 'failed' || rått === 'notdelivered' || rått === 'undelivered' ? 'failed'
-    : null
-
-  const råTid = falt['delivered'] || falt['delivered_at'] || falt['created'] || ''
-  const parsad = råTid ? new Date(råTid) : null
-  const tidpunkt = parsad && Number.isFinite(parsad.getTime()) ? parsad.toISOString() : null
-
-  return { elksId: elksId && elksId.trim() ? elksId.trim() : null, utfall, tidpunkt }
-}
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text()

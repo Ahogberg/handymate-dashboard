@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
+import { phoneCandidates } from '@/lib/voice/find-customer-by-phone'
 
 interface TimelineEvent {
   id: string
@@ -82,26 +83,50 @@ export function DealTimeline({ dealId, customerId, businessId }: Props) {
         })
       })
 
-      // 2. SMS logs (if customer has phone)
+      // 2. SMS för kunden
+      //
+      // ═══ TELEFONNUMMER JÄMFÖRT MED ETT KUND-ID (fynd 2026-09-18) ═══
+      //
+      // Filtret var `.or(\`phone_to.ilike.%${customerId}%\`)` — kundens ID
+      // ("cust_a1b2c3") söktes som delsträng i ett TELEFONNUMMER. Det kan
+      // aldrig träffa, så SMS-grenen i dealtidslinjen har varit tom sedan den
+      // skrevs: hantverkaren såg aktiviteter, offerter och anteckningar men
+      // aldrig ett enda SMS.
+      //
+      // Nu hämtas kundens nummer och slås upp med samma kandidatlista som
+      // resten av kundminnet (lib/voice/find-customer-by-phone), både som
+      // mottagare (utgående) och avsändare (inkommande) — kunden kan vara
+      // sparad som "070-123 45 67" medan 46elks skriver "+46701234567".
       if (customerId) {
-        const { data: sms } = await supabase
-          .from('sms_log')
-          .select('id, direction, message, phone_to, created_at')
+        const { data: kund } = await supabase
+          .from('customer')
+          .select('phone_number')
           .eq('business_id', businessId)
-          .or(`phone_to.ilike.%${customerId}%`)
-          .order('created_at', { ascending: false })
-          .limit(10)
+          .eq('customer_id', customerId)
+          .maybeSingle()
 
-        sms?.forEach((s: any) => {
-          allEvents.push({
-            id: `sms-${s.id}`,
-            type: s.direction === 'inbound' ? 'sms_received' : 'sms_sent',
-            timestamp: s.created_at,
-            title: s.direction === 'inbound' ? 'SMS mottaget' : 'SMS skickat',
-            subtitle: s.message?.slice(0, 60) + (s.message && s.message.length > 60 ? '...' : ''),
-            icon: ICONS.sms_sent,
+        const kandidater = phoneCandidates(kund?.phone_number)
+        if (kandidater.length > 0) {
+          const lista = kandidater.map(n => `"${n}"`).join(',')
+          const { data: sms } = await supabase
+            .from('sms_log')
+            .select('sms_id, direction, message, phone_to, created_at')
+            .eq('business_id', businessId)
+            .or(`phone_to.in.(${lista}),phone_from.in.(${lista})`)
+            .order('created_at', { ascending: false })
+            .limit(10)
+
+          sms?.forEach((s: any) => {
+            allEvents.push({
+              id: `sms-${s.sms_id}`,
+              type: s.direction === 'inbound' ? 'sms_received' : 'sms_sent',
+              timestamp: s.created_at,
+              title: s.direction === 'inbound' ? 'SMS mottaget' : 'SMS skickat',
+              subtitle: s.message?.slice(0, 60) + (s.message && s.message.length > 60 ? '...' : ''),
+              icon: ICONS.sms_sent,
+            })
           })
-        })
+        }
 
         // 3. Customer activities
         const { data: custActivities } = await supabase

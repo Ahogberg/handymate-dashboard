@@ -1389,7 +1389,20 @@ async function createBooking(
   const { error } = await supabase.from('booking').insert({
     booking_id: bookingId, business_id: businessId, customer_id: params.customer_id,
     scheduled_start: params.scheduled_start,
-    scheduled_end: params.scheduled_end, status: 'pending',
+    scheduled_end: params.scheduled_end,
+    // ═══ AGENTENS create_booking HAR ALDRIG KUNNAT LYCKAS (fynd 2026-09-18) ═══
+    //
+    // Raden skickade `status: 'pending'`. I prod är `booking.status` enumet
+    // booking_status (confirmed|cancelled|completed|no_show) — 'pending' finns
+    // inte, och kolumnen `source` finns inte alls på tabellen. Varje insert
+    // föll på ett databasfel och returnerades som { success: false }, precis
+    // som lib/approve-actions.ts createBooking gjorde före spår 3 (a5d6253).
+    //
+    // 'confirmed' är rätt värde här: koden kommer bara hit när grinden ovanför
+    // har sagt att bokningen INTE kräver godkännande (annars går den via
+    // queueAgentActionForApproval och POST /api/bookings). Är raden skriven är
+    // tiden bokad.
+    status: 'confirmed',
     notes: [params.service_type, params.notes].filter(Boolean).join(' — ') || null,
     created_at: new Date().toISOString(),
   })

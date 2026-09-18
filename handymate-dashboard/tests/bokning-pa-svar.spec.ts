@@ -543,3 +543,52 @@ test.describe('9. inkommande SMS', () => {
     expect(spår).toContain('agent')
   })
 })
+
+// ══════════════════════════════════════════════════════════════════════
+// 7. Ingen väg får skriva ett status-värde som inte finns i enumet
+// ══════════════════════════════════════════════════════════════════════
+//
+// createBooking i lib/approve-actions.ts skickade 'pending' och föll på ett
+// databasfel vid VARJE godkänt bokningsförslag (rättat ovan). Samma trasiga
+// insert låg kvar i agentens create_booking-verktyg (tool-router.ts) och
+// rättades 2026-09-18. Enumet booking_status i prod har fyra värden —
+// uppslaget gjort mot pg_enum, inte gissat — och kolumnen `source` finns inte
+// alls på tabellen. En källskanning hindrar att en tredje väg återinför felet.
+
+test.describe('booking-inserts håller sig till enumet', () => {
+  const BOOKING_STATUS = ['confirmed', 'cancelled', 'completed', 'no_show']
+  const FILER = [
+    'app/api/agent/trigger/tool-router.ts',
+    'lib/approve-actions.ts',
+    'app/api/public/book/[slug]/route.ts',
+    'lib/agents/lars/service-bookings.ts',
+    'lib/demo/seed-demo-account.ts',
+  ]
+
+  for (const fil of FILER) {
+    test(`${fil} skriver bara giltiga booking_status-värden`, () => {
+      const src = las(fil)
+      let hittade = 0
+      for (const m of Array.from(src.matchAll(/\.from\('booking'\)\s*\n?\s*\.insert\(\{/g))) {
+        hittade++
+        // Klipp EXAKT vid insert-objektets slutklammer — annars läses kod
+        // efter anropet in och ett 'pending' längre ned läses som bokningens.
+        const start = src.indexOf('{', (m.index || 0) + '.from(\'booking\')'.length)
+        let djup = 0, slut = start
+        for (let i = start; i < src.length; i++) {
+          if (src[i] === '{') djup++
+          else if (src[i] === '}' && --djup === 0) { slut = i + 1; break }
+        }
+        // Kommentarerna i blocket berättar om den gamla buggen ("skickade
+        // `status: 'pending'`") — bara koden prövas.
+        const block = src.slice(start, slut).split('\n').filter(rad => !rad.trim().startsWith('//')).join('\n')
+        const status = block.match(/\bstatus:\s*'([a-z_]+)'/)
+        expect(status, `booking-insert utan uttryckligt status i ${fil}`).toBeTruthy()
+        expect(BOOKING_STATUS, `'${status?.[1]}' finns inte i enumet booking_status`).toContain(status?.[1])
+        const fram_till_status = block.slice(0, block.indexOf(status?.[0] || ''))
+        expect(fram_till_status, `kolumnen source finns inte på booking (${fil})`).not.toMatch(/\bsource:/)
+      }
+      expect(hittade, `inget booking-insert hittades i ${fil} — har filen flyttats?`).toBeGreaterThan(0)
+    })
+  }
+})

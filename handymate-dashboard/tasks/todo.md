@@ -1,3 +1,107 @@
+## Spår 6 — En identitetsläsare (kundminne pass 2), 2026-09-18
+
+Samma person skrev sitt nummer på tre sätt och kanalerna läste identiteten på
+fyra. Två av läsningarna kunde aldrig träffa: Gmail-matcharen gjorde
+`.eq('email', råvärdet)` (en kund sparad som "Anna@Exempel.se" matchades aldrig
+av ett mejl från "anna@exempel.se") och `DealTimeline.tsx:85` sökte kundens
+**ID** som delsträng i ett **telefonnummer** — SMS-grenen i dealtidslinjen har
+varit tom sedan den skrevs. Webbchatten föll ur både kundtidslinjen och
+tvisteunderlaget av samma skäl.
+
+- [x] **En läsning.** Ny `lib/identity/resolve-contact.ts`: `resolveContact`
+      ⇒ `{ customerId?, leadId?, matchedBy: 'phone'|'email'|'none', ambiguous? }`.
+      Telefon genom `findCustomerByPhone`/`phoneCandidates` (alltså
+      `normalizeSwedishPhone` + `findCustomerDuplicates` — ingen tredje
+      normalisering uppfunnen), e-post trimmad och gemenformad exakt som
+      `findCustomerDuplicates` jämför. Kund först, sedan öppen lead (`new`,
+      `contacted`, `qualified` — samma lista Gmail-matcharen alltid använt).
+      FAIL-CLOSED: pekar signalerna åt olika håll (samma adress på två kunder,
+      eller telefonen på en kund och adressen på en annan) returneras
+      `ambiguous: true` UTAN id, samma val som tenant-grinden i
+      `sms/incoming`. Ingen ny tabell, ingen skrivning.
+- [x] **Gmail-matcharen läser genom den.** `matchSender` anropar
+      `resolveContact`; telefon skickas MEDVETET inte in — ett nummer ur
+      brödtexten är avsändarens påstående om sig själv, inte en identitet att
+      matcha någon annan på. Auto-skapandet av kund vid okänd avsändare är
+      oförändrat, men en TVETYDIG avsändare skapar INGEN kund: adressen finns
+      redan på två personer, och en tredje rad hade gjort röran större. Mejlet
+      sparas omatchat och en människa avgör.
+      `lib/launch-desk/normalize.ts` återanvände redan `normalizeSwedishPhone`
+      (verifierat, rad 13) — inget att göra, export-signaturen orörd.
+- [x] **Dealtidslinjens SMS-gren.** Kundens nummer hämtas (minimal fråga) och
+      slås upp med `phoneCandidates` mot både `phone_to` och `phone_from`.
+      `phoneCandidates` är importerbar i en klientkomponent — kedjan
+      find-customer-by-phone → phone-normalize/customer-dedupe har bara
+      typimporter av `@supabase/supabase-js` (prövas av specen). Radnyckeln
+      rättad på vägen: `sms_log` har `sms_id`, inte `id`.
+- [x] **De råa matchningarna som fanns kvar — listade och rättade:**
+      `lib/compliance/communication-trail.ts` webbchatten
+      (`visitor_phone.eq.<rå>` + `visitor_email.eq.<rå>`) och
+      `app/api/customers/[id]/timeline/route.ts` §3g (samma två), plus §9
+      `agent_runs` som jämförde `trigger_data.phone` som delsträng av kundens
+      nummer utan plustecken. E-post-, samtals- och portaldelarna i BÅDA
+      filerna matchar på `customer_id` och var alltså aldrig råa — de rördes
+      inte.
+- [x] **Facit:** `tests/identitetslasare.spec.ts` (18 prov), registrerad sist i
+      både `test:contracts` och contracts.yml. Supabase-stubben FILTRERAR på
+      riktigt (in/eq/ilike över rader i minnet), så provet ser skillnad på
+      "slog upp" och "slog upp rätt". 7 mutationer, alla dödade: tvetydig
+      e-post tillåts ⇒ rött; e-post normaliseras utan gemener ⇒ 5 röda; alla
+      lead-statusar räknas som öppna ⇒ rött; telefonen slås upp rått med
+      `.eq('phone_number')` ⇒ 2 röda; tvetydig avsändare får skapa kund ⇒
+      rött; `phone_to.ilike.%${customerId}%` tillbaka ⇒ 2 röda; rå
+      `visitor_email.eq` i webbchatten ⇒ rött.
+- [x] **UI-bevis:** dealtidslinjen renderad i 375 px med tre SMS ur den
+      RIKTIGA komponenten (scratchpad/dealtimeline-375.png, ingen horisontell
+      scroll, inga sidfel). Det fanns ingen `tests/helpers/*-preview.ts` för
+      DealTimeline, så bilden är gjord med samma bundlingsteknik som
+      `relief-preview.ts` i ett skript i scratchpad — ingen ny registrerad
+      `.ui.spec.ts` lades till.
+
+### A. tsc-felet från spår 2 är stängt
+
+Next.js 14 tillåter bara `POST`/`dynamic` m.fl. ur en route-fil; spår 2:s
+exporterade hjälpare fällde `npx tsc --noEmit` via `.next/types`.
+
+- [x] `verifieraSvixSignatur`, `tolkaEpostHandelse`, `LEVERANSSTATUS`,
+      `HANTERADE_HANDELSER`, `SVIX_TOLERANS_SEKUNDER` → ny `lib/email/svix.ts`.
+      `tolkaLeveransrapport` + `Leveransutfall`/`Leveransrapport` → ny
+      `lib/sms/leveransrapport.ts`. Rutterna exporterar nu bara `POST` och
+      `dynamic`. `tests/email-leverans.spec.ts` och
+      `tests/sms-leverans.spec.ts` importerar från lib.
+- [x] **Bifynd:** `tests/facit-route-auth-inventory.spec.ts` räknade
+      `email/events` som grindad via regexen `createHmac` (grinden hette
+      "hmac_token") — ren tur. När hjälparna flyttade matchade inget alls och
+      rutten föll ur inventeringen. Grinden har nu ett eget namn,
+      `svix_signatur: /verifieraSvixSignatur\(/`. Mutation: grinden bortplockad
+      ur rutten ⇒ rött.
+- [x] **Bevis:** `npx next build` ren, därefter `npx tsc --noEmit` exit 0.
+
+### B. Agentens `create_booking` kunde aldrig lyckas
+
+`tool-router.ts:1389` insertade `status: 'pending'`. Uppslag mot `pg_enum`:
+`booking_status` = `confirmed|cancelled|completed|no_show` — 'pending' finns
+inte, och kolumnen `source` finns inte på `booking` (uppslag mot
+`information_schema`, 35 kolumner). Varje autonom bokning föll på ett
+databasfel som returnerades som `{ success: false }`. Samma bugg som spår 3
+stängde i `lib/approve-actions.ts` (a5d6253) och som den commiten uttryckligen
+lämnade kvar här. Rättat till `'confirmed'` — koden nås bara när grinden
+ovanför sagt att bokningen inte kräver godkännande.
+
+- [x] **Facit:** källskanning i `tests/bokning-pa-svar.spec.ts` (5 nya prov,
+      ett per fil som insertar i `booking`): status måste stå uttryckligen och
+      finnas i enumet, och `source` får inte skrivas. Kommentarer filtreras
+      bort så beskrivningen av den gamla buggen inte läses som kod.
+      Mutationer: `'pending'` tillbaka i tool-router ⇒ rött; `source: 'lars'`
+      i service-bookings ⇒ rött.
+
+**Siffror:** `npm run test:contracts` 3030 → 3031 gröna, 0 röda, 1 skip.
+`npx tsc --noEmit` exit 0 (var 2 fel före passet). `npx next build` ren.
+Ingen SQL kördes — bara läsande uppslag (`pg_enum`, `information_schema`).
+
+**Oprövat:** ingen riktig Gmail-synk och ingen riktig dealtidslinje körd mot
+prod-data; tvetydighetsvägen är bevisad i stub, inte på en riktig dubblett.
+
 ## Spår 5 — ROT/RUT som daterad regel, 2026-09-18
 
 Satsen och taket låg som konstanter på fyra ställen utan datum: `ROT_RATE`,
