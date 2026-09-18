@@ -288,6 +288,7 @@ jobs:
           tests/rot-regler.spec.ts
           tests/identitetslasare.spec.ts
           tests/accept-en-sanning.spec.ts
+          tests/bulk-med-bekraftelse.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
