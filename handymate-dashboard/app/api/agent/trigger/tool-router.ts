@@ -1396,6 +1396,20 @@ async function createBooking(
 
   if (error) return { success: false, error: error.message }
 
+  // Eventkontraktet (spår 4): EN gång per faktiskt skapad bokning. Den här
+  // vägen (agentens create_booking-verktyg) saknade avfyrningen helt, så
+  // Lars regler och kundtidslinjen aldrig fick veta att bokningen fanns.
+  try {
+    const { fireEvent } = await import('@/lib/automation-engine')
+    await fireEvent(supabase, 'booking_created', businessId, {
+      booking_id: bookingId,
+      customer_id: (params.customer_id as string) ?? null,
+      date: params.scheduled_start as string,
+    })
+  } catch (eventFel) {
+    console.error('[tool-router] fireEvent booking_created misslyckades (icke-blockerande):', eventFel)
+  }
+
   // Sync to Google Calendar if connected
   let googleEventId: string | null = null
   if (context.googleConnection?.sync_enabled) {

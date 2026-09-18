@@ -248,6 +248,23 @@ export async function POST(request: NextRequest) {
       .select('id')
       .maybeSingle()
 
+    // ── Svar på ett tidsförslag går FÖRE intent-agenten (spår 3) ──────
+    // Bad vi själva kunden svara "1", "2" eller "3" är svaret inte en ny
+    // förfrågan att klassa — det är valet av en tid vi redan erbjudit.
+    // Matchar det ett öppet erbjudande hoppas hela Matte-vägen (inklusive
+    // lead_review-kortet från spår 1) över, annars hade kunden fått ett kort
+    // med texten "2" ovanpå bokningskortet. Utgånget eller tvetydigt svar
+    // matchar inget och går den vanliga vägen.
+    let erbjudandeSvar: { hanterat: boolean } = { hanterat: false }
+    try {
+      const { svarPaErbjudande } = await import('@/lib/bookings/svar-pa-erbjudande')
+      erbjudandeSvar = await svarPaErbjudande({
+        supabase, businessId: business.business_id, from, text: message,
+      })
+    } catch (erbjudandeFel) {
+      console.error('[SMS Incoming] erbjudandematchningen misslyckades (fail-soft):', erbjudandeFel)
+    }
+
     // V3 Automation Engine: fire sms_received event
     try {
       const { fireEvent } = await import('@/lib/automation-engine')
@@ -282,6 +299,9 @@ export async function POST(request: NextRequest) {
     const businessId = business.business_id
     ;(async () => {
       try {
+        // Spår 3: valet av en tid vi själva erbjudit är redan besvarat med
+        // ett kort. Att klassa "2" som en ny förfrågan ger bara brus.
+        if (erbjudandeSvar.hanterat) return
         const { resolveEntity } = await import('@/lib/matte/resolver')
         const { runIntentAgent } = await import('@/lib/matte/intent-agent')
         const { executeMatteActions } = await import('@/lib/matte/action-executor')
@@ -346,17 +366,22 @@ export async function POST(request: NextRequest) {
       }
     })()
 
-    // Trigger the AI agent — it will respond via send_sms tool
-    triggerAgentFireAndForget(
-      business.business_id,
-      'incoming_sms',
-      {
-        phone_number: from,
-        message,
-        conversation_history: conversationHistory,
-      },
-      makeIdempotencyKey('sms', msgHash)
-    )
+    // Trigger the AI agent — it will respond via send_sms tool.
+    // Spår 3: hanterades SMS:et som ett svar på ett tidsförslag körs agenten
+    // INTE. Den svarar kunden med send_sms, och ett fritt svar ovanpå ett
+    // redan hanterat tidsval riskerar att lova något annat än kortet gör.
+    if (!erbjudandeSvar.hanterat) {
+      triggerAgentFireAndForget(
+        business.business_id,
+        'incoming_sms',
+        {
+          phone_number: from,
+          message,
+          conversation_history: conversationHistory,
+        },
+        makeIdempotencyKey('sms', msgHash)
+      )
+    }
 
     // Return 200 immediately — agent handles response asynchronously
     // 46elks expects plain-text "OK" (or any 200), not JSON

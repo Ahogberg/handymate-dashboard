@@ -173,6 +173,10 @@ export const RADERAS: string[] = [
   'lead_intake_request', // mottagna förfrågningar innehåller kundens kontaktuppgifter
   // Schemalagd offertförberedelse: radera händelser och ansvar före kopplade beslut/användare.
   'work_report_session', 'agent_followup_event', 'agent_followup',
+  // Bokningserbjudanden (sql/v262): bär kundens telefonnummer och de tider
+  // vi SMS:at. Raderas FÖRE booking/customer — raden pekar på båda (utan
+  // FK) och ska aldrig överleva det den beskriver.
+  'booking_offer',
   // ── Kundregister, offerter, bokningar, leads, affärer — kärnan ──
   'customer', 'quotes', 'first_work', 'booking', 'leads', 'deal', 'project',
 

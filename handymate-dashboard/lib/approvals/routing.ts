@@ -64,6 +64,8 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   autopilot_package: 'owner_admin',
   cert_expiry_reminder: 'owner_admin',
   create_booking: 'owner_admin',
+  // Kunden har valt en av de SMS:ade tiderna; ett tryck bokar och bekräftar.
+  booking_offer_confirm: 'owner_admin',
   customer_reactivation: 'owner_admin',
   deal_flow_site_visit: 'owner_admin',
   dispatch_suggestion: 'owner_admin',
@@ -80,6 +82,10 @@ const ROUTING_TABLE: Partial<Record<string, RoutingRole>> = {
   monday_brief: 'owner_admin',
   monthly_review: 'owner_admin',
   new_booking_request: 'owner_admin',
+  // Tidsförslaget skickar ett SMS till kunden i firmans namn — samma krets
+  // som övriga bokningskort. (Spår 3 gjorde typen till en riktig producent:
+  // ett upptaget tidsval förbereder nya tider genom samma väg.)
+  propose_booking_times: 'owner_admin',
   operating_experiment_proposal: 'owner_admin',
   operating_experiment_readout: 'owner_admin',
   payment_failed_signal: 'owner_admin',

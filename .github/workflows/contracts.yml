@@ -284,6 +284,7 @@ jobs:
           tests/email-leverans.spec.ts
           tests/email-chokepoint.spec.ts
           tests/outbound-status.spec.ts
+          tests/bokning-pa-svar.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

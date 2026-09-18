@@ -29,6 +29,7 @@ export const CARD_KIND = {
   propose_site_visit: 'decision',
   reschedule_request: 'decision',
   new_booking_request: 'decision',
+  booking_offer_confirm: 'decision',
   dispatch_suggestion: 'notice',
   publish_microsite: 'decision',
   invoice_reminder: 'decision',

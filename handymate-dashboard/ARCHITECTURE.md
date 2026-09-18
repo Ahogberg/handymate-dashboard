@@ -128,7 +128,7 @@ Hantverkaren hanterar det faktiska hantverket — allt administrativt sköts av 
 |-------|-------------|----------------|-----------|
 | `ata_sent` | ÄTA skickad till kund (länk eller e-post) | `{ change_id, project_id, ata_number, total, customer_name }` | `app/api/ata/[id]/send/route.ts` |
 | `ata_signed` | Kunden signerar ÄTA i den publika länken | `{ change_id, project_id, ata_number, total, signed_by }` | `app/api/ata/sign/[token]/route.ts` |
-| `booking_created` | Ny bokning skapad — en gång per skapad rad | `{ booking_id, customer_id, date }` | `app/api/bookings/route.ts`, `app/api/public/book/[slug]/route.ts`, `lib/approve-actions.ts` |
+| `booking_created` | Ny bokning skapad — en gång per skapad rad | `{ booking_id, customer_id, date }` | `app/api/bookings/route.ts`, `app/api/public/book/[slug]/route.ts`, `lib/approve-actions.ts`, `app/api/agent/trigger/tool-router.ts`, `lib/agents/lars/service-bookings.ts` |
 | `call_completed` | Inkommande samtal transkriberat, analyserat och kvalificerat | `{ from, duration, call_recording_id, customer_id }` | `app/api/voice/analyze/route.ts` |
 | `call_missed` | Inkommande samtal besvarades inte — agenten tog meddelande | `{ phone, call_id }` | `app/api/voice/incoming/route.ts`, `app/api/voice/missed/route.ts` |
 | `call_transferred` | Samtalet kopplades vidare till hantverkarens egen telefon | `{ to, from, call_id, mode }` | `app/api/voice/incoming/route.ts` |

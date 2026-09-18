@@ -1,3 +1,75 @@
+## Spår 3 — Bokning på svar, 2026-09-18
+
+Vi bad själva kunden svara: "Vi kan komma: 1) … 2) … Svara med numret som
+passar bäst". Kunden svarade "2" — och svaret blev ett lead_review-kort med
+texten "2". Ingen bokning, ingen koppling till de tider vi just erbjudit.
+`lib/approvals/booking-times-review.ts` sa det rakt ut: "Kundens svar hanteras
+separat innan kalendern ändras". Det ledet fanns inte. Nu finns det.
+
+- [x] **Erbjudandet blev data.** `sql/v262_booking_offer.sql` körd mot prod:
+      ny tabell `booking_offer` (15 kolumner, 4 index, RLS på, DML bara till
+      service_role — samma rättighetsbild som pending_approvals/booking).
+      Erbjudandets id härleds ur kortet som skickade SMS:et, så ett omkört
+      godkännande ger samma rad. Raden skrivs i
+      `app/api/approvals/[id]/route.ts` FÖRST när SMS:et faktiskt gått iväg —
+      ett erbjudande kunden aldrig fick ska inte gå att besvara.
+      `sms_log` har ingen metadata-kolumn (uppslaget gjort mot
+      information_schema), så SMS-raden märks INTE med offer_id; kopplingen
+      bärs av `source_approval_id` i stället.
+- [x] **Svaret matchas före intent-agenten.** `lib/bookings/svar-pa-erbjudande.ts`
+      slår upp öppet, ej utgånget erbjudande på avsändarens telefonkandidater i
+      samma företag och tolkar svaret i REN KOD: siffra 1–3, eller en veckodag
+      (+ klockslag när flera tider ligger samma dag) som entydigt pekar ut EN
+      tid. Ingen modell. Tvetydigt svar matchar ingenting och går vanliga
+      vägen. Matchar det, hoppas både Matte-vägen (lead_review-kortet) och den
+      fria agenten över — annars hade kunden fått ett svar som lovar något
+      annat än kortet gör.
+- [x] **Ledig tid ⇒ ETT kort.** Status-CAS `open → accepted` + kortet
+      `booking_offer_confirm` ("Anna valde tisdag 22 september kl 13:00–15:00 —
+      Boka", risk `high`, push via skapaKort). Godkännandet går genom den
+      BEFINTLIGA bokningsvägen (`executeApproveAction` → createBooking: kunddedup,
+      konfliktkoll, `booking_created`) och skickar bokningsbekräftelsen via
+      `lib/bookings/confirmation-sms.ts`. Granskningen läser erbjudandet ur
+      tabellen och kontrollerar tiden EN GÅNG TILL — en tid som hunnit bli
+      upptagen blockerar kortet i stället för att dubbelboka.
+- [x] **Upptagen tid ⇒ nya tider, max en gång.** Erbjudandet blir `superseded`
+      och ett nytt `propose_booking_times`-kort förbereds med
+      `parent_offer_id` — SMS:et går genom exakt samma väg och grindar som det
+      första (ingen ny utskickstyp). Andra gången: inget tredje SMS, ärendet
+      går till hantverkaren (`agent_insight`).
+- [x] **Dedupe.** Två svar ⇒ ett kort och en bokning: status-CAS plus
+      deterministiskt kort-id ur erbjudandet, och en idempotenskontroll på
+      `resulting_booking_id` före bokningen. Utgånget erbjudande matchar inte
+      (både i queryn och som JS-bälte) — inget kort från den här modulen.
+- [x] **Fynd som stängdes på vägen:** `createBooking` i `lib/approve-actions.ts`
+      har ALDRIG kunnat lyckas. Den skickade `status: 'pending'` (finns inte i
+      enumet booking_status: confirmed|cancelled|completed|no_show) och
+      `source: 'ai_suggestion'` (kolumnen finns inte på `booking`). Varje
+      godkänt bokningsförslag föll på ett databasfel som fångades och
+      returnerades som `{ success: false }`. Rättat till `status: 'confirmed'`
+      utan `source`. Funktionen tar nu också en exakt ISO-tid
+      (`scheduled_start`), i stället för att sätta ihop `${date}T${time}` utan
+      tidszon och låta servern tolka den som UTC.
+- [x] **Två saknade `booking_created`** (spår 4-fyndet) avfyras nu:
+      `app/api/agent/trigger/tool-router.ts` och
+      `lib/agents/lars/service-bookings.ts`. ARCHITECTURE.md §4 filkolumn
+      uppdaterad; `tests/event-kontrakt.spec.ts` grön.
+- [x] **Kundens kvitto-SMS byggdes INTE.** "Tack, jag återkommer med
+      bekräftelse" är en ny, automatisk, kundvänd utskickstyp utan kort och
+      utan regel — lead-intake-granskningen säger att nya utskickstyper ska gå
+      genom approvals/regler. Kunden får bokningsbekräftelsen när hantverkaren
+      trycker: ETT SMS, inte två. Avvisning skickar heller ingenting; "tiden
+      gick inte att bekräfta" är ett besked bara hantverkaren kan formulera.
+- [x] `tests/bokning-pa-svar.spec.ts` (23 prov) registrerad sist i både
+      `test:contracts` och `contracts.yml`. 14 mutationer testade, alla dödade.
+      Kortet renderat i 375 px (ingen horisontell scroll, rubriken kapas inte).
+
+**Inte gjort:** helautonom bokning på svar (kräver spec-beslut —
+`create_booking` är aldrig autonom i `tasks/earned-autonomy-spec.md`);
+`tool-router`-vägens egen `status: 'pending'`-insert är samma trasiga klass som
+createBooking hade men ligger utanför det här spåret; kundprov med två
+telefoner är inte kört.
+
 ## Spår 2 — Skickat blir levererat, 2026-09-18
 
 "Skickat" har betytt att sändtjänsten svarade HTTP 200 på vårt anrop. Ett SMS

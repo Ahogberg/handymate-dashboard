@@ -31,6 +31,11 @@ export const EXPIRY_DAYS = {
   propose_site_visit: 7,
   reschedule_request: 7,
   new_booking_request: 7,
+  // Kunden har redan valt en tid. Kortet får ALDRIG tyst försvinna ur kön —
+  // då står kunden med ett löfte och hantverkaren utan ärende. Erbjudandets
+  // egen 48-timmarsklocka (booking_offer.expires_at) styr matchningen av
+  // svaret, inte kortets liv.
+  booking_offer_confirm: null,
   dispatch_suggestion: null,
   publish_microsite: 7,
   invoice_reminder: 7,
