@@ -5,6 +5,13 @@ import { verifyOwnership } from '@/lib/auth/verify-ownership'
 import { getCurrentUser } from '@/lib/permissions'
 import { resolveTaskScope, taskListOrFilter, taskPrivacyOrFilter, canSeeTask, canEditTask, type TaskScope } from '@/lib/tasks/visibility'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 // Helper: log task activity
 async function logTaskActivity(
   supabase: ReturnType<typeof getServerSupabase>,

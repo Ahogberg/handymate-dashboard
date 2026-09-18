@@ -14,6 +14,13 @@ import {
   wrapInPage,
 } from '@/lib/document-html'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/time-entry/report - Generera tidsrapport
  * Query: startDate, endDate, format (json|csv|html), groupBy (day|week|customer|project)

@@ -4,6 +4,13 @@ import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getCurrentUser, hasPermission, isOwnerOrAdmin } from '@/lib/permissions'
 import { resolveTimeEntryHourlyRate } from '@/lib/time-entry/rate'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 const WORK_CATEGORIES = new Set(['work', 'travel', 'material_pickup', 'meeting', 'admin'])
 
 class TimeEntryRequestError extends Error {
