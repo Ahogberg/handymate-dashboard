@@ -288,6 +288,7 @@ jobs:
           tests/rivning-c-verktygen.spec.ts
           tests/rivning-2-20-mall-upplagg.spec.ts
           tests/rivning-d-runtomkring.spec.ts
+          tests/design-offertflodet-kontrakt.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
