@@ -243,3 +243,26 @@ publiceras, inte bara grundarna. Bytet får inte ske före §10 i heroutkastet.
      `founders-offer.ts` filhuvud i flippasset så koden och villkoren säger
      samma sak.
   Kvar före merge: juridisk genomläsning av §6–§9.
+
+  **Fynd 2026-09-18 vid faktakontroll av §9.** Jag hade skrivit "årsplanen
+  förnyas inte automatiskt utan ditt godkännande" utan att verifiera det.
+  Det var falskt: **ingenting i koden sätter `cancel_at_period_end`**, så
+  båda planerna förnyas automatiskt tills de sägs upp. Uppsägningen sker i
+  Stripes kundportal via knappen "Hantera prenumeration"
+  (`app/dashboard/settings/billing/page.tsx:378` →
+  `POST /api/billing/portal`, ägar-/adminsgrindad). §9 är omskriven till
+  det som faktiskt gäller.
+
+  Två saker som föll ut och som **inte** är åtgärdade:
+
+  1. **`'Avsluta när som helst'`** i Step5Activates punktlista
+     (`app/onboarding/components/Step5Activate.tsx:496`) står kvar medan
+     årsplanen är förvald. Du kan säga upp, men de tolv betalda månaderna
+     löper ändå. Landningssidans FAQ är noggrannare: "ingen bindningstid
+     **på månadsplanen** … Årsplanen betalas för ett år i taget". Punkten
+     bör säga samma sak. Vad den ska säga är ett beslut, därför orörd.
+  2. **Ingen påminnelse före årsförnyelse.** Ett årsabonnemang som förnyas
+     tyst för 59 950 kr är den sortens sak en kund upplever som ett
+     övertramp även när den är avtalsenlig. Ingen kod skickar en sådan
+     påminnelse. Jag skrev medvetet inte in ett löfte om det i villkoren —
+     men det är värt att bygga, och då kan raden läggas till.
