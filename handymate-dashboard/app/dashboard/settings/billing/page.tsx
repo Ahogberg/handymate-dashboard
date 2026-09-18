@@ -199,6 +199,15 @@ export default function BillingPage() {
   // Garantin läses från EN källa (getGuaranteeFacts) — facit i
   // tests/guarantee-truth.spec.ts.
   const guarantee = getGuaranteeFacts(Boolean(billing?.founders_available), billingInterval)
+  // Faktureringsintervallet lagras inte på kontot — det härleds ur periodens
+  // längd, samma tröskel som harledIntervall() i lib/billing/write-billing-update.ts.
+  const harledIntervall = (p: { period_start: string | null; period_end: string | null }) => {
+    if (!p.period_start || !p.period_end) return null
+    const dygn = (new Date(p.period_end).getTime() - new Date(p.period_start).getTime()) / 86_400_000
+    if (!Number.isFinite(dygn) || dygn <= 0) return null
+    return dygn > 45 ? 'yearly' : 'monthly'
+  }
+  const arsbelopp = billing?.plan?.id ? getPlanCommercialFacts(billing.plan.id as PlanType).yearlyPriceSek : null
 
   useEffect(() => {
     if (!business?.business_id) return
@@ -349,7 +358,15 @@ export default function BillingPage() {
                       )}
                       {billing?.subscription?.status === 'active' && billing.subscription.period_end && (
                         <p className="text-gray-500 text-sm mt-1">
-                          Fornyelse: {formatDate(billing.subscription.period_end)}
+                          {/* Raden fanns redan men var alltid tom: period_end
+                              skrevs aldrig (se laesAbonnemangsperiod). Nu när
+                              den fylls är det här den subtila påminnelsen i
+                              plattformen — mejlet 30 dagar innan är det andra
+                              spåret. Årsplanen får beloppet utskrivet,
+                              eftersom det är den dragningen som överraskar. */}
+                          {harledIntervall(billing.subscription) === 'yearly' && arsbelopp
+                            ? `Förnyas automatiskt ${formatDate(billing.subscription.period_end)} för ${arsbelopp.toLocaleString('sv-SE')} kr exkl. moms`
+                            : `Förnyas automatiskt ${formatDate(billing.subscription.period_end)}`}
                         </p>
                       )}
                       {billing?.subscription?.status === 'cancelled' && (

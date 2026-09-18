@@ -220,5 +220,10 @@ test('inventeringens storlek — ändras den, uppdatera docs/audits/TENANT_SWEEP
   // 2026-09-12 (Revenue OS V1): admin/revenue — plattformsadmin via
   // isAdmin(request), service-role bakom admin-grinden och ingen kundtenant-
   // kontext. Den interna säljytan arbetar med husets GTM-data → 156.
-  expect(utanStandard.length).toBeLessThanOrEqual(156)
+  // 2026-09-18 (årsförnyelsen + backfyllnaden): två rutter, båda utan
+  // kundtenant-kontext eftersom de arbetar ÖVER konton, inte i ett:
+  // cron/arsforyelse-paminnelse (cron-hemlighet, sveper alla årsplaner som
+  // förnyas om 30 dagar) och admin/billing-resync (isAdmin, läser om
+  // prenumerationsstatus från Stripe när en webhook missats) → 158.
+  expect(utanStandard.length).toBeLessThanOrEqual(158)
 })

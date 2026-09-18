@@ -323,3 +323,36 @@ roten. Är det förklaringen skriver koden aldrig något datum, och då har
 **Ordning:** verifiera var perioden ligger mot ett riktigt
 prenumerationsobjekt → rätta läsningen → backfyll → sedan påminnelsen. Att
 bygga cronen först ger en påminnelse som aldrig går ut.
+
+### Kedjan körd 2026-09-18
+
+**Verifierat utan att röra produktionsnycklar.** Stripe-paketets egna typer
+svarade: `current_period_end` finns inte i `types/Subscriptions.d.ts` utan i
+`types/SubscriptionItems.d.ts`. `(subscription as any).current_period_end`
+var alltså alltid `undefined` — casten var spåret efter typfelet, och den
+icke-blockerande skrivningen skrev tyst ingenting.
+
+- **Läsningen:** `laesAbonnemangsperiod()` läser posterna först, roten som
+  reserv för äldre API-versioner. Alla sex anropsställen går genom den.
+  `harledIntervall()` härleder månad/år ur periodlängden, eftersom
+  intervallet inte lagras någonstans (det finns bara i checkout-metadata).
+- **Backfyllnaden:** `POST /api/admin/billing-resync`. Blev en driftrutt,
+  inte en engångsrutt — missas en webhook driver databasen isär från Stripe
+  och ingenting upptäcker det. Rör aldrig grundarstämpeln.
+- **Påminnelsen:** `cron/arsforyelse-paminnelse`, dagligen 08:00. Bara
+  årsplaner, aldrig demo/test, deterministiskt kvitto i `billing_event` som
+  kontrolleras före utskicket och skrivs bara när det lyckades.
+- **Den subtila ytan fanns redan.** Fakturasidans rad "Förnyelse: {datum}"
+  har alltid varit tom eftersom `period_end` var null. Nu fylls den, och
+  för årsplaner skriver den ut beloppet — det är den dragningen som
+  överraskar.
+
+**Facit:** `tests/abonnemangsperiod.spec.ts` (16 prov).
+
+**Och en bredare rättelse på vägen:** de kommersiella facit —
+`pricing-truth`, `guarantee-truth`, `founders-offer`, `launch-visibility`,
+`admin-email-gate`, `abonnemangsperiod` — kördes bara i den nattliga
+sviten. En glidande pris- eller garantitext upptäcktes alltså först timmar
+efter merge. De är browserlösa och tar under två sekunder; de ligger nu i
+PR-grinden (`contracts.yml` + `test:contracts`). Sviten gick från 2 189 till
+2 275 prov.

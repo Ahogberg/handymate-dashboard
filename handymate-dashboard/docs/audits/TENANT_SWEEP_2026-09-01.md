@@ -130,3 +130,38 @@ Efter-SMS:et (SMS 2) skickas från `finalizeAcceptedQuote` men bara när
 `arDemoOffertForetag(businessId)` — en riktig hantverkares kund får det
 aldrig. Demo-besökarna städas efter 7 dagar av `demo_quote_cleanup` (v223),
 som själv kastar på företag utan `is_demo_tenant`.
+
+## Tillägg 2026-09-18 — årsförnyelsen och backfyllnaden
+
+Två nya rutter utanför standardgrinden (158 totalt). Båda arbetar **över**
+konton i stället för i ett, vilket är skälet till att `getAuthenticatedBusiness`
+inte passar dem:
+
+- `cron/arsforyelse-paminnelse`: cron-hemlighet via `verifyCronSecret`.
+  Sveper alla konton vars `billing_period_end` ligger 30 dygn bort, filtrerar
+  till årsplaner och skickar ett mejl om att abonnemanget förnyas
+  automatiskt. Skälet: ingenting i koden sätter `cancel_at_period_end`, så
+  ett årsabonnemang på 59 950 kr dras utan förvarning. Demo- och testkonton
+  exkluderas (`is_demo_tenant`, `arTestNamn`). Dubbelutskick är omöjligt:
+  kvittot i `billing_event` har en deterministisk nyckel
+  (`arsforyelse_<business_id>_<datum>`) som kontrolleras före utskicket och
+  bara skrivs när utskicket faktiskt accepterades.
+- `admin/billing-resync`: `isAdmin(request)` + service-role. Läser om
+  prenumerationsstatus från Stripe och skriver via samma
+  `writeBillingUpdate` som webhooken — aldrig en egen variant. Rör aldrig
+  grundarstämpeln (`founding_at`), som sätts vid köptillfället och inte får
+  kunna återuppstå vid en omläsning.
+
+### Varför backfyllnaden behövdes
+
+`business_config.billing_period_start/end` var **null för alla konton**.
+Koden läste `(subscription as any).current_period_start/end` — men i
+stripe v20 (API `2026-01-28.clover`) finns de fälten inte på
+prenumerationsroten, utan på varje `SubscriptionItem`. Casten tystade
+typfelet, uttrycket blev `undefined`, och den icke-blockerande skrivningen
+skrev tyst ingenting.
+
+Det tog samtidigt bort underlaget för `/api/billing/usage` och för
+fakturasidans förnyelserad, som fanns i UI:t men alltid var tom.
+Läsningen går nu genom `laesAbonnemangsperiod()` med posterna först och
+roten som reserv för äldre API-versioner. Facit: `tests/abonnemangsperiod.spec.ts`.

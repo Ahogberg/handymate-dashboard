@@ -42,6 +42,55 @@ export interface BillingPeriod {
 }
 
 /**
+ * Prenumerationens innevarande period.
+ *
+ * ═══ VARFÖR EN HJÄLPARE, OCH VARFÖR DEN SÅG UT SÅ HÄR FÖRUT ═══
+ *
+ * Koden läste `(subscription as any).current_period_start/end`. Casten var
+ * spåret: i stripe v20 (kontot kör API 2026-01-28.clover) finns de fälten
+ * INTE på prenumerationsroten — de ligger på varje `SubscriptionItem`
+ * (node_modules/stripe/types/SubscriptionItems.d.ts). `as any` tystade
+ * typfelet, uttrycket blev `undefined`, `toIsoOrNull(undefined)` gav null,
+ * och den icke-blockerande skrivningen skrev tyst ingenting.
+ *
+ * Följden: `business_config.billing_period_start/end` har varit null för
+ * varje konto sedan uppgraderingen. Verifierat 2026-09-18 — den enda skarpa
+ * prenumerationen hade båda tomma. Det tog också bort underlaget för
+ * `app/api/billing/usage` och för varje påminnelse om förnyelse.
+ *
+ * `items` är ett obligatoriskt fält på Subscription och följer med utan
+ * expand. Handymates prenumerationer har ett pris, alltså en post; skulle
+ * det någon gång bli flera delar de ändå faktureringscykel, så första
+ * posten är rätt. Roten läses som reserv ifall en äldre API-version används
+ * någonstans — då är den ifylld och posterna saknas.
+ */
+export function laesAbonnemangsperiod(
+  subscription: Stripe.Subscription,
+): BillingPeriod | undefined {
+  const post = subscription.items?.data?.[0] as { current_period_start?: unknown; current_period_end?: unknown } | undefined
+  const rot = subscription as unknown as { current_period_start?: unknown; current_period_end?: unknown }
+  const start = toIsoOrNull(post?.current_period_start ?? rot.current_period_start)
+  const end = toIsoOrNull(post?.current_period_end ?? rot.current_period_end)
+  if (!start && !end) return undefined
+  return { start, end }
+}
+
+/**
+ * Faktureringsintervallet härlett ur periodens längd.
+ *
+ * Intervallet lagras inte på kontot — det finns bara i checkout-sessionens
+ * metadata och når aldrig business_config. Periodlängden är entydig:
+ * en månadsplan har ~30 dagar, en årsplan ~365. Tröskeln 45 dygn kan inte
+ * träffa fel på de två plantyper som finns.
+ */
+export function harledIntervall(period: BillingPeriod | undefined): 'monthly' | 'yearly' | null {
+  if (!period?.start || !period?.end) return null
+  const dygn = (new Date(period.end).getTime() - new Date(period.start).getTime()) / 86_400_000
+  if (!Number.isFinite(dygn) || dygn <= 0) return null
+  return dygn > 45 ? 'yearly' : 'monthly'
+}
+
+/**
  * Grundarstämpeln (sql/v239, beslutsfilen §4). Byggs bara när checkout-
  * sessionen bar metadata.founders = 'true' — erbjudandet var tillgängligt i
  * det ögonblick kunden sa ja. Priset är LISTPRISET vid köpet i hela kronor
@@ -128,10 +177,7 @@ export async function byggAbonnemangsfalt(
       if (subscription.trial_end) {
         critical.trial_ends_at = new Date(subscription.trial_end * 1000).toISOString()
       }
-      period = {
-        start: toIsoOrNull((subscription as any).current_period_start),
-        end: toIsoOrNull((subscription as any).current_period_end),
-      }
+      period = laesAbonnemangsperiod(subscription)
     } catch (err) {
       console.error('[Billing] Kunde inte hämta prenumerationsdetaljer:', err)
     }

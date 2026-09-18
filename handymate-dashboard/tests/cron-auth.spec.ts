@@ -92,11 +92,16 @@ test('alla cron-rutter utanför Claudes Karin-fillås använder helpern', () => 
   // 2026-09-10: cron/phone-number-verify tillkom — kontrollerar att de nummer
   // vi säger är kopplade faktiskt är våra hos 46elks. Sex av åtta nummer var
   // spöken när saldot tog slut, och ingenting kontrollerade det → 48.
-  expect(files).toHaveLength(48)
+  // 2026-09-18 (årsförnyelsen): cron/arsforyelse-paminnelse tillkom — mejl
+  // 30 dagar innan ett årsabonnemang förnyas automatiskt, eftersom
+  // ingenting i koden sätter cancel_at_period_end och en tyst dragning på
+  // 59 950 kr upplevs som ett övertramp även när den är avtalsenlig.
+  // Använder helpern korrekt → 49.
+  expect(files).toHaveLength(49)
 
   const karinRoute = path.join(CRON_DIR, 'karin-deadlines', 'route.ts')
   const ownedRoutes = files.filter(file => file !== karinRoute)
-  expect(ownedRoutes).toHaveLength(47)
+  expect(ownedRoutes).toHaveLength(48)
 
   const missing = ownedRoutes
     .filter(file => {

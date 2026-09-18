@@ -70,6 +70,10 @@ jobs:
         # Inga browsers installeras — sviterna nedan får inte använda
         # `page`. En svit som behöver browser hör hemma i den nattliga
         # prod-sviten, inte här.
+        # 2026-09-18: de kommersiella facit (pris, garanti, uppsägning,
+        # adminbehörighet, lanseringssynlighet, prenumerationsperiod) kördes
+        # bara i den nattliga sviten, så en glidande text upptäcktes först
+        # timmar efter merge. De är browserlösa och tar under två sekunder.
         run: >-
           npx playwright test
           tests/trade-start-packages.spec.ts
@@ -221,6 +225,12 @@ jobs:
           tests/demo-seedning-tackning.spec.ts
           tests/demo-undantaget.spec.ts
           tests/salj-case-overlamning.spec.ts
+          tests/guarantee-truth.spec.ts
+          tests/abonnemangsperiod.spec.ts
+          tests/launch-visibility.spec.ts
+          tests/admin-email-gate.spec.ts
+          tests/pricing-truth.spec.ts
+          tests/founders-offer.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

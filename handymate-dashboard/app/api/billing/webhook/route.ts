@@ -7,7 +7,7 @@ import { classifyStripeInvoiceForPartner } from '@/lib/partners/stripe-revenue'
 // Skrivningen av prenumerationsstatus är delad med betalverifieringen i
 // onboardingen (POST /api/billing/onboarding-checkout/verify) — se
 // lib/billing/write-billing-update.ts. Två vägar, exakt en sanning.
-import { writeBillingUpdate, byggAbonnemangsfalt, byggGrundarstampel, toIsoOrNull, STRIPE_STATUS_MAP } from '@/lib/billing/write-billing-update'
+import { writeBillingUpdate, byggAbonnemangsfalt, byggGrundarstampel, laesAbonnemangsperiod, STRIPE_STATUS_MAP } from '@/lib/billing/write-billing-update'
 
 function getStripe() {
   if (!process.env.STRIPE_SECRET_KEY) {
@@ -353,10 +353,7 @@ async function updateSubscriptionData(
 
   // billing_period_* skrivs separat best-effort (kolumnen kan saknas innan v69);
   // subscription_status MÅSTE persisteras och får aldrig blockeras av den.
-  const period = {
-    start: toIsoOrNull((subscription as any).current_period_start),
-    end: toIsoOrNull((subscription as any).current_period_end),
-  }
+  const period = laesAbonnemangsperiod(subscription)
 
   // Grundarstämpeln (sql/v239): checkout-skaparen la `founders` i
   // subscription_data.metadata, så den följer med hit. Skrivs en gång —
@@ -373,8 +370,8 @@ async function updateSubscriptionData(
       data: {
         status: subscription.status,
         plan_id: planId,
-        period_start: (subscription as any).current_period_start,
-        period_end: (subscription as any).current_period_end
+        period_start: period?.start ?? null,
+        period_end: period?.end ?? null
       }
     })
 }
