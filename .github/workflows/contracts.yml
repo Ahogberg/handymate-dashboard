@@ -276,6 +276,7 @@ jobs:
           tests/partner-demo-ingang.spec.ts
           tests/partner-genomgangar.spec.ts
           tests/revenue-bulk.spec.ts
+          tests/revisorsplats.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

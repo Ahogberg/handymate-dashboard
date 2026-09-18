@@ -34,7 +34,7 @@ type Filter = 'all' | 'active' | 'invited' | 'inactive'
 interface InviteForm {
   email: string
   name: string
-  role: 'admin' | 'project_manager' | 'kalkylator' | 'employee'
+  role: 'admin' | 'project_manager' | 'kalkylator' | 'employee' | 'revisor'
   title: string
   phone: string
   hourly_rate: string
@@ -83,10 +83,27 @@ const EMPLOYEE_PERMISSIONS: Pick<InviteForm, 'can_see_all_projects' | 'can_see_f
   can_create_invoices: false,
 }
 
+/**
+ * Revisorns förval. Bockarna sätts för att formuläret ska visa sanningen —
+ * men de STYR ingenting för den här rollen: lib/permissions.ts ignorerar
+ * can_*-flaggorna för en läsroll och lib/auth.ts nekar allt som inte är en
+ * läsning. Bockar man i "kan skapa fakturor" på en revisor händer alltså
+ * ingenting, och det är avsiktligt.
+ */
+const REVISOR_PERMISSIONS: Pick<InviteForm, 'can_see_all_projects' | 'can_see_financials' | 'can_manage_users' | 'can_approve_time' | 'can_create_invoices'> = {
+  can_see_all_projects: true,
+  can_see_financials: true,
+  can_manage_users: false,
+  can_approve_time: false,
+  can_create_invoices: false,
+}
+
 const ROLE_DESCRIPTIONS: Record<string, string> = {
   admin: 'Full tillgång — fakturor, inställningar, AI, pipeline',
   project_manager: 'Projekt, offerter, fakturor, attestering',
   employee: 'Tidrapport, check-in, lager, sina projekt',
+  kalkylator: 'Offerter och kalkyler',
+  revisor: 'Ser bara fakturor, leverantörsfakturor, ROT/RUT och dokument — kan inte ändra något',
 }
 
 // ---------------------------------------------------------------------------
@@ -365,8 +382,8 @@ export default function TeamPage() {
     setInviteModalOpen(true)
   }
 
-  const handleInviteRoleChange = (role: 'admin' | 'project_manager' | 'employee') => {
-    const perms = role === 'admin' ? ADMIN_PERMISSIONS : role === 'project_manager' ? PROJECT_MANAGER_PERMISSIONS : EMPLOYEE_PERMISSIONS
+  const handleInviteRoleChange = (role: 'admin' | 'project_manager' | 'kalkylator' | 'employee' | 'revisor') => {
+    const perms = role === 'admin' ? ADMIN_PERMISSIONS : role === 'revisor' ? REVISOR_PERMISSIONS : role === 'project_manager' ? PROJECT_MANAGER_PERMISSIONS : EMPLOYEE_PERMISSIONS
     setInviteForm(prev => ({ ...prev, role, ...perms }))
   }
 
@@ -446,8 +463,8 @@ export default function TeamPage() {
     setEditModalOpen(true)
   }
 
-  const handleEditRoleChange = (role: 'admin' | 'project_manager' | 'employee') => {
-    const perms = role === 'admin' ? ADMIN_PERMISSIONS : role === 'project_manager' ? PROJECT_MANAGER_PERMISSIONS : EMPLOYEE_PERMISSIONS
+  const handleEditRoleChange = (role: 'admin' | 'project_manager' | 'kalkylator' | 'employee' | 'revisor') => {
+    const perms = role === 'admin' ? ADMIN_PERMISSIONS : role === 'revisor' ? REVISOR_PERMISSIONS : role === 'project_manager' ? PROJECT_MANAGER_PERMISSIONS : EMPLOYEE_PERMISSIONS
     setEditForm(prev => ({ ...prev, role, ...perms }))
   }
 
@@ -649,12 +666,13 @@ export default function TeamPage() {
                 <label className="block text-sm text-gray-500 mb-1">Roll</label>
                 <select
                   value={inviteForm.role}
-                  onChange={e => handleInviteRoleChange(e.target.value as 'admin' | 'project_manager' | 'employee')}
+                  onChange={e => handleInviteRoleChange(e.target.value as 'admin' | 'project_manager' | 'kalkylator' | 'employee' | 'revisor')}
                   className="w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50"
                 >
                   <option value="admin">Admin</option>
                   <option value="project_manager">Projektledare</option>
                   <option value="kalkylator">Kalkylator</option>
+                  <option value="revisor">Revisor eller redovisningskonsult</option>
                   <option value="employee">Anställd</option>
                 </select>
                 <p className="text-xs text-gray-400 mt-1">{ROLE_DESCRIPTIONS[inviteForm.role]}</p>
@@ -838,7 +856,7 @@ export default function TeamPage() {
                 <label className="block text-sm text-gray-500 mb-1">Roll</label>
                 <select
                   value={editingMember.role === 'owner' ? 'owner' : editForm.role}
-                  onChange={e => handleEditRoleChange(e.target.value as 'admin' | 'project_manager' | 'employee')}
+                  onChange={e => handleEditRoleChange(e.target.value as 'admin' | 'project_manager' | 'kalkylator' | 'employee' | 'revisor')}
                   disabled={editingMember.role === 'owner'}
                   className={`w-full px-4 py-2.5 bg-white border border-[#E2E8F0] rounded-lg text-gray-900 focus:outline-none focus:border-primary-600 focus:ring-1 focus:ring-primary-600/50 ${
                     editingMember.role === 'owner' ? 'opacity-50 cursor-not-allowed' : ''
@@ -848,6 +866,7 @@ export default function TeamPage() {
                   <option value="admin">Admin</option>
                   <option value="project_manager">Projektledare</option>
                   <option value="kalkylator">Kalkylator</option>
+                  <option value="revisor">Revisor eller redovisningskonsult</option>
                   <option value="employee">Anställd</option>
                 </select>
                 {editingMember.role !== 'owner' && (

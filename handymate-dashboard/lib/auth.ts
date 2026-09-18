@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { isSuperAdmin, readImpersonationCookie } from '@/lib/auth/superadmin'
+import { farSkriva } from './auth/lasbehorighet'
 
 function getSupabase() {
   return createClient(
@@ -162,12 +163,30 @@ export async function getAuthenticatedBusiness(
     // Fallback: kolla om användaren är anställd via business_users
     const { data: businessUser } = await supabase
       .from('business_users')
-      .select('business_id')
+      .select('business_id, role')
       .eq('user_id', user.id)
       .eq('is_active', true)
       .single()
 
     if (businessUser) {
+      // LÄSROLLSGRINDEN (2026-09-18, revisorsplatsen).
+      //
+      // Den här funktionen är enda stället som gör en medlemsrad till en
+      // autentiserad tenant, och de flesta mutande rutter nöjer sig med den
+      // — de läser aldrig rollen. Utan grinden HÄR hade `revisor` fått
+      // skriva överallt där ingen råkat lägga en egen kontroll, bland annat
+      // i utskicksvägarna till kundens kunder.
+      //
+      // Metoden avgör, och läsning är en allowlist (GET/HEAD/OPTIONS) så att
+      // en metod vi inte tänkt på räknas som skrivning och nekas. Svaret är
+      // null, vilket rutterna redan hanterar som 401 — ingen ny felväg.
+      if (!farSkriva(businessUser.role, request.method)) {
+        console.warn(
+          `[auth] läsroll ${businessUser.role} nekas ${request.method} mot ${businessUser.business_id}`,
+        )
+        return null
+      }
+
       const { data: employeeBusiness } = await supabase
         .from('business_config')
         .select('*')

@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { arLasroll, LASROLLENS_RATTIGHETER } from './auth/lasbehorighet'
 
 function getSupabase() {
   return createClient(
@@ -12,7 +13,7 @@ export interface BusinessUser {
   id: string
   business_id: string
   user_id: string | null
-  role: 'owner' | 'admin' | 'employee'
+  role: 'owner' | 'admin' | 'employee' | 'project_manager' | 'kalkylator' | 'revisor'
   name: string
   email: string
   phone: string | null
@@ -50,6 +51,17 @@ const PERMISSION_MAP: Record<Permission, keyof BusinessUser> = {
  * Kontrollerar om en användare har en viss permission
  */
 export function hasPermission(user: BusinessUser, permission: Permission): boolean {
+  // LÄSROLL (revisor) — rollen avgör, aldrig flaggorna.
+  //
+  // Prövas FÖRST, före owner/admin, eftersom en läsroll aldrig ska kunna
+  // kombineras med något som öppnar upp. Och före flaggrenen nedan av ett
+  // skarpare skäl: can_create_invoices och can_approve_time är bockar någon
+  // kan sätta i teamvyn. Hade de fått gälla här vore revisorn en skrivande
+  // användare efter ett klick som inte syns i någon kodgranskning.
+  if (arLasroll(user.role)) {
+    return (LASROLLENS_RATTIGHETER as readonly string[]).includes(permission)
+  }
+
   // Owner har alltid alla permissions
   if (user.role === 'owner') return true
 
@@ -69,6 +81,9 @@ export function hasPermission(user: BusinessUser, permission: Permission): boole
  * Kontrollerar om en användare är owner eller admin
  */
 export function isOwnerOrAdmin(user: BusinessUser): boolean {
+  // En läsroll är varken owner eller admin och behöver ingen egen gren här —
+  // men facit håller påståendet, så ingen kan lägga till en roll i den här
+  // jämförelsen utan att bli stoppad.
   return user.role === 'owner' || user.role === 'admin'
 }
 
