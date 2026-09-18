@@ -278,6 +278,7 @@ jobs:
           tests/revenue-bulk.spec.ts
           tests/revisorsplats.spec.ts
           tests/pengar-pa-bordet.spec.ts
+          tests/bulk-med-bekraftelse.spec.ts
           tests/intake-questions.spec.ts
           tests/forsta-jobbresan.spec.ts
           tests/quote-content-lock.spec.ts
