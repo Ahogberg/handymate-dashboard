@@ -161,7 +161,13 @@ export function QuickIntake({
   const voiceUnavailable = recording.state === 'denied' || recording.state === 'unsupported'
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
+    // z-[60], inte z-50: Jobbkompisen ligger på z-50 och renderas EFTER
+    // sidinnehållet i dashboardens layout, så vid samma nivå vann bubblan
+    // på DOM-ordning och lade sig över helskärmen — bredvid mikrofonknappen,
+    // så att det såg ut som två mikrofoner (Andreas klickprov 2026-09-18).
+    // 60 är över bubblan och FeedbackWidget (z-40) men under radsheetsen
+    // (z-70) och Toast, som fortfarande ska nå över den här ytan.
+    <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto">
       <div className="max-w-xl mx-auto min-h-screen flex flex-col px-4 py-5 sm:py-8">
         {/* Headerraden: vägen ut åt BÅDA hållen är synlig från början —
             "Tillbaka" lämnar offerten, editorlänken byter verktyg. Ingen av

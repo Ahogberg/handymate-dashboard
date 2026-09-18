@@ -787,3 +787,35 @@ Följdregel, dyrköpt två gånger nu: **kolla alltid om main själv är grön i
 du antar att rött är ditt.** Både den här och `sprint/onboarding-seeding.cjs`
 samma morgon var mains fel som grenen ärvde. `actions_list` på
 `contracts.yml` med `branch: main` tar tio sekunder och svarar på frågan.
+
+## 2026-09-18 — Ett komponentprov ser inte vad som ligger OVANPÅ komponenten
+
+Andreas klickprov på telefon: i offertintaget satt Matte-bubblans porträtt
+precis bredvid mikrofonknappen i textrutans hörn. Det såg ut som två
+mikrofoner, och bubblan täckte delar av ytan.
+
+Ingen källskanning kunde hitta det, och `ui-bevis` hade inte heller gjort det:
+`tests/intake-flow.ui.spec.ts` renderar komponenten **för sig**, utan
+dashboardens layout. Felet uppstod först i mötet mellan två filer som var
+rimliga var för sig — intaget `fixed inset-0 z-50`, Jobbkompisen
+`fixed bottom-6 right-6 z-50`, och Jobbkompisen renderad efter `{children}`.
+Vid samma z-nivå avgör DOM-ordningen, och då vinner alltid den som står sist.
+
+**Regel: en helskärmsyta är inte bevisad förrän något mäter den mot det som
+lever utanför den.** `tests/facit-helskarm-over-bubblan.spec.ts` läser
+bubblans nivå ur bubblans EGEN fil i stället för att hårdkoda 50 — annars
+tystnar provet samma dag någon höjer bubblan, och felet ser likadant ut igen.
+Provet vaktar både golv (över hjälparna) och tak (under radsheetsen), för
+annars "löses" nästa variant genom att skruva upp helskärmen tills
+radeditorn hamnar bakom den.
+
+Två egna misstag i samma pass, båda värda att skriva ner:
+
+- **`git checkout -- fil` för att backa en mutation raderar hela din egen
+  ändring i filen, inte bara mutationen.** Backa mutationer med den omvända
+  `sed`:en. `git checkout` duger bara när filen är orörd i övrigt.
+- **`{/* … */}` mellan `return (` och elementet är inte giltig JSX**, och ett
+  block som saknar sitt `}` gör att nästa regex-ersättning äter riktig kod
+  fram till nästa `*/}`. Kommentaren före rotelementet ska vara `//`-rader.
+  `tsc --noEmit` fångade det — kör det direkt efter varje skriptad
+  filändring, inte först på slutet.

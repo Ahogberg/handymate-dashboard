@@ -81,7 +81,13 @@ export function IntakeQuestionFlow({ jobTypeName, questions, targets = [], initi
   const chip = (active: boolean) => `min-h-[44px] px-4 rounded-xl border-2 text-sm font-semibold transition-colors ${active ? 'bg-primary-700 border-primary-700 text-white' : 'bg-white border-slate-200 text-slate-700 hover:border-primary-300'}`
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto" aria-busy={busy}>
+    // z-[60], inte z-50: Jobbkompisen ligger på z-50 och renderas EFTER
+    // sidinnehållet i dashboardens layout, så vid samma nivå vann bubblan
+    // på DOM-ordning och lade sig över helskärmen — bredvid mikrofonknappen,
+    // så att det såg ut som två mikrofoner (Andreas klickprov 2026-09-18).
+    // 60 är över bubblan och FeedbackWidget (z-40) men under radsheetsen
+    // (z-70) och Toast, som fortfarande ska nå över den här ytan.
+    <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto" aria-busy={busy}>
       <div className="max-w-xl mx-auto min-h-screen flex flex-col px-4 py-5 sm:py-8">
         <div className="flex items-center justify-between mb-5">
           <button type="button" onClick={onBack} disabled={busy} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-900 -ml-1 px-2 py-2 disabled:opacity-50">

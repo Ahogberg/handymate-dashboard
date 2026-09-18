@@ -290,6 +290,7 @@ jobs:
           tests/rivning-d-runtomkring.spec.ts
           tests/design-offertflodet-kontrakt.spec.ts
           tests/facit-force-dynamic.spec.ts
+          tests/facit-helskarm-over-bubblan.spec.ts
           --no-deps
           --project=chromium
           --reporter=line
