@@ -1,18 +1,19 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-export function gmailIdentity(account: string, messageId: string) {
+export function gmailIdentity(account: string, messageId: string, provider: 'google' | 'microsoft' = 'google') {
   const mailbox = account.trim().toLowerCase()
   if (!mailbox || !messageId.trim()) throw new Error('Mejlets konto eller meddelande-ID saknas.')
-  return { mail_provider: 'google', mail_account: mailbox, provider_message_id: messageId }
+  return { mail_provider: provider, mail_account: mailbox, provider_message_id: messageId }
 }
 
-export async function findGmailMessage(db: SupabaseClient, businessId: string, account: string, messageId: string) {
-  const identity = gmailIdentity(account, messageId)
+export async function findGmailMessage(db: SupabaseClient, businessId: string, account: string, messageId: string, provider: 'google' | 'microsoft' = 'google') {
+  const identity = gmailIdentity(account, messageId, provider)
   const { data, error } = await db.from('email_conversations').select('id')
     .eq('business_id', businessId).eq('mail_provider', identity.mail_provider)
     .eq('mail_account', identity.mail_account).eq('provider_message_id', messageId).maybeSingle()
   if (error) throw new Error('Mejlets identitet kunde inte kontrolleras.')
   if (data) return data
+  if (provider !== 'google') return null
   // Old rows have no proven mailbox. Never guess one or create a duplicate.
   const legacy = await db.from('email_conversations').select('id')
     .eq('business_id', businessId).eq('mail_provider', 'legacy')

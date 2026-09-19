@@ -1,3 +1,4 @@
+import { receipt as receiptContactEvent } from '@/lib/onboarding/contact-proof'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { notifyReceivedLead } from './golden-path'
 
@@ -92,6 +93,7 @@ export async function completeIntake(db: SupabaseClient, businessId: string, rec
       }
     }
   }
+  if(receipt.state==='completed'){try{await receiptContactEvent(db,{businessId,channel:'website',text:receipt.input.message||'',sourceId:receipt.id,customerId:receipt.customer_id,leadId:receipt.lead_id,dealId:receipt.deal_id})}catch{console.warn('[contact-proof] Webbprovet kunde inte sparas.')}}
   return receipt
 }
 

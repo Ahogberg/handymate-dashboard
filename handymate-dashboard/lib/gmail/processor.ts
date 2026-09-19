@@ -150,7 +150,8 @@ export async function processInboundEmail(
   supabase: SupabaseClient,
   businessId: string,
   message: GmailMessage,
-  ownerEmail: string
+  ownerEmail: string,
+  provider: 'google' | 'microsoft' = 'google',
 ): Promise<{ stored: boolean; reason?: string }> {
   // 1. Ägarens egna skickade mejl (kontextrevisionen 2026-08-16): hoppades
   // tidigare över helt — systemet behöll då permanent bara ENA sidan av
@@ -159,7 +160,7 @@ export async function processInboundEmail(
   // komplett för både agentkontext och ett framtida revisionsspår. Inga
   // events triggas för utgående — automationer ska reagera på KUNDENS mejl.
   if (isFromOwner(message, ownerEmail)) {
-    const existingOut = await findGmailMessage(supabase, businessId, ownerEmail, message.messageId)
+    const existingOut = await findGmailMessage(supabase, businessId, ownerEmail, message.messageId, provider)
     if (existingOut) return { stored: false, reason: 'duplicate' }
 
     const toEmail = extractEmail(message.to || '')
@@ -169,9 +170,9 @@ export async function processInboundEmail(
 
     const { data: savedOut, error: outErr } = await supabase.from('email_conversations').insert({
       business_id: businessId,
-      gmail_thread_id: message.threadId,
-      gmail_message_id: message.messageId,
-      ...gmailIdentity(ownerEmail, message.messageId),
+      gmail_thread_id: provider === 'google' ? message.threadId : null,
+      gmail_message_id: provider === 'google' ? message.messageId : null,
+      ...gmailIdentity(ownerEmail, message.messageId, provider),
       customer_id: match.customer_id,
       lead_id: match.lead_id,
       matched_by: `outbound_${match.matched_by}`,
@@ -190,7 +191,7 @@ export async function processInboundEmail(
   }
 
   // 2. Dedup check
-  const existing = await findGmailMessage(supabase, businessId, ownerEmail, message.messageId)
+  const existing = await findGmailMessage(supabase, businessId, ownerEmail, message.messageId, provider)
   if (existing) {
     return { stored: false, reason: 'duplicate' }
   }
@@ -224,9 +225,9 @@ export async function processInboundEmail(
     .from('email_conversations')
     .insert({
       business_id: businessId,
-      gmail_thread_id: message.threadId,
-      gmail_message_id: message.messageId,
-      ...gmailIdentity(ownerEmail, message.messageId),
+      gmail_thread_id: provider === 'google' ? message.threadId : null,
+      gmail_message_id: provider === 'google' ? message.messageId : null,
+      ...gmailIdentity(ownerEmail, message.messageId, provider),
       customer_id: match.customer_id,
       lead_id: match.lead_id,
       matched_by: match.matched_by,
@@ -256,7 +257,7 @@ export async function processInboundEmail(
       from_name: fromName,
       subject: message.subject,
       body_preview: bodyPreview.substring(0, 500),
-      gmail_thread_id: message.threadId,
+      gmail_thread_id: provider === 'google' ? message.threadId : null,
       matched_by: match.matched_by,
     }
 

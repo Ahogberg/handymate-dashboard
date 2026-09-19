@@ -1,5 +1,8 @@
 'use client'
 
+import { ContactProofGuide } from '@/components/onboarding/ContactProofGuide'
+import { MailConnections } from '@/components/onboarding/MailConnections'
+import { ContactReadiness } from '@/components/onboarding/ContactReadiness'
 import { useBusiness } from '@/lib/BusinessContext'
 import Link from 'next/link'
 import { ArrowLeft, Globe, Calendar, Mail, ChevronRight, Copy, Check, Loader2, Lock, Receipt, RefreshCw, Download } from 'lucide-react'
@@ -336,6 +339,9 @@ export default function IntegrationsPage() {
             )}
           </div>
 
+          <MailConnections key={`mail-${business.business_id}`} />
+          <ContactReadiness key={business.business_id} />
+          <ContactProofGuide />
           <div className="pt-7 pb-1"><h2 className="text-xs font-semibold uppercase tracking-widest text-slate-500">Planering & kundkontakt</h2></div>
           {/* Hemsida-widget */}
           <Link

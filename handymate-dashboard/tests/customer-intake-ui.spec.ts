@@ -22,6 +22,7 @@ function component(relative: string) {
   loaded._compile(ts.transpileModule(fs.readFileSync(filename, 'utf8'), { compilerOptions: {
     jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020, esModuleInterop: true,
   } }).outputText, filename)
+  require.cache[filename] = loaded
   return loaded.exports
 }
 const { QuoteJobTypeStart } = component('components/onboarding/QuoteJobTypeStart.tsx')
@@ -67,6 +68,9 @@ function button(text: string): HTMLButtonElement {
   return found
 }
 async function click(text: string) { await act(async () => button(text).click()) }
+const { ContactReadiness } = component('components/onboarding/ContactReadiness.tsx')
+component('components/onboarding/MailConnections.tsx')
+component('components/onboarding/ContactProofGuide.tsx')
 const { CustomerIntakeSetup } = component('app/onboarding/components/CustomerIntakeSetup.tsx')
 const form = { businessId: 'real-test-company', primaryLeadChannel: 'email' }
 test('choosing the main channel changes only form data and sends no activation request', async () => {
@@ -78,7 +82,7 @@ test('choosing the main channel changes only form data and sends no activation r
 })
 test('email starts with read-only status and requires a click to provision', async () => {
   const methods:string[]=[]
-  global.fetch=(async (_url:any, options:any)=>{methods.push(options?.method||'GET');return Response.json(options?.method==='POST'?{address:'test@example.invalid',active:true}:{address:null,active:false})}) as typeof fetch
+  global.fetch=(async (url:any, options:any)=>{if(String(url).includes('/api/integrations/email-lead'))methods.push(options?.method||'GET');return Response.json(options?.method==='POST'?{address:'test@example.invalid',active:true}:{address:null,active:false})}) as typeof fetch
   await render(CustomerIntakeSetup,{data:form,setData:()=>{}})
   expect(methods).toEqual(['GET'])
   await click('Skapa mottagaradress')
@@ -100,4 +104,39 @@ test('provider choice is saved without pretending Outlook or Gmail is connected'
   await act(async()=>{Simulate.change(host.querySelector('select')!,{target:{value:'microsoft'}} as any)})
   expect(saved.customerMailProvider).toBe('microsoft')
   expect(host.textContent).toContain('Direktkoppling av Gmail och Outlook förbereds')
+})
+
+test('secondary email opens setup while preserving the primary telephone channel', async () => {
+  let saved: any = {businessId:'real-test-company', primaryLeadChannel:'phone'}
+  const setData = (fn: any) => { saved = fn(saved) }
+  await render(CustomerIntakeSetup, {data:saved,setData})
+  await click('E-post')
+  expect(saved.primaryLeadChannel).toBe('phone')
+  expect(saved.customerIntakeChannels).toEqual(['phone','email'])
+  await render(CustomerIntakeSetup, {data:saved,setData})
+  expect(host.textContent).toContain('Vilken e-post använder ni?')
+})
+test('readiness errors never report a verified channel and can be retried', async () => {
+  global.fetch = (async () => Response.json({error:'unavailable'}, {status:503})) as typeof fetch
+  await render(CustomerIntakeSetup, {data:{businessId:'real-test-company',primaryLeadChannel:'phone'},setData:()=>{}})
+  await click('Kontrollera kontaktvägarna')
+  expect(host.textContent).toContain('statusen är okänd')
+  expect(host.textContent).not.toContain('Lead och affär verifierade')
+  expect(button('Kontrollera kontaktvägarna').disabled).toBe(false)
+})
+
+test('settings save only channel preferences and show a failed save without losing choices', async () => {
+  const writes: any[] = []
+  global.fetch = (async (_url: any, options: any) => {
+    if (options?.method === 'PUT') { writes.push(JSON.parse(options.body)); return Response.json({error:'failed'}, {status:503}) }
+    return Response.json({channels:[],selected_channels:['phone']})
+  }) as typeof fetch
+  await render(ContactReadiness, {})
+  await click('Kontrollera kontaktvägarna')
+  await click('E-post')
+  await click('Spara kontaktvägar')
+  expect(writes).toEqual([{data:{customerIntakeChannels:['phone','email'],primaryLeadChannel:'phone'}}])
+  expect(host.textContent).toContain('kunde inte sparas')
+  expect(button('E-post').getAttribute('aria-pressed')).toBe('true')
+  expect(host.textContent).not.toContain('Kontaktvägarna är sparade.')
 })

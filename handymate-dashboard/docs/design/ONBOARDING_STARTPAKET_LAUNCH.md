@@ -187,3 +187,24 @@ Se [implementations- och lanseringsplan](../runbooks/MAIL_INTEGRATIONS_PREPARATI
 ## Implementationsuppdatering
 
 Se [branschpaket och onboarding](BRANSCHPAKET_ONBOARDING_LAUNCH.md) för genomfört kodpaket för samtliga sju namngivna branscher, kundkanal och borttagna malltak. Befintliga kundval bevaras. Underhållsmålning har ersatts av Trapphus och gemensamma utrymmen i måleriets starturval.
+
+
+## Kontaktvägar — implementation 2026-09-14 (draft)
+
+Flera kontaktvägar kan väljas med bibehållen primär kanal och bakåtkompatibilitet för äldre sessioner. SMS är separat från samtal. Valen sparas i befintlig onboarding_data och kan ändras på integrationssidan. Samma ContactReadiness visar serverlästa, daterade kanalbevis på båda ytorna och guidar till kundärende, ansvarig och nästa steg. Läsfel blir okänd status. Alla valda kanaler måste ha bevis innan startuppgiften kan avslutas; vidarekopplad telefon avslutas inte automatiskt eftersom befintligt prov inte bevisar vägen genom det gamla numret.
+
+Telefonsteget skiljer på missade respektive alla samtal och hänvisar till operatörens inställningar. Tidigare ovillkorliga **21-koder har tagits bort från instruktionen för missade samtal. Gmail/Outlook får leverantörsval och vägledning för manuellt prov/vidarebefordran; valknapparna aktiverar inte OAuth eller synk.
+
+Verifierat lokalt: fyra beteendeprov för kanalval/readiness, sju React/DOM-prov (inklusive misslyckad lagring och återförsök), tio befintliga telefon-/startuppgiftskontrakt samt TypeScript. DOM-proven använder jsdom utan dess valfria native canvas-modul; ingen canvasfunktion ingår. Ingen autentiserad browserresa, riktig lagring eller providerleverans har verifierats på denna kodversion.
+
+Återstår i det bredare uppdraget: separata direktanslutningar för Gmail/Microsoft med säker OAuth-återgång, Microsoft-adapter, vald avsändare och externa leverantörsgodkännanden; färska prov bundna till exakt anslutning/vidarekoppling; SMS-bevis; utfallsmätning till första riktiga kundnytta; mobil- och autentiserat acceptansprov. Historiska kanalbevis ska inte tolkas som dessa acceptansbevis. Ingen produktionsändring ingår.
+
+## Direkt mejl och hela kontaktvägen — kodpaket 2026-09-19
+
+Direkta läsanslutningar för Gmail/Google Workspace och användarens egen Microsoft 365-arbetsbrevlåda ligger separat från kalenderbehörigheten. OAuth använder PKCE, nonce, engångs-claim, sessions-/tenant-/användarkontroll, fast returväg och krypterade tokens med tenant/provider/konto som AAD. Ny synk börjar vid anslutningstidpunkten, använder lås, paginering, CAS/revision, pausgrind, retry/backoff och flyttar läsposition först efter beständig meddelandekvittens. Microsofts delta-URL är låst till Graphs egen inbox-endpoint. Gamla Gmail-importen måste pausas innan den nya Google-vägen kan anslutas.
+
+Samma färska provmodell kan bevisa telefon, SMS, direkt/vidarebefordrad e-post och webb. Varje prov har kort giltighet och unik markör eller exakt avsändarnummer; gamla händelser kan inte uppfylla provet. Transportbevis, kund/lead/affär, företagets egen bekräftelse av den publika vägen, ansvarig/nästa steg och ett nytt offertutkast lagras separat. Ingen del påstår utskick eller sparad tid.
+
+Direktkopplingarna begär bara läsbehörighet. Skicka-scope ingår inte. Delade Microsoft-brevlådor, alias och privata Outlook-konton använder vidarebefordran tills ett separat granskat flöde finns. Tillåtna bilagor sparas i den privata kunddokumentlagringen, högst fem filer och totalt 20 MB per mejl. Filtyper eller storlekar som hoppas över visas i synkstatusen och originalmejlet förblir källan.
+
+Aktivering kräver migrationen `20260919163143_mail_connections_contact_proofs.sql`, en slumpad 32-byte `MAIL_TOKEN_KEY` (base64), separata Google/Microsoft klient-ID och hemligheter, exakta callback-URL:er, providerflaggorna och `CONTACT_PROOFS_ENABLED=true`. Providerverifiering och riktig kontoacceptans återstår tills dessa externa behörigheter finns.

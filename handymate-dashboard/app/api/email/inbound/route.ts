@@ -1,3 +1,4 @@
+import { receipt as contactReceipt } from '@/lib/onboarding/contact-proof'
 /**
  * POST /api/email/inbound — Postmark Inbound-webhook.
  *
@@ -296,6 +297,8 @@ export async function POST(request: NextRequest) {
     },
     supabase,
   )
+
+  try { await contactReceipt(supabase,{businessId,channel:'email',target:recipientAddress||'',text:emailInput.body,sourceId:payload.MessageID||result.leadId,customerId:result.customerId,leadId:result.leadId,dealId:result.dealId}) } catch { console.warn('[contact-proof] Mejlprovet kunde inte sparas.') }
 
   // ── 6.5 Bilagor → customer_document (B4) ──────────────────────
   // Leaden är redan skapad — en trasig bilaga får aldrig påverka svaret.

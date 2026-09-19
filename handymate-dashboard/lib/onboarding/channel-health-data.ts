@@ -1,3 +1,4 @@
+import { selectedIntakeChannels, allSelectedIntakeVerified } from './customer-intake'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { deriveChannelHealth, type ChannelProof } from './channel-health'
 import type { TestCallState } from './test-call'
@@ -208,6 +209,9 @@ export async function loadChannelHealth(supabase: SupabaseClient, businessId: st
 
   return {
     channels,
+    selected_channels: selectedIntakeChannels(onboardingData),
+    all_selected_leads_verified: allSelectedIntakeVerified(selectedIntakeChannels(onboardingData), channels) &&
+      !(selectedIntakeChannels(onboardingData).includes('phone') && onboardingData.phoneMode !== 'primary'),
     any_channel_verified: channels.some(channel =>
       channel.state === 'channel_verified' || channel.state === 'lead_verified'),
     any_lead_verified: channels.some(channel => channel.state === 'lead_verified'),

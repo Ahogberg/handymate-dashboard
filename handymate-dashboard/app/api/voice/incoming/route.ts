@@ -1,3 +1,4 @@
+import { receipt as contactReceipt } from '@/lib/onboarding/contact-proof'
 import { NextRequest, NextResponse } from 'next/server'
 import { callRecordingId } from '@/lib/voice/call-processing'
 import { findCustomerByPhone } from '@/lib/voice/find-customer-by-phone'
@@ -80,6 +81,8 @@ export async function POST(request: NextRequest) {
       console.error('No business found for number:', to)
       return NextResponse.json({ "hangup": "no_business_found" })
     }
+
+    try { await contactReceipt(supabase,{businessId:business.business_id,channel:'phone',target:to,sender:from,sourceId:callRecordingId(business.business_id,callId)}) } catch { console.warn('[contact-proof] Samtalsprovet kunde inte sparas.') }
 
     // ── Aha-onboardingens ring-test (spec: tasks/aha-onboarding-spec.md) ──
     // Armerat testfönster → deterministisk fångst UTANFÖR regelmotorn
