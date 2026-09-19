@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/colors_and_type.css">
+  <script src="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/_ds_bundle.js"></script>
+  <style>
+    body { margin: 0; background: #eef2f6; }
+    a { color: #0f766e; } a:hover { color: #115e59; }
+    textarea, input, button { font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; }
+    textarea::placeholder { color: #94A3B8; }
+  </style>
+</helmet>
+<div style="display: flex; justify-content: center; padding: 32px 16px; font-family: -apple-system, 'SF Pro Text', system-ui, sans-serif; color: #1E293B;">
+  <div data-screen-label="App – Mellansidan (Ny offert)" style="flex-shrink: 0;">
+    <x-import component-from-global-scope="IOSDevice" from="./ios-frame.jsx" width="{{ 375 }}" height="{{ 812 }}" hint-size="375px,812px">
+      <div style="display: flex; flex-direction: column; height: 100%; background: #F8FAFC;">
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 74px 16px 12px; background: #fff; border-bottom: 1px solid #E2E8F0;">
+          <button type="button" aria-label="Tillbaka" style="width: 32px; height: 44px; display: flex; align-items: center; justify-content: center; background: none; border: 0; padding: 0; cursor: pointer;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color: #1E293B;"><path d="m15 18-6-6 6-6"></path></svg></button>
+          <div style="text-align: center;"><div style="font-family: 'Space Grotesk', -apple-system, system-ui, sans-serif; font-size: 17px; font-weight: 700; color: #1E293B;">Ny offert</div><sc-if value="{{ visaRaknare }}" hint-placeholder-val="{{ false }}"><div style="font-size: 11px; margin-top: 2px; color: {{ raknareFg }};">{{ antalKontroller }} av 12 kontroller</div></sc-if></div>
+          <div style="width: 32px;"></div>
+        </div>
+
+        <div style="flex: 1; overflow: auto; padding: 16px 16px 24px; scrollbar-width: none; display: flex; flex-direction: column; gap: 12px;">
+
+          <!-- Box 1 -->
+          <section style="order: {{ box1Order }}; background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 10px;">
+            <div>
+              <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0F766E; margin-bottom: 3px;">1</div>
+              <div style="font-family: 'Space Grotesk', -apple-system, system-ui, sans-serif; font-size: 18px; font-weight: 700; color: #0F172A; letter-spacing: -0.02em; line-height: 1.15;">Skapa offert genom frågeflöde</div>
+              <div style="font-size: 13px; color: #64748B; margin-top: 4px; line-height: 1.45;">Tryck på jobbtypen. Frågorna sätter mängderna.</div>
+            </div>
+            <div style="border: 1px solid #E2E8F0; border-radius: 12px; overflow: hidden;">
+              <sc-for list="{{ jobTypes }}" as="job" hint-placeholder-count="4">
+                <button type="button" onClick="{{ job.start }}" style="width: 100%; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 14px; background: #fff; border: 0; border-top: 1px solid {{ job.divider }}; text-align: left; cursor: pointer;">
+                  <span style="width: 10px; height: 10px; border-radius: 9999px; background: {{ job.color }}; flex-shrink: 0;"></span>
+                  <span style="flex: 1; min-width: 0;">
+                    <span style="display: block; font-size: 15px; font-weight: 600; color: #1E293B; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ job.name }}</span>
+                    <span style="display: block; font-size: 12px; color: #64748B; margin-top: 1px;">{{ job.meta }}</span>
+                  </span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#CBD5E1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="m9 18 6-6-6-6"></path></svg>
+                </button>
+              </sc-for>
+            </div>
+            <div style="display: flex; flex-wrap: wrap; gap: 4px 16px;">
+              <button type="button" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; background: none; border: 0; font-size: 14px; font-weight: 600; color: #0F766E; cursor: pointer;">
+                Alla jobbtyper ({{ antalAlla }})
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+              </button>
+              <button type="button" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; background: none; border: 0; font-size: 14px; font-weight: 500; color: #64748B; cursor: pointer;">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+                Skapa nytt frågeflöde
+              </button>
+            </div>
+          </section>
+
+          <!-- Box 2 -->
+          <section style="background: #fff; border: 1px solid #E2E8F0; border-radius: 16px; padding: 14px; display: flex; flex-direction: column; gap: 12px;">
+            <div>
+              <div style="font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0F766E; margin-bottom: 3px;">2</div>
+              <div style="font-family: 'Space Grotesk', -apple-system, system-ui, sans-serif; font-size: 18px; font-weight: 700; color: #0F172A; letter-spacing: -0.02em; line-height: 1.15;">Skapa ny offert</div>
+              <div style="font-size: 13px; color: #64748B; margin-top: 4px; line-height: 1.45;">Skriv eller prata in. Matte bygger utkastet, du granskar allt.</div>
+            </div>
+            <div>
+              <div style="position: relative;">
+                <textarea rows="4" value="{{ value }}" onChange="{{ onInput }}" placeholder="Vad ska göras, var, och vad kunden önskat sig …" style="width: 100%; box-sizing: border-box; padding: 12px 60px 12px 14px; border: 1px solid #E2E8F0; border-radius: 12px; color: #1E293B; background: #fff; font-size: 16px; line-height: 1.5; resize: none; outline: none; display: block;" style-focus="border-color: #0F766E;"></textarea>
+                <button type="button" onClick="{{ toggleVoice }}" aria-label="{{ micTitle }}" style="position: absolute; right: 8px; bottom: 8px; width: 44px; height: 44px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; border: 0; cursor: pointer; background: {{ micBg }}; color: {{ micFg }};">
+                  <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg></sc-if>
+                  <sc-if value="{{ notRecording }}" hint-placeholder-val="{{ true }}"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></sc-if>
+                </button>
+              </div>
+              <sc-if value="{{ showChips }}" hint-placeholder-val="{{ true }}">
+                <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px;">
+                  <sc-for list="{{ exempel }}" as="ex" hint-placeholder-count="2">
+                    <button type="button" onClick="{{ ex.fill }}" style="display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 9999px; border: 1px solid #E2E8F0; background: #F8FAFC; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer;">{{ ex.text }}</button>
+                  </sc-for>
+                </div>
+              </sc-if>
+              <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}"><p style="font-size: 13px; color: #DC2626; font-weight: 500; margin: 8px 0 0;">Lyssnar… texten landar i rutan och går att rätta</p></sc-if>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button type="button" onClick="{{ addPhoto }}" style="min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; border: 1px dashed #CBD5E1; border-radius: 12px; background: #fff; font-size: 14px; font-weight: 600; color: #475569; cursor: pointer; flex-shrink: 0;">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+                {{ photoLabel }}
+              </button>
+              <button type="button" onClick="{{ pickCustomer }}" style="flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; border: 1px solid #E2E8F0; border-radius: 12px; background: #fff; font-size: 14px; color: {{ customerColor }}; cursor: pointer; text-align: left;">
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ customerLabel }}</span>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94A3B8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="m6 9 6 6 6-6"></path></svg>
+              </button>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #F1F5F9; padding-top: 12px;">
+              <button type="button" disabled="{{ cannotBuild }}" style="min-height: 52px; border-radius: 20px; background: #0F766E; color: #fff; font-size: 15px; font-weight: 700; border: 0; box-shadow: 0 8px 16px rgba(15,118,110,.3); cursor: pointer; opacity: {{ buildOpacity }};">Bygg utkast</button>
+              <sc-if value="{{ showBlank }}" hint-placeholder-val="{{ true }}">
+                <button type="button" style="min-height: 48px; border: 1px solid #E2E8F0; border-radius: 20px; background: #fff; font-size: 14px; font-weight: 600; color: #475569; cursor: pointer;">{{ blankLabel }}</button>
+              </sc-if>
+            </div>
+          </section>
+        </div>
+
+        <div style="display: flex; background: #fff; border-top: 1px solid #E2E8F0; padding: 6px 0 30px;">
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #0F766E;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11 12 3l9 8"></path><path d="M5 10v10h14V10"></path></svg><span style="font-size: 10.5px; font-weight: 600;">Hem</span></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="m8 12 2.5 2.5 5.5-5.5"></path></svg><span style="font-size: 10.5px; font-weight: 600;">Godkänn</span></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"></path></svg><span style="font-size: 10.5px; font-weight: 600;">Projekt</span></div>
+          <div style="flex: 1; display: flex; flex-direction: column; align-items: center; gap: 2px; color: #94A3B8;"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.6" fill="currentColor"></circle><circle cx="12" cy="12" r="1.6" fill="currentColor"></circle><circle cx="19" cy="12" r="1.6" fill="currentColor"></circle></svg><span style="font-size: 10.5px; font-weight: 600;">Mer</span></div>
+        </div>
+      </div>
+    </x-import>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ordning&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;frageflode-forst&quot;,&quot;offert-forst&quot;],&quot;default&quot;:&quot;offert-forst&quot;,&quot;tsType&quot;:&quot;'frageflode-forst' | 'offert-forst'&quot;,&quot;section&quot;:&quot;Variant&quot;},&quot;antalJobbtyper&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:3,&quot;min&quot;:2,&quot;max&quot;:8,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Box 1&quot;},&quot;harRader&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tillstånd&quot;},&quot;visaRaknare&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Kanvas&quot;}}">
+class Component extends DCLogic {
+  // Designreferens för handymate-mobile (React Native) — samma kontrakt som Mellansidan-webb:
+  // två boxar, jobbtyper synliga, kund frivillig, röst redigerbar, blankstart döljs vid rader, budget 12.
+  state = { value: '', photos: 0, customer: '', recording: false }
+  EXEMPEL = ['Helrenovera badrum, ca 6 m²']
+  JOBTYPES = [
+    { name: 'Renovera badrum', color: '#0F766E', meta: '5 frågor · sätter klinker, tätskikt, golvvärme' },
+    { name: 'Byta fönster', color: '#0EA5E9', meta: '3 frågor' },
+    { name: 'Installera laddbox', color: '#F59E0B', meta: '4 frågor' },
+    { name: 'Lägga nytt golv', color: '#22C55E', meta: '3 frågor' },
+    { name: 'Måla om invändigt', color: '#134E4A', meta: '4 frågor' },
+    { name: 'Dra om el', color: '#EF4444', meta: '3 frågor' },
+    { name: 'Byta kök', color: '#64748B', meta: '6 frågor' },
+    { name: 'Altan och trädäck', color: '#0EA5E9', meta: '4 frågor' },
+  ]
+  renderVals() {
+    const s = this.state, p = this.props
+    const harRader = p.harRader ?? false, n = p.antalJobbtyper ?? 3
+    const trimmed = s.value.trim(), showChips = !trimmed && !s.recording, showBlank = !harRader
+    const canBuild = trimmed.length >= 12 || s.photos > 0
+    const antalKontroller = n + 2 + 2 + (showChips ? this.EXEMPEL.length : 0) + 3 + (showBlank ? 1 : 0)
+    return {
+      antalAlla: this.JOBTYPES.length, box1Order: (p.ordning ?? 'offert-forst') === 'frageflode-forst' ? 0 : 1,
+      visaRaknare: p.visaRaknare ?? true, antalKontroller, raknareFg: antalKontroller > 12 ? '#B91C1C' : '#94A3B8',
+      jobTypes: this.JOBTYPES.slice(0, n).map((j, i) => ({ ...j, divider: i === 0 ? 'transparent' : '#F1F5F9', start: () => {} })),
+      value: s.value, onInput: e => this.setState({ value: e.target.value }),
+      exempel: this.EXEMPEL.map(text => ({ text, fill: () => this.setState({ value: text }) })), showChips,
+      isRecording: s.recording, notRecording: !s.recording, micTitle: s.recording ? 'Stoppa' : 'Prata in',
+      micBg: s.recording ? '#DC2626' : '#F0FDFA', micFg: s.recording ? '#fff' : '#0F766E',
+      toggleVoice: () => this.setState(st => ({ recording: !st.recording })),
+      photoLabel: s.photos ? `${s.photos} foto` : 'Foto', addPhoto: () => this.setState(st => ({ photos: st.photos + 1 })),
+      customerLabel: s.customer || 'Kund — frivilligt', customerColor: s.customer ? '#1E293B' : '#64748B',
+      pickCustomer: () => this.setState(st => ({ customer: st.customer ? '' : 'Anna Lindqvist' })),
+      cannotBuild: !canBuild, buildOpacity: canBuild ? 1 : 0.5, showBlank,
+      blankLabel: trimmed ? 'Börja tomt — texten följer med' : 'Börja med tomt dokument',
+    }
+  }
+}
+</script>
+</body>
+</html>

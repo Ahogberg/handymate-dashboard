@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/colors_and_type.css">
+  <link rel="stylesheet" href="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/styles.css">
+  <script src="_ds/handymate-brand-system-1bbb6869-81ba-41c1-a511-a62720d57ed1/_ds_bundle.js"></script>
+  <style>
+    body { margin: 0; background: #f8fafc; }
+    a { color: #0f766e; } a:hover { color: #115e59; }
+    textarea, select, input, button { font-family: 'DM Sans', system-ui, sans-serif; }
+    textarea::placeholder { color: #94a3b8; }
+    @keyframes qk-fade { from { opacity: 0 } }
+    @keyframes hm-pulse { 0% { opacity: .7 } 50% { opacity: 1 } 100% { opacity: .7 } }
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important } }
+  </style>
+</helmet>
+<div data-screen-label="Mellansidan webb" style="min-height: 100vh; background: #f8fafc; font-family: 'DM Sans', system-ui, sans-serif; color: #1e293b;">
+  <div style="max-width: 960px; margin: 0 auto; padding: 16px 16px 32px; box-sizing: border-box;">
+
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px;">
+      <button type="button" onClick="{{ onClose }}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; font-size: 14px; color: #64748b; background: none; border: 0; margin-left: -8px; padding: 0 8px; cursor: pointer; border-radius: 10px;" style-hover="color: #0f172a;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"></path><path d="M19 12H5"></path></svg>
+        Tillbaka
+      </button>
+      <sc-if value="{{ visaRaknare }}" hint-placeholder-val="{{ false }}">
+        <span role="status" style="font-size: 12px; font-weight: 600; padding: 4px 10px; border-radius: 9999px; background: {{ raknareBg }}; color: {{ raknareFg }};">{{ antalKontroller }} av 12 kontroller</span>
+      </sc-if>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <h1 style="font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 28px; line-height: 1.1; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin: 0;">Ny offert</h1>
+      <p style="color: #64748b; margin: 8px 0 0; font-size: 15px; line-height: 1.5; text-wrap: pretty;">Två sätt att börja. Båda slutar i samma dokument.</p>
+    </div>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 12px; align-items: start;">
+
+      <!-- Box 1 — frågeflöde -->
+      <section aria-labelledby="box1" style="order: {{ box1Order }}; background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(15,23,42,.05); display: flex; flex-direction: column; gap: 12px;">
+        <div>
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0f766e; margin-bottom: 4px;">1</div>
+          <h2 id="box1" style="font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 20px; line-height: 1.15; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin: 0;">Skapa offert genom frågeflöde</h2>
+          <p style="color: #64748b; margin: 6px 0 0; font-size: 14px; line-height: 1.5;">Tryck på jobbtypen. Frågorna sätter mängderna i ditt upplägg.</p>
+        </div>
+        <div style="border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden;">
+          <sc-for list="{{ jobTypes }}" as="job" hint-placeholder-count="4">
+            <button type="button" onClick="{{ job.start }}" style="width: 100%; display: flex; align-items: center; gap: 12px; min-height: 52px; padding: 0 14px; background: #fff; border: 0; border-top: 1px solid {{ job.divider }}; text-align: left; cursor: pointer;" style-hover="background: #f0fdfa;">
+              <span style="width: 10px; height: 10px; border-radius: 9999px; background: {{ job.color }}; flex-shrink: 0;"></span>
+              <span style="flex: 1; min-width: 0;">
+                <span style="display: block; font-size: 15px; font-weight: 600; color: #0f172a; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">{{ job.name }}</span>
+                <span style="display: block; font-size: 12px; color: #64748b; margin-top: 1px;">{{ job.meta }}</span>
+              </span>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink: 0;"><path d="m9 18 6-6-6-6"></path></svg>
+            </button>
+          </sc-for>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; gap: 4px 16px;">
+          <button type="button" onClick="{{ onAlla }}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; background: none; border: 0; font-size: 14px; font-weight: 600; color: #0f766e; cursor: pointer;" style-hover="color: #115e59;">
+            Alla jobbtyper ({{ antalAlla }})
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"></path></svg>
+          </button>
+          <button type="button" onClick="{{ onNyttFlode }}" style="display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 4px; background: none; border: 0; font-size: 14px; font-weight: 500; color: #64748b; cursor: pointer;" style-hover="color: #0f172a;">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14"></path><path d="M5 12h14"></path></svg>
+            Skapa nytt frågeflöde
+          </button>
+        </div>
+      </section>
+
+      <!-- Box 2 — ny offert -->
+      <section aria-labelledby="box2" style="background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px; box-shadow: 0 2px 8px rgba(15,23,42,.05); display: flex; flex-direction: column; gap: 14px;">
+        <div>
+          <div style="font-size: 12px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: #0f766e; margin-bottom: 4px;">2</div>
+          <h2 id="box2" style="font-family: 'Space Grotesk', system-ui, sans-serif; font-size: 20px; line-height: 1.15; font-weight: 700; color: #0f172a; letter-spacing: -0.02em; margin: 0;">Skapa ny offert</h2>
+          <p style="color: #64748b; margin: 6px 0 0; font-size: 14px; line-height: 1.5;">Skriv eller prata in. Matte bygger utkastet, du granskar allt.</p>
+        </div>
+
+        <div>
+          <div style="position: relative;">
+            <textarea rows="5" value="{{ value }}" onChange="{{ onInput }}" placeholder="Vad ska göras, var, och vad kunden önskat sig …" style="width: 100%; box-sizing: border-box; padding: 14px 64px 14px 16px; border: 1.5px solid #e2e8f0; border-radius: 14px; color: #0f172a; background: #fff; font-size: 16px; line-height: 1.6; resize: none; outline: none; display: block;" style-focus="border-color: #0f766e; box-shadow: 0 0 0 4px #ccfbef;"></textarea>
+            <button type="button" onClick="{{ toggleVoice }}" title="{{ micTitle }}" aria-label="{{ micTitle }}" style="position: absolute; right: 10px; bottom: 10px; width: 48px; height: 48px; border-radius: 9999px; display: flex; align-items: center; justify-content: center; border: 0; cursor: pointer; background: {{ micBg }}; color: {{ micFg }}; box-shadow: {{ micRing }}; transition: all 250ms cubic-bezier(0.2,0.8,0.2,1);">
+              <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="4" y="4" width="16" height="16" rx="3"></rect></svg></sc-if>
+              <sc-if value="{{ notRecording }}" hint-placeholder-val="{{ true }}"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v7a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path><path d="M19 10v2a7 7 0 0 1-14 0v-2"></path><line x1="12" x2="12" y1="19" y2="22"></line></svg></sc-if>
+            </button>
+          </div>
+          <sc-if value="{{ showChips }}" hint-placeholder-val="{{ true }}">
+            <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; animation: qk-fade 250ms cubic-bezier(0.2,0.8,0.2,1) backwards;">
+              <span style="font-size: 12px; color: #94a3b8; align-self: center; margin-right: 2px;">T.ex.</span>
+              <sc-for list="{{ exempel }}" as="ex" hint-placeholder-count="2">
+                <button type="button" onClick="{{ ex.fill }}" style="display: inline-flex; align-items: center; min-height: 32px; padding: 0 12px; border-radius: 9999px; border: 1px solid #e2e8f0; background: #f8fafc; font-size: 12px; font-weight: 500; color: #475569; cursor: pointer;" style-hover="border-color: #99f6e0; color: #0f766e; background: #f0fdfa;">{{ ex.text }}</button>
+              </sc-for>
+            </div>
+          </sc-if>
+          <div style="margin-top: 8px; min-height: 20px;">
+            <sc-if value="{{ isRecording }}" hint-placeholder-val="{{ false }}"><p style="font-size: 14px; color: #dc2626; font-weight: 500; display: flex; align-items: center; gap: 8px; margin: 0;"><span style="width: 8px; height: 8px; border-radius: 9999px; background: #dc2626; animation: hm-pulse 1.2s ease-in-out infinite;"></span>Lyssnar… {{ duration }} — texten landar i rutan och går att rätta</p></sc-if>
+            <sc-if value="{{ transcribing }}" hint-placeholder-val="{{ false }}"><p style="font-size: 14px; color: #64748b; margin: 0;">Skriver ner…</p></sc-if>
+            <sc-if value="{{ voiceError }}" hint-placeholder-val="{{ false }}"><p style="font-size: 14px; color: #64748b; margin: 0;">{{ voiceError }}</p></sc-if>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px;">
+          <sc-for list="{{ photos }}" as="photo" hint-placeholder-count="0">
+            <div style="position: relative; width: 56px; height: 56px; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; background: #f1f5f9;">
+              <div role="img" aria-label="Foto" style="width: 100%; height: 100%; background-color: #f1f5f9; background-size: cover; background-position: center; background-image: {{ photo.bgImage }};"></div>
+              <button type="button" onClick="{{ photo.remove }}" title="Ta bort foto" style="position: absolute; top: 3px; right: 3px; width: 22px; height: 22px; border-radius: 9999px; background: rgba(15,23,42,.7); color: #fff; border: 0; display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M18 6 6 18"></path><path d="m6 6 12 12"></path></svg></button>
+            </div>
+          </sc-for>
+          <button type="button" onClick="{{ addPhoto }}" style="min-height: 44px; padding: 0 14px; display: inline-flex; align-items: center; gap: 8px; border: 1.5px dashed #cbd5e1; border-radius: 12px; background: #fff; font-size: 14px; font-weight: 600; color: #475569; cursor: pointer;" style-hover="border-color: #0f766e; color: #0f766e;">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"></path><circle cx="12" cy="13" r="3"></circle></svg>
+            {{ photoLabel }}
+          </button>
+          <div style="flex: 1; min-width: 160px; display: flex; align-items: center; gap: 8px;">
+            <select aria-label="Kund (frivilligt)" value="{{ customer }}" onChange="{{ onCustomer }}" style="flex: 1; min-width: 0; min-height: 44px; padding: 0 12px; border: 1px solid #e2e8f0; border-radius: 10px; color: {{ customerColor }}; background: #fff; font-size: 14px; outline: none;">
+              <option value="">Kund — frivilligt</option>
+              <sc-for list="{{ customers }}" as="c" hint-placeholder-count="3"><option value="{{ c.id }}">{{ c.name }}</option></sc-for>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid #f1f5f9; padding-top: 14px;">
+          <button type="button" onClick="{{ onBuild }}" disabled="{{ cannotBuild }}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 52px; padding: 0 20px; background: linear-gradient(135deg, #0f766e, #14b8a6); color: #fff; font-size: 16px; font-weight: 600; border-radius: 12px; border: 0; box-shadow: 0 10px 25px -5px rgba(13,148,136,.25); cursor: pointer; opacity: {{ buildOpacity }}; transition: opacity 250ms cubic-bezier(0.2,0.8,0.2,1);" style-hover="opacity: .92;" style-active="transform: scale(.98);">{{ buildLabel }}</button>
+          <sc-if value="{{ showBlank }}" hint-placeholder-val="{{ true }}">
+            <button type="button" onClick="{{ onBlank }}" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 20px; background: #fff; border: 1px solid #e2e8f0; border-radius: 12px; font-size: 15px; font-weight: 600; color: #334155; cursor: pointer;" style-hover="background: #f1f5f9;">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.376 3.622a1 1 0 0 1 3.002 3.002L7.368 18.635a2 2 0 0 1-.855.506l-2.872.838a.5.5 0 0 1-.62-.62l.838-2.872a2 2 0 0 1 .506-.854z"></path></svg>
+              {{ blankLabel }}
+            </button>
+          </sc-if>
+          <p style="text-align: center; font-size: 12px; line-height: 16px; color: #94a3b8; margin: 2px 0 0; min-height: 16px;">{{ hint }}</p>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;ordning&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;frageflode-forst&quot;,&quot;offert-forst&quot;],&quot;default&quot;:&quot;frageflode-forst&quot;,&quot;tsType&quot;:&quot;'frageflode-forst' | 'offert-forst'&quot;,&quot;section&quot;:&quot;Variant&quot;},&quot;antalJobbtyper&quot;:{&quot;editor&quot;:&quot;range&quot;,&quot;default&quot;:3,&quot;min&quot;:2,&quot;max&quot;:8,&quot;step&quot;:1,&quot;tsType&quot;:&quot;number&quot;,&quot;section&quot;:&quot;Box 1&quot;},&quot;harRader&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:false,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Tillstånd&quot;},&quot;visaRaknare&quot;:{&quot;editor&quot;:&quot;boolean&quot;,&quot;default&quot;:true,&quot;tsType&quot;:&quot;boolean&quot;,&quot;section&quot;:&quot;Kanvas&quot;}}">
+class Component extends DCLogic {
+  // ── Kontrakt (tasks/offertflodet-brief 2026-09-19) ─────────────────────
+  // Exakt två boxar. Jobbtyperna synliga i box 1 utan extra klick (job.start
+  // → frågeflödet direkt). Kunden frivillig (<option value="">). Rösten landar
+  // redigerbar i textrutan. Blankstart (onBlank) döljs när offerten har rader
+  // (harRader). Exempelchips fyller rutan och döljs så fort något står där.
+  // Kontrollbudget 12 — räknas live i antalKontroller.
+  state = { value: '', photos: [], customer: '', building: false, recording: false, transcribing: false, seconds: 0, voiceError: null }
+  EXEMPEL = ['Helrenovera badrum, ca 6 m²']
+  // Exempeldata. I produktion: GET /api/job-types (företagsegna, sorterade efter användning).
+  JOBTYPES = [
+    { name: 'Renovera badrum', color: '#0F766E', meta: '5 frågor · sätter klinker, tätskikt, golvvärme' },
+    { name: 'Byta fönster', color: '#0EA5E9', meta: '3 frågor' },
+    { name: 'Installera laddbox', color: '#F59E0B', meta: '4 frågor' },
+    { name: 'Lägga nytt golv', color: '#22C55E', meta: '3 frågor' },
+    { name: 'Måla om invändigt', color: '#134E4A', meta: '4 frågor' },
+    { name: 'Dra om el', color: '#EF4444', meta: '3 frågor' },
+    { name: 'Byta kök', color: '#64748B', meta: '6 frågor' },
+    { name: 'Altan och trädäck', color: '#0EA5E9', meta: '4 frågor' },
+  ]
+  CUSTOMERS = [{ id: 'c1', name: 'Anna Lindqvist' }, { id: 'c2', name: 'Brf Eken 12' }, { id: 'c3', name: 'Johan Berg' }]
+  componentWillUnmount() { clearInterval(this.timer); if (this.stream) this.stream.getTracks().forEach(t => t.stop()) }
+
+  // Rösten: MediaRecorder → POST /api/matte/transcribe → texten LÄGGS TILL i rutan.
+  toggleVoice = () => {
+    if (this.state.recording) { if (this.recorder) this.recorder.stop(); return }
+    if (!navigator.mediaDevices || !window.MediaRecorder) { this.setState({ voiceError: 'Inspelning fungerar inte här — skriv i rutan i stället.' }); return }
+    navigator.mediaDevices.getUserMedia({ audio: true }).then(stream => {
+      this.stream = stream
+      const chunks = [], rec = new MediaRecorder(stream)
+      rec.ondataavailable = e => chunks.push(e.data)
+      rec.onstop = async () => {
+        clearInterval(this.timer); stream.getTracks().forEach(t => t.stop())
+        this.setState({ recording: false, transcribing: true })
+        try {
+          const form = new FormData(); form.append('audio', new Blob(chunks, { type: 'audio/webm' }), 'inspelning.webm')
+          const res = await fetch('/api/matte/transcribe', { method: 'POST', body: form })
+          const data = await res.json()
+          if (!res.ok || !data.text) throw new Error(data.error)
+          this.setState(s => ({ value: s.value.trim() ? `${s.value.trim()}\n${data.text}` : data.text }))
+        } catch (e) { this.setState({ voiceError: (e && e.message) || 'Kunde inte tolka inspelningen — skriv gärna i stället.' }) }
+        finally { this.setState({ transcribing: false }) }
+      }
+      rec.start(); this.recorder = rec
+      this.setState({ recording: true, seconds: 0, voiceError: null })
+      this.timer = setInterval(() => this.setState(s => ({ seconds: s.seconds + 1 })), 1000)
+    }).catch(() => this.setState({ voiceError: 'Mikrofonen är blockerad i webbläsaren. Skriv i rutan i stället.' }))
+  }
+
+  renderVals() {
+    const s = this.state, p = this.props
+    const antalJobbtyper = p.antalJobbtyper ?? 3
+    const harRader = p.harRader ?? false
+    const trimmed = s.value.trim()
+    const substantial = trimmed.length >= 12 && trimmed.split(/\s+/).filter(Boolean).length > 1
+    const canBuild = (substantial || s.photos.length > 0) && !s.building && !s.transcribing
+    const showChips = !trimmed && !s.recording && !s.transcribing
+    const showBlank = !harRader
+    const jobTypes = this.JOBTYPES.slice(0, antalJobbtyper)
+    // Synliga kontroller: jobbtyper + alla jobbtyper + nytt flöde + textfält + mikrofon + chips + foto + kund + bygg + blankstart
+    const antalKontroller = jobTypes.length + 2 + 2 + (showChips ? this.EXEMPEL.length : 0) + 1 + 1 + 1 + (showBlank ? 1 : 0)
+    const over = antalKontroller > 12
+    const mm = String(Math.floor(s.seconds / 60)).padStart(2, '0'), ss = String(s.seconds % 60).padStart(2, '0')
+    return {
+      visaRaknare: p.visaRaknare ?? true, antalKontroller, raknareBg: over ? '#fee2e2' : '#f0fdfa', raknareFg: over ? '#b91c1c' : '#0f766e',
+      jobTypes: jobTypes.map((j, i) => ({ ...j, divider: i === 0 ? 'transparent' : '#f1f5f9', start: () => {} })),
+      onNyttFlode: () => {}, onAlla: () => {}, antalAlla: this.JOBTYPES.length,
+      box1Order: (p.ordning ?? 'frageflode-forst') === 'frageflode-forst' ? 0 : 1,
+      value: s.value, onInput: e => this.setState({ value: e.target.value }),
+      exempel: this.EXEMPEL.map(text => ({ text, fill: () => this.setState({ value: text }) })), showChips,
+      isRecording: s.recording, notRecording: !s.recording, transcribing: s.transcribing,
+      micTitle: s.recording ? 'Stoppa inspelningen' : 'Prata in beskrivningen',
+      micBg: s.recording ? '#dc2626' : '#f0fdf9', micFg: s.recording ? '#fff' : '#0f766e', micRing: s.recording ? '0 0 0 4px #fee2e2' : 'none',
+      duration: `${mm}:${ss}`, voiceError: s.voiceError,
+      photos: s.photos.map((src, i) => ({ src, bgImage: `url(${src})`, remove: () => this.setState(st => ({ photos: st.photos.filter((_, j) => j !== i) })) })),
+      photoLabel: s.photos.length ? 'Fler foton' : 'Foto',
+      addPhoto: () => { const input = document.createElement('input'); input.type = 'file'; input.accept = 'image/*'
+        input.onchange = () => { const f = input.files && input.files[0]; if (f) this.setState(st => ({ photos: [...st.photos, URL.createObjectURL(f)] })) }; input.click() },
+      customers: this.CUSTOMERS, customer: s.customer, customerColor: s.customer ? '#0f172a' : '#64748b', onCustomer: e => this.setState({ customer: e.target.value }),
+      cannotBuild: !canBuild, buildOpacity: canBuild ? 1 : 0.4, buildLabel: s.building ? 'Bygger…' : 'Bygg utkast',
+      showBlank, blankLabel: trimmed ? 'Börja tomt — texten följer med' : 'Börja med tomt dokument',
+      hint: canBuild || s.building ? '' : trimmed ? 'Några ord till räcker.' : 'Beskriv jobbet — eller börja tomt, direkt i dokumentet.',
+      onBuild: () => { this.setState({ building: true }); setTimeout(() => this.setState({ building: false }), 1200) },
+      onBlank: () => {}, onClose: () => {},
+    }
+  }
+}
+</script>
+</body>
+</html>
