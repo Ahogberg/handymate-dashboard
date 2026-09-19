@@ -1,3 +1,4 @@
+import { receipt } from '@/lib/onboarding/contact-proof'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSupabase } from '@/lib/supabase'
 import { triggerAgentFireAndForget, makeIdempotencyKey } from '@/lib/agent-trigger'
@@ -193,7 +194,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Store inbound message in sms_conversation
-    await supabase
+    const storedSms = await supabase
       .from('sms_conversation')
       .insert({
         business_id: business.business_id,
@@ -201,7 +202,9 @@ export async function POST(request: NextRequest) {
         role: 'user',
         content: message,
         created_at: new Date().toISOString(),
-      })
+      }).select('id').single()
+    if (storedSms.error || !storedSms.data) return new NextResponse('Temporary storage error', { status: 503 })
+    try { await receipt(supabase,{businessId:business.business_id,channel:'sms',target:to,text:message,sourceId:String(storedSms.data.id)}) } catch { console.warn('[contact-proof] SMS-provet kunde inte sparas.') }
 
     // V3 Automation Engine: fire sms_received event
     try {

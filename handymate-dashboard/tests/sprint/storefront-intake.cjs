@@ -7,7 +7,7 @@ function load(file,deps={}) {
  },m,m.exports);return m.exports
 }
 const input={business_id:'a',name:'Kund',phone:'',email:'CUSTOMER@example.invalid',message:'Bygg ett garage'}
-const durable=load('lib/leads/durable-intake.ts',{'./golden-path':{notifyReceivedLead:async()=>true}})
+const durable=load('lib/leads/durable-intake.ts',{'./golden-path':{notifyReceivedLead:async()=>true},'@/lib/onboarding/contact-proof':{receipt:async()=>{}}})
 const portal=load('lib/leads/portal-submission.ts')
 const browser=load('lib/leads/storefront-submission.ts',{'./portal-submission':portal})
 const tests=[];const test=(name,fn)=>tests.push([name,fn])

@@ -61,3 +61,7 @@ Kör därefter hela kedjan M01 → M08 → M15/M16 → M18 → M20 mot faktisk p
 Första aktivering kräver: lösta token-/identitetshinder i [förberedelseplanen](MAIL_INTEGRATIONS_PREPARATION.md), erforderlig providerverifiering, godkända relevanta fall och matchande UI. Releaseansvarig registrerar bevis och kvarvarande avgränsning per provider. Om ett centralt prov fallerar: behåll direktkopplingen avstängd och erbjud bara ett separat verifierat alternativ.
 
 **Resultat i denna leverans:** metadata-/kodgranskning genomförd; inga acceptansfall uppgraderade till godkända, inga meddelanden skickade och inga kundanslutningar ändrade.
+
+## Kodstatus 2026-09-19
+
+Gemensam direktläsning, säker OAuth-återgång, tenant-/kontoidentitet, paus, manuell/cron-synk, tillåten bilageimport och färska kontaktprov finns nu i kodpaketet `codex/contact-path-complete`. Bilagor sparas privat och begränsas till fem filer och totalt 20 MB; otillåten filtyp eller storlek visas som ett uttryckligt överhopp och originalmejlet förblir källan. Lokala kontrakt och provider-/DB-dubblar ersätter inte tabellen ovan. Livefallen M01–M21, G01–G04 och O01–O03 förblir blockerade tills testapparna har klientuppgifter, callback-URL:er och leverantörsgodkännande. Sändbehörighet begärs inte.

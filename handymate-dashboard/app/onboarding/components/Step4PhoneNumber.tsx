@@ -17,11 +17,11 @@ interface Step4Props {
   setData: (updater: (d: OnboardingFormData) => OnboardingFormData) => void
 }
 
-const OPERATORS: { id: string; name: string; code: string }[] = [
-  { id: 'telia',   name: 'Telia',   code: '**21*<NUMMER>#' },
-  { id: 'telenor', name: 'Telenor', code: '**21*<NUMMER>#' },
-  { id: 'tre',     name: 'Tre',     code: '**21*<NUMMER>#' },
-  { id: 'telavox', name: 'Telavox', code: 'Logga in → Vidarekoppling' },
+const OPERATORS = [
+  { id: 'telia', name: 'Telia', url: 'https://www.telia.se/support/mobiltelefoni/guider/vidarekoppling' },
+  { id: 'telenor', name: 'Telenor', url: 'https://www.telenor.se/foretag/kundservice/' },
+  { id: 'tre', name: 'Tre', url: 'https://www.tre.se/support' },
+  { id: 'telavox', name: 'Telavox', url: 'https://support.telavox.com/' },
 ]
 
 // Historisk platshållare som äldre onboarding-sessioner kan ha persisterat i
@@ -302,6 +302,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
   const [openOp, setOpenOp] = useState<string | null>(null)
   const [whatForOpen, setWhatForOpen] = useState(false)
   const mode = data.phoneMode || 'forward'
+  const forwardingMode = data.forwardingMode || 'missed'
 
   // Agenter som faktiskt använder numret för outbound (SMS-utskick).
   // Lisa = inbound-samtal, Karin/Daniel/Hanna = outbound-SMS.
@@ -393,7 +394,6 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [retryTick])
 
-  const cleanNumber = number.replace(/[\s-+]/g, '').replace(/^46/, '0')
 
   return (
     <div className="ob-screen">
@@ -556,7 +556,7 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
               {
                 id: 'forward' as const,
                 title: 'Behåll mitt nummer',
-                sub: 'Kunder ringer ditt vanliga nummer som idag. Samtal du inte hinner ta skickas vidare — Lisa fångar dem och SMS:ar kunden.',
+                sub: 'Kunder behåller ert vanliga nummer. Du väljer hos operatören när samtal ska gå vidare till Handymate.',
               },
               {
                 id: 'primary' as const,
@@ -626,6 +626,15 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
               <Info size={14} />
               Vidarekopplings-instruktioner
             </div>
+            <div style={{ padding: 14 }}>
+              <label htmlFor="forwarding-mode">När ska samtalen gå till Handymate?</label>
+              <select id="forwarding-mode" value={forwardingMode} onChange={e => update({ forwardingMode: e.target.value as 'missed' | 'all' })}>
+                <option value="missed">När ni inte kan svara</option><option value="all">Alla samtal direkt</option>
+              </select>
+              <p>Valet här ändrar inte operatörens inställningar. Följ instruktionerna nedan. Direkt vidarekoppling gör att er vanliga telefon inte ringer först.</p>
+              <p><strong>Prova kundens väg:</strong> ring ert vanliga företagsnummer från en annan telefon. Vid missade samtal: låt det ringa utan att svara. Kontrollera att samtalet når Handymate, att kunden får rätt SMS och att ärendet finns i inkorgen.</p>
+              <p>Att ringa Handymate-numret direkt provar mottagningen, men bevisar inte att ert gamla nummer är vidarekopplat. SMS till det gamla numret vidarekopplas inte med samtalen.</p>
+            </div>
             {OPERATORS.map(op => (
               <div key={op.id} style={{ borderTop: '1px solid var(--ob-border)' }}>
                 <button
@@ -666,10 +675,9 @@ export default function Step4PhoneNumber({ onNext, onBack, data, setData }: Step
                       fontFamily: 'ui-monospace, monospace',
                     }}
                   >
-                    Slå{' '}
-                    <span style={{ color: 'var(--ob-primary-700)', fontWeight: 600 }}>
-                      {op.code.replace('<NUMMER>', cleanNumber)}
-                    </span>
+                    <p>Välj {forwardingMode === 'all' ? 'direkt vidarekoppling av alla samtal' : 'vidarekoppling vid inget svar. Ställ även in upptaget och ej nåbar om ni vill fånga dessa samtal'} hos {op.name}. Mål: <strong>{number}</strong>.</p>
+                    <a href={op.url} target="_blank" rel="noopener noreferrer">Öppna {op.name}s instruktioner</a>
+                    <p>Har ni en telefonväxel? Ändra er kö eller ringgrupp i växeln. Mobilkoder gäller inte alltid där.</p>
                   </div>
                 )}
               </div>

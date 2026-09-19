@@ -216,6 +216,7 @@ export const RADERAS: string[] = [
   'business_users', // se not nedan — hanteras av en EGEN, senare kodsteg
   'time_entry', 'time_checkins', 'time_off_request', 'travel_entry',
   'vehicle_reports', 'allowance_reports', 'employee_certificate',
+  'mail_oauth_attempt', 'mail_connection', 'contact_proof',
   'calendar_connection', 'push_subscriptions', 'push_tokens', 'push_held',
   'push_dispatch_log', 'notification', 'benchmark_consent_audit',
   'inventory_movements', 'inventory_transaction',

@@ -89,12 +89,14 @@ export interface OnboardingFormData {
    */
   firstFocus?: FirstFocusId
 
+  customerIntakeChannels?: CustomerIntakeChannel[]
   primaryLeadChannel?: CustomerIntakeChannel
   customerMailProvider?: CustomerMailProvider
 
   // ── Step 4: Telefonnummer ────────────────────────────────
   lisaNumber?: string
   phoneMode?: 'forward' | 'primary'
+  forwardingMode?: 'missed' | 'all'
 
   // ── Step 5: Aktivera ─────────────────────────────────────
   plan?: string  // 'starter' | 'professional' | 'business'

@@ -2518,3 +2518,8 @@ Rubriken `Väntar på ditt OK` ersätts med `Projektets ärenden` eftersom lista
 **NOT VERIFIED/RISKS:** Ingen ny live-synk eller återanslutning efter kodändringen. Automatisk säkerhetsgranskning avvisade körning av migrationen i produktion; godkännande krävs. SEK-standardfakturor stöds av uppdateringen; kredit/kontant, annan valuta och återöppnade betalda fakturor rapporteras för avstämning. Ingen faktura skickades i browserprovet.
 
 **CUSTOMER IMPACT/STATUS:** Fortnox kvarstår PROVE, inte färdig lanseringsacceptans. Nästa steg: godkänn och kör den granskade migrationen, deploya, återanslut testföretaget, hämta testfakturan och bevisa beständig ändring från Fortnox utan dubblett.
+
+
+### Kontaktvägar 2026-09-14 — granskningspaket efter integrationspolish
+
+Onboardingens flerkanalsval, separat SMS-vägledning, korrekt telefonvidarekoppling och gemensam serverläst kanalöversikt är implementerade som draft. Detaljer och kvarvarande acceptansluckor finns i `handymate-dashboard/docs/design/ONBOARDING_STARTPAKET_LAUNCH.md`. Direkt Gmail-/Microsoft-synk, färska anslutningsbundna prov och full dag-ett-mätning är inte levererade av detta paket. Ingen release eller liveacceptans uppgraderas.
