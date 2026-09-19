@@ -3,8 +3,6 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Bookmark, Check, Loader2, Send, Sparkles } from 'lucide-react'
-import { QuoteCompletenessStrip } from './QuoteCompletenessStrip'
-import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
 
 interface QuoteBuilderHeaderProps {
   /** 'create' (default om utelämnad) → "Ny offert", inga autosave-badges.
@@ -18,13 +16,6 @@ interface QuoteBuilderHeaderProps {
       hårdkodade "Ny offert"/"Redigerar offert" så snart den är ifylld —
       se headerTitle nedan. Tom/odefinierad → oförändrat fallback-beteende. */
   title?: string
-  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31): renderas som
-      header-RAD 2, inne i SAMMA sticky/backdrop-blur-wrapper som rad 1 —
-      inte en egen sticky-yta, och inte längre en separat <div> som
-      scrollar bort under headern (se QuoteBuilder.tsx/QuoteEditView.tsx).
-      Utelämnad (t.ex. om ingen sammanfattning finns) → ingen rad 2 alls. */
-  completenessSummaries?: Record<QuoteSection, SectionSummary>
-  onSelectSection?: (section: QuoteSection) => void
   /** Edit-läge: autosparets status — samma badge som gamla QuoteEditHeader. */
   autoSaveStatus?: 'idle' | 'saving' | 'saved' | 'error'
   aiGenerated?: boolean
@@ -74,8 +65,6 @@ export function QuoteBuilderHeader({
   mode = 'create',
   quoteNumber,
   title,
-  completenessSummaries,
-  onSelectSection,
   autoSaveStatus,
   aiGenerated,
   aiConfidence,
@@ -229,21 +218,10 @@ export function QuoteBuilderHeader({
         </div>
       </div>
 
-      {/* Rad 2 — completeness-remsan (Fas 1, offert-omtaget 2026-08-31,
-          flyttad hit ur en egen <div className="mb-4"> under headern så
-          att den scrollar MED headern i stället för bort under den). Samma
-          sticky/backdrop-blur-wrapper som rad 1 ovan — ingen egen sticky-
-          yta. Utelämnad helt om anroparen inte skickar in en sammanfattning.
-          Fas B-granskningsfix (2026-08-31): `hidden lg:block` — under `lg`
-          visar QuoteBuilderBottomBar (mobilens fasta bottenfält) samma
-          chip-data i sin egen horisontella rad. Utan denna gate visades
-          remsan DUBBELT på mobil (en gång här, en gång i bottenfältet) —
-          samma princip som knappgruppen ovan, exakt en yta synlig per bredd. */}
-      {completenessSummaries && onSelectSection && (
-        <div className="hidden lg:block mt-2">
-          <QuoteCompletenessStrip summaries={completenessSummaries} onSelect={onSelectSection} />
-        </div>
-      )}
+      {/* RIVNING PAKET C (2026-09-17, rad 2.16): header-RAD 2 (completeness-
+          remsan, QuoteCompletenessStrip) är borttagen — Skicka-knappens
+          egen orsakstext ("Välj kund först", sendDisabledReason ovan)
+          räcker. */}
     </div>
   )
 }

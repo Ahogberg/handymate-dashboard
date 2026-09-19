@@ -3,13 +3,21 @@ import { getServerSupabase } from '@/lib/supabase'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import { getEfterkalkylInsight } from '@/lib/efterkalkyl/get-insight'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 /**
  * GET /api/quotes/efterkalkyl-insikt
  *
  * Motor 1 (Lärande prissättning) — steg 2. Läser project_outcome för
  * businessen, grupperat på template_id (primär) eller job_type (sekundär),
- * och returnerar snittdiffar som driver QuoteNewEfterkalkylBanner i
- * offertflödet.
+ * och returnerar snittdiffar som driver "Matte säger" (MatteSager.tsx,
+ * tidigare QuoteNewEfterkalkylBanner — RIVNING PAKET C 2026-09-17 rad 2.17)
+ * i offertflödet.
  *
  * Query-params: template_id och/eller job_type. template_id vinner om
  * båda skickas (samma prioritering som freeze-outcome: mallen är den

@@ -6,6 +6,13 @@ import { getCommunicationTrail, normalizeTrailRange } from '@/lib/compliance/com
 import { renderTrailHtml } from '@/lib/compliance/trail-html'
 import { renderHtmlToPdf } from '@/lib/pdf/render-html-to-pdf'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 // Chromium-rendering kräver Node-runtime (inte Edge) och tål kallstart —
 // samma förutsättningar som offert-/faktura-PDF:erna.
 export const runtime = 'nodejs'

@@ -53,6 +53,10 @@ async function harness(m) {
     '@/lib/quotes/lifecycle':{lockedChanges:()=>{throw Error('Unexpected edit')},lockedChangeMessage:()=>''},
     '@/lib/quotes/create-quote':m.writer,'@/lib/quotes/validity':m.validity,'@/lib/storage-signing':m.storage,
     '@/lib/rot-rut-basis':m.basis,
+    // Frågeflödets svar på offerten (v253, 2026-09-17). POST validerar dem
+    // med readIntakeAnswerSet; formen låses av tests/intake-questions.spec.ts,
+    // så här räcker en genomsläppande stub som bevarar ett giltigt svar.
+    '@/lib/quotes/intake-questions':{readIntakeAnswerSet:v=>v && typeof v==='object'?v:null},
   })
   const post=body=>api.POST(new Request('https://unit.invalid/api/quotes',{method:'POST',body:JSON.stringify(body)}))
   const get=id=>{const nextUrl=new URL(`https://unit.invalid/api/quotes?quoteId=${id}`);return api.GET({nextUrl})}

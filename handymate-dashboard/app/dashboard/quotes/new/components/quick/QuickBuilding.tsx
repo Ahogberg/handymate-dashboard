@@ -55,7 +55,13 @@ export function QuickBuilding({ businessName, customerName, issuedDate }: QuickB
   return (
     // bg-slate-50 — samma fond som intaget (designpasset 2026-08-10), så
     // beskriv → bygg läses som EN resa, inte två appar.
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
+    // z-[60], inte z-50: Jobbkompisen ligger på z-50 och renderas EFTER
+    // sidinnehållet i dashboardens layout, så vid samma nivå vann bubblan
+    // på DOM-ordning och lade sig över helskärmen — bredvid mikrofonknappen,
+    // så att det såg ut som två mikrofoner (Andreas klickprov 2026-09-18).
+    // 60 är över bubblan och FeedbackWidget (z-40) men under radsheetsen
+    // (z-70) och Toast, som fortfarande ska nå över den här ytan.
+    <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto">
       <style>{`
         @keyframes qb-shimmer { 0% { opacity: .45 } 50% { opacity: .9 } 100% { opacity: .45 } }
         .qb-skel { background: #E2E8F0; border-radius: 6px; animation: qb-shimmer 1.4s ease-in-out infinite; }

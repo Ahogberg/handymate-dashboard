@@ -9,6 +9,7 @@ import { resolveReferencePerson } from '@/lib/quotes/resolve-reference-person'
 import { lockedChanges, lockedChangeMessage } from '@/lib/quotes/lifecycle'
 import { createQuote, resolveItemSplit } from '@/lib/quotes/create-quote'
 import { calculateQuoteValidUntil } from '@/lib/quotes/validity'
+import { readIntakeAnswerSet } from '@/lib/quotes/intake-questions'
 import { signAttachmentList } from '@/lib/storage-signing'
 import type { QuoteItem } from '@/lib/types/quote'
 import { splitLine } from '@/lib/rot-rut-basis'
@@ -475,6 +476,9 @@ export async function POST(request: NextRequest) {
       job_type: typeof body.job_type === 'string'
         ? body.job_type.trim().slice(0, 120) || null
         : null,
+      // Frågeflödet (v253): svaren från platsbesöket, i validerad form eller
+      // null — aldrig råa klientobjekt i kolumnen. Rör inga belopp.
+      intake_answers: readIntakeAnswerSet(body.intake_answers),
       template_style: ['modern', 'premium', 'friendly'].includes(body.template_style)
         ? body.template_style
         : null,

@@ -1,0 +1,38 @@
+name: Offertflödets ytor i 375 px
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: intake-flow-ui-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  ui:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: handymate-dashboard
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+        env:
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:intake-flow-ui
+      # Bilderna är hela poängen med provet — de ska gå att titta på efteråt,
+      # inte bara ha funnits under körningen.
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ytor-375
+          path: |
+            handymate-dashboard/docs/ui/fragefloedet-375-*.png
+            handymate-dashboard/docs/ui/kom-ikapp-375.png
+            handymate-dashboard/docs/ui/startskarm-375*.png
+            handymate-dashboard/test-results/

@@ -30,7 +30,7 @@ async function mount(page: Page, respond: (n: number) => { status?:number; body?
   await page.evaluate(() => { const original = HTMLElement.prototype.scrollIntoView; HTMLElement.prototype.scrollIntoView = function(options) { (window as any).lastScrolledSection = this.dataset.section; original.call(this, options) } })
   return { errors, writes, reads:()=>reads }
 }
-for (const width of [375,1280]) test(`första uppdraget och offertguide ${width}px`, async ({ page }) => {
+for (const width of [375,1280]) test(`första uppdraget och offertvyn ${width}px`, async ({ page }) => {
   await page.setViewportSize({ width, height:812 })
   const h = await mount(page)
   await expect(page.getByText('Du valde:', { exact:false })).toContainText('Få in fler jobb')
@@ -38,22 +38,11 @@ for (const width of [375,1280]) test(`första uppdraget och offertguide ${width}
   await expect(page.getByRole('textbox', { name:'Fråga till Matte' })).toHaveValue(/verifiera minst en riktig kanal/)
   await page.getByRole('textbox', { name:'Fråga till Matte' }).fill('Mitt eget uppdrag')
   expect(h.writes).toEqual([])
+  // Rivningen A3 (2026-09-17): offertguiden är borta — frågeflödet och
+  // dokumentet gör dess jobb. Offertvyn är nu bara exempeldokumentet.
   await page.getByRole('button', { name:'offert', exact:true }).click()
-  await page.getByRole('button', { name:'Välj kund', exact:true }).click()
-  await expect(page.getByRole('combobox', { name:'Kund' })).toBeFocused()
-  await page.getByRole('combobox').selectOption('a')
-  await expect(page.getByRole('heading', { name:'Gör underlaget till ditt eget' })).toBeVisible()
-  await page.getByRole('button', { name:'Visa rader och priser' }).click()
-  await expect(page.locator('output')).toHaveText('inkluderat')
-  await page.getByRole('button', { name:'Visa tips inför granskning' }).click()
-  await expect(page.locator('output')).toHaveText('prisbild')
-  await page.getByRole('button', { name:'Visa reservationer' }).click()
-  await expect(page.locator('output')).toHaveText('reservationer')
-  await expect.poll(() => page.evaluate(() => (window as any).lastScrolledSection)).toBe('reservationer')
-  await page.getByRole('button', { name:'Dölj offertguiden' }).click()
+  await expect(page.getByRole('heading', { name:'Exempeloffert · Servicebesök' })).toBeVisible()
   await expect(page.getByRole('complementary')).toHaveCount(0)
-  await page.getByRole('button', { name:'Visa offertguiden' }).click()
-  await expect(page.getByRole('complementary')).toBeVisible()
   expect(await page.evaluate(()=>document.documentElement.scrollWidth <= innerWidth)).toBe(true)
   await page.screenshot({ path:`test-results/first-value-offert-${width}.png`, fullPage:true })
   await page.getByRole('button', { name:'start', exact:true }).click()

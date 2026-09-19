@@ -18,21 +18,18 @@
  * raden till en vägg av amber och lärt hantverkaren att ignorera den.
  *
  * Ren funktion — facit-testad i tests/panel-status.spec.ts.
+ *
+ * Rivning paket B (2026-09-17, rad 2.3–2.6, 2.10): "stil", "villkor" och
+ * "rot" bar tre av Mer-radens sex paneler. Alla tre är borttagna som egna
+ * paneler (stil → firmadefault i inställningar, villkor → dokumentets egna
+ * textfält, rot → avdragsväxeln vid dokumentets summering) — kvar är bara
+ * de tre paneler som fortfarande är egna ytor.
  */
 
-export type PanelKey = 'stil' | 'villkor' | 'betalplan' | 'visning' | 'bilagor' | 'rot'
+export type PanelKey = 'betalplan' | 'visning' | 'bilagor'
 export type PanelState = 'filled' | 'empty' | 'attention'
 
 export interface PanelStatusInput {
-  /** Villkor & texter */
-  notIncluded?: string | null
-  termsText?: string | null
-  ataTerms?: string | null
-  paymentTermsText?: string | null
-  referencePerson?: string | null
-  customerReference?: string | null
-  projectAddress?: string | null
-
   /** Betalplan */
   paymentPlanCount?: number
   paymentPlanValid?: boolean
@@ -44,15 +41,6 @@ export interface PanelStatusInput {
 
   /** Bilagor */
   attachmentCount?: number
-
-  /** Stil — null betyder "företagets standard" */
-  templateStyle?: string | null
-
-  /** ROT-detaljer */
-  hasRotItems?: boolean
-  hasRutItems?: boolean
-  personnummer?: string | null
-  fastighetsbeteckning?: string | null
 }
 
 export interface PanelStatusEntry {
@@ -61,27 +49,7 @@ export interface PanelStatusEntry {
   hint?: string
 }
 
-const hasText = (value: string | null | undefined): boolean => !!(value && value.trim().length > 0)
-
-const STYLE_LABELS: Record<string, string> = {
-  modern: 'Modern',
-  premium: 'Premium',
-  friendly: 'Personlig',
-}
-
 export function panelStatus(input: PanelStatusInput): Record<PanelKey, PanelStatusEntry> {
-  // ── Villkor & texter ──────────────────────────────────────────────
-  const villkorFields = [
-    input.notIncluded,
-    input.termsText,
-    input.ataTerms,
-    input.paymentTermsText,
-    input.referencePerson,
-    input.customerReference,
-    input.projectAddress,
-  ]
-  const villkorCount = villkorFields.filter(hasText).length
-
   // ── Betalplan ─────────────────────────────────────────────────────
   const planCount = input.paymentPlanCount ?? 0
   let betalplan: PanelStatusEntry
@@ -105,29 +73,10 @@ export function panelStatus(input: PanelStatusInput): Record<PanelKey, PanelStat
   // ── Bilagor ───────────────────────────────────────────────────────
   const attachments = input.attachmentCount ?? 0
 
-  // ── ROT-detaljer ──────────────────────────────────────────────────
-  // Personnumret krävs för att avdraget ska kunna begäras. Saknas det när ROT
-  // är valt skickas en offert som lovar ett avdrag som inte går att få.
-  let rot: PanelStatusEntry
-  if (input.hasRotItems && !hasText(input.personnummer)) {
-    rot = { state: 'attention', hint: 'personnummer saknas' }
-  } else if (input.hasRotItems || input.hasRutItems) {
-    rot = { state: 'filled' }
-  } else if (hasText(input.personnummer) || hasText(input.fastighetsbeteckning)) {
-    rot = { state: 'filled' }
-  } else {
-    rot = { state: 'empty' }
-  }
-
   return {
-    stil: input.templateStyle
-      ? { state: 'filled', hint: STYLE_LABELS[input.templateStyle] || input.templateStyle }
-      : { state: 'empty' },
-    villkor: villkorCount > 0 ? { state: 'filled', hint: `${villkorCount}` } : { state: 'empty' },
     betalplan,
     visning: isDefaultDisplay ? { state: 'empty' } : { state: 'filled' },
     bilagor: attachments > 0 ? { state: 'filled', hint: `${attachments}` } : { state: 'empty' },
-    rot,
   }
 }
 

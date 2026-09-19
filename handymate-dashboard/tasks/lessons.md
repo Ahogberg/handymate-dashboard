@@ -700,3 +700,122 @@ Spara gärna pågående kontroll för samtidiga anrop, men kasta cacheposten vid
 ## 2026-09-16 — En "delad" funktion måste bevisas på varje väg, inte en
 Codex fixade de sex namngivna ROT-ställena men fyra fakturavägar och kreditvägen låg kvar på gamla logiken, och specen "all paths" körde en väg. Briefen ska räkna upp alla anropare (grep `.from('invoices')`/`createInvoice(`) och acceptansen ska köra tal genom varje, inte textskanna källfiler.
 
+
+## 2026-09-17 — Enheten ensam bevisar inte att antalet är ett antal
+Frågeflödets mängdregel matchade på enhet: svar med enheten "st" satte `quantity`
+på varje st-rad. Andreas kollade produktionen: Bee Services badrumsmall används som
+miniräknare — BELOPPET ligger i antalskolumnen (25 348 st × 1 kr), enheten är "st"
+även för timmar, och ingen rad är kopplad till en artikel. Svaret "3" hade tagit
+offerten från 170 000 kr till knappt 2 000, tyst framför kunden. I hela databasen
+bär 4 av 221 mallrader en artikelkoppling, och 2 075 av 2 076 artiklar är seedade
+och aldrig kopplade till något.
+Regler: (1) en regel som SKRIVER mängder eller belopp får bara röra rader vars form
+är garanterad — artikelkopplingen garanterar att enhet och á-pris kommer ur
+registret, enhetssträngen garanterar ingenting. (2) Innan en sådan regel släpps:
+läs verklig produktionsdata och lägg in den formen som testfall, inte en påhittad
+mall. (3) Seeda aldrig ett förslag som inte kan få effekt — en mängdfråga utan
+kopplade rader är ett löfte flödet inte kan hålla, så seedningen läser samma vakt.
+
+## 2026-09-17 — Påstå inte "ingen gör det" när den egna researchen säger annat
+
+Sammanfattningen i `docs/offert/offertflodet-research-malbild-2026-09-17.md`
+skrev "Ingen gör det ni håller på att bygga" medan brödtexten i samma dokument
+beskrev Housecall Pros Pricing Forms (mått → kvadratmeter → pris). Detaljen var
+korrekt researchad, rubriken överdrev den. **Regel: en sammanfattning får aldrig
+vara starkare än den svagaste detaljen den sammanfattar.** Läs om den egna
+brödtexten innan en punktsats skrivs som absolut.
+
+Samma dokument påstod "dolda rader filtreras inte" till faktura som en lucka.
+Det var fel: `is_hidden` betyder "syns inte i kundens dokument men PRISET INGÅR I
+SUMMAN" (beslut Andreas 2026-08-05, `lib/types/quote.ts`). Att fakturan tar med
+raden är alltså rätt, inte en bugg. **Regel: innan något kallas lucka — läs
+typens egen kommentar och alla konsumenter, inte bara den ena.**
+"Dold för kunden", "inte vald" och "ska inte faktureras" är tre olika saker och
+bara den första finns i dag.
+
+## 2026-09-17 — `npx playwright` är inte repots Playwright (samma fälla som `npx tsc`)
+
+`npx playwright test …` plockade version 1.63 som kräver `chromium_headless_shell-1243`,
+medan miljön bara har `-1194`. Alla browserspecar föll med "Executable doesn't
+exist" och det såg ut som att mina testomskrivningar var trasiga. Källskanningen
+kördes ändå, så felet dolde sig bland riktiga resultat.
+**Regel: kör alltid `./node_modules/.bin/playwright` och `./node_modules/.bin/tsc`,
+aldrig `npx <verktyg>` för något som finns i node_modules.** Och när ett helt
+block tester faller med SAMMA fel är det miljön, inte koden — leta där först.
+
+## 2026-09-18 — "Grönt lokalt" betydde inte grönt i CI
+
+PR 91 föll på `TypeScript och kontrakt` trots att `test:contracts` (2896),
+tsc och `next build` var gröna. CI-jobbet kör FEM sviter till som inte ligger
+i `test:contracts`: `test:six-outcomes`, `customer-preparation/contract.test.mjs`,
+`sprint/activity-route.cjs`, `sprint/mail-boundaries.cjs`,
+`live-journey/policy.test.cjs` och `test:planning`.
+
+Tre fel dolde sig där, alla mina:
+1. `createInvoice` fick läsa `quotes`/`project` för att härleda jobbtypen.
+   `tests/sprint/invoice-acceptance-service.cjs` slår fast att kärnan ALDRIG
+   rör databasen utanför sin atomiska RPC (dess `from()` kastar och testet
+   kräver noll anrop). Regeln är riktig — en läsning före RPC:n ligger
+   utanför transaktionen. Härledningen flyttades ut till de anropare som
+   redan har offerten eller projektet läst.
+2. + 3. Två sprint-tester har modulladdare som kräver att VARJE `@/`-import
+   stubbas uttryckligen. Nya moduler (`template-articles`, `intake-questions`)
+   fick dem att falla — avsiktligt högljutt.
+
+**Regel: innan något kallas grönt inför en PR, läs `.github/workflows/*.yml`
+och kör varje `run:`-steg i det jobb som grindar — inte bara `test:contracts`.**
+Samma rot som de tre ogatade facit vi hittade i går: grinden lokalt är smalare
+än grinden i CI, och skillnaden är osynlig tills något faller.
+
+## 2026-09-18 — Ett facit får inte påstå något om maskinen det körs på
+
+Samma dag, nästa lager av samma rot. `tests/arbetsordningen.spec.ts` krävde
+att `/opt/pw-browsers/chromium-1194/chrome-linux/chrome` fanns på disk. Den
+sökvägen finns i utvecklingsburken; CI kör `ubuntu-latest` med
+`PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1` och har ingen sådan katalog. Provet var
+alltså omöjligt att klara i CI och höll kontraktsgrinden röd på **main** från
+2026-09-17 — åtta commits utan att någon märkte det, eftersom det var grönt
+på den maskin där det skrevs.
+
+**Regel: skilj på vad som är repots innehåll och vad som är miljöns tillstånd.**
+Att sökvägen STÅR i instruktionen är ett påstående om repot och prövas överallt.
+Att den FINNS är ett påstående om maskinen och hör hemma i ett eget prov med
+`test.skip(...)`, aldrig i ett `if` — ett hoppat prov syns i rapporten, en
+if-sats gör provet tyst tomt.
+
+Följdregel, dyrköpt två gånger nu: **kolla alltid om main själv är grön innan
+du antar att rött är ditt.** Både den här och `sprint/onboarding-seeding.cjs`
+samma morgon var mains fel som grenen ärvde. `actions_list` på
+`contracts.yml` med `branch: main` tar tio sekunder och svarar på frågan.
+
+## 2026-09-18 — Ett komponentprov ser inte vad som ligger OVANPÅ komponenten
+
+Andreas klickprov på telefon: i offertintaget satt Matte-bubblans porträtt
+precis bredvid mikrofonknappen i textrutans hörn. Det såg ut som två
+mikrofoner, och bubblan täckte delar av ytan.
+
+Ingen källskanning kunde hitta det, och `ui-bevis` hade inte heller gjort det:
+`tests/intake-flow.ui.spec.ts` renderar komponenten **för sig**, utan
+dashboardens layout. Felet uppstod först i mötet mellan två filer som var
+rimliga var för sig — intaget `fixed inset-0 z-50`, Jobbkompisen
+`fixed bottom-6 right-6 z-50`, och Jobbkompisen renderad efter `{children}`.
+Vid samma z-nivå avgör DOM-ordningen, och då vinner alltid den som står sist.
+
+**Regel: en helskärmsyta är inte bevisad förrän något mäter den mot det som
+lever utanför den.** `tests/facit-helskarm-over-bubblan.spec.ts` läser
+bubblans nivå ur bubblans EGEN fil i stället för att hårdkoda 50 — annars
+tystnar provet samma dag någon höjer bubblan, och felet ser likadant ut igen.
+Provet vaktar både golv (över hjälparna) och tak (under radsheetsen), för
+annars "löses" nästa variant genom att skruva upp helskärmen tills
+radeditorn hamnar bakom den.
+
+Två egna misstag i samma pass, båda värda att skriva ner:
+
+- **`git checkout -- fil` för att backa en mutation raderar hela din egen
+  ändring i filen, inte bara mutationen.** Backa mutationer med den omvända
+  `sed`:en. `git checkout` duger bara när filen är orörd i övrigt.
+- **`{/* … */}` mellan `return (` och elementet är inte giltig JSX**, och ett
+  block som saknar sitt `}` gör att nästa regex-ersättning äter riktig kod
+  fram till nästa `*/}`. Kommentaren före rotelementet ska vara `//`-rader.
+  `tsc --noEmit` fångade det — kör det direkt efter varje skriptad
+  filändring, inte först på slutet.

@@ -6,9 +6,12 @@ import config from '../../tailwind.config'
 
 /** Real React components and CSS. Only API responses and the editor host are fixtures. */
 export async function productionPreview() {
-  const files = ['lib/followup/presentation.ts', 'components/quotes/ScheduledFollowup.tsx', 'lib/onboarding/work-sample.ts', 'lib/quotes/visit-rule.ts', 'lib/jarvis/brain-overview.ts',
-    'components/onboarding/WorkSampleStart.tsx', 'components/onboarding/WorkSampleResume.tsx',
-    'components/quotes/VisitRuleEditor.tsx', 'components/quotes/QuoteHandoff.tsx', 'components/jarvis/home/BrainOverview.tsx']
+  // RIVNING PAKET C (2026-09-17, rad 2.14): VisitRuleEditor (och dess
+  // 'regel'-vy nedan) borttagen — lib/quotes/visit-rule.ts behövs inte
+  // längre här (den lever kvar åt lib/ai-quote-generator.ts, oberoende).
+  const files = ['lib/followup/presentation.ts', 'components/quotes/ScheduledFollowup.tsx', 'lib/onboarding/work-sample.ts', 'lib/jarvis/brain-overview.ts',
+    'components/onboarding/WorkSampleStart.tsx',
+    'components/quotes/QuoteHandoff.tsx', 'components/jarvis/home/BrainOverview.tsx']
   const css = (await postcss([tailwind({ ...config, content: files })]).process('@tailwind base; @tailwind components; @tailwind utilities;', { from: undefined })).css
   const loads = files.map(file => `load(${JSON.stringify('@/' + file.replace(/\.tsx?$/, ''))}, ${JSON.stringify(ts.transpileModule(readFileSync(file,'utf8'), { compilerOptions:{ module:ts.ModuleKind.CommonJS, target:ts.ScriptTarget.ES2020, jsx:ts.JsxEmit.React, esModuleInterop:true } }).outputText)});`).join('\n')
   const script = `
@@ -23,18 +26,16 @@ export async function productionPreview() {
     ${loads}
     const h=React.createElement;
     function Host() {
-      const [view,setView]=React.useState('start'), [business,setBusiness]=React.useState('firm-a'), [job,setJob]=React.useState('dorrar'), [description,setDescription]=React.useState('Kunden står för dörrarna.'), [applied,setApplied]=React.useState(null), [receipt,setReceipt]=React.useState(''), [home,setHome]=React.useState({handled:undefined,needsYou:undefined,moneyCases:undefined});
-      window.fixture={setView,setBusiness,setJob,setDescription,settleHomeEmpty:()=>{missionFixture={loading:false,error:null,mission:null,handover:null};setHome({handled:0,needsYou:0,moneyCases:0});}};
+      const [view,setView]=React.useState('start'), [business,setBusiness]=React.useState('firm-a'), [receipt,setReceipt]=React.useState(''), [home,setHome]=React.useState({handled:undefined,needsYou:undefined,moneyCases:undefined});
+      window.fixture={setView,setBusiness,settleHomeEmpty:()=>{missionFixture={loading:false,error:null,mission:null,handover:null};setHome({handled:0,needsYou:0,moneyCases:0});}};
       return h(React.Fragment,null,
-        h('nav',{'aria-label':'Testvyer',className:'flex gap-3 mb-4'},...['start','resume','regel','handoff','home'].map(v=>h('button',{key:v,onClick:()=>setView(v),className:'min-h-[44px] underline'},v))),
+        h('nav',{'aria-label':'Testvyer',className:'flex gap-3 mb-4'},...['start','handoff','home'].map(v=>h('button',{key:v,onClick:()=>setView(v),className:'min-h-[44px] underline'},v))),
         view==='start'?h('div',{className:'ob-card-wrap'},h(modules['@/components/onboarding/WorkSampleStart'].WorkSampleStart,{key:business,businessId:business,onContinue:async(source,sample)=>{
           const r=await fetch('/fixture/save',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({source,sample})}); if(!r.ok) throw Error('Kunde inte spara. Din text finns kvar.'); setReceipt('Sparat på servern');
         }})):null,
-        view==='resume'?h(modules['@/components/onboarding/WorkSampleResume'].WorkSampleResume,{key:business,businessId:business,hasContent:true,onApply:s=>{setApplied(s);setDescription(s.description)},onSource:setDescription}):null,
-        view==='regel'?h(modules['@/components/quotes/VisitRuleEditor'].VisitRuleEditor,{key:business+job,jobType:job,description,onApply:setDescription}):null,
         view==='handoff'?h(modules['@/components/quotes/QuoteHandoff'].QuoteHandoff,{quoteId:'q',revision:'sent',businessId:business}):null,
         view==='home'?h(modules['@/components/jarvis/home/BrainOverview'].BrainOverview,home):null,
-        h('output',{'data-testid':'description'},description),h('output',{'data-testid':'applied'},JSON.stringify(applied)),h('p',{role:'status'},receipt));
+        h('p',{role:'status'},receipt));
     }
     ReactDOM.createRoot(document.getElementById('root')).render(h(Host));`
   const safe = (s:string)=>s.replace(/<\/script/gi,'<\\/script')

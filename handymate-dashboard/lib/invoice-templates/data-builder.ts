@@ -117,6 +117,11 @@ export function buildInvoiceTemplateData(
     return {
       itemType,
       id: i.id,
+      // Samma flagga som offertens byggare sätter (lib/quote-templates/
+      // data-builder.ts) — mallarna filtrerar på den. Summorna kommer ur
+      // invoice.subtotal/total och räknas ALDRIG om ur raderna, så en dold
+      // rad ändrar ingen krona: den faktureras, den syns bara inte.
+      isHidden: i.is_hidden === true,
       name: i.description || i.name || '',
       description: i.long_description || null,
       quantity: itemType === 'item' || itemType === 'discount' ? (quantity || 1) : quantity,

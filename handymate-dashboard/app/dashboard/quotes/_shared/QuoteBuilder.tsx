@@ -9,23 +9,25 @@ import { supabase } from '@/lib/supabase'
 import { loadQuoteReliefHandoff } from '@/lib/relief/intake'
 import { useBusiness } from '@/lib/BusinessContext'
 import { useToast } from '@/components/Toast'
-import ProductSearchModal from '@/components/ProductSearchModal'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuoteTemplateData, QuoteTemplateItem } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
 import { RowEditSheet } from '@/components/quotes/document/RowEditSheet'
 import { AddRowSheet } from '@/components/quotes/document/AddRowSheet'
 import {
-  generateItemId, recalculateItems, getItemRotRutType,
+  generateItemId, recalculateItems, getItemRotRutType, applyGlobalDeductionType,
 } from '@/lib/quote-calculations'
 import { generatedQuoteToQuoteItems, rotRutEfterArtikelkoppling } from '@/lib/quotes/generated-to-quote-items'
 import { resolveTemplateItemPrices } from '@/lib/quotes/resolve-template-item-prices'
 import type { TemplatePricingProduct } from '@/lib/quotes/resolve-template-item-prices'
 import { useQuoteSectionNavigation } from './useQuoteSectionNavigation'
-import { FirstQuoteGuide } from '@/components/onboarding/FirstQuoteGuide'
 import { QuoteJobTypeStart } from '@/components/onboarding/QuoteJobTypeStart'
-import { canApplyJobTypeStart, loadJobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
+import { canApplyJobTypeStart, loadJobTypeStart, type JobTypeStart, type QuoteStartSnapshot } from '@/lib/quotes/job-type-start'
 import { byggPafyllnadsrader } from '@/lib/quotes/job-type-append'
+import { IntakeQuestionFlow } from '@/components/quotes/IntakeQuestionFlow'
+import { fetchIntakeQuestions } from '@/lib/quotes/intake-flow'
+import type { IntakeChoiceArticle } from '@/lib/quotes/intake-questions-server'
+import { applyIntakeAnswers, buildIntakeAnswerSet, intakeAnswersText, intakeTargetsFromRows, type IntakeAnswerSet, type IntakeAnswers, type IntakeQuestion } from '@/lib/quotes/intake-questions'
 import { readFirstQuoteIntent } from '@/lib/onboarding/first-quote-handoff'
 import type { FirstQuoteSelection } from '@/lib/quotes/job-type-setup'
 import { compressImageFile } from '@/lib/images/compress-photo'
@@ -42,29 +44,27 @@ import { useQuoteCalculations } from './useQuoteCalculations'
 import { useQuoteItems } from './useQuoteItems'
 import { usePriceListLookup } from './usePriceListLookup'
 import { ensureProductComponents, applyProductToItem, type ProductWithComponents } from './applyProductToItem'
-import { QuoteQuickstartCard, type QuickstartRow } from './QuoteQuickstartCard'
-import { QuoteItemsSection } from './QuoteItemsSection'
 import { QUOTE_SURFACE_BUSINESS_SELECT, logBusinessConfigError } from '@/lib/business/quote-surface-select'
 import { useReservationSuggestions } from './useReservationSuggestions'
 import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
-import QuotePreparationInput from '@/components/customer-preparation/QuotePreparationInput'
-import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 
 // Delade sektionskomponenter (flyttade+döpta om från [id]/edit/components/ i
 // Fas 1, offert-omtaget 2026-08-31 — edit/page.tsx importerar samma filer).
-import { QuoteRotSection } from './QuoteRotSection'
-import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
+// RIVNING PAKET B (2026-09-17): QuoteRotSection, QuoteStandardTextsSection
+// och QuoteTotalsSection är borttagna — se panel-status.ts:s docblock för
+// var de tre ytorna flyttade.
 import { QuotePaymentPlanSection } from './QuotePaymentPlanSection'
 import { QuoteDisplaySettingsSection } from './QuoteDisplaySettingsSection'
-import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import type { QuotePayloadContext } from './buildQuotePayload'
 import { useQuoteBuilderSave } from './useQuoteBuilderSave'
 import { useQuoteRecovery } from './useQuoteRecovery'
+import { readQuoteStartParams, hasQuoteStartSignal as startSignalOf } from '@/lib/quotes/start-params'
+import { loadPreparationQuoteInput } from '@/lib/customer-preparation/quote-handoff'
 import { QuotePriceMemory } from './QuotePriceMemory'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
 import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
@@ -72,40 +72,32 @@ import { QuoteEditView } from './QuoteEditView'
 import { fetchQuoteForEdit } from './loadEditQuote'
 import type { ReservationSnapshotEntry } from '@/lib/reservations/match'
 
-import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
+// RIVNING PAKET B (2026-09-17, rad 2.4/3.12): QuoteStylePicker monteras inte
+// längre här — firmadefaulten i inställningar (businessDefaultStyle) räcker,
+// ingen per-offert-stilväljare kvar i editorn. Komponenten själv lever kvar
+// (components/quotes/QuoteStylePicker.tsx) — InvoiceEditor.tsx använder den
+// fortfarande för fakturans EGEN per-faktura-stil, utanför uppdragets scope.
 import { panelStatus } from '@/lib/quotes/panel-status'
 
 // Komponenter unika för create-flödet (bor kvar i new/components/ — bara
 // QuoteBuilder.tsx själv flyttade till _shared/, se new/page.tsx).
-import { DanielsBedomning } from '../new/components/DanielsBedomning'
-import { VisitRuleEditor } from '@/components/quotes/VisitRuleEditor'
-import { WorkSampleResume } from '@/components/onboarding/WorkSampleResume'
-import { workSampleDraft } from '@/lib/onboarding/work-sample'
-import { QuoteNewAIHelper } from '../new/components/QuoteNewAIHelper'
 import { QuoteNewCustomerSection } from '../new/components/QuoteNewCustomerSection'
 import { QuoteNewAttachmentsCard } from '../new/components/QuoteNewAttachmentsCard'
 import { QuickIntake } from '../new/components/quick/QuickIntake'
-import { QuickBlankStart } from '../new/components/quick/QuickBlankStart'
 import { QuickBuilding } from '../new/components/quick/QuickBuilding'
-import {
-  sectionSummary,
-  SECTION_ORDER,
-  type QuoteSection,
-} from '@/lib/quotes/quote-completeness'
-import {
-  shouldAskPreferred,
-  getPreferredStart,
-  setPreferredStart,
-  recordEscape,
-  hasBeenAskedPreferred,
-  markAskedPreferred,
-  type EscapeRoute,
-  type StartMode,
-} from '@/lib/quotes/quick-preferences'
-import { QuickStartPreferenceBanner } from '../new/components/quick/QuickStartPreferenceBanner'
-import { QuoteNewPriceWarningsBanner } from '../new/components/QuoteNewPriceWarningsBanner'
-import { QuoteNewEfterkalkylBanner, type EfterkalkylInsight } from '../new/components/QuoteNewEfterkalkylBanner'
-import { AgentAvatar } from '@/components/agents/AgentAvatar'
+// STARTVANAN BORTTAGEN (rivningen paket A, 2026-09-17, Andreas: "strippa bort
+// saker som inte tillför"). lib/quotes/quick-preferences.ts, banderollen
+// "Vill du alltid börja så här?" och de fem localStorage-nycklarna är borta.
+// Var offerten börjar är ett designbeslut, inte en inställning per person och
+// enhet: tre sparade startlägen betydde tre versioner av appen att hålla i
+// huvudet, och den som svarat "börja i editorn" fick aldrig se frågeflödet.
+// Kallstart öppnar nu alltid intaget, och vägen tillbaka dit finns kvar för
+// alla med tom offert.
+// RIVNING PAKET C (2026-09-17, rad 2.17): QuoteNewPriceWarningsBanner,
+// QuoteNewEfterkalkylBanner, Daniel-buffertkortet och DanielsBedomning
+// (fyra ytor för en röst) slås ihop till EN — se MatteSager nedan.
+import { MatteSager } from '../new/components/MatteSager'
+import type { EfterkalkylInsight } from '@/lib/efterkalkyl/get-insight'
 import { formatHours as formatAgentradHours } from '@/lib/daniel-agentrad'
 
 // ─── Types ───────────────────────────────────────────────────────────
@@ -263,8 +255,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   } | null>(null)
   const [loading, setLoading] = useState(true)
   // `saving` ägs numera av useQuoteBuilderSave (se hooket längre ner) —
-  // ingen egen kopia här.
-  const [generating, setGenerating] = useState(false)
+  // ingen egen kopia här. RIVNING PAKET C (2026-09-17, rad 2.12): `generating`
+  // (den borttagna QuoteNewAIHelper-panelens egen laddningsindikator) är
+  // borta — Snabbofferten har sin egen, `quickMode === 'building'`.
 
   // ─── EDIT-LÄGE ENDAST (Fas 2, offert-omtaget 2026-08-31) ────────────
   // Offertens LADDADE status (draft/sent/...) — skickas oförändrad tillbaka
@@ -287,11 +280,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [allStandardTexts, setAllStandardTexts] = useState<QuoteStandardText[]>([])
 
   // ─── AI state ──────────────────────────────────────────────────────
-  const [sourceImageBase64, setSourceImageBase64] = useState<string | null>(null)
   const [sourceTranscript, setSourceTranscript] = useState<string | null>(null)
   const [aiGenerated, setAiGenerated] = useState(false)
   const [reliefError, setReliefError] = useState('')
-  const [aiTextInput, setAiTextInput] = useState('')
   const [aiConfidence, setAiConfidence] = useState<number | null>(null)
   // Kvittoprincipen Fall 1 (docs/design/SYNLIG-INTELLIGENS.md): motorns
   // eget resonemang + kunskapen som faktiskt påverkade offerten.
@@ -302,8 +293,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     customerFacts: Array<{ content: string }>
   } | null>(null)
   const [photos, setPhotos] = useState<string[]>([])
-  const [photoDescription, setPhotoDescription] = useState('')
-  const [showAiHelper, setShowAiHelper] = useState(false)
+  // RIVNING PAKET C (2026-09-17, rad 2.12): QuoteNewAIHelper (foto-analys +
+  // fritext-generering INNE i editorn) borttagen — AI-vägen är intaget
+  // (QuickIntake → buildQuickDraft). sourceImageBase64/aiTextInput/
+  // photoDescription/showAiHelper/analyzePhoto/generateFromText hörde bara
+  // till den panelen och togs bort med den.
   const [aiPriceWarning, setAiPriceWarning] = useState<{ message: string; link: string } | null>(null)
   const [aiPhotoCount, setAiPhotoCount] = useState(0)
   const MAX_PHOTOS = 5
@@ -355,10 +349,10 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [showUnitPrices, setShowUnitPrices] = useState(true)
   const [showQuantities, setShowQuantities] = useState(true)
 
-  // Template save modal
+  // Template save modal. RIVNING PAKET C (2026-09-17, rad 2.20):
+  // templateName/savingTemplate (det fria mallnamnet + dess egen sparning)
+  // är borta — se QuoteSaveTemplateModal.tsx:s docblock.
   const [showSaveTemplateModal, setShowSaveTemplateModal] = useState(false)
-  const [templateName, setTemplateName] = useState('')
-  const [savingTemplate, setSavingTemplate] = useState(false)
   const [templateId, setTemplateId] = useState<string | undefined>(undefined)
   // Explicit jobbtyp från kopplad deal. Sparas på offerten så samma
   // Outcome Quality Gate-nyckel finns kvar vid kontrollen före utskick.
@@ -369,7 +363,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [businessDefaultStyle, setBusinessDefaultStyle] = useState<'modern' | 'premium' | 'friendly'>('modern')
 
   // Modals & search
-  const [showGrossistSearch, setShowGrossistSearch] = useState(false)
   // Spara-i-prislistan modal — vilken offertrad som ska sparas
   const [productModalRow, setProductModalRow] = useState<QuoteItem | null>(null)
   const [savingProduct, setSavingProduct] = useState(false)
@@ -387,8 +380,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [showDisplaySettings, setShowDisplaySettings] = useState(false)
 
   // Custom categories — inline create
-  const [showNewCategoryInput, setShowNewCategoryInput] = useState<string | null>(null)
-  const [newCategoryLabel, setNewCategoryLabel] = useState('')
 
   // Attachments — `url` är en KORTLIVAD signerad länk bara för visning i det
   // här passet; `path` är storage-pathen som faktiskt ska sparas
@@ -416,15 +407,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   // ETAPP 2b (offert-masterplan.md): canvas-first-layouten. `activePanel`
   // styr "Mer"-verktygsraden ovanför dokumentet — en sektion synlig i taget,
-  // inte modal (hantverkaren ska se dokumentet samtidigt). `mainView` växlar
-  // huvudytan mellan dokument-canvasen och radeditorn ("Listvy") — canvas
-  // är default när live-läget finns, annars listvy (satt en gång när datan
-  // laddat klart, se effekten nedan).
+  // inte modal (hantverkaren ska se dokumentet samtidigt).
+  //
+  // RIVNINGEN PAKET A (2026-09-17): `mainView` och växeln Dokument/Listvy är
+  // borta. Dokumentet är alltid huvudytan.
   const [activePanel, setActivePanel] = useState<
     null | 'stil' | 'villkor' | 'betalplan' | 'visning' | 'bilagor' | 'rot'
   >(null)
-  const [mainView, setMainView] = useState<'document' | 'list'>('document')
-  const mainViewInitialized = useRef(false)
   // ETAPP 1f: inline-bekräftelse för "beskrivning saknas" (ersätter den
   // gamla descriptionWarningShownRef-vägen — se useQuoteBuilderSave/QuoteBuilderHeader).
   const [sendConfirmPending, setSendConfirmPending] = useState(false)
@@ -439,13 +428,21 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   //
   // FAS 1 (offert-omtaget, 2026-08-31): 'review'/'overview' är BORTA.
   // Grundaren konstaterade att den tvingade steg-för-steg-granskningen inte
-  // fungerade i praktiken — koden höll själv med (SKIP_SEQUENCE_AFTER i
-  // lib/quotes/quick-preferences.ts kopplade bort den efter fem offerter).
+  // fungerade i praktiken — koden höll själv med (den dåvarande
+  // startvanan kopplade bort granskningen efter fem offerter).
   // AI-utkast, blankt eller mall landar nu ALLA direkt i den fulla
-  // canvas-editorn (quickMode = null) via finishQuickStart() nedan — se
-  // completenessSummaries/QuoteCompletenessStrip för vad som ersatte
-  // kvittots granskningskrav: en alltid synlig, icke-blockerande chip-rad.
-  const [quickMode, setQuickMode] = useState<'intake' | 'blank' | 'building' | null>(null)
+  // canvas-editorn (quickMode = null) via finishQuickStart() nedan.
+  // RIVNING PAKET C (2026-09-17, rad 2.16): completeness-remsan/chip-raden
+  // som ersatte kvittots granskningskrav är själv borttagen — Skicka-
+  // knappens egen orsakstext ("Välj kund först") räcker.
+  const [quickMode, setQuickMode] = useState<'intake' | 'building' | 'fragor' | null>(null)
+  // Frågeflödet per jobbtyp (2026-09-17): upplägget är hämtat och verifierat
+  // men INTE inlagt förrän frågorna är besvarade eller hoppade över. Sätts
+  // och töms alltid tillsammans med quickMode 'fragor'; returläget är det
+  // hantverkaren stod i när upplägget trycktes (intaget eller editorn).
+  const [pendingIntake, setPendingIntake] = useState<{ start: JobTypeStart; questions: IntakeQuestion[]; choiceArticles: IntakeChoiceArticle[] } | null>(null)
+  const intakeReturnMode = useRef<'intake' | 'building' | null>(null)
+  const [intakeAnswers, setIntakeAnswers] = useState<IntakeAnswerSet | null>(null)
   /** Snabbofferten öppnas automatiskt EN gång vid kallstart. Utan den här
       vakten hade "Öppna fullständiga editorn" (som sätter quickMode = null)
       studsat tillbaka in i intaget direkt. */
@@ -453,13 +450,10 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const [quickInput, setQuickInput] = useState('')
   const jobStartSnapshot = useRef<QuoteStartSnapshot>({ items, jobType: quoteJobType, input: quickInput, mode: quickMode, busy: false })
   jobStartSnapshot.current = { items, jobType: quoteJobType, input: quickInput,
-    mode: `${quickMode}`, busy: generating || quickMode === 'building',
+    mode: `${quickMode}`, busy: quickMode === 'building',
     formSignature: JSON.stringify([selectedCustomer, title, description, notIncluded, ataTerms, paymentTermsText,
       termsText, paymentPlan, detailLevel, showUnitPrices, showQuantities, pricingSettings?.hourly_rate, templateId]),
   }
-  /** Vilket ämne chip-raden senast bads scrolla till — se scrollToSection
-      och effekten som konsumerar den, längre ner. */
-
   // ─── Shared hooks ──────────────────────────────────────────────────
   const {
     products,
@@ -500,11 +494,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     addItem,
     updateItem,
     removeItem,
-    moveItem,
     moveItemById,
-    dndSensors,
-    handleDragEnd,
-    addFromGrossist,
     applyProductToRow,
     addFromProductBank,
   } = useQuoteItems(items, setItems, localCustomCategories, !!pricingSettings)
@@ -532,38 +522,24 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   const hasRotItems = items.some(i => i.is_rot_eligible)
   const hasRutItems = items.some(i => i.is_rut_eligible)
 
-  // Statusprickar för Mer-raden — sju offertfält bor bara bakom den, och utan
-  // markering måste hantverkaren öppna varje panel för att veta vad som är
-  // ifyllt. Det var halva "man får inte med allt".
+  // Statusprickar för Mer-raden. Rivning paket B (2026-09-17, rad 2.3–2.6,
+  // 2.10): Stil/Villkor & texter/ROT-detaljer är inte längre egna paneler
+  // (se panel-status.ts) — kvar är bara de tre fälten de tre återstående
+  // panelerna faktiskt behöver.
   const merPanelStatus = useMemo(
     () =>
       panelStatus({
-        notIncluded,
-        termsText,
-        ataTerms,
-        paymentTermsText,
-        referencePerson,
-        customerReference,
-        projectAddress,
         paymentPlanCount: paymentPlan.length,
         paymentPlanValid,
         detailLevel,
         showUnitPrices,
         showQuantities,
         attachmentCount: attachments.length,
-        templateStyle,
-        hasRotItems,
-        hasRutItems,
-        personnummer,
-        fastighetsbeteckning,
       }),
     [
-      notIncluded, termsText, ataTerms, paymentTermsText,
-      referencePerson, customerReference, projectAddress,
       paymentPlan.length, paymentPlanValid,
       detailLevel, showUnitPrices, showQuantities,
-      attachments.length, templateStyle,
-      hasRotItems, hasRutItems, personnummer, fastighetsbeteckning,
+      attachments.length,
     ],
   )
 
@@ -574,91 +550,30 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // alla på en gång. Att räkna en i taget hade krävt fyra memon som ändå
   // beror på samma state.
   //
-  // itemsWithoutPrice räknar bara riktiga 'item'/'option'-rader: en rubrik
-  // eller fritextrad har aldrig ett pris, och att flagga dem hade gett en
-  // varning på varenda välbyggd offert.
-  const completenessSummaries = useMemo(() => {
-    const priceable = items.filter(i => {
-      const t = i.item_type || 'item'
-      return t === 'item' || t === 'option'
-    })
-    const input = {
-      itemCount: items.length,
-      itemsWithoutPrice: priceable.filter(i => !i.unit_price).length,
-      notIncludedFilled: notIncluded.trim().length > 0,
-      reservationCount: reservations.snapshot.length,
-      reservationSuggestions: reservations.suggestions.length,
-      amountToPay:
-        totals.gronBase > 0
-          ? totals.customerPaysAfterDeductions
-          : hasRotItems
-            ? totals.rotCustomerPays
-            : hasRutItems
-              ? totals.rutCustomerPays
-              : totals.total,
-      deductionMissingPersonnummer: hasRotItems && !personnummer.trim(),
-      paymentPlanValid,
-      hasPaymentPlan: paymentPlan.length > 0,
-    }
-    return Object.fromEntries(
-      SECTION_ORDER.map(s => [s, sectionSummary(s, input)]),
-    ) as Record<QuoteSection, ReturnType<typeof sectionSummary>>
-  }, [
-    items, notIncluded, reservations.snapshot.length, reservations.suggestions.length,
-    totals, hasRotItems, hasRutItems, personnummer, paymentPlanValid, paymentPlan.length,
-  ])
-
-  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): completeness-
-  // remsan (header rad 2 + bottenfältets chip-rad) ska döljas HELT — inte
-  // bara sin attention/amber-styling — tills offerten har meningsfullt
-  // innehåll. Utan detta visade mobilens bottenfält en amber "Offerten har
-  // inga rader"-chip precis ovanpå Fas E:s lugna, inbjudande tomt-läge i
-  // canvasen — två motsägande budskap på exakt samma skärm vid den absolut
-  // vanligaste "dag ett"-vägen (ny offert, noll rader, mobil).
-  const hasQuoteContent = items.length > 0 || !!selectedCustomer
+  // RIVNING PAKET C (2026-09-17, rad 2.16): completenessSummaries
+  // (sectionSummary/SECTION_ORDER, lib/quotes/quote-completeness.ts) och
+  // hasQuoteContent (som bara gated completeness-remsan/chip-raden) är
+  // borttagna med QuoteCompletenessStrip och bottenfältets chip-rad —
+  // Skicka-knappens egen orsakstext ("Välj kund först") räcker.
 
   /**
-   * Chip-radens klick-mål: scrollar till ämnet i dokumentet via
-   * QuoteDocuments `data-section`-attribut, som redan sätts på varje
-   * sektion OAVSETT fokus (se QuoteDocument.tsx) — samma hake som den
-   * borttagna granskningssekvensens auto-scroll använde, nu utlöst
-   * on-demand av ett klick i stället för av ett kontinuerligt useEffect på
-   * `quickSection`. Byter till dokumentvyn först om listvyn är aktiv,
-   * eftersom `data-section` bara finns i canvas-renderingen.
+   * Scrollar till ett ämne i dokumentet via QuoteDocuments `data-section`-
+   * attribut, som redan sätts på varje sektion OAVSETT fokus (se
+   * QuoteDocument.tsx) — samma hake som den borttagna granskningssekvensens
+   * auto-scroll använde.
+   *
+   * RIVNING PAKET C (2026-09-17, rad 2.16): den enda anroparen
+   * (completeness-chipparna i header och bottenfält) är borttagen.
+   * Funktionen behålls, oanropad, som den enda vägen in i `data-section` —
+   * se useQuoteSectionNavigation.ts.
    */
-  const showDocument = useCallback(() => setMainView('document'), [])
-  const scrollToSection = useQuoteSectionNavigation(showDocument)
+  const scrollToSection = useQuoteSectionNavigation()
 
   const selectedCustomerObj = useMemo(
     () => customers.find(c => c.customer_id === selectedCustomer) || null,
     [customers, selectedCustomer],
   )
 
-  // ─── Custom category creation (new-vyn unique) ────────────────────
-  async function createCustomCategory(label: string, itemId: string) {
-    const slug =
-      'custom_' + label.toLowerCase().replace(/[^a-zåäö0-9]/g, '_').replace(/_+/g, '_')
-    const { data, error } = await supabase
-      .from('custom_quote_categories')
-      .insert({
-        business_id: business.business_id,
-        slug,
-        label,
-        rot_eligible: false,
-        rut_eligible: false,
-      })
-      .select('*')
-      .single()
-    if (error) {
-      toast.error('Kunde inte skapa kategori')
-      return
-    }
-    const newCat = data as CustomCategory
-    setLocalCustomCategories(prev => [...prev, newCat])
-    updateItem(itemId, 'category_slug', newCat.slug)
-    setShowNewCategoryInput(null)
-    setNewCategoryLabel('')
-  }
 
   // ─── EN preview-pipeline (ETAPP 1a, offert-masterplan.md) ─────────
   // quoteTemplateData (→ ModernCanvas) och templatePreviewPayload (→
@@ -863,14 +778,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
 
   const liveAvailable = (templateStyle || businessDefaultStyle) === 'modern'
 
-  // ETAPP 2b: mainView-defaulten sätts EN gång när data laddat klart —
-  // canvas när live-läget finns, annars listvy (se komponentens state ovan).
-  useEffect(() => {
-    if (!loading && !mainViewInitialized.current) {
-      mainViewInitialized.current = true
-      setMainView(liveAvailable ? 'document' : 'list')
-    }
-  }, [loading, liveAvailable])
 
   // ETAPP 2a (offert-masterplan.md), punkt 6: id-baserade liveHandlers —
   // ersätter tidigare index-mutation. Återanvänder useQuoteItems' egna
@@ -928,13 +835,21 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       },
       onItemMove: moveItemById,
       onReservationRemove: reservations.removeReservation,
+      // Rivning paket B (2026-09-17, rad 2.5/2.6): avdragsväxeln flyttad
+      // från den borttagna QuoteTotalsSection — samma anrop, ny plats.
+      onDeductionTypeChange: type => setItems(prev => applyGlobalDeductionType(prev, type)),
     }),
     [
       setTitle, setDescription, setPaymentTermsText, setTermsText, setValidDays, setDiscountPercent,
       setNotIncluded, setAtaTerms, updateItem, addItem, removeItem, items, moveItemById,
-      reservations.removeReservation,
+      reservations.removeReservation, setItems,
     ],
   )
+
+  // Rivning paket B (2026-09-17, rad 2.5/2.6): samma prioritetsordning som
+  // QuoteTotalsSection tidigare använde (ROT går före RUT om båda skulle
+  // förekomma via radvis cykling) — dokumentets avdragsväxel visar detta.
+  const activeDeductionType: 'rot' | 'rut' | null = hasRotItems ? 'rot' : hasRutItems ? 'rut' : null
 
   // ═══════════════════════════════════════════════════════════════════
   // Data fetching
@@ -963,22 +878,32 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     if (searchParams?.get('relief') && !reliefDraft) setReliefError('Det överlämnade underlaget kunde inte läsas i den här sessionen. Gå tillbaka till ditt underlag eller beskriv jobbet här.')
     if (reliefDraft?.intent === 'quote') {
       setQuickInput(reliefDraft.text)
-      setAiTextInput(reliefDraft.text)
       setSourceTranscript(reliefDraft.text)
     }
-    const transcript = searchParams?.get('transcript')
-    const customerId = searchParams?.get('customerId') || searchParams?.get('customer_id')
-    const prefillTitle = searchParams?.get('title')
-    const prefillDescription = searchParams?.get('description')
-    const dealId = searchParams?.get('deal_id')
+    // EN läsare för adressraden (rivningen A3): lib/quotes/start-params.ts.
+    const { transcript, customerId, title: prefillTitle, description: prefillDescription, dealId, preparationId } = readQuoteStartParams(searchParams)
     if (transcript) {
       setSourceTranscript(transcript)
-      setAiTextInput(transcript)
-      setShowAiHelper(true)
+      // RIVNING PAKET C (2026-09-17, rad 2.12): öppnade tidigare den
+      // borttagna AI-hjälpen (setShowAiHelper) med texten förifylld —
+      // AI-vägen är intaget, så en ?transcript=-djuplänk öppnar det i
+      // stället, med texten redan i rutan.
+      setQuickInput(prev => prev || transcript)
+      setQuickMode('intake')
     }
     if (customerId) setSelectedCustomer(customerId)
     if (prefillTitle) setTitle(prefillTitle)
-    if (prefillDescription) setDescription(prefillDescription)
+    // Beskrivningen når intagets ruta också — förut stod den bara på
+    // offerten medan intaget öppnade tomt.
+    if (prefillDescription) { setDescription(prefillDescription); setQuickInput(prev => prev || prefillDescription) }
+    // Kundunderlaget (?preparation_id): direkt i rutan, ingen panel. Samma
+    // tre fält som panelens "Lägg till svaren i offertunderlaget" fyllde.
+    if (customerId && preparationId) {
+      void loadPreparationQuoteInput(customerId, preparationId).then(text => {
+        setQuickInput(previous => [previous, text].filter(Boolean).join('\n\n'))
+        setSourceTranscript(previous => [previous, text].filter(Boolean).join('\n\n'))
+      }).catch(err => setReliefError(`${err instanceof Error ? err.message : 'Kunde inte läsa kundunderlaget.'} Öppna kundkortet.`))
+    }
     if (!referencePerson && business.contact_name) setReferencePerson(business.contact_name)
     if (dealId && customerId) fetchDealDocuments(customerId)
     // Deal-lookup (Etapp 2): körs bara en gång per mount (ref-flagga skyddar
@@ -1220,6 +1145,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       setFastighetsbeteckning(loaded.fastighetsbeteckning)
       setDiscountPercent(loaded.discountPercent)
       setValidDays(loaded.validDays)
+      // RIVNING PAKET C (2026-09-17, rad 2.20): quoteJobType (redan
+      // create-lägets state) återanvänds i edit-läge för "Spara som
+      // upplägg för jobbtypen" — samma kolumn (quotes.job_type), bara en
+      // ny läsare (loadEditQuote.ts).
+      setQuoteJobType(loaded.jobType)
 
       setLoading(false)
       // Samma 500ms-marginal som gamla edit-sidan: låter alla setState-
@@ -1491,7 +1421,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // mobilkamerabild (3-8 MB) blir 4-11 MB som base64 och spränger både
   // Vercels ~4,5 MB request-gräns och Anthropics 5 MB/bild-gräns. Gäller
   // ALLA foto-inläsningsvägar (kamera, galleri, "+"-rutan) — de går alla
-  // genom denna enda funktion (QuoteNewAIHelper → onPhotoFile).
+  // genom denna enda funktion (Snabbofferten/QuickIntake → onPhotoFile).
   async function handlePhotoFile(file: File) {
     if (!file.type.startsWith('image/')) return
     if (photos.length >= MAX_PHOTOS) {
@@ -1537,75 +1467,12 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     }
   }
 
-  async function analyzePhoto() {
-    if (photos.length === 0) return
-    const images = photos.map(p => p.split(',')[1])
-    setSourceImageBase64(images[0])
-    setGenerating(true)
-    try {
-      const response = await fetch('/api/quotes/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          images,
-          textDescription: photoDescription || undefined,
-          customerId: selectedCustomer || undefined,
-          jobType: quoteJobType || undefined,
-          templateId: templateId || undefined,
-        }),
-      })
-      const data = await response.json()
-      if (data.success) {
-        applyAiResult(data.quote)
-        setAiPriceWarning(data.priceWarning || null)
-        setAiPhotoCount(data.photoCount || photos.length)
-        // B6: spara de analyserade fotona som bilagor på offerten i stället
-        // för att bara slänga dem — hantverkarens dokumentation ska finnas
-        // kvar. Görs innan `setPhotos([])` nedan.
-        const uploaded = await Promise.all(photos.map((p, i) => uploadPhotoAsAttachment(p, i)))
-        const newAttachments = uploaded.filter((a): a is { name: string; url: string; size: number } => !!a)
-        if (newAttachments.length > 0) {
-          setAttachments(prev => [...prev, ...newAttachments])
-        }
-        setPhotos([])
-        setPhotoDescription('')
-      } else {
-        toast.error(data.error || 'AI-generering misslyckades')
-      }
-    } catch (err) {
-      console.error('AI generation failed:', err)
-      toast.error('Nätverksfel vid AI-generering')
-    }
-    setGenerating(false)
-  }
-
-  async function generateFromText(text?: string) {
-    const inputText = text || aiTextInput
-    if (!inputText.trim()) return
-    setGenerating(true)
-    try {
-      const body: Record<string, string> = { textDescription: inputText }
-      if (sourceImageBase64) body.imageBase64 = sourceImageBase64
-      if (quoteJobType) body.jobType = quoteJobType
-      if (templateId) body.templateId = templateId
-      const response = await fetch('/api/quotes/ai-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await response.json()
-      if (data.success) {
-        setSourceTranscript(inputText)
-        applyAiResult(data.quote)
-      } else {
-        toast.error(data.error || 'AI-generering misslyckades')
-      }
-    } catch (err) {
-      console.error('AI generation failed:', err)
-      toast.error('Nätverksfel vid AI-generering')
-    }
-    setGenerating(false)
-  }
+  // RIVNING PAKET C (2026-09-17, rad 2.12): analyzePhoto/generateFromText
+  // (foto-analys och fritext-generering INNE i editorn, bakom den
+  // borttagna QuoteNewAIHelper-panelen) är borttagna — AI-vägen är intaget
+  // (QuickIntake → buildQuickDraft nedan), som redan pratar med samma
+  // /api/quotes/ai-generate och redan tar emot foton (photos-state, delad
+  // med intaget). Två AI-ingångar in i EN.
 
   // ═══ SNABBOFFERTEN: bygg utkastet ═══════════════════════════════════
   //
@@ -1656,6 +1523,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       setSourceTranscript(inputText)
       applyAiResult(data.quote)
       setAiPriceWarning(data.priceWarning || null)
+      // RIVNING PAKET C (2026-09-17, rad 2.12): "Baserad på X foton"-chippen
+      // i headern (QuoteBuilderHeader) hörde tidigare bara till den
+      // borttagna analyzePhoto-vägen — intaget är nu den enda foto+AI-vägen,
+      // så räkningen flyttar hit.
+      if (photos.length > 0) setAiPhotoCount(data.photoCount || photos.length)
 
       // Fotona sparas som bilagor i stället för att slängas — samma väg som
       // AI-hjälpen (B6). Fail-soft: en misslyckad uppladdning får aldrig
@@ -1673,17 +1545,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       toast.error('Nätverksfel — försök igen')
       setQuickMode('intake')
     }
-  }
-
-  /** Blank-starten (2026-08-14) — kund+titel är redan satta av QuickBlankStart
-   *  via title/setTitle och selectedCustomer/setSelectedCustomer direkt (samma
-   *  page-state, ingen kopia). items är redan [] (ny offert). Nollställer bara
-   *  AI-relaterade fält defensivt innan den fulla editorn öppnas utan innehåll. */
-  function startBlankQuickDraft() {
-    if (!title.trim()) return
-    setDescription('')
-    setSourceTranscript('')
-    finishQuickStart()
   }
 
   // ═══════════════════════════════════════════════════════════════════
@@ -1754,12 +1615,73 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     if (!canApplyJobTypeStart(before, jobStartSnapshot.current)) {
       throw new Error('Du har börjat ändra offerten. Dina ändringar behålls; inget underlag har lagts in.')
     }
-    // Samma mallhandler, prisresolver och reservationshook som alla andra
-    // mallstarter. Rör INTE kund, affär, titel/beskrivning som redan finns.
+    // Frågeflödet (2026-09-17): har jobbtypen frågor öppnas de INNAN upplägget
+    // läggs in, så svaren kan sätta mängderna i samma klon. Ett läsfel är ett
+    // fel (remsan visar "Försök igen"), aldrig ett tyst hopp förbi frågorna.
+    const intake = await fetchIntakeQuestions(start.selection.jobTypeSlug, signal)
+    if (signal.aborted) return
+    if (intake.questions.length > 0) {
+      intakeReturnMode.current = quickMode === 'fragor' ? null : quickMode
+      setPendingIntake({ start, questions: intake.questions, choiceArticles: intake.choiceArticles ?? [] })
+      setQuickMode('fragor')
+      return
+    }
+    applyVerifiedJobTypeStart(start, null)
+  }
+
+  /**
+   * Samma mallhandler, prisresolver och reservationshook som alla andra
+   * mallstarter. Rör INTE kund, affär, titel/beskrivning som redan finns.
+   * Med svar: mängder och tillval sätts i klonen FÖRE prisresolvern, så
+   * radernas totaler räknas på de riktiga mängderna. Svaren sparas
+   * strukturerat på offerten och som text till Matte (source_transcript);
+   * kundens beskrivning rörs inte.
+   */
+  function applyVerifiedJobTypeStart(
+    verified: JobTypeStart,
+    answered: { questions: IntakeQuestion[]; answers: IntakeAnswers } | null,
+    choiceArticles: IntakeChoiceArticle[] = []
+  ) {
+    const set = answered ? buildIntakeAnswerSet(verified.selection.jobTypeSlug, answered.questions, answered.answers) : null
+    /**
+     * Raden ett valt alternativ lägger in. Byggs HÄR och inte i den rena
+     * modulen, som varken känner radens fulla form eller artikelregistret.
+     * Formen är exakt mallradens, så raddelningen arbete/material/resa,
+     * prisresolvern, ROT-basen och dokumentet fungerar oförändrade — det är
+     * hela vinsten med att återanvända radformen i stället för att uppfinna
+     * en egen "artikelrad".
+     */
+    const buildRow = (input: { choice: { productId?: string }; rowId: string }) => {
+      const artikel = choiceArticles.find(a => a.id === input.choice.productId)
+      if (!artikel) return null
+      return {
+        id: input.rowId,
+        item_type: 'item',
+        description: artikel.name,
+        unit: artikel.unit,
+        quantity: 1,
+        unit_price: artikel.salesPrice,
+        linked_product_id: artikel.id,
+      } as (typeof verified.template.default_items extends (infer R)[] | undefined ? R : never)
+    }
+    const start: JobTypeStart = set && answered
+      ? { ...verified, template: { ...verified.template, default_items: applyIntakeAnswers(verified.template.default_items ?? [], answered.questions, answered.answers, { buildRow }) } }
+      : verified
     setQuoteJobType(start.selection.jobTypeSlug)
     handleNewTemplateSelect(start.template, start.products)
+    setIntakeAnswers(set)
+    if (set) {
+      const text = intakeAnswersText(set)
+      setSourceTranscript(prev => prev && prev.trim() ? `${prev.trim()}\n\n${text}` : text)
+    }
     setJobStartApplied(true)
+    setPendingIntake(null)
     finishQuickStart()
+  }
+
+  function leaveIntakeFlow() {
+    setPendingIntake(null)
+    setQuickMode(intakeReturnMode.current)
   }
 
   // Fyll på från jobbtyp (2026-09-17): offerten har redan rader, nu ska en
@@ -1992,26 +1914,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     setSavingProduct(false)
   }
 
-  function addQuickstartRow(row: QuickstartRow) {
-    setItems(prev => [
-      ...prev,
-      {
-        id: generateItemId(),
-        item_type: 'item',
-        description: row.name,
-        quantity: 1,
-        unit: row.unit,
-        unit_price: row.sales_price,
-        total: row.sales_price,
-        category_slug: row.category_slug,
-        is_rot_eligible: row.is_rot_eligible,
-        is_rut_eligible: row.is_rut_eligible,
-        rot_rut_type: row.is_rot_eligible ? 'rot' : row.is_rut_eligible ? 'rut' : null,
-        sort_order: prev.length,
-      },
-    ])
-  }
-
   function buildProductInitialValues(row: QuoteItem): ProductInitialValues {
     return {
       name: row.description,
@@ -2078,6 +1980,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             sourceTranscript,
             templateId,
             quoteJobType,
+            intakeAnswers,
             dealId: dealIdFromQuery,
             leadId: leadIdFromQuery,
           }),
@@ -2087,12 +1990,19 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     businessId: business.business_id,
     scope: searchParams?.toString() || 'blank',
     enabled: !isEditMode && !loading && dealContextReady,
-    value: { context: getQuoteContext(), items, quickInput, photos, aiTextInput, aiBedomning },
-    hasContent: items.length > 0 || photos.length > 0 || attachments.length > 0 || [title, description, quickInput, aiTextInput, notIncluded, projectAddress].some(value => !!value.trim()),
+    // Rivningen A3: kopian läggs på plats direkt, ingen helskärmsfråga först.
+    autoRestore: true,
+    onReset: () => {
+      setItems([]); setTitle(''); setDescription(''); setQuickInput(''); setPhotos([]); setAiBedomning(null)
+      setSourceTranscript(null); setAiGenerated(false); setIntakeAnswers(null); setQuoteJobType(null); setFirstWorkId(undefined)
+      setQuickMode('intake')
+    },
+    value: { context: getQuoteContext(), items, quickInput, photos, aiBedomning },
+    hasContent: items.length > 0 || photos.length > 0 || attachments.length > 0 || [title, description, quickInput, notIncluded, projectAddress].some(value => !!value.trim()),
     onRestore: saved => {
       const c = saved.context
       if (!c || !Array.isArray(saved.items) || !Array.isArray(saved.photos) || !Array.isArray(c.reservationsSnapshot) || !Array.isArray(c.paymentPlan) || !Array.isArray(c.attachments)
-        || [c.title,c.description,c.selectedCustomer,c.notIncluded,c.ataTerms,c.paymentTermsText,c.termsText,c.referencePerson,c.customerReference,c.projectAddress,c.personnummer,c.fastighetsbeteckning,saved.quickInput,saved.aiTextInput].some(value => typeof value !== 'string')
+        || [c.title,c.description,c.selectedCustomer,c.notIncluded,c.ataTerms,c.paymentTermsText,c.termsText,c.referencePerson,c.customerReference,c.projectAddress,c.personnummer,c.fastighetsbeteckning,saved.quickInput].some(value => typeof value !== 'string')
         || [c.vatRate,c.discountPercent,c.validDays].some(value => !Number.isFinite(value))) throw new Error('Invalid recovery')
       setFirstWorkId(c.firstWorkId); setItems(saved.items); setSelectedCustomer(c.selectedCustomer); setTitle(c.title); setDescription(c.description)
       setPricingSettings(previous => previous ? { ...previous, vat_rate: c.vatRate } : previous); setDiscountPercent(c.discountPercent); setNotIncluded(c.notIncluded)
@@ -2103,8 +2013,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       setPersonnummer(c.personnummer); setFastighetsbeteckning(c.fastighetsbeteckning); setValidDays(c.validDays)
       setTemplateStyle(c.templateStyle); setAttachments(c.attachments); setTemplateId(c.templateId)
       setAiGenerated(!!c.aiGenerated); setAiConfidence(c.aiConfidence ?? null); setSourceTranscript(c.sourceTranscript ?? null)
-      setQuoteJobType(c.quoteJobType ?? null); setQuickInput(saved.quickInput); setPhotos(saved.photos)
-      setAiTextInput(saved.aiTextInput); setAiBedomning(saved.aiBedomning)
+      setQuoteJobType(c.quoteJobType ?? null); setIntakeAnswers(c.intakeAnswers ?? null); setQuickInput(saved.quickInput); setPhotos(saved.photos)
+      setAiBedomning(saved.aiBedomning)
       setQuickMode(saved.items.length ? null : 'intake')
     },
   })
@@ -2139,45 +2049,12 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     templateStyle, attachments,
   ])
 
-  async function saveAsTemplate() {
-    if (!templateName.trim()) return
-    setSavingTemplate(true)
-    try {
-      const response = await fetch('/api/quote-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: templateName,
-          description,
-          // Upplägget hör till offertens jobbtyp — annars hamnar det under
-          // "Övriga upplägg" och ingen hittar det nästa gång.
-          job_type_slug: quoteJobType || null,
-          default_items: recalculateItems(items),
-          default_payment_plan: paymentPlan,
-          not_included: notIncluded || null,
-          ata_terms: ataTerms || null,
-          payment_terms_text: paymentTermsText || null,
-          terms_text: termsText || null,
-          detail_level: detailLevel,
-          show_unit_prices: showUnitPrices,
-          show_quantities: showQuantities,
-          rot_enabled: hasRotItems,
-          rut_enabled: hasRutItems,
-        }),
-      })
-      if (!response.ok) {
-        const result = await response.json().catch(() => ({}))
-        throw new Error(result.error || 'Kunde inte spara mallen')
-      }
-      toast.success('Mall sparad!')
-      setShowSaveTemplateModal(false)
-      setTemplateName('')
-    } catch (err) {
-      console.error('Failed to save template:', err)
-      toast.error(err instanceof Error ? err.message : 'Kunde inte spara mallen')
-    }
-    setSavingTemplate(false)
-  }
+  // RIVNING PAKET C (2026-09-17, rad 2.20): saveAsTemplate (POST till det
+  // fria, jobbtyp-lösa /api/quote-templates) är borttagen — "Spara som
+  // mall" är nu "Spara som upplägg för jobbtypen" och sparar via
+  // SaveJobStandardFromQuote inne i QuoteSaveTemplateModal (se dess
+  // docblock). /api/quote-templates-routen själv och mallistan i
+  // Inställningar rörs inte (rad 3.10, kräver Andreas).
 
   // ═══════════════════════════════════════════════════════════════════
   // Render
@@ -2186,13 +2063,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   // Startsteget döljs så fort NÅGON styrsignal redan pekat ut vad offerten
   // ska bli — transcript (AI-flödet öppnas redan automatiskt ovan),
   // deal/lead-koppling, vald kund, eller en förifylld titel.
-  const hasQuoteStartSignal = !!(
-    firstQuoteIntent ||
-    searchParams?.get('transcript') ||
-    searchParams?.get('deal_id') || searchParams?.get('lead_id') ||
-    searchParams?.get('customerId') || searchParams?.get('customer_id') ||
-    searchParams?.get('title')
-  )
+  const hasQuoteStartSignal = !!firstQuoteIntent || startSignalOf(readQuoteStartParams(searchParams))
   /**
    * KALLSTART GÅR DIREKT TILL SNABBOFFERTEN (2026-08-06).
    *
@@ -2221,53 +2092,28 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   useEffect(() => {
     if (isEditMode || loading || !coldStart || quickMode !== null || quickStartDoneRef.current) return
     quickStartDoneRef.current = true
-
-    // Etapp D2: hantverkarens egen vana väger tyngre än vårt default. Den som
-    // svarat ja på "vill du alltid börja så här?" slipper mellansteget.
-    const preferred = getPreferredStart()
-    if (preferred === 'editor') return          // stanna i offertskaparen
+    // En kallstart öppnar alltid intaget. Ingen sparad vana att läsa.
     setQuickMode('intake')
   }, [loading, coldStart, quickMode])
 
   /**
-   * Etapp D2: den väg ut ur Snabbofferten som hantverkaren just tagit för
-   * tredje gången. Sätts av utgångarna nedan och visar frågan EN gång.
-   */
-  const [askPreferredFor, setAskPreferredFor] = useState<EscapeRoute | null>(null)
-
-  /**
-   * Hantverkarens sparade startläge. Läses en gång efter montering — inte i
-   * en useState-initierare, eftersom localStorage inte finns under
-   * serverrenderingen och värdena då skulle skilja sig mellan server och
-   * klient.
-   *
-   * Används bara för att kunna ta sig TILLBAKA till Snabbofferten. Den som
-   * svarat "börja alltid i offertskaparen" hade annars ingen väg dit igen —
-   * och banderollen lovar uttryckligen att man kan ändra sig.
-   */
-  const [preferredStart, setPreferredStartState] = useState<StartMode>('quick')
-  useEffect(() => { setPreferredStartState(getPreferredStart()) }, [])
-
-  /**
-   * Tar hand om en väg ut ur Snabbofferten: räknar, och frågar vid tredje.
+   * Lämnar Snabbofferten och bär med sig det som skrivits.
    *
    * `carryText` finns för att inget skrivet ska gå förlorat. Skriver man halva
    * beskrivningen i intaget och sedan byter till offertskaparen låg texten
    * tidigare kvar i quickInput utan att någonsin tillämpas — och eftersom det
    * inte finns någon väg tillbaka till intaget var den i praktiken tappad.
+   *
+   * Räknandet av utgångar och frågan "vill du alltid börja så här?" är borta
+   * (rivningen paket A, 2026-09-17) — se kommentaren vid importerna.
    */
-  function leaveQuickMode(route: EscapeRoute, carryText: boolean) {
+  function leaveQuickMode(carryText: boolean) {
     jobStartAttempted.current = true
-    if (carryText) {
-      const typed = quickInput.trim()
-      // Skriver aldrig över något som redan står där.
-      if (typed && !description.trim()) setDescription(typed)
-      if (typed && !sourceTranscript) setSourceTranscript(typed)
-    }
-    const count = recordEscape(route)
-    if (shouldAskPreferred(count, hasBeenAskedPreferred(route))) {
-      setAskPreferredFor(route)
-    }
+    if (!carryText) return
+    const typed = quickInput.trim()
+    // Skriver aldrig över något som redan står där.
+    if (typed && !description.trim()) setDescription(typed)
+    if (typed && !sourceTranscript) setSourceTranscript(typed)
   }
 
   if (loading) {
@@ -2278,21 +2124,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
     )
   }
 
-  if (!isEditMode && recovery.pending) return (
-    <main className="mx-auto max-w-xl p-6 pt-12">
-      <div className="rounded-2xl border border-teal-200 bg-white p-6 shadow-sm">
-        <p className="text-sm font-medium text-teal-700">Fortsätt där du slutade</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-900">Du har en påbörjad offert</h1>
-        <p className="mt-3 text-sm text-slate-600">En återställningskopia finns i den här fliken från {new Date(recovery.pending.savedAt).toLocaleTimeString('sv-SE')}. Den är inte ett bekräftat serverutkast.</p>
-        {recovery.status && <p role="status" className="mt-3 text-sm text-amber-800">{recovery.status}</p>}
-        <div className="mt-6 flex flex-wrap gap-3">
-          <button type="button" onClick={recovery.restore} className="min-h-[48px] rounded-xl bg-teal-700 px-4 font-medium text-white">Återställ arbetet</button>
-          <button type="button" onClick={recovery.discard} className="min-h-[48px] rounded-xl border px-4 text-slate-600">Börja om och ta bort kopian</button>
-        </div>
-      </div>
-    </main>
-  )
-
   // EDIT-LÄGE (Fas 2, offert-omtaget 2026-08-31): egen layout, egen fil
   // (QuoteEditView.tsx) — se den filens docblock för varför den INTE ligger
   // inline här (mount-räkningen i tests/quotes-mer-i-flodet.spec.ts).
@@ -2300,23 +2131,14 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
   if (isEditMode) {
     return (
       <QuoteEditView
-        visitRuleEditor={<VisitRuleEditor key={`${business.business_id}:${quoteJobType}`} jobType={quoteJobType || null} description={description} onApply={setDescription} />}
         quoteId={quoteId}
         quoteNumber={quoteNumberRef.current}
-        completenessSummaries={completenessSummaries}
-        onSelectSection={scrollToSection}
         autoSaveStatus={autoSaveStatus}
         saving={saving}
         onSendQuote={() => saveQuote(true)}
         onSaveDraft={() => saveQuote(false)}
-        onSaveTemplate={() => {
-          setTemplateName(title)
-          setShowSaveTemplateModal(true)
-        }}
+        onSaveTemplate={() => setShowSaveTemplateModal(true)}
         hasItems={items.length > 0}
-        businessDefaultStyle={businessDefaultStyle}
-        templateStyle={templateStyle}
-        setTemplateStyle={setTemplateStyle}
         reservations={reservations}
         recalculated={recalculated}
         customers={customers}
@@ -2331,34 +2153,17 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         items={items}
         setItems={setItems}
         allCategories={allCategories}
-        localCustomCategories={localCustomCategories}
         products={products}
         onSaveAsStandard={saveStandardPrice}
-        dndSensors={dndSensors}
-        handleDragEnd={handleDragEnd}
         addItem={addItem}
         updateItem={updateItem}
         removeItem={removeItem}
-        moveItem={moveItem}
         moveItemById={moveItemById}
         addFromProduct={addFromProduct}
         applyProductToExistingRow={applyProductToExistingRow}
         addBlankRowWithDescription={addBlankRowWithDescription}
-        setShowGrossistSearch={setShowGrossistSearch}
-        createCustomCategory={createCustomCategory}
-        showNewCategoryInput={showNewCategoryInput}
-        setShowNewCategoryInput={setShowNewCategoryInput}
-        newCategoryLabel={newCategoryLabel}
-        setNewCategoryLabel={setNewCategoryLabel}
         setProductModalRow={setProductModalRow}
-        hasRotItems={hasRotItems}
-        hasRutItems={hasRutItems}
-        personnummer={personnummer}
-        setPersonnummer={setPersonnummer}
-        fastighetsbeteckning={fastighetsbeteckning}
-        setFastighetsbeteckning={setFastighetsbeteckning}
-        showStandardTexts={showStandardTexts}
-        setShowStandardTexts={setShowStandardTexts}
+        activeDeductionType={activeDeductionType}
         textsByType={textsByType}
         referencePerson={referencePerson}
         setReferencePerson={setReferencePerson}
@@ -2366,14 +2171,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         setCustomerReference={setCustomerReference}
         projectAddress={projectAddress}
         setProjectAddress={setProjectAddress}
-        notIncluded={notIncluded}
-        setNotIncluded={setNotIncluded}
-        ataTerms={ataTerms}
-        setAtaTerms={setAtaTerms}
-        paymentTermsText={paymentTermsText}
-        setPaymentTermsText={setPaymentTermsText}
-        termsText={termsText}
-        setTermsText={setTermsText}
         showPaymentPlan={showPaymentPlan}
         setShowPaymentPlan={setShowPaymentPlan}
         paymentPlan={paymentPlan}
@@ -2395,10 +2192,8 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         setShowUnitPrices={setShowUnitPrices}
         showQuantities={showQuantities}
         setShowQuantities={setShowQuantities}
-        totals={totals}
         vatRate={vatRate}
         discountPercent={discountPercent}
-        setDiscountPercent={setDiscountPercent}
         liveAvailable={liveAvailable}
         quoteTemplateData={quoteTemplateData}
         liveHandlers={liveHandlers}
@@ -2407,19 +2202,14 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         setAddRowSheetOpen={setAddRowSheetOpen}
         templatePreviewPayload={templatePreviewPayload}
         sheetItem={sheetItem}
-        showGrossistSearch={showGrossistSearch}
         businessId={business.business_id}
-        addFromGrossist={addFromGrossist}
         productModalRow={productModalRow}
         savingProduct={savingProduct}
         saveItemToProducts={saveItemToProducts}
         buildProductInitialValues={buildProductInitialValues}
         showSaveTemplateModal={showSaveTemplateModal}
         setShowSaveTemplateModal={setShowSaveTemplateModal}
-        templateName={templateName}
-        setTemplateName={setTemplateName}
-        savingTemplate={savingTemplate}
-        saveAsTemplate={saveAsTemplate}
+        quoteJobType={quoteJobType}
       />
     )
   }
@@ -2439,15 +2229,22 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       onSelectJobType={() => {}} onApply={applyJobTypeAppend} onApplyOvrig={applyOvrigtUpplagg} />
   ) : null
 
-  const preparationInput = !isEditMode && selectedCustomer ? <QuotePreparationInput
-    key={selectedCustomer} customerId={selectedCustomer} preparationId={searchParams?.get('preparation_id')}
-    onApply={text => {
-      setQuickInput(previous => [previous, text].filter(Boolean).join('\n\n'))
-      setAiTextInput(previous => [previous, text].filter(Boolean).join('\n\n'))
-      setSourceTranscript(previous => [previous, text].filter(Boolean).join('\n\n'))
-      if (items.length === 0) setQuickMode('intake')
-      else setShowAiHelper(true)
-    }} /> : null
+  // ═══ FRÅGEFLÖDET: fullskärm mellan upplägg-trycket och offerten ═══════
+  // "Hoppa över" ger upplägget orört (samma resultat som före 2026-09-17),
+  // "Tillbaka" lämnar allt som det var och landar där hantverkaren stod.
+  if (quickMode === 'fragor' && pendingIntake) {
+    return (
+      <IntakeQuestionFlow
+        jobTypeName={pendingIntake.start.jobTypeName}
+        questions={pendingIntake.questions}
+        targets={intakeTargetsFromRows(pendingIntake.start.template.default_items ?? [])}
+        busy={false}
+        onSubmit={answers => applyVerifiedJobTypeStart(pendingIntake.start, { questions: pendingIntake.questions, answers }, pendingIntake.choiceArticles)}
+        onSkip={() => applyVerifiedJobTypeStart(pendingIntake.start, null)}
+        onBack={leaveIntakeFlow}
+      />
+    )
+  }
 
   // ═══ SNABBOFFERTEN: intag och byggkänsla är fullskärmslägen ══════════
   if (quickMode === 'intake') {
@@ -2455,9 +2252,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       <>
       <QuickIntake
         jobTypeStart={<>{reliefError && <p role="alert" className="mb-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{reliefError} <a href="/dashboard/avlastning" className="underline">Till mitt underlag</a></p>}{recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
-          <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
-            onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
-            onSource={text => setQuickInput(text)} />{jobTypeStart}{preparationInput}</>}
+{jobTypeStart}</>}
         customers={customers}
         selectedCustomer={selectedCustomer}
         onSelectCustomer={setSelectedCustomer}
@@ -2474,29 +2269,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         // "Öppna fullständiga editorn" strax intill, alltså samma sorts
         // dubblett vi nyss städade bort.
         onClose={() => router.push('/dashboard/quotes')}
-        onOpenFullEditor={() => { leaveQuickMode('editor', true); setQuickMode(null) }}
+        // "Bygg själv": det skrivna följer med som beskrivning, sedan rakt in
+        // i dokumentet via samma avslutning som alla andra startvägar.
+        onBuildYourself={() => { leaveQuickMode(true); finishQuickStart() }}
         building={false}
         hasContent={items.length > 0}
-        onSkipDescription={() => setQuickMode('blank')}
       />
       </>
-    )
-  }
-
-  // Blank-starten (Andreas fynd 2026-08-14): samma guidade granskning som
-  // AI-vägen, bara utan beskrivningen — se startBlankQuickDraft ovan.
-  if (quickMode === 'blank') {
-    return (
-      <QuickBlankStart
-        customers={customers}
-        selectedCustomer={selectedCustomer}
-        onSelectCustomer={setSelectedCustomer}
-        title={title}
-        onTitleChange={setTitle}
-        onStart={startBlankQuickDraft}
-        onClose={() => setQuickMode('intake')}
-        onOpenFullEditor={() => { leaveQuickMode('editor', false); setQuickMode(null) }}
-      />
     )
   }
 
@@ -2521,9 +2300,9 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       {/* FAS 1 (offert-omtaget, 2026-08-31): den tvingade steg-för-steg-
           granskningen ("quickMode === 'review' || 'overview'") är BORTA.
           AI-utkast, blankt och mall landar alla direkt här — samma canvas-
-          editor, oavsett startväg. Se completenessSummaries nedan — de
-          skickas in i QuoteBuilderHeader (rad 2, completeness-remsan) för
-          vad som ersatte kvittots granskningskrav. */}
+          editor, oavsett startväg. RIVNING PAKET C (2026-09-17, rad 2.16):
+          completenessSummaries/QuoteCompletenessStrip (header rad 2), som
+          ersatte kvittots granskningskrav, är själva borttagna. */}
       <div
         // Fas B (offertskaparen-design-polish, 2026-08-31): pb-40/lg:pb-6
         // ersätter det gamla py-4/sm:py-6-bottenvärdet EXPLICIT (pt-* hanterar
@@ -2538,8 +2317,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
       >
         <QuoteBuilderHeader
           title={title}
-          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
-          onSelectSection={scrollToSection}
           aiGenerated={aiGenerated}
           aiConfidence={aiConfidence}
           aiPriceWarning={aiPriceWarning}
@@ -2553,10 +2330,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
           hasItems={items.length > 0}
           onSendQuote={() => saveQuote(true)}
           onSaveDraft={() => saveQuote(false)}
-          onSaveTemplate={() => {
-            setTemplateName(title)
-            setShowSaveTemplateModal(true)
-          }}
+          onSaveTemplate={() => setShowSaveTemplateModal(true)}
         />
         {/* Jobbtypsremsan (Del 2, offertytan, 2026-09-01 — flyttad hit
             2026-09-02): låg tidigare i dokumentkolumnen ovanför "Mer"-raden,
@@ -2568,37 +2342,29 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
             OAVSETT skärmstorlek utan att kundkortets mobilordning rörs.
             Grindvillkoret bor kvar på jobTypeStart-variabeln högre upp —
             orört. */}
-        {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600">{recovery.status}</p>}
+        {recovery.status && <p role="status" className="mb-3 rounded-lg bg-white p-3 text-xs text-slate-600 flex flex-wrap items-center gap-x-3">{recovery.status}
+          {recovery.restored && <button type="button" onClick={recovery.discardRestored} className="min-h-[44px] underline text-slate-700">Börja om</button>}</p>}
         {jobTypeStart}
         {jobTypeFyllPa}
-        {preparationInput}
-        {!isEditMode && <WorkSampleResume businessId={business.business_id} hasContent={items.length > 0 || !!title || !!description}
-          onApply={sample => { setFirstWorkId(sample.workId); applyAiResult(workSampleDraft(sample)); finishQuickStart() }}
-          onSource={text => { setQuickInput(text); setAiTextInput(text) }} />}
-        {firstQuoteIntent && jobStartApplied && <FirstQuoteGuide key={business.business_id}
-          companyName={business.business_name} hasCustomer={!!selectedCustomer}
-          onCustomer={() => {
-            const target = document.querySelector<HTMLElement>('[data-first-quote-customer]')
-            target?.scrollIntoView({ block: 'center', behavior: 'smooth' })
-            target?.querySelector<HTMLElement>('input, button, select')?.focus({ preventScroll: true })
-          }} onSection={scrollToSection} />}
         {jobStartApplied && <p className="text-sm text-teal-800 mb-4" role="status">
           Ditt underlag är på plats. Kontrollera mängder, priser och föreslagna förbehåll — inget är skickat.
         </p>}
-        {/* Kvittoprincipen Fall 1: motorns eget resonemang, direkt under
-            headern före radlistan. Renderar ingenting utan reasoning;
-            expanderat från start när en affärsregel aktiverats. Visas
-            OAVSETT quickMode — en AI-draftad offert ska alltid visa den,
-            inte bara i ett specifikt läge (borttagen distinktion, Fas 1). */}
-        {aiGenerated && aiBedomning && (
-          <DanielsBedomning
-            reasoning={aiBedomning.reasoning}
-            rules={aiBedomning.rules}
-            lessons={aiBedomning.lessons}
-            customerFacts={aiBedomning.customerFacts}
-            confidence={aiConfidence}
-          />
-        )}
+        {/* RIVNING PAKET C (2026-09-17, rad 2.17): "Matte säger" — EN yta i
+            stället för fyra (motorns eget resonemang/Kvittoprincipen Fall 1,
+            prisvarningar, efterkalkylinsikt, Daniels buffertförslag).
+            Renderar ingenting när inget av delarna har något att visa.
+            Visas OAVSETT quickMode, direkt under headern, före radlistan —
+            samma placering som den tidigare DanielsBedomning hade. */}
+        <MatteSager
+          aiGenerated={aiGenerated}
+          aiBedomning={aiBedomning}
+          aiConfidence={aiConfidence}
+          priceWarnings={priceWarnings}
+          priceAlternatives={priceAlts}
+          efterkalkylInsight={efterkalkylInsight}
+          danielBufferHours={daniel_buffert_h}
+          formatHours={formatAgentradHours}
+        />
 
         {/* ETAPP 2b (offert-masterplan.md): canvas-first-layouten. Dokumentet
             är huvudytan (majoritetsbredd) — assistentkolumnen innehåller bara
@@ -2615,60 +2381,25 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         <div className="grid grid-cols-1 lg:grid-cols-[minmax(320px,380px)_1fr] lg:grid-rows-[auto_1fr] gap-5 items-start">
           {/* ── Assistentkolumnen, del 1: varningar + kund ────────── */}
           <div className="order-1 lg:order-none lg:col-start-1 lg:row-start-1 flex flex-col gap-4">
-            {/* Etapp D2: "vill du alltid börja så här?" — ställs en gång, när
-                hantverkaren tagit samma väg ut för tredje gången. Banderoll
-                och inte dialog: frågan dyker upp precis när han är på väg att
-                börja jobba, och ska gå att ignorera helt. */}
-            {askPreferredFor && (
-              <QuickStartPreferenceBanner
-                route={askPreferredFor}
-                onAccept={() => {
-                  setPreferredStart(askPreferredFor)
-                  markAskedPreferred(askPreferredFor)
-                  setAskPreferredFor(null)
-                  toast.success('Sparat — vi börjar här nästa gång.')
-                }}
-                onDecline={() => {
-                  // Ett nej är också ett svar. Markeras som ställd så frågan
-                  // aldrig kommer tillbaka.
-                  markAskedPreferred(askPreferredFor)
-                  setAskPreferredFor(null)
-                }}
-              />
-            )}
-
             {/* Vägen TILLBAKA till Snabbofferten — för ALLA med tom offert,
-                inte bara den som sparat bort den (fix 2026-08-17, Andreas
-                fynd): med default-preferensen 'quick' fanns ingen väg
-                tillbaka alls efter att man lämnat intaget i samma session,
-                och inget i synfältet signalerade ens att det guidade läget
-                finns. Villkoret items.length === 0 består — aldrig en knapp
-                som slänger påbörjat arbete. */}
+                fynd 2026-08-17): inget i synfältet signalerade annars att det
+                guidade läget finns när man väl lämnat intaget. Villkoret
+                items.length === 0 består — aldrig en knapp som slänger
+                påbörjat arbete. */}
             {quickMode === null && items.length === 0 && (
               <button
                 type="button"
-                onClick={() => {
-                  setPreferredStart('quick')
-                  setPreferredStartState('quick')
-                  setQuickMode('intake')
-                }}
+                onClick={() => setQuickMode('intake')}
                 className="w-full px-4 py-3 bg-white border border-slate-200 hover:border-primary-700 rounded-2xl text-sm font-medium text-primary-700 transition-colors text-left"
               >
                 Beskriv jobbet i stället — vi bygger utkastet
               </button>
             )}
 
-            {/* Prisvarningar/efterkalkyl — viktig info, inte begravd */}
-            <QuoteNewPriceWarningsBanner warnings={priceWarnings} alternatives={priceAlts} />
-            <QuoteNewEfterkalkylBanner insight={efterkalkylInsight} />
-            {daniel_buffert_h != null && (
-              <div className="rounded-2xl border border-primary-100 bg-primary-50 p-4 flex items-start gap-3">
-                <AgentAvatar agentKey="daniel" size="sm" />
-                <p className="text-xs leading-relaxed text-slate-700 min-w-0">
-                  <span className="font-semibold text-slate-900">Daniel</span> föreslog +{formatAgentradHours(daniel_buffert_h)} h. Lägg dem på arbetsraden.
-                </p>
-              </div>
-            )}
+            {/* RIVNING PAKET C (2026-09-17, rad 2.17): prisvarningar,
+                efterkalkylinsikt och Daniels buffertkort låg tidigare här,
+                var för sig — de visas nu i "Matte säger" ovanför headern
+                (se MatteSager-monteringen ovan). */}
 
             {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
                 fristående "N reservationer matchar"-bannern som satt här
@@ -2676,9 +2407,11 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                 renderas nu i dokumentets egen Reservationer-sektion
                 (QuoteDocument.tsx, se `reservationSuggestions`-proppen på
                 QuoteDocumentSurface nedan) i stället för i assistentkolumnen,
-                utanför dokumentet. Discovery-vägen är completeness-chippen
-                (redan amber+räknare, se quote-completeness.ts) — ingen ny
-                mekanism byggd. ReservationMutedNotice är en ANNAN,
+                utanför dokumentet. Discovery-vägen var completeness-chippen
+                (amber+räknare) — de är själva borttagna sedan (RIVNING
+                PAKET C, 2026-09-17, rad 2.16); reservationssektionen i
+                dokumentet är oberoende av dem och påverkas inte.
+                ReservationMutedNotice är en ANNAN,
                 orelaterad affordans (inlärningens tystnings-kvitto) och
                 stannar kvar precis här. */}
             {reservations.mutedNotice && (
@@ -2693,7 +2426,13 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                 minst en rad har ett känt inköpspris. */}
             <QuoteMarginCard items={recalculated} />
             <QuotePriceMemory items={items} onChange={setItems} />
-            <VisitRuleEditor key={`${business.business_id}:${quoteJobType}`} jobType={quoteJobType || null} description={description} onApply={setDescription} />
+            {/* RIVNING PAKET C (2026-09-17, rad 2.14): VisitRuleEditor +
+                /api/quotes/visit-rule borttagna — en seedad fritextfråga
+                ("Hur många besök räknar du med?", lib/quotes/intake-
+                questions.ts) ersätter dem i frågeflödet. lib/quotes/
+                visit-rule.ts lever kvar: lib/ai-quote-generator.ts läser
+                fortfarande TIDIGARE sparade regler direkt ur
+                business_knowledge (oberoende av den borttagna rutten). */}
 
             <div data-first-quote-customer>
             <QuoteNewCustomerSection
@@ -2701,77 +2440,45 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
               onCustomerCreated={customer => setCustomers(previous => [...previous.filter(c => c.customer_id !== customer.customer_id), customer])}
               selectedCustomer={selectedCustomer}
               setSelectedCustomer={setSelectedCustomer}
-              validDays={validDays}
-              setValidDays={setValidDays}
-              title={title}
-              setTitle={setTitle}
-              description={description}
-              setDescription={setDescription}
               customerPriceListInfo={customerPriceListInfo}
               items={items}
               setItems={setItems}
-              hasItems={items.length > 0}
+              referencePerson={referencePerson}
+              setReferencePerson={setReferencePerson}
+              customerReference={customerReference}
+              setCustomerReference={setCustomerReference}
+              projectAddress={projectAddress}
+              setProjectAddress={setProjectAddress}
             />
             </div>
           </div>
 
-          {/* ── Assistentkolumnen, del 2: verktyg och avslut ───────
-              Ligger EFTER dokumentet på mobil (order-3) men i samma
-              vänsterkolumn på desktop. */}
-          <div className="order-3 lg:order-none lg:col-start-1 lg:row-start-2 flex flex-col gap-4">
-            <QuoteNewAIHelper
-              open={showAiHelper}
-              setOpen={setShowAiHelper}
-              generating={generating}
-              photos={photos}
-              maxPhotos={MAX_PHOTOS}
-              onPhotoFile={handlePhotoFile}
-              onRemovePhoto={removePhoto}
-              photoDescription={photoDescription}
-              setPhotoDescription={setPhotoDescription}
-              onAnalyzePhoto={analyzePhoto}
-              aiTextInput={aiTextInput}
-              setAiTextInput={setAiTextInput}
-              onGenerateFromText={() => generateFromText()}
-            />
-
-            <QuoteTotalsSection
-              totals={totals}
-              vatRate={vatRate}
-              discountPercent={discountPercent}
-              setDiscountPercent={setDiscountPercent}
-              hasRotItems={hasRotItems}
-              hasRutItems={hasRutItems}
-              formatCurrency={formatCurrency}
-              items={items}
-              setItems={setItems}
-            />
-
-            {/* DUBBLETT BORTTAGEN (2026-08-06): Skicka fanns både här och i
-                den sticky headern. Headern vinner — den är alltid synlig,
-                vilket blev avgörande när summeringen flyttade under
-                dokumentet på mobil. En sanning per kontroll. */}
-          </div>
+          {/* RIVNING PAKET C (2026-09-17, rad 2.12): "assistentkolumnen, del 2"
+              (verktyg och avslut) är borttagen som EGEN yta — den innehöll
+              bara QuoteNewAIHelper (2.12) sedan QuoteTotalsSection (paket B)
+              och den dubbla Skicka-knappen (2026-08-06) redan hade flyttat
+              därifrån. AI-vägen är intaget (QuickIntake → buildQuickDraft);
+              tomrutans "beskriv jobbet"-länk öppnar det igen, se
+              onOpenAiHelp nedan. */}
 
           {/* ── Dokumentpanelen — huvudytan, näst överst på mobil ── */}
           <div className="order-2 lg:order-none lg:col-start-2 lg:row-start-1 lg:row-span-2 flex flex-col gap-3">
             {/* Jobbtypsremsan flyttades HÄRIFRÅN 2026-09-02 till direkt under
                 headern (se kommentaren där) — mobilordningen gjorde att den
                 hamnade en hel skärm ner, bakom hela assistentkolumn del 1. */}
-            {/* "Mer"-verktygsrad — Stil/Villkor/Betalplan/Visning/Bilagor/
-                ROT nås härifrån, en panel synlig i taget (inte modal —
-                dokumentet syns hela tiden nedanför). Listvy/Dokument växlar
-                huvudytans innehåll. */}
+            {/* "Mer"-verktygsrad. RIVNING PAKET B (2026-09-17, rad 2.10):
+                sex knappar → tre. Stil flyttade till inställningarnas
+                firmadefault (2.4), Villkor & texter till dokumentets egna
+                textfält (2.3), ROT-detaljer till avdragsväxeln vid
+                dokumentets summering (2.5) — kvar är de tre paneler som
+                fortfarande är egna ytor. */}
             <div className="bg-white border border-slate-200 rounded-2xl p-2 flex flex-wrap items-center gap-1.5">
               <span className="px-2 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Mer</span>
               {(
                 [
-                  { key: 'stil', label: 'Stil' },
-                  { key: 'villkor', label: 'Villkor & texter' },
                   { key: 'betalplan', label: 'Betalplan' },
                   { key: 'visning', label: 'Visning' },
                   { key: 'bilagor', label: 'Bilagor' },
-                  { key: 'rot', label: 'ROT-detaljer' },
                 ] as const
               ).map(p => {
                 // Statusprick: sju av offertens fält bor bara här, och utan
@@ -2812,61 +2519,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
                   </button>
                 )
               })}
-              <div className="ml-auto flex items-center gap-1 bg-slate-100 rounded-lg p-1">
-                <button
-                  type="button"
-                  onClick={() => setMainView('document')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    mainView === 'document' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Dokument
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMainView('list')}
-                  className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${
-                    mainView === 'list' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'
-                  }`}
-                >
-                  Listvy
-                </button>
-              </div>
             </div>
-
-            {activePanel === 'stil' && (
-              <div className="relative">
-                <MerPanelClose onClose={() => setActivePanel(null)} />
-                <QuoteStylePicker
-                  value={templateStyle}
-                  onChange={setTemplateStyle}
-                  businessDefaultStyle={businessDefaultStyle}
-                  accentColor={businessConfig?.accent_color}
-                />
-              </div>
-            )}
-
-            {activePanel === 'villkor' && (
-              <QuoteStandardTextsSection
-                open={true}
-                setOpen={b => setActivePanel(b ? 'villkor' : null)}
-                textsByType={textsByType}
-                referencePerson={referencePerson}
-                setReferencePerson={setReferencePerson}
-                customerReference={customerReference}
-                setCustomerReference={setCustomerReference}
-                projectAddress={projectAddress}
-                setProjectAddress={setProjectAddress}
-                notIncluded={notIncluded}
-                setNotIncluded={setNotIncluded}
-                ataTerms={ataTerms}
-                setAtaTerms={setAtaTerms}
-                paymentTermsText={paymentTermsText}
-                setPaymentTermsText={setPaymentTermsText}
-                termsText={termsText}
-                setTermsText={setTermsText}
-              />
-            )}
 
             {activePanel === 'betalplan' && (
               <QuotePaymentPlanSection
@@ -2907,93 +2560,61 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
               </div>
             )}
 
-            {activePanel === 'rot' && (
-              <div className="relative">
-                <MerPanelClose onClose={() => setActivePanel(null)} />
-                <QuoteRotSection
-                  items={items}
-                  setItems={setItems}
-                  hasRotItems={hasRotItems}
-                  personnummer={personnummer}
-                  setPersonnummer={setPersonnummer}
-                  fastighetsbeteckning={fastighetsbeteckning}
-                  setFastighetsbeteckning={setFastighetsbeteckning}
-                />
-              </div>
-            )}
+            {/* RIVNING PAKET C (2026-09-17, rad 2.13): QuotePackageComparison
+                ("Jämför offertpaket" Bas/Rekommenderat/Utökat) borttagen —
+                4 tillvalsrader i hela databasen. Kommer tillbaka som
+                "bra/bättre/bäst" per jobbtyp, en annan yta, senare. */}
 
-            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
-
-            {/* Huvudyta: dokument-canvas (default) eller listvy (radeditor) */}
-            {mainView === 'list' ? (
-              <QuoteItemsSection
-                items={items}
-                recalculated={recalculated}
-                allCategories={allCategories}
-                customCategories={localCustomCategories}
-                products={products}
-                onSaveAsStandard={saveStandardPrice}
-                dndSensors={dndSensors}
-                onDragEnd={handleDragEnd}
-                onAddItem={addItem}
-                onUpdateItem={updateItem}
-                onRemoveItem={removeItem}
-                onMoveItem={moveItem}
-                onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
-                onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-                onAddBlankRow={addBlankRowWithDescription}
-                onOpenGrossistSearch={() => setShowGrossistSearch(true)}
-                onCreateCategory={createCustomCategory}
-                showNewCategoryInput={showNewCategoryInput}
-                setShowNewCategoryInput={setShowNewCategoryInput}
-                newCategoryLabel={newCategoryLabel}
-                setNewCategoryLabel={setNewCategoryLabel}
-                onSaveToProducts={row => setProductModalRow(row)}
+            {/* Huvudytan: dokumentet. RIVNINGEN PAKET A (2026-09-17, Andreas):
+                listvyn och växeln Dokument/Listvy är borta — offerten ÄR ytan,
+                och två radeditorer betydde att varje ny radtyp måste byggas
+                två gånger eller glida isär. Rader läggs till via AddRowSheet,
+                ändras och flyttas via RowEditSheet. */}
+            <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
+              <QuoteDocumentSurface
+                liveEnabled={liveAvailable}
+                liveTemplateData={quoteTemplateData}
+                // ETAPP C3: i granskningsläget skickas bara den fokuserade
+                // sektionens handlers in — dokumentmotorn renderar då resten
+                // som ren text. focusSection sköter dimningen. Två oberoende
+                // spakar: dimning utan handler-gating hade sett låst ut men
+                liveHandlers={liveHandlers}
+                // FAS 1 (offert-omtaget, 2026-08-31): focusSection/dimning
+                // hörde till den borttagna granskningssekvensen — chip-
+                // raden scrollar via data-section (scrollToSection) i
+                // stället, ALDRIG via denna prop, så dimningen den
+                // driver aldrig triggas av ett chip-klick.
+                focusSection={null}
+                quickReveal={quickMode !== null}
+                onRowTap={setSheetItemId}
+                onAddRowTap={() => setAddRowSheetOpen(true)}
+                // FAS E (offertskaparen-design-polish, 2026-09-01), ändrad
+                // RIVNING PAKET C (2026-09-17, rad 2.12): tomt-läges-rutans
+                // "beskriv jobbet"/"Fota eller beskriv jobbet"-länk öppnade
+                // förut den borttagna QuoteNewAIHelper-panelen (showAiHelper).
+                // AI-vägen är intaget — länken öppnar det i stället. Create-
+                // läget ENDA anropare som skickar denna: QuoteEditView.tsx
+                // har ingen Snabboffert alls, se QuoteDocument.tsx:s
+                // onOpenAiHelp-docblock.
+                onOpenAiHelp={() => setQuickMode('intake')}
+                templatePreviewPayload={templatePreviewPayload}
+                reservationSuggestions={reservations.suggestions}
+                onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
+                activeDeductionType={activeDeductionType}
+                standardTexts={textsByType}
               />
-            ) : (
-              <div className="lg:sticky lg:top-[5.5rem] lg:h-[calc(100vh-7rem)]">
-                <QuoteDocumentSurface
-                  liveEnabled={liveAvailable}
-                  liveTemplateData={quoteTemplateData}
-                  // ETAPP C3: i granskningsläget skickas bara den fokuserade
-                  // sektionens handlers in — dokumentmotorn renderar då resten
-                  // som ren text. focusSection sköter dimningen. Två oberoende
-                  // spakar: dimning utan handler-gating hade sett låst ut men
-                  liveHandlers={liveHandlers}
-                  // FAS 1 (offert-omtaget, 2026-08-31): focusSection/dimning
-                  // hörde till den borttagna granskningssekvensen — chip-
-                  // raden scrollar via data-section (scrollToSection) i
-                  // stället, ALDRIG via denna prop, så dimningen den
-                  // driver aldrig triggas av ett chip-klick.
-                  focusSection={null}
-                  quickReveal={quickMode !== null}
-                  onRowTap={setSheetItemId}
-                  onAddRowTap={() => setAddRowSheetOpen(true)}
-                  // FAS E (offertskaparen-design-polish, 2026-09-01): tomt-
-                  // läges-rutans "beskriv jobbet"/"Fota eller beskriv
-                  // jobbet" — återanvänder AI-hjälpens BEFINTLIGA state
-                  // (showAiHelper), ingen ny state uppfunnen. Create-läget
-                  // ENDA anropare som skickar denna: QuoteEditView.tsx har
-                  // ingen QuoteNewAIHelper/showAiHelper alls, se
-                  // QuoteDocument.tsx:s onOpenAiHelp-docblock.
-                  onOpenAiHelp={() => setShowAiHelper(true)}
-                  templatePreviewPayload={templatePreviewPayload}
-                  reservationSuggestions={reservations.suggestions}
-                  onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
-                />
-              </div>
-            )}
+            </div>
+
           </div>
         </div>
       </div>
 
       {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
-          bottenfält — samma completeness-data och Spara/Skicka-handlers som
-          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate). */}
+          bottenfält — samma Spara/Skicka-handlers som headern ovan (nu
+          desktop-only, se dess `hidden lg:flex`-gate). RIVNING PAKET C
+          (2026-09-17, rad 2.16): completeness-chipparna (summaries/
+          hasQuoteContent/onSelect) är borttagna. */}
       <QuoteBuilderBottomBar
-        summaries={completenessSummaries}
-        hasQuoteContent={hasQuoteContent}
-        onSelect={scrollToSection}
         saving={saving}
         canSend={canSend}
         sendDisabledReason={sendDisabledReason}
@@ -3025,6 +2646,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         }
         onSaveAsStandard={(productId, price) => { void saveStandardPrice(productId, price) }}
         onSaveToBank={row => setProductModalRow(row)}
+        onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
       />
 
       {/* Mobilens "lägg till rad" — söker i artikelbanken i stället för att
@@ -3035,7 +2657,7 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         reservationCount={product => reservations.countForProduct(product)}
         onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
         onAddBlankRow={addBlankRowWithDescription}
-        onAddHeading={() => addItem('heading')}
+        onAddRowType={addItem}
         onClose={() => setAddRowSheetOpen(false)}
       />
 
@@ -3057,16 +2679,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         onClose={() => reservations.setReviewOpen(false)}
       />
 
-      {/* Grossist search modal */}
-      <ProductSearchModal
-        isOpen={showGrossistSearch}
-        onClose={() => setShowGrossistSearch(false)}
-        onSelect={p => {
-          addFromGrossist(p)
-          setShowGrossistSearch(false)
-        }}
-        businessId={business.business_id}
-      />
 
       {productModalRow && (
         <ProductModal
@@ -3084,10 +2696,6 @@ function QuoteBuilderSession(props: QuoteBuilderProps & { recoveryUserId: string
         items={items}
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
-        templateName={templateName}
-        setTemplateName={setTemplateName}
-        saving={savingTemplate}
-        onSave={saveAsTemplate}
       />
     </div>
   )

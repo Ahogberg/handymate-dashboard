@@ -1,8 +1,12 @@
 const assert=require('node:assert/strict'), {load}=require('./onboarding-completion.cjs')
 async function fixture(failure) {
  const state={failure,writes:[],reads:[],rows:{reservation_texts:[{id:'existing'}],service_agreement_type:[]}}
+ // update tillkom 2026-09-18: seedern relänkar sedan main cd1993b5 gamla
+ // seedade rader till sin jobbtyp med .update(). Attrappen saknade metoden,
+ // så main föll på det här testet — verifierat genom att köra testet mot
+ // mains egen seed-defaults.ts. Skrivning räknas, men ingen rad läggs till.
  const db={from(table){let op='read',rows
-  const q={select:()=>q,eq:()=>q,limit:()=>q,order:()=>q,insert(r){op='write';rows=r;return q},delete(){op='delete';return q},then(resolve,reject){return Promise.resolve(result()).then(resolve,reject)}}
+  const q={select:()=>q,eq:()=>q,limit:()=>q,order:()=>q,insert(r){op='write';rows=r;return q},update(r){op='update';rows=r;return q},delete(){op='delete';return q},then(resolve,reject){return Promise.resolve(result()).then(resolve,reject)}}
   function result(){if(op==='read')state.reads.push(table)
    if(state.failure===table+':'+op)return {data:null,error:{message:'injected failure'},count:null}
    if(op!=='read'){state.writes.push({table,op,rows});if(op==='write')state.rows[table]=[...(state.rows[table]||[]),...rows]}
@@ -16,7 +20,14 @@ async function fixture(failure) {
   '@/lib/reservation-defaults':{getDefaultReservations:()=>[]},
   '@/lib/quote-template-defaults':{normalizeTemplateBranch:v=>v,getDefaultQuoteTemplates:()=>[{name:'First',default_items:[]},{name:'Second',default_items:[]}]},
   '@/lib/agreement-type-defaults':{getDefaultAgreementTypes:()=>[]},
-  '@/lib/job-types':{ensureOnboardingJobTypes:async()=>[]},
+  '@/lib/job-types':{ensureOnboardingJobTypes:async()=>[],slugifyJobType:n=>String(n).toLowerCase().replace(/[^a-z0-9]+/g,'_')},
+  // Artiklar härledda ur mallraderna (2026-09-17). Ren modul utan databas —
+  // stubbad här för att hålla det här testets fokus på seedningens
+  // fel- och återhämtningsvägar, inte på härledningens innehåll (det
+  // låses av tests/forsta-jobbresan.spec.ts).
+  '@/lib/onboarding/template-articles':{deriveTemplateArticles:()=>[],jobTypeStarters:()=>[],
+   linkTemplateRowsToArticles:templates=>templates,templateArticleKey:(n,u)=>`${n}|${u}`,
+   templateArticleId:(b,k)=>`prod_${b}_m${k}`},
  })
  return {state,run:()=>seed.seedAllDefaults(db,'biz_test','electrician',[],950)}
 }

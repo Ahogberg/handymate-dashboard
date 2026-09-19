@@ -10,7 +10,7 @@ remsan renderas utanför skärmen, staplas på varandra i 375 px, eller aldrig
 monteras för att en grind ovanför den är fel. Vi har skeppat UI verifierad så,
 och låtit Andreas hitta felen på sin telefon efter deploy.
 
-Det behövs ingen ny infrastruktur: **den finns redan**, arton
+Det behövs ingen ny infrastruktur: **den finns redan**, sjutton
 `tests/*.ui.spec.ts` renderar riktiga komponenter i riktig Chromium på
 375 px och 1280 px, utan inloggning, med riktig Tailwind-CSS och riktig
 Postgres bakom.
@@ -44,7 +44,7 @@ Postgres bakom.
 4. **Skicka den till Andreas** med SendUserFile. Han granskar på telefon; en
    bild sparar en deploy-cykel.
 
-5. **Behåll bredd-provet i specen.** 16 av 18 `.ui.spec.ts` kör
+5. **Behåll bredd-provet i specen.** 19 av 21 `.ui.spec.ts` kör
    `expect(document.documentElement.scrollWidth <= innerWidth)` — horisontell
    scroll i 375 px är ett fel, inte en smaksak. Lägger du till en ny yta ska
    den ha provet.
@@ -84,7 +84,7 @@ en Vercel-preview på en branch.
   och `scrollWidth`-provet är vad som går; påstå inte mer.
 - **En bild är inget korrekthetsbevis.** Den visar att ytan syns. Logiken
   bevisas fortfarande av facit med mutationstest (se `facit`).
-- **Varje ui-spec sparar en bild.** Alla arton gör det sedan 2026-09-17
+- **Varje ui-spec sparar en bild.** Alla sjutton gör det sedan 2026-09-17
   (onboardingturen var den sista). Letar du efter anropet: det heter inte
   alltid `page.screenshot` — specar med två flikar använder
   `second.screenshot`. Grep på `.screenshot(`.

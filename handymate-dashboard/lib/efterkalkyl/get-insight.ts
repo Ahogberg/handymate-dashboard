@@ -2,7 +2,7 @@
  * Motor 1: Lärande prissättning — Steg 2, delad kärna.
  *
  * Extraherad ur app/api/quotes/efterkalkyl-insikt/route.ts så att både
- * routen (QuoteNewEfterkalkylBanner) och Matte-verktyget
+ * routen ("Matte säger", MatteSager.tsx) och Matte-verktyget
  * get_efterkalkyl_insight (app/api/agent/trigger/tool-router.ts) delar
  * EXAKT samma lazy-backfill + aggregeringslogik — ingen dubblett.
  *

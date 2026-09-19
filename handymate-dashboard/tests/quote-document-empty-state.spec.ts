@@ -27,18 +27,13 @@
  * items.length > 0 tar en OFÖRÄNDRAD väg (samma <table>/<tbody> som innan
  * denna etapp) — ett regressionsprov täcker det uttryckligen.
  *
- * ═══ Del 2: "Att betala" (QuoteTotalsSection.tsx) ═══
+ * ═══ Del 2 (borttagen, rivning paket B 2026-09-17) ═══
  *
- * Etiketten hette tidigare "Kund betalar" — bytt till "Att betala" för att
- * matcha QuoteDocument.tsx:s egen statiska totalsumma (samma sträng syns
- * på två ställen nu, inte olika ord för samma sak). Källskannar filen
- * (samma facit-stil som tests/quotes-mer-i-flodet.spec.ts) i stället för
- * att montera komponenten: QuoteTotalsSection.tsx saknar (avsiktligt,
- * ingen anledning att lägga till den bara för ett textprov) pragmat
- * `/** @jsxImportSource react *\/` som QuoteDocument.tsx/
- * ReservationSuggestionBox.tsx bär av samma skäl som deras egna docblock
- * anger — utan det tar Playwrights egen komponenttest-JSX-runtime över
- * filens JSX i stället för Reacts, och renderToStaticMarkup kastar.
+ * QuoteTotalsSection.tsx är raderad (rad 2.2/2.5/2.6 i inventeringen,
+ * 2026-09-17) — dess "Att betala"-highlightbox var samma slutsumma som
+ * QuoteDocument.tsx:s egen grand-total-rad ("Att betala") visade sedan
+ * tidigare, bara re-emphasized en gång till. Källskanningstestet av filen
+ * är borttaget härifrån tillsammans med filen.
  *
  *   npx playwright test tests/quote-document-empty-state.spec.ts --no-deps
  */
@@ -210,21 +205,16 @@ test.describe('Fakturans egen editor är OPÅVERKAD av Fas E:s tomt-läge (!isIn
   })
 })
 
-test.describe('"Att betala" ersätter "Kund betalar" (QuoteTotalsSection.tsx)', () => {
-  const SOURCE = fs.readFileSync(
-    path.join(__dirname, '..', 'app', 'dashboard', 'quotes', '_shared', 'QuoteTotalsSection.tsx'),
-    'utf8',
-  )
-
-  test('highlight-boxens etikett är "Att betala"', () => {
-    expect(SOURCE).toContain('>Att betala<')
+test.describe('QuoteTotalsSection.tsx är raderad (rivning paket B, 2026-09-17)', () => {
+  test('filen finns inte längre på disk', () => {
+    expect(fs.existsSync(path.join(__dirname, '..', 'app', 'dashboard', 'quotes', '_shared', 'QuoteTotalsSection.tsx'))).toBe(false)
   })
 
-  test('"Kund betalar" renderas inte längre som JSX-text (historikkommentaren om det gamla namnet får finnas kvar)', () => {
-    // Matchar mot faktiskt JSX-textinnehåll (`>Kund betalar<`), inte fri
-    // text — samma princip som tests/quotes-mer-i-flodet.spec.ts:s
-    // "NÄMNER i förbigående ≠ finns kvar i koden". Filens egen
-    // historikkommentar ovanför boxen nämner medvetet det gamla namnet.
-    expect(SOURCE).not.toMatch(/>Kund betalar</)
+  test('dokumentets egen "Att betala"-rad finns kvar (samma summa, en yta)', () => {
+    const DOCUMENT_SOURCE = fs.readFileSync(
+      path.join(__dirname, '..', 'components', 'quotes', 'document', 'QuoteDocument.tsx'),
+      'utf8',
+    )
+    expect(DOCUMENT_SOURCE).toContain('>Att betala<')
   })
 })

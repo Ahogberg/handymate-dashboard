@@ -62,14 +62,25 @@ läggs bakom en adapter (`lib/bild/`) så leverantören går att byta.
 | ROT/RUT i kronor | `lib/rot-rut-basis.ts`, `lib/quote-calculations.ts` | klart |
 | Kundens offertsida + e-signering | `app/quote/[token]/page.tsx` | klart |
 | Uppföljning | `app/api/cron/quote-follow-up` (Daniel) | klart |
-| Fritextintag i dag | `QuickIntake`: en ruta "Vad ska göras, var, och vad kunden önskat sig …" | det som ska ersättas av frågeflödet |
+| Fritextintag i dag | `QuickIntake`: en ruta "Vad ska göras, var, och vad kunden önskat sig …" | kvar som egen väg (Andreas 2026-09-17: frågeflödet är inte enda vägen) |
 
 ## Finns INTE (verifierat)
 
 - **Ingen fotolagring.** Ingen tabell i `sql/` matchar photo/bild/image/attachment.
 - **Ingen bildgenerering.** Ingen kod, ingen leverantör, inga env-variabler.
-- **Inga frågor per jobbtyp.** `job_types` har name/slug/color/hourly_rate/sort_order — inget frågefält.
-- **Inga svar på offerten.** `quotes` bär ingen intagsstruktur; bara description/source_transcript.
+- ~~Inga frågor per jobbtyp.~~ **Byggt 2026-09-17 (V1):** `job_types.intake_questions`
+  (v253), seedade ur bransch + jobbtypens namn + enheterna i standardraderna när
+  kolumnen är NULL, redigerbara i uppsättningsytan (`JobTypeQuestionsEditor` i
+  `JobTypeQuoteSetup`, onboarding + Inställningar → Jobbtyper). Logik i
+  `lib/quotes/intake-questions.ts`, rutt `/api/job-types/intake-questions`.
+- ~~Inga svar på offerten.~~ **Byggt 2026-09-17 (V1):** `quotes.intake_answers` (v253,
+  version 1, `source: 'hantverkare'`). Flödet (`components/quotes/IntakeQuestionFlow.tsx`)
+  öppnas när ett upplägg trycks i jobbtypsremsan, före upplägget läggs in; mått/antal
+  sätter mängd på rader med samma enhet, ja/nej kryssar kopplat tillval, resten går
+  som text till `source_transcript`. "Hoppa över" ger upplägget orört. Facit:
+  `tests/intake-questions.spec.ts`. Kvar till nästa pass: kundsvar före besöket
+  (portalen → leaden → förifyllda frågor), svaren i AI-prompten som eget fält,
+  "Så här går det till"-tidslinjen ur svaren.
 - "Spara som mall" från en offert skickar inte med jobbtypen (`POST /api/quote-templates` saknar `job_type_slug`) — täpps i förenklingspasset 2026-09-17.
 
 ## Pågående parallellt (rör inte)

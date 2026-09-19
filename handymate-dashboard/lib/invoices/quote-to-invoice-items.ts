@@ -16,6 +16,11 @@
  *
  * Regler som är avsiktliga och låsta av tests/quote-to-invoice-mapper.spec.ts:
  * - Tillval: ovalda 'option'-rader exkluderas helt; valda blir 'item'.
+ * - Dolda rader (is_hidden) FÖLJER MED och behåller sin doldhet. De ska
+ *   faktureras — priset ingår i offertens summa (lib/types/quote.ts, beslut
+ *   Andreas 2026-08-05) — men kunden såg dem aldrig i offerten och ska inte
+ *   se dem på fakturan heller. Före 2026-09-17 tappades flaggan här, så en
+ *   rad hantverkaren dolt dök upp som en vanlig fakturarad hos kunden.
  * - labor_amount kopieras med ?? (ALDRIG ||): 0 är giltigt och betyder
  *   "ren materialrad — ROT-bas 0".
  * - Endast 'item'-rader får sin total omräknad (qty × á-pris). Delsummor
@@ -48,6 +53,8 @@ export interface MappedInvoiceItem {
   /** Produktkopplingen — utan den bryts marginaluppföljning, Fortnox
       ArticleNumber och prisåterkopplingen till artikelbanken vid fakturan. */
   linked_product_id: string | null
+  /** Dold för kunden — raden faktureras och ingår i summan, men visas inte. */
+  is_hidden: boolean
 }
 
 export interface MapQuoteItemsOptions {
@@ -98,6 +105,7 @@ export function mapQuoteItemsToInvoiceItems(
         travel_amount: item.travel_amount ?? null,
         category_slug: item.category_slug ?? null,
         linked_product_id: item.linked_product_id ?? null,
+        is_hidden: item.is_hidden === true,
       }
     })
 }

@@ -213,7 +213,7 @@ export async function POST(request: NextRequest) {
   // gjorde framtida marginal-analys + backfill omöjlig (TD-58, v52).
   const { data: projectRow, error: projectError } = await supabase
     .from('project')
-    .select('project_id, quote_id, customer_id')
+    .select('project_id, quote_id, customer_id, job_type')
     .eq('project_id', project_id)
     .eq('business_id', business.business_id)
     .single()
@@ -312,6 +312,9 @@ export async function POST(request: NextRequest) {
       customerPays,
       projectId: project_id,
       quoteId: linkedQuoteId,
+      // Jobbtypen följer med till fakturan (sql/v255) — kärnan läser den
+      // aldrig själv, se CreateInvoiceInput.jobType.
+      jobType: projectRow.job_type ?? null,
       invoiceType: 'standard',
       status: 'draft',
       dueDays,

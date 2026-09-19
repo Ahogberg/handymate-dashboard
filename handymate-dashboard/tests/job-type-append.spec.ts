@@ -158,7 +158,13 @@ test.describe('ett begrepp i offertflödet: jobbtyp (2026-09-17)', () => {
   })
 
   test('"Spara som upplägg" bär offertens jobbtyp, och servern validerar den', () => {
-    expect(builder).toMatch(/job_type_slug: quoteJobType \|\| null,/)
+    // RIVNING rad 2.20 (2026-09-18): byggaren POSTar inte längre till det fria
+    // /api/quote-templates. Jobbtypen går i stället in i dialogen, som vägrar
+    // spara utan den — strängare än det gamla `|| null`.
+    expect(builder).toContain('jobType={quoteJobType}')
+    const dialog = read('app/dashboard/quotes/_shared/QuoteSaveTemplateModal.tsx')
+    expect(dialog).toContain('<SaveJobStandardFromQuote jobType={jobType} items={items} />')
+    expect(dialog, 'utan jobbtyp sparas ingenting').toContain('Välj jobbtyp först')
     const rutt = utanKommentarer(read('app/api/quote-templates/route.ts'))
     expect(rutt).toMatch(/from\('job_types'\)\.select\('slug'\)[\s\S]{0,200}\.eq\('slug', body\.job_type_slug\)\.eq\('is_active', true\)/)
     expect(rutt).toContain('job_type_slug: jobTypeSlug,')

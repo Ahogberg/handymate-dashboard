@@ -8,8 +8,10 @@ import { SignatureCta } from './SignatureCta'
 import { InvoicePaymentSection } from './InvoicePaymentSection'
 import { mixWithWhite } from './format'
 import { ReservationSuggestionBox } from './ReservationSuggestionBox'
+import { StandardTextPicker } from '@/app/dashboard/quotes/_shared/StandardTextPicker'
 import type { QuoteDocumentHandlers, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
 import type { ReservationSuggestion } from '@/lib/reservations/match'
+import type { QuoteStandardText } from '@/lib/types/quote'
 
 export type { QuoteDocumentHandlers, QuoteItemPatch, QuoteDocumentMode, QuoteDocumentMobileProps, MoneyDocumentData } from './types'
 
@@ -88,11 +90,15 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    * och INTE en del av QuoteDocumentHandlers.
    *
    * GENUIN ASYMMETRI, inte en lucka att täppa till: AI-beskrivningsflödet
-   * (QuoteNewAIHelper) finns bara i create-flödet (QuoteBuilder.tsx →
-   * showAiHelper-state). Redigeringsvyn (QuoteEditView.tsx) har ingen
-   * motsvarighet och ska inte få en uppfunnen sådan här — den lämnar denna
-   * prop outnyttjad. Utelämnad → länken renderas inte alls, bara den
-   * primära "+ Lägg till rad"-knappen visas i tomrutan.
+   * (Snabbofferten/QuickIntake, öppnas via quickMode='intake') finns bara i
+   * create-flödet (QuoteBuilder.tsx). RIVNING PAKET C (2026-09-17, rad
+   * 2.12): länken öppnade tidigare den nu borttagna QuoteNewAIHelper-panelen
+   * (showAiHelper-state) — den öppnar nu intaget i stället, samma väg som
+   * "Beskriv jobbet i stället"-länken på övriga ställen. Redigeringsvyn
+   * (QuoteEditView.tsx) har ingen motsvarighet och ska inte få en
+   * uppfunnen sådan här — den lämnar denna prop outnyttjad. Utelämnad →
+   * länken renderas inte alls, bara den primära "+ Lägg till rad"-knappen
+   * visas i tomrutan.
    */
   onOpenAiHelp?: () => void
   /**
@@ -114,12 +120,23 @@ export interface QuoteDocumentProps extends QuoteDocumentMobileProps {
    */
   reservationSuggestions?: ReservationSuggestion[]
   onReviewReservationSuggestions?: () => void
+  /** Rivning paket B (2026-09-17, rad 2.5/2.6): vilket avdrag som är valt
+      just nu (härlett av anroparen ur radlistan, samma prioritetsordning
+      som getItemRotRutType redan använder — ROT före RUT). Data, inte en
+      handler, så den ligger som egen toppnivåprop precis som
+      reservationSuggestions ovan. Renderas bara tillsammans med
+      handlers.onDeductionTypeChange. */
+  activeDeductionType?: 'rot' | 'rut' | null
+  /** Rivning paket B (2026-09-17, rad 2.3): standardtexterna som tidigare
+      valdes i den borttagna QuoteStandardTextsSection — "Välj standardtext"
+      flyttar hit, bredvid respektive fält i villkorsstycket/betalboxen. */
+  standardTexts?: Record<string, QuoteStandardText[]>
 }
 
 /** Sektionerna hantverkaren granskar en i taget, i Andreas taxonomi. */
 export type DocumentSection = 'inkluderat' | 'exkluderat' | 'reservationer' | 'prisbild'
 
-export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow, onOpenAiHelp, reservationSuggestions, onReviewReservationSuggestions }: QuoteDocumentProps) {
+export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTap, focusSection, onAddRow, onOpenAiHelp, reservationSuggestions, onReviewReservationSuggestions, activeDeductionType, standardTexts }: QuoteDocumentProps) {
   const accent = data.business.accentColor
   const accent50 = mixWithWhite(accent, 0.92)
   const accent100 = mixWithWhite(accent, 0.82)
@@ -499,6 +516,44 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
               </>
             ) : (
               <>
+                {/* Rivning paket B (2026-09-17, rad 2.5/2.6): avdragsväxeln
+                    flyttad hit från den borttagna QuoteTotalsSection/
+                    QuoteRotSection — samma applyGlobalDeductionType-anrop,
+                    en yta i stället för tre. Bara i edit-läge: kunden ser
+                    aldrig en knapp, bara raden den resulterar i nedan. */}
+                {mode === 'edit' && handlers?.onDeductionTypeChange && (
+                  <div className="total-row" style={{ marginBottom: 8 }}>
+                    <div style={{ display: 'flex', gap: 4, width: '100%' }}>
+                      {([
+                        { type: null, label: 'Inget avdrag' },
+                        { type: 'rot', label: 'ROT' },
+                        { type: 'rut', label: 'RUT' },
+                      ] as { type: 'rot' | 'rut' | null; label: string }[]).map(opt => {
+                        const active = (activeDeductionType ?? null) === opt.type
+                        return (
+                          <button
+                            key={opt.label}
+                            type="button"
+                            onClick={() => handlers.onDeductionTypeChange!(opt.type)}
+                            style={{
+                              flex: 1,
+                              padding: '4px 8px',
+                              fontSize: 11,
+                              fontWeight: 600,
+                              borderRadius: 8,
+                              border: active ? '1px solid #0F766E' : '1px solid #e2e8f0',
+                              background: active ? '#0F766E' : '#fff',
+                              color: active ? '#fff' : '#475569',
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {opt.label}
+                          </button>
+                        )
+                      })}
+                    </div>
+                  </div>
+                )}
                 <div className="total-row"><span className="lbl">Summa exkl. moms</span><span className="val">{formatCurrency(data.quote.subtotalExVat)}</span></div>
                 {data.quote.discountPercent !== undefined ? (
                   <div className="total-row discount">
@@ -605,6 +660,14 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                     ? <EditableText value={data.quote.paymentTerms} onChange={handlers.onPaymentTermsChange} placeholder="30 dagar netto" />
                     : data.quote.paymentTerms}.
                 </strong>
+                {/* Rivning paket B (2026-09-17, rad 2.3): standardtext-
+                    väljaren för betalningsvillkor, flyttad hit från den
+                    borttagna QuoteStandardTextsSection. */}
+                {mode === 'edit' && handlers?.onPaymentTermsChange && standardTexts?.payment_terms?.length ? (
+                  <span style={{ marginLeft: 6 }}>
+                    <StandardTextPicker texts={standardTexts.payment_terms} onSelect={handlers.onPaymentTermsChange} />
+                  </span>
+                ) : null}
                 {data.business.swish && ' Vid mindre delbetalningar accepteras Swish till nummer nedan med offertnummer i meddelandet.'}
               </div>
             </div>
@@ -629,6 +692,13 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
         ) : mode === 'edit' && handlers?.onTermsChange ? (
           <p className="terms" {...section('exkluderat')}>
             <strong>Villkor.</strong>{' '}
+            {/* Rivning paket B (2026-09-17, rad 2.3): standardtextväljarna
+                flyttade hit från den borttagna QuoteStandardTextsSection —
+                samma tre texttyper (terms/not_included/ata_terms), samma
+                state, en yta i stället för två. */}
+            {standardTexts?.terms?.length ? (
+              <StandardTextPicker texts={standardTexts.terms} onSelect={handlers.onTermsChange} />
+            ) : null}
             <EditableText
               value={data.quote.termsText || ''}
               onChange={handlers.onTermsChange}
@@ -640,12 +710,17 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 <br /><br /><strong>Ej inkluderat:</strong>{' '}
                 {handlers.onNotIncludedChange
                   ? (
-                    <EditableText
-                      value={data.quote.notIncluded || ''}
-                      onChange={handlers.onNotIncludedChange}
-                      placeholder="Vad ingår inte i offerten…"
-                      multiline
-                    />
+                    <>
+                      {standardTexts?.not_included?.length ? (
+                        <StandardTextPicker texts={standardTexts.not_included} onSelect={handlers.onNotIncludedChange} />
+                      ) : null}
+                      <EditableText
+                        value={data.quote.notIncluded || ''}
+                        onChange={handlers.onNotIncludedChange}
+                        placeholder="Vad ingår inte i offerten…"
+                        multiline
+                      />
+                    </>
                   )
                   : data.quote.notIncluded}
               </>
@@ -664,12 +739,17 @@ export default function QuoteDocument({ data, mode, handlers, sheetMode, onRowTa
                 <br /><br /><strong>Ändringar och tilläggsarbeten:</strong>{' '}
                 {handlers.onAtaTermsChange
                   ? (
-                    <EditableText
-                      value={data.quote.ataTerms || ''}
-                      onChange={handlers.onAtaTermsChange}
-                      placeholder="T.ex. hur prissätts tilläggsarbete"
-                      multiline
-                    />
+                    <>
+                      {standardTexts?.ata_terms?.length ? (
+                        <StandardTextPicker texts={standardTexts.ata_terms} onSelect={handlers.onAtaTermsChange} />
+                      ) : null}
+                      <EditableText
+                        value={data.quote.ataTerms || ''}
+                        onChange={handlers.onAtaTermsChange}
+                        placeholder="T.ex. hur prissätts tilläggsarbete"
+                        multiline
+                      />
+                    </>
                   )
                   : data.quote.ataTerms}
               </>

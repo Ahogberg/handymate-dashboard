@@ -103,7 +103,8 @@ test('inkopplingen äger ingen ny offertskrivare, ingen ny pris-/reservationsmot
   expect(builder).toContain('useReservationSuggestions(items,')
   const intakeStart = builder.match(/jobTypeStart=\{<>[\s\S]*?<\/>\}/)?.[0]
   expect(intakeStart).toContain('{jobTypeStart}')
-  expect(intakeStart).toContain('{preparationInput}')
+  // Rivningen A3 (2026-09-17): kundunderlagspanelen är borta — ?preparation_id går direkt i rutan.
+  expect(intakeStart).not.toContain('{preparationInput}')
   const intake = read('app/dashboard/quotes/new/components/quick/QuickIntake.tsx')
   expect(intake.indexOf('{jobTypeStart}')).toBeGreaterThan(intake.indexOf('fixed inset-0'))
   const onboarding = read('app/onboarding/page.tsx')

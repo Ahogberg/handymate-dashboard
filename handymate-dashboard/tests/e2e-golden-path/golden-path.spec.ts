@@ -492,17 +492,15 @@ test.describe.serial('Golden Path — Fas 1 (station 1-7)', () => {
         await dismissKnownOverlays(ownerPage, 2500)
       })
 
-      // KÄLLGRANSKAT (upptäckt under en riktig körning, 2026-08-13):
-      // /dashboard/quotes/new öppnas i `mainView === 'document'` som
-      // default (app/dashboard/quotes/new/page.tsx) — sök/skriv-kombon
-      // (QuoteAddRowCombo.tsx) renderas bara i `mainView === 'list'`
-      // ("Listvy"-togglen). Klicka dit först.
-      await test.step('Växla till Listvy (sök/skriv-kombon finns bara där)', async () => {
-        await ownerPage.getByRole('button', { name: 'Listvy' }).click()
+      // RIVNINGEN PAKET A (2026-09-17): listvyn och växeln Dokument/Listvy är
+      // borta — dokumentet är enda radeditorn. Rader läggs till via
+      // "+ Lägg till rad" under dokumentet, som öppnar AddRowSheet.
+      await test.step('Öppna Lägg till rad under dokumentet', async () => {
+        await ownerPage.getByRole('button', { name: '+ Lägg till rad' }).first().click()
       })
 
-      await test.step('Lägg till en rad via sök/skriv-kombon', async () => {
-        const combo = ownerPage.getByPlaceholder('Sök produkt eller skriv ny beskrivning…')
+      await test.step('Lägg till en rad via sök/skriv-fältet i sheeten', async () => {
+        const combo = ownerPage.getByPlaceholder('Sök artikel eller skriv en beskrivning…')
         await combo.waitFor({ state: 'visible', timeout: 10_000 })
         await combo.fill('Arbete — badrumsrenovering (E2E)')
         await combo.press('Enter')

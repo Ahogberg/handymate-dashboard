@@ -3,7 +3,6 @@ import { productionPreview } from './helpers/first-value-production-preview'
 
 test.use({ storageState: { cookies: [], origins: [] }, launchOptions: process.env.HANDYMATE_TEST_CHROMIUM ? { executablePath: process.env.HANDYMATE_TEST_CHROMIUM } : undefined })
 const sample = { version:1, source:'Byt sex innerdörrar och forsla bort de gamla.', title:'Byte av sex innerdörrar', description:'Montering och bortforsling.', createdAt:'2026-09-08T10:00:00Z', items:[{description:'Montera innerdörrar',quantity:6,unit:'st',type:'labor'}] }
-const rule = {version:1,kind:'planned_visits',visits:2,jobType:'dorrar'}
 let html:string
 test.beforeAll(async()=>{ html=await productionPreview() })
 async function setup(page:Page) {
@@ -12,7 +11,6 @@ async function setup(page:Page) {
   await page.route('**/api/onboarding',r=>r.fulfill({json:{business_id:'firm-a',onboarding_data:{workSample:sample,workSampleSource:sample.source}}}))
   await page.route('**/api/onboarding/work-sample',r=>r.fulfill({json:{sample}}))
   await page.route('**/fixture/save',r=>r.fulfill({json:{ok:true}}))
-  await page.route('**/api/quotes/visit-rule**',r=>r.fulfill({json:{rule:r.request().method()==='POST'?JSON.parse(r.request().postData()!):null}}))
   await page.route('**/api/quotes/q/handoff',r=>r.fulfill({json:{checkedAt:'2026-09-08T10:00:00Z',summary:{state:'decision',headline:'Ett förslag väntar på ditt beslut',done:'Offerten är registrerad som skickad.',next:'Granska förslaget.',needsYou:'Godkänn eller avvisa.',link:'/dashboard/approvals?focus=a',linkLabel:'Granska förslaget'}}}))
   await page.route('**/api/quotes/q/followup',r=>r.fulfill({json:{enabled:false,items:[]}}))
   await page.goto('https://first-value.test/')
@@ -30,35 +28,12 @@ for(const width of [375,1280]) {
     await page.getByRole('button',{name:'Behåll underlaget och fortsätt'}).click()
     expect((await saved).postDataJSON()).toEqual({source:sample.source,sample})
     await expect(page.getByText('Sparat på servern')).toBeVisible()
-    await page.getByRole('button',{name:'resume',exact:true}).click()
-    await page.getByRole('button',{name:'Använd mitt förberedda underlag'}).click()
-    await expect(page.getByTestId('description')).toHaveText('Kunden står för dörrarna.')
-    await page.getByRole('button',{name:'Ersätt med arbetsprovet'}).click()
-    await expect(page.getByTestId('description')).toHaveText(sample.description)
+    // Rivningen A3 (2026-09-17): arbetsprovsbannern i offertstarten är borta.
     await page.getByRole('button',{name:'handoff',exact:true}).click()
     await expect(page.getByRole('link',{name:'Granska förslaget'})).toHaveAttribute('href','/dashboard/approvals?focus=a')
     await page.screenshot({path:info.outputPath(`overlamning-${width}.png`),fullPage:true})
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true)
     expect(errors).toEqual([])
-  })
-  test(`jobbregel kräver preview, denna offert skriver inget och framtida regel får kvitto, ${width}px`,async({page},info)=>{
-    await page.setViewportSize({width,height:900}); const errors=await setup(page)
-    const writes:unknown[]=[]; page.on('request',r=>{if(r.method()==='POST'&&r.url().includes('/visit-rule'))writes.push(r.postDataJSON())})
-    await page.getByRole('button',{name:'regel',exact:true}).click()
-    await page.getByLabel('Antal besök').fill('3')
-    await page.getByRole('button',{name:'Visa ändringen först'}).click()
-    await expect(page.getByTestId('description')).not.toContainText('Planerade besök')
-    await page.getByRole('button',{name:'Använd i den här offerten'}).click()
-    await expect(page.getByTestId('description')).toContainText('Planerade besök: 3.')
-    expect(writes).toEqual([])
-    await page.getByLabel('Även nya AI-utkast för den här jobbtypen').check()
-    await page.getByLabel('Antal besök').fill('2')
-    await page.getByRole('button',{name:'Visa ändringen först'}).click()
-    await page.screenshot({path:info.outputPath(`jobbregel-${width}.png`),fullPage:true})
-    await page.getByRole('button',{name:'Spara regeln och använd här'}).click()
-    await expect(page.getByText('Din regel är sparad för jobbtypen', {exact:false})).toBeVisible()
-    expect(writes).toEqual([rule]); await expect(page.getByTestId('description')).toContainText('Planerade besök: 2.')
-    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true); expect(errors).toEqual([])
   })
 }
 test('AI-fel och sparfel behåller förfrågan; annat företag får inte se samma arbetsprov',async({page})=>{
@@ -72,30 +47,16 @@ test('AI-fel och sparfel behåller förfrågan; annat företag får inte se samm
   await expect(page.getByRole('alert')).toContainText('Kunde inte spara')
   await page.evaluate(()=> (window as any).fixture.setBusiness('firm-b'))
   await expect(page.getByLabel('Din förfrågan')).toHaveValue('')
-  await page.getByRole('button',{name:'resume',exact:true}).click()
-  await expect(page.getByRole('alert')).toContainText('Kunde inte kontrollera')
-  await expect(page.getByRole('button',{name:'Använd mitt förberedda underlag'})).toHaveCount(0)
 })
-test('sen regelsparning kan aldrig skriva över ett nytt jobb',async({page})=>{
+// RIVNING PAKET C (2026-09-17, rad 2.14): VisitRuleEditor och
+// /api/quotes/visit-rule är borttagna — den seedade "Hur många besök
+// räknar du med?"-frågan i intaget (lib/quotes/intake-questions.ts) har
+// ingen egen preview/lås-mekanism att testa (den är fritext som vilken
+// annan intagsfråga som helst). Två tester ("sen regelsparning …",
+// "ändrad offert kräver ny förhandsvisning …") som bara provade den
+// borttagna editorns egen guard-logik är borttagna med den.
+test('läsfel ger inget överlämningskvitto',async({page})=>{
   await setup(page)
-  let release!:()=>void; const gate=new Promise<void>(resolve=>{release=resolve})
-  await page.route('**/api/quotes/visit-rule**',async r=>{ if(r.request().method()==='POST')await gate; await r.fulfill({json:{rule:r.request().method()==='POST'?rule:null}}) })
-  await page.getByRole('button',{name:'regel',exact:true}).click()
-  await page.getByLabel('Även nya AI-utkast för den här jobbtypen').check()
-  await page.getByRole('button',{name:'Visa ändringen först'}).click()
-  const started=page.waitForRequest(r=>r.method()==='POST'&&r.url().includes('/visit-rule'))
-  await page.getByRole('button',{name:'Spara regeln och använd här'}).click(); await started
-  await page.evaluate(()=>{ (window as any).fixture.setJob('annat'); (window as any).fixture.setDescription('Ett annat jobb') })
-  const response=page.waitForResponse(r=>r.request().method()==='POST'&&r.url().includes('/visit-rule')); release(); await response
-  await expect(page.getByTestId('description')).toHaveText('Ett annat jobb')
-})
-test('ändrad offert kräver ny förhandsvisning och läsfel ger inget överlämningskvitto',async({page})=>{
-  await setup(page); await page.getByRole('button',{name:'regel',exact:true}).click()
-  await page.getByRole('button',{name:'Visa ändringen först'}).click()
-  await page.evaluate(()=> (window as any).fixture.setDescription('Nytt villkor'))
-  await page.getByRole('button',{name:'Använd i den här offerten'}).click()
-  await expect(page.getByRole('alert')).toContainText('Förhandsgranska på nytt')
-  await expect(page.getByTestId('description')).toHaveText('Nytt villkor')
   await page.route('**/api/quotes/q/handoff',r=>r.fulfill({status:503,json:{error:'failed'}}))
   await page.getByRole('button',{name:'handoff',exact:true}).click()
   await expect(page.getByRole('alert')).toContainText('Kunde inte kontrollera överlämningen')

@@ -6,6 +6,13 @@ import { checkPublicRateLimitDb } from '@/lib/rate-limit-db'
 import { loadAttribution } from '@/lib/branding/attribution'
 import { createHash } from 'crypto'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 /**
  * /api/referral-lead — Epic C spel 1 (tasks/hanna-sales-engine-v2-spec.md).
  *

@@ -1,7 +1,6 @@
 'use client'
 
-import type { Dispatch, SetStateAction, ReactNode } from 'react'
-import ProductSearchModal from '@/components/ProductSearchModal'
+import type { Dispatch, SetStateAction } from 'react'
 import type { TemplatePreviewPayload } from '@/components/quotes/TemplatePreviewFrame'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
 import type { QuoteDocumentHandlers } from '@/components/quotes/document/QuoteDocument'
@@ -13,8 +12,6 @@ import type {
   QuoteItem,
   QuoteStandardText,
 } from '@/lib/types/quote'
-import type { QuoteSection, SectionSummary } from '@/lib/quotes/quote-completeness'
-import { QuoteStylePicker } from '@/components/quotes/QuoteStylePicker'
 import { ProductModal, type ProductInitialValues, type ProductSavePayload } from '@/components/products/ProductModal'
 import type { CustomCategory } from '@/lib/constants/categories'
 
@@ -23,19 +20,18 @@ import { ReservationMutedNotice } from './ReservationSuggestionBanner'
 import { ReservationReviewSheet } from './ReservationReviewSheet'
 import { QuoteMarginCard } from './QuoteMarginCard'
 import { QuoteDocumentSurface } from './QuoteDocumentSurface'
-import QuotePackageComparison from '@/components/quotes/QuotePackageComparison'
-import { QuoteItemsSection } from './QuoteItemsSection'
-import { QuoteRotSection } from './QuoteRotSection'
-import { QuoteStandardTextsSection } from './QuoteStandardTextsSection'
+// RIVNING PAKET B (2026-09-17): QuoteStylePicker monteras inte längre här
+// (komponenten lever kvar, InvoiceEditor.tsx använder den fortfarande för
+// fakturans egen stil). QuoteRotSection och QuoteStandardTextsSection är
+// raderade filer — se lib/quotes/panel-status.ts:s docblock för var de tre
+// ytorna flyttade. QuoteTotalsSection är också raderad.
 import { QuotePaymentPlanSection } from './QuotePaymentPlanSection'
 import { QuoteDisplaySettingsSection } from './QuoteDisplaySettingsSection'
-import { QuoteTotalsSection } from './QuoteTotalsSection'
 import { QuoteSaveTemplateModal } from './QuoteSaveTemplateModal'
 import { QuoteBuilderHeader } from './QuoteBuilderHeader'
 import { QuoteBuilderBottomBar } from './QuoteBuilderBottomBar'
 import { QuoteEditCustomerSection } from './QuoteEditCustomerSection'
 import type { ProductWithComponents } from './applyProductToItem'
-import type { useQuoteCalculations } from './useQuoteCalculations'
 import { QuoteNewAttachmentsCard } from '../new/components/QuoteNewAttachmentsCard'
 
 interface Customer {
@@ -56,12 +52,12 @@ interface Customer {
  * modell som create-lägets state.
  *
  * VARFÖR EN EGEN FIL (inte inline i QuoteBuilder.tsx):
- * `tests/quotes-mer-i-flodet.spec.ts` låser att de sex delade
- * "Mer"-panelerna (QuoteStylePicker/QuoteStandardTextsSection/
- * QuotePaymentPlanSection/QuoteDisplaySettingsSection/
- * QuoteNewAttachmentsCard/QuoteRotSection) monteras EXAKT EN GÅNG i
- * `QuoteBuilder.tsx` — de monteras redan där för create-lägets "Mer"-rad.
- * Om edit-lägets JSX (som VISAR alla sex permanent, ingen "Mer"-rad) låg
+ * `tests/quotes-mer-i-flodet.spec.ts` låser att de delade Mer-panelerna
+ * (efter rivning paket B, 2026-09-17: QuotePaymentPlanSection/
+ * QuoteDisplaySettingsSection/QuoteNewAttachmentsCard — Stil/Villkor &
+ * texter/ROT-detaljer är borta, se panel-status.ts) monteras EXAKT EN GÅNG
+ * i `QuoteBuilder.tsx` — de monteras redan där för create-lägets "Mer"-rad.
+ * Om edit-lägets JSX (som VISAR dem permanent, ingen "Mer"-rad) låg
  * inline i samma fil hade mount-räkningen blivit två för varje panel.
  * Edit-läget har dessutom en helt annan layout (klassisk tvåkolumn, ingen
  * Snabboffert/canvas-first "Mer"-rad) — att tvinga in det i samma
@@ -69,26 +65,14 @@ interface Customer {
  * QuoteBuilder.tsx svårläst utan att vinna något.
  */
 export interface QuoteEditViewProps {
-  visitRuleEditor?: ReactNode
   quoteId: string
   quoteNumber: string
-  /** Completeness-remsan (Fas 1, offert-omtaget 2026-08-31) — samma
-      sammanfattning som create-läget beräknar (sectionSummary/SECTION_ORDER
-      i lib/quotes/quote-completeness.ts), ägd av QuoteBuilder.tsx eftersom
-      den här komponenten är ren presentation (se docblock ovan). Renderas
-      som header-RAD 2 i QuoteBuilderHeader. */
-  completenessSummaries: Record<QuoteSection, SectionSummary>
-  onSelectSection: (section: QuoteSection) => void
   autoSaveStatus: 'idle' | 'saving' | 'saved' | 'error'
   saving: boolean
   onSendQuote: () => void
   onSaveDraft: () => void
   onSaveTemplate: () => void
   hasItems: boolean
-
-  businessDefaultStyle: 'modern' | 'premium' | 'friendly'
-  templateStyle: 'modern' | 'premium' | 'friendly' | null
-  setTemplateStyle: (s: 'modern' | 'premium' | 'friendly' | null) => void
 
   reservations: ReturnType<typeof useReservationSuggestions>
 
@@ -107,36 +91,26 @@ export interface QuoteEditViewProps {
   items: QuoteItem[]
   setItems: Dispatch<SetStateAction<QuoteItem[]>>
   allCategories: { slug: string; label: string; rot: boolean; rut: boolean }[]
-  localCustomCategories: CustomCategory[]
   products: ProductWithComponents[]
   onSaveAsStandard: (productId: string, price: number) => void
-  dndSensors: any
-  handleDragEnd: (event: any) => void
   addItem: (type: QuoteItem['item_type']) => void
   updateItem: (id: string, field: keyof QuoteItem, value: any) => void
   removeItem: (id: string) => void
-  moveItem: (index: number, direction: 'up' | 'down') => void
   moveItemById: (id: string, direction: 'up' | 'down') => void
   addFromProduct: (product: ProductWithComponents, quantity?: number) => void
   applyProductToExistingRow: (itemId: string, product: ProductWithComponents) => void
   addBlankRowWithDescription: (description: string) => void
-  setShowGrossistSearch: (b: boolean) => void
-  createCustomCategory: (label: string, itemId: string) => void
-  showNewCategoryInput: string | null
-  setShowNewCategoryInput: (v: string | null) => void
-  newCategoryLabel: string
-  setNewCategoryLabel: (v: string) => void
   setProductModalRow: (row: QuoteItem | null) => void
 
-  hasRotItems: boolean
-  hasRutItems: boolean
-  personnummer: string
-  setPersonnummer: (v: string) => void
-  fastighetsbeteckning: string
-  setFastighetsbeteckning: (v: string) => void
+  /** Rivning paket B (2026-09-17, rad 2.5/2.6): vilket avdrag som är valt —
+      ersätter hasRotItems/hasRutItems, som bara behövdes av den borttagna
+      QuoteRotSection/QuoteTotalsSection. Vidarebefordras rakt till
+      QuoteDocumentSurface. */
+  activeDeductionType: 'rot' | 'rut' | null
 
-  showStandardTexts: boolean
-  setShowStandardTexts: (b: boolean) => void
+  /** Rivning paket B (2026-09-17, rad 2.3): standardtexterna, vidare-
+      befordrade till dokumentets egna textfält i stället för den
+      borttagna QuoteStandardTextsSection. */
   textsByType: Record<string, QuoteStandardText[]>
   referencePerson: string
   setReferencePerson: (v: string) => void
@@ -144,14 +118,6 @@ export interface QuoteEditViewProps {
   setCustomerReference: (v: string) => void
   projectAddress: string
   setProjectAddress: (v: string) => void
-  notIncluded: string
-  setNotIncluded: (v: string) => void
-  ataTerms: string
-  setAtaTerms: (v: string) => void
-  paymentTermsText: string
-  setPaymentTermsText: (v: string) => void
-  termsText: string
-  setTermsText: (v: string) => void
 
   showPaymentPlan: boolean
   setShowPaymentPlan: (b: boolean) => void
@@ -177,10 +143,8 @@ export interface QuoteEditViewProps {
   showQuantities: boolean
   setShowQuantities: (b: boolean) => void
 
-  totals: ReturnType<typeof useQuoteCalculations>['totals']
   vatRate: number
   discountPercent: number
-  setDiscountPercent: (n: number) => void
 
   liveAvailable: boolean
   quoteTemplateData: QuoteTemplateData
@@ -192,9 +156,7 @@ export interface QuoteEditViewProps {
 
   sheetItem: QuoteItem | null
 
-  showGrossistSearch: boolean
   businessId: string
-  addFromGrossist: (p: any) => void
 
   productModalRow: QuoteItem | null
   savingProduct: boolean
@@ -203,51 +165,38 @@ export interface QuoteEditViewProps {
 
   showSaveTemplateModal: boolean
   setShowSaveTemplateModal: (b: boolean) => void
-  templateName: string
-  setTemplateName: (s: string) => void
-  savingTemplate: boolean
-  saveAsTemplate: () => void
+  /** RIVNING PAKET C (2026-09-17, rad 2.20): "Spara som upplägg för
+      jobbtypen" behöver veta offertens jobbtyp — läst av loadEditQuote.ts
+      (quotes.job_type) precis som create-läget redan läser den. */
+  quoteJobType: string | null
 }
 
 export function QuoteEditView(props: QuoteEditViewProps) {
   const {
-    quoteId, quoteNumber, completenessSummaries, onSelectSection,
+    quoteId, quoteNumber,
     autoSaveStatus, saving, onSendQuote, onSaveDraft, onSaveTemplate, hasItems,
-    businessDefaultStyle, templateStyle, setTemplateStyle,
     reservations, recalculated,
     customers, selectedCustomer, setSelectedCustomer, validDays, setValidDays, title, setTitle, description, setDescription,
-    items, setItems, allCategories, localCustomCategories, products, onSaveAsStandard, dndSensors, handleDragEnd,
-    addItem, updateItem, removeItem, moveItem, moveItemById, addFromProduct, applyProductToExistingRow,
-    addBlankRowWithDescription, setShowGrossistSearch, createCustomCategory, showNewCategoryInput,
-    setShowNewCategoryInput, newCategoryLabel, setNewCategoryLabel, setProductModalRow,
-    hasRotItems, hasRutItems, personnummer, setPersonnummer, fastighetsbeteckning, setFastighetsbeteckning,
-    showStandardTexts, setShowStandardTexts, textsByType, referencePerson, setReferencePerson,
-    customerReference, setCustomerReference, projectAddress, setProjectAddress, notIncluded, setNotIncluded,
-    ataTerms, setAtaTerms, paymentTermsText, setPaymentTermsText, termsText, setTermsText,
+    items, setItems, allCategories, products, onSaveAsStandard, addItem, updateItem, removeItem, moveItemById, addFromProduct, applyProductToExistingRow,
+    addBlankRowWithDescription, setProductModalRow,
+    activeDeductionType, textsByType, referencePerson, setReferencePerson,
+    customerReference, setCustomerReference, projectAddress, setProjectAddress,
     showPaymentPlan, setShowPaymentPlan, paymentPlan, calculatedPaymentPlan, paymentPlanValid,
     addPaymentPlanEntry, updatePaymentPlanEntry, removePaymentPlanEntry, formatCurrency,
     attachments, setAttachments, uploadingFile, onFileUpload,
     showDisplaySettings, setShowDisplaySettings, detailLevel, setDetailLevel, showUnitPrices, setShowUnitPrices,
     showQuantities, setShowQuantities,
-    totals, vatRate, discountPercent, setDiscountPercent,
+    vatRate, discountPercent,
     liveAvailable, quoteTemplateData,
     liveHandlers, setSheetItemId, addRowSheetOpen, setAddRowSheetOpen, templatePreviewPayload, sheetItem,
-    showGrossistSearch, businessId, addFromGrossist,
-    productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
-    showSaveTemplateModal, setShowSaveTemplateModal, templateName, setTemplateName, savingTemplate, saveAsTemplate,
+    businessId, productModalRow, savingProduct, saveItemToProducts, buildProductInitialValues,
+    showSaveTemplateModal, setShowSaveTemplateModal, quoteJobType,
   } = props
 
   // Fas B-granskningsfix (offertskaparen-design-polish, 2026-08-31): lyft ur
   // en gång i stället för att copy-pasta samma uttryck till både
   // QuoteBuilderHeader (desktop) och QuoteBuilderBottomBar (mobil) nedan.
   const canSend = !!selectedCustomer
-
-  // DESIGN-SPEC.md ("Helt tomt läge", offertskaparen-polish): samma villkor
-  // som QuoteBuilder.tsx (create-läget) — döljer completeness-remsan (både
-  // header-rad 2 och bottenfältets chip-rad) helt tills offerten har
-  // meningsfullt innehåll. Beräknas lokalt av samma skäl som `canSend` ovan:
-  // den här komponenten är ren presentation men äger sitt eget JSX-träd.
-  const hasQuoteContent = items.length > 0 || !!selectedCustomer
 
   return (
     <div className="min-h-screen bg-slate-50">
@@ -263,8 +212,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
           mode="edit"
           quoteNumber={quoteNumber}
           title={title}
-          completenessSummaries={hasQuoteContent ? completenessSummaries : undefined}
-          onSelectSection={onSelectSection}
           autoSaveStatus={autoSaveStatus}
           saving={saving}
           canSend={canSend}
@@ -277,12 +224,9 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         <div className="grid grid-cols-1 lg:grid-cols-[1fr_minmax(620px,46%)] gap-5 items-start">
           {/* ── Left Column — Form ─────────────────────────────────── */}
           <div className="flex flex-col gap-4">
-            <QuoteStylePicker
-              quoteId={quoteId}
-              value={templateStyle}
-              onChange={setTemplateStyle}
-              businessDefaultStyle={businessDefaultStyle}
-            />
+            {/* RIVNING PAKET B (2026-09-17, rad 2.4/3.12): QuoteStylePicker
+                monteras inte längre här — firmadefaulten i inställningar
+                räcker, ingen per-offert-stilväljare kvar. */}
 
             {/* FAS D (offertskaparen-design-polish, 2026-09-01): den
                 fristående "N reservationer matchar"-bannern som satt här
@@ -312,64 +256,24 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               setTitle={setTitle}
               description={description}
               setDescription={setDescription}
-            />
-
-            {props.visitRuleEditor}
-            <QuotePackageComparison items={items} discountPercent={discountPercent} vatRate={vatRate} onApply={setItems} />
-            <QuoteItemsSection
-              items={items}
-              recalculated={recalculated}
-              allCategories={allCategories}
-              customCategories={localCustomCategories}
-              products={products}
-              onSaveAsStandard={onSaveAsStandard}
-              dndSensors={dndSensors}
-              onDragEnd={handleDragEnd}
-              onAddItem={addItem}
-              onUpdateItem={updateItem}
-              onRemoveItem={removeItem}
-              onMoveItem={moveItem}
-              onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
-              onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
-              onAddBlankRow={addBlankRowWithDescription}
-              onOpenGrossistSearch={() => setShowGrossistSearch(true)}
-              onCreateCategory={createCustomCategory}
-              showNewCategoryInput={showNewCategoryInput}
-              setShowNewCategoryInput={setShowNewCategoryInput}
-              newCategoryLabel={newCategoryLabel}
-              setNewCategoryLabel={setNewCategoryLabel}
-              onSaveToProducts={row => setProductModalRow(row)}
-            />
-
-            <QuoteRotSection
-              items={items}
-              setItems={setItems}
-              hasRotItems={hasRotItems}
-              personnummer={personnummer}
-              setPersonnummer={setPersonnummer}
-              fastighetsbeteckning={fastighetsbeteckning}
-              setFastighetsbeteckning={setFastighetsbeteckning}
-            />
-
-            <QuoteStandardTextsSection
-              open={showStandardTexts}
-              setOpen={setShowStandardTexts}
-              textsByType={textsByType}
               referencePerson={referencePerson}
               setReferencePerson={setReferencePerson}
               customerReference={customerReference}
               setCustomerReference={setCustomerReference}
               projectAddress={projectAddress}
               setProjectAddress={setProjectAddress}
-              notIncluded={notIncluded}
-              setNotIncluded={setNotIncluded}
-              ataTerms={ataTerms}
-              setAtaTerms={setAtaTerms}
-              paymentTermsText={paymentTermsText}
-              setPaymentTermsText={setPaymentTermsText}
-              termsText={termsText}
-              setTermsText={setTermsText}
             />
+
+            {/* RIVNING PAKET C (2026-09-17, rad 2.14): VisitRuleEditor
+                borttagen, se motivering i QuoteBuilder.tsx. */}
+            {/* RIVNING PAKET C (2026-09-17, rad 2.13): QuotePackageComparison
+                borttagen, se motivering i QuoteBuilder.tsx. */}
+
+            {/* RIVNING PAKET B (2026-09-17, rad 2.3/2.5/2.6): QuoteRotSection,
+                QuoteStandardTextsSection och QuoteTotalsSection borttagna —
+                avdragsväxeln och texterna sitter nu i dokumentets egen
+                summering/villkorsstycke (se activeDeductionType/textsByType
+                på QuoteDocumentSurface nedan). */}
 
             <QuotePaymentPlanSection
               open={showPaymentPlan}
@@ -401,18 +305,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               showQuantities={showQuantities}
               setShowQuantities={setShowQuantities}
             />
-
-            <QuoteTotalsSection
-              totals={totals}
-              vatRate={vatRate}
-              discountPercent={discountPercent}
-              setDiscountPercent={setDiscountPercent}
-              hasRotItems={hasRotItems}
-              hasRutItems={hasRutItems}
-              formatCurrency={formatCurrency}
-              items={items}
-              setItems={setItems}
-            />
           </div>
 
           {/* ── Höger kolumn — dokumentytan, fyller viewport ─────── */}
@@ -426,27 +318,28 @@ export function QuoteEditView(props: QuoteEditViewProps) {
               templatePreviewPayload={templatePreviewPayload}
               reservationSuggestions={reservations.suggestions}
               onReviewReservationSuggestions={() => reservations.setReviewOpen(true)}
+              activeDeductionType={activeDeductionType}
+              standardTexts={textsByType}
               // onOpenAiHelp intentionally omitted: edit-läget har ingen
-              // AI-utkasts-flöde (showAiHelper/QuoteNewAIHelper finns bara i
-              // create-läget i QuoteBuilder.tsx) — utan proppen visar
-              // dokumentets tomma-läge bara "Lägg till rad", ingen "eller
-              // beskriv jobbet"-länk. Se QuoteDocument.tsx:s onOpenAiHelp-docblock.
+              // AI-utkasts-flöde (Snabbofferten finns bara i create-läget
+              // i QuoteBuilder.tsx) — utan proppen visar dokumentets tomma-
+              // läge bara "Lägg till rad", ingen "eller beskriv jobbet"-länk.
+              // Se QuoteDocument.tsx:s onOpenAiHelp-docblock.
             />
           </div>
         </div>
       </div>
 
       {/* Fas B (offertskaparen-design-polish, 2026-08-31): mobilens fasta
-          bottenfält — samma completeness-data och Spara/Skicka-handlers som
-          headern ovan (nu desktop-only, se dess `hidden lg:flex`-gate).
-          Edit-läget har aldrig haft sendDisabledReason/sendConfirmPending/
-          onConfirmSend/onCancelSend (se QuoteBuilderHeader.tsx:s docblock —
-          den "extra bekräftelsen" hörde bara till create-flödet), så de
-          utelämnas här precis som i mountningen av headern ovan. */}
+          bottenfält — samma Spara/Skicka-handlers som headern ovan (nu
+          desktop-only, se dess `hidden lg:flex`-gate). Edit-läget har
+          aldrig haft sendDisabledReason/sendConfirmPending/onConfirmSend/
+          onCancelSend (se QuoteBuilderHeader.tsx:s docblock — den "extra
+          bekräftelsen" hörde bara till create-flödet), så de utelämnas här
+          precis som i mountningen av headern ovan. RIVNING PAKET C
+          (2026-09-17, rad 2.16): completeness-chipparna (summaries/
+          hasQuoteContent/onSelect) är borttagna. */}
       <QuoteBuilderBottomBar
-        summaries={completenessSummaries}
-        hasQuoteContent={hasQuoteContent}
-        onSelect={onSelectSection}
         saving={saving}
         canSend={canSend}
         onSendQuote={onSendQuote}
@@ -467,6 +360,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         }
         onSaveAsStandard={(productId, price) => { void onSaveAsStandard(productId, price) }}
         onSaveToBank={row => setProductModalRow(row)}
+        onSelectProductForRow={(itemId, product) => { void applyProductToExistingRow(itemId, product) }}
       />
 
       <AddRowSheet
@@ -474,7 +368,7 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         reservationCount={product => reservations.countForProduct(product)}
         onSelectProduct={(product, quantity) => { void addFromProduct(product, quantity) }}
         onAddBlankRow={addBlankRowWithDescription}
-        onAddHeading={() => addItem('heading')}
+        onAddRowType={addItem}
         onClose={() => setAddRowSheetOpen(false)}
       />
 
@@ -486,15 +380,6 @@ export function QuoteEditView(props: QuoteEditViewProps) {
         onClose={() => reservations.setReviewOpen(false)}
       />
 
-      <ProductSearchModal
-        isOpen={showGrossistSearch}
-        onClose={() => setShowGrossistSearch(false)}
-        onSelect={p => {
-          addFromGrossist(p)
-          setShowGrossistSearch(false)
-        }}
-        businessId={businessId}
-      />
 
       {productModalRow && (
         <ProductModal
@@ -508,12 +393,10 @@ export function QuoteEditView(props: QuoteEditViewProps) {
       )}
 
       <QuoteSaveTemplateModal
+        jobType={quoteJobType}
+        items={items}
         show={showSaveTemplateModal}
         onClose={() => setShowSaveTemplateModal(false)}
-        templateName={templateName}
-        setTemplateName={setTemplateName}
-        saving={savingTemplate}
-        onSave={saveAsTemplate}
       />
     </div>
   )

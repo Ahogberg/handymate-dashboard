@@ -62,6 +62,12 @@ export interface LoadedEditQuote {
   fastighetsbeteckning: string
   discountPercent: number
   validDays: number
+  /** quotes.job_type (sql/v7_pricing.sql) — RIVNING PAKET C (2026-09-17,
+      rad 2.20): läses nu även vid redigering, så "Spara som upplägg för
+      jobbtypen" (QuoteSaveTemplateModal) vet vilken jobbtyp offertens rader
+      ska bindas till. Samma kolumn som create-flödet redan skriver via
+      buildQuotePayload.ts — ingen ny kolumn, bara en ny läsare. */
+  jobType: string | null
 }
 
 /**
@@ -184,5 +190,6 @@ export async function fetchQuoteForEdit(quoteId: string): Promise<LoadedEditQuot
     fastighetsbeteckning: quote.fastighetsbeteckning || '',
     discountPercent: quote.discount_percent || 0,
     validDays: computeValidDays(quote.valid_until, quote.created_at),
+    jobType: quote.job_type || null,
   }
 }

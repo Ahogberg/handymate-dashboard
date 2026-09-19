@@ -279,6 +279,19 @@ jobs:
           tests/revisorsplats.spec.ts
           tests/pengar-pa-bordet.spec.ts
           tests/bulk-med-bekraftelse.spec.ts
+          tests/intake-questions.spec.ts
+          tests/forsta-jobbresan.spec.ts
+          tests/quote-content-lock.spec.ts
+          tests/offertens-radtyper.spec.ts
+          tests/snabboffert-startvagar.spec.ts
+          tests/offertstarten-en-skarm.spec.ts
+          tests/rivning-c-verktygen.spec.ts
+          tests/rivning-2-20-mall-upplagg.spec.ts
+          tests/rivning-d-runtomkring.spec.ts
+          tests/design-offertflodet-kontrakt.spec.ts
+          tests/facit-force-dynamic.spec.ts
+          tests/facit-helskarm-over-bubblan.spec.ts
+          tests/facit-kom-ikapp.spec.ts
           tests/auto-faktura-avdragsvakt.spec.ts
           --no-deps
           --project=chromium

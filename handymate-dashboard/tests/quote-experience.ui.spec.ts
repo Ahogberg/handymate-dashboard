@@ -24,31 +24,30 @@ function bundle(entry: string) {
   }
   return {entry:add(entry),modules}
 }
-async function mount(page:Page,kind:'recovery'|'experience'|'send'|'preparation'){
+async function mount(page:Page,kind:'recovery'|'experience'|'send'){
  const errors:string[]=[];page.on('pageerror',e=>errors.push(e.message))
  await page.route('**/*',r=>r.request().url()==='http://quote.test/'?r.fulfill({contentType:'text/html',body:'<html lang="sv"><head><meta name="viewport" content="width=device-width,initial-scale=1"></head><body><div id="root"></div></body></html>'}):r.abort())
- if(kind==='preparation') await page.route('**/api/customer-preparation?*',r=>r.fulfill({json:{preparations:[{id:'prep',template:'charging',context:'Laddbox vid garaget',status:'reviewed',answers:{location:'Garage',route:'Okänd sträcka',wishes:'Bil'},images:['private/path']},{id:'unreviewed',template:'charging',context:'Ska inte användas',status:'submitted',answers:{},images:[]}]}}))
  await page.goto('http://quote.test/')
  const css=await postcss([tailwind({...config,content:['app/dashboard/quotes/_shared/*.tsx','app/dashboard/quotes/[[]id[]]/components/QuoteSendModal.tsx']})]).process('@tailwind base;@tailwind components;@tailwind utilities;',{from:undefined});await page.addStyleTag({content:css.css})
  for(const f of ['react/umd/react.production.min.js','react-dom/umd/react-dom.production.min.js'])await page.addScriptTag({content:fs.readFileSync('node_modules/'+f,'utf8')})
- const files=kind==='preparation'?['components/customer-preparation/QuotePreparationInput.tsx']:kind==='recovery'?['app/dashboard/quotes/_shared/useQuoteRecovery.ts']:kind==='send'?['app/dashboard/quotes/[id]/components/QuoteSendModal.tsx']:['app/dashboard/quotes/_shared/QuoteBuilderHeader.tsx','app/dashboard/quotes/_shared/QuoteBuilderBottomBar.tsx','app/dashboard/quotes/_shared/QuotePriceMemory.tsx']
+ const files=kind==='recovery'?['app/dashboard/quotes/_shared/useQuoteRecovery.ts']:kind==='send'?['app/dashboard/quotes/[id]/components/QuoteSendModal.tsx']:['app/dashboard/quotes/_shared/QuoteBuilderHeader.tsx','app/dashboard/quotes/_shared/QuoteBuilderBottomBar.tsx','app/dashboard/quotes/_shared/QuotePriceMemory.tsx']
  const bundles=files.map(f=>bundle(f));const modules=Object.assign({},...bundles.map(b=>b.modules))
- const host=kind==='preparation'?`
- function Host(){const [text,setText]=React.useState('Min tidigare text');return React.createElement('main',null,React.createElement(PreparationInput,{customerId:'customer-a',preparationId:'prep',onApply:t=>setText(old=>old+'\\n'+t)}),React.createElement('textarea',{'aria-label':'Offertunderlag',readOnly:true,value:text}))}
- `:kind==='recovery'?`
+ const host=kind==='recovery'?`
  function Host(){const [v,setV]=React.useState({text:'',items:[{linked_product_id:'article',component_snapshot:{hours:2}}],reservations:[{id:'r'}]});const r=useQuoteRecovery({userId:'user',businessId:'business',scope:'new',enabled:true,value:v,hasContent:!!v.text,onRestore:setV});window.readValue=()=>v;return React.createElement('main',null,React.createElement('input',{value:v.text,'aria-label':'Arbete',onChange:e=>setV({...v,text:e.target.value})}),r.pending&&React.createElement('button',{onClick:r.restore},'Återställ'),React.createElement('button',{onClick:r.clear},'Servern bekräftar sparat'),React.createElement('p',{role:'status'},r.status))}
  `:kind==='send'?`
  function Host(){return React.createElement(QuoteSendModal,{show:true,quote:{quote_id:'q',title:'Badrumsrenovering',quote_number:'1042',total:12500,customer:{name:'Anna Andersson',email:'anna@example.test'},description:'Montering',quote_items:[]},business:{business_name:'Testbolag'},sending:false,sendMethod:'email',setSendMethod:()=>{},extraEmails:'',setExtraEmails:()=>{},bccEmails:'',setBccEmails:()=>{},quoteIntelligence:null,quoteIntelligenceLoading:false,setQuoteIntelligence:()=>{},onClose:()=>{},onSend:()=>{window.sent=true},preview:React.createElement('div',{style:{height:900,padding:24}},'Kundens dokument från samma visningskomponent')})}
  `:`
- function Host(){const [notice,setNotice]=React.useState('');const [items,setItems]=React.useState([{id:'row',item_type:'item',description:'Montering av duschvägg',quantity:1,unit:'st',unit_price:3200,total:3200,ai_price_missing:true,linked_product_id:'p',component_snapshot:{hours:2}}]);window.readItems=()=>items;const sums={inkluderat:{text:'3 rader',attention:'1 rad utan pris'},exkluderat:{text:'Ifyllt',attention:null},reservationer:{text:'2 förbehåll',attention:'1 föreslaget förbehåll'},prisbild:{text:'12 500 kr',attention:null}};const actions={saving:false,canSend:true,onSendQuote:()=>{window.review=true;setNotice('I offertskaparen öppnas nu den sparade offerten för dokument- och mottagargranskning. Den här skissen skickar ingenting.')},onSaveDraft:()=>{},onSaveTemplate:()=>{},hasItems:true};return React.createElement('main',{className:'mx-auto max-w-5xl bg-slate-50 p-4 pb-40'},React.createElement(QuoteBuilderHeader,{...actions,title:'Badrum hos Andersson',completenessSummaries:sums,onSelectSection:s=>{window.selected=s;setNotice('I offertskaparen flyttas du till '+s+' i dokumentet.')}}),notice&&React.createElement('p',{role:'status',className:'mb-3 rounded-xl bg-teal-50 p-3 text-sm text-teal-900'},notice),React.createElement('div',{className:'mb-4 rounded-xl border bg-white p-6'},React.createElement('p',{className:'text-xs text-teal-700'},'SKISS · EXEMPELOFFERT'),React.createElement('h2',{className:'my-4 text-2xl font-semibold'},'Badrumsrenovering'),React.createElement('p',null,'Anna Andersson · Storgatan 12'),React.createElement('p',{className:'mt-6 border-t py-4'},'Montering av duschvägg — 3 200 kr'),React.createElement('p',{className:'border-t py-4'},'Förbehåll: underlaget kontrolleras före start')),React.createElement(QuotePriceMemory,{items,onChange:setItems}),React.createElement(QuoteBuilderBottomBar,{...actions,summaries:sums,hasQuoteContent:true,onSelect:s=>{window.selected=s;setNotice('I offertskaparen flyttas du till '+s+' i dokumentet.')}}))}
+ function Host(){const [notice,setNotice]=React.useState('');const [items,setItems]=React.useState([{id:'row',item_type:'item',description:'Montering av duschvägg',quantity:1,unit:'st',unit_price:3200,total:3200,ai_price_missing:true,linked_product_id:'p',component_snapshot:{hours:2}}]);window.readItems=()=>items;const actions={saving:false,canSend:true,onSendQuote:()=>{window.review=true;setNotice('I offertskaparen öppnas nu den sparade offerten för dokument- och mottagargranskning. Den här skissen skickar ingenting.')},onSaveDraft:()=>{},onSaveTemplate:()=>{},hasItems:true};return React.createElement('main',{className:'mx-auto max-w-5xl bg-slate-50 p-4 pb-40'},React.createElement(QuoteBuilderHeader,{...actions,title:'Badrum hos Andersson'}),notice&&React.createElement('p',{role:'status',className:'mb-3 rounded-xl bg-teal-50 p-3 text-sm text-teal-900'},notice),React.createElement('div',{className:'mb-4 rounded-xl border bg-white p-6'},React.createElement('p',{className:'text-xs text-teal-700'},'SKISS · EXEMPELOFFERT'),React.createElement('h2',{className:'my-4 text-2xl font-semibold'},'Badrumsrenovering'),React.createElement('p',null,'Anna Andersson · Storgatan 12'),React.createElement('p',{className:'mt-6 border-t py-4'},'Montering av duschvägg — 3 200 kr'),React.createElement('p',{className:'border-t py-4'},'Förbehåll: underlaget kontrolleras före start')),React.createElement(QuotePriceMemory,{items,onChange:setItems}),React.createElement(QuoteBuilderBottomBar,{...actions}))}
  `
- await page.addScriptTag({content:`const modules=${JSON.stringify(modules)};const cache={react:{exports:React},'next/link':{exports:{__esModule:true,default:p=>React.createElement('a',p)}},'lucide-react':{exports:new Proxy({},{get:(_,key)=>key==='__esModule'?true:()=>React.createElement('span',{'aria-hidden':true})})}};function load(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;new Function('require','module','exports',modules[id].code)(n=>load(modules[id].deps[n]),m,m.exports);return m.exports};${files.map(f=>`Object.assign(window,load(${JSON.stringify(f)}));`).join('')}${kind==='preparation'?'const PreparationInput=load("components/customer-preparation/QuotePreparationInput.tsx").default;':''}${host}const root=ReactDOM.createRoot(document.getElementById('root'));window.remount=()=>{root.render(null);setTimeout(()=>root.render(React.createElement(Host)),0)};root.render(React.createElement(Host));`})
+ await page.addScriptTag({content:`const modules=${JSON.stringify(modules)};const cache={react:{exports:React},'next/link':{exports:{__esModule:true,default:p=>React.createElement('a',p)}},'lucide-react':{exports:new Proxy({},{get:(_,key)=>key==='__esModule'?true:()=>React.createElement('span',{'aria-hidden':true})})}};function load(id){if(cache[id])return cache[id].exports;const m={exports:{}};cache[id]=m;new Function('require','module','exports',modules[id].code)(n=>load(modules[id].deps[n]),m,m.exports);return m.exports};${files.map(f=>`Object.assign(window,load(${JSON.stringify(f)}));`).join('')}${host}const root=ReactDOM.createRoot(document.getElementById('root'));window.remount=()=>{root.render(null);setTimeout(()=>root.render(React.createElement(Host)),0)};root.render(React.createElement(Host));`})
  return errors
 }
 for(const width of [375,1280])test(`real quote controls and explicit price scope at ${width}`,async({page})=>{
  await page.setViewportSize({width,height:1000});const errors=await mount(page,'experience')
- if(width>=1024){await expect(page.getByText('Nästa sak att kontrollera')).toBeVisible();await page.getByRole('button',{name:'Kontrollera inkluderat →'}).click()}else{await page.getByRole('button',{name:/Inkluderat/}).click()}
- expect(await page.evaluate(()=>(window as any).selected)).toBe('inkluderat')
+ // RIVNING PAKET C (2026-09-17, rad 2.16): completeness-chipraden
+ // (QuoteCompletenessStrip i headern, chip-raden i bottenfältet — det
+ // som klickades här för att bevisa onSelectSection-koppling) är
+ // borttagen. Skicka-knappens egen orsakstext räcker.
  await page.getByText('Priser för nästa jobb',{exact:false}).click()
  const checkbox=page.getByRole('checkbox');await expect(checkbox).not.toBeChecked();await checkbox.check()
  expect((await page.evaluate(()=>(window as any).readItems()))[0]).toMatchObject({save_to_products:true,linked_product_id:'p',component_snapshot:{hours:2},unit_price:3200})
@@ -128,18 +127,27 @@ test('an older autosave finishes before the explicit latest quote save', async (
 })
 
 
-test('reviewed customer answers reach editable quote input without erasing prior text', async ({page}) => {
-  const errors = await mount(page, 'preparation')
-  await expect(page.getByText('Laddbox vid garaget', {exact:true})).toBeVisible()
-  await expect(page.getByText('Ska inte användas')).toHaveCount(0)
-  await page.getByRole('button',{name:'Lägg till svaren i offertunderlaget'}).click()
-  const input = page.getByLabel('Offertunderlag')
-  await expect(input).toContainText('Min tidigare text')
-  await expect(input).toContainText('Okänd sträcka')
-  await expect(input).toContainText('Kundunderlag · Underlag för laddbox')
-  await expect(page.getByRole('button',{name:'Tillagt i offertunderlaget'})).toBeDisabled()
-  expect(await input.inputValue()).not.toContain('private/path')
-  expect(errors).toEqual([])
+test('reviewed customer answers reach the intake through the preparation loader; unreviewed rows and image paths never do', async () => {
+  // Rivningen A3 (2026-09-17): panelen "Använd granskat kundunderlag" är
+  // borta. ?preparation_id läggs direkt i intagets ruta via
+  // loadPreparationQuoteInput — samma regler som panelen hade.
+  const { loadPreparationQuoteInput } = await import('../lib/customer-preparation/quote-handoff')
+  const preparations = [
+    { id:'prep', template:'charging', context:'Laddbox vid garaget', status:'reviewed', answers:{ location:'Garage', route:'Okänd sträcka', wishes:'Bil' }, images:['private/path'] },
+    { id:'unreviewed', template:'charging', context:'Ska inte användas', status:'submitted', answers:{}, images:[] },
+  ]
+  const calls: string[] = []
+  const fetcher = (async (url: string) => { calls.push(url); return new Response(JSON.stringify({ preparations }), { status: 200, headers: { 'Content-Type': 'application/json' } }) }) as typeof fetch
+  const text = await loadPreparationQuoteInput('customer-a', 'prep', fetcher)
+  expect(calls).toEqual(['/api/customer-preparation?customer_id=customer-a'])
+  expect(text).toContain('Kundunderlag · Underlag för laddbox')
+  expect(text).toContain('Okänd sträcka')
+  expect(text).not.toContain('private/path')
+  expect(text).not.toContain('Ska inte användas')
+  await expect(loadPreparationQuoteInput('customer-a', 'unreviewed', fetcher)).rejects.toThrow(/Granska kundunderlaget först/)
+  await expect(loadPreparationQuoteInput('customer-a', 'saknas', fetcher)).rejects.toThrow(/Inget granskat underlag/)
+  const forbjuden = (async () => new Response('{}', { status: 403 })) as typeof fetch
+  await expect(loadPreparationQuoteInput('customer-a', 'prep', forbjuden)).rejects.toThrow(/ägar- eller administratörsbehörighet/)
 })
 
 

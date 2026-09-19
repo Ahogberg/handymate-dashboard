@@ -1,112 +1,131 @@
+import { test, expect } from '@playwright/test'
+import fs from 'fs'
+import path from 'path'
+
 /**
- * Snabboffertens startvägs-invariant (Andreas krav, låst 2026-08-17):
+ * Snabboffertens startvägar — efter rivningen A3 (2026-09-17).
  *
- *   "Oavsett om man väljer att få utkast med AI, att skapa en ny själv
- *    eller med en sparad mall ska man ALLTID hamna i vår nya
- *    offertskapare."
+ * Intaget är den enda startskärmen och har TVÅ vägar ut: "Bygg utkast"
+ * (Matte) och "Bygg själv" (rakt in i dokumentet). Båda slutar i samma
+ * delade avslutning, finishQuickStart(). Det som revs: headerlänken "Öppna
+ * editorn direkt", mellanskärmen QuickBlankStart (titel + kund innan
+ * editorn), "Använd en mall" med mallistan QuoteNewStartChooser, och
+ * startlägena 'blank' och templatePickerOpen.
  *
- * ═══ HISTORIK (Fas 1, offert-omtaget 2026-08-31) ═══
- *
- * Fram till 2026-08-31 betydde "vår nya offertskapare" en sektionsvis
- * tvingad granskningssekvens (`enterQuickReview()` → quickMode 'review'/
- * 'overview'). Den granskningen är borttagen — grundaren konstaterade att
- * den inte fungerade i praktiken. Invarianten själv består oförändrad
- * (alla tre starterna ska konvergera på EN plats, aldrig glida isär), bara
- * MÅLET bytte: alla tre landar nu direkt i den fulla canvas-editorn
- * (quickMode = null) via den delade `finishQuickStart()` — se
- * `app/dashboard/quotes/_shared/QuoteBuilder.tsx`. Det är alltså numera
- * HELT OK att slutsteget sätter quickMode till null, så länge det sker
- * via den delade funktionen och inte via en egen, parallell genväg per
- * startväg (vilket är precis vad testerna nedan låser).
- *
- * Källskanning (husets facit-stil): låser strukturen som gör invarianten
- * sann, så en refaktor som bryter den blir röd — inte en tyst regression
- * som återupptäcks av en förvirrad användare.
+ * Det här facit stod tidigare OGATAT utanför test:contracts och låste
+ * precis det som revs. Nu i grinden.
  *
  *   npx playwright test tests/snabboffert-startvagar.spec.ts --no-deps
  */
-import { test, expect } from '@playwright/test'
-import * as fs from 'fs'
-import * as path from 'path'
+const ROOT = path.resolve(__dirname, '..')
+const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
+const finns = (p: string) => fs.existsSync(path.join(ROOT, p))
+const utanKommentarer = (s: string) =>
+  s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '').replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+const PAGE = utanKommentarer(read('app/dashboard/quotes/_shared/QuoteBuilder.tsx'))
+const INTAKE = utanKommentarer(read('app/dashboard/quotes/new/components/quick/QuickIntake.tsx'))
 
-const PAGE = fs.readFileSync(
-  path.join(__dirname, '..', 'app', 'dashboard', 'quotes', '_shared', 'QuoteBuilder.tsx'),
-  'utf8',
-)
-const INTAKE = fs.readFileSync(
-  path.join(__dirname, '..', 'app', 'dashboard', 'quotes', 'new', 'components', 'quick', 'QuickIntake.tsx'),
-  'utf8',
-)
-
-test.describe('alla tre starterna landar i samma fulla editor', () => {
+test.describe('två vägar ut ur intaget, en editor', () => {
   test('AI-vägen: buildQuickDraft slutar i finishQuickStart', () => {
     const fn = PAGE.slice(PAGE.indexOf('async function buildQuickDraft'))
     const body = fn.slice(0, fn.indexOf('\n  }'))
-    expect(body, 'AI-utkastet ska landa i editorn via den delade funktionen').toContain('finishQuickStart()')
-    expect(body, 'AI-vägen får aldrig sätta quickMode(null) direkt, förbi den delade funktionen').not.toContain('setQuickMode(null)')
+    expect(body).toContain('finishQuickStart()')
+    expect(body, 'aldrig setQuickMode(null) förbi den delade funktionen').not.toContain('setQuickMode(null)')
   })
 
-  test('Bygg själv-vägen: startBlankQuickDraft slutar i finishQuickStart', () => {
-    const fn = PAGE.slice(PAGE.indexOf('function startBlankQuickDraft'))
-    const body = fn.slice(0, fn.indexOf('\n  }'))
-    expect(body, 'blankstarten ska landa i editorn via den delade funktionen').toContain('finishQuickStart()')
-    expect(body).not.toContain('setQuickMode(null)')
+  test('Bygg själv: texten följer med (leaveQuickMode(true)) och landar via finishQuickStart', () => {
+    expect(PAGE).toContain('onBuildYourself={() => { leaveQuickMode(true); finishQuickStart() }}')
+    // 'blank' lever kvar som återställningens scope-namn — det är inte ett
+    // startläge. Startlägena är exakt tre plus null.
+    expect(PAGE, 'inget blank-startläge').toContain("useState<'intake' | 'building' | 'fragor' | null>(null)")
+    expect(PAGE).not.toContain("setQuickMode('blank')")
+    expect(PAGE).not.toContain("quickMode === 'blank'")
+    expect(PAGE).not.toContain('startBlankQuickDraft')
   })
 
   test('upplägg-vägen: jobbtypsstarten och Övriga upplägg slutar i finishQuickStart', () => {
-    // Mallistan (QuoteNewStartChooser) togs bort 2026-09-17. Vägen till ett
-    // upplägg är jobbtypsremsan, och den får aldrig landa i editorn via en
-    // egen, parallell genväg.
+    // Från main 2026-09-17: mallistan är borta, och vägen till ett upplägg är
+    // jobbtypsremsan. Den får aldrig landa i editorn via en egen genväg.
     expect(PAGE).not.toContain('QuoteNewStartChooser')
     expect(PAGE).not.toContain('onSelectTemplate=')
-    for (const namn of ['async function applyJobTypeStart', 'async function applyOvrigtUpplagg']) {
+    // applyJobTypeStart kan inte avsluta själv: frågeflödet lägger sig emellan
+    // (2026-09-17) och avslutningen sker i applyVerifiedJobTypeStart när
+    // frågorna besvarats eller hoppats över. Invarianten är densamma — ingen
+    // väg får ta en egen genväg förbi finishQuickStart.
+    for (const namn of ['function applyVerifiedJobTypeStart', 'async function applyOvrigtUpplagg']) {
       const fn = PAGE.slice(PAGE.indexOf(namn))
       const body = fn.slice(0, fn.indexOf('\n  }'))
       expect(body, `${namn} ska landa i editorn via den delade funktionen`).toContain('finishQuickStart()')
       expect(body).not.toContain('setQuickMode(null)')
     }
+    const start = PAGE.slice(PAGE.indexOf('async function applyJobTypeStart'))
+    expect(start.slice(0, start.indexOf('\n  }')), 'starten delegerar, tar ingen genväg')
+      .toContain('applyVerifiedJobTypeStart(start, null)')
   })
 
   test('finishQuickStart() finns bara en gång och landar i editorn', () => {
-    // Den delade svansen ska bara definieras EN gång — annars kan mall-,
-    // blank- och AI-vägarna glida isär från varandra igen.
-    const defs = PAGE.match(/function finishQuickStart\(\)/g) || []
-    expect(defs.length, 'finishQuickStart ska definieras exakt en gång').toBe(1)
+    expect((PAGE.match(/function finishQuickStart\(\)/g) || []).length).toBe(1)
     const fn = PAGE.slice(PAGE.indexOf('function finishQuickStart()'))
-    const body = fn.slice(0, fn.indexOf('\n  }'))
-    expect(body).toContain('setQuickMode(null)')
+    expect(fn.slice(0, fn.indexOf('\n  }'))).toContain('setQuickMode(null)')
+  })
+
+  test('leaveQuickMode bär fortfarande med skriven text', () => {
+    const idx = PAGE.indexOf('function leaveQuickMode')
+    expect(idx).toBeGreaterThan(-1)
+    const kropp = PAGE.slice(idx, idx + 600)
+    expect(kropp).toContain('if (typed && !description.trim()) setDescription(typed)')
+    expect(kropp).toContain('if (typed && !sourceTranscript) setSourceTranscript(typed)')
   })
 })
 
-test.describe('intaget — tre riktiga knappar, inte en hjälte och två fotnoter', () => {
-  test('Bygg själv är en riktig knapp (fix 2026-08-17), inte en fotnotlänk', () => {
-    // Fotnotversionen var text-xs + underline. Knappversionen delar
-    // sekundärknapparnas klassform. Låser att onSkipDescription sitter på
-    // en knapp med sekundär-styling, inte en underline-länk.
-    const skipIdx = INTAKE.indexOf('onClick={onSkipDescription}')
-    expect(skipIdx, 'onSkipDescription-knappen finns').toBeGreaterThan(-1)
-    const around = INTAKE.slice(skipIdx, skipIdx + 400)
-    expect(around, 'ska vara en sekundärknapp, inte en fotnot').toContain('border-2 border-slate-200')
+test.describe('intaget — två riktiga knappar', () => {
+  test('Bygg utkast och Bygg själv finns; Bygg själv är en sekundärknapp', () => {
+    expect(INTAKE).toContain('Bygg utkast')
+    const idx = INTAKE.indexOf('onClick={onBuildYourself}')
+    expect(idx, 'Bygg själv-knappen finns').toBeGreaterThan(-1)
+    const around = INTAKE.slice(idx, idx + 400)
+    expect(around).toContain('border-2 border-slate-200')
     expect(around).not.toContain('underline')
     expect(around).toContain('Bygg själv')
   })
 
-  test('två startknappar i intaget — mallknappen är borta (2026-09-17)', () => {
+  test('de rivna knapparna är borta ur intaget', () => {
+    for (const borta of ['Öppna editorn direkt', 'Använd en mall', 'onOpenFullEditor', 'onUseTemplate', 'onSkipDescription']) {
+      expect(INTAKE, `${borta} ska vara borta`).not.toContain(borta)
+    }
     expect(INTAKE).toContain('Bygg utkast')
     expect(INTAKE).toContain('Bygg själv')
-    expect(INTAKE).not.toContain('Använd en mall')
   })
 })
 
-test.describe('vägen tillbaka från editorn', () => {
-  test('tillbaka-knappen är INTE grindad på preferredStart (fix 2026-08-17)', () => {
-    // Före fixen: preferredStart !== 'quick' && ... — vilket gjorde att
-    // default-preferensens användare saknade väg tillbaka helt efter att
-    // ha lämnat intaget. Nu: bara editor-läge + tom offert.
-    const idx = PAGE.indexOf('Beskriv jobbet i stället')
-    expect(idx, 'tillbaka-knappen finns').toBeGreaterThan(-1)
-    const guard = PAGE.slice(Math.max(0, idx - 600), idx)
-    expect(guard).toContain("quickMode === null && items.length === 0 && (")
-    expect(guard, 'preferens-grinden är borttagen').not.toContain("preferredStart !== 'quick' &&")
+test.describe('det rivna finns inte kvar', () => {
+  test('filerna är raderade och importeras ingenstans', () => {
+    for (const fil of [
+      'app/dashboard/quotes/new/components/quick/QuickBlankStart.tsx',
+      'app/dashboard/quotes/new/components/QuoteNewStartChooser.tsx',
+    ]) expect(finns(fil), `${fil} ska vara raderad`).toBe(false)
+    for (const namn of ['QuickBlankStart', 'QuoteNewStartChooser', 'templatePickerOpen', 'setTemplatePickerOpen']) {
+      expect(PAGE, `${namn} ska vara borta ur QuoteBuilder`).not.toContain(namn)
+    }
+  })
+
+  test('kallstarten går rakt till intaget, utan gren', () => {
+    const idx = PAGE.indexOf('quickStartDoneRef.current = true')
+    expect(idx).toBeGreaterThan(-1)
+    const efter = PAGE.slice(idx, idx + 400)
+    expect(efter).toContain("setQuickMode('intake')")
+    expect(efter).not.toContain('getPreferredStart')
+  })
+
+  test('startvanan är fortfarande borta (A1)', () => {
+    for (const spar of ["from '@/lib/quotes/quick-preferences'", 'preferredStart', 'askPreferredFor', '<QuickStartPreferenceBanner']) {
+      expect(PAGE).not.toContain(spar)
+    }
+    expect(finns('lib/quotes/quick-preferences.ts')).toBe(false)
+  })
+
+  test('facit är gatat — det stod utanför grinden och låste det som revs', () => {
+    expect(JSON.parse(read('package.json')).scripts['test:contracts']).toContain('tests/snabboffert-startvagar.spec.ts')
+    expect(fs.readFileSync(path.join(ROOT, '..', '.github/workflows/contracts.yml'), 'utf8')).toContain('tests/snabboffert-startvagar.spec.ts')
   })
 })

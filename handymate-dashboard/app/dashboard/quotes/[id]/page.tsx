@@ -21,6 +21,7 @@ import { QuoteDeleteConfirmModal } from './components/QuoteDeleteConfirmModal'
 import { QuoteNewVersionModal } from './components/QuoteNewVersionModal'
 import { DanielAgentrad } from './components/DanielAgentrad'
 import { QuoteHandoff } from '@/components/quotes/QuoteHandoff'
+import { QuoteSaveTemplateModal } from '@/app/dashboard/quotes/_shared/QuoteSaveTemplateModal'
 import type { Quote, QuoteVersion, QuoteIntelligence, QuoteTrackingEvent } from './types'
 
 interface BusinessConfig {
@@ -63,13 +64,12 @@ export default function QuoteDetailPage() {
   })
   const [creatingInvoice, setCreatingInvoice] = useState(false)
   const [creatingProject, setCreatingProject] = useState(false)
+  const [markingAccepted, setMarkingAccepted] = useState(false)
   const [generatingSignLink, setGeneratingSignLink] = useState(false)
   const [portalUrl, setPortalUrl] = useState<string | null>(null)
   const [extraEmails, setExtraEmails] = useState('')
   const [bccEmails, setBccEmails] = useState('')
   const [showSaveTemplate, setShowSaveTemplate] = useState(false)
-  const [templateName, setTemplateName] = useState('')
-  const [savingTemplate, setSavingTemplate] = useState(false)
   const [duplicating, setDuplicating] = useState(false)
   const [quoteIntelligence, setQuoteIntelligence] = useState<QuoteIntelligence | null>(null)
   const [quoteIntelligenceLoading, setQuoteIntelligenceLoading] = useState(false)
@@ -95,38 +95,11 @@ export default function QuoteDetailPage() {
     setTimeout(() => setToast({ show: false, message: '', type: 'success' }), 3000)
   }
 
-  const saveAsTemplate = async () => {
-    if (!quote || !templateName.trim()) return
-    setSavingTemplate(true)
-    try {
-      await fetch('/api/quote-templates', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: templateName,
-          description: quote.description,
-          default_items: quote.quote_items || [],
-          default_payment_plan: quote.payment_plan || [],
-          introduction_text: quote.introduction_text,
-          conclusion_text: quote.conclusion_text,
-          not_included: quote.not_included,
-          ata_terms: quote.ata_terms,
-          payment_terms_text: quote.payment_terms_text,
-          detail_level: quote.detail_level,
-          show_unit_prices: quote.show_unit_prices,
-          show_quantities: quote.show_quantities,
-          rot_enabled: (quote.quote_items || []).some((i: any) => i.is_rot_eligible),
-          rut_enabled: (quote.quote_items || []).some((i: any) => i.is_rut_eligible),
-        }),
-      })
-      showToast('Mall sparad!', 'success')
-      setShowSaveTemplate(false)
-      setTemplateName('')
-    } catch {
-      showToast('Kunde inte spara mall', 'error')
-    }
-    setSavingTemplate(false)
-  }
+  // RIVNING PAKET C (2026-09-17, rad 2.20): den handkopierade
+  // saveAsTemplate/POST-till-/api/quote-templates-vägen är borttagen —
+  // "Spara som mall" är nu "Spara som upplägg för jobbtypen", samma
+  // QuoteSaveTemplateModal som offertskaparen/redigeraren använder (se
+  // dess docblock). Två implementationer blir en.
 
   useEffect(() => {
     fetchQuote()
@@ -372,6 +345,35 @@ export default function QuoteDetailPage() {
     }
   }
 
+  // RIVNING PAKET D (2026-09-17, rad 3.3): flyttad hit från listans
+  // "Acceptera"-radknapp (app/dashboard/quotes/page.tsx). Samma
+  // /api/quotes/accept-anrop som förut, oförändrat — se rapportens fynd
+  // om varför rutten INTE skrevs om att anropa finalizeAcceptedQuote:
+  // den är en egen, tungt kontraktstestad väg (concurrency, RBAC,
+  // tenant-isolering — tests/first-job-acceptance.spec.ts), inte en
+  // övergiven dubblett. Ingen status skrivs direkt från klienten här.
+  const markAccepted = async () => {
+    if (!quote) return
+    setMarkingAccepted(true)
+    try {
+      const response = await fetch('/api/quotes/accept', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ quoteId: quote.quote_id }),
+      })
+      if (response.ok) {
+        showToast('Offerten är markerad som accepterad!', 'success')
+        fetchQuote()
+      } else {
+        const err = await response.json().catch(() => ({}))
+        showToast(err.error || 'Kunde inte markera offerten som accepterad', 'error')
+      }
+    } catch {
+      showToast('Något gick fel', 'error')
+    }
+    setMarkingAccepted(false)
+  }
+
   const createProjectFromQuote = async () => {
     if (!quote) return
     setCreatingProject(true)
@@ -450,7 +452,6 @@ export default function QuoteDetailPage() {
   }
 
   const onSaveTemplateClick = () => {
-    setTemplateName(quote?.title || '')
     setShowSaveTemplate(true)
   }
 
@@ -515,6 +516,8 @@ export default function QuoteDetailPage() {
           onSaveTemplate={onSaveTemplateClick}
           onRequestNewVersion={requestNewVersion}
           onRequestDelete={requestDelete}
+          onMarkAccepted={markAccepted}
+          markingAccepted={markingAccepted}
         />
 
         {/* Daniels agentrad (docs/design/skisser-2026-09-06/agentnarvaro-
@@ -583,46 +586,15 @@ export default function QuoteDetailPage() {
         creating={creatingVersion}
       />
 
-      {/* Save as Template Modal */}
-      {showSaveTemplate && (
-        <div
-          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
-          onClick={() => setShowSaveTemplate(false)}
-        >
-          <div
-            className="bg-white border border-slate-200 rounded-2xl w-full max-w-md p-6 shadow-xl"
-            onClick={e => e.stopPropagation()}
-          >
-            <h3 className="font-heading text-lg font-bold text-slate-900 mb-4 tracking-tight">Spara som mall</h3>
-            <div className="mb-5">
-              <label className="block text-sm font-semibold text-slate-700 mb-2">Mallnamn</label>
-              <input
-                type="text"
-                value={templateName}
-                onChange={e => setTemplateName(e.target.value)}
-                placeholder="T.ex. Byte elcentral"
-                autoFocus
-                className="w-full px-4 py-2.5 bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
-              />
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={() => setShowSaveTemplate(false)}
-                className="flex-1 px-4 py-2.5 bg-white border border-slate-200 hover:border-slate-300 rounded-xl text-slate-700 text-sm font-semibold transition-colors"
-              >
-                Avbryt
-              </button>
-              <button
-                onClick={saveAsTemplate}
-                disabled={!templateName.trim() || savingTemplate}
-                className="flex-1 px-4 py-2.5 bg-primary-700 hover:bg-primary-600 disabled:opacity-50 rounded-xl text-white text-sm font-semibold transition-colors"
-              >
-                {savingTemplate ? <Loader2 className="w-4 h-4 animate-spin mx-auto" /> : 'Spara'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* RIVNING PAKET C (2026-09-17, rad 2.20): den egna handkopierade
+          "Spara som mall"-modalen är ersatt med samma QuoteSaveTemplateModal
+          som offertskaparen/redigeraren använder — se dess docblock. */}
+      <QuoteSaveTemplateModal
+        jobType={quote?.job_type ?? null}
+        items={quote?.quote_items}
+        show={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+      />
     </div>
   )
 }

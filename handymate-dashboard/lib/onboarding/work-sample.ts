@@ -32,12 +32,3 @@ export function buildWorkSample(source: string, quote: GeneratedQuote, now = new
   if (!sample) throw new Error('Underlaget kunde inte färdigställas. Förtydliga förfrågan och försök igen.')
   return sample
 }
-
-/** Keep the prepared scope. Prices are deliberately reviewed in the real editor. */
-export function workSampleDraft(sample: WorkSample) {
-  return { jobTitle: sample.title, jobDescription: sample.description,
-    items: sample.items.map((r, i) => ({ ...r, id: `work-sample-${i}`, unitPrice: 0, confidence: 0,
-      note: 'Mängdförslag från arbetsprovet. Kontrollera mängd, pris och avdrag.', fromPriceList: false })),
-    options: [], suggestedDeductionType: 'none', rules: [], lessons: [], customerFacts: [],
-    reasoning: 'Arbetsprovet är förberett från din förfrågan. Mängder är förslag. Priser och avdrag behöver granskas.' }
-}

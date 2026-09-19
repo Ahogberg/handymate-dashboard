@@ -6,6 +6,7 @@ import { ArrowRight, Check, FileText, Loader2, Plus } from 'lucide-react'
 import { getAgentById } from '@/lib/agents/team'
 import { QuickPriceInput } from '@/components/products/QuickPriceInput'
 import { JobStandardRowsEditor } from '@/components/onboarding/JobStandardRowsEditor'
+import { JobTypeQuestionsEditor } from '@/components/onboarding/JobTypeQuestionsEditor'
 import { slugifyJobType } from '@/lib/job-types'
 import { JobTypeQuotePreview } from '@/components/onboarding/JobTypeQuotePreview'
 import type { ReservationWithTriggers } from '@/lib/reservations/match'
@@ -166,8 +167,6 @@ export function JobTypeQuoteSetup({ trade, syncOnboarding = false, initialJobTyp
         {starterPackage && <div className="job-setup-note">
           <p>{starterPackage.scope}</p>
           <p><strong>Arbetskostnad:</strong> {starterPackage.labor} med eget timpris, eller uttryckligen inkluderat arbete i ett fastpris. Ange hur arbetet ska prissättas innan offerten används.</p>
-          <p><strong>Inför offerten behöver ni veta:</strong></p>
-          <ul>{starterPackage.questions.map(question => <li key={question}>{question}</li>)}</ul>
           <p>Materialförslag: {starterPackage.materials.join(', ')}. Välj specifika produkter som passar uppdraget. Standardmängder är ert eget val, inte en bedömning av det kommande jobbet.</p>
         </div>}
         {!linked.length && data.canManage && <button type="button" className="job-setup-primary" disabled={busy || priceSaving || loading} onClick={() => { setTemplateId(''); void mutate('/api/job-types/quote-setup', 'POST', { operation: 'create', jobTypeSlug: job.slug }) }}>Förbered standardrader för {job.name}</button>}
@@ -202,6 +201,11 @@ export function JobTypeQuoteSetup({ trade, syncOnboarding = false, initialJobTyp
           <p className="job-setup-caption">{coreArticleGuidance(rows)}</p>
           <p className="job-setup-caption">Artikelpriser exkl. moms. Mängder, kundavtal och jobbets förutsättningar granskar du i offerten.</p>
           <JobTypeQuotePreview jobName={job.name} template={chosen} products={data.products} reservationLibrary={reservationLibrary} />
+          {/* Frågorna på plats (2026-09-17) hör till jobbtypen, inte mallen — men de
+              sätter mängder på upplägget här ovanför, så de bor bredvid det. Enheterna
+              hämtas om när standardraderna ändrats (updatedAt). */}
+          {chosen.jobTypeSlug === job.slug && <JobTypeQuestionsEditor jobTypeSlug={job.slug} jobTypeName={job.name} canManage={data.canManage}
+            busy={busy || priceSaving || loading} refreshKey={`${chosen.updatedAt ?? ''}:${chosen.items.length}`} />}
           {(!data.canManage || chosen.jobTypeSlug !== job.slug) && <><div className="job-setup-products">
             {(showAll ? products : products.slice(0, 10)).map(p => <div className="job-setup-product" key={p.id}>
               <div><strong>{p.name}</strong><span>{p.unit}</span></div>

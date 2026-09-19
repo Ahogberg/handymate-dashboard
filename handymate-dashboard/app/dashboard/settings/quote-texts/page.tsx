@@ -27,9 +27,11 @@ interface StandardText {
   updated_at?: string
 }
 
+// RIVNING PAKET D (2026-09-17, rad 3.11): Inledning och Avslutning borttagna
+// ur inställningen — de togs bort ur själva offertflödet redan i juli 2026
+// (pilotbeslut), men typerna levde kvar här. Tidigare sparade rader av dessa
+// typer rörs INTE (ingen SQL/radering) — de blir bara ovalbara i UI:t.
 const TEXT_TYPES = [
-  { value: 'introduction', label: 'Inledning', description: 'Inledande text som visas överst i offerten' },
-  { value: 'conclusion', label: 'Avslutning', description: 'Avslutande text innan signatur' },
   { value: 'not_included', label: 'Ej inkluderat', description: 'Saker som inte ingår i offerten' },
   { value: 'ata_terms', label: 'ÄTA-villkor', description: 'Villkor för ändrings- och tilläggsarbeten' },
   { value: 'payment_terms', label: 'Betalningsvillkor', description: 'Betalningsvillkor och faktureringsinfo' },
@@ -40,7 +42,7 @@ export default function QuoteStandardTextsPage() {
   const [texts, setTexts] = useState<StandardText[]>([])
   const [loading, setLoading] = useState(true)
   const [seeding, setSeeding] = useState(false)
-  const [activeTab, setActiveTab] = useState('introduction')
+  const [activeTab, setActiveTab] = useState('not_included')
 
   // Edit state
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -52,7 +54,7 @@ export default function QuoteStandardTextsPage() {
   const [showNew, setShowNew] = useState(false)
   const [newName, setNewName] = useState('')
   const [newContent, setNewContent] = useState('')
-  const [newType, setNewType] = useState('introduction')
+  const [newType, setNewType] = useState('not_included')
 
   useEffect(() => {
     if (business) fetchTexts()

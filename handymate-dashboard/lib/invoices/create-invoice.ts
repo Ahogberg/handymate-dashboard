@@ -60,6 +60,19 @@ export interface CreateInvoiceInput {
   discountAmount?: number
   projectId?: string | null
   quoteId?: string | null
+  /**
+   * Jobbtypens slug (sql/v255). Sätts av ANROPAREN, aldrig av kärnan.
+   *
+   * Första försöket (2026-09-17) lät kärnan läsa jobbtypen ur offerten eller
+   * projektet själv, så att alla åtta vägar skulle få den utan att ändras.
+   * Det bröt husregeln som tests/sprint/invoice-acceptance-service.cjs
+   * vaktar: createInvoice får ALDRIG röra databasen utanför sin atomiska
+   * RPC — dess `from()` kastar "unprotected insert" och testet kräver noll
+   * anrop. Regeln är riktig: en läsning före RPC:n ligger utanför
+   * transaktionen. Vägarna som HAR offerten eller projektet läst skickar
+   * därför med jobbtypen; övriga lämnar den tom, precis som förut.
+   */
+  jobType?: string | null
   bookingId?: string | null
   invoiceType?: InvoiceType
   status?: InvoiceStatus
@@ -207,6 +220,7 @@ export async function createInvoice(
     customer_id: input.customerId ?? null,
     project_id: input.projectId ?? null,
     quote_id: input.quoteId ?? null,
+    job_type: input.jobType ?? null,
     invoice_number: invoiceNumber,
     invoice_type: input.invoiceType ?? 'standard',
     status: input.status ?? 'draft',

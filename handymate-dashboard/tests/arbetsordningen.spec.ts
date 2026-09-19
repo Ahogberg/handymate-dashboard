@@ -21,6 +21,8 @@ const read = (p: string) => fs.readFileSync(path.join(ROOT, p), 'utf8')
 const agents = fs.readFileSync(path.resolve(ROOT, '..', 'AGENTS.md'), 'utf8')
 
 const FORVANTADE = ['facit', 'databasen-ar-facit', 'starta-ratt', 'ui-bevis']
+const PW_BROWSERS = '/opt/pw-browsers'
+const CHROME = `${PW_BROWSERS}/chromium-1194/chrome-linux/chrome`
 
 function frontmatter(namn: string) {
   const text = read(`.claude/skills/${namn}/SKILL.md`)
@@ -75,10 +77,20 @@ test.describe('arbetsordningen laddar sig själv', () => {
     const pkg = JSON.parse(read('package.json'))
     expect(pkg.scripts['test:contracts'], 'test:contracts saknas').toBeTruthy()
     expect(allt).toContain('npm run test:contracts')
-    // Chromium-sökvägen i ui-bevis måste finnas i den här miljön.
-    const chrome = '/opt/pw-browsers/chromium-1194/chrome-linux/chrome'
-    expect(frontmatter('ui-bevis').kropp).toContain(chrome)
-    expect(fs.existsSync(chrome), `${chrome} saknas — rätta ui-bevis`).toBe(true)
+    // Chromium-sökvägen ska stå i ui-bevis. Att den också FINNS är ett
+    // påstående om maskinen och prövas i sitt eget prov nedan.
+    expect(frontmatter('ui-bevis').kropp).toContain(CHROME)
+  })
+
+  // Sökvägen finns bara på en maskin som har en webbläsarkatalog. CI kör
+  // ubuntu-latest med PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD=1 och har ingen — ett
+  // ovillkorligt existenskrav var därför omöjligt att klara där och höll
+  // kontraktsgrinden röd på main från 2026-09-17. Villkoret ligger i test.skip
+  // och inte i ett if, så ett hoppat prov SYNS i rapporten i stället för att
+  // tyst bli ett tomt påstående.
+  test('chromium-sökvägen i ui-bevis finns där det finns en webbläsarkatalog', () => {
+    test.skip(!fs.existsSync(PW_BROWSERS), `${PW_BROWSERS} saknas i den här miljön`)
+    expect(fs.existsSync(CHROME), `${CHROME} saknas — rätta ui-bevis`).toBe(true)
   })
 
   test('ui-bevis räknar rätt antal ui-specar och preview-helpers', () => {

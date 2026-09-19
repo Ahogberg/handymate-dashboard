@@ -84,6 +84,12 @@ export interface Quote {
     address_line: string
   }
   quote_items?: QuoteItem[]
+  /** Jobbtypens slug (quotes.job_type, sql/v7_pricing.sql). Skrivs redan vid
+      create (buildQuotePayload.ts) och läses av create-from-quote.ts —
+      fältet saknades bara i den här detaljvyns TYP, inte i databasen eller
+      API-svaret (`select('*')`, app/api/quotes/route.ts). Tillagd 2026-09-17
+      (rivning paket C, rad 2.20) för "Spara som upplägg för jobbtypen". */
+  job_type?: string | null
   introduction_text?: string
   conclusion_text?: string
   not_included?: string

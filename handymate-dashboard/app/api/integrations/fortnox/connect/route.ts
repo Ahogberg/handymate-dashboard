@@ -3,6 +3,13 @@ import { cookies } from 'next/headers'
 import { getAuthenticatedBusiness } from '@/lib/auth'
 import crypto from 'crypto'
 
+
+// force-dynamic: läser auth via en helper (t.ex. getAuthenticatedBusiness)
+// som läser request.headers direkt, inte cookies()/headers() från next/headers —
+// Next ser bara route-filens egen kod och cachar annars denna GET-rutt statiskt,
+// så samma frusna svar går till alla anropare oavsett vem som faktiskt frågar.
+export const dynamic = 'force-dynamic'
+
 const FORTNOX_AUTH_BASE = 'https://apps.fortnox.se/oauth-v1'
 // Slimmad 2026-06-03 per tasks/fortnox-scope-audit.md.
 // Strategi: Handymate äger arbetet, Fortnox äger bokföringen.

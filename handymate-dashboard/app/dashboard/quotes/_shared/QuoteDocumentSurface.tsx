@@ -7,8 +7,9 @@ import QuoteDocument, { type QuoteDocumentHandlers } from '@/components/quotes/d
 import { DocumentScaler } from '@/components/quotes/document/DocumentScaler'
 import { useIsMobileViewport } from '@/components/quotes/document/useIsMobileViewport'
 import type { QuoteTemplateData } from '@/lib/quote-templates/types'
-import type { QuoteSection } from '@/lib/quotes/quote-completeness'
+import type { QuoteSection } from './useQuoteSectionNavigation'
 import type { ReservationSuggestion } from '@/lib/reservations/match'
+import type { QuoteStandardText } from '@/lib/types/quote'
 
 interface QuoteDocumentSurfaceProps {
   /** ETAPP 2c (offert-masterplan.md): styr om den redigerbara
@@ -66,6 +67,10 @@ interface QuoteDocumentSurfaceProps {
    */
   reservationSuggestions?: ReservationSuggestion[]
   onReviewReservationSuggestions?: () => void
+  /** Rivning paket B (2026-09-17, rad 2.3/2.5): vidarebefordras rakt till
+      QuoteDocument, se dess docblock för respektive prop. */
+  activeDeductionType?: 'rot' | 'rut' | null
+  standardTexts?: Record<string, QuoteStandardText[]>
 }
 
 /**
@@ -97,6 +102,8 @@ export function QuoteDocumentSurface({
   quickReveal,
   reservationSuggestions,
   onReviewReservationSuggestions,
+  activeDeductionType,
+  standardTexts,
 }: QuoteDocumentSurfaceProps) {
   const [fullscreen, setFullscreen] = useState(false)
   const [previewPending, setPreviewPending] = useState(false)
@@ -139,6 +146,8 @@ export function QuoteDocumentSurface({
               onOpenAiHelp={onOpenAiHelp}
               reservationSuggestions={reservationSuggestions}
               onReviewReservationSuggestions={onReviewReservationSuggestions}
+              activeDeductionType={activeDeductionType}
+              standardTexts={standardTexts}
             />
           </DocumentScaler>
 

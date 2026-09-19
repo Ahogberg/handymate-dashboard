@@ -57,8 +57,9 @@ export type QuoteDocumentMode = 'static' | 'edit'
  * Befintliga anropare (new/edit-sidornas liveHandlers) skickar fortfarande
  * allt och påverkas inte. Sektions-DELMÄNGDER (den forna gating-mekanismen
  * som filtrerade det här objektet till en sektion i taget) togs bort i Fas 1
- * (offert-omtaget, 2026-08-31) — se lib/quotes/quote-completeness.ts för
- * vad som är kvar (rena sammanfattningsfunktioner, ingen filtrering).
+ * (offert-omtaget, 2026-08-31). Sammanfattningsfunktionerna som ersatte den
+ * (lib/quotes/quote-completeness.ts) är själva borttagna sedan (RIVNING
+ * PAKET C, 2026-09-17, rad 2.16).
  */
 export interface QuoteDocumentHandlers {
   onTitleChange?: (v: string) => void
@@ -114,6 +115,13 @@ export interface QuoteDocumentHandlers {
   onDueDateChange?: (v: string) => void
   onOurReferenceChange?: (v: string) => void
   onYourReferenceChange?: (v: string) => void
+  /** Rivning paket B (2026-09-17, rad 2.5/2.6): avdragsväxeln (Inget
+      avdrag/ROT/RUT) satt tidigare bara i den fristående QuoteTotalsSection
+      och skrev direkt på radlistan via applyGlobalDeductionType — flyttad
+      hit så den sitter vid dokumentets summering i stället för i en
+      duplicerad sidopanel. Utelämnad → växeln renderas inte (fakturans
+      canvas skickar den aldrig). */
+  onDeductionTypeChange?: (type: 'rot' | 'rut' | null) => void
 }
 
 /**

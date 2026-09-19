@@ -592,7 +592,7 @@ export function DealModal() {
                         <Link href={selectedDeal.quote_id
                           ? `/dashboard/quotes/${selectedDeal.quote_id}`
                           : selectedDeal.customer_id
-                            ? `/dashboard/quotes/new?customerId=${selectedDeal.customer_id}&deal_id=${selectedDeal.id}`
+                            ? `/dashboard/quotes/new?customer_id=${selectedDeal.customer_id}&deal_id=${selectedDeal.id}`
                             : `/dashboard/quotes/new?deal_id=${selectedDeal.id}`}
                           className="flex items-center gap-1.5 px-3 py-2 rounded-lg border border-[#E2E8F0] text-sm text-primary-700 hover:bg-primary-50 transition-colors">
                           <FileText className="w-4 h-4" /> {selectedDeal.quote_id ? 'Visa offert' : 'Skapa offert'}

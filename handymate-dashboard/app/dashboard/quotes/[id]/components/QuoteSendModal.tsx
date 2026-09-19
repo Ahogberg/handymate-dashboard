@@ -5,12 +5,12 @@ import { useState, type ReactNode } from 'react'
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
   FileText,
   Loader2,
   Mail,
   MessageSquare,
   Send,
-  ShieldCheck,
   XCircle,
 } from 'lucide-react'
 import type { Quote, QuoteIntelligence } from '../types'
@@ -53,6 +53,11 @@ export function QuoteSendModal({
   onSend,
 }: QuoteSendModalProps) {
   const [previewOpen, setPreviewOpen] = useState(false)
+  // RIVNING PAKET D (2026-09-17, rad 3.8): Kopia/BCC/Ämne är sällanfält på
+  // huvudvägen — hopfällda som standard, men öppna direkt om något av dem
+  // redan har ett värde (t.ex. efter att modalen stängts och öppnats igen
+  // med sparat state i page.tsx), så ett ifyllt fält aldrig göms bort tyst.
+  const [moreOpen, setMoreOpen] = useState(() => !!(extraEmails.trim() || bccEmails.trim()))
   if (!show) return null
 
   return (
@@ -100,24 +105,12 @@ export function QuoteSendModal({
             </div>
           )}
 
-          {quoteIntelligenceLoading && (
-            <div className="flex items-center gap-2 rounded-xl border border-teal-100 bg-teal-50 px-3 py-2.5 text-xs font-medium text-teal-800">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden />
-              Business Twin jämför med verifierade efterkalkyler…
-            </div>
-          )}
-
-          {!quoteIntelligenceLoading && quoteIntelligence?.status === 'unavailable' && (
-            <div className="flex items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-xs text-slate-600">
-              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
-              <div>
-                <p className="m-0 font-semibold text-slate-700">Verklighetskontrollen är inte tillgänglig</p>
-                <p className="m-0 mt-0.5">{quoteIntelligence.reason} Offerten har inte ändrats.</p>
-              </div>
-            </div>
-          )}
-
-          {!quoteIntelligenceLoading && quoteIntelligence?.status === 'ready' && quoteIntelligence.analysis && (
+          {/* RIVNING PAKET D (2026-09-17, rad 3.9): laddnings- och
+              otillgänglig-lägena är borttagna helt — tre lägen för en rad.
+              Verklighetskontrollen syns bara när den faktiskt har något att
+              säga (status "ready"); annars är den tyst, ingen spinner och
+              ingen "kunde inte läsa"-rad. */}
+          {quoteIntelligence?.status === 'ready' && quoteIntelligence.analysis && (
             <div className={`rounded-xl border p-4 ${
               quoteIntelligence.show_warning
                 ? 'border-amber-200 bg-amber-50'
@@ -243,39 +236,49 @@ export function QuoteSendModal({
             </div>
           </div>
 
-          {/* Extra mottagare (email) */}
+          {/* RIVNING PAKET D (2026-09-17, rad 3.8): Kopia/BCC/Ämne bakom
+              "Fler mottagare" — sällanfält, inte huvudvägen (Till + Skicka). */}
           {(sendMethod === 'email' || sendMethod === 'both') && (
-            <>
-              <div className="flex items-start gap-3">
-                <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Kopia</span>
-                <input
-                  type="text"
-                  value={extraEmails}
-                  onChange={e => setExtraEmails(e.target.value)}
-                  placeholder="anna@firma.se"
-                  className="flex-1 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50"
-                />
-              </div>
-              <div className="flex items-start gap-3">
-                <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">BCC</span>
-                <input
-                  type="text"
-                  value={bccEmails}
-                  onChange={e => setBccEmails(e.target.value)}
-                  placeholder="chef@firma.se"
-                  className="flex-1 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50"
-                />
-              </div>
-            </>
-          )}
-
-          {/* Ämne (email) */}
-          {(sendMethod === 'email' || sendMethod === 'both') && (
-            <div className="flex items-start gap-3">
-              <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Ämne</span>
-              <p className="flex-1 text-sm text-gray-700 pt-1.5">
-                Offert från {business?.business_name}: {quote.title || 'Offert'}
-              </p>
+            <div>
+              <button
+                type="button"
+                onClick={() => setMoreOpen(o => !o)}
+                aria-expanded={moreOpen}
+                className="flex min-h-[44px] items-center gap-1.5 text-xs font-semibold text-gray-500 hover:text-gray-700"
+              >
+                <ChevronDown className={`w-3.5 h-3.5 transition-transform ${moreOpen ? 'rotate-180' : ''}`} />
+                Fler mottagare
+              </button>
+              {moreOpen && (
+                <div className="mt-2 space-y-3">
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Kopia</span>
+                    <input
+                      type="text"
+                      value={extraEmails}
+                      onChange={e => setExtraEmails(e.target.value)}
+                      placeholder="anna@firma.se"
+                      className="flex-1 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50"
+                    />
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">BCC</span>
+                    <input
+                      type="text"
+                      value={bccEmails}
+                      onChange={e => setBccEmails(e.target.value)}
+                      placeholder="chef@firma.se"
+                      className="flex-1 px-3 py-1.5 text-sm border border-[#E2E8F0] rounded-lg focus:outline-none focus:border-primary-500 bg-gray-50"
+                    />
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <span className="text-xs text-gray-400 w-16 pt-2 text-right flex-shrink-0">Ämne</span>
+                    <p className="flex-1 text-sm text-gray-700 pt-1.5">
+                      Offert från {business?.business_name}: {quote.title || 'Offert'}
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

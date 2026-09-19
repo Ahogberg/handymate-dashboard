@@ -60,6 +60,12 @@ export const COMMERCIAL_FIELDS = [
   // Vad det kostar
   'subtotal', 'total', 'vat_rate', 'vat_amount',
   'labor_total', 'material_total',
+  // Resekostnaden (v252 line split travel). Skrevs av PUT utan att vara låst
+  // — en accepterad offerts reseandel kunde alltså skrivas om i efterhand.
+  // Hittades 2026-09-17 av tests/quote-content-lock.spec.ts, som stod OGATAD
+  // utanför test:contracts och därför fått gå röd obemärkt. Facit är nu i
+  // grinden; ett lås utan grind är ingen spärr.
+  'travel_total',
   'discount_amount', 'discount_percent',
   // Avdragen och vad kunden faktiskt betalar
   'rot_rut_type', 'rot_deduction', 'rot_work_cost', 'rot_customer_pays',
@@ -72,6 +78,10 @@ export const COMMERCIAL_FIELDS = [
   'terms', 'terms_text', 'introduction_text', 'conclusion_text',
   'not_included', 'ata_terms', 'payment_terms_text', 'payment_plan',
   'reservations_snapshot',
+  // Svaren från frågeflödet (2026-09-17): de är UNDERLAGET för mängderna
+  // kunden sa ja till — "6,5 m² klinker, golvvärme ja". Ändras de i
+  // efterhand pekar offertens egen förklaring på något annat än raderna.
+  'intake_answers',
   // Vad kunden ser
   'images', 'attachments', 'template_style',
   'show_quantities', 'show_unit_prices', 'detail_level',

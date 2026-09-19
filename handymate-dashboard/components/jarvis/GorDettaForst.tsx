@@ -24,7 +24,9 @@ import { agentForApproval, approveLabel, typeLabel } from '@/lib/jarvis/approval
  * är fallbacken och en rankning utan NBA-rader hittas ALDRIG på.
  *
  * `principlesApplied` under etiketten "Din regel" — samma etikett som
- * DanielsBedomning.tsx redan använder — Christoffers principer syns
+ * MatteSager.tsx (offertskaparen, tidigare DanielsBedomning.tsx, se
+ * RIVNING PAKET C 2026-09-17 rad 2.17) redan använder — Christoffers
+ * principer syns
  * ALDRIG vid namn, de framstår som ägarens egna (Andreas beslut).
  * Citaten är dagens NBA-rads (delade över kandidaterna, se
  * app/api/next-best-action/route.ts), så de renderas EN gång under

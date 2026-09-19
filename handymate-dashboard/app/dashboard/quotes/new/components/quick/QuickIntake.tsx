@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeft, ArrowRight, Camera, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
+import { ArrowLeft, Camera, Loader2, Mic, PenLine, Square, X } from 'lucide-react'
 import { useAudioRecording } from '@/hooks/useAudioRecording'
 /** Bara det intaget faktiskt behöver. Strukturell typ i stället för en import
     av sidans Customer: det finns tre olika Customer-typer i kodbasen, och den
@@ -32,14 +32,16 @@ interface IntakeCustomer {
  * innan AI:n bygger vidare på det. Att skicka ett orättat transkript direkt
  * till genereringen hade gjort felet dyrare att upptäcka.
  *
- * ═══ VÄGVALET ÄR FÖRSTKLASSIGT (designpasset 2026-08-10, Andreas fynd) ═══
+ * ═══ TVÅ KNAPPAR, EN EDITOR (rivningen A3, 2026-09-17) ═══
  *
- * "Öppna editorn direkt" låg som en grå fotnot under en jättelik inaktiverad
- * knapp — en vägtull med gömd nödutgång för den som kan editorn. Nu ligger
- * den i headerhöjd och mallvalet är en riktig sekundärknapp bredvid Bygg
- * utkast. Standarden förblir beskriv-vägen (den byggdes åt piloten som blev
- * galen på editorns ~33 kontroller); rymningarna är synliga, och D2-vanan
- * ("vill du alltid börja så här?") minns valet efter tredje gången.
+ * Intaget är den enda startskärmen. Det finns två vägar ut: "Bygg utkast"
+ * (Matte bygger ur beskrivningen) och "Bygg själv" (rakt in i dokumentet,
+ * texten följer med som beskrivning). Tidigare fanns fyra: en headerlänk
+ * "Öppna editorn direkt", en mellanskärm som frågade efter titel och kund
+ * innan editorn (som dokumentet ändå frågar efter), och "Använd en mall"
+ * med en mallista — 2 av 39 offerter i produktionen hade en mall, och
+ * mallar nås via jobbtypens upplägg. Fyra knappar som landade på två
+ * ställen är två knappar för mycket.
  */
 
 /** Exempelchips mot tomma-sidan-paralysen. Klick FYLLER rutan — texten är
@@ -66,8 +68,8 @@ interface QuickIntakeProps {
   maxPhotos: number
   onBuild: () => void
   onClose: () => void
-  /** "Öppna fullständiga editorn" — samma offert, andra verktyget. */
-  onOpenFullEditor: () => void
+  /** "Bygg själv" — rakt in i dokumentet, det skrivna följer med. */
+  onBuildYourself: () => void
   building: boolean
   /**
    * true när offerten redan har rader. "Bygg själv" DÖLJS då: en blankstart
@@ -79,14 +81,6 @@ interface QuickIntakeProps {
    * mycket.
    */
   hasContent: boolean
-  /**
-   * En tredje väg in i samma guidade, sektion-för-sektion-upplevelse — bara
-   * utan AI-beskrivningen. Andreas fynd (2026-08-14): steg-för-steg ska vara
-   * standard oavsett starttyp, inte bara AI-vägen. Leder till en egen liten
-   * skärm (kund + titel) i stället för direkt till 'blank', så granskningen
-   * alltid har en titel att visa.
-   */
-  onSkipDescription: () => void
 }
 
 export function QuickIntake({
@@ -102,10 +96,9 @@ export function QuickIntake({
   maxPhotos,
   onBuild,
   onClose,
-  onOpenFullEditor,
+  onBuildYourself,
   building,
   hasContent,
-  onSkipDescription,
 }: QuickIntakeProps) {
   const recording = useAudioRecording()
   const [transcribing, setTranscribing] = useState(false)
@@ -168,7 +161,13 @@ export function QuickIntake({
   const voiceUnavailable = recording.state === 'denied' || recording.state === 'unsupported'
 
   return (
-    <div className="fixed inset-0 bg-slate-50 z-50 overflow-y-auto">
+    // z-[60], inte z-50: Jobbkompisen ligger på z-50 och renderas EFTER
+    // sidinnehållet i dashboardens layout, så vid samma nivå vann bubblan
+    // på DOM-ordning och lade sig över helskärmen — bredvid mikrofonknappen,
+    // så att det såg ut som två mikrofoner (Andreas klickprov 2026-09-18).
+    // 60 är över bubblan och FeedbackWidget (z-40) men under radsheetsen
+    // (z-70) och Toast, som fortfarande ska nå över den här ytan.
+    <div className="fixed inset-0 bg-slate-50 z-[60] overflow-y-auto">
       <div className="max-w-xl mx-auto min-h-screen flex flex-col px-4 py-5 sm:py-8">
         {/* Headerraden: vägen ut åt BÅDA hållen är synlig från början —
             "Tillbaka" lämnar offerten, editorlänken byter verktyg. Ingen av
@@ -181,14 +180,6 @@ export function QuickIntake({
           >
             <ArrowLeft className="w-4 h-4" />
             Tillbaka
-          </button>
-          <button
-            type="button"
-            onClick={onOpenFullEditor}
-            className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-primary-700 px-2 py-2 transition-colors"
-          >
-            Öppna editorn direkt
-            <ArrowRight className="w-4 h-4" />
           </button>
         </div>
 
@@ -363,7 +354,7 @@ export function QuickIntake({
             {!hasContent && (
               <button
                 type="button"
-                onClick={onSkipDescription}
+                onClick={onBuildYourself}
                 className="sm:w-auto inline-flex items-center justify-center gap-2 px-5 py-4 bg-white border-2 border-slate-200 hover:border-primary-700 rounded-2xl text-base font-semibold text-slate-700 hover:text-primary-700 transition-colors"
               >
                 <PenLine className="w-4 h-4" />

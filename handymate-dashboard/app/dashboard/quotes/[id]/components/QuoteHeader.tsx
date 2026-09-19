@@ -4,6 +4,7 @@ import { useState } from 'react'
 import {
   ArrowLeft,
   Bookmark,
+  CheckCircle,
   ChevronDown,
   Copy,
   Download,
@@ -40,6 +41,11 @@ interface QuoteHeaderProps {
   onCreateInvoice: () => void
   onDuplicate: () => void
   onSaveTemplate: () => void
+  /** RIVNING PAKET D (2026-09-17, rad 3.3): flyttad hit från listans
+   *  radknapp ("Acceptera", app/dashboard/quotes/page.tsx). Samma
+   *  /api/quotes/accept-anrop som förut — bara UI:t är flyttat. */
+  onMarkAccepted: () => void
+  markingAccepted: boolean
   /** Öppnar page.tsx:s namn-modal — ETAPP 4, punkt 4: ingen window.prompt(). */
   onRequestNewVersion: () => void
   /** Öppnar page.tsx:s bekräftelsemodal — ETAPP 4, punkt 4: ingen window.confirm(). */
@@ -71,7 +77,7 @@ const MENU_ITEM_DANGER =
  *  - SEKUNDÄR: Redigera + en "Dokument"-dropdown (Visa i ny flik/Visa
  *    kundvy/Ladda ner PDF — tre knappar med samma Eye/Download-ikoner slås
  *    ihop till en meny).
- *  - "…"-OVERFLOW: Duplicera, Ny version, Spara mall, Skapa faktura (bara
+ *  - "…"-OVERFLOW: Duplicera, Ny version, Spara som upplägg, Skapa faktura (bara
  *    accepted — flyttad hit eftersom planen bara namnger EN primärknapp för
  *    accepted-status), Ta bort (bara draft).
  *  - Signeringslänken finns INTE här längre (punkt 6): QuoteSignatureCard
@@ -98,6 +104,8 @@ export function QuoteHeader({
   onSaveTemplate,
   onRequestNewVersion,
   onRequestDelete,
+  onMarkAccepted,
+  markingAccepted,
 }: QuoteHeaderProps) {
   const router = useRouter()
   const [docMenuOpen, setDocMenuOpen] = useState(false)
@@ -192,6 +200,16 @@ export function QuoteHeader({
             Skicka påminnelse
           </button>
         )}
+        {/* RIVNING PAKET D (2026-09-17, rad 3.3): "Acceptera" per rad i
+            listan flyttad hit — enda stället en offert med vunnen/förlorad-
+            beslut kan markeras manuellt fanns i listan, inte på detaljsidan
+            om den faktiska offerten. */}
+        {['sent', 'opened'].includes(quote.status) && (
+          <button onClick={onMarkAccepted} disabled={markingAccepted} className={GHOST_BTN}>
+            <CheckCircle className="w-4 h-4" />
+            {markingAccepted ? 'Markerar…' : 'Markera som accepterad'}
+          </button>
+        )}
         {quote.status === 'accepted' && quote.linked_project && (
           <Link href={`/dashboard/projects/${quote.linked_project.project_id}`} className={PRIMARY_BTN}>
             <FolderKanban className="w-4 h-4" />
@@ -279,7 +297,7 @@ export function QuoteHeader({
               </button>
               <button onClick={() => { setMoreMenuOpen(false); onSaveTemplate() }} className={MENU_ITEM}>
                 <Bookmark className="w-4 h-4 text-slate-400" />
-                Spara mall
+                Spara som upplägg
               </button>
               {quote.status === 'accepted' && (
                 <button onClick={() => { setMoreMenuOpen(false); onCreateInvoice() }} disabled={creatingInvoice} className={MENU_ITEM}>

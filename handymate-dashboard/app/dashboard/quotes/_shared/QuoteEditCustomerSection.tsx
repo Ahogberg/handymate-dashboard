@@ -1,6 +1,7 @@
 'use client'
 
 import { User } from 'lucide-react'
+import AddressAutocomplete from '@/components/AddressAutocomplete'
 
 interface Customer {
   customer_id: string
@@ -22,6 +23,15 @@ interface QuoteEditCustomerSectionProps {
   setTitle: (s: string) => void
   description: string
   setDescription: (s: string) => void
+  /** Rivning paket B (2026-09-17, rad 2.3): flyttade hit från den
+      borttagna QuoteStandardTextsSection ("Mer → Villkor & texter") — hör
+      hemma vid kundvalet, inte i en separat textpanel. */
+  referencePerson: string
+  setReferencePerson: (v: string) => void
+  customerReference: string
+  setCustomerReference: (v: string) => void
+  projectAddress: string
+  setProjectAddress: (v: string) => void
 }
 
 export function QuoteEditCustomerSection({
@@ -34,6 +44,12 @@ export function QuoteEditCustomerSection({
   setTitle,
   description,
   setDescription,
+  referencePerson,
+  setReferencePerson,
+  customerReference,
+  setCustomerReference,
+  projectAddress,
+  setProjectAddress,
 }: QuoteEditCustomerSectionProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6">
@@ -102,6 +118,41 @@ export function QuoteEditCustomerSection({
             rows={2}
             className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors resize-y leading-relaxed"
           />
+        </div>
+
+        {/* Rivning paket B (2026-09-17, rad 2.3): referens/adress, flyttade
+            hit från den borttagna "Mer → Villkor & texter"-panelen. */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 border-t border-slate-100 pt-4">
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Er referens</label>
+            <input
+              type="text"
+              value={referencePerson}
+              onChange={e => setReferencePerson(e.target.value)}
+              placeholder="Namn"
+              className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Kundens referens</label>
+            <input
+              type="text"
+              value={customerReference}
+              onChange={e => setCustomerReference(e.target.value)}
+              placeholder="Referensnummer"
+              className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold uppercase tracking-wider text-slate-500 mb-1.5">Arbetsplatsadress</label>
+            <AddressAutocomplete
+              value={projectAddress}
+              onChange={setProjectAddress}
+              onSelect={r => setProjectAddress(r.full_address)}
+              placeholder="Sök adress…"
+              className="w-full px-3 py-2.5 text-sm bg-white border border-slate-200 rounded-xl text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-primary-700 focus:ring-2 focus:ring-primary-100 transition-colors"
+            />
+          </div>
         </div>
       </div>
     </div>
