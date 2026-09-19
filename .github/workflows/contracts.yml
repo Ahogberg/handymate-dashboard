@@ -292,6 +292,7 @@ jobs:
           tests/facit-force-dynamic.spec.ts
           tests/facit-helskarm-over-bubblan.spec.ts
           tests/facit-kom-ikapp.spec.ts
+          tests/auto-faktura-avdragsvakt.spec.ts
           --no-deps
           --project=chromium
           --reporter=line

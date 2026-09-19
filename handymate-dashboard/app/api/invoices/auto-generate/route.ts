@@ -5,6 +5,7 @@ import { getServerSupabase } from '@/lib/supabase'
 import { createInvoice } from '@/lib/invoices/create-invoice'
 import { rapporteraTystFel } from '@/lib/observability/driftlarm'
 import { loadBranding, brandingFromConfig } from '@/lib/branding/get-branding'
+import { avdragsvaktSkal, kunderMedAvdragshistorik } from '@/lib/invoices/auto-invoice-avdragsvakt'
 
 /**
  * POST - Auto-generera fakturor från ofakturerade tidrapporter.
@@ -150,12 +151,60 @@ async function generateInvoicesForBusiness(params: {
     }
   }
 
+  // AVDRAGSVAKTEN (spår 5, 2026-09-18). Rutten satte tidigare
+  // customerPays = total utan ROT/RUT — en ROT-kund fick en auto-faktura på
+  // fullt belopp och fick inte sitt årsutrymme förbrukat.
+  //
+  // Avdraget kan inte räknas HÄR: customer har noll ROT-kolumner, och
+  // auto-fakturan har varken offert eller projekt att läsa rot_rut_type,
+  // personnummer eller fastighetsbeteckning ur. Därför hoppas kunder med
+  // avdragshistorik över, precis som tidposter utan timpris utesluts i
+  // stället för att få ett gissat pris. Se lib/invoices/auto-invoice-avdragsvakt.ts.
+  const avdragskunder = new Set<string>()
+  if (customerIds.length > 0) {
+    const [offerter, fakturor] = await Promise.all([
+      supabase.from('quotes').select('customer_id, rot_rut_type')
+        .eq('business_id', params.businessId).in('customer_id', customerIds)
+        .not('rot_rut_type', 'is', null),
+      supabase.from('invoice').select('customer_id, rot_rut_type')
+        .eq('business_id', params.businessId).in('customer_id', customerIds)
+        .not('rot_rut_type', 'is', null),
+    ])
+    // En misslyckad läsning får INTE tolkas som "ingen har avdrag" — då
+    // hade vakten fallit öppen och skickat just den faktura den finns för
+    // att stoppa. Hela körningen avbryts i stället.
+    if (offerter.error || fakturor.error) {
+      const fel = offerter.error?.message || fakturor.error?.message || 'okänt fel'
+      await rapporteraTystFel(
+        supabase,
+        params.businessId,
+        'invoices/auto-generate:avdragshistorik_olasbar',
+        `Kunde inte kontrollera vilka kunder som har ROT/RUT-avdrag (${fel}). Ingen auto-faktura skapades — annars hade avdraget kunnat saknas.`,
+        { customer_count: customerIds.length },
+      )
+      return {
+        ...result,
+        success: false,
+        errors: ['Kunde inte kontrollera ROT/RUT-historiken. Inga fakturor skapades.'],
+      }
+    }
+    kunderMedAvdragshistorik([...(offerter.data || []), ...(fakturor.data || [])])
+      .forEach(kund => avdragskunder.add(kund))
+  }
+
   // Generate invoice per customer
   for (const customerId of Object.keys(byCustomer)) {
     const entries = byCustomer[customerId]
     try {
       const customer = customerMap[customerId]
       const customerName = customer?.name || 'Okänd kund'
+
+      // Vakten först, före radbyggnaden: kunden ska inte ens få en faktura
+      // beräknad om avdraget ändå skulle saknas i den.
+      if (avdragskunder.has(customerId)) {
+        result.skipped.push({ customer_name: customerName, reason: avdragsvaktSkal() })
+        continue
+      }
 
       // Build invoice items from time entries. Etapp T — KVITTOPRINCIPEN:
       // aldrig ett hårdkodat 500 på en RIKTIG faktura — det är den värsta
