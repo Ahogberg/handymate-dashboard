@@ -34,4 +34,5 @@ jobs:
           path: |
             handymate-dashboard/docs/ui/fragefloedet-375-*.png
             handymate-dashboard/docs/ui/kom-ikapp-375.png
+            handymate-dashboard/docs/ui/startskarm-375*.png
             handymate-dashboard/test-results/
