@@ -1,6 +1,7 @@
 ﻿'use client'
 
 import Link from 'next/link'
+import { AutoInvoiceButton } from '@/components/settings/AutoInvoiceButton'
 import { ChevronRight, FileText, TrendingUp } from 'lucide-react'
 import { Fragment, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
@@ -175,66 +176,6 @@ const SERVICE_SUGGESTIONS = [
   'Målning', 'Tapetsering', 'Snickeri', 'Golvläggning',
   'Låsbyte', 'Inbrottsskydd', 'Städning', 'Fönsterputs'
 ]
-
-function AutoInvoiceButton({ businessId, autoSend, maxAmount }: { businessId: string; autoSend: boolean; maxAmount: number }) {
-  const [running, setRunning] = useState(false)
-  const [result, setResult] = useState<{ invoices_created: number; invoices: { customer_name: string; total: number }[]; errors: string[] } | null>(null)
-
-  async function runAutoGenerate() {
-    setRunning(true)
-    setResult(null)
-    try {
-      const res = await fetch('/api/invoices/auto-generate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ auto_send: autoSend, max_amount: maxAmount }),
-      })
-      const data = await res.json()
-      setResult(data)
-    } catch {
-      setResult({ invoices_created: 0, invoices: [], errors: ['Nätverksfel'] })
-    } finally {
-      setRunning(false)
-    }
-  }
-
-  return (
-    <div>
-      <button
-        onClick={runAutoGenerate}
-        disabled={running}
-        className="px-5 py-2.5 bg-gradient-to-r from-emerald-500 to-primary-600 text-white rounded-xl text-sm font-semibold hover:shadow-lg transition-all disabled:opacity-50 flex items-center gap-2"
-      >
-        {running ? <Loader2 className="w-4 h-4 animate-spin" /> : <Receipt className="w-4 h-4" />}
-        {running ? 'Genererar...' : 'Generera fakturor nu'}
-      </button>
-
-      {result && (
-        <div className="mt-3 p-3 bg-gray-50 rounded-xl text-sm">
-          {result.invoices_created > 0 ? (
-            <>
-              <p className="font-medium text-emerald-700">
-                {result.invoices_created} faktura{result.invoices_created > 1 ? 'or' : ''} skapad{result.invoices_created > 1 ? 'e' : ''}
-              </p>
-              <ul className="mt-1 space-y-0.5 text-gray-600">
-                {result.invoices.map((inv, i) => (
-                  <li key={i}>{inv.customer_name}: {inv.total.toLocaleString('sv-SE')} kr</li>
-                ))}
-              </ul>
-            </>
-          ) : (
-            <p className="text-gray-500">Inga fakturor att skapa (inga ofakturerade tidrapporter)</p>
-          )}
-          {result.errors.length > 0 && (
-            <div className="mt-2 text-red-600">
-              {result.errors.map((err, i) => <p key={i}>{err}</p>)}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
 
 function SMSUsageWidget({ businessId, plan }: { businessId: string; plan: string }) {
   const [usage, setUsage] = useState({ sent: 0, delivered: 0, failed: 0 })
